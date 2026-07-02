@@ -12,11 +12,15 @@ publish.workspace = true
 agentloop-contracts = { workspace = true }
 agentloop-core = { workspace = true }
 async-trait = { workspace = true }
+http = { workspace = true }
+rmcp = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
 tokio-util = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

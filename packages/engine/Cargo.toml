@@ -85,6 +85,12 @@ insta = { version = "1", features = ["json", "redactions"] }
 pretty_assertions = "1"
 tempfile = "3"
 wiremock = "0.6"
+rmcp = { version = "2.1.0", default-features = false, features = [
+    "client",
+    "transport-child-process",
+    "transport-streamable-http-client-reqwest",
+] }
+http = "1"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -1502,6 +1502,11 @@
       "description": "A structured question the agent asks the user (`AskUserQuestion` tool).",
       "type": "object",
       "properties": {
+        "allow_custom": {
+          "description": "When true the user may type a free-text answer instead of picking options.",
+          "type": "boolean",
+          "default": true
+        },
         "header": {
           "description": "Short chip/tag label (e.g. \"Auth method\").",
           "type": "string"

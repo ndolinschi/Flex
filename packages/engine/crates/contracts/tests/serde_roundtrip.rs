@@ -74,6 +74,7 @@ fn all_variants() -> Vec<AgentEvent> {
                     description: Some("append-only file".to_owned()),
                 }],
                 multi_select: false,
+                allow_custom: true,
             }],
         },
         AgentEvent::QuestionResolved {

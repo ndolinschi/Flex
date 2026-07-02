@@ -46,7 +46,8 @@ impl Tool for AskQuestionTool {
             description: "Ask the user one or more structured questions and wait for answers. \
                           Use only when progress depends on information the model cannot infer. \
                           Each question should have a short `header`, clear `question`, optional \
-                          `options`, and `multi_select` when multiple options may be selected. \
+                          `options`, `multi_select` when multiple options may be selected, and \
+                          `allow_custom` (default true) when a typed answer is acceptable. \
                           The tool returns the user's answers and records request/resolution \
                           events."
                 .to_owned(),

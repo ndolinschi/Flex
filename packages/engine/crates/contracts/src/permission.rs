@@ -125,6 +125,10 @@ pub struct QuestionOption {
     pub description: Option<String>,
 }
 
+const fn default_allow_custom() -> bool {
+    true
+}
+
 /// A structured question the agent asks the user (`AskUserQuestion` tool).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Question {
@@ -135,6 +139,9 @@ pub struct Question {
     pub options: Vec<QuestionOption>,
     #[serde(default)]
     pub multi_select: bool,
+    /// When true the user may type a free-text answer instead of picking options.
+    #[serde(default = "default_allow_custom")]
+    pub allow_custom: bool,
 }
 
 /// The user's answer to one [`Question`].

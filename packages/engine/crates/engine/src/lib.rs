@@ -18,6 +18,7 @@ use agentloop_core::{
     Agent, AgentError, EventStream, ProviderError, ProviderRegistry, SessionStore, StoreError,
 };
 use agentloop_loop::NativeAgentBuilder;
+use agentloop_mcp::{McpBridgeConfig, McpBridgeError, McpManager};
 use agentloop_prompts::{
     CommandDiscoveryConfig, CommandError, CommandRegistry, PromptError, SystemPromptAssembler,
     SystemPromptConfig, Vars,
@@ -51,7 +52,7 @@ pub struct CustomProviderSpec {
     pub thinking: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct EngineOptions {
     pub provider: Option<String>,
     pub model: Option<String>,
@@ -60,6 +61,10 @@ pub struct EngineOptions {
     /// Client-configured OpenAI-compatible providers, registered after the
     /// built-ins in vec order.
     pub custom: Vec<CustomProviderSpec>,
+    /// MCP servers bridged into the native tool registry.
+    pub mcp: McpBridgeConfig,
+    /// Pre-built MCP manager; when set, the engine reuses it instead of creating a new one.
+    pub mcp_manager: Option<std::sync::Arc<McpManager>>,
 }
 
 impl Default for EngineOptions {
@@ -70,6 +75,8 @@ impl Default for EngineOptions {
             cwd: PathBuf::from("."),
             date: String::new(),
             custom: Vec::new(),
+            mcp: McpBridgeConfig::default(),
+            mcp_manager: None,
         }
     }
 }
@@ -87,6 +94,8 @@ pub enum EngineServiceError {
     Prompt(#[from] PromptError),
     #[error(transparent)]
     Command(#[from] CommandError),
+    #[error(transparent)]
+    Mcp(#[from] McpBridgeError),
     #[error(
         "provider `{0}` is not available in this build; supported runtime providers: `openai`, `anthropic`, `gemini`, `ollama`, or a provider configured in the client's config"
     )]
@@ -105,6 +114,7 @@ impl EngineServiceError {
             Self::Store(err) => EngineError::engine(ErrorCode::Unknown, err.to_string()),
             Self::Prompt(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
             Self::Command(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
+            Self::Mcp(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
             Self::UnsupportedProvider(_)
             | Self::CustomProviderConflict(_)
             | Self::CustomProviderInvalid { .. } => {
@@ -180,7 +190,7 @@ impl EngineService {
     fn build_native(
         providers: ProviderRegistry,
         default_model: ModelRef,
-        options: EngineOptions,
+        mut options: EngineOptions,
     ) -> EngineResult<Self> {
         let BaseTools {
             registry: tools,
@@ -197,15 +207,26 @@ impl EngineService {
             project_dir: Some(options.cwd.join(".agent").join("commands")),
         })?;
 
+        let mcp_manager = match options.mcp_manager.take() {
+            Some(manager) => Some(manager),
+            None if options.mcp.servers.is_empty() => None,
+            None => Some(Arc::new(McpManager::from_config_blocking_default(
+                options.mcp.clone(),
+            )?)),
+        };
+
         let store: Arc<dyn SessionStore> = Arc::new(MemoryStore::new());
-        let agent = NativeAgentBuilder::new(store.clone())
+        let mut builder = NativeAgentBuilder::new(store.clone())
             .providers(providers.clone())
             .tools(tools)
             .questions(pending_questions)
             .system_prompt(system_prompt)
             .commands(commands.infos())
-            .default_model(default_model)
-            .build();
+            .default_model(default_model);
+        if let Some(manager) = mcp_manager {
+            builder = builder.mcp(manager);
+        }
+        let agent = builder.build();
         let mut service = Self::with_commands(agent, store, commands);
         service.providers = providers;
         Ok(service)

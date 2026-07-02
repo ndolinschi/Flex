@@ -112,6 +112,9 @@ pub trait McpToolClient: Send + Sync {
         call: McpToolCall,
         cancel: CancellationToken,
     ) -> Result<ToolOutput, McpBridgeError>;
+
+    /// Close live server connections. Default is a no-op for mock clients.
+    async fn shutdown(&self) {}
 }
 
 pub fn bridge_tool_name(
@@ -201,8 +204,22 @@ pub enum McpBridgeError {
     EmptyToolName { server: String },
     #[error("duplicate bridged MCP tool name `{name}`")]
     DuplicateBridgeToolName { name: String },
-    #[error("MCP bridge runtime is not implemented yet: {hint}")]
-    NotImplemented { hint: String },
+    #[error("MCP connection to `{server}` failed: {message}")]
+    Connection { server: String, message: String },
+    #[error("MCP transport error for `{server}`: {message}")]
+    Transport { server: String, message: String },
+    #[error("MCP tool call failed: {0}")]
+    ToolCall(String),
+    #[error("invalid HTTP header `{name}` for MCP server `{server}`: {message}")]
+    InvalidHeader {
+        server: String,
+        name: String,
+        message: String,
+    },
+    #[error("MCP operation cancelled")]
+    Cancelled,
+    #[error("bridged MCP tool `{name}` is not registered")]
+    UnknownBridgedTool { name: String },
 }
 
 #[cfg(test)]

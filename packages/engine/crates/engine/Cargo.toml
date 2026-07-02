@@ -12,6 +12,7 @@ publish.workspace = true
 agentloop-contracts = { workspace = true }
 agentloop-core = { workspace = true }
 agentloop-loop = { workspace = true }
+agentloop-mcp = { workspace = true }
 agentloop-provider-anthropic = { workspace = true }
 agentloop-provider-copilot = { workspace = true }
 agentloop-provider-gemini = { workspace = true }

@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use agentloop_contracts::{Answer, CommandInfo, ModelRef, PermissionMode, QuestionId};
 use agentloop_core::{Hook, PendingMap, ProviderRegistry, SessionStore, ToolRegistry};
+use agentloop_mcp::McpManager;
 
 use crate::agent::NativeAgent;
 use crate::deps::TurnDeps;
@@ -44,6 +45,7 @@ pub struct NativeAgentBuilder {
     default_model: Option<ModelRef>,
     command_infos: Vec<CommandInfo>,
     pending_questions: Arc<PendingMap<QuestionId, Vec<Answer>>>,
+    mcp: Option<std::sync::Arc<McpManager>>,
 }
 
 impl NativeAgentBuilder {
@@ -59,6 +61,7 @@ impl NativeAgentBuilder {
             default_model: None,
             command_infos: Vec::new(),
             pending_questions: Arc::new(PendingMap::new()),
+            mcp: None,
         }
     }
 
@@ -109,12 +112,22 @@ impl NativeAgentBuilder {
         self
     }
 
+    /// Register bridged MCP tools from a loaded manager after base tools.
+    pub fn mcp(mut self, manager: std::sync::Arc<McpManager>) -> Self {
+        self.mcp = Some(manager);
+        self
+    }
+
     pub fn build(self) -> Arc<NativeAgent> {
+        let mut tools = self.tools;
+        if let Some(manager) = &self.mcp {
+            manager.register_tools(&mut tools);
+        }
         Arc::new(NativeAgent {
             deps: Arc::new(TurnDeps {
                 agent_id: "native".to_owned(),
                 providers: self.providers,
-                tools: self.tools,
+                tools,
                 store: self.store,
                 hooks: self.hooks,
                 policy: self.policy,
