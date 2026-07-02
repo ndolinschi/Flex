@@ -9,6 +9,13 @@
       "type": "object",
       "additionalProperties": true
     },
+    "fallback_models": {
+      "description": "Models to fall back to (in order) when the effective model's provider\nfails mid-turn (rate limit, outage). The conversation continues on the\nnext chain entry; partial output from the failed attempt is discarded.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ModelRef"
+      }
+    },
     "model": {
       "anyOf": [
         {

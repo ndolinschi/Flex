@@ -154,6 +154,15 @@ pub enum AgentEvent {
     CompactionBoundary {
         summary: CompactionSummary,
     },
+    /// The turn's model was switched mid-work (provider failure, rate limit).
+    ModelFallback {
+        from: crate::capability::ModelRef,
+        /// The next model being tried; `None` = the chain is exhausted and
+        /// the turn is about to fail.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to: Option<crate::capability::ModelRef>,
+        reason: EngineError,
+    },
     HookFired {
         point: HookPoint,
         outcome: HookOutcomeKind,
@@ -228,6 +237,7 @@ impl AgentEvent {
             Self::QuestionResolved { .. } => "question_resolved",
             Self::CommandExpanded { .. } => "command_expanded",
             Self::CompactionBoundary { .. } => "compaction_boundary",
+            Self::ModelFallback { .. } => "model_fallback",
             Self::HookFired { .. } => "hook_fired",
             Self::SubagentStarted { .. } => "subagent_started",
             Self::SubagentEvent { .. } => "subagent_event",

@@ -473,3 +473,97 @@ async fn thinking_option_is_dropped_for_non_thinking_providers() {
     let requests = provider.requests();
     assert_eq!(requests[0].thinking, None);
 }
+
+#[tokio::test]
+async fn provider_failure_falls_back_to_next_chain_model() {
+    use agentloop_testkit::ScriptedError;
+
+    let failing = Arc::new(MockProvider::with_id("mock-a"));
+    failing.push_turn(Err(ScriptedError::RateLimited {
+        retry_after_ms: Some(1_000),
+    }));
+    let healthy = Arc::new(MockProvider::with_id("mock-b"));
+    healthy.push_turn(MockProvider::text_turn("rescued"));
+
+    let store = Arc::new(MemoryStore::new());
+    let mut providers = ProviderRegistry::new();
+    providers.register(failing.clone());
+    providers.register(healthy.clone());
+    let agent = NativeAgentBuilder::new(store.clone())
+        .providers(providers)
+        .system_prompt("You are a test agent.")
+        .default_model(ModelRef::from("mock-a/model-one"))
+        .build();
+
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+    let opts = TurnOptions {
+        fallback_models: vec![ModelRef::from("mock-b/model-two")],
+        ..TurnOptions::default()
+    };
+    let summary = agent
+        .prompt(&session, PromptInput::text("hello"), opts)
+        .await
+        .expect("turn survives the failing provider");
+
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+    assert_eq!(healthy.requests().len(), 1, "fallback model served");
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    assert!(
+        events.iter().any(|(_, event)| matches!(
+            event,
+            AgentEvent::ModelFallback { from, to: Some(to), .. }
+                if from.0 == "mock-a/model-one" && to.0 == "mock-b/model-two"
+        )),
+        "fallback event is persisted"
+    );
+    assert!(
+        events.iter().any(|(_, event)| matches!(
+            event,
+            AgentEvent::AssistantMessage { content, .. }
+                if content.iter().any(|block| matches!(
+                    block,
+                    agentloop_contracts::ContentBlock::Markdown { text } if text == "rescued"
+                ))
+        )),
+        "the healthy provider's answer materializes"
+    );
+}
+
+#[tokio::test]
+async fn exhausted_chain_surfaces_the_error() {
+    use agentloop_testkit::ScriptedError;
+
+    let failing = Arc::new(MockProvider::with_id("mock-a"));
+    failing.push_turn(Err(ScriptedError::RateLimited {
+        retry_after_ms: None,
+    }));
+    let store = Arc::new(MemoryStore::new());
+    let mut providers = ProviderRegistry::new();
+    providers.register(failing);
+    let agent = NativeAgentBuilder::new(store.clone())
+        .providers(providers)
+        .system_prompt("You are a test agent.")
+        .default_model(ModelRef::from("mock-a/model-one"))
+        .build();
+
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+    let result = agent
+        .prompt(&session, PromptInput::text("hello"), TurnOptions::default())
+        .await;
+    assert!(result.is_err(), "no chain configured: the error surfaces");
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    assert!(
+        events
+            .iter()
+            .any(|(_, event)| matches!(event, AgentEvent::ModelFallback { to: None, .. })),
+        "exhaustion is recorded with to: None"
+    );
+}

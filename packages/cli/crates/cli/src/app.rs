@@ -197,6 +197,8 @@ pub struct App {
     /// Prompts submitted while a turn was running; sent in order after each
     /// turn completes. Cleared when the user interrupts.
     pub queued_prompts: std::collections::VecDeque<String>,
+    /// Fallback model chain sent with every turn (from config.json).
+    pub fallback_models: Vec<ModelRef>,
     dirty: bool,
 }
 
@@ -240,6 +242,7 @@ impl App {
             mcp_store: McpStore::load(),
             mcp_enabled: bootstrap.mcp_enabled,
             queued_prompts: std::collections::VecDeque::new(),
+            fallback_models: Vec::new(),
             dirty: true,
         };
         app.chat
@@ -285,6 +288,11 @@ impl App {
             self.show_thinking = visible;
         }
         self.thinking_budget = prefs.thinking_budget;
+        self.fallback_models = prefs
+            .fallback_models
+            .iter()
+            .map(|model| ModelRef(model.clone()))
+            .collect();
     }
 
     /// Show a transient notification above the input (never in transcript).
@@ -2193,6 +2201,7 @@ impl App {
     fn turn_options(&self) -> TurnOptions {
         TurnOptions {
             model: self.session.model.clone(),
+            fallback_models: self.fallback_models.clone(),
             permission_mode: Some(self.session.effective_permission_mode()),
             thinking: thinking_config_from_prefs(self.thinking_budget, &self.caps),
             ..TurnOptions::default()

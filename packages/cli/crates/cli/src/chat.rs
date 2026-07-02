@@ -480,6 +480,16 @@ impl ChatState {
                 };
                 self.push_info(text);
             }
+            AgentEvent::ModelFallback { from, to, reason } => match to {
+                Some(to) => self.push_info(format!(
+                    "\u{21bb} model fallback: {from} \u{2192} {to} ({})",
+                    reason.message
+                )),
+                None => self.push_human_error(
+                    format!("all fallback models exhausted after {from}"),
+                    Some(reason.message.clone()),
+                ),
+            },
             AgentEvent::CompactionBoundary { summary } => {
                 let savings = match (summary.tokens_before, summary.tokens_after) {
                     (Some(before), Some(after)) if before > after => {

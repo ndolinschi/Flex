@@ -582,6 +582,38 @@
           ]
         },
         {
+          "description": "The turn's model was switched mid-work (provider failure, rate limit).",
+          "type": "object",
+          "properties": {
+            "from": {
+              "$ref": "#/$defs/ModelRef"
+            },
+            "kind": {
+              "type": "string",
+              "const": "model_fallback"
+            },
+            "reason": {
+              "$ref": "#/$defs/EngineError"
+            },
+            "to": {
+              "description": "The next model being tried; `None` = the chain is exhausted and\nthe turn is about to fail.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ModelRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "from",
+            "reason"
+          ]
+        },
+        {
           "type": "object",
           "properties": {
             "kind": {

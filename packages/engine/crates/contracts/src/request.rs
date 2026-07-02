@@ -63,6 +63,11 @@ pub struct ThinkingConfig {
 pub struct TurnOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<ModelRef>,
+    /// Models to fall back to (in order) when the effective model's provider
+    /// fails mid-turn (rate limit, outage). The conversation continues on the
+    /// next chain entry; partial output from the failed attempt is discarded.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fallback_models: Vec<ModelRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permission_mode: Option<PermissionMode>,
     /// Extra system-prompt text appended for this turn only.

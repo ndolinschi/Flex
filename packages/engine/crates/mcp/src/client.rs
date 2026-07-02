@@ -183,32 +183,6 @@ impl McpToolClient for RmcpToolClient {
     }
 }
 
-// #region agent log
-fn agent_debug_log(hypothesis_id: &str, location: &str, message: &str, data: serde_json::Value) {
-    use std::io::Write;
-    if let Ok(mut file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("/Users/ndolinschi/Documents/Apps/AgenticStudio/.cursor/debug-79ecfd.log")
-    {
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|duration| duration.as_millis())
-            .unwrap_or(0);
-        let payload = serde_json::json!({
-            "sessionId": "79ecfd",
-            "timestamp": timestamp,
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "runId": "pre-fix",
-        });
-        let _ = writeln!(file, "{payload}");
-    }
-}
-// #endregion
-
 async fn connect_server(
     server: &McpServerConfig,
     cancel: CancellationToken,
@@ -218,18 +192,6 @@ async fn connect_server(
 
     let result = match &server.transport {
         McpServerTransport::Stdio(config) => {
-            // #region agent log
-            agent_debug_log(
-                "A",
-                "client.rs:connect_server",
-                "spawning stdio MCP server",
-                serde_json::json!({
-                    "server": server.name,
-                    "command": config.command,
-                    "args": config.args,
-                }),
-            );
-            // #endregion
             let command = tokio::process::Command::new(&config.command).configure(|cmd| {
                 cmd.args(&config.args);
                 for (key, value) in &config.env {
@@ -258,35 +220,12 @@ async fn connect_server(
     };
 
     match result {
-        Ok(service) => {
-            // #region agent log
-            agent_debug_log(
-                "D",
-                "client.rs:connect_server",
-                "MCP server connected",
-                serde_json::json!({ "server": server.name }),
-            );
-            // #endregion
-            Ok(service)
-        }
+        Ok(service) => Ok(service),
         Err(ClientInitializeError::Cancelled) => Err(McpBridgeError::Cancelled),
-        Err(err) => {
-            // #region agent log
-            agent_debug_log(
-                "A",
-                "client.rs:connect_server",
-                "MCP server connect failed",
-                serde_json::json!({
-                    "server": server.name,
-                    "error": err.to_string(),
-                }),
-            );
-            // #endregion
-            Err(McpBridgeError::Connection {
-                server: server.name.clone(),
-                message: err.to_string(),
-            })
-        }
+        Err(err) => Err(McpBridgeError::Connection {
+            server: server.name.clone(),
+            message: err.to_string(),
+        }),
     }
 }
 

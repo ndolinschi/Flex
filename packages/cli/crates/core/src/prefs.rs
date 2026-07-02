@@ -31,6 +31,10 @@ pub struct CliPrefs {
     /// Custom OpenAI-compatible providers keyed by provider id.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub providers: BTreeMap<String, ProviderConfig>,
+    /// Models to fall back to (in order) when the active model's provider
+    /// fails mid-turn (`provider/model` refs).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fallback_models: Vec<String>,
     /// Forward-compat catch-all: preserves keys this build doesn't know
     /// across load-mutate-save cycles.
     #[serde(flatten)]
