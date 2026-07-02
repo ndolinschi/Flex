@@ -12,6 +12,8 @@ use crate::permission::PermissionPolicy;
 /// Immutable (or internally synchronized) dependencies shared by every turn
 /// of a [`crate::NativeAgent`].
 pub(crate) struct TurnDeps {
+    /// Spawned tool execution: bounded, panic-isolated (see [`crate::pool`]).
+    pub(crate) pool: Arc<crate::pool::ToolWorkerPool>,
     pub(crate) agent_id: String,
     pub(crate) providers: ProviderRegistry,
     pub(crate) tools: ToolRegistry,

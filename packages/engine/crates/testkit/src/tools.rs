@@ -140,6 +140,31 @@ impl Tool for SlowTool {
     }
 }
 
+/// A tool that always panics — exercises the loop's panic containment.
+pub struct PanickingTool;
+
+#[async_trait]
+impl Tool for PanickingTool {
+    fn descriptor(&self) -> ToolDescriptor {
+        ToolDescriptor {
+            name: "panicking".to_owned(),
+            description: "Always panics. Test double for panic isolation.".to_owned(),
+            input_schema: schema_of::<EchoInput>(),
+            read_only: true,
+            category: ToolCategory::Other,
+            needs_permission: PermissionHint::Never,
+        }
+    }
+
+    async fn run(
+        &self,
+        _ctx: ToolContext,
+        _input: serde_json::Value,
+    ) -> Result<ToolOutput, ToolError> {
+        panic!("intentional test panic");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

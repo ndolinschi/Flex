@@ -18,6 +18,7 @@ mod draft;
 mod manager;
 mod messages;
 mod permission;
+mod pool;
 mod rules;
 mod session_handle;
 mod tool_results;

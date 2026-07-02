@@ -567,3 +567,84 @@ async fn exhausted_chain_surfaces_the_error() {
         "exhaustion is recorded with to: None"
     );
 }
+
+#[tokio::test]
+async fn panic_in_tool_fails_call_not_turn() {
+    use agentloop_testkit::PanickingTool;
+
+    let (turn, ids) = MockProvider::tool_turn(&[("panicking", serde_json::json!({"text": "x"}))]);
+    let provider = Arc::new(MockProvider::with_turns(vec![
+        turn,
+        MockProvider::text_turn("recovered"),
+    ]));
+    let (agent, store) =
+        create_agent(provider.clone(), vec![Arc::new(PanickingTool)], Vec::new()).await;
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+
+    let summary = agent
+        .prompt(
+            &session,
+            PromptInput::text("go panic"),
+            TurnOptions::default(),
+        )
+        .await
+        .expect("the turn survives a panicking tool");
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    assert!(
+        events.iter().any(|(_, event)| matches!(
+            event,
+            AgentEvent::ToolCallUpdated { call }
+                if call.id == ids[0]
+                    && matches!(&call.status, ToolCallStatus::Failed { error } if error.contains("panicked"))
+        )),
+        "the panicking call fails with a panic message"
+    );
+    assert_eq!(
+        provider.requests().len(),
+        2,
+        "the model saw the failure and continued"
+    );
+}
+
+#[tokio::test]
+async fn read_only_batch_runs_in_parallel_on_the_pool() {
+    let (turn, _ids) = MockProvider::tool_turn(&[
+        ("slow", serde_json::json!({"ms": 200})),
+        ("slow", serde_json::json!({"ms": 200})),
+        ("slow", serde_json::json!({"ms": 200})),
+        ("slow", serde_json::json!({"ms": 200})),
+    ]);
+    let provider = Arc::new(MockProvider::with_turns(vec![
+        turn,
+        MockProvider::text_turn("done"),
+    ]));
+    let (agent, _store) = create_agent(
+        provider,
+        vec![Arc::new(agentloop_testkit::SlowTool)],
+        Vec::new(),
+    )
+    .await;
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+
+    let started = std::time::Instant::now();
+    let summary = agent
+        .prompt(&session, PromptInput::text("sleep"), TurnOptions::default())
+        .await
+        .expect("turn succeeds");
+    let elapsed = started.elapsed();
+
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+    assert_eq!(summary.num_tool_calls, 4);
+    assert!(
+        elapsed < std::time::Duration::from_millis(700),
+        "4x200ms read-only calls overlap on the pool (took {elapsed:?})"
+    );
+}

@@ -88,8 +88,7 @@ impl ToolWorkerPool {
             call_id = %job.call_id
         );
         span.follows_from(tracing::Span::current());
-        let handle =
-            tokio::spawn(run_job(job, global, session_permits, results).instrument(span));
+        let handle = tokio::spawn(run_job(job, global, session_permits, results).instrument(span));
         handle.abort_handle()
     }
 }

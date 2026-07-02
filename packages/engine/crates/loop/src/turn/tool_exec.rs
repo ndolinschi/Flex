@@ -3,8 +3,8 @@
 use std::sync::{Arc, Mutex};
 
 use futures::StreamExt;
+use tokio::sync::{Semaphore, mpsc};
 use tokio_util::sync::CancellationToken;
-use tracing::{Instrument, info_span};
 
 use agentloop_contracts::{
     AgentEvent, ContentBlock, HookPoint, MessageId, PermissionDecision, PermissionDecisionKind,
@@ -18,6 +18,7 @@ use crate::deps::TurnDeps;
 use crate::draft::DraftToolCall;
 use crate::manager::ToolCallManager;
 use crate::permission::{PermissionPolicy, Verdict};
+use crate::pool::{ToolEvent, ToolJob, ToolJobOutcome};
 use crate::session_handle::SessionHandle;
 use crate::tool_results::output_or_synthetic;
 
@@ -59,6 +60,9 @@ pub(super) async fn execute_tool_requests(
 
     // Batch consecutive read-only calls; run them concurrently (bounded).
     // The manager is shared behind a mutex — no await happens under the lock.
+    // One turn per session (turn gate) makes this per-turn semaphore the
+    // session-level execution bound the pool expects.
+    let session_permits = Arc::new(Semaphore::new(deps.limits.tool_concurrency));
     let manager_shared = Arc::new(Mutex::new(std::mem::take(manager)));
     let mut index = 0;
     while index < tool_requests.len() {
@@ -90,6 +94,7 @@ pub(super) async fn execute_tool_requests(
                         cancel,
                         sink,
                         &manager_shared,
+                        &session_permits,
                         req,
                     )
                 })
@@ -107,6 +112,7 @@ pub(super) async fn execute_tool_requests(
                 cancel,
                 sink,
                 &manager_shared,
+                &session_permits,
                 tool_requests[index].clone(),
             )
             .await;
@@ -162,6 +168,7 @@ async fn execute_one_call(
     cancel: &CancellationToken,
     sink: &EventSink,
     manager: &Arc<Mutex<ToolCallManager>>,
+    session_permits: &Arc<Semaphore>,
     request: DraftToolCall,
 ) {
     let emit_update = |call: agentloop_contracts::ToolCall| {
@@ -351,10 +358,7 @@ async fn execute_one_call(
         }
     }
 
-    // ── run ─────────────────────────────────────────────────────────────────
-    if let Some(call) = transition(ToolCallStatus::Running, None) {
-        emit_update(call).await;
-    }
+    // ── run on the worker pool: real parallelism + panic isolation ─────────
     let call_token = cancel.child_token();
     let ctx = ToolContext {
         session_id: handle.id.clone(),
@@ -364,14 +368,51 @@ async fn execute_one_call(
         cancel: call_token.clone(),
         events: sink.clone(),
     };
-    let span = info_span!("tool_call", tool = %descriptor.name, call_id = %request.id);
-    let result = tokio::select! {
-        result = tokio::time::timeout(deps.limits.tool_timeout, tool.run(ctx, input))
-            .instrument(span) => match result {
-                Ok(inner) => inner,
-                Err(_) => Err(ToolError::Timeout(deps.limits.tool_timeout.as_millis() as u64)),
-            },
-        _ = call_token.cancelled() => Err(ToolError::Cancelled),
+    let job = ToolJob {
+        call_id: request.id.clone(),
+        tool: tool.clone(),
+        ctx,
+        input,
+        timeout: deps.limits.tool_timeout,
+    };
+    let (results_tx, mut results_rx) = mpsc::channel(2);
+    let _abort = deps.pool.submit(job, session_permits.clone(), results_tx);
+    let mut outcome = None;
+    while let Some(event) = results_rx.recv().await {
+        match event {
+            ToolEvent::Started { call_id } if call_id == request.id => {
+                // Permits acquired; the tool is actually executing now.
+                if let Some(call) = transition(ToolCallStatus::Running, None) {
+                    emit_update(call).await;
+                }
+            }
+            ToolEvent::Finished {
+                call_id,
+                outcome: done,
+            } if call_id == request.id => {
+                outcome = Some(done);
+                break;
+            }
+            // A report for another call can only mean a wiring bug; ignore.
+            ToolEvent::Started { .. } | ToolEvent::Finished { .. } => {}
+        }
+    }
+    let result = match outcome {
+        Some(ToolJobOutcome::Output(result)) => result,
+        Some(ToolJobOutcome::Panicked { message }) => {
+            // The call fails; the turn (and the session) survive.
+            if let Some(call) = transition(
+                ToolCallStatus::Failed {
+                    error: format!("tool panicked: {message}"),
+                },
+                None,
+            ) {
+                emit_update(call).await;
+            }
+            return;
+        }
+        // Channel closed without a Finished report: torn down mid-flight.
+        None => Err(ToolError::Cancelled),
     };
 
     let final_call = match result {

@@ -21,6 +21,9 @@ pub struct LoopLimits {
     pub tool_concurrency: usize,
     /// Hard per-tool-call timeout.
     pub tool_timeout: Duration,
+    /// Optional global cross-session cap on concurrently running tools.
+    /// `None` (default) keeps today's per-session bound only.
+    pub tool_pool_size: Option<usize>,
 }
 
 impl Default for LoopLimits {
@@ -29,6 +32,7 @@ impl Default for LoopLimits {
             max_iterations: 50,
             tool_concurrency: 4,
             tool_timeout: Duration::from_secs(600),
+            tool_pool_size: None,
         }
     }
 }
@@ -125,6 +129,7 @@ impl NativeAgentBuilder {
         }
         Arc::new(NativeAgent {
             deps: Arc::new(TurnDeps {
+                pool: Arc::new(crate::pool::ToolWorkerPool::new(self.limits.tool_pool_size)),
                 agent_id: "native".to_owned(),
                 providers: self.providers,
                 tools,
