@@ -103,6 +103,9 @@ delegator `EventMapper`). Nothing downstream of `contracts` may see a provider q
   Extract a shared crate only when a third client appears. Engine hard rules (brand gate,
   runner-only stdout) stop at the engine workspace boundary; the CLI mirrors the lint set
   and keeps crate names brand-free anyway, with the brand only in its `[[bin]]` name.
+- **Model failover is loop-owned**: `TurnOptions.fallback_models` + the persisted
+  `ModelFallback` event; eligible provider failures advance the chain mid-turn with
+  partial drafts discarded pre-materialization. Role chains (v3) feed the same field.
 - **Copilot device-flow sign-in lives in `providers/copilot`** (`device_flow.rs` +
   `store_github_token`): provider crates are the sanctioned I/O edges, and the apps.json
   format knowledge stays next to `discover_github_token`. The stored token interoperates
