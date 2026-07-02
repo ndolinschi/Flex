@@ -2,7 +2,9 @@
 source: crates/cli/src/render_snapshots.rs
 expression: rendered
 ---
-AgenticStudio 0.1.0 — /help for keys and commands
+✻ AgenticStudio 0.1.0
+cwd: .
+shift+tab cycles modes · ctrl+o expands tools · enter mid-turn queues · /help
 
 > show me a heading
 
@@ -13,8 +15,6 @@ AgenticStudio 0.1.0 — /help for keys and commands
   ┌─ rust
   │ fn main() {}
   └─
-
-
 
 
 

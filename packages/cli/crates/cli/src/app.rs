@@ -242,11 +242,13 @@ impl App {
             queued_prompts: std::collections::VecDeque::new(),
             dirty: true,
         };
-        let welcome = format!(
-            "{} {} — /help for keys and commands",
-            app.engine_name, app.engine_version
+        app.chat
+            .push_info(format!("✻ {} {}", app.engine_name, app.engine_version));
+        app.chat
+            .push_info(format!("cwd: {}", app.workdir.display()));
+        app.chat.push_info(
+            "shift+tab cycles modes · ctrl+o expands tools · enter mid-turn queues · /help",
         );
-        app.chat.push_info(welcome);
         app.install_bootstrap(bootstrap, false);
         app
     }

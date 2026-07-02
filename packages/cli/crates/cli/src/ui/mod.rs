@@ -771,11 +771,14 @@ fn draw_permission(frame: &mut Frame<'_>, prompt: &PermissionPrompt, root: Rect)
         } else {
             Style::default()
         };
-        lines.push(Line::from(Span::styled(permission_label(*option), style)));
+        lines.push(Line::from(Span::styled(
+            permission_label(*option, idx + 1),
+            style,
+        )));
     }
     lines.push(Line::default());
     lines.push(Line::from(Span::styled(
-        "Enter/y allow, a always, Esc/n deny",
+        "enter confirm · 1-3 select · y allow · a always · esc/n deny",
         theme::DIM,
     )));
     frame.render_widget(Clear, area);
@@ -787,13 +790,14 @@ fn draw_permission(frame: &mut Frame<'_>, prompt: &PermissionPrompt, root: Rect)
     );
 }
 
-fn permission_label(kind: PermissionDecisionKind) -> &'static str {
-    match kind {
-        PermissionDecisionKind::AllowOnce => "allow once",
-        PermissionDecisionKind::AllowAlways => "allow always",
-        PermissionDecisionKind::Deny => "deny",
+fn permission_label(kind: PermissionDecisionKind, number: usize) -> String {
+    let text = match kind {
+        PermissionDecisionKind::AllowOnce => "Yes",
+        PermissionDecisionKind::AllowAlways => "Yes, don't ask again",
+        PermissionDecisionKind::Deny => "No (esc)",
         _ => "unknown",
-    }
+    };
+    format!("{number}. {text}")
 }
 
 fn draw_question(frame: &mut Frame<'_>, prompt: &QuestionPrompt, root: Rect) {
@@ -1032,6 +1036,21 @@ fn draw_help(frame: &mut Frame<'_>, app: &App, root: Rect) {
         Line::from(
             "Ctrl+O expand/collapse tool result · Tab cycle tool rows · Enter/Space toggle focused row",
         ),
+        Line::from(
+            "Shift+Tab cycle mode: require → accept edits → plan · Enter mid-turn queues the prompt",
+        ),
+        Line::default(),
+        Line::from(Span::styled("Modes", theme::TITLE)),
+        Line::from("require — ask before mutating tools · accept edits — file edits auto-allowed"),
+        Line::from(
+            "plan — read-only research · allow-all — /permissions allow-all (never in the cycle)",
+        ),
+        Line::default(),
+        Line::from(Span::styled("Backends vs providers", theme::TITLE)),
+        Line::from(
+            "/provider switches the LLM API inside the native loop (incl. /connect custom hosts);",
+        ),
+        Line::from("/agent swaps the whole backend (native loop vs external claude/copilot CLIs)."),
         Line::default(),
         Line::from(Span::styled("Commands", theme::TITLE)),
     ];

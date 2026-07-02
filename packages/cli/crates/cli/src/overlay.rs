@@ -547,6 +547,21 @@ fn permission_key(prompt: &mut PermissionPrompt, key: KeyEvent) -> OverlayOutcom
                 ..OverlayOutcome::default()
             }
         }
+        // Digits select-and-confirm the numbered option (1-based).
+        (KeyCode::Char(digit @ '1'..='9'), KeyModifiers::NONE) => {
+            let index = digit as usize - '1' as usize;
+            let Some(kind) = prompt.options.get(index) else {
+                return OverlayOutcome::consumed();
+            };
+            OverlayOutcome {
+                effects: vec![Effect::RespondPermission {
+                    id: prompt.id.clone(),
+                    decision: decision_for(*kind),
+                }],
+                close: true,
+                ..OverlayOutcome::default()
+            }
+        }
         // Esc never leaves a request dangling while the turn blocks on it.
         (KeyCode::Esc, _) | (KeyCode::Char('n'), KeyModifiers::NONE) => deny(prompt),
         _ => OverlayOutcome::consumed(),

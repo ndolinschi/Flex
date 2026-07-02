@@ -2,7 +2,9 @@
 source: crates/cli/src/render_snapshots.rs
 expression: rendered
 ---
-AgenticStudio 0.1.0 — /help for keys and commands
+✻ AgenticStudio 0.1.0
+cwd: .
+shift+tab cycles modes · ctrl+o expands tools · enter mid-turn queues · /help
 
 ⏺ Bash(cargo test)
   ⎿ exit 101
@@ -10,8 +12,6 @@ AgenticStudio 0.1.0 — /help for keys and commands
       --> src/main.rs:4:5
      note: expected `u32`
   ⎿ … +2 lines (ctrl+o to expand)
-
-
 
 
 
