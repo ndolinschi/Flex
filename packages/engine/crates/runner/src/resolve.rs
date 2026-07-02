@@ -102,6 +102,7 @@ fn native_service(
         custom: Vec::new(),
         mcp: Default::default(),
         mcp_manager: None,
+        session_store: None,
     })
 }
 

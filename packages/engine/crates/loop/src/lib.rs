@@ -12,6 +12,7 @@ mod agent;
 mod attachments;
 mod builder;
 mod compaction;
+mod context_budget;
 mod deps;
 mod draft;
 mod manager;

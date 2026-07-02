@@ -184,6 +184,136 @@ async fn permission_ask_can_be_resolved() {
 }
 
 #[tokio::test]
+async fn bypass_permissions_skips_ask() {
+    let (turn, _ids) = MockProvider::tool_turn(&[("needs_permission", serde_json::json!({}))]);
+    let provider = Arc::new(MockProvider::with_turns([
+        turn,
+        MockProvider::text_turn("bypass done"),
+    ]));
+    let (agent, store) = create_agent(provider, vec![Arc::new(PermissionTool)], Vec::new()).await;
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+    let mut stream = agent.events(&session).expect("subscribe succeeds");
+    let prompt_agent = agent.clone();
+    let prompt_session = session.clone();
+    let prompt_task = tokio::spawn(async move {
+        prompt_agent
+            .prompt(
+                &prompt_session,
+                PromptInput::text("run protected tool"),
+                TurnOptions {
+                    permission_mode: Some(PermissionMode::BypassPermissions),
+                    ..TurnOptions::default()
+                },
+            )
+            .await
+    });
+
+    while let Some(event) = stream.next().await {
+        if matches!(event.payload, AgentEvent::PermissionRequested { .. }) {
+            panic!("bypass mode must not surface permission prompts");
+        }
+        if matches!(event.payload, AgentEvent::TurnCompleted { .. }) {
+            break;
+        }
+    }
+
+    let summary = prompt_task
+        .await
+        .expect("prompt task joins")
+        .expect("turn succeeds");
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    assert!(
+        !events
+            .iter()
+            .any(|(_, event)| matches!(event, AgentEvent::PermissionRequested { .. }))
+    );
+    assert!(events.iter().any(|(_, event)| matches!(
+        event,
+        AgentEvent::ToolCallUpdated { call }
+            if call.tool_name == "needs_permission"
+                && matches!(call.status, ToolCallStatus::Completed)
+    )));
+}
+
+#[tokio::test]
+async fn set_turn_permission_mode_applies_to_later_tools_in_same_turn() {
+    let (turn, _ids) = MockProvider::tool_turn(&[
+        ("needs_permission", serde_json::json!({})),
+        ("needs_permission", serde_json::json!({})),
+    ]);
+    let provider = Arc::new(MockProvider::with_turns([
+        turn,
+        MockProvider::text_turn("mid-turn bypass done"),
+    ]));
+    let (agent, store) = create_agent(provider, vec![Arc::new(PermissionTool)], Vec::new()).await;
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+    let mut stream = agent.events(&session).expect("subscribe succeeds");
+    let prompt_agent = agent.clone();
+    let prompt_session = session.clone();
+    let prompt_task = tokio::spawn(async move {
+        prompt_agent
+            .prompt(
+                &prompt_session,
+                PromptInput::text("run protected tools"),
+                TurnOptions {
+                    permission_mode: Some(PermissionMode::Default),
+                    ..TurnOptions::default()
+                },
+            )
+            .await
+    });
+
+    let mut permission_events = 0u32;
+    while let Some(event) = stream.next().await {
+        if let AgentEvent::PermissionRequested { id, .. } = &event.payload {
+            permission_events += 1;
+            agent
+                .set_turn_permission_mode(&session, Some(PermissionMode::BypassPermissions))
+                .expect("live permission update succeeds");
+            agent
+                .respond_permission(&session, id.clone(), PermissionDecision::AllowOnce)
+                .await
+                .expect("permission response succeeds");
+        }
+        if matches!(event.payload, AgentEvent::TurnCompleted { .. }) {
+            break;
+        }
+    }
+
+    let summary = prompt_task
+        .await
+        .expect("prompt task joins")
+        .expect("turn succeeds");
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+    assert_eq!(
+        permission_events, 1,
+        "only the first protected tool should prompt before bypass took effect"
+    );
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    let completed = events
+        .iter()
+        .filter(|(_, event)| {
+            matches!(
+                event,
+                AgentEvent::ToolCallUpdated { call }
+                    if call.tool_name == "needs_permission"
+                        && matches!(call.status, ToolCallStatus::Completed)
+            )
+        })
+        .count();
+    assert_eq!(completed, 2);
+}
+
+#[tokio::test]
 async fn cancellation_marks_in_flight_tool_cancelled() {
     let (turn, _ids) = MockProvider::tool_turn(&[("slow", serde_json::json!({"ms": 60_000}))]);
     let provider = Arc::new(MockProvider::with_turns([turn]));

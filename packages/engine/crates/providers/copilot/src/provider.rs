@@ -76,7 +76,7 @@ impl Provider for CopilotProvider {
             thinking: false,
             prompt_caching: false,
             native_json_schema_tools: true,
-            max_context_tokens: None,
+            max_context_tokens: Some(136_000),
         }
     }
 

@@ -27,6 +27,7 @@ pub(crate) async fn compact_session(
     handle: Arc<SessionHandle>,
     opts: TurnOptions,
     cancel: CancellationToken,
+    strategy: &str,
 ) -> Result<CompactionSummary, AgentError> {
     let events = deps.store.read(&handle.id, 0).await?;
     let transcript = reduce(events.iter().map(|(_, event)| event).collect::<Vec<_>>());
@@ -109,7 +110,7 @@ pub(crate) async fn compact_session(
     let tokens_after = estimate_tokens(&summary_markdown);
     let summary = CompactionSummary {
         summary_markdown,
-        strategy: "summarize_oldest".to_owned(),
+        strategy: strategy.to_owned(),
         tokens_before: Some(tokens_before),
         tokens_after: Some(tokens_after),
     };

@@ -13,8 +13,8 @@ use futures::Stream;
 
 use agentloop_contracts::{
     AgentCaps, AgentInfo, Answer, CompactionSummary, EngineError, NewSessionParams,
-    PermissionDecision, PermissionRequestId, PromptInput, QuestionId, SessionEvent, SessionId,
-    SessionMeta, TurnOptions, TurnSummary,
+    PermissionDecision, PermissionMode, PermissionRequestId, PromptInput, QuestionId, SessionEvent,
+    SessionId, SessionMeta, TurnOptions, TurnSummary,
 };
 
 use crate::provider::ProviderError;
@@ -101,6 +101,16 @@ pub trait Agent: Send + Sync {
     /// Cancellation is not an error: the turn completes with
     /// `TurnStopReason::Cancelled`.
     async fn cancel(&self, session: &SessionId) -> Result<(), AgentError>;
+
+    /// Update the permission mode for an in-flight native turn. Default: no-op
+    /// (delegated agents manage their own policy).
+    fn set_turn_permission_mode(
+        &self,
+        _session: &SessionId,
+        _mode: Option<PermissionMode>,
+    ) -> Result<(), AgentError> {
+        Ok(())
+    }
 
     /// Resolve a pending `PermissionRequested` event.
     async fn respond_permission(

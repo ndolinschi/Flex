@@ -158,7 +158,7 @@ async fn execute_one_call(
     handle: &Arc<SessionHandle>,
     meta: &SessionMeta,
     turn_id: &TurnId,
-    opts: &TurnOptions,
+    _opts: &TurnOptions,
     cancel: &CancellationToken,
     sink: &EventSink,
     manager: &Arc<Mutex<ToolCallManager>>,
@@ -201,9 +201,12 @@ async fn execute_one_call(
     let descriptor = tool.descriptor();
 
     // ── permission gate ─────────────────────────────────────────────────────
-    let verdict =
-        deps.policy
-            .evaluate(&descriptor, &request.input, &meta.cwd, opts.permission_mode);
+    let verdict = deps.policy.evaluate(
+        &descriptor,
+        &request.input,
+        &meta.cwd,
+        handle.turn_permission_mode(),
+    );
     match verdict {
         Verdict::Deny { reason } => {
             if let Some(call) = transition(

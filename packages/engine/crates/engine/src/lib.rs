@@ -10,9 +10,9 @@ use std::sync::Arc;
 
 use agentloop_contracts::{
     AgentEvent, Answer, CompactionSummary, EngineError, ErrorCode, Hello, ModelInfo, ModelRef,
-    NewSessionParams, PermissionDecision, PermissionRequestId, PromptInput, ProviderId, QuestionId,
-    SessionEvent, SessionId, SessionMeta, Transcript, TurnId, TurnOptions, TurnSummary, now_ms,
-    reduce,
+    NewSessionParams, PermissionDecision, PermissionMode, PermissionRequestId, PromptInput,
+    ProviderId, QuestionId, SessionEvent, SessionId, SessionMeta, Transcript, TurnId, TurnOptions,
+    TurnSummary, now_ms, reduce,
 };
 use agentloop_core::{
     Agent, AgentError, EventStream, ProviderError, ProviderRegistry, SessionStore, StoreError,
@@ -65,6 +65,8 @@ pub struct EngineOptions {
     pub mcp: McpBridgeConfig,
     /// Pre-built MCP manager; when set, the engine reuses it instead of creating a new one.
     pub mcp_manager: Option<std::sync::Arc<McpManager>>,
+    /// Reuse an existing session store across native service rebuilds (CLI MCP reload).
+    pub session_store: Option<Arc<dyn SessionStore>>,
 }
 
 impl Default for EngineOptions {
@@ -77,6 +79,7 @@ impl Default for EngineOptions {
             custom: Vec::new(),
             mcp: McpBridgeConfig::default(),
             mcp_manager: None,
+            session_store: None,
         }
     }
 }
@@ -215,7 +218,10 @@ impl EngineService {
             )?)),
         };
 
-        let store: Arc<dyn SessionStore> = Arc::new(MemoryStore::new());
+        let store: Arc<dyn SessionStore> = options
+            .session_store
+            .take()
+            .unwrap_or_else(|| Arc::new(MemoryStore::new()));
         let mut builder = NativeAgentBuilder::new(store.clone())
             .providers(providers.clone())
             .tools(tools)
@@ -277,6 +283,15 @@ impl EngineService {
 
     pub async fn cancel(&self, session: &SessionId) -> EngineResult<()> {
         Ok(self.agent.cancel(session).await?)
+    }
+
+    /// Push a permission-mode change into an in-flight native turn.
+    pub fn set_turn_permission_mode(
+        &self,
+        session: &SessionId,
+        mode: Option<PermissionMode>,
+    ) -> EngineResult<()> {
+        Ok(self.agent.set_turn_permission_mode(session, mode)?)
     }
 
     pub async fn respond_permission(

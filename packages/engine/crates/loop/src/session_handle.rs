@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 
-use agentloop_contracts::{AgentEvent, SessionEvent, SessionId, TurnId, now_ms};
+use agentloop_contracts::{AgentEvent, PermissionMode, SessionEvent, SessionId, TurnId, now_ms};
 use agentloop_core::{SessionStore, StoreError};
 
 /// Per-session live state: the broadcast bus, the turn gate, and the current
@@ -23,6 +23,9 @@ pub(crate) struct SessionHandle {
     /// One turn at a time per session.
     pub(crate) turn_gate: tokio::sync::Mutex<()>,
     pub(crate) current_cancel: Mutex<Option<CancellationToken>>,
+    /// Live permission mode for the in-flight turn; updated when the client
+    /// changes `/permissions` mid-turn.
+    turn_permission_mode: Mutex<Option<PermissionMode>>,
 }
 
 impl SessionHandle {
@@ -41,7 +44,22 @@ impl SessionHandle {
             next_seq: AtomicU64::new(next_seq),
             turn_gate: tokio::sync::Mutex::new(()),
             current_cancel: Mutex::new(None),
+            turn_permission_mode: Mutex::new(None),
         }
+    }
+
+    pub(crate) fn set_turn_permission_mode(&self, mode: Option<PermissionMode>) {
+        *self
+            .turn_permission_mode
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = mode;
+    }
+
+    pub(crate) fn turn_permission_mode(&self) -> Option<PermissionMode> {
+        *self
+            .turn_permission_mode
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
     }
 
     /// Append to the store (assigning seq), record metrics, then broadcast.

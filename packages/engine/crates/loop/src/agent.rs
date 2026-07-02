@@ -206,6 +206,16 @@ impl Agent for NativeAgent {
         Ok(())
     }
 
+    fn set_turn_permission_mode(
+        &self,
+        session: &SessionId,
+        mode: Option<PermissionMode>,
+    ) -> Result<(), AgentError> {
+        let handle = self.handle(session)?;
+        handle.set_turn_permission_mode(mode);
+        Ok(())
+    }
+
     async fn respond_permission(
         &self,
         session: &SessionId,
@@ -252,7 +262,14 @@ impl Agent for NativeAgent {
             .current_cancel
             .lock()
             .unwrap_or_else(|p| p.into_inner()) = Some(cancel.clone());
-        let result = compact_session(&self.deps, handle.clone(), opts, cancel).await;
+        let result = compact_session(
+            &self.deps,
+            handle.clone(),
+            opts,
+            cancel,
+            crate::context_budget::MANUAL_COMPACT_STRATEGY,
+        )
+        .await;
         *handle
             .current_cancel
             .lock()

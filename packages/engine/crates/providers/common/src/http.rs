@@ -29,6 +29,12 @@ pub fn status_to_provider_error(
     } else {
         body
     };
+    if looks_like_context_overflow(&message) {
+        return ProviderError::ContextOverflow {
+            provider: provider.clone(),
+            message,
+        };
+    }
     match status {
         StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => ProviderError::AuthRejected {
             provider: provider.clone(),
@@ -57,5 +63,58 @@ pub fn status_to_provider_error(
             provider: provider.clone(),
             message: format!("HTTP {status}: {message}"),
         },
+    }
+}
+
+/// True when a provider body reports the prompt exceeded its context window.
+///
+/// Copilot returns HTTP 400 with text like
+/// `prompt token count of 383156 exceeds the limit of 136000`.
+pub fn looks_like_context_overflow(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    let tokenish = lower.contains("token")
+        || lower.contains("context")
+        || lower.contains("prompt")
+        || lower.contains("maximum");
+    if !tokenish {
+        return false;
+    }
+    lower.contains("exceed")
+        || lower.contains("too large")
+        || lower.contains("too long")
+        || lower.contains("context length")
+        || lower.contains("context window")
+        || lower.contains("maximum context")
+        || lower.contains("max context")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agentloop_contracts::ProviderId;
+
+    #[test]
+    fn copilot_token_limit_maps_to_context_overflow() {
+        let provider = ProviderId::from("copilot");
+        let body = "prompt token count of 383156 exceeds the limit of 136000";
+        let err = status_to_provider_error(
+            &provider,
+            StatusCode::BAD_REQUEST,
+            body.to_owned(),
+            Some("claude-haiku-4.5"),
+        );
+        assert!(matches!(err, ProviderError::ContextOverflow { .. }));
+    }
+
+    #[test]
+    fn unrelated_bad_request_stays_invalid() {
+        let provider = ProviderId::from("copilot");
+        let err = status_to_provider_error(
+            &provider,
+            StatusCode::BAD_REQUEST,
+            "unknown tool name".to_owned(),
+            None,
+        );
+        assert!(matches!(err, ProviderError::InvalidRequest { .. }));
     }
 }

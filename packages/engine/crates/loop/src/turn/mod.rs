@@ -62,6 +62,8 @@ pub(crate) async fn run_turn(
     );
 
     async {
+        handle.set_turn_permission_mode(opts.permission_mode);
+
         // ── prompt intake ───────────────────────────────────────────────────
         let outcome = run_hooks(
             deps,
