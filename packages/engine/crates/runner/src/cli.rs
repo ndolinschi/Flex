@@ -84,7 +84,7 @@ fn take_value(args: &[String], index: &mut usize, flag: &str) -> anyhow::Result<
 
 pub(crate) fn usage() -> String {
     format!(
-        "usage:\n  {slug} --version\n  {slug} doctor\n  {slug} run [--agent native|claude-code] \
+        "usage:\n  {slug} --version\n  {slug} doctor\n  {slug} run [--agent native|claude-code|copilot] \
          [--provider anthropic|openai|gemini|ollama] [--model <model>] -p <prompt> \
          [--workdir <path>] [--output-format ndjson]\n\n\
          With no --agent/--provider, the engine auto-detects: provider API keys in the \

@@ -4,6 +4,12 @@
 //! common defines launch metadata, host traits, and normalized mapper output.
 
 use std::collections::BTreeMap;
+mod line_agent;
+mod tokio_host;
+
+pub use line_agent::{DelegatorProfile, LineDelegatorAgent};
+pub use tokio_host::TokioCommandHost;
+
 use std::path::PathBuf;
 
 use async_trait::async_trait;

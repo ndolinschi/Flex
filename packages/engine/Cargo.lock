@@ -74,9 +74,27 @@ name = "agentloop-delegator-common"
 version = "0.1.0"
 dependencies = [
  "agentloop-contracts",
+ "agentloop-core",
  "async-trait",
+ "futures",
  "serde_json",
  "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+]
+
+[[package]]
+name = "agentloop-delegator-copilot"
+version = "0.1.0"
+dependencies = [
+ "agentloop-contracts",
+ "agentloop-core",
+ "agentloop-delegator-common",
+ "agentloop-session",
+ "async-trait",
+ "serde_json",
+ "tokio",
  "tokio-util",
 ]
 
@@ -252,6 +270,7 @@ version = "0.1.0"
 dependencies = [
  "agentloop-contracts",
  "agentloop-delegator-claude-code",
+ "agentloop-delegator-copilot",
  "agentloop-engine",
  "agentloop-session",
  "agentloop-transport-stdio",

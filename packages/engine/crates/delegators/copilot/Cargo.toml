@@ -1,6 +1,6 @@
 [package]
-name = "agentloop-delegator-common"
-description = "Shared delegator scaffolding"
+name = "agentloop-delegator-copilot"
+description = "GitHub Copilot CLI delegator: drives `copilot -p` and normalizes its output"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,12 +11,13 @@ publish.workspace = true
 [dependencies]
 agentloop-contracts = { workspace = true }
 agentloop-core = { workspace = true }
+agentloop-delegator-common = { workspace = true }
+agentloop-session = { workspace = true }
+
+[dev-dependencies]
 async-trait = { workspace = true }
-futures = { workspace = true }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
 tokio = { workspace = true }
-tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
 
 [lints]

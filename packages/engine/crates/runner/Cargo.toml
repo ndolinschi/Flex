@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 agentloop-contracts = { workspace = true }
 agentloop-delegator-claude-code = { workspace = true }
+agentloop-delegator-copilot = { workspace = true }
 agentloop-engine = { workspace = true }
 agentloop-session = { workspace = true }
 agentloop-transport-stdio = { workspace = true }

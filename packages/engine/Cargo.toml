@@ -6,6 +6,7 @@ members = [
     "crates/delegators/acp",
     "crates/delegators/claude-code",
     "crates/delegators/common",
+    "crates/delegators/copilot",
     "crates/delegators/cursor",
     "crates/delegators/opencode",
     "crates/engine",
@@ -39,6 +40,7 @@ agentloop-contracts = { path = "crates/contracts" }
 agentloop-core = { path = "crates/core" }
 agentloop-delegator-acp = { path = "crates/delegators/acp" }
 agentloop-delegator-claude-code = { path = "crates/delegators/claude-code" }
+agentloop-delegator-copilot = { path = "crates/delegators/copilot" }
 agentloop-delegator-common = { path = "crates/delegators/common" }
 agentloop-delegator-cursor = { path = "crates/delegators/cursor" }
 agentloop-delegator-opencode = { path = "crates/delegators/opencode" }

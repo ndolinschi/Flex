@@ -12,7 +12,10 @@ use std::sync::Arc;
 use anyhow::bail;
 use tokio_util::sync::CancellationToken;
 
-use agentloop_delegator_claude_code::{ClaudeCodeAgent, ClaudeCodeConfig, DelegatorProbeStatus};
+use agentloop_delegator_claude_code::{
+    ClaudeCodeConfig, DelegatorProbeStatus, claude_code_agent, ephemeral_claude_code_agent,
+};
+use agentloop_delegator_copilot::{CopilotConfig, copilot_agent, ephemeral_copilot_agent};
 use agentloop_engine::{EngineOptions, EngineService, EngineServiceError};
 use agentloop_session::MemoryStore;
 
@@ -36,6 +39,11 @@ pub(crate) async fn resolve_service(
             let service = claude_code_service(workdir, &mut trace).await?;
             return Ok(Resolution { service, trace });
         }
+        Some("copilot") => {
+            trace.push("explicit --agent copilot".to_owned());
+            let service = copilot_service(workdir, &mut trace).await?;
+            return Ok(Resolution { service, trace });
+        }
         Some("native") | None if provider.is_some() => {
             trace.push(format!(
                 "explicit --provider {}",
@@ -51,7 +59,7 @@ pub(crate) async fn resolve_service(
             trace.push("selected native loop (provider from environment)".to_owned());
             return Ok(Resolution { service, trace });
         }
-        Some(other) => bail!("unknown agent `{other}`; available: native, claude-code"),
+        Some(other) => bail!("unknown agent `{other}`; available: native, claude-code, copilot"),
         None => {}
     }
 
@@ -64,11 +72,14 @@ pub(crate) async fn resolve_service(
         }
         Err(err) if is_auth_missing(&err) => {
             trace.push("no provider API keys in environment".to_owned());
-            match claude_code_service(workdir, &mut trace).await {
+            if let Ok(service) = claude_code_service(workdir, &mut trace).await {
+                return Ok(Resolution { service, trace });
+            }
+            match copilot_service(workdir, &mut trace).await {
                 Ok(service) => Ok(Resolution { service, trace }),
                 Err(delegator_err) => bail!(
                     "no way to run: {err}\n\
-                     falling back to an external agent also failed: {delegator_err}\n\
+                     no external agent CLI is usable either: {delegator_err}\n\
                      resolution trace:\n  - {}",
                     trace.join("\n  - ")
                 ),
@@ -100,7 +111,7 @@ async fn claude_code_service(
         ..ClaudeCodeConfig::default()
     };
     let store = Arc::new(MemoryStore::new());
-    let agent = Arc::new(ClaudeCodeAgent::new(config, store.clone()));
+    let agent = Arc::new(claude_code_agent(config, store.clone()));
     match agent.probe(CancellationToken::new()).await {
         Ok(DelegatorProbeStatus::Installed { version }) => {
             trace.push(format!(
@@ -117,6 +128,33 @@ async fn claude_code_service(
         Err(err) => {
             trace.push(format!("probed `claude`: failed ({err})"));
             bail!("failed to probe claude-code: {err}")
+        }
+    }
+}
+
+async fn copilot_service(workdir: &Path, trace: &mut Vec<String>) -> anyhow::Result<EngineService> {
+    let config = CopilotConfig {
+        cwd: Some(workdir.to_path_buf()),
+        ..CopilotConfig::default()
+    };
+    let store = Arc::new(MemoryStore::new());
+    let agent = Arc::new(copilot_agent(config, store.clone()));
+    match agent.probe(CancellationToken::new()).await {
+        Ok(DelegatorProbeStatus::Installed { version }) => {
+            trace.push(format!(
+                "probed `copilot`: installed ({})",
+                version.as_deref().unwrap_or("version unknown")
+            ));
+            trace.push("selected delegator copilot".to_owned());
+            Ok(EngineService::new(agent, store))
+        }
+        Ok(DelegatorProbeStatus::NotInstalled { hint }) => {
+            trace.push("probed `copilot`: not installed".to_owned());
+            bail!("copilot is not available: {hint}")
+        }
+        Err(err) => {
+            trace.push(format!("probed `copilot`: failed ({err})"));
+            bail!("failed to probe copilot: {err}")
         }
     }
 }
@@ -188,7 +226,7 @@ pub(crate) async fn doctor(workdir: &Path) -> anyhow::Result<()> {
 
     println!("external agents:");
     let config = ClaudeCodeConfig::default();
-    let agent = ClaudeCodeAgent::ephemeral(config);
+    let agent = ephemeral_claude_code_agent(config);
     match agent.probe(CancellationToken::new()).await {
         Ok(DelegatorProbeStatus::Installed { version }) => {
             println!(
@@ -200,6 +238,19 @@ pub(crate) async fn doctor(workdir: &Path) -> anyhow::Result<()> {
             println!("  claude-code: not installed ({hint})");
         }
         Err(err) => println!("  claude-code: probe failed ({err})"),
+    }
+    let copilot = ephemeral_copilot_agent(CopilotConfig::default());
+    match copilot.probe(CancellationToken::new()).await {
+        Ok(DelegatorProbeStatus::Installed { version }) => {
+            println!(
+                "  copilot: installed ({})",
+                version.as_deref().unwrap_or("version unknown")
+            );
+        }
+        Ok(DelegatorProbeStatus::NotInstalled { hint }) => {
+            println!("  copilot: not installed ({hint})");
+        }
+        Err(err) => println!("  copilot: probe failed ({err})"),
     }
 
     println!("resolution:");
