@@ -22,7 +22,7 @@ pub enum AppEvent {
     Task(TaskResult),
     /// Progress of a running device-flow login.
     Login(LoginEvent),
-    /// 100ms heartbeat: spinner animation and notice expiry.
+    /// 100ms heartbeat: spinner animation and toast expiry.
     Tick,
     /// OS interrupt (Ctrl+C / SIGINT) delivered outside the key stream.
     Interrupt,

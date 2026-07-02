@@ -4,12 +4,12 @@ expression: rendered
 ---
 AgenticStudio 0.1.0 — /help for keys and commands
 
-✻ Thought for 0s (ctrl+t to expand)
-
-  Here is the answer.
-
-
-
+⏺ Edit(src/app.rs)
+  ⎿   1   fn main() {
+       2 -     let x = old();
+       2 +     let x = new();
+       3       run(x);
+  ⎿ … +4 lines (ctrl+o to expand)
 
 
 

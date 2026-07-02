@@ -4,8 +4,8 @@ expression: rendered
 ---
 AgenticStudio 0.1.0 — /help for keys and commands
 
-⏺ Read(src/main.rs) completed 40ms
-  done
+⏺ Read(src/main.rs)
+  ⎿ Read 1 line
 
 
 
@@ -25,4 +25,4 @@ AgenticStudio 0.1.0 — /help for keys and commands
 ┌ prompt ──────────────────────────────────────────────────────────────────────┐
 │ Type a message, / for commands, @ for files                                  │
 └──────────────────────────────────────────────────────────────────────────────┘
-native · code · auto · anthropic/claude-sonnet-4-5 · idle · tokens in/out 0 / 0
+native · code · auto · anthropic/claude-sonnet-4-5 · ↑0 ↓0

@@ -12,6 +12,7 @@ pub mod args;
 pub mod chat;
 pub mod clipboard;
 pub mod commands;
+pub mod error_fmt;
 pub mod events;
 pub mod files;
 pub mod input;

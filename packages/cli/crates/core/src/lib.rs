@@ -9,15 +9,17 @@
 
 pub mod auth;
 pub mod catalog;
+pub mod connect;
 pub mod controller;
 pub mod engines;
 pub mod prefs;
 
 pub use auth::{AuthError, LoginEvent, has_copilot_credentials, login_copilot};
 pub use catalog::{CatalogEntry, ModelCatalog};
+pub use connect::validate_provider;
 pub use controller::SessionController;
 pub use engines::{AgentKind, EngineHub, HubError};
 pub use prefs::{
-    CliPrefs, PrefsError, config_dir, config_path, model_in_catalog, model_provider_available,
-    resolve_stored_model,
+    CliPrefs, ModelEntry, PrefsError, ProviderConfig, config_dir, config_path, custom_specs,
+    model_in_catalog, model_provider_available, resolve_api_key, resolve_stored_model,
 };

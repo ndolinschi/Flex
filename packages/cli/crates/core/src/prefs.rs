@@ -1,18 +1,75 @@
 //! CLI preferences persisted under the XDG config directory.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use agentloop_contracts::ModelRef;
+use agentloop_contracts::{ModelInfo, ModelRef};
+use agentloop_engine::CustomProviderSpec;
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::CatalogEntry;
 
 /// On-disk CLI preferences.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct CliPrefs {
     /// Last successfully selected model (`provider/model` or bare id).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_model: Option<String>,
+    /// Requested extended-thinking budget in tokens; `None` = thinking off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking_budget: Option<u32>,
+    /// Whether thinking output is rendered in the transcript.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking_visible: Option<bool>,
+    /// Session mode default: `"code"` or `"plan"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_mode: Option<String>,
+    /// Permission mode default: `"default"`, `"accept-edits"`, `"plan"`,
+    /// `"dont-ask"`, or `"bypass"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission_mode: Option<String>,
+    /// Custom OpenAI-compatible providers keyed by provider id.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub providers: BTreeMap<String, ProviderConfig>,
+    /// Forward-compat catch-all: preserves keys this build doesn't know
+    /// across load-mutate-save cycles.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// One user-configured OpenAI-compatible provider.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProviderConfig {
+    /// Display name; the id is used when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// API base URL (e.g. `https://api.deepseek.com/v1`).
+    pub base_url: String,
+    /// Literal key or a `{env:VAR}` reference resolved at load time.
+    pub api_key: String,
+    /// Static model catalog; served without a network call when non-empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub models: Vec<ModelEntry>,
+    /// Model used when none is qualified.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_model: Option<String>,
+    /// Whether the endpoint accepts extended-thinking config
+    /// (DeepSeek-style `thinking` request field).
+    #[serde(default)]
+    pub thinking: bool,
+}
+
+/// One model in a custom provider's static catalog.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelEntry {
+    /// Model id as sent to the API.
+    pub id: String,
+    /// Display name; the id is used when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// Context window in tokens, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u32>,
 }
 
 /// Failure reading or writing CLI preferences.
@@ -30,6 +87,57 @@ pub enum PrefsError {
         /// Underlying error text.
         message: String,
     },
+    /// An `{env:VAR}` reference points at an unset or empty variable.
+    #[error("environment variable `{0}` is unset or empty")]
+    MissingEnv(String),
+}
+
+/// Resolve an api-key value: `{env:VAR}` reads the variable, anything else
+/// is returned verbatim.
+pub fn resolve_api_key(raw: &str) -> Result<String, PrefsError> {
+    let trimmed = raw.trim();
+    let Some(var) = trimmed
+        .strip_prefix("{env:")
+        .and_then(|rest| rest.strip_suffix('}'))
+    else {
+        return Ok(trimmed.to_owned());
+    };
+    match std::env::var(var) {
+        Ok(value) if !value.trim().is_empty() => Ok(value.trim().to_owned()),
+        _ => Err(PrefsError::MissingEnv(var.to_owned())),
+    }
+}
+
+/// Translate configured providers into engine specs. Entries whose key
+/// cannot be resolved are skipped and reported as `(id, reason)` so callers
+/// can surface them in the resolution trace instead of failing startup.
+pub fn custom_specs(prefs: &CliPrefs) -> (Vec<CustomProviderSpec>, Vec<(String, String)>) {
+    let mut specs = Vec::new();
+    let mut skipped = Vec::new();
+    for (id, config) in &prefs.providers {
+        match resolve_api_key(&config.api_key) {
+            Ok(api_key) => specs.push(CustomProviderSpec {
+                id: id.clone(),
+                base_url: config.base_url.clone(),
+                api_key,
+                default_model: config.default_model.clone(),
+                models: config.models.iter().map(model_entry_info).collect(),
+                thinking: config.thinking,
+            }),
+            Err(err) => skipped.push((id.clone(), err.to_string())),
+        }
+    }
+    (specs, skipped)
+}
+
+fn model_entry_info(entry: &ModelEntry) -> ModelInfo {
+    ModelInfo {
+        id: entry.id.clone(),
+        display_name: entry.name.clone(),
+        context_window: entry.context_window,
+        reasoning: false,
+        vision: false,
+    }
 }
 
 impl CliPrefs {
@@ -106,6 +214,41 @@ impl CliPrefs {
         let mut prefs = Self::load();
         prefs.last_model = Some(model.0.clone());
         prefs.save()
+    }
+
+    /// Update and persist the thinking budget.
+    pub fn remember_thinking_budget(budget: Option<u32>) -> Result<(), PrefsError> {
+        let mut prefs = Self::load();
+        prefs.thinking_budget = budget;
+        prefs.save()
+    }
+
+    /// Update and persist UI mode defaults.
+    pub fn remember_modes(
+        session_mode: &str,
+        permission_mode: &str,
+        thinking_visible: bool,
+    ) -> Result<(), PrefsError> {
+        let mut prefs = Self::load();
+        prefs.session_mode = Some(session_mode.to_owned());
+        prefs.permission_mode = Some(permission_mode.to_owned());
+        prefs.thinking_visible = Some(thinking_visible);
+        prefs.save()
+    }
+
+    /// Insert or replace a custom provider and persist.
+    pub fn remember_provider(id: &str, config: ProviderConfig) -> Result<(), PrefsError> {
+        let mut prefs = Self::load();
+        prefs.providers.insert(id.to_owned(), config);
+        prefs.save()
+    }
+
+    /// Remove a custom provider and persist. Returns whether it existed.
+    pub fn forget_provider(id: &str) -> Result<bool, PrefsError> {
+        let mut prefs = Self::load();
+        let existed = prefs.providers.remove(id).is_some();
+        prefs.save()?;
+        Ok(existed)
     }
 }
 
@@ -187,6 +330,7 @@ mod tests {
         let path = dir.path().join("config.json");
         let prefs = CliPrefs {
             last_model: Some("anthropic/claude-sonnet-4-5".to_owned()),
+            ..CliPrefs::default()
         };
         CliPrefs::save_to(&path, &prefs).expect("save");
         let loaded = CliPrefs::load_from(&path).expect("load");
@@ -242,5 +386,94 @@ mod tests {
             resolve_stored_model("  ", &["anthropic".to_owned()], None),
             None
         );
+    }
+
+    #[test]
+    fn providers_round_trip() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("config.json");
+        let mut prefs = CliPrefs::default();
+        prefs.providers.insert(
+            "deepseek".to_owned(),
+            ProviderConfig {
+                name: Some("DeepSeek".to_owned()),
+                base_url: "https://api.deepseek.com/v1".to_owned(),
+                api_key: "{env:DEEPSEEK_API_KEY}".to_owned(),
+                models: vec![ModelEntry {
+                    id: "deepseek-chat".to_owned(),
+                    name: None,
+                    context_window: Some(64_000),
+                }],
+                default_model: Some("deepseek-chat".to_owned()),
+                thinking: true,
+            },
+        );
+        prefs.thinking_budget = Some(8192);
+        CliPrefs::save_to(&path, &prefs).expect("save");
+        let loaded = CliPrefs::load_from(&path).expect("load");
+        assert_eq!(loaded, prefs);
+    }
+
+    #[test]
+    fn unknown_top_level_keys_survive_load_mutate_save() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("config.json");
+        std::fs::write(
+            &path,
+            r#"{"last_model":"a/b","future_setting":{"nested":true}}"#,
+        )
+        .expect("write");
+        let mut prefs = CliPrefs::load_from(&path).expect("load");
+        prefs.last_model = Some("c/d".to_owned());
+        CliPrefs::save_to(&path, &prefs).expect("save");
+        let raw = std::fs::read_to_string(&path).expect("read");
+        let value: serde_json::Value = serde_json::from_str(&raw).expect("json");
+        assert_eq!(value["future_setting"]["nested"], serde_json::json!(true));
+        assert_eq!(value["last_model"], serde_json::json!("c/d"));
+    }
+
+    #[test]
+    fn resolve_api_key_literal_and_env() {
+        assert_eq!(resolve_api_key(" sk-literal ").expect("ok"), "sk-literal");
+        temp_env::with_var("PREFS_TEST_KEY", Some("sk-env"), || {
+            assert_eq!(
+                resolve_api_key("{env:PREFS_TEST_KEY}").expect("ok"),
+                "sk-env"
+            );
+        });
+        temp_env::with_var_unset("PREFS_TEST_MISSING", || {
+            assert!(matches!(
+                resolve_api_key("{env:PREFS_TEST_MISSING}"),
+                Err(PrefsError::MissingEnv(var)) if var == "PREFS_TEST_MISSING"
+            ));
+        });
+    }
+
+    #[test]
+    fn custom_specs_skips_unresolvable_entries() {
+        let mut prefs = CliPrefs::default();
+        prefs.providers.insert(
+            "good".to_owned(),
+            ProviderConfig {
+                base_url: "https://api.example.com/v1".to_owned(),
+                api_key: "sk-ok".to_owned(),
+                ..ProviderConfig::default()
+            },
+        );
+        prefs.providers.insert(
+            "bad".to_owned(),
+            ProviderConfig {
+                base_url: "https://api.example.com/v1".to_owned(),
+                api_key: "{env:PREFS_TEST_UNSET_VAR}".to_owned(),
+                ..ProviderConfig::default()
+            },
+        );
+        temp_env::with_var_unset("PREFS_TEST_UNSET_VAR", || {
+            let (specs, skipped) = custom_specs(&prefs);
+            assert_eq!(specs.len(), 1);
+            assert_eq!(specs[0].id, "good");
+            assert_eq!(skipped.len(), 1);
+            assert_eq!(skipped[0].0, "bad");
+        });
     }
 }

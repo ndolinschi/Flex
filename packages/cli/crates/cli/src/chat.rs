@@ -7,6 +7,7 @@
 //! loss or duplication self-heals.
 
 use std::collections::HashMap;
+use std::time::Instant;
 
 use agentloop_contracts::{
     AgentEvent, ContentBlock, MessageId, PlanEntry, Role, SessionId, TokenUsage, ToolCall,
@@ -19,7 +20,26 @@ pub enum DraftBlock {
     /// Markdown body text.
     Markdown(String),
     /// Reasoning text; collapsed to one line once the message completes.
-    Thinking { text: String, collapsed: bool },
+    Thinking {
+        text: String,
+        collapsed: bool,
+        /// When the first delta arrived (drives the real duration).
+        started: Option<Instant>,
+        /// Total thinking time, fixed once the block completes.
+        duration_ms: Option<u64>,
+    },
+}
+
+/// Displayed thinking duration in whole seconds: real when measured, a
+/// rough line-count estimate otherwise (resumed transcripts).
+pub(crate) fn thinking_seconds(duration_ms: Option<u64>, text: &str) -> u64 {
+    match duration_ms {
+        Some(ms) => ms / 1000,
+        None => {
+            let lines = text.lines().count().max(1);
+            (lines as u64).saturating_add(1)
+        }
+    }
 }
 
 /// One rendered row group in the chat viewport.
@@ -50,7 +70,10 @@ pub enum ChatItem {
     /// CLI-local informational line.
     Info { text: String },
     /// An error surfaced by the engine or the CLI.
-    Error { message: String },
+    Error {
+        headline: String,
+        detail: Option<String>,
+    },
     /// A subagent task marker.
     Subagent {
         child: SessionId,
@@ -163,16 +186,24 @@ impl ChatState {
         self.rev
     }
 
-    /// Append a CLI-local info line.
+    /// Append a CLI-local info line. Skipped when it would repeat the
+    /// immediately preceding info line (no `already on native` stutter).
     pub fn push_info(&mut self, text: impl Into<String>) {
-        self.items.push(ChatItem::Info { text: text.into() });
+        let text = text.into();
+        if matches!(self.items.last(), Some(ChatItem::Info { text: last }) if *last == text) {
+            return;
+        }
+        self.items.push(ChatItem::Info { text });
     }
 
-    /// Append an error line.
+    /// Append an error line (headline only).
     pub fn push_error(&mut self, message: impl Into<String>) {
-        self.items.push(ChatItem::Error {
-            message: message.into(),
-        });
+        self.push_human_error(message.into(), None);
+    }
+
+    /// Append a humanized engine error with optional dim detail.
+    pub fn push_human_error(&mut self, headline: String, detail: Option<String>) {
+        self.items.push(ChatItem::Error { headline, detail });
     }
 
     /// Plain-text export of the visible transcript (for clipboard copy).
@@ -185,17 +216,8 @@ impl ChatState {
                     out.push_str(text);
                     out.push('\n');
                 }
-                ChatItem::Assistant {
-                    blocks,
-                    complete,
-                    model,
-                    ..
-                } => {
-                    if *complete {
-                        out.push_str("assistant");
-                    } else {
-                        out.push_str("assistant (streaming)");
-                    }
+                ChatItem::Assistant { blocks, model, .. } => {
+                    out.push_str("assistant");
                     if let Some(model) = model {
                         out.push_str(" [");
                         out.push_str(model);
@@ -210,9 +232,17 @@ impl ChatState {
                                     out.push('\n');
                                 }
                             }
-                            DraftBlock::Thinking { text, collapsed } => {
+                            DraftBlock::Thinking {
+                                text,
+                                collapsed,
+                                duration_ms,
+                                ..
+                            } => {
                                 if *collapsed {
-                                    out.push_str("[thinking collapsed]\n");
+                                    out.push_str(&format!(
+                                        "[thought for {}s]\n",
+                                        thinking_seconds(*duration_ms, text)
+                                    ));
                                 } else {
                                     out.push_str("[thinking]\n");
                                     out.push_str(text);
@@ -225,10 +255,11 @@ impl ChatState {
                     }
                 }
                 ChatItem::Tool { call, progress, .. } => {
-                    out.push_str("tool ");
-                    out.push_str(&call.tool_name);
-                    out.push_str(": ");
-                    out.push_str(&format!("{:?}", call.status));
+                    out.push_str(&crate::tool_output::tool_summary(
+                        &call.tool_name,
+                        &call.input,
+                    ));
+                    out.push_str(&format!(" [{:?}]", call.status));
                     out.push('\n');
                     if let Some(progress) = progress {
                         out.push_str("  ");
@@ -254,9 +285,14 @@ impl ChatState {
                     out.push_str(text);
                     out.push('\n');
                 }
-                ChatItem::Error { message } => {
+                ChatItem::Error { headline, detail } => {
                     out.push_str("error: ");
-                    out.push_str(message);
+                    out.push_str(headline);
+                    if let Some(detail) = detail {
+                        out.push_str(" (");
+                        out.push_str(detail);
+                        out.push(')');
+                    }
                     out.push('\n');
                 }
                 ChatItem::Subagent { task, done, .. } => {
@@ -299,6 +335,8 @@ impl ChatState {
                         _ => blocks.push(DraftBlock::Thinking {
                             text: text.clone(),
                             collapsed: false,
+                            started: Some(Instant::now()),
+                            duration_ms: None,
                         }),
                     }
                     *r = rev;
@@ -318,7 +356,7 @@ impl ChatState {
                 model,
                 usage,
             } => {
-                let final_blocks = materialize_blocks(content);
+                let mut final_blocks = materialize_blocks(content);
                 let rev = self.next_rev();
                 match self.open.remove(message_id) {
                     Some(idx) => {
@@ -330,6 +368,7 @@ impl ChatState {
                             rev: r,
                         }) = self.items.get_mut(idx)
                         {
+                            carry_thinking_durations(blocks, &mut final_blocks);
                             *blocks = final_blocks;
                             *m = model.clone();
                             *u = *usage;
@@ -429,7 +468,9 @@ impl ChatState {
                 }
             }
             AgentEvent::SessionError { error } => {
-                self.push_error(error.message.clone());
+                if let Some(human) = crate::error_fmt::humanize_engine_error(error) {
+                    self.push_human_error(human.headline, human.detail);
+                }
             }
             AgentEvent::CommandExpanded { name, args } => {
                 let text = if args.is_empty() {
@@ -490,8 +531,17 @@ impl ChatState {
             {
                 *complete = true;
                 for block in blocks.iter_mut() {
-                    if let DraftBlock::Thinking { collapsed, .. } = block {
+                    if let DraftBlock::Thinking {
+                        collapsed,
+                        started,
+                        duration_ms,
+                        ..
+                    } = block
+                    {
                         *collapsed = true;
+                        if duration_ms.is_none() {
+                            *duration_ms = started.map(|at| at.elapsed().as_millis() as u64);
+                        }
                     }
                 }
                 *r = rev;
@@ -578,9 +628,7 @@ impl ChatState {
     /// Toggle expand/collapse on one tool item.
     pub fn toggle_tool_expand(&mut self, idx: usize) -> bool {
         let expandable = match self.items.get(idx) {
-            Some(ChatItem::Tool { call, .. }) => call.result.as_ref().is_some_and(|result| {
-                crate::tool_output::result_is_expandable(&call.tool_name, result)
-            }),
+            Some(ChatItem::Tool { call, .. }) => crate::tool_output::call_is_expandable(call),
             _ => false,
         };
         if !expandable {
@@ -599,9 +647,7 @@ impl ChatState {
         let ChatItem::Tool { call, .. } = &self.items[idx] else {
             return false;
         };
-        call.result
-            .as_ref()
-            .is_some_and(|result| crate::tool_output::result_is_expandable(&call.tool_name, result))
+        crate::tool_output::call_is_expandable(call)
     }
 
     fn last_expandable_tool_index(&self) -> Option<usize> {
@@ -644,6 +690,8 @@ impl ChatState {
                                 blocks.push(DraftBlock::Thinking {
                                     text: text.clone(),
                                     collapsed: true,
+                                    started: None,
+                                    duration_ms: None,
                                 });
                             }
                             TranscriptBlock::ToolCall(call) => calls.push(call),
@@ -710,11 +758,34 @@ fn materialize_blocks(content: &[ContentBlock]) -> Vec<DraftBlock> {
             ContentBlock::Thinking { text, .. } => blocks.push(DraftBlock::Thinking {
                 text: text.clone(),
                 collapsed: true,
+                started: None,
+                duration_ms: None,
             }),
             _ => {}
         }
     }
     blocks
+}
+
+/// Carry measured thinking durations from a streamed draft onto the
+/// authoritative materialized blocks (matched in order).
+fn carry_thinking_durations(draft: &[DraftBlock], materialized: &mut [DraftBlock]) {
+    let mut measured = draft.iter().filter_map(|block| match block {
+        DraftBlock::Thinking {
+            started,
+            duration_ms,
+            ..
+        } => Some(duration_ms.or_else(|| started.map(|at| at.elapsed().as_millis() as u64))),
+        _ => None,
+    });
+    for block in materialized.iter_mut() {
+        if let DraftBlock::Thinking { duration_ms, .. } = block {
+            match measured.next() {
+                Some(duration) => *duration_ms = duration,
+                None => break,
+            }
+        }
+    }
 }
 
 fn joined_markdown(content: &[ContentBlock]) -> String {
@@ -855,13 +926,15 @@ mod apply_tests {
         };
         assert!(!complete);
         assert_eq!(blocks.len(), 1);
-        assert_eq!(
-            blocks[0],
+        assert!(matches!(
+            &blocks[0],
             DraftBlock::Thinking {
-                text: "step one and two".to_owned(),
+                text,
                 collapsed: false,
-            }
-        );
+                started: Some(_),
+                duration_ms: None,
+            } if text == "step one and two"
+        ));
     }
 
     #[test]
@@ -886,13 +959,41 @@ mod apply_tests {
         };
         assert_eq!(blocks.len(), 2);
         assert_eq!(blocks[0], DraftBlock::Markdown("answer".to_owned()));
-        assert_eq!(
-            blocks[1],
+        assert!(matches!(
+            &blocks[1],
             DraftBlock::Thinking {
-                text: "late thought".to_owned(),
+                text,
                 collapsed: false,
-            }
-        );
+                ..
+            } if text == "late thought"
+        ));
+    }
+}
+
+#[cfg(test)]
+mod push_info_tests {
+    use super::{ChatItem, ChatState};
+
+    #[test]
+    fn push_info_dedupes_identical_last_line() {
+        let mut chat = ChatState::default();
+        chat.push_info("already on native");
+        chat.push_info("already on native");
+        chat.push_info("already on native");
+        assert_eq!(chat.items.len(), 1);
+        chat.push_info("something else");
+        chat.push_info("already on native");
+        assert_eq!(chat.items.len(), 3);
+    }
+
+    #[test]
+    fn push_info_dedupe_ignores_non_info_last_item() {
+        let mut chat = ChatState::default();
+        chat.push_info("note");
+        chat.push_error("boom");
+        chat.push_info("note");
+        assert_eq!(chat.items.len(), 3);
+        assert!(matches!(&chat.items[2], ChatItem::Info { text } if text == "note"));
     }
 }
 

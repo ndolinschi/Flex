@@ -10,10 +10,10 @@ use std::time::{Duration, Instant};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
-use agentloop_cli_core::{AgentKind, CatalogEntry, LoginEvent, has_copilot_credentials};
+use agentloop_cli_core::{AgentKind, CatalogEntry, CliPrefs, LoginEvent, has_copilot_credentials};
 use agentloop_contracts::{
     AgentCaps, AgentEvent, ModelDiscovery, ModelInfo, ModelRef, PermissionMode, PromptInput,
-    SessionEvent, SessionId, TokenUsage, TurnOptions, TurnStopReason,
+    SessionEvent, SessionId, ThinkingConfig, TokenUsage, TurnOptions, TurnStopReason,
 };
 
 use crate::chat::ChatState;
@@ -28,12 +28,16 @@ use crate::overlay::{
 };
 use crate::ui::MarkdownCache;
 
-/// Second Ctrl+C within this window quits.
-const QUIT_WINDOW: Duration = Duration::from_millis(1500);
 /// PageUp/PageDown scroll step in wrapped lines.
 const SCROLL_STEP: usize = 10;
 /// Arrow-key scroll step when the prompt is empty.
 const ARROW_SCROLL_STEP: usize = 3;
+/// How long a toast stays visible.
+const TOAST_TTL: Duration = Duration::from_secs(4);
+/// At most this many toasts queue before the oldest is dropped.
+const TOAST_CAP: usize = 3;
+/// Transcript marker for an interrupted turn.
+pub(crate) const INTERRUPT_NOTE: &str = "⎿ Interrupted";
 
 /// Whether a turn is in flight.
 #[derive(Debug, Clone, Copy)]
@@ -103,18 +107,32 @@ pub fn permission_mode_label(mode: PermissionMode) -> &'static str {
     }
 }
 
-/// Status-bar state.
+/// A transient notification shown on the line above the input for a few
+/// seconds; never enters the transcript.
+#[derive(Debug)]
+pub struct Toast {
+    pub text: String,
+    pub created: Instant,
+}
+
+/// Status-bar and notification-line state.
 #[derive(Debug, Default)]
 pub struct StatusState {
     /// Accumulated from `TurnCompleted` summaries.
     pub total_usage: TokenUsage,
     pub last_cost_usd: Option<f64>,
-    /// One-line error, cleared on the next keypress.
-    pub last_error: Option<String>,
-    /// Transient notice ("press ctrl+c again to exit").
-    pub notice: Option<String>,
+    /// Transient notifications, newest last; expired on tick.
+    pub toasts: VecDeque<Toast>,
     /// Spinner animation counter, advanced by ticks while busy.
     pub spinner: usize,
+    /// Busy-line verb index, picked at turn start and stable for the turn.
+    pub turn_verb_idx: usize,
+    /// Streamed output characters this turn (approximate tokens = chars/4,
+    /// snapped to reported usage as messages materialize).
+    pub turn_output_chars: u64,
+    /// Prompt-side context size from the last `TurnCompleted`
+    /// (`usage.input + cache_read`), for the context-% segment.
+    pub last_context_tokens: Option<u64>,
 }
 
 /// What to resume after a contextual Copilot sign-in completes.
@@ -159,13 +177,16 @@ pub struct App {
     pub mouse_capture: bool,
     /// User preference: show reasoning blocks when the agent exposes them.
     pub show_thinking: bool,
+    /// Extended-thinking token budget; `None` = off for provider turns.
+    pub thinking_budget: Option<u32>,
+    /// Agent switch in flight (for Copilot probe-fail tip).
+    pending_switch_kind: Option<AgentKind>,
     pub should_quit: bool,
     /// Session working directory (`--workdir`); scopes `@` file search.
     pub workdir: PathBuf,
     /// Indexed files under [`Self::workdir`] for `@` mention autocomplete.
     pub file_index: FileIndex,
     dirty: bool,
-    quit_armed_at: Option<Instant>,
 }
 
 impl App {
@@ -200,11 +221,12 @@ impl App {
             markdown_cache: MarkdownCache::default(),
             mouse_capture: false,
             show_thinking: bootstrap.hello.capabilities.reasoning_visible,
+            thinking_budget: None,
+            pending_switch_kind: None,
             should_quit: false,
             workdir,
             file_index,
             dirty: true,
-            quit_armed_at: None,
         };
         let welcome = format!(
             "{} {} — /help for keys and commands",
@@ -229,6 +251,48 @@ impl App {
     /// Whether reasoning/thinking blocks should render in the chat transcript.
     pub fn thinking_visible(&self) -> bool {
         self.caps.reasoning_visible && self.show_thinking
+    }
+
+    /// Apply persisted CLI preferences (modes, thinking budget/visibility).
+    pub fn apply_loaded_prefs(&mut self, prefs: &CliPrefs) {
+        if let Some(ref text) = prefs.session_mode {
+            if let Some(mode) = parse_session_mode(text) {
+                self.session.session_mode = mode;
+            }
+        }
+        if let Some(ref text) = prefs.permission_mode {
+            if let Some(mode) = parse_stored_permission_mode(text) {
+                self.session.permission_mode = mode;
+            }
+        }
+        if let Some(visible) = prefs.thinking_visible {
+            self.show_thinking = visible;
+        }
+        self.thinking_budget = prefs.thinking_budget;
+    }
+
+    /// Show a transient notification above the input (never in transcript).
+    pub fn toast(&mut self, text: impl Into<String>) {
+        self.status.toasts.push_back(Toast {
+            text: text.into(),
+            created: Instant::now(),
+        });
+        while self.status.toasts.len() > TOAST_CAP {
+            self.status.toasts.pop_front();
+        }
+        self.dirty = true;
+    }
+
+    /// Enter the running phase and reset the per-turn busy-line state.
+    fn begin_turn(&mut self) {
+        if self.session.turn.is_running() {
+            return;
+        }
+        self.session.turn = TurnPhase::Running {
+            started: Instant::now(),
+        };
+        self.status.turn_verb_idx = pick_verb_idx();
+        self.status.turn_output_chars = 0;
     }
 
     /// The single reducer entry point.
@@ -289,25 +353,12 @@ impl App {
     }
 
     fn on_key(&mut self, key: KeyEvent) -> Vec<Effect> {
-        self.status.last_error = None;
-
         // Copy transcript before generic Ctrl/Cmd+C handling.
         if matches!(key.code, KeyCode::Char('c') | KeyCode::Char('C'))
             && key.modifiers.contains(KeyModifiers::CONTROL)
             && key.modifiers.contains(KeyModifiers::SHIFT)
         {
             return self.copy_chat();
-        }
-
-        // Expand/collapse the latest thinking block (Shift+Ctrl+T).
-        if matches!(key.code, KeyCode::Char('t') | KeyCode::Char('T'))
-            && key.modifiers.contains(KeyModifiers::CONTROL)
-            && key.modifiers.contains(KeyModifiers::SHIFT)
-        {
-            if self.thinking_visible() {
-                self.chat.toggle_last_thinking();
-            }
-            return Vec::new();
         }
 
         // Toggle mouse capture (wheel scroll vs native text selection).
@@ -348,7 +399,7 @@ impl App {
         match (key.code, key.modifiers) {
             (KeyCode::Esc, _) if !popup_open => {
                 if self.session.turn.is_running() {
-                    self.status.notice = Some("interrupting…".to_owned());
+                    self.toast("interrupting…");
                     return vec![Effect::CancelTurn];
                 }
                 return Vec::new();
@@ -373,14 +424,21 @@ impl App {
                 self.chat.scroll.scroll_to_bottom();
                 return Vec::new();
             }
+            // Expand/collapse the latest thinking block.
             (KeyCode::Char('t'), KeyModifiers::CONTROL) => {
-                return self.toggle_thinking();
+                if self.thinking_visible() {
+                    self.chat.toggle_last_thinking();
+                }
+                return Vec::new();
             }
-            (KeyCode::Tab, modifiers) if self.input.is_empty() => {
-                if self
-                    .chat
-                    .cycle_tool_focus(modifiers.contains(KeyModifiers::SHIFT))
-                {
+            // Expand/collapse the focused (or last) tool result.
+            (KeyCode::Char('o'), KeyModifiers::CONTROL) => {
+                self.chat.toggle_focused_tool_expand();
+                return Vec::new();
+            }
+            // Shift+Tab/BackTab stays unbound: reserved for mode cycling.
+            (KeyCode::Tab, KeyModifiers::NONE) if self.input.is_empty() => {
+                if self.chat.cycle_tool_focus(false) {
                     return Vec::new();
                 }
             }
@@ -401,7 +459,7 @@ impl App {
 
     fn on_ctrl_c(&mut self) -> Vec<Effect> {
         if self.session.turn.is_running() {
-            self.status.notice = Some("interrupting…".to_owned());
+            self.toast("interrupting…");
             return vec![Effect::CancelTurn];
         }
         if matches!(self.overlay, Overlay::Login(_)) {
@@ -413,8 +471,7 @@ impl App {
         }
         if !self.input.is_empty() {
             self.input.set_text("");
-            self.quit_armed_at = Some(Instant::now());
-            self.status.notice = Some("input cleared — ctrl+c again to exit".to_owned());
+            self.toast("input cleared — ctrl+c again to exit");
             return Vec::new();
         }
         self.should_quit = true;
@@ -487,20 +544,13 @@ impl App {
 
     fn submit_prompt(&mut self, line: &str) -> Vec<Effect> {
         if self.session.turn.is_running() {
-            self.status.notice = Some("turn in progress — esc to cancel".to_owned());
+            self.toast("turn in progress — esc to cancel");
             return Vec::new();
         }
-        self.session.turn = TurnPhase::Running {
-            started: Instant::now(),
-        };
-        self.status.notice = None;
+        self.begin_turn();
         vec![Effect::SubmitPrompt {
             input: PromptInput::text(line),
-            opts: TurnOptions {
-                model: self.session.model.clone(),
-                permission_mode: Some(self.session.effective_permission_mode()),
-                ..TurnOptions::default()
-            },
+            opts: self.turn_options(),
         }]
     }
 
@@ -516,7 +566,7 @@ impl App {
                 Vec::new()
             }
             LocalCommand::New => {
-                self.status.notice = Some("starting new session…".to_owned());
+                self.toast("starting new session…");
                 vec![Effect::NewSession]
             }
             LocalCommand::Help => {
@@ -538,33 +588,28 @@ impl App {
 
     fn run_compact(&mut self) -> Vec<Effect> {
         if self.session.turn.is_running() {
-            self.status.notice = Some("turn in progress — esc to cancel first".to_owned());
+            self.toast("turn in progress — esc to cancel first");
             return Vec::new();
         }
-        self.session.turn = TurnPhase::Running {
-            started: Instant::now(),
-        };
-        self.status.notice = Some("compacting session…".to_owned());
+        self.begin_turn();
+        self.toast("compacting session…");
         vec![Effect::CompactSession {
-            opts: TurnOptions {
-                model: self.session.model.clone(),
-                permission_mode: Some(self.session.effective_permission_mode()),
-                ..TurnOptions::default()
-            },
+            opts: self.turn_options(),
         }]
     }
 
     fn toggle_thinking(&mut self) -> Vec<Effect> {
         if !self.caps.reasoning_visible {
-            self.status.notice = Some("this agent does not expose reasoning".to_owned());
+            self.toast("this agent does not expose reasoning");
             return Vec::new();
         }
         self.show_thinking = !self.show_thinking;
         if self.show_thinking {
-            self.status.notice = Some("thinking visible (ctrl+t to hide)".to_owned());
+            self.toast("thinking visible (/thinking off to hide)");
         } else {
-            self.status.notice = Some("thinking hidden (ctrl+t to show)".to_owned());
+            self.toast("thinking hidden (/thinking on to show)");
         }
+        self.persist_mode_prefs();
         Vec::new()
     }
 
@@ -578,20 +623,51 @@ impl App {
             None => self.toggle_thinking(),
             Some("on" | "show") => {
                 self.show_thinking = true;
-                self.chat.push_info("thinking visible");
+                self.toast("thinking visible");
+                self.persist_mode_prefs();
                 Vec::new()
             }
-            Some("off" | "hide") => {
+            Some("off") => {
+                self.thinking_budget = None;
+                self.persist_thinking_budget();
+                self.toast("thinking off");
+                Vec::new()
+            }
+            Some("hide") => {
                 self.show_thinking = false;
-                self.chat.push_info("thinking hidden");
+                self.toast("thinking hidden");
+                self.persist_mode_prefs();
                 Vec::new()
             }
+            Some("low") => self.set_thinking_budget(4096),
+            Some("medium") => self.set_thinking_budget(12_288),
+            Some("high") => self.set_thinking_budget(32_768),
             Some(text) => {
-                self.chat
-                    .push_error(format!("unknown /thinking value `{text}` (use on or off)"));
+                if let Ok(budget) = text.parse::<u32>() {
+                    if budget == 0 {
+                        self.thinking_budget = None;
+                        self.persist_thinking_budget();
+                        self.toast("thinking off");
+                        return Vec::new();
+                    }
+                    return self.set_thinking_budget(budget);
+                }
+                self.chat.push_error(format!(
+                    "unknown /thinking value `{text}` (use off, low, medium, high, or a token count)"
+                ));
                 Vec::new()
             }
         }
+    }
+
+    fn set_thinking_budget(&mut self, budget: u32) -> Vec<Effect> {
+        self.thinking_budget = Some(budget);
+        self.persist_thinking_budget();
+        self.toast(format!(
+            "thinking budget set to {}",
+            crate::ui::fmt_thinking_budget_k(budget)
+        ));
+        Vec::new()
     }
 
     fn run_mode_command(&mut self, arg: Option<String>) -> Vec<Effect> {
@@ -658,8 +734,8 @@ impl App {
 
     fn set_session_mode(&mut self, mode: SessionMode) {
         self.session.session_mode = mode;
-        self.chat
-            .push_info(format!("session mode set to {}", session_mode_label(mode)));
+        self.toast(format!("session mode set to {}", session_mode_label(mode)));
+        self.persist_mode_prefs();
     }
 
     fn set_permission_mode(&mut self, mode: PermissionMode) {
@@ -671,15 +747,16 @@ impl App {
             return;
         }
         self.session.permission_mode = mode;
-        self.chat.push_info(format!(
+        self.toast(format!(
             "permissions set to {}",
             permission_mode_label(mode)
         ));
+        self.persist_mode_prefs();
     }
 
     fn confirm_allow_all(&mut self) {
         if self.session.permission_mode == PermissionMode::BypassPermissions {
-            self.chat.push_info("permissions already allow-all");
+            self.toast("permissions already allow-all");
             return;
         }
         if !self
@@ -750,19 +827,19 @@ impl App {
     fn copy_chat(&mut self) -> Vec<Effect> {
         let text = self.chat.plain_text();
         if text.trim().is_empty() {
-            self.status.notice = Some("nothing to copy".to_owned());
+            self.toast("nothing to copy");
             return Vec::new();
         }
-        self.status.notice = Some("chat copied to clipboard".to_owned());
+        // Success is toasted by the runtime once the clipboard write lands.
         vec![Effect::CopyToClipboard { text }]
     }
 
     fn toggle_mouse_capture(&mut self) -> Vec<Effect> {
         self.mouse_capture = !self.mouse_capture;
-        self.status.notice = Some(if self.mouse_capture {
-            "mouse scroll on — drag-select off (Ctrl+M to toggle)".to_owned()
+        self.toast(if self.mouse_capture {
+            "mouse scroll on — drag-select off (Ctrl+M to toggle)"
         } else {
-            "mouse select on — drag to copy, Ctrl+Shift+C copies all".to_owned()
+            "mouse select on — drag to copy, Ctrl+Shift+C copies all"
         });
         vec![Effect::SetMouseCapture(self.mouse_capture)]
     }
@@ -781,7 +858,7 @@ impl App {
                 invalidate: true,
             }];
         }
-        self.chat.push_info(format!("model set to {model}"));
+        self.toast(format!("model set to {model}"));
         self.session.model = Some(model.clone());
         vec![Effect::SaveLastModel(model)]
     }
@@ -795,7 +872,7 @@ impl App {
     fn resume_after_copilot_login(&mut self, pending: PendingCopilotAuth) -> Vec<Effect> {
         match pending {
             PendingCopilotAuth::SwitchAgent(kind) => {
-                self.status.notice = Some(format!("switching to {kind}…"));
+                self.toast(format!("switching to {kind}…"));
                 vec![Effect::SwitchAgent {
                     kind,
                     invalidate: false,
@@ -848,7 +925,7 @@ impl App {
             _ => {
                 if self.catalog.is_empty() {
                     self.awaiting_model_picker = true;
-                    self.status.notice = Some("fetching models…".to_owned());
+                    self.toast("fetching models…");
                     vec![Effect::ListModels]
                 } else {
                     self.open_catalog_picker();
@@ -951,7 +1028,7 @@ impl App {
             Some(entry) => self.set_model(entry.model_ref()),
             None => {
                 self.pending_provider = Some(name.to_owned());
-                self.status.notice = Some("fetching models…".to_owned());
+                self.toast("fetching models…");
                 vec![Effect::ListModels]
             }
         }
@@ -960,14 +1037,15 @@ impl App {
     fn switch_agent(&mut self, id: &str) -> Vec<Effect> {
         match AgentKind::parse(id) {
             Some(kind) if kind == self.kind => {
-                self.chat.push_info(format!("already on {kind}"));
+                self.toast(format!("already on {kind}"));
                 Vec::new()
             }
             Some(AgentKind::Copilot) if !has_copilot_credentials() => {
                 self.start_copilot_login(PendingCopilotAuth::SwitchAgent(AgentKind::Copilot))
             }
             Some(kind) => {
-                self.status.notice = Some(format!("switching to {kind}…"));
+                self.pending_switch_kind = Some(kind);
+                self.toast(format!("switching to {kind}…"));
                 vec![Effect::SwitchAgent {
                     kind,
                     invalidate: false,
@@ -988,42 +1066,44 @@ impl App {
         self.session.last_seq = self.session.last_seq.max(event.seq);
         match &event.payload {
             AgentEvent::TurnStarted { .. } => {
-                if !self.session.turn.is_running() {
-                    self.session.turn = TurnPhase::Running {
-                        started: Instant::now(),
-                    };
-                }
+                self.begin_turn();
                 Vec::new()
             }
             AgentEvent::MessageStarted { role, .. } => {
-                if *role == agentloop_contracts::Role::Assistant && !self.session.turn.is_running()
-                {
-                    self.session.turn = TurnPhase::Running {
-                        started: Instant::now(),
-                    };
+                if *role == agentloop_contracts::Role::Assistant {
+                    self.begin_turn();
                 }
                 self.chat.apply(&event.payload);
                 Vec::new()
             }
-            AgentEvent::MarkdownDelta { .. } | AgentEvent::ThinkingDelta { .. } => {
-                if !self.session.turn.is_running() {
-                    self.session.turn = TurnPhase::Running {
-                        started: Instant::now(),
-                    };
+            AgentEvent::MarkdownDelta { text, .. } | AgentEvent::ThinkingDelta { text, .. } => {
+                self.begin_turn();
+                self.status.turn_output_chars += text.len() as u64;
+                self.chat.apply(&event.payload);
+                Vec::new()
+            }
+            AgentEvent::AssistantMessage { usage, .. } => {
+                // Snap the approximate live counter to reported usage.
+                if let Some(usage) = usage {
+                    self.status.turn_output_chars = self
+                        .status
+                        .turn_output_chars
+                        .max(usage.output.saturating_mul(4));
                 }
                 self.chat.apply(&event.payload);
                 Vec::new()
             }
             AgentEvent::TurnCompleted { summary, .. } => {
                 self.session.turn = TurnPhase::Idle;
-                self.status.notice = None;
                 self.status.total_usage.add(&summary.usage);
+                self.status.last_context_tokens =
+                    Some(summary.usage.input + summary.usage.cache_read.unwrap_or(0));
                 if summary.cost_usd.is_some() {
                     self.status.last_cost_usd = summary.cost_usd;
                 }
                 self.chat.finalize_drafts();
                 if summary.stop_reason == TurnStopReason::Cancelled {
-                    self.chat.push_info("turn interrupted");
+                    self.chat.push_info(INTERRUPT_NOTE);
                 }
                 Vec::new()
             }
@@ -1113,23 +1193,21 @@ impl App {
             TaskResult::TurnFinished(outcome) => {
                 self.session.turn = TurnPhase::Idle;
                 if let Err(message) = outcome {
-                    // Turn failures render from the event stream; this line
+                    // Turn failures render from the event stream; this toast
                     // is only a fallback signal (e.g. TurnInProgress).
-                    self.status.last_error = Some(message);
+                    self.toast(message);
                 }
                 Vec::new()
             }
             TaskResult::CompactFinished(outcome) => {
                 self.session.turn = TurnPhase::Idle;
-                self.status.notice = None;
                 if let Err(message) = outcome {
-                    self.status.last_error = Some(message);
+                    self.toast(message);
                 }
                 Vec::new()
             }
             TaskResult::Models(Ok(entries)) => {
                 self.catalog = entries;
-                self.status.notice = None;
                 let mut effects = Vec::new();
                 if let Some(name) = self.pending_provider.take() {
                     match self
@@ -1151,12 +1229,12 @@ impl App {
             TaskResult::Models(Err(message)) => {
                 self.awaiting_model_picker = false;
                 self.pending_provider = None;
-                self.status.notice = None;
-                self.status.last_error = Some(format!("model listing failed: {message}"));
+                self.toast(format!("model listing failed: {message}"));
                 Vec::new()
             }
             TaskResult::EngineSwitched(outcome) => match *outcome {
                 Ok(bootstrap) => {
+                    self.pending_switch_kind = None;
                     let pending_model = self.pending_model.take();
                     let pending_provider = self.pending_provider.take();
                     self.install_bootstrap(bootstrap, true);
@@ -1169,7 +1247,14 @@ impl App {
                     effects
                 }
                 Err(message) => {
-                    self.status.notice = None;
+                    if self.pending_switch_kind == Some(AgentKind::Copilot)
+                        && has_copilot_credentials()
+                    {
+                        self.toast(
+                            "Use /provider copilot for the Copilot API (no CLI install needed)",
+                        );
+                    }
+                    self.pending_switch_kind = None;
                     self.chat.push_error(format!("switch failed: {message}"));
                     Vec::new()
                 }
@@ -1178,7 +1263,6 @@ impl App {
                 self.session.id = id;
                 self.session.last_seq = 0;
                 self.session.turn = TurnPhase::Idle;
-                self.status.notice = None;
                 self.chat = ChatState::default();
                 self.markdown_cache.clear();
                 self.overlay = Overlay::None;
@@ -1188,7 +1272,6 @@ impl App {
                 Vec::new()
             }
             TaskResult::SessionReset(Err(message)) => {
-                self.status.notice = None;
                 self.chat
                     .push_error(format!("new session failed: {message}"));
                 Vec::new()
@@ -1198,7 +1281,7 @@ impl App {
                 Vec::new()
             }
             TaskResult::Resynced(Err(message)) => {
-                self.status.last_error = Some(format!("resync failed: {message}"));
+                self.toast(format!("resync failed: {message}"));
                 Vec::new()
             }
             TaskResult::LoginFinished(Ok(())) => {
@@ -1210,7 +1293,7 @@ impl App {
                 if let Some(pending) = self.pending_copilot_auth.take() {
                     self.resume_after_copilot_login(pending)
                 } else {
-                    self.status.notice = Some("reloading providers…".to_owned());
+                    self.toast("reloading providers…");
                     vec![Effect::SwitchAgent {
                         kind: AgentKind::Native,
                         invalidate: true,
@@ -1263,7 +1346,8 @@ impl App {
                 }
             }
             if !cancelled {
-                self.chat.push_info(summary);
+                // The overlay already showed the output; a toast suffices.
+                self.toast(summary);
             }
         } else {
             self.chat.push_info(summary);
@@ -1272,6 +1356,10 @@ impl App {
 
     /// Adopt a (new or resumed) session and its agent's capabilities.
     fn install_bootstrap(&mut self, bootstrap: SessionBootstrap, announce: bool) {
+        let prev_session_mode = self.session.session_mode;
+        let prev_permission_mode = self.session.permission_mode;
+        let prev_show_thinking = self.show_thinking;
+        let prev_thinking_budget = self.thinking_budget;
         self.kind = bootstrap.kind;
         self.caps = bootstrap.hello.capabilities.clone();
         self.engine_name = bootstrap.hello.engine.name.clone();
@@ -1294,9 +1382,15 @@ impl App {
         self.overlay = Overlay::None;
         self.pending_permissions.clear();
         self.pending_questions.clear();
-        self.status.notice = None;
+        self.status.toasts.clear();
         self.markdown_cache.clear();
         self.show_thinking = bootstrap.hello.capabilities.reasoning_visible;
+        if announce {
+            self.session.session_mode = prev_session_mode;
+            self.session.permission_mode = prev_permission_mode;
+            self.show_thinking = prev_show_thinking;
+            self.thinking_budget = prev_thinking_budget;
+        }
         if announce {
             self.chat = ChatState::default();
         }
@@ -1368,14 +1462,12 @@ impl App {
             self.status.spinner = self.status.spinner.wrapping_add(1);
             self.dirty = true;
         }
-        if let Some(armed) = self.quit_armed_at {
-            if armed.elapsed() > QUIT_WINDOW {
-                self.quit_armed_at = None;
-                if self.status.notice.as_deref() == Some("press ctrl+c again to exit") {
-                    self.status.notice = None;
-                }
-                self.dirty = true;
-            }
+        let live_toasts = self.status.toasts.len();
+        self.status
+            .toasts
+            .retain(|toast| toast.created.elapsed() < TOAST_TTL);
+        if self.status.toasts.len() != live_toasts {
+            self.dirty = true;
         }
     }
 }
@@ -1419,6 +1511,60 @@ fn parse_session_mode(text: &str) -> Option<SessionMode> {
         "code" => Some(SessionMode::Code),
         "plan" => Some(SessionMode::Plan),
         _ => None,
+    }
+}
+
+fn parse_stored_permission_mode(text: &str) -> Option<PermissionMode> {
+    parse_permission_arg(text).or_else(|| match text.trim().to_lowercase().as_str() {
+        "accept-edits" => Some(PermissionMode::AcceptEdits),
+        "dont-ask" => Some(PermissionMode::DontAsk),
+        "bypass" => Some(PermissionMode::BypassPermissions),
+        _ => None,
+    })
+}
+
+fn permission_mode_pref_value(mode: PermissionMode) -> &'static str {
+    match mode {
+        PermissionMode::Default => "default",
+        PermissionMode::AcceptEdits => "accept-edits",
+        PermissionMode::Plan => "plan",
+        PermissionMode::DontAsk => "dont-ask",
+        PermissionMode::BypassPermissions => "bypass",
+        _ => "default",
+    }
+}
+
+fn thinking_config_from_prefs(budget: Option<u32>, caps: &AgentCaps) -> Option<ThinkingConfig> {
+    let budget = budget?;
+    caps.reasoning_visible.then_some(ThinkingConfig {
+        budget_tokens: budget,
+    })
+}
+
+impl App {
+    fn turn_options(&self) -> TurnOptions {
+        TurnOptions {
+            model: self.session.model.clone(),
+            permission_mode: Some(self.session.effective_permission_mode()),
+            thinking: thinking_config_from_prefs(self.thinking_budget, &self.caps),
+            ..TurnOptions::default()
+        }
+    }
+
+    fn persist_mode_prefs(&self) {
+        if let Err(err) = CliPrefs::remember_modes(
+            session_mode_label(self.session.session_mode),
+            permission_mode_pref_value(self.session.permission_mode),
+            self.show_thinking,
+        ) {
+            tracing::warn!(target: "prefs", "failed to save mode preferences: {err}");
+        }
+    }
+
+    fn persist_thinking_budget(&self) {
+        if let Err(err) = CliPrefs::remember_thinking_budget(self.thinking_budget) {
+            tracing::warn!(target: "prefs", "failed to save thinking budget: {err}");
+        }
     }
 }
 
@@ -1477,6 +1623,16 @@ fn permission_picker_items(
 
 fn is_copilot_model(model: &ModelRef) -> bool {
     model.split().0 == Some("copilot")
+}
+
+/// A pseudo-random verb index; one pick per turn is all the randomness the
+/// busy line needs, so clock jitter beats a rand dependency.
+fn pick_verb_idx() -> usize {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.subsec_nanos())
+        .unwrap_or(0);
+    nanos as usize % crate::theme::SPINNER_VERBS.len()
 }
 
 fn model_badges(model: &ModelInfo) -> Option<String> {
@@ -1584,6 +1740,78 @@ mod copilot_auth_tests {
         assert!(app.chat.items.iter().any(|item| {
             matches!(item, ChatItem::Info { text } if text.contains("starts automatically"))
         }));
+    }
+}
+
+#[cfg(test)]
+mod status_tests {
+    use super::*;
+    use crate::events::SessionBootstrap;
+    use crate::files::FileIndex;
+    use agentloop_contracts::{AgentCaps, Hello, SessionId};
+
+    fn test_app() -> App {
+        let bootstrap = SessionBootstrap {
+            kind: AgentKind::Native,
+            hello: Hello::new(AgentCaps::default()),
+            session: SessionId::from("sess-test"),
+            providers: vec!["anthropic".to_owned()],
+            model: None,
+            transcript: None,
+            trace: Vec::new(),
+            permission_mode: None,
+        };
+        App::new(bootstrap, PathBuf::from("."), FileIndex::default())
+    }
+
+    #[test]
+    fn toasts_cap_at_three_dropping_oldest() {
+        let mut app = test_app();
+        for idx in 0..5 {
+            app.toast(format!("toast {idx}"));
+        }
+        assert_eq!(app.status.toasts.len(), 3);
+        assert_eq!(
+            app.status.toasts.front().map(|t| t.text.as_str()),
+            Some("toast 2")
+        );
+        assert_eq!(
+            app.status.toasts.back().map(|t| t.text.as_str()),
+            Some("toast 4")
+        );
+    }
+
+    #[test]
+    fn begin_turn_resets_busy_counters_once() {
+        let mut app = test_app();
+        app.status.turn_output_chars = 999;
+        app.begin_turn();
+        assert!(app.session.turn.is_running());
+        assert_eq!(app.status.turn_output_chars, 0);
+        // A second begin_turn mid-turn must not reset the counter or verb.
+        app.status.turn_output_chars = 40;
+        let verb = app.status.turn_verb_idx;
+        app.begin_turn();
+        assert_eq!(app.status.turn_output_chars, 40);
+        assert_eq!(app.status.turn_verb_idx, verb);
+    }
+
+    #[test]
+    fn delta_events_accumulate_output_chars() {
+        let mut app = test_app();
+        let event = agentloop_contracts::SessionEvent {
+            session_id: SessionId::from("sess-test"),
+            seq: 1,
+            turn_id: None,
+            ts_ms: 0,
+            payload: AgentEvent::MarkdownDelta {
+                message_id: agentloop_contracts::MessageId::from("m1"),
+                text: "abcdefgh".to_owned(),
+            },
+        };
+        app.on_engine(event);
+        assert_eq!(app.status.turn_output_chars, 8);
+        assert!(app.session.turn.is_running());
     }
 }
 

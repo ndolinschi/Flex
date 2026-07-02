@@ -1,5 +1,6 @@
 //! Pure ratatui rendering for the app state.
 
+pub(crate) mod diff;
 mod markdown;
 mod thinking;
 mod tool_view;
@@ -23,24 +24,85 @@ use crate::overlay::{
 };
 use crate::theme;
 
-/// Draw one full frame.
+/// Draw one full frame: chat, an optional notification line (busy pulse or
+/// newest toast), the input box, and the status bar.
 pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     let area = frame.area();
     let input_height = input_height(app);
+    let notify = notification_line_visible(app);
+    let mut constraints = vec![Constraint::Min(1)];
+    if notify {
+        constraints.push(Constraint::Length(1));
+    }
+    constraints.push(Constraint::Length(input_height));
+    constraints.push(Constraint::Length(1));
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(1),
-            Constraint::Length(input_height),
-            Constraint::Length(1),
-        ])
+        .constraints(constraints)
         .split(area);
 
+    let input_area = chunks[if notify { 2 } else { 1 }];
     draw_chat(frame, app, chunks[0]);
-    draw_input(frame, app, chunks[1]);
-    draw_status(frame, app, chunks[2]);
-    draw_popup(frame, app, chunks[1]);
+    if notify {
+        draw_notification_line(frame, app, chunks[1]);
+    }
+    draw_input(frame, app, input_area);
+    draw_status(frame, app, chunks[if notify { 3 } else { 2 }]);
+    draw_popup(frame, app, input_area);
     draw_overlay(frame, app, area);
+}
+
+/// The notification line stays reserved while a turn runs or a toast is
+/// alive, so the layout doesn't jitter between busy and toast states.
+fn notification_line_visible(app: &App) -> bool {
+    app.session.turn.is_running() || !app.status.toasts.is_empty()
+}
+
+/// Busy line (priority) or the newest toast.
+fn draw_notification_line(frame: &mut Frame<'_>, app: &App, area: Rect) {
+    let line = if let TurnPhase::Running { started } = app.session.turn {
+        let glyph = theme::pulse_frame(app.status.spinner);
+        let verb = theme::spinner_verb(app.status.turn_verb_idx);
+        let tokens = app.status.turn_output_chars / 4;
+        Line::from(vec![
+            Span::styled(format!("{glyph} {verb}… "), theme::WARN),
+            Span::styled(
+                format!(
+                    "({}s · ↑ {} tokens · esc to interrupt)",
+                    started.elapsed().as_secs(),
+                    fmt_k(tokens)
+                ),
+                theme::DIM,
+            ),
+        ])
+    } else if let Some(toast) = app.status.toasts.back() {
+        Line::from(Span::styled(toast.text.clone(), theme::DIM))
+    } else {
+        return;
+    };
+    frame.render_widget(Paragraph::new(line), area);
+}
+
+/// `1234` → `1.2k`, `12_300_000` → `12.3M`.
+fn fmt_k(n: u64) -> String {
+    if n >= 1_000_000 {
+        format!("{:.1}M", n as f64 / 1_000_000.0)
+    } else if n >= 1_000 {
+        format!("{:.1}k", n as f64 / 1_000.0)
+    } else {
+        n.to_string()
+    }
+}
+
+/// Thinking budget label for the status bar (`8192` → `8k`).
+pub(crate) fn fmt_thinking_budget_k(tokens: u32) -> String {
+    if tokens >= 1024 && tokens % 1024 == 0 {
+        format!("{}k", tokens / 1024)
+    } else if tokens >= 1000 {
+        format!("{}k", tokens / 1000)
+    } else {
+        tokens.to_string()
+    }
 }
 
 fn input_height(app: &App) -> u16 {
@@ -116,10 +178,19 @@ fn chat_lines(app: &mut App, viewport_width: u16) -> Vec<Line<'static>> {
         let item = &items[idx];
         match item {
             ChatItem::User { text } => {
-                lines.push(Line::from(vec![
-                    Span::styled("  > ", theme::USER),
-                    Span::styled(text.clone(), theme::USER),
-                ]));
+                for (line_idx, line) in text.lines().enumerate() {
+                    if line_idx == 0 {
+                        lines.push(Line::from(vec![
+                            Span::styled("> ", theme::DIM),
+                            Span::styled(line.to_owned(), theme::USER_TEXT),
+                        ]));
+                    } else {
+                        lines.push(Line::from(Span::styled(
+                            format!("  {line}"),
+                            theme::USER_TEXT,
+                        )));
+                    }
+                }
             }
             ChatItem::Assistant {
                 blocks,
@@ -139,19 +210,25 @@ fn chat_lines(app: &mut App, viewport_width: u16) -> Vec<Line<'static>> {
                                 viewport_width,
                             ));
                         }
-                        DraftBlock::Thinking { text, collapsed } => {
+                        DraftBlock::Thinking {
+                            text,
+                            collapsed,
+                            duration_ms,
+                            ..
+                        } => {
                             lines.extend(thinking::render_thinking_lines(
                                 text,
                                 *collapsed,
                                 *complete,
                                 thinking_visible,
                                 app.status.spinner,
+                                *duration_ms,
                             ));
                         }
                     }
                 }
                 if should_show_stream_cursor(blocks, *complete, thinking_visible) {
-                    lines.push(Line::from(Span::styled("  ▌", theme::WARN)));
+                    lines.push(Line::from(Span::styled("  ▌", theme::DIM)));
                 }
             }
             ChatItem::Assistant { .. } => {}
@@ -168,6 +245,7 @@ fn chat_lines(app: &mut App, viewport_width: u16) -> Vec<Line<'static>> {
                     failed_streak,
                     expanded: *expanded,
                     focused: app.chat.focused_tool == Some(idx),
+                    spinner: app.status.spinner,
                 };
                 lines.extend(tool_view::render_tool_row(&row));
                 if failed_streak > 1 {
@@ -178,16 +256,31 @@ fn chat_lines(app: &mut App, viewport_width: u16) -> Vec<Line<'static>> {
                 lines.push(Line::from(Span::styled("plan", theme::DIM)));
                 for entry in entries {
                     lines.push(Line::from(Span::styled(
-                        format!("  {:?}: {}", entry.status, entry.content),
+                        format!("  {} {}", plan_marker(entry.status), entry.content),
                         theme::DIM,
                     )));
                 }
             }
             ChatItem::Info { text } => {
-                lines.push(Line::from(Span::styled(text.clone(), theme::DIM)));
+                // The interrupt marker reads as a soft error, not plain info.
+                let style = if text == crate::app::INTERRUPT_NOTE {
+                    theme::ERROR.add_modifier(Modifier::DIM)
+                } else {
+                    theme::DIM
+                };
+                lines.push(Line::from(Span::styled(text.clone(), style)));
             }
-            ChatItem::Error { message } => {
-                lines.push(Line::from(Span::styled(message.clone(), theme::ERROR)));
+            ChatItem::Error { headline, detail } => {
+                lines.push(Line::from(Span::styled(
+                    format!("✗ {headline}"),
+                    theme::ERROR,
+                )));
+                if let Some(detail) = detail {
+                    lines.push(Line::from(Span::styled(
+                        detail.clone(),
+                        theme::ERROR.add_modifier(Modifier::DIM),
+                    )));
+                }
             }
             ChatItem::Subagent { task, done, .. } => {
                 let marker = if *done { "done" } else { "running" };
@@ -197,7 +290,7 @@ fn chat_lines(app: &mut App, viewport_width: u16) -> Vec<Line<'static>> {
                 )));
             }
         }
-        if item_produces_lines(item, items, idx, thinking_visible) {
+        if item_produces_lines(item, items, idx, thinking_visible) && !tight_group(items, idx) {
             lines.push(Line::default());
         }
         idx += 1;
@@ -258,6 +351,30 @@ fn item_produces_lines(
     }
 }
 
+/// Consecutive Info lines and consecutive Tool rows group tightly: no blank
+/// line between them.
+fn tight_group(items: &[ChatItem], idx: usize) -> bool {
+    let Some(next) = items.get(idx + 1) else {
+        return false;
+    };
+    matches!(
+        (&items[idx], next),
+        (ChatItem::Info { .. }, ChatItem::Info { .. })
+            | (ChatItem::Tool { .. }, ChatItem::Tool { .. })
+    )
+}
+
+/// Checkbox marker for one plan entry.
+fn plan_marker(status: agentloop_contracts::PlanStatus) -> &'static str {
+    use agentloop_contracts::PlanStatus;
+    match status {
+        PlanStatus::Pending => "☐",
+        PlanStatus::InProgress => "◐",
+        PlanStatus::Completed => "☑",
+        _ => "☐",
+    }
+}
+
 /// Whether an assistant item has no body blocks and is followed by tool rows
 /// in the same turn (no intervening user or assistant message).
 fn is_tool_only_assistant(items: &[ChatItem], idx: usize) -> bool {
@@ -310,6 +427,9 @@ fn draw_input(frame: &mut Frame<'_>, app: &App, area: Rect) {
     frame.render_widget(&app.input.textarea, inner);
 }
 
+/// One line: `native · code · auto · <model> · 47% context · ↑12.3k ↓4.1k`
+/// plus scrolled-up and cost suffixes. Busy state lives on the notification
+/// line, errors in the transcript — neither renders here.
 fn draw_status(frame: &mut Frame<'_>, app: &App, area: Rect) {
     let model = app
         .session
@@ -317,40 +437,80 @@ fn draw_status(frame: &mut Frame<'_>, app: &App, area: Rect) {
         .as_ref()
         .map(ToString::to_string)
         .unwrap_or_else(|| "default model".to_owned());
-    let running = app.session.turn.is_running();
-    let busy = match app.session.turn {
-        TurnPhase::Idle => "idle".to_owned(),
-        TurnPhase::Running { started } => {
-            format!(
-                "{} streaming {}s",
-                theme::spinner_frame(app.status.spinner),
-                started.elapsed().as_secs()
-            )
-        }
-    };
     let usage = app.status.total_usage;
     let session_mode = session_mode_label(app.session.session_mode);
     let permission = permission_mode_label(app.session.effective_permission_mode());
-    let mut text = format!(
-        "{} · {} · {} · {} · {} · tokens in/out {} / {}",
-        app.kind, session_mode, permission, model, busy, usage.input, usage.output
-    );
+
+    let mut segments = vec![
+        app.kind.to_string(),
+        session_mode.to_owned(),
+        permission.to_owned(),
+    ];
+    if let Some(budget) = app.thinking_budget.filter(|_| app.caps.reasoning_visible) {
+        segments.push(format!("think:{}", fmt_thinking_budget_k(budget)));
+    }
+    segments.push(model);
+
+    let mut spans = vec![Span::styled(segments.join(" · "), theme::STATUS)];
+    if let Some((pct, style)) = context_percent(app) {
+        spans.push(Span::styled(" · ", theme::STATUS));
+        spans.push(Span::styled(format!("{pct}% context"), style));
+    }
+    spans.push(Span::styled(
+        format!(" · ↑{} ↓{}", fmt_k(usage.input), fmt_k(usage.output)),
+        theme::STATUS,
+    ));
     if !app.chat.scroll.follow {
-        text.push_str(" · scrolled up (End or PgDn to follow)");
+        spans.push(Span::styled(
+            " · scrolled up (End to follow)",
+            theme::STATUS,
+        ));
     }
     if let Some(cost) = app.status.last_cost_usd {
-        text.push_str(&format!(" · ${cost:.4}"));
+        spans.push(Span::styled(format!(" · ${cost:.4}"), theme::STATUS));
     }
-    if let Some(notice) = &app.status.notice {
-        text.push_str(&format!(" · {notice}"));
+    frame.render_widget(Paragraph::new(Line::from(spans)), area);
+}
+
+/// Context usage as a percentage of the current model's window, colored by
+/// pressure. `None` until a turn completes or when the window is unknown.
+fn context_percent(app: &App) -> Option<(u8, Style)> {
+    let tokens = app.status.last_context_tokens?;
+    let window = u64::from(context_window(app)?);
+    if window == 0 {
+        return None;
     }
-    if let Some(error) = &app.status.last_error {
-        text.push_str(&format!(" · {error}"));
+    let pct = (tokens.saturating_mul(100) / window).min(100) as u8;
+    let style = if pct < 50 {
+        theme::SUCCESS
+    } else if pct < 80 {
+        theme::WARN
+    } else {
+        theme::ERROR
+    };
+    Some((pct, style))
+}
+
+/// The current model's context window from the catalog, falling back to
+/// static model discovery.
+fn context_window(app: &App) -> Option<u32> {
+    let model = app.session.model.as_ref()?;
+    if let Some(window) = app
+        .catalog
+        .iter()
+        .find(|entry| entry.model_ref().0 == model.0)
+        .and_then(|entry| entry.model.context_window)
+    {
+        return Some(window);
     }
-    frame.render_widget(
-        Paragraph::new(text).style(if running { theme::WARN } else { theme::STATUS }),
-        area,
-    );
+    if let agentloop_contracts::ModelDiscovery::Static { models } = &app.caps.models {
+        let (_, name) = model.split();
+        return models
+            .iter()
+            .find(|info| info.id == name || info.id == model.0)
+            .and_then(|info| info.context_window);
+    }
+    None
 }
 
 fn draw_popup(frame: &mut Frame<'_>, app: &App, input_area: Rect) {
@@ -692,9 +852,11 @@ fn draw_help(frame: &mut Frame<'_>, app: &App, root: Rect) {
         Line::from("PgUp/PgDn or ↑/↓ (empty prompt) scroll · End follow · drag to select & copy"),
         Line::from("Ctrl+Shift+C or /copy — copy transcript · Ctrl+M — toggle mouse wheel scroll"),
         Line::from(
-            "Ctrl+T show/hide thinking · Shift+Ctrl+T expand/collapse · /mode code|plan · /permissions require|auto|allow-all",
+            "Ctrl+T expand/collapse thought · /thinking off|low|medium|high · /mode code|plan · /permissions require|auto|allow-all",
         ),
-        Line::from("Tab cycle tool rows · Enter/Space expand tool output (empty prompt)"),
+        Line::from(
+            "Ctrl+O expand/collapse tool result · Tab cycle tool rows · Enter/Space toggle focused row",
+        ),
         Line::default(),
         Line::from(Span::styled("Commands", theme::TITLE)),
     ];

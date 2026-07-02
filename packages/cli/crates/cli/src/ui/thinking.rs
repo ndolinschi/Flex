@@ -1,11 +1,13 @@
-//! Reasoning / thinking block rendering.
+//! Reasoning / thinking block rendering: borderless, dim italic, with a
+//! one-line collapsed form once the thought completes.
 
 use ratatui::style::Modifier;
 use ratatui::text::{Line, Span};
 
+use crate::chat::thinking_seconds;
 use crate::theme;
 
-const STREAM_TAIL_LINES: usize = 6;
+const STREAM_TAIL_LINES: usize = 4;
 
 /// Render a thinking block for the chat transcript.
 pub(super) fn render_thinking_lines(
@@ -14,13 +16,19 @@ pub(super) fn render_thinking_lines(
     complete: bool,
     reasoning_visible: bool,
     spinner: usize,
+    duration_ms: Option<u64>,
 ) -> Vec<Line<'static>> {
     if !reasoning_visible {
         return Vec::new();
     }
 
+    // Never render a bare "Thinking…" placeholder before any delta arrives.
+    if !complete && text.trim().is_empty() {
+        return Vec::new();
+    }
+
     if collapsed && complete {
-        return vec![collapsed_line(text)];
+        return vec![collapsed_line(text, duration_ms)];
     }
 
     if !complete {
@@ -30,52 +38,42 @@ pub(super) fn render_thinking_lines(
     expanded_block(text)
 }
 
-fn collapsed_line(text: &str) -> Line<'static> {
-    let seconds = estimate_thinking_seconds(text);
+fn collapsed_line(text: &str, duration_ms: Option<u64>) -> Line<'static> {
+    let seconds = thinking_seconds(duration_ms, text);
     Line::from(vec![
-        Span::styled("∴ ", theme::THINKING),
+        Span::styled(format!("{} ", theme::THINKING_MARK), theme::THINKING),
         Span::styled(
-            format!("Thought for {seconds}s (shift+ctrl+t to expand)"),
+            format!("Thought for {seconds}s (ctrl+t to expand)"),
             theme::THINKING,
         ),
     ])
 }
 
 fn streaming_block(text: &str, spinner: usize) -> Vec<Line<'static>> {
-    let frame = theme::spinner_frame(spinner);
     let mut lines = vec![Line::from(vec![
-        Span::styled("┌ ", theme::BORDER),
-        Span::styled(
-            format!("Thinking {frame}"),
-            theme::THINKING.add_modifier(Modifier::BOLD),
-        ),
+        Span::styled(format!("{} ", theme::pulse_frame(spinner)), theme::THINKING),
+        Span::styled("Thinking…", theme::THINKING.add_modifier(Modifier::BOLD)),
     ])];
     for line in tail_lines(text, STREAM_TAIL_LINES) {
-        lines.push(Line::from(vec![
-            Span::styled("│ ", theme::BORDER),
-            Span::styled(line, theme::THINKING),
-        ]));
+        lines.push(Line::from(Span::styled(
+            format!("  {line}"),
+            theme::THINKING,
+        )));
     }
-    lines.push(Line::from(vec![
-        Span::styled("│ ", theme::BORDER),
-        Span::styled("▌", theme::WARN),
-    ]));
-    lines.push(Line::from(Span::styled("└", theme::BORDER)));
     lines
 }
 
 fn expanded_block(text: &str) -> Vec<Line<'static>> {
     let mut lines = vec![Line::from(vec![
-        Span::styled("┌ ", theme::BORDER),
+        Span::styled(format!("{} ", theme::THINKING_MARK), theme::THINKING),
         Span::styled("Thinking", theme::THINKING.add_modifier(Modifier::BOLD)),
     ])];
     for line in text.lines() {
-        lines.push(Line::from(vec![
-            Span::styled("│ ", theme::BORDER),
-            Span::styled(line.to_owned(), theme::THINKING),
-        ]));
+        lines.push(Line::from(Span::styled(
+            format!("  {line}"),
+            theme::THINKING,
+        )));
     }
-    lines.push(Line::from(Span::styled("└", theme::BORDER)));
     lines
 }
 
@@ -87,33 +85,62 @@ fn tail_lines(text: &str, max: usize) -> Vec<String> {
     lines
 }
 
-/// Rough duration estimate until the engine emits thinking timing.
-fn estimate_thinking_seconds(text: &str) -> u64 {
-    let lines = text.lines().count().max(1);
-    (lines as u64).saturating_add(1)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn hidden_when_reasoning_not_visible() {
-        let lines = render_thinking_lines("secret", false, false, false, 0);
+        let lines = render_thinking_lines("secret", false, false, false, 0, None);
         assert!(lines.is_empty());
     }
 
     #[test]
-    fn collapsed_shows_duration_line() {
-        let lines = render_thinking_lines("one\ntwo\nthree", true, true, true, 0);
-        assert_eq!(lines.len(), 1);
-        assert!(lines[0].spans[1].content.contains("Thought for"));
+    fn empty_streaming_text_renders_nothing() {
+        let lines = render_thinking_lines("", false, false, true, 0, None);
+        assert!(lines.is_empty());
+        let whitespace = render_thinking_lines("  \n ", false, false, true, 0, None);
+        assert!(whitespace.is_empty());
     }
 
     #[test]
-    fn streaming_shows_border() {
-        let lines = render_thinking_lines("thinking…", false, false, true, 0);
-        assert!(lines.iter().any(|l| l.spans[0].content.starts_with('┌')));
-        assert!(lines.iter().any(|l| l.spans[0].content.starts_with('└')));
+    fn collapsed_shows_real_duration() {
+        let lines = render_thinking_lines("one\ntwo\nthree", true, true, true, 0, Some(12_400));
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].spans[1].content.contains("Thought for 12s"));
+        assert!(lines[0].spans[1].content.contains("ctrl+t to expand"));
+    }
+
+    #[test]
+    fn collapsed_estimates_without_duration() {
+        let lines = render_thinking_lines("one\ntwo\nthree", true, true, true, 0, None);
+        assert!(lines[0].spans[1].content.contains("Thought for 4s"));
+    }
+
+    #[test]
+    fn streaming_is_borderless_and_tails_four_lines() {
+        let text = "a\nb\nc\nd\ne\nf";
+        let lines = render_thinking_lines(text, false, false, true, 3, None);
+        // Header + 4 tail lines, no border or cursor rows.
+        assert_eq!(lines.len(), 5);
+        assert!(lines[0].spans[0].content.starts_with(theme::PULSE[3]));
+        assert!(lines[0].spans[1].content.contains("Thinking…"));
+        assert!(lines[1].spans[0].content.contains('c'));
+        assert!(lines[4].spans[0].content.contains('f'));
+        let flat: String = lines
+            .iter()
+            .flat_map(|l| l.spans.iter().map(|s| s.content.as_ref()))
+            .collect();
+        assert!(!flat.contains('┌'));
+        assert!(!flat.contains('│'));
+        assert!(!flat.contains('▌'));
+    }
+
+    #[test]
+    fn expanded_is_borderless() {
+        let lines = render_thinking_lines("full thought", false, true, true, 0, None);
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].spans[0].content.starts_with(theme::THINKING_MARK));
+        assert!(lines[1].spans[0].content.contains("full thought"));
     }
 }

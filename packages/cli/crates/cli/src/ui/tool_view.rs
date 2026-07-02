@@ -1,13 +1,27 @@
 //! Human-readable tool call rows for the chat transcript.
+//!
+//! ```text
+//! ⏺ Bash(npm run build)          ← status-colored glyph, spinner while running
+//!   ⎿ added 128 packages in 3s   ← first result line
+//!      npm notice ...            ← continuation, 5-space indent
+//!   ⎿ … +47 lines (ctrl+o to expand)
+//! ```
 
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
-use agentloop_contracts::{ToolCall, ToolCallStatus, ToolOutput};
+use agentloop_contracts::{ToolCall, ToolCallStatus};
 
 use crate::theme;
-use crate::tool_output::{PREVIEW_MAX_LINES, display_body_lines, parse_bash_result};
+use crate::tool_output::{
+    DisplayBody, PREVIEW_MAX_LINES, call_is_expandable, collapsed_summary_line, display_body,
+    parse_bash_result, tool_summary,
+};
 
-const SUMMARY_MAX_LEN: usize = 72;
+use super::diff::{DiffKind, DiffLine};
+
+/// Duration is only worth showing above this threshold.
+const DURATION_MIN_MS: u64 = 2000;
 
 /// One logical tool row (may represent a collapsed failed streak).
 #[derive(Debug, Clone)]
@@ -18,144 +32,225 @@ pub(super) struct ToolRow<'a> {
     pub failed_streak: usize,
     pub expanded: bool,
     pub focused: bool,
+    /// Spinner tick for the running glyph.
+    pub spinner: usize,
 }
 
 /// Build display lines for one tool row.
 pub(super) fn render_tool_row(row: &ToolRow<'_>) -> Vec<Line<'static>> {
-    let mut lines = Vec::new();
-    let summary = tool_summary(&row.call.tool_name, &row.call.input);
-    let status = status_badge(
-        &row.call.tool_name,
-        &row.call.status,
-        &row.call.timing,
-        row.failed_streak,
-        row.call.result.as_ref(),
-    );
-
-    let header_style = if row.focused {
-        theme::SELECTED
-    } else {
-        theme::TOOL
-    };
-    lines.push(Line::from(vec![
-        Span::styled("⏺ ", header_style),
-        Span::styled(summary, header_style),
-        Span::raw(" "),
-        status,
-    ]));
+    let mut lines = vec![header_line(row)];
 
     if let Some(progress) = row.progress {
-        lines.push(Line::from(Span::styled(
-            format!("  {progress}"),
-            theme::DIM,
-        )));
-    }
-
-    if let Some(result) = &row.call.result {
-        lines.extend(result_display_lines(
-            &row.call.tool_name,
-            result,
-            &row.call.status,
-            row.expanded,
+        lines.push(gutter_line(
+            true,
+            vec![Span::styled(progress.to_owned(), theme::DIM)],
         ));
     }
 
+    lines.extend(result_lines(row));
     lines
 }
 
-/// Human-readable one-line summary for a tool invocation.
-pub(super) fn tool_summary(tool_name: &str, input: &serde_json::Value) -> String {
-    let detail = match tool_name {
-        "Bash" => input
-            .get("command")
-            .and_then(|v| v.as_str())
-            .map(str::to_owned),
-        "Read" | "Write" | "Edit" => input
-            .get("file_path")
-            .or_else(|| input.get("path"))
-            .and_then(|v| v.as_str())
-            .map(str::to_owned),
-        "Grep" => {
-            let pattern = input.get("pattern").and_then(|v| v.as_str());
-            let path = input
-                .get("path")
-                .or_else(|| input.get("glob"))
-                .and_then(|v| v.as_str());
-            match (pattern, path) {
-                (Some(p), Some(path)) => Some(format!("{p} in {path}")),
-                (Some(p), None) => Some(p.to_owned()),
-                _ => None,
+/// The `⏺ Tool(args)` header: status-colored glyph, plain summary, and a
+/// small trailing badge only where it earns its place.
+fn header_line(row: &ToolRow<'_>) -> Line<'static> {
+    let call = row.call;
+    let summary = tool_summary(&call.tool_name, &call.input);
+
+    let glyph = match &call.status {
+        ToolCallStatus::Running => Span::styled(
+            format!("{} ", theme::spinner_frame(row.spinner)),
+            theme::WARN,
+        ),
+        ToolCallStatus::Pending => Span::styled("⏺ ".to_owned(), theme::DIM),
+        ToolCallStatus::AwaitingPermission { .. } => Span::styled("⏺ ".to_owned(), theme::WARN),
+        ToolCallStatus::Completed => {
+            if bash_exit_code(call).is_some_and(|code| code != 0) {
+                Span::styled("⏺ ".to_owned(), theme::ERROR)
+            } else {
+                Span::styled("⏺ ".to_owned(), theme::SUCCESS)
             }
         }
-        "Glob" => input
-            .get("glob")
-            .or_else(|| input.get("pattern"))
-            .and_then(|v| v.as_str())
-            .map(str::to_owned),
-        "WebFetch" => input.get("url").and_then(|v| v.as_str()).map(webfetch_host),
-        _ => first_scalar_field(input),
+        ToolCallStatus::Failed { .. } | ToolCallStatus::Denied { .. } => {
+            Span::styled("⏺ ".to_owned(), theme::ERROR)
+        }
+        ToolCallStatus::Cancelled => Span::styled("⏺ ".to_owned(), theme::DIM),
+        _ => Span::styled("⏺ ".to_owned(), theme::DIM),
     };
 
-    match detail {
-        Some(detail) => truncate(&format!("{tool_name}({detail})"), SUMMARY_MAX_LEN),
-        None => truncate(
-            &format!("{tool_name}({})", compact_json(input)),
-            SUMMARY_MAX_LEN,
-        ),
+    let summary_style = if row.focused {
+        theme::SELECTED
+    } else if matches!(call.status, ToolCallStatus::Running) {
+        theme::TOOL_RUNNING
+    } else {
+        Style::default()
+    };
+
+    let mut spans = vec![glyph, Span::styled(summary, summary_style)];
+
+    match &call.status {
+        ToolCallStatus::AwaitingPermission { .. } => {
+            spans.push(Span::styled(" awaiting permission".to_owned(), theme::DIM));
+        }
+        ToolCallStatus::Completed => {
+            if let Some(duration) = call.timing.duration_ms().filter(|ms| *ms > DURATION_MIN_MS) {
+                spans.push(Span::styled(
+                    format!(" {}", format_duration(duration)),
+                    theme::DIM,
+                ));
+            }
+        }
+        ToolCallStatus::Failed { .. } if row.failed_streak > 1 => {
+            spans.push(Span::styled(
+                format!(" ×{} failed", row.failed_streak),
+                theme::ERROR,
+            ));
+        }
+        ToolCallStatus::Denied { .. } if row.failed_streak > 1 => {
+            spans.push(Span::styled(
+                format!(" ×{} denied", row.failed_streak),
+                theme::ERROR,
+            ));
+        }
+        ToolCallStatus::Cancelled => {
+            spans.push(Span::styled(" cancelled".to_owned(), theme::DIM));
+        }
+        _ => {}
     }
+
+    Line::from(spans)
 }
 
-/// Whether a tool result has more lines than the collapsed preview shows.
-pub(super) fn result_display_lines(
-    tool_name: &str,
-    result: &ToolOutput,
-    status: &ToolCallStatus,
-    expanded: bool,
-) -> Vec<Line<'static>> {
-    let body_lines = display_body_lines(tool_name, result);
-    if body_lines.is_empty() {
-        return Vec::new();
+/// The `⎿`-guttered result area: error line first, then the body preview,
+/// then the expand/collapse footer.
+fn result_lines(row: &ToolRow<'_>) -> Vec<Line<'static>> {
+    let call = row.call;
+    let mut content: Vec<Vec<Span<'static>>> = Vec::new();
+    let mut footer: Option<String> = None;
+
+    // Failure text moves from the header to the first result line.
+    match &call.status {
+        ToolCallStatus::Failed { error } => {
+            content.push(vec![Span::styled(error.clone(), theme::ERROR)]);
+        }
+        ToolCallStatus::Denied { reason } => {
+            let reason = reason.clone().unwrap_or_else(|| "denied".to_owned());
+            content.push(vec![Span::styled(reason, theme::ERROR)]);
+        }
+        _ => {}
     }
 
-    let total = body_lines.len();
-    let shown = if expanded {
-        total
-    } else {
-        total.min(PREVIEW_MAX_LINES)
-    };
-
-    let mut lines = Vec::with_capacity(shown + 1);
-    for line in &body_lines[..shown] {
-        lines.push(Line::from(Span::styled(format!("  {line}"), theme::DIM)));
-    }
-
-    if !expanded && total > PREVIEW_MAX_LINES {
-        let more = total - PREVIEW_MAX_LINES;
-        lines.push(Line::from(vec![
-            Span::styled(format!("  … (+{more} more)"), theme::DIM),
-            Span::styled(" · Enter/Space expand", theme::DIM),
-        ]));
-    } else if expanded && total > PREVIEW_MAX_LINES {
-        lines.push(Line::from(Span::styled(
-            "  · Enter/Space collapse",
-            theme::DIM,
-        )));
-    }
-
-    if tool_name == "Bash" && matches!(status, ToolCallStatus::Failed { .. }) {
-        if let Some(parts) = parse_bash_result(result) {
-            if let Some(code) = parts.exit_code.filter(|code| *code != 0) {
-                if parts.stderr.trim().is_empty() && parts.stdout.trim().is_empty() {
-                    lines.insert(
-                        0,
-                        Line::from(Span::styled(format!("  exit {code}"), theme::ERROR)),
-                    );
+    match display_body(&call.tool_name, &call.input, call.result.as_ref()) {
+        DisplayBody::Diff(preview) => {
+            let total = preview.lines.len();
+            let shown = if row.expanded {
+                total
+            } else {
+                preview.preview_len()
+            };
+            for line in &preview.lines[..shown] {
+                content.push(vec![diff_span(line)]);
+            }
+            if !row.expanded && total > shown {
+                footer = Some(format!("… +{} lines (ctrl+o to expand)", total - shown));
+            } else if row.expanded && total > preview.preview_len() {
+                footer = Some("(ctrl+o to collapse)".to_owned());
+            }
+        }
+        DisplayBody::Lines(body) => {
+            let summary = (!row.expanded)
+                .then_some(call.result.as_ref())
+                .flatten()
+                .and_then(|result| collapsed_summary_line(&call.tool_name, result));
+            match summary {
+                Some(summary) => {
+                    content.push(vec![Span::styled(summary, theme::DIM)]);
+                }
+                None => {
+                    let total = body.len();
+                    let shown = if row.expanded {
+                        total
+                    } else {
+                        total.min(PREVIEW_MAX_LINES)
+                    };
+                    // Bash success previews show the tail; everything else the head.
+                    let tail = !row.expanded && bash_success_body(call);
+                    let visible: Box<dyn Iterator<Item = &String>> = if tail {
+                        Box::new(body.iter().skip(total - shown))
+                    } else {
+                        Box::new(body.iter().take(shown))
+                    };
+                    for line in visible {
+                        content.push(vec![Span::styled(line.clone(), body_style(call, line))]);
+                    }
+                    if !row.expanded && total > shown {
+                        footer = Some(format!("… +{} lines (ctrl+o to expand)", total - shown));
+                    } else if row.expanded && call_is_expandable(call) {
+                        footer = Some("(ctrl+o to collapse)".to_owned());
+                    }
                 }
             }
         }
     }
 
+    let mut lines = Vec::with_capacity(content.len() + 1);
+    for (idx, spans) in content.into_iter().enumerate() {
+        lines.push(gutter_line(idx == 0, spans));
+    }
+    if let Some(footer) = footer {
+        lines.push(gutter_line(true, vec![Span::styled(footer, theme::DIM)]));
+    }
     lines
+}
+
+/// Prefix a content line with the result gutter: `  ⎿ ` on anchor lines,
+/// five spaces on continuations.
+fn gutter_line(anchor: bool, mut spans: Vec<Span<'static>>) -> Line<'static> {
+    let prefix = if anchor { "  ⎿ " } else { "     " };
+    let mut all = vec![Span::styled(prefix.to_owned(), theme::DIM)];
+    all.append(&mut spans);
+    Line::from(all)
+}
+
+fn diff_span(line: &DiffLine) -> Span<'static> {
+    let no = line
+        .line_no
+        .map(|n| format!("{n:>3}"))
+        .unwrap_or_else(|| "   ".to_owned());
+    match line.kind {
+        DiffKind::Del => Span::styled(format!("{no} - {}", line.text), theme::DIFF_DEL),
+        DiffKind::Add => Span::styled(format!("{no} + {}", line.text), theme::DIFF_ADD),
+        DiffKind::Ctx => Span::styled(format!("{no}   {}", line.text), theme::DIM),
+    }
+}
+
+/// Style for a plain body line: Bash failure `exit N` lines go red.
+fn body_style(call: &ToolCall, line: &str) -> Style {
+    if call.tool_name == "Bash"
+        && line.starts_with("exit ")
+        && bash_exit_code(call).is_some_and(|code| code != 0)
+    {
+        theme::ERROR
+    } else {
+        theme::DIM
+    }
+}
+
+fn bash_exit_code(call: &ToolCall) -> Option<i32> {
+    if call.tool_name != "Bash" {
+        return None;
+    }
+    call.result
+        .as_ref()
+        .and_then(parse_bash_result)
+        .and_then(|parts| parts.exit_code)
+}
+
+fn bash_success_body(call: &ToolCall) -> bool {
+    call.tool_name == "Bash"
+        && matches!(call.status, ToolCallStatus::Completed)
+        && bash_exit_code(call).is_none_or(|code| code == 0)
+        && !call.result.as_ref().is_some_and(|result| result.is_error)
 }
 
 /// Whether two tool calls are identical for failed-streak collapse.
@@ -171,57 +266,6 @@ pub(super) fn is_failed_streak_member(call: &ToolCall) -> bool {
     )
 }
 
-fn status_badge(
-    tool_name: &str,
-    status: &ToolCallStatus,
-    timing: &agentloop_contracts::ToolCallTiming,
-    failed_streak: usize,
-    result: Option<&ToolOutput>,
-) -> Span<'static> {
-    let duration = timing
-        .duration_ms()
-        .map(format_duration)
-        .unwrap_or_default();
-
-    let (label, style) = match status {
-        ToolCallStatus::Pending => ("pending", theme::DIM),
-        ToolCallStatus::AwaitingPermission { .. } => ("awaiting permission", theme::WARN),
-        ToolCallStatus::Running => ("running", theme::WARN),
-        ToolCallStatus::Completed => {
-            if tool_name == "Bash" {
-                if let Some(result) = result {
-                    if let Some(parts) = parse_bash_result(result) {
-                        if let Some(code) = parts.exit_code.filter(|code| *code != 0) {
-                            return Span::styled(format!("exit {code} {duration}"), theme::ERROR);
-                        }
-                    }
-                }
-            }
-            if duration.is_empty() {
-                ("completed", theme::SUCCESS)
-            } else {
-                return Span::styled(format!("completed {duration}"), theme::SUCCESS);
-            }
-        }
-        ToolCallStatus::Failed { error } => {
-            if failed_streak > 1 {
-                return Span::styled(format!("×{failed_streak} failed: {error}"), theme::ERROR);
-            }
-            return Span::styled(format!("failed: {error}"), theme::ERROR);
-        }
-        ToolCallStatus::Denied { reason } => {
-            let reason = reason.as_deref().unwrap_or("denied");
-            if failed_streak > 1 {
-                return Span::styled(format!("×{failed_streak} denied: {reason}"), theme::ERROR);
-            }
-            return Span::styled(format!("denied: {reason}"), theme::ERROR);
-        }
-        ToolCallStatus::Cancelled => ("cancelled", theme::ERROR),
-        _ => ("unknown", theme::DIM),
-    };
-    Span::styled(label.to_owned(), style)
-}
-
 fn format_duration(ms: u64) -> String {
     if ms < 1000 {
         format!("{ms}ms")
@@ -230,49 +274,12 @@ fn format_duration(ms: u64) -> String {
     }
 }
 
-fn webfetch_host(url: &str) -> String {
-    url.trim_start_matches("https://")
-        .trim_start_matches("http://")
-        .split('/')
-        .next()
-        .unwrap_or(url)
-        .to_owned()
-}
-
-fn first_scalar_field(input: &serde_json::Value) -> Option<String> {
-    input.as_object().and_then(|obj| {
-        obj.values().find_map(|v| match v {
-            serde_json::Value::String(s) => Some(s.clone()),
-            serde_json::Value::Number(n) => Some(n.to_string()),
-            serde_json::Value::Bool(b) => Some(b.to_string()),
-            _ => None,
-        })
-    })
-}
-
-fn compact_json(value: &serde_json::Value) -> String {
-    let text = value.to_string();
-    if text.len() > 60 {
-        format!("{}...", &text[..57])
-    } else {
-        text
-    }
-}
-
-fn truncate(text: &str, max: usize) -> String {
-    if text.len() <= max {
-        text.to_owned()
-    } else {
-        format!("{}...", &text[..max.saturating_sub(3)])
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use agentloop_contracts::{
         MessageId, SessionId, ToolCall, ToolCallId, ToolCallOrigin, ToolCallStatus, ToolCallTiming,
-        TurnId,
+        ToolOutput, TurnId,
     };
 
     fn sample_call(tool_name: &str, input: serde_json::Value, status: ToolCallStatus) -> ToolCall {
@@ -304,69 +311,88 @@ mod tests {
         }
     }
 
-    #[test]
-    fn bash_summary_shows_command() {
-        let summary = tool_summary(
-            "Bash",
-            &serde_json::json!({"command": "cd packages/cli && cargo test"}),
-        );
-        assert!(summary.contains("Bash("));
-        assert!(summary.contains("cargo test"));
-    }
-
-    #[test]
-    fn read_summary_shows_path() {
-        let summary = tool_summary("Read", &serde_json::json!({"file_path": "src/main.rs"}));
-        assert_eq!(summary, "Read(src/main.rs)");
-    }
-
-    #[test]
-    fn result_preview_truncates_extra_lines() {
-        let result = ToolOutput::text("line1\nline2\nline3\nline4\nline5");
-        let lines = result_display_lines("Read", &result, &ToolCallStatus::Completed, false);
-        assert_eq!(lines.len(), 4);
-        assert!(lines[3].spans.iter().any(|s| s.content.contains("+2 more")));
-        assert!(lines[3].spans.iter().any(|s| s.content.contains("expand")));
-    }
-
-    #[test]
-    fn result_expanded_shows_all_lines() {
-        let result = ToolOutput::text("line1\nline2\nline3\nline4\nline5");
-        let lines = result_display_lines("Read", &result, &ToolCallStatus::Completed, true);
-        assert_eq!(lines.len(), 6);
-        assert!(lines[5].spans[0].content.contains("collapse"));
-    }
-
-    #[test]
-    fn bash_success_renders_without_labels() {
-        let result = bash_result("hello\nworld", "", 0);
-        let rendered = result_display_lines("Bash", &result, &ToolCallStatus::Completed, false);
-        let text: String = rendered
-            .iter()
-            .flat_map(|line| line.spans.iter().map(|s| s.content.as_ref()))
-            .collect();
-        assert!(!text.contains("stdout:"));
-        assert!(!text.contains("exit_code"));
-        assert!(text.contains("hello"));
-    }
-
-    #[test]
-    fn bash_nonzero_exit_badge_on_completed_status() {
-        let mut call = sample_call(
-            "Bash",
-            serde_json::json!({"command": "false"}),
-            ToolCallStatus::Completed,
-        );
-        call.result = Some(bash_result("", "error", 1));
-        let row = ToolRow {
-            call: &call,
+    fn row<'a>(call: &'a ToolCall, expanded: bool) -> ToolRow<'a> {
+        ToolRow {
+            call,
             progress: None,
             failed_streak: 1,
-            expanded: false,
+            expanded,
             focused: false,
-        };
-        let lines = render_tool_row(&row);
-        assert!(lines[0].spans.iter().any(|s| s.content.contains("exit 1")));
+            spinner: 0,
+        }
+    }
+
+    fn flat(lines: &[Line<'_>]) -> Vec<String> {
+        lines
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|s| s.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn running_row_shows_spinner_and_no_badge() {
+        let call = sample_call(
+            "Bash",
+            serde_json::json!({"command": "cargo build"}),
+            ToolCallStatus::Running,
+        );
+        let lines = render_tool_row(&row(&call, false));
+        let text = flat(&lines);
+        assert_eq!(text.len(), 1);
+        assert!(text[0].starts_with(theme::SPINNER[0]));
+        assert!(text[0].contains("Bash(cargo build)"));
+        assert!(!text[0].contains("running"));
+    }
+
+    #[test]
+    fn completed_hides_fast_duration() {
+        let mut call = sample_call(
+            "Read",
+            serde_json::json!({"file_path": "src/main.rs"}),
+            ToolCallStatus::Completed,
+        );
+        call.timing.started_at_ms = Some(0);
+        call.timing.finished_at_ms = Some(500);
+        call.result = Some(ToolOutput::text("done"));
+        let lines = render_tool_row(&row(&call, false));
+        let text = flat(&lines);
+        assert!(!text[0].contains("ms"));
+        assert!(!text[0].contains("completed"));
+    }
+
+    #[test]
+    fn completed_shows_slow_duration() {
+        let mut call = sample_call(
+            "Bash",
+            serde_json::json!({"command": "cargo test"}),
+            ToolCallStatus::Completed,
+        );
+        call.timing.started_at_ms = Some(0);
+        call.timing.finished_at_ms = Some(3400);
+        call.result = Some(bash_result("ok", "", 0));
+        let lines = render_tool_row(&row(&call, false));
+        assert!(flat(&lines)[0].contains("3.4s"));
+    }
+
+    #[test]
+    fn failed_error_moves_to_result_line() {
+        let call = sample_call(
+            "Bash",
+            serde_json::json!({"command": "false"}),
+            ToolCallStatus::Failed {
+                error: "spawn failed".to_owned(),
+            },
+        );
+        let lines = render_tool_row(&row(&call, false));
+        let text = flat(&lines);
+        assert!(!text[0].contains("spawn failed"));
+        assert!(text[1].starts_with("  ⎿ "));
+        assert!(text[1].contains("spawn failed"));
     }
 
     #[test]
@@ -378,19 +404,107 @@ mod tests {
                 error: "exit 1".to_owned(),
             },
         );
-        let row = ToolRow {
-            call: &call,
-            progress: None,
-            failed_streak: 5,
-            expanded: false,
-            focused: false,
-        };
-        let lines = render_tool_row(&row);
-        assert!(
-            lines[0]
-                .spans
-                .iter()
-                .any(|s| s.content.contains("×5 failed"))
+        let mut streak = row(&call, false);
+        streak.failed_streak = 5;
+        let lines = render_tool_row(&streak);
+        assert!(flat(&lines)[0].contains("×5 failed"));
+    }
+
+    #[test]
+    fn bash_success_preview_shows_tail() {
+        let mut call = sample_call(
+            "Bash",
+            serde_json::json!({"command": "seq 6"}),
+            ToolCallStatus::Completed,
         );
+        call.result = Some(bash_result("1\n2\n3\n4\n5\n6", "", 0));
+        let lines = render_tool_row(&row(&call, false));
+        let text = flat(&lines);
+        // Header + 4 tail lines + footer.
+        assert_eq!(text.len(), 6);
+        assert!(text[1].contains('3'));
+        assert!(text[4].contains('6'));
+        assert!(text[5].contains("+2 lines"));
+        assert!(text[5].contains("ctrl+o to expand"));
+    }
+
+    #[test]
+    fn bash_failure_shows_exit_head_first() {
+        let mut call = sample_call(
+            "Bash",
+            serde_json::json!({"command": "cargo test"}),
+            ToolCallStatus::Completed,
+        );
+        call.result = Some(bash_result("", "error[E0308]: mismatched types", 101));
+        let lines = render_tool_row(&row(&call, false));
+        let text = flat(&lines);
+        assert!(text[1].contains("exit 101"));
+        assert!(text[2].contains("error[E0308]"));
+        assert!(text[2].starts_with("     "));
+    }
+
+    #[test]
+    fn read_collapsed_shows_summary_line() {
+        let mut call = sample_call(
+            "Read",
+            serde_json::json!({"file_path": "src/main.rs"}),
+            ToolCallStatus::Completed,
+        );
+        call.result = Some(ToolOutput::text("line1\nline2\nline3\nline4\nline5"));
+        let lines = render_tool_row(&row(&call, false));
+        let text = flat(&lines);
+        assert_eq!(text.len(), 2);
+        assert_eq!(text[1], "  ⎿ Read 5 lines");
+    }
+
+    #[test]
+    fn read_expanded_shows_all_lines() {
+        let mut call = sample_call(
+            "Read",
+            serde_json::json!({"file_path": "src/main.rs"}),
+            ToolCallStatus::Completed,
+        );
+        call.result = Some(ToolOutput::text("line1\nline2\nline3\nline4\nline5"));
+        let lines = render_tool_row(&row(&call, true));
+        let text = flat(&lines);
+        // Header + 5 lines + collapse footer.
+        assert_eq!(text.len(), 7);
+        assert!(text[1].contains("line1"));
+        assert!(text[6].contains("ctrl+o to collapse"));
+    }
+
+    #[test]
+    fn edit_awaiting_permission_renders_diff() {
+        let call = sample_call(
+            "Edit",
+            serde_json::json!({
+                "file_path": "src/app.rs",
+                "old_string": "let x = old();",
+                "new_string": "let x = new();",
+            }),
+            ToolCallStatus::AwaitingPermission {
+                request_id: agentloop_contracts::PermissionRequestId::from("p1"),
+            },
+        );
+        let lines = render_tool_row(&row(&call, false));
+        let text = flat(&lines);
+        assert!(text[0].contains("awaiting permission"));
+        assert!(text[1].contains("- let x = old();"));
+        assert!(text[2].contains("+ let x = new();"));
+    }
+
+    #[test]
+    fn bash_success_renders_without_labels() {
+        let mut call = sample_call(
+            "Bash",
+            serde_json::json!({"command": "echo"}),
+            ToolCallStatus::Completed,
+        );
+        call.result = Some(bash_result("hello\nworld", "", 0));
+        let lines = render_tool_row(&row(&call, false));
+        let text = flat(&lines).join("\n");
+        assert!(!text.contains("stdout:"));
+        assert!(!text.contains("exit_code"));
+        assert!(text.contains("hello"));
     }
 }

@@ -154,6 +154,10 @@ Automated subset (env-gated, skipped in CI):
 AGENTLOOP_SMOKE=1 ANTHROPIC_API_KEY=... cargo test -p agentloop-cli-core smoke -- --ignored --nocapture
 ```
 
+Custom providers (manual): add a `providers` entry to `~/.config/agentloop/config.json` with
+`base_url`, `api_key` (`{env:VAR}` supported), optional `thinking: true`, then `/provider <id>`
+or restart. No `/connect` wizard yet.
+
 Brand-leak gate (CI runs this; must print nothing):
 
 ```bash

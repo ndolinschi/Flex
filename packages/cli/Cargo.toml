@@ -21,6 +21,7 @@ agentloop-session = { path = "../engine/crates/session" }
 agentloop-delegator-claude-code = { path = "../engine/crates/delegators/claude-code" }
 agentloop-delegator-copilot = { path = "../engine/crates/delegators/copilot" }
 agentloop-provider-copilot = { path = "../engine/crates/providers/copilot" }
+agentloop-provider-openai = { path = "../engine/crates/providers/openai" }
 agentloop-loop = { path = "../engine/crates/loop" }
 agentloop-tools = { path = "../engine/crates/tools" }
 agentloop-testkit = { path = "../engine/crates/testkit" }
@@ -31,6 +32,7 @@ tui-textarea = "0.7"
 tui-markdown = "0.3.6"
 pulldown-cmark = "0.13"
 unicode-width = "0.2"
+similar = "2"
 # async — mirror the engine workspace pins
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "fs", "process", "signal"] }
 tokio-stream = { version = "0.1", features = ["sync"] }

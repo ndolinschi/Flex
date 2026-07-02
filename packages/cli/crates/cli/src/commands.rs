@@ -30,7 +30,7 @@ pub enum LocalCommand {
     Mode { arg: Option<String> },
     /// `/permissions [require|auto|allow-all]` — security level.
     Permissions { arg: Option<String> },
-    /// `/thinking [on|off]` — show or hide reasoning blocks.
+    /// `/thinking [off|low|medium|high|on|off]` — budget or visibility.
     Thinking { arg: Option<String> },
     /// `/compact` — summarize conversation history to save context.
     Compact,

@@ -16,6 +16,7 @@ agentloop-session = { workspace = true }
 agentloop-delegator-claude-code = { workspace = true }
 agentloop-delegator-copilot = { workspace = true }
 agentloop-provider-copilot = { workspace = true }
+agentloop-provider-openai = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }

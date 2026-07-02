@@ -4,12 +4,12 @@ expression: rendered
 ---
 AgenticStudio 0.1.0 — /help for keys and commands
 
-✻ Thought for 0s (ctrl+t to expand)
-
-  Here is the answer.
-
-
-
+⏺ Bash(cargo test)
+  ⎿ exit 101
+     error[E0308]: mismatched types
+      --> src/main.rs:4:5
+     note: expected `u32`
+  ⎿ … +2 lines (ctrl+o to expand)
 
 
 

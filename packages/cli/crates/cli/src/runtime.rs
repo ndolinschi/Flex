@@ -51,8 +51,9 @@ async fn run_tui(args: Args) -> Result<()> {
         args.model.clone(),
     );
     let cli_model = args.model.clone().map(ModelRef);
+    let prefs = CliPrefs::load();
     let saved_model = if cli_model.is_none() {
-        CliPrefs::load().last_model
+        prefs.last_model.clone()
     } else {
         None
     };
@@ -93,6 +94,7 @@ async fn run_tui(args: Args) -> Result<()> {
     };
 
     let mut app = App::new(bootstrap, workdir, file_index);
+    app.apply_loaded_prefs(&prefs);
     let executor = EffectExecutor::new(hub, controller, args.agent, tx.clone());
     let mut terminal = TerminalSession::enter()?;
     terminal.draw(&mut app)?;
@@ -183,7 +185,7 @@ fn apply_terminal_effects(
             }
             Effect::CopyToClipboard { text } => match crate::clipboard::copy_text(text) {
                 Ok(()) => {
-                    app.status.notice = Some("chat copied to clipboard".to_owned());
+                    app.toast("chat copied to clipboard");
                 }
                 Err(err) => {
                     app.chat.push_error(format!("clipboard copy failed: {err}"));

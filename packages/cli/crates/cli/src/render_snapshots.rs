@@ -44,6 +44,41 @@ fn sample_tool_call(status: ToolCallStatus) -> ToolCall {
     }
 }
 
+fn custom_tool_call(
+    id: &str,
+    tool_name: &str,
+    input: serde_json::Value,
+    status: ToolCallStatus,
+    result: Option<agentloop_contracts::ToolOutput>,
+) -> ToolCall {
+    ToolCall {
+        id: ToolCallId::from(id),
+        session_id: agentloop_contracts::SessionId::from("sess-test"),
+        turn_id: TurnId::from("turn-1"),
+        message_id: MessageId::from("msg-tool"),
+        tool_name: tool_name.to_owned(),
+        input,
+        read_only: false,
+        origin: ToolCallOrigin::Model,
+        status,
+        timing: ToolCallTiming::default(),
+        result,
+    }
+}
+
+fn bash_output(stdout: &str, stderr: &str, exit_code: i32) -> agentloop_contracts::ToolOutput {
+    agentloop_contracts::ToolOutput {
+        content: vec![agentloop_contracts::ToolResultBlock::markdown(format!(
+            "exit_code: {exit_code}\n\nstdout:\n{stdout}\n\nstderr:\n{stderr}"
+        ))],
+        is_error: exit_code != 0,
+        structured: Some(serde_json::json!({
+            "exit_code": exit_code,
+            "success": exit_code == 0,
+        })),
+    }
+}
+
 #[test]
 fn chat_markdown_snapshot() {
     let mut app = test_app(test_bootstrap());
@@ -132,6 +167,137 @@ fn chat_thinking_streaming_snapshot() {
 }
 
 #[test]
+fn tool_row_bash_running_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    app.status.spinner = 0;
+    app.chat.apply(&AgentEvent::ToolCallUpdated {
+        call: custom_tool_call(
+            "call-bash",
+            "Bash",
+            serde_json::json!({"command": "npm run build"}),
+            ToolCallStatus::Running,
+            None,
+        ),
+    });
+
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("tool_row_bash_running", rendered);
+}
+
+#[test]
+fn tool_row_bash_failed_tail_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    app.chat.apply(&AgentEvent::ToolCallUpdated {
+        call: custom_tool_call(
+            "call-bash-fail",
+            "Bash",
+            serde_json::json!({"command": "cargo test"}),
+            ToolCallStatus::Completed,
+            Some(bash_output(
+                "",
+                "error[E0308]: mismatched types\n --> src/main.rs:4:5\nnote: expected `u32`\nhelp: try into()\nerror: aborting due to previous error",
+                101,
+            )),
+        ),
+    });
+
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("tool_row_bash_failed_tail", rendered);
+}
+
+#[test]
+fn tool_row_edit_diff_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    app.chat.apply(&AgentEvent::ToolCallUpdated {
+        call: custom_tool_call(
+            "call-edit",
+            "Edit",
+            serde_json::json!({
+                "file_path": "src/app.rs",
+                "old_string": "fn main() {\n    let x = old();\n    run(x);\n    done();\n    after();\n}",
+                "new_string": "fn main() {\n    let x = new();\n    run(x);\n    done();\n    later();\n}",
+            }),
+            ToolCallStatus::Completed,
+            Some(agentloop_contracts::ToolOutput::text("edited src/app.rs")),
+        ),
+    });
+
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("tool_row_edit_diff", rendered);
+}
+
+#[test]
+fn tool_row_read_summary_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    app.chat.apply(&AgentEvent::ToolCallUpdated {
+        call: custom_tool_call(
+            "call-read",
+            "Read",
+            serde_json::json!({"file_path": "src/main.rs"}),
+            ToolCallStatus::Completed,
+            Some(agentloop_contracts::ToolOutput::text(
+                "fn main() {}\nfn helper() {}\nfn other() {}\nfn more() {}\nfn last() {}",
+            )),
+        ),
+    });
+
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("tool_row_read_summary", rendered);
+}
+
+#[test]
+fn thinking_streaming_borderless_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    app.caps.reasoning_visible = true;
+    app.show_thinking = true;
+    app.status.spinner = 0;
+    app.session.turn = TurnPhase::Running {
+        started: std::time::Instant::now(),
+    };
+    app.chat.apply(&AgentEvent::MessageStarted {
+        message_id: MessageId::from("msg-borderless"),
+        role: agentloop_contracts::Role::Assistant,
+    });
+    app.chat.apply(&AgentEvent::ThinkingDelta {
+        message_id: MessageId::from("msg-borderless"),
+        text: "line one\nline two\nline three\nline four\nline five\nline six".to_owned(),
+    });
+
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("thinking_streaming_borderless", rendered);
+}
+
+#[test]
+fn thinking_collapsed_duration_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    app.caps.reasoning_visible = true;
+    app.show_thinking = true;
+    app.chat.apply(&AgentEvent::MessageStarted {
+        message_id: MessageId::from("msg-done"),
+        role: agentloop_contracts::Role::Assistant,
+    });
+    app.chat.apply(&AgentEvent::ThinkingDelta {
+        message_id: MessageId::from("msg-done"),
+        text: "considering the options".to_owned(),
+    });
+    app.chat.apply(&assistant_markdown("Here is the answer."));
+    app.chat.finalize_drafts();
+    // Pin the measured duration for a stable snapshot.
+    for item in &mut app.chat.items {
+        if let crate::chat::ChatItem::Assistant { blocks, .. } = item {
+            for block in blocks {
+                if let crate::chat::DraftBlock::Thinking { duration_ms, .. } = block {
+                    *duration_ms = Some(12_000);
+                }
+            }
+        }
+    }
+
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("thinking_collapsed_duration", rendered);
+}
+
+#[test]
 fn status_idle_snapshot() {
     let mut app = test_app(test_bootstrap());
     app.kind = AgentKind::Native;
@@ -146,6 +312,55 @@ fn status_idle_snapshot() {
 
     let rendered = render_app(&mut app, 80, 24);
     assert_snapshot!("status_idle", rendered);
+}
+
+#[test]
+fn busy_line_running_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    app.status.spinner = 0;
+    app.status.turn_verb_idx = 0;
+    app.status.turn_output_chars = 4_900; // ≈ 1.2k tokens
+    app.session.turn = TurnPhase::Running {
+        started: std::time::Instant::now(),
+    };
+
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("busy_line_running", rendered);
+}
+
+#[test]
+fn toast_line_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    app.toast("model set to copilot/gpt-4.1");
+
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("toast_line", rendered);
+}
+
+#[test]
+fn status_bar_context_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    app.session.model = Some(agentloop_contracts::ModelRef::from(
+        "anthropic/claude-sonnet-4-5",
+    ));
+    app.catalog = vec![agentloop_cli_core::CatalogEntry {
+        provider: agentloop_contracts::ProviderId::from("anthropic"),
+        model: agentloop_contracts::ModelInfo {
+            id: "claude-sonnet-4-5".to_owned(),
+            display_name: None,
+            context_window: Some(200_000),
+            reasoning: true,
+            vision: false,
+        },
+    }];
+    app.status.last_context_tokens = Some(94_000); // 47%
+    app.status.total_usage.input = 12_300;
+    app.status.total_usage.output = 4_100;
+    app.status.last_cost_usd = Some(0.0421);
+
+    // Wider than the default 80 so the cost suffix stays visible.
+    let rendered = render_app(&mut app, 100, 24);
+    assert_snapshot!("status_bar_context", rendered);
 }
 
 #[test]

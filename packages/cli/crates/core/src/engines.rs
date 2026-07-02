@@ -159,11 +159,16 @@ impl EngineHub {
     }
 
     fn build_native(&self) -> Result<(EngineService, Vec<String>), HubError> {
+        // Re-read prefs on every (re)build so `/connect` followed by an
+        // invalidate picks up new custom providers without extra plumbing.
+        let prefs = crate::prefs::CliPrefs::load();
+        let (custom, skipped) = crate::prefs::custom_specs(&prefs);
         let service = EngineService::native_all(EngineOptions {
             provider: self.provider.clone(),
             model: self.model.clone(),
             cwd: self.cwd.clone(),
             date: today(),
+            custom,
         })?;
         let mut trace = vec!["selected native loop".to_owned()];
         let ids = service
@@ -173,6 +178,9 @@ impl EngineHub {
             .map(ToString::to_string)
             .collect::<Vec<_>>();
         trace.push(format!("registered providers: {}", ids.join(", ")));
+        for (id, reason) in skipped {
+            trace.push(format!("skipped custom provider {id}: {reason}"));
+        }
         Ok((service, trace))
     }
 }

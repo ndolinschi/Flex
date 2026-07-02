@@ -4,12 +4,11 @@ expression: rendered
 ---
 AgenticStudio 0.1.0 — /help for keys and commands
 
-✻ Thought for 0s (ctrl+t to expand)
-
-  Here is the answer.
-
-
-
+· Thinking…
+  line three
+  line four
+  line five
+  line six
 
 
 
@@ -22,6 +21,7 @@ AgenticStudio 0.1.0 — /help for keys and commands
 
 
 ────────────────────────────────────────────────────────────────────────────────
+· Pondering… (0s · ↑ 0 tokens · esc to interrupt)
 ┌ prompt ──────────────────────────────────────────────────────────────────────┐
 │ Type a message, / for commands, @ for files                                  │
 └──────────────────────────────────────────────────────────────────────────────┘
