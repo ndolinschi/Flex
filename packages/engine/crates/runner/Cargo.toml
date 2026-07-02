@@ -14,10 +14,15 @@ path = "src/main.rs"
 
 [dependencies]
 agentloop-contracts = { workspace = true }
+agentloop-delegator-claude-code = { workspace = true }
 agentloop-engine = { workspace = true }
+agentloop-session = { workspace = true }
 agentloop-transport-stdio = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 [lints]
 workspace = true

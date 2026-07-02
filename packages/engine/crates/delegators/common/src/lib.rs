@@ -144,6 +144,12 @@ pub enum DelegatorEvent {
         call_id: ToolCallId,
         output: ToolOutput,
     },
+    /// Token usage and cost reported by the external agent (usually once,
+    /// with its final result frame). Later reports supersede earlier ones.
+    Usage {
+        usage: agentloop_contracts::TokenUsage,
+        cost_usd: Option<f64>,
+    },
     TurnFinished {
         stop_reason: TurnStopReason,
     },

@@ -8,6 +8,7 @@ use agentloop_contracts::branding;
 
 #[derive(Debug)]
 pub(crate) struct RunArgs {
+    pub(crate) agent: Option<String>,
     pub(crate) provider: Option<String>,
     pub(crate) model: Option<String>,
     pub(crate) prompt: String,
@@ -21,6 +22,7 @@ pub(crate) enum OutputFormat {
 }
 
 pub(crate) fn parse_run_args(args: &[String]) -> anyhow::Result<RunArgs> {
+    let mut agent: Option<String> = None;
     let mut provider: Option<String> = None;
     let mut model: Option<String> = None;
     let mut prompt: Option<String> = None;
@@ -30,6 +32,9 @@ pub(crate) fn parse_run_args(args: &[String]) -> anyhow::Result<RunArgs> {
 
     while index < args.len() {
         match args[index].as_str() {
+            "--agent" => {
+                agent = Some(take_value(args, &mut index, "--agent")?);
+            }
             "--provider" => {
                 provider = Some(take_value(args, &mut index, "--provider")?);
             }
@@ -58,6 +63,7 @@ pub(crate) fn parse_run_args(args: &[String]) -> anyhow::Result<RunArgs> {
     }
 
     Ok(RunArgs {
+        agent,
         provider,
         model,
         prompt: prompt.context("missing prompt: pass -p \"...\" or --prompt \"...\"")?,
@@ -78,9 +84,12 @@ fn take_value(args: &[String], index: &mut usize, flag: &str) -> anyhow::Result<
 
 pub(crate) fn usage() -> String {
     format!(
-        "usage:\n  {} --version\n  {} run [--provider openai|anthropic] [--model <model>] -p <prompt> \
-         [--workdir <path>] [--output-format ndjson]",
-        branding::PRODUCT_SLUG,
-        branding::PRODUCT_SLUG
+        "usage:\n  {slug} --version\n  {slug} doctor\n  {slug} run [--agent native|claude-code] \
+         [--provider anthropic|openai|gemini|ollama] [--model <model>] -p <prompt> \
+         [--workdir <path>] [--output-format ndjson]\n\n\
+         With no --agent/--provider, the engine auto-detects: provider API keys in the \
+         environment select the native loop; otherwise an installed external agent CLI is \
+         probed and delegated to. `doctor` explains the decision.",
+        slug = branding::PRODUCT_SLUG
     )
 }

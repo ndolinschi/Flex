@@ -161,7 +161,15 @@ where
             Ok(output) => output,
             Err(DelegatorHostError::Cancelled) => {
                 let summary = self
-                    .complete_turn(&handle, &turn_id, TurnStopReason::Cancelled, 0, started_at)
+                    .complete_turn(
+                        &handle,
+                        &turn_id,
+                        TurnStopReason::Cancelled,
+                        0,
+                        started_at,
+                        TokenUsage::default(),
+                        None,
+                    )
                     .await?;
                 return Ok(summary);
             }
@@ -187,6 +195,8 @@ where
         let mut tool_calls = HashMap::<ToolCallId, ToolCall>::new();
         let mut stop_reason = TurnStopReason::EndTurn;
         let mut mapped_error: Option<String> = None;
+        let mut turn_usage = TokenUsage::default();
+        let mut turn_cost: Option<f64> = None;
 
         for line in output.stdout_lines {
             match mapper.map_line(&line) {
@@ -240,6 +250,12 @@ where
                                 )
                                 .await?;
                             }
+                            DelegatorEvent::Usage { usage, cost_usd } => {
+                                turn_usage = usage;
+                                if cost_usd.is_some() {
+                                    turn_cost = cost_usd;
+                                }
+                            }
                             DelegatorEvent::TurnFinished { stop_reason: stop } => {
                                 stop_reason = stop;
                             }
@@ -283,7 +299,7 @@ where
                         message_id: assistant_message_id,
                         content: vec![ContentBlock::markdown(assistant_text)],
                         model: None,
-                        usage: None,
+                        usage: (turn_usage != TokenUsage::default()).then_some(turn_usage),
                     },
                 )
                 .await?;
@@ -298,6 +314,8 @@ where
                 stop_reason,
                 tool_calls.len() as u32,
                 started_at,
+                turn_usage,
+                turn_cost,
             )
             .await?;
 
@@ -433,11 +451,20 @@ where
             )
             .await?;
         let _summary = self
-            .complete_turn(handle, turn_id, TurnStopReason::Error, 0, started_at)
+            .complete_turn(
+                handle,
+                turn_id,
+                TurnStopReason::Error,
+                0,
+                started_at,
+                TokenUsage::default(),
+                None,
+            )
             .await?;
         Err(AgentError::Other(message))
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn complete_turn(
         &self,
         handle: &DelegatedSessionHandle,
@@ -445,12 +472,14 @@ where
         stop_reason: TurnStopReason,
         num_tool_calls: u32,
         started_at: u64,
+        usage: TokenUsage,
+        cost_usd: Option<f64>,
     ) -> Result<TurnSummary, AgentError> {
         let summary = TurnSummary {
             turn_id: turn_id.clone(),
             stop_reason,
-            usage: TokenUsage::default(),
-            cost_usd: None,
+            usage,
+            cost_usd,
             num_model_calls: 1,
             num_tool_calls,
             duration_ms: now_ms().saturating_sub(started_at),

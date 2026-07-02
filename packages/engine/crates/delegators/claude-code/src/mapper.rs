@@ -3,11 +3,16 @@ use agentloop_delegator_common::{DelegatorEvent, DelegatorMapError, LineMapper};
 use serde::Deserialize;
 
 #[derive(Debug, Default)]
-pub struct ClaudeCodeLineMapper;
+pub struct ClaudeCodeLineMapper {
+    /// Claude Code emits complete `assistant` messages *and* echoes the final
+    /// text again in its `result` frame. Once assistant text has streamed,
+    /// the result echo must be suppressed or the message doubles.
+    saw_assistant_text: bool,
+}
 
 impl ClaudeCodeLineMapper {
     pub fn new() -> Self {
-        Self
+        Self::default()
     }
 }
 
@@ -21,6 +26,7 @@ impl LineMapper for ClaudeCodeLineMapper {
         let event: ClaudeCodeWireEvent = serde_json::from_str(trimmed)?;
         Ok(match event {
             ClaudeCodeWireEvent::AssistantDelta { text } => {
+                self.saw_assistant_text = true;
                 vec![DelegatorEvent::AssistantDelta { text }]
             }
             ClaudeCodeWireEvent::ToolCall { id, name, input } => {
@@ -47,11 +53,35 @@ impl LineMapper for ClaudeCodeLineMapper {
                     is_error,
                 ),
             }],
-            ClaudeCodeWireEvent::Assistant { message } => map_assistant_message(message)?,
-            ClaudeCodeWireEvent::Result { result, is_error } => {
+            ClaudeCodeWireEvent::Assistant { message } => {
+                let events = map_assistant_message(message)?;
+                if events
+                    .iter()
+                    .any(|event| matches!(event, DelegatorEvent::AssistantDelta { .. }))
+                {
+                    self.saw_assistant_text = true;
+                }
+                events
+            }
+            ClaudeCodeWireEvent::Result {
+                result,
+                is_error,
+                usage,
+                total_cost_usd,
+            } => {
                 let mut events = Vec::new();
-                if let Some(result) = result.filter(|value| !value.is_empty()) {
-                    events.push(DelegatorEvent::AssistantDelta { text: result });
+                // The result frame echoes the final assistant text; only use
+                // it when no assistant message streamed it already.
+                if !self.saw_assistant_text {
+                    if let Some(result) = result.filter(|value| !value.is_empty()) {
+                        events.push(DelegatorEvent::AssistantDelta { text: result });
+                    }
+                }
+                if usage.is_some() || total_cost_usd.is_some() {
+                    events.push(DelegatorEvent::Usage {
+                        usage: usage.map(ClaudeUsage::into_token_usage).unwrap_or_default(),
+                        cost_usd: total_cost_usd,
+                    });
                 }
                 events.push(if is_error.unwrap_or(false) {
                     DelegatorEvent::TurnFinished {
@@ -62,6 +92,7 @@ impl LineMapper for ClaudeCodeLineMapper {
                         stop_reason: TurnStopReason::EndTurn,
                     }
                 });
+                self.saw_assistant_text = false;
                 events
             }
             ClaudeCodeWireEvent::TurnFinished { stop_reason } => {
@@ -105,6 +136,10 @@ enum ClaudeCodeWireEvent {
         result: Option<String>,
         #[serde(default)]
         is_error: Option<bool>,
+        #[serde(default)]
+        usage: Option<ClaudeUsage>,
+        #[serde(default)]
+        total_cost_usd: Option<f64>,
     },
     TurnFinished {
         stop_reason: Option<String>,
@@ -114,6 +149,30 @@ enum ClaudeCodeWireEvent {
     },
     #[serde(other)]
     Unknown,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct ClaudeUsage {
+    #[serde(default)]
+    input_tokens: u64,
+    #[serde(default)]
+    output_tokens: u64,
+    #[serde(default)]
+    cache_read_input_tokens: Option<u64>,
+    #[serde(default)]
+    cache_creation_input_tokens: Option<u64>,
+}
+
+impl ClaudeUsage {
+    fn into_token_usage(self) -> agentloop_contracts::TokenUsage {
+        agentloop_contracts::TokenUsage {
+            input: self.input_tokens,
+            output: self.output_tokens,
+            cache_read: self.cache_read_input_tokens,
+            cache_write: self.cache_creation_input_tokens,
+            reasoning: None,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -287,6 +346,67 @@ mod tests {
             }
             Err(err) => panic!("fake CLI line should parse: {err}"),
         }
+    }
+
+    #[test]
+    fn result_echo_is_deduped_and_usage_mapped() {
+        let mut mapper = ClaudeCodeLineMapper::new();
+        // The assistant message streams the final text...
+        let events = mapper
+            .map_line(
+                r#"{"type":"assistant","message":{"content":[{"type":"text","text":"pong"}]}}"#,
+            )
+            .expect("assistant line maps");
+        assert_eq!(
+            events,
+            vec![DelegatorEvent::AssistantDelta {
+                text: "pong".to_owned()
+            }]
+        );
+        // ...and the result frame echoes it. The echo must be suppressed,
+        // while usage and cost are captured.
+        let events = mapper
+            .map_line(
+                r#"{"type":"result","result":"pong","is_error":false,"usage":{"input_tokens":7,"output_tokens":3,"cache_read_input_tokens":100},"total_cost_usd":0.0125}"#,
+            )
+            .expect("result line maps");
+        assert_eq!(
+            events,
+            vec![
+                DelegatorEvent::Usage {
+                    usage: agentloop_contracts::TokenUsage {
+                        input: 7,
+                        output: 3,
+                        cache_read: Some(100),
+                        cache_write: None,
+                        reasoning: None,
+                    },
+                    cost_usd: Some(0.0125),
+                },
+                DelegatorEvent::TurnFinished {
+                    stop_reason: TurnStopReason::EndTurn
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn result_text_is_used_when_nothing_streamed() {
+        let mut mapper = ClaudeCodeLineMapper::new();
+        let events = mapper
+            .map_line(r#"{"type":"result","result":"pong","is_error":false}"#)
+            .expect("result line maps");
+        assert_eq!(
+            events,
+            vec![
+                DelegatorEvent::AssistantDelta {
+                    text: "pong".to_owned()
+                },
+                DelegatorEvent::TurnFinished {
+                    stop_reason: TurnStopReason::EndTurn
+                },
+            ]
+        );
     }
 
     #[test]
