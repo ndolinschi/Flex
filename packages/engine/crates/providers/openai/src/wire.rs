@@ -23,11 +23,24 @@ pub(crate) struct OpenAiChatRequest {
     max_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    thinking: Option<OpenAiThinking>,
 }
 
 #[derive(Debug, Serialize)]
 struct StreamOptions {
     include_usage: bool,
+}
+
+/// Extended-thinking request config in the DeepSeek-style dialect:
+/// `{"type":"enabled","budget_tokens":N}`. Only serialized when the caller
+/// set [`ChatRequest::thinking`]; strict Chat Completions endpoints never
+/// see the field.
+#[derive(Debug, Serialize)]
+struct OpenAiThinking {
+    #[serde(rename = "type")]
+    kind: String,
+    budget_tokens: u32,
 }
 
 #[derive(Debug, Serialize)]
@@ -113,6 +126,10 @@ struct Choice {
 #[derive(Debug, Default, Deserialize)]
 struct Delta {
     content: Option<String>,
+    /// DeepSeek dialect: reasoning text streamed alongside `content`.
+    reasoning_content: Option<String>,
+    /// Router/GLM variant of the same field.
+    reasoning: Option<String>,
     #[serde(default)]
     tool_calls: Vec<DeltaToolCall>,
 }
@@ -189,6 +206,12 @@ impl OpenAiStreamMapper {
         }
 
         for choice in chunk.choices {
+            if let Some(text) = choice.delta.reasoning_content.or(choice.delta.reasoning) {
+                if !text.is_empty() {
+                    events.push(ProviderStreamEvent::ThinkingDelta { text });
+                }
+            }
+
             if let Some(text) = choice.delta.content {
                 if !text.is_empty() {
                     events.push(ProviderStreamEvent::MarkdownDelta { text });
@@ -265,6 +288,10 @@ pub(crate) fn build_request(request: ChatRequest) -> OpenAiChatRequest {
         tool_choice: tool_choice(request.tool_choice),
         max_tokens: request.max_tokens,
         temperature: request.temperature,
+        thinking: request.thinking.map(|thinking| OpenAiThinking {
+            kind: "enabled".to_owned(),
+            budget_tokens: thinking.budget_tokens,
+        }),
     }
 }
 
@@ -305,9 +332,13 @@ fn push_message(out: &mut Vec<OpenAiMessage>, message: Message) {
 
     for block in message.content {
         match block {
-            ContentBlock::Markdown { text: value } | ContentBlock::Thinking { text: value, .. } => {
+            ContentBlock::Markdown { text: value } => {
                 text.push(value);
             }
+            // Reasoning must not be echoed back on replay (DeepSeek rejects
+            // it, and switching providers mid-session would leak another
+            // model's thinking); drop it instead of folding into text.
+            ContentBlock::Thinking { .. } => {}
             ContentBlock::Image { media_type, data } => {
                 text.push(render_blob("image", &media_type, &data));
             }
@@ -486,6 +517,89 @@ mod tests {
             }
             Err(err) => panic!("stream chunk should parse: {err}"),
         }
+    }
+
+    #[test]
+    fn maps_reasoning_content_delta_to_thinking_events() {
+        let mut mapper = OpenAiStreamMapper::new("deepseek-reasoner");
+        let events = mapper.map_json(
+            r#"{"model":"deepseek-reasoner","choices":[{"delta":{"reasoning_content":"pondering"},"finish_reason":null}]}"#,
+        );
+        match events {
+            Ok(events) => assert!(matches!(
+                events.get(1),
+                Some(ProviderStreamEvent::ThinkingDelta { text }) if text == "pondering"
+            )),
+            Err(err) => panic!("stream chunk should parse: {err}"),
+        }
+    }
+
+    #[test]
+    fn maps_reasoning_delta_variant_to_thinking_events() {
+        let mut mapper = OpenAiStreamMapper::new("glm-test");
+        let events = mapper.map_json(
+            r#"{"model":"glm-test","choices":[{"delta":{"reasoning":"weighing options","content":"answer"},"finish_reason":null}]}"#,
+        );
+        match events {
+            Ok(events) => {
+                assert!(matches!(
+                    events.get(1),
+                    Some(ProviderStreamEvent::ThinkingDelta { text }) if text == "weighing options"
+                ));
+                assert!(matches!(
+                    events.get(2),
+                    Some(ProviderStreamEvent::MarkdownDelta { text }) if text == "answer"
+                ));
+            }
+            Err(err) => panic!("stream chunk should parse: {err}"),
+        }
+    }
+
+    #[test]
+    fn serializes_thinking_config_and_omits_it_when_unset() {
+        let mut request = ChatRequest::new("deepseek-chat", Vec::new());
+        request.thinking = Some(agentloop_core::ThinkingConfig {
+            budget_tokens: 2048,
+        });
+        let json = match serde_json::to_value(build_request(request)) {
+            Ok(value) => value,
+            Err(err) => panic!("request should serialize: {err}"),
+        };
+        assert_eq!(json["thinking"]["type"], "enabled");
+        assert_eq!(json["thinking"]["budget_tokens"], 2048);
+
+        let bare = ChatRequest::new("deepseek-chat", Vec::new());
+        let json = match serde_json::to_value(build_request(bare)) {
+            Ok(value) => value,
+            Err(err) => panic!("request should serialize: {err}"),
+        };
+        assert!(
+            json.get("thinking").is_none(),
+            "unset thinking must not reach the wire: {json}"
+        );
+    }
+
+    #[test]
+    fn replay_skips_thinking_blocks() {
+        let request = ChatRequest::new(
+            "deepseek-chat",
+            vec![Message {
+                role: Role::Assistant,
+                content: vec![
+                    ContentBlock::Thinking {
+                        text: "private reasoning".to_owned(),
+                        signature: None,
+                    },
+                    ContentBlock::markdown("visible answer"),
+                ],
+                cache_hint: false,
+            }],
+        );
+        let json = match serde_json::to_value(build_request(request)) {
+            Ok(value) => value,
+            Err(err) => panic!("request should serialize: {err}"),
+        };
+        assert_eq!(json["messages"][0]["content"], "visible answer");
     }
 
     #[test]

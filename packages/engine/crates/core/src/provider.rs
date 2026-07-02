@@ -85,11 +85,10 @@ pub enum ToolChoice {
     Named(String),
 }
 
-/// Canonical extended-thinking configuration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct ThinkingConfig {
-    pub budget_tokens: u32,
-}
+/// Re-export: the canonical extended-thinking configuration lives in
+/// contracts (it is part of the `TurnOptions` wire type); providers keep
+/// importing it from here.
+pub use agentloop_contracts::ThinkingConfig;
 
 /// One chat request in canonical form. Providers map this onto their wire.
 #[derive(Debug, Clone, PartialEq)]

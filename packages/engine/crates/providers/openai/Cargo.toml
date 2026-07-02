@@ -20,5 +20,8 @@ serde_json = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 
+[dev-dependencies]
+wiremock = { workspace = true }
+
 [lints]
 workspace = true

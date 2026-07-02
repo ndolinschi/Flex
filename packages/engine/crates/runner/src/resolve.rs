@@ -99,6 +99,7 @@ fn native_service(
         model,
         cwd: workdir.to_path_buf(),
         date: today(),
+        custom: Vec::new(),
     })
 }
 

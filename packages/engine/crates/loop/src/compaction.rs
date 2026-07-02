@@ -12,7 +12,7 @@ use agentloop_contracts::{
 use agentloop_core::provider::ChatRequest;
 use agentloop_core::{AgentError, ProviderError};
 
-use crate::agent::NativeAgent;
+use crate::deps::TurnDeps;
 use crate::draft::AssistantDraft;
 use crate::session_handle::SessionHandle;
 
@@ -23,12 +23,12 @@ const SUMMARIZE_SYSTEM: &str = "You are a conversation summarizer. Summarize the
 
 /// Summarize the session's current context view and record a compaction boundary.
 pub(crate) async fn compact_session(
-    agent: &NativeAgent,
+    deps: &Arc<TurnDeps>,
     handle: Arc<SessionHandle>,
     opts: TurnOptions,
     cancel: CancellationToken,
 ) -> Result<CompactionSummary, AgentError> {
-    let events = agent.store.read(&handle.id, 0).await?;
+    let events = deps.store.read(&handle.id, 0).await?;
     let transcript = reduce(events.iter().map(|(_, event)| event).collect::<Vec<_>>());
     let items_before = transcript.items.len();
 
@@ -39,12 +39,12 @@ pub(crate) async fn compact_session(
         ));
     }
 
-    let meta = agent.store.get_meta(&handle.id).await?;
+    let meta = deps.store.get_meta(&handle.id).await?;
     let model_ref = opts
         .model
         .clone()
         .or_else(|| meta.model.clone())
-        .or_else(|| agent.default_model.clone())
+        .or_else(|| deps.default_model.clone())
         .ok_or_else(|| {
             AgentError::Other(
                 "no model configured: pass TurnOptions.model, set a session model, \
@@ -52,11 +52,11 @@ pub(crate) async fn compact_session(
                     .to_owned(),
             )
         })?;
-    let (provider, model) = agent.providers.resolve(&model_ref).ok_or_else(|| {
+    let (provider, model) = deps.providers.resolve(&model_ref).ok_or_else(|| {
         AgentError::Other(format!(
             "no provider registered for model reference `{model_ref}`; \
              registered providers: {:?}",
-            agent.providers.ids()
+            deps.providers.ids()
         ))
     })?;
 

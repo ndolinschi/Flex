@@ -25,8 +25,8 @@ use agentloop_contracts::{
 use agentloop_core::hook::{HookData, HookOutcome};
 use agentloop_core::{AgentError, EventSink};
 
-use crate::agent::NativeAgent;
 use crate::attachments::resolve_blob_paths;
+use crate::deps::TurnDeps;
 use crate::manager::ToolCallManager;
 use crate::session_handle::SessionHandle;
 
@@ -40,12 +40,12 @@ pub(super) enum IterationOutcome {
 }
 
 pub(crate) async fn run_turn(
-    agent: &NativeAgent,
+    deps: &Arc<TurnDeps>,
     handle: Arc<SessionHandle>,
     mut input: PromptInput,
     opts: TurnOptions,
 ) -> Result<TurnSummary, AgentError> {
-    let meta = agent.store.get_meta(&handle.id).await?;
+    let meta = deps.store.get_meta(&handle.id).await?;
     let turn_id = TurnId::generate();
     let cancel = CancellationToken::new();
     *handle
@@ -58,13 +58,13 @@ pub(crate) async fn run_turn(
         "turn",
         session_id = %handle.id,
         turn_id = %turn_id,
-        agent = %agent.agent_id
+        agent = %deps.agent_id
     );
 
     async {
         // ── prompt intake ───────────────────────────────────────────────────
         let outcome = run_hooks(
-            agent,
+            deps,
             &handle,
             HookPoint::UserPromptSubmit,
             &turn_id,
@@ -130,13 +130,13 @@ pub(crate) async fn run_turn(
         let mut manager = ToolCallManager::new();
         let mut stop_reason = TurnStopReason::MaxIterations;
 
-        for _iteration in 0..agent.limits.max_iterations {
+        for _iteration in 0..deps.limits.max_iterations {
             if cancel.is_cancelled() {
                 stop_reason = TurnStopReason::Cancelled;
                 break;
             }
             let outcome = run_iteration(
-                agent,
+                deps,
                 &handle,
                 &meta,
                 &turn_id,

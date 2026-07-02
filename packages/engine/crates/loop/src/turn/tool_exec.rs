@@ -14,7 +14,7 @@ use agentloop_contracts::{
 use agentloop_core::tool::{ToolContext, ToolError};
 use agentloop_core::{AgentError, EventSink};
 
-use crate::agent::NativeAgent;
+use crate::deps::TurnDeps;
 use crate::draft::DraftToolCall;
 use crate::manager::ToolCallManager;
 use crate::permission::{PermissionPolicy, Verdict};
@@ -25,7 +25,7 @@ use super::hooks::run_hooks;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn execute_tool_requests(
-    agent: &NativeAgent,
+    deps: &Arc<TurnDeps>,
     handle: &Arc<SessionHandle>,
     meta: &SessionMeta,
     turn_id: &TurnId,
@@ -37,7 +37,7 @@ pub(super) async fn execute_tool_requests(
     tool_requests: &[DraftToolCall],
 ) -> Result<(), AgentError> {
     for request in tool_requests {
-        let read_only = agent
+        let read_only = deps
             .tools
             .get(&request.name)
             .map(|tool| tool.descriptor().read_only)
@@ -82,7 +82,7 @@ pub(super) async fn execute_tool_requests(
             futures::stream::iter(batch.iter().cloned())
                 .map(|req| {
                     execute_one_call(
-                        agent,
+                        deps,
                         handle,
                         meta,
                         turn_id,
@@ -93,13 +93,13 @@ pub(super) async fn execute_tool_requests(
                         req,
                     )
                 })
-                .buffer_unordered(agent.limits.tool_concurrency)
+                .buffer_unordered(deps.limits.tool_concurrency)
                 .collect::<Vec<_>>()
                 .await;
             index = end;
         } else {
             execute_one_call(
-                agent,
+                deps,
                 handle,
                 meta,
                 turn_id,
@@ -154,7 +154,7 @@ pub(super) async fn execute_tool_requests(
 /// Execute a single tool call through its full lifecycle.
 #[allow(clippy::too_many_arguments)]
 async fn execute_one_call(
-    agent: &NativeAgent,
+    deps: &Arc<TurnDeps>,
     handle: &Arc<SessionHandle>,
     meta: &SessionMeta,
     turn_id: &TurnId,
@@ -182,7 +182,7 @@ async fn execute_one_call(
     };
 
     // Unknown tool: a model mistake — feed a teaching error result back.
-    let Some(tool) = agent.tools.get(&request.name) else {
+    let Some(tool) = deps.tools.get(&request.name) else {
         if let Some(call) = transition(ToolCallStatus::Running, None) {
             emit_update(call).await;
         }
@@ -191,7 +191,7 @@ async fn execute_one_call(
             Some(ToolOutput::error(format!(
                 "Unknown tool `{}`. Available tools: {}.",
                 request.name,
-                agent.tools.names().join(", ")
+                deps.tools.names().join(", ")
             ))),
         ) {
             emit_update(call).await;
@@ -202,8 +202,7 @@ async fn execute_one_call(
 
     // ── permission gate ─────────────────────────────────────────────────────
     let verdict =
-        agent
-            .policy
+        deps.policy
             .evaluate(&descriptor, &request.input, &meta.cwd, opts.permission_mode);
     match verdict {
         Verdict::Deny { reason } => {
@@ -251,9 +250,9 @@ async fn execute_one_call(
                 )
                 .await;
 
-            let wait = agent
+            let wait = deps
                 .pending_permissions
-                .wait(request_id.clone(), agent.policy.ask_timeout);
+                .wait(request_id.clone(), deps.policy.ask_timeout);
             let decision = tokio::select! {
                 decision = wait => decision,
                 _ = cancel.cancelled() => None,
@@ -280,7 +279,7 @@ async fn execute_one_call(
                     return;
                 }
                 PermissionDecision::AllowAlways => {
-                    agent.policy.add_rule(PermissionPolicy::rule_for_always(
+                    deps.policy.add_rule(PermissionPolicy::rule_for_always(
                         &descriptor,
                         &request.input,
                     ));
@@ -314,7 +313,7 @@ async fn execute_one_call(
         if let Some(mut call) = call_snapshot {
             call.input = input.clone();
             let outcome = run_hooks(
-                agent,
+                deps,
                 handle,
                 HookPoint::PreToolUse,
                 turn_id,
@@ -364,10 +363,10 @@ async fn execute_one_call(
     };
     let span = info_span!("tool_call", tool = %descriptor.name, call_id = %request.id);
     let result = tokio::select! {
-        result = tokio::time::timeout(agent.limits.tool_timeout, tool.run(ctx, input))
+        result = tokio::time::timeout(deps.limits.tool_timeout, tool.run(ctx, input))
             .instrument(span) => match result {
                 Ok(inner) => inner,
-                Err(_) => Err(ToolError::Timeout(agent.limits.tool_timeout.as_millis() as u64)),
+                Err(_) => Err(ToolError::Timeout(deps.limits.tool_timeout.as_millis() as u64)),
             },
         _ = call_token.cancelled() => Err(ToolError::Cancelled),
     };
@@ -382,7 +381,7 @@ async fn execute_one_call(
                 .cloned();
             if let Some(call) = call_snapshot {
                 let _ = run_hooks(
-                    agent,
+                    deps,
                     handle,
                     HookPoint::PostToolUse,
                     turn_id,

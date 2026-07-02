@@ -35,6 +35,17 @@
         "string",
         "null"
       ]
+    },
+    "thinking": {
+      "description": "Extended-thinking budget for this turn; `None` = provider default\n(off). Forwarded only to providers that declare the thinking\ncapability.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ThinkingConfig"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "$defs": {
@@ -70,6 +81,20 @@
           "type": "string",
           "const": "bypass_permissions"
         }
+      ]
+    },
+    "ThinkingConfig": {
+      "description": "Canonical extended-thinking configuration.",
+      "type": "object",
+      "properties": {
+        "budget_tokens": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "budget_tokens"
       ]
     }
   }

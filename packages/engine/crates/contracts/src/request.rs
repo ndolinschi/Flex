@@ -52,6 +52,12 @@ impl PromptInput {
     }
 }
 
+/// Canonical extended-thinking configuration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ThinkingConfig {
+    pub budget_tokens: u32,
+}
+
 /// Per-turn options.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct TurnOptions {
@@ -62,6 +68,11 @@ pub struct TurnOptions {
     /// Extra system-prompt text appended for this turn only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub system_append: Option<String>,
+    /// Extended-thinking budget for this turn; `None` = provider default
+    /// (off). Forwarded only to providers that declare the thinking
+    /// capability.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<ThinkingConfig>,
     /// Namespaced passthrough for agent-specific options.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub extra: BTreeMap<String, serde_json::Value>,

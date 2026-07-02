@@ -8,6 +8,7 @@ use agentloop_contracts::{Answer, CommandInfo, ModelRef, PermissionMode, Questio
 use agentloop_core::{Hook, PendingMap, ProviderRegistry, SessionStore, ToolRegistry};
 
 use crate::agent::NativeAgent;
+use crate::deps::TurnDeps;
 use crate::permission::PermissionPolicy;
 
 /// Bounds on a turn.
@@ -110,19 +111,21 @@ impl NativeAgentBuilder {
 
     pub fn build(self) -> Arc<NativeAgent> {
         Arc::new(NativeAgent {
-            agent_id: "native".to_owned(),
-            providers: self.providers,
-            tools: self.tools,
-            store: self.store,
-            hooks: self.hooks,
-            policy: self.policy,
-            limits: self.limits,
-            system_prompt: self.system_prompt,
-            default_model: self.default_model,
+            deps: Arc::new(TurnDeps {
+                agent_id: "native".to_owned(),
+                providers: self.providers,
+                tools: self.tools,
+                store: self.store,
+                hooks: self.hooks,
+                policy: self.policy,
+                limits: self.limits,
+                system_prompt: self.system_prompt,
+                default_model: self.default_model,
+                pending_permissions: Arc::new(PendingMap::new()),
+                pending_questions: self.pending_questions,
+            }),
             command_infos: self.command_infos,
             sessions: Mutex::new(HashMap::new()),
-            pending_permissions: PendingMap::new(),
-            pending_questions: self.pending_questions,
         })
     }
 }

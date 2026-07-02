@@ -11,36 +11,23 @@ use tokio_util::sync::CancellationToken;
 
 use agentloop_contracts::{
     AgentCaps, AgentEvent, AgentInfo, Answer, AttachmentCaps, CancelSupport, CommandInfo,
-    CompactionSummary, McpPassthrough, ModelDiscovery, ModelRef, NewSessionParams, PermissionCaps,
+    CompactionSummary, McpPassthrough, ModelDiscovery, NewSessionParams, PermissionCaps,
     PermissionDecision, PermissionMode, PermissionRequestId, PromptInput, QuestionId,
     ResumeSupport, SessionEvent, SessionId, SessionMeta, StreamingGranularity, TurnOptions,
     TurnSummary, now_ms,
 };
-use agentloop_core::{
-    Agent, AgentError, EventStream, Hook, PendingMap, ProviderRegistry, SessionStore, ToolRegistry,
-};
+use agentloop_core::{Agent, AgentError, EventStream};
 
-use crate::builder::LoopLimits;
 use crate::compaction::compact_session;
-use crate::permission::PermissionPolicy;
+use crate::deps::TurnDeps;
 use crate::session_handle::SessionHandle;
 use crate::turn;
 
 /// The native agent loop. Construct with [`crate::NativeAgentBuilder`].
 pub struct NativeAgent {
-    pub(crate) agent_id: String,
-    pub(crate) providers: ProviderRegistry,
-    pub(crate) tools: ToolRegistry,
-    pub(crate) store: Arc<dyn SessionStore>,
-    pub(crate) hooks: Vec<Arc<dyn Hook>>,
-    pub(crate) policy: PermissionPolicy,
-    pub(crate) limits: LoopLimits,
-    pub(crate) system_prompt: String,
-    pub(crate) default_model: Option<ModelRef>,
+    pub(crate) deps: Arc<TurnDeps>,
     pub(crate) command_infos: Vec<CommandInfo>,
     pub(crate) sessions: Mutex<HashMap<SessionId, Arc<SessionHandle>>>,
-    pub(crate) pending_permissions: PendingMap<PermissionRequestId, PermissionDecision>,
-    pub(crate) pending_questions: Arc<PendingMap<QuestionId, Vec<Answer>>>,
 }
 
 impl NativeAgent {
@@ -60,8 +47,8 @@ impl NativeAgent {
             .or_insert_with(|| {
                 Arc::new(SessionHandle::new(
                     id.clone(),
-                    self.agent_id.clone(),
-                    self.store.clone(),
+                    self.deps.agent_id.clone(),
+                    self.deps.store.clone(),
                     next_seq,
                 ))
             })
@@ -73,7 +60,7 @@ impl NativeAgent {
 impl Agent for NativeAgent {
     fn info(&self) -> AgentInfo {
         AgentInfo {
-            id: self.agent_id.clone(),
+            id: self.deps.agent_id.clone(),
             display_name: "Native loop".to_owned(),
             version: Some(env!("CARGO_PKG_VERSION").to_owned()),
         }
@@ -120,16 +107,16 @@ impl Agent for NativeAgent {
         let meta = SessionMeta {
             id: id.clone(),
             title: params.title,
-            agent_id: self.agent_id.clone(),
+            agent_id: self.deps.agent_id.clone(),
             parent_id: None,
             provider_session_id: None,
             cwd,
-            model: params.model.or_else(|| self.default_model.clone()),
+            model: params.model.or_else(|| self.deps.default_model.clone()),
             mode: params.mode,
             created_at_ms: now,
             updated_at_ms: now,
         };
-        self.store.create(meta.clone()).await?;
+        self.deps.store.create(meta.clone()).await?;
         let handle = self.install_handle(&id, 0);
         handle
             .emit_persistent(None, AgentEvent::SessionCreated { meta })
@@ -138,7 +125,7 @@ impl Agent for NativeAgent {
             .emit_persistent(
                 None,
                 AgentEvent::EngineInfo {
-                    agent_id: self.agent_id.clone(),
+                    agent_id: self.deps.agent_id.clone(),
                     capabilities: self.capabilities(),
                     provider_session_id: None,
                     resolution_trace: Vec::new(),
@@ -151,15 +138,15 @@ impl Agent for NativeAgent {
     async fn resume_session(&self, id: &SessionId) -> Result<(), AgentError> {
         // The log is the ground truth: resuming is just re-attaching a
         // handle at the right sequence number.
-        let _meta = self.store.get_meta(id).await?;
-        let events = self.store.read(id, 0).await?;
+        let _meta = self.deps.store.get_meta(id).await?;
+        let events = self.deps.store.read(id, 0).await?;
         let next_seq = events.last().map(|(seq, _)| seq + 1).unwrap_or(0);
         self.install_handle(id, next_seq);
         Ok(())
     }
 
     async fn list_sessions(&self) -> Result<Vec<SessionMeta>, AgentError> {
-        Ok(self.store.list().await?)
+        Ok(self.deps.store.list().await?)
     }
 
     fn events(&self, session: &SessionId) -> Result<EventStream, AgentError> {
@@ -198,7 +185,7 @@ impl Agent for NativeAgent {
             .turn_gate
             .try_lock()
             .map_err(|_| AgentError::TurnInProgress(session.clone()))?;
-        let result = turn::run_turn(self, handle.clone(), input, opts).await;
+        let result = turn::run_turn(&self.deps, handle.clone(), input, opts).await;
         *handle
             .current_cancel
             .lock()
@@ -226,7 +213,7 @@ impl Agent for NativeAgent {
         decision: PermissionDecision,
     ) -> Result<(), AgentError> {
         let _ = self.handle(session)?;
-        if self.pending_permissions.resolve(&id, decision) {
+        if self.deps.pending_permissions.resolve(&id, decision) {
             Ok(())
         } else {
             Err(AgentError::UnknownPermissionRequest(id))
@@ -240,7 +227,7 @@ impl Agent for NativeAgent {
         answers: Vec<Answer>,
     ) -> Result<(), AgentError> {
         let _ = self.handle(session)?;
-        if self.pending_questions.resolve(&id, answers) {
+        if self.deps.pending_questions.resolve(&id, answers) {
             Ok(())
         } else {
             Err(AgentError::Other(format!(
@@ -265,7 +252,7 @@ impl Agent for NativeAgent {
             .current_cancel
             .lock()
             .unwrap_or_else(|p| p.into_inner()) = Some(cancel.clone());
-        let result = compact_session(self, handle.clone(), opts, cancel).await;
+        let result = compact_session(&self.deps, handle.clone(), opts, cancel).await;
         *handle
             .current_cancel
             .lock()

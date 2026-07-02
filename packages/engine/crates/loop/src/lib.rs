@@ -12,6 +12,7 @@ mod agent;
 mod attachments;
 mod builder;
 mod compaction;
+mod deps;
 mod draft;
 mod manager;
 mod messages;

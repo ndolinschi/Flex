@@ -7,8 +7,8 @@ use pretty_assertions::assert_eq;
 
 use agentloop_contracts::{
     AgentEvent, ContentBlock, HookPoint, ModelRef, NewSessionParams, PermissionDecision,
-    PermissionMode, PromptInput, SessionEvent, ToolCallStatus, ToolOutput, TurnOptions,
-    TurnStopReason,
+    PermissionMode, PromptInput, ProviderCaps, SessionEvent, ThinkingConfig, ToolCallStatus,
+    ToolOutput, TurnOptions, TurnStopReason,
 };
 use agentloop_core::{
     Agent, Hook, HookContext, HookData, HookError, HookOutcome, PermissionHint, ProviderRegistry,
@@ -282,4 +282,64 @@ async fn prompt_submit_hook_can_mutate_user_message() {
                 ContentBlock::Markdown { text } if text == "hook-added"
             ))
     )));
+}
+
+fn thinking_opts(budget_tokens: u32) -> TurnOptions {
+    TurnOptions {
+        thinking: Some(ThinkingConfig { budget_tokens }),
+        ..TurnOptions::default()
+    }
+}
+
+#[tokio::test]
+async fn thinking_option_is_forwarded_to_thinking_capable_providers() {
+    let provider = Arc::new(MockProvider::with_caps(ProviderCaps {
+        thinking: true,
+        ..MockProvider::default_caps()
+    }));
+    let (agent, _store) = create_agent(provider.clone(), Vec::new(), Vec::new()).await;
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+
+    agent
+        .prompt(
+            &session,
+            PromptInput::text("think hard"),
+            thinking_opts(2048),
+        )
+        .await
+        .expect("turn succeeds");
+
+    let requests = provider.requests();
+    assert_eq!(
+        requests[0].thinking,
+        Some(ThinkingConfig {
+            budget_tokens: 2048
+        })
+    );
+}
+
+#[tokio::test]
+async fn thinking_option_is_dropped_for_non_thinking_providers() {
+    // Default mock caps declare `thinking: false`.
+    let provider = Arc::new(MockProvider::new());
+    let (agent, _store) = create_agent(provider.clone(), Vec::new(), Vec::new()).await;
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+
+    agent
+        .prompt(
+            &session,
+            PromptInput::text("think hard"),
+            thinking_opts(2048),
+        )
+        .await
+        .expect("turn succeeds");
+
+    let requests = provider.requests();
+    assert_eq!(requests[0].thinking, None);
 }

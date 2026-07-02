@@ -14,7 +14,7 @@ use agentloop_core::hook::{HookData, HookOutcome};
 use agentloop_core::provider::ChatRequest;
 use agentloop_core::{AgentError, EventSink, ProviderError};
 
-use crate::agent::NativeAgent;
+use crate::deps::TurnDeps;
 use crate::draft::AssistantDraft;
 use crate::manager::ToolCallManager;
 use crate::messages::transcript_to_messages;
@@ -27,7 +27,7 @@ use super::tool_exec::execute_tool_requests;
 /// One model call plus its tool executions.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn run_iteration(
-    agent: &NativeAgent,
+    deps: &Arc<TurnDeps>,
     handle: &Arc<SessionHandle>,
     meta: &SessionMeta,
     turn_id: &TurnId,
@@ -40,12 +40,12 @@ pub(super) async fn run_iteration(
     num_tool_calls: &mut u32,
 ) -> Result<IterationOutcome, AgentError> {
     // ── build the request from the log ──────────────────────────────────────
-    let events = agent.store.read(&handle.id, 0).await?;
+    let events = deps.store.read(&handle.id, 0).await?;
     let transcript =
         agentloop_contracts::reduce(events.iter().map(|(_, event)| event).collect::<Vec<_>>());
     let messages = transcript_to_messages(&transcript);
 
-    let mut system = agent.system_prompt.clone();
+    let mut system = deps.system_prompt.clone();
     if let Some(append) = &opts.system_append {
         if !system.is_empty() {
             system.push_str("\n\n");
@@ -57,7 +57,7 @@ pub(super) async fn run_iteration(
         .model
         .clone()
         .or_else(|| meta.model.clone())
-        .or_else(|| agent.default_model.clone())
+        .or_else(|| deps.default_model.clone())
         .ok_or_else(|| {
             AgentError::Other(
                 "no model configured: pass TurnOptions.model, set a session model, \
@@ -65,17 +65,22 @@ pub(super) async fn run_iteration(
                     .to_owned(),
             )
         })?;
-    let (provider, model) = agent.providers.resolve(&model_ref).ok_or_else(|| {
+    let (provider, model) = deps.providers.resolve(&model_ref).ok_or_else(|| {
         AgentError::Other(format!(
             "no provider registered for model reference `{model_ref}`; \
              registered providers: {:?}",
-            agent.providers.ids()
+            deps.providers.ids()
         ))
     })?;
 
     let mut request = ChatRequest::new(model.clone(), messages);
     request.system = (!system.is_empty()).then_some(system);
-    request.tools = agent.tools.specs(&Default::default());
+    request.tools = deps.tools.specs(&Default::default());
+    // Forward extended thinking only to providers that declare the
+    // capability, so strict APIs never receive an unknown field.
+    if opts.thinking.is_some() && provider.capabilities().thinking {
+        request.thinking = opts.thinking;
+    }
     if !opts.extra.is_empty() {
         for (key, value) in &opts.extra {
             request
@@ -174,7 +179,7 @@ pub(super) async fn run_iteration(
         // Stop hook may inject a continuation.
         let mut continuation: Option<String> = None;
         let outcome = run_hooks(
-            agent,
+            deps,
             handle,
             agentloop_contracts::HookPoint::Stop,
             turn_id,
@@ -202,7 +207,7 @@ pub(super) async fn run_iteration(
 
     *num_tool_calls += tool_requests.len() as u32;
     execute_tool_requests(
-        agent,
+        deps,
         handle,
         meta,
         turn_id,

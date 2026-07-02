@@ -48,7 +48,7 @@ pub use permission::{
     QuestionOption,
 };
 pub use reduce::{Transcript, TranscriptBlock, TranscriptItem, reduce};
-pub use request::{ExpandedCommand, NewSessionParams, PromptInput, TurnOptions};
+pub use request::{ExpandedCommand, NewSessionParams, PromptInput, ThinkingConfig, TurnOptions};
 pub use session::{
     CompactionSummary, PlanEntry, PlanStatus, SessionMeta, SessionMetaPatch, StopReason,
     TokenUsage, TurnStopReason, TurnSummary,

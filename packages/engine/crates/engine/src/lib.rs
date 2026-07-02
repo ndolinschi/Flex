@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use agentloop_contracts::{
-    AgentEvent, Answer, CompactionSummary, EngineError, ErrorCode, Hello, ModelRef,
+    AgentEvent, Answer, CompactionSummary, EngineError, ErrorCode, Hello, ModelInfo, ModelRef,
     NewSessionParams, PermissionDecision, PermissionRequestId, PromptInput, ProviderId, QuestionId,
     SessionEvent, SessionId, SessionMeta, Transcript, TurnId, TurnOptions, TurnSummary, now_ms,
     reduce,
@@ -26,9 +26,30 @@ use agentloop_provider_anthropic::{ANTHROPIC_PROVIDER_ID, AnthropicProvider};
 use agentloop_provider_copilot::{COPILOT_PROVIDER_ID, CopilotConfig, CopilotProvider};
 use agentloop_provider_gemini::{GEMINI_PROVIDER_ID, GeminiProvider};
 use agentloop_provider_ollama::{OLLAMA_PROVIDER_ID, OllamaProvider};
-use agentloop_provider_openai::{OPENAI_PROVIDER_ID, OpenAiProvider};
+use agentloop_provider_openai::{OPENAI_PROVIDER_ID, OpenAiConfig, OpenAiProvider};
 use agentloop_session::MemoryStore;
 use agentloop_tools::BaseTools;
+
+/// One client-configured OpenAI-compatible provider, registered alongside the
+/// built-in providers under its own id.
+#[derive(Debug, Clone)]
+pub struct CustomProviderSpec {
+    /// Registry id; must match `^[a-z0-9][a-z0-9_-]*$` (no `/`, which is the
+    /// [`ModelRef`] separator) and must not collide with a built-in id.
+    pub id: String,
+    /// Chat Completions base URL (e.g. `https://api.deepseek.com/v1`).
+    pub base_url: String,
+    /// API key, already resolved by the caller (never an env reference).
+    pub api_key: String,
+    /// Default model; falls back to the first entry of `models`, then to the
+    /// OpenAI config default as a documented last resort.
+    pub default_model: Option<String>,
+    /// Static model catalog served without a network call; may be empty for
+    /// endpoints that implement `/models`.
+    pub models: Vec<ModelInfo>,
+    /// Advertise + forward extended-thinking config (DeepSeek-style APIs).
+    pub thinking: bool,
+}
 
 #[derive(Debug, Clone)]
 pub struct EngineOptions {
@@ -36,6 +57,9 @@ pub struct EngineOptions {
     pub model: Option<String>,
     pub cwd: PathBuf,
     pub date: String,
+    /// Client-configured OpenAI-compatible providers, registered after the
+    /// built-ins in vec order.
+    pub custom: Vec<CustomProviderSpec>,
 }
 
 impl Default for EngineOptions {
@@ -45,6 +69,7 @@ impl Default for EngineOptions {
             model: None,
             cwd: PathBuf::from("."),
             date: String::new(),
+            custom: Vec::new(),
         }
     }
 }
@@ -63,9 +88,13 @@ pub enum EngineServiceError {
     #[error(transparent)]
     Command(#[from] CommandError),
     #[error(
-        "provider `{0}` is not available in this build; supported runtime providers: `openai`, `anthropic`, `gemini`, `ollama`"
+        "provider `{0}` is not available in this build; supported runtime providers: `openai`, `anthropic`, `gemini`, `ollama`, or a provider configured in the client's config"
     )]
     UnsupportedProvider(String),
+    #[error("custom provider `{0}` conflicts with a built-in provider id")]
+    CustomProviderConflict(String),
+    #[error("custom provider `{id}` is invalid: {message}")]
+    CustomProviderInvalid { id: String, message: String },
 }
 
 impl EngineServiceError {
@@ -76,7 +105,9 @@ impl EngineServiceError {
             Self::Store(err) => EngineError::engine(ErrorCode::Unknown, err.to_string()),
             Self::Prompt(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
             Self::Command(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
-            Self::UnsupportedProvider(_) => {
+            Self::UnsupportedProvider(_)
+            | Self::CustomProviderConflict(_)
+            | Self::CustomProviderInvalid { .. } => {
                 EngineError::engine(ErrorCode::InvalidRequest, self.to_string())
             }
         }
@@ -122,7 +153,7 @@ impl EngineService {
     pub fn native(mut options: EngineOptions) -> EngineResult<Self> {
         let model = options.model.take();
         let (providers, default_model) =
-            resolve_real_providers(options.provider.as_deref(), model)?;
+            resolve_real_providers(options.provider.as_deref(), model, &options.custom)?;
         Self::build_native(providers, default_model, options)
     }
 
@@ -136,7 +167,7 @@ impl EngineService {
     pub fn native_all(mut options: EngineOptions) -> EngineResult<Self> {
         let model = options.model.take();
         let (providers, default_model) =
-            resolve_available_providers(options.provider.as_deref(), model)?;
+            resolve_available_providers(options.provider.as_deref(), model, &options.custom)?;
         Self::build_native(providers, default_model, options)
     }
 
@@ -283,9 +314,69 @@ impl EngineService {
     }
 }
 
+/// The built-in provider ids custom specs may not shadow.
+const BUILTIN_PROVIDER_IDS: [&str; 5] = [
+    OPENAI_PROVIDER_ID,
+    ANTHROPIC_PROVIDER_ID,
+    GEMINI_PROVIDER_ID,
+    COPILOT_PROVIDER_ID,
+    OLLAMA_PROVIDER_ID,
+];
+
+/// `true` when `id` matches `^[a-z0-9][a-z0-9_-]*$` (which also excludes `/`,
+/// the [`ModelRef`] separator).
+fn valid_custom_id(id: &str) -> bool {
+    let mut chars = id.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (first.is_ascii_lowercase() || first.is_ascii_digit())
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+}
+
+/// Build one custom provider plus its default model id.
+///
+/// Validates the spec (id shape, non-empty base URL and key) so failures are
+/// attributed to the custom id instead of surfacing as `openai` errors.
+/// Default model precedence: `spec.default_model`, else the first static
+/// model, else the OpenAI config default as a documented last resort.
+fn build_custom_provider(
+    spec: &CustomProviderSpec,
+) -> Result<(Arc<dyn agentloop_core::Provider>, String), EngineServiceError> {
+    let invalid = |message: &str| EngineServiceError::CustomProviderInvalid {
+        id: spec.id.clone(),
+        message: message.to_owned(),
+    };
+    if !valid_custom_id(&spec.id) {
+        return Err(invalid(
+            "id must match ^[a-z0-9][a-z0-9_-]*$ (lowercase, no `/`)",
+        ));
+    }
+    if spec.base_url.trim().is_empty() {
+        return Err(invalid("base_url is empty"));
+    }
+    if spec.api_key.trim().is_empty() {
+        return Err(invalid("api_key is empty"));
+    }
+    let config = OpenAiConfig::from_values(
+        spec.api_key.clone(),
+        Some(spec.base_url.clone()),
+        spec.default_model.clone(),
+    )?;
+    let default_model = spec
+        .default_model
+        .clone()
+        .or_else(|| spec.models.first().map(|model| model.id.clone()))
+        .unwrap_or_else(|| config.default_model.clone());
+    let provider =
+        OpenAiProvider::with_identity(spec.id.as_str(), config, spec.models.clone(), spec.thinking);
+    Ok((Arc::new(provider), default_model))
+}
+
 fn resolve_real_providers(
     provider_arg: Option<&str>,
     model_arg: Option<String>,
+    custom: &[CustomProviderSpec],
 ) -> EngineResult<(ProviderRegistry, ModelRef)> {
     let provider_name = match provider_arg {
         Some(provider) => provider,
@@ -350,21 +441,36 @@ fn resolve_real_providers(
             providers.register(Arc::new(provider));
             Ok((providers, ModelRef(format!("{OLLAMA_PROVIDER_ID}/{model}"))))
         }
-        other => Err(EngineServiceError::UnsupportedProvider(other.to_owned())),
+        other => {
+            if let Some(spec) = custom.iter().find(|spec| spec.id == other) {
+                let (provider, default_model) = build_custom_provider(spec)?;
+                let model = model_arg.unwrap_or(default_model);
+                let mut providers = ProviderRegistry::new();
+                providers.register(provider);
+                Ok((providers, ModelRef(format!("{other}/{model}"))))
+            } else {
+                Err(EngineServiceError::UnsupportedProvider(other.to_owned()))
+            }
+        }
     }
 }
 
 /// Register every provider whose credentials resolve from the environment,
-/// in the same precedence order [`resolve_real_providers`] detects them.
+/// in the same precedence order [`resolve_real_providers`] detects them,
+/// followed by every `custom` spec in vec order.
 ///
 /// Providers with missing credentials are skipped (debug-traced); any other
-/// construction error propagates. `preferred` must resolve and becomes the
+/// construction error propagates. Custom specs shadowing a built-in id are
+/// rejected with [`EngineServiceError::CustomProviderConflict`]; malformed or
+/// duplicate specs with [`EngineServiceError::CustomProviderInvalid`].
+/// `preferred` must resolve (it may name a custom id) and becomes the
 /// registry priority. The returned [`ModelRef`] is always provider-qualified:
 /// `model_arg` wins (qualified against the priority provider unless it
 /// already names one), else the priority provider's default model.
 fn resolve_available_providers(
     preferred: Option<&str>,
     model_arg: Option<String>,
+    custom: &[CustomProviderSpec],
 ) -> EngineResult<(ProviderRegistry, ModelRef)> {
     /// A constructed provider paired with its default model id.
     type ProviderWithDefault = (Arc<dyn agentloop_core::Provider>, String);
@@ -434,6 +540,24 @@ fn resolve_available_providers(
         }
     }
 
+    // Client-configured providers come after the built-ins, in vec order.
+    // Shadowing a built-in id or repeating a custom id is rejected rather
+    // than silently last-wins.
+    let mut seen_custom_ids = std::collections::HashSet::new();
+    for spec in custom {
+        if BUILTIN_PROVIDER_IDS.contains(&spec.id.as_str()) {
+            return Err(EngineServiceError::CustomProviderConflict(spec.id.clone()));
+        }
+        if !seen_custom_ids.insert(spec.id.as_str()) {
+            return Err(EngineServiceError::CustomProviderInvalid {
+                id: spec.id.clone(),
+                message: "declared more than once".to_owned(),
+            });
+        }
+        let (provider, model) = build_custom_provider(spec)?;
+        register(&mut providers, provider, model);
+    }
+
     if let Some(name) = preferred {
         let id = ProviderId::from(name);
         if providers.get(&id).is_none() {
@@ -496,9 +620,30 @@ fn default_user_command_dir() -> Option<PathBuf> {
 mod tests {
     use super::*;
 
+    fn spec(id: &str) -> CustomProviderSpec {
+        CustomProviderSpec {
+            id: id.to_owned(),
+            base_url: "https://example.test/v1".to_owned(),
+            api_key: "sk-test".to_owned(),
+            default_model: Some("test-chat".to_owned()),
+            models: Vec::new(),
+            thinking: false,
+        }
+    }
+
+    fn model_info(id: &str) -> ModelInfo {
+        ModelInfo {
+            id: id.to_owned(),
+            display_name: None,
+            context_window: None,
+            reasoning: false,
+            vision: false,
+        }
+    }
+
     #[test]
     fn unsupported_provider_is_invalid_request() {
-        let err = match resolve_real_providers(Some("mock"), None) {
+        let err = match resolve_real_providers(Some("mock"), None, &[]) {
             Ok(_) => panic!("mock provider must not resolve at runtime"),
             Err(err) => err,
         };
@@ -508,7 +653,7 @@ mod tests {
 
     #[test]
     fn unknown_preferred_provider_is_invalid_request_in_multi_resolver() {
-        let err = match resolve_available_providers(Some("mock"), None) {
+        let err = match resolve_available_providers(Some("mock"), None, &[]) {
             Ok(_) => panic!("mock provider must not resolve at runtime"),
             Err(err) => err,
         };
@@ -519,9 +664,130 @@ mod tests {
     fn qualified_model_arg_passes_through_multi_resolver() {
         // Whatever providers the environment yields, an explicit
         // provider-qualified model must survive verbatim.
-        if let Ok((_, model)) = resolve_available_providers(None, Some("ollama/llama3".to_owned()))
+        if let Ok((_, model)) =
+            resolve_available_providers(None, Some("ollama/llama3".to_owned()), &[])
         {
             assert_eq!(model.0, "ollama/llama3");
         }
+    }
+
+    #[test]
+    fn custom_spec_registers_in_multi_resolver() {
+        let (providers, _) = match resolve_available_providers(None, None, &[spec("deepseek")]) {
+            Ok(resolved) => resolved,
+            Err(err) => panic!("custom provider should register: {err}"),
+        };
+        assert!(
+            providers.ids().iter().any(|id| id.as_str() == "deepseek"),
+            "registry should contain the custom id: {:?}",
+            providers.ids()
+        );
+    }
+
+    #[test]
+    fn preferred_custom_provider_sets_priority_and_default_model() {
+        let (providers, model) =
+            match resolve_available_providers(Some("deepseek"), None, &[spec("deepseek")]) {
+                Ok(resolved) => resolved,
+                Err(err) => panic!("preferred custom provider should resolve: {err}"),
+            };
+        assert_eq!(
+            providers.ids().first().map(|id| id.as_str().to_owned()),
+            Some("deepseek".to_owned())
+        );
+        assert_eq!(model.0, "deepseek/test-chat");
+    }
+
+    #[test]
+    fn custom_default_model_falls_back_to_first_static_model() {
+        let custom = CustomProviderSpec {
+            default_model: None,
+            models: vec![model_info("glm-4"), model_info("glm-4-air")],
+            ..spec("glm")
+        };
+        let (_, model) = match resolve_available_providers(Some("glm"), None, &[custom]) {
+            Ok(resolved) => resolved,
+            Err(err) => panic!("custom provider should resolve: {err}"),
+        };
+        assert_eq!(model.0, "glm/glm-4");
+    }
+
+    #[test]
+    fn custom_spec_shadowing_a_builtin_is_rejected() {
+        let err = match resolve_available_providers(None, None, &[spec("openai")]) {
+            Ok(_) => panic!("builtin id collision must be rejected"),
+            Err(err) => err,
+        };
+        assert!(matches!(
+            &err,
+            EngineServiceError::CustomProviderConflict(id) if id == "openai"
+        ));
+        assert_eq!(err.to_engine_error().code, ErrorCode::InvalidRequest);
+    }
+
+    #[test]
+    fn malformed_custom_id_is_rejected() {
+        for bad in ["Deep-Seek", "deep/seek", "", "-deepseek"] {
+            let err = match resolve_available_providers(None, None, &[spec(bad)]) {
+                Ok(_) => panic!("id `{bad}` must be rejected"),
+                Err(err) => err,
+            };
+            assert!(
+                matches!(&err, EngineServiceError::CustomProviderInvalid { id, .. } if id == bad),
+                "id `{bad}` should be CustomProviderInvalid, got: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn empty_custom_credentials_are_rejected() {
+        let no_key = CustomProviderSpec {
+            api_key: "  ".to_owned(),
+            ..spec("deepseek")
+        };
+        assert!(matches!(
+            resolve_available_providers(None, None, &[no_key]),
+            Err(EngineServiceError::CustomProviderInvalid { id, .. }) if id == "deepseek"
+        ));
+
+        let no_url = CustomProviderSpec {
+            base_url: String::new(),
+            ..spec("deepseek")
+        };
+        assert!(matches!(
+            resolve_available_providers(None, None, &[no_url]),
+            Err(EngineServiceError::CustomProviderInvalid { id, .. }) if id == "deepseek"
+        ));
+    }
+
+    #[test]
+    fn duplicate_custom_ids_are_rejected() {
+        let err =
+            match resolve_available_providers(None, None, &[spec("deepseek"), spec("deepseek")]) {
+                Ok(_) => panic!("duplicate custom ids must be rejected"),
+                Err(err) => err,
+            };
+        assert!(matches!(
+            &err,
+            EngineServiceError::CustomProviderInvalid { id, .. } if id == "deepseek"
+        ));
+    }
+
+    #[test]
+    fn single_provider_resolver_builds_a_named_custom_spec() {
+        let (providers, model) =
+            match resolve_real_providers(Some("deepseek"), None, &[spec("deepseek")]) {
+                Ok(resolved) => resolved,
+                Err(err) => panic!("custom provider should resolve: {err}"),
+            };
+        assert_eq!(
+            providers
+                .ids()
+                .iter()
+                .map(|id| id.as_str().to_owned())
+                .collect::<Vec<_>>(),
+            vec!["deepseek".to_owned()]
+        );
+        assert_eq!(model.0, "deepseek/test-chat");
     }
 }

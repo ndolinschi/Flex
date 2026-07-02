@@ -18,14 +18,41 @@ use crate::wire::{ModelList, OpenAiStreamMapper, build_request, models_from_resp
 
 #[derive(Debug, Clone)]
 pub struct OpenAiProvider {
+    /// Instance identity: `openai` for [`OpenAiProvider::new`], the caller's
+    /// id for [`OpenAiProvider::with_identity`]. Errors and stream events are
+    /// attributed to this id.
+    id: ProviderId,
     config: Arc<OpenAiConfig>,
+    /// Static catalog served when non-empty (endpoints without `/models`).
+    static_models: Vec<ModelInfo>,
+    /// Advertise + forward extended-thinking config (DeepSeek-style endpoints).
+    thinking: bool,
     client: Client,
 }
 
 impl OpenAiProvider {
     pub fn new(config: OpenAiConfig) -> Self {
+        Self::with_identity(OPENAI_PROVIDER_ID, config, Vec::new(), false)
+    }
+
+    /// An OpenAI-compatible provider registering under a custom id
+    /// (e.g. `deepseek`, `glm`) with its own base URL and key.
+    ///
+    /// When `static_models` is non-empty, [`Provider::list_models`] serves it
+    /// without a network call; when `thinking` is true the provider advertises
+    /// the extended-thinking capability and forwards
+    /// [`ChatRequest::thinking`](agentloop_core::ChatRequest) on the wire.
+    pub fn with_identity(
+        id: impl Into<ProviderId>,
+        config: OpenAiConfig,
+        static_models: Vec<ModelInfo>,
+        thinking: bool,
+    ) -> Self {
         Self {
+            id: id.into(),
             config: Arc::new(config),
+            static_models,
+            thinking,
             client: Client::new(),
         }
     }
@@ -37,16 +64,12 @@ impl OpenAiProvider {
     pub fn default_model(&self) -> &str {
         &self.config.default_model
     }
-
-    fn provider_id() -> ProviderId {
-        ProviderId::from(OPENAI_PROVIDER_ID)
-    }
 }
 
 #[async_trait]
 impl Provider for OpenAiProvider {
     fn id(&self) -> ProviderId {
-        Self::provider_id()
+        self.id.clone()
     }
 
     fn capabilities(&self) -> ProviderCaps {
@@ -55,7 +78,7 @@ impl Provider for OpenAiProvider {
             parallel_tool_use: true,
             vision: true,
             documents: false,
-            thinking: false,
+            thinking: self.thinking,
             prompt_caching: false,
             native_json_schema_tools: true,
             max_context_tokens: None,
@@ -63,6 +86,9 @@ impl Provider for OpenAiProvider {
     }
 
     async fn list_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        if !self.static_models.is_empty() {
+            return Ok(self.static_models.clone());
+        }
         let provider = self.id();
         let response = authenticated_request(
             &self.client,
@@ -237,6 +263,60 @@ fn enqueue_decoded(
                 provider: state.provider.clone(),
                 message: err.to_string(),
             })),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config() -> OpenAiConfig {
+        match OpenAiConfig::from_values(
+            "sk-test".to_owned(),
+            Some("https://example.test/v1".to_owned()),
+            None,
+        ) {
+            Ok(config) => config,
+            Err(err) => panic!("config should build: {err}"),
+        }
+    }
+
+    fn model(id: &str) -> ModelInfo {
+        ModelInfo {
+            id: id.to_owned(),
+            display_name: None,
+            context_window: None,
+            reasoning: false,
+            vision: false,
+        }
+    }
+
+    #[test]
+    fn new_keeps_the_builtin_identity_and_caps() {
+        let provider = OpenAiProvider::new(config());
+        assert_eq!(provider.id().as_str(), OPENAI_PROVIDER_ID);
+        assert!(!provider.capabilities().thinking);
+    }
+
+    #[test]
+    fn with_identity_registers_under_the_custom_id() {
+        let provider = OpenAiProvider::with_identity("deepseek", config(), Vec::new(), true);
+        assert_eq!(provider.id().as_str(), "deepseek");
+        let caps = provider.capabilities();
+        assert!(caps.thinking);
+        assert!(caps.tool_use);
+    }
+
+    #[tokio::test]
+    async fn static_models_are_served_without_a_network_call() {
+        // The config points at an unroutable host: a network attempt would
+        // error, so an Ok result proves the static catalog short-circuits.
+        let models = vec![model("deepseek-chat"), model("deepseek-reasoner")];
+        let provider = OpenAiProvider::with_identity("deepseek", config(), models.clone(), false);
+        match provider.list_models().await {
+            Ok(listed) => assert_eq!(listed, models),
+            Err(err) => panic!("static models must not hit the network: {err}"),
         }
     }
 }

@@ -78,6 +78,8 @@ pub struct MockProvider {
     requests: Mutex<Vec<ChatRequest>>,
     /// Provider id override; [`MOCK_PROVIDER_ID`] when unset.
     id: Option<ProviderId>,
+    /// Capability override; [`MockProvider::default_caps`] when unset.
+    caps: Option<ProviderCaps>,
 }
 
 /// Test doubles must never deadlock a suite on a poisoned lock: a panic in
@@ -105,6 +107,26 @@ impl MockProvider {
         Self {
             id: Some(id.into()),
             ..Self::default()
+        }
+    }
+
+    /// A provider advertising `caps` instead of [`MockProvider::default_caps`],
+    /// so capability-gated code paths (e.g. thinking forwarding) can be
+    /// exercised from tests.
+    pub fn with_caps(caps: ProviderCaps) -> Self {
+        Self {
+            caps: Some(caps),
+            ..Self::default()
+        }
+    }
+
+    /// The capabilities advertised when no override is set.
+    pub fn default_caps() -> ProviderCaps {
+        ProviderCaps {
+            tool_use: true,
+            parallel_tool_use: true,
+            max_context_tokens: Some(1_000_000),
+            ..ProviderCaps::default()
         }
     }
 
@@ -228,12 +250,7 @@ impl Provider for MockProvider {
     }
 
     fn capabilities(&self) -> ProviderCaps {
-        ProviderCaps {
-            tool_use: true,
-            parallel_tool_use: true,
-            max_context_tokens: Some(1_000_000),
-            ..ProviderCaps::default()
-        }
+        self.caps.unwrap_or_else(Self::default_caps)
     }
 
     async fn list_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
