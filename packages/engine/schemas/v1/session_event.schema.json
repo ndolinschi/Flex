@@ -636,12 +636,30 @@
         {
           "type": "object",
           "properties": {
+            "call_id": {
+              "description": "The Task tool call that spawned the child, when tool-driven.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolCallId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "child_session": {
               "$ref": "#/$defs/SessionId"
             },
             "kind": {
               "type": "string",
               "const": "subagent_started"
+            },
+            "role": {
+              "description": "The child's role (e.g. `searcher`, `worker`).",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "task": {
               "type": "string"
@@ -1668,6 +1686,13 @@
         },
         "provider_session_id": {
           "description": "The backing agent's own session id, for native resume.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "description": "The role this session serves (e.g. `searcher`); `None` = main.",
           "type": [
             "string",
             "null"

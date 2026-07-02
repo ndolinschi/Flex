@@ -526,6 +526,7 @@ where
             title: params.title,
             agent_id: self.profile.agent_id().to_owned(),
             parent_id: None,
+            role: None,
             provider_session_id: None,
             cwd,
             model: params.model,

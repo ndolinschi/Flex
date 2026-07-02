@@ -53,6 +53,13 @@
         "null"
       ]
     },
+    "role": {
+      "description": "The role this session serves (e.g. `searcher`); `None` = main.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "title": {
       "type": [
         "string",

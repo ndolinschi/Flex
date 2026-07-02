@@ -172,6 +172,12 @@ pub enum AgentEvent {
     SubagentStarted {
         child_session: SessionId,
         task: String,
+        /// The Task tool call that spawned the child, when tool-driven.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        call_id: Option<ToolCallId>,
+        /// The child's role (e.g. `searcher`, `worker`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        role: Option<String>,
     },
     /// Live relay of a child event into the parent stream (ephemeral — the
     /// child persists its own log).

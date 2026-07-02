@@ -101,6 +101,8 @@ fn all_variants() -> Vec<AgentEvent> {
             outcome: HookOutcomeKind::Continue,
         },
         AgentEvent::SubagentStarted {
+            call_id: None,
+            role: Some("searcher".to_owned()),
             child_session: SessionId::from("sess-2"),
             task: "explore the repo".to_owned(),
         },

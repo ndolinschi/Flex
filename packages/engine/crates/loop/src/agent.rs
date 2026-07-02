@@ -109,6 +109,7 @@ impl Agent for NativeAgent {
             title: params.title,
             agent_id: self.deps.agent_id.clone(),
             parent_id: None,
+            role: None,
             provider_session_id: None,
             cwd,
             model: params.model.or_else(|| self.deps.default_model.clone()),

@@ -316,6 +316,7 @@ mod tests {
             title: None,
             agent_id: "native".to_owned(),
             parent_id: None,
+            role: None,
             provider_session_id: None,
             cwd: PathBuf::from("/workspace"),
             model: None,

@@ -21,6 +21,9 @@ pub struct SessionMeta {
     /// Set for subagent sessions; links the session tree.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<SessionId>,
+    /// The role this session serves (e.g. `searcher`); `None` = main.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
     /// The backing agent's own session id, for native resume.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_session_id: Option<String>,

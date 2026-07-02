@@ -15,6 +15,7 @@ pub fn sample_meta() -> SessionMeta {
         title: Some("demo".to_owned()),
         agent_id: "native".to_owned(),
         parent_id: None,
+        role: None,
         provider_session_id: None,
         cwd: PathBuf::from("/tmp/demo"),
         model: Some(ModelRef::from("anthropic/claude-sonnet-4-5")),
