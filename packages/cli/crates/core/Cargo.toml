@@ -1,0 +1,38 @@
+[package]
+name = "agentloop-cli-core"
+description = "Engine composition, provider catalog, and auth orchestration for the interactive CLI"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+agentloop-contracts = { workspace = true }
+agentloop-core = { workspace = true }
+agentloop-engine = { workspace = true }
+agentloop-session = { workspace = true }
+agentloop-delegator-claude-code = { workspace = true }
+agentloop-delegator-copilot = { workspace = true }
+agentloop-provider-copilot = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+futures = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+agentloop-loop = { workspace = true }
+agentloop-tools = { workspace = true }
+agentloop-testkit = { workspace = true }
+async-trait = { workspace = true }
+pretty_assertions = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+temp_env = { workspace = true }
+
+[lints]
+workspace = true

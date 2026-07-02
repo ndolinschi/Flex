@@ -1,6 +1,6 @@
 //! Anthropic environment configuration.
 
-use agentloop_contracts::ProviderId;
+use agentloop_contracts::{ModelInfo, ProviderId};
 use agentloop_core::ProviderError;
 use agentloop_provider_common::required_env;
 
@@ -8,6 +8,33 @@ pub const ANTHROPIC_PROVIDER_ID: &str = "anthropic";
 pub const DEFAULT_ANTHROPIC_BASE_URL: &str = "https://api.anthropic.com/v1";
 pub const DEFAULT_ANTHROPIC_MODEL: &str = "claude-sonnet-4-5";
 pub(crate) const ANTHROPIC_VERSION: &str = "2023-06-01";
+
+/// Page size for Anthropic `/models` listing (API default is small).
+pub(crate) const MODEL_LIST_PAGE_LIMIT: u32 = 100;
+
+/// Baseline Claude model ids merged into live listings when the API omits
+/// them (pagination gaps, account visibility). Direct Anthropic API keys list
+/// every tier here; Copilot uses its own `/models` endpoint via the
+/// `copilot/` provider.
+pub(crate) fn known_anthropic_models() -> Vec<ModelInfo> {
+    const IDS: &[&str] = &[
+        "claude-opus-4-6",
+        "claude-opus-4-5",
+        "claude-sonnet-4-5",
+        "claude-haiku-4-5",
+        "claude-3-7-sonnet-latest",
+        "claude-3-5-haiku-latest",
+    ];
+    IDS.iter()
+        .map(|id| ModelInfo {
+            id: (*id).to_owned(),
+            display_name: None,
+            context_window: None,
+            reasoning: false,
+            vision: false,
+        })
+        .collect()
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnthropicConfig {
@@ -107,5 +134,15 @@ mod tests {
     fn config_rejects_missing_api_key() {
         let err = AnthropicConfig::from_values(" ".to_owned(), None, None);
         assert!(matches!(err, Err(ProviderError::AuthMissing { .. })));
+    }
+
+    #[test]
+    fn known_models_include_haiku_tier() {
+        let models = known_anthropic_models();
+        assert!(
+            models.iter().any(|model| model.id == "claude-haiku-4-5"),
+            "baseline catalog should list haiku: {:?}",
+            models.iter().map(|m| &m.id).collect::<Vec<_>>()
+        );
     }
 }

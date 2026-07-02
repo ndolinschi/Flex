@@ -13,8 +13,13 @@ use agentloop_contracts::{ModelInfo, ProviderCaps, ProviderId, StopReason};
 use agentloop_core::{ChatRequest, Provider, ProviderError, ProviderStream, ProviderStreamEvent};
 use agentloop_provider_common::{SseDecoder, status_to_provider_error};
 
-use crate::config::{ANTHROPIC_PROVIDER_ID, ANTHROPIC_VERSION, AnthropicConfig};
-use crate::wire::{AnthropicStreamMapper, ModelList, build_request, models_from_response};
+use crate::config::{
+    ANTHROPIC_PROVIDER_ID, ANTHROPIC_VERSION, AnthropicConfig, MODEL_LIST_PAGE_LIMIT,
+};
+use crate::wire::{
+    AnthropicStreamMapper, ModelList, build_request, merge_model_pages, models_from_response,
+    supplement_known_models,
+};
 
 #[derive(Debug, Clone)]
 pub struct AnthropicProvider {
@@ -72,27 +77,45 @@ impl Provider for AnthropicProvider {
 
     async fn list_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
         let provider = self.id();
-        let response = self
-            .request(Method::GET, &self.config.models_url())
-            .send()
-            .await
-            .map_err(|err| ProviderError::Http {
+        let mut pages = Vec::new();
+        let mut after_id: Option<String> = None;
+
+        for _ in 0..32 {
+            let limit = MODEL_LIST_PAGE_LIMIT.to_string();
+            let mut request = self
+                .request(Method::GET, &self.config.models_url())
+                .query(&[("limit", limit.as_str())]);
+            if let Some(cursor) = &after_id {
+                request = request.query(&[("after_id", cursor.as_str())]);
+            }
+
+            let response = request.send().await.map_err(|err| ProviderError::Http {
                 provider: provider.clone(),
                 message: err.to_string(),
             })?;
-        let status = response.status();
-        if !status.is_success() {
-            let body = response.text().await.unwrap_or_else(|err| err.to_string());
-            return Err(status_to_provider_error(&provider, status, body, None));
+            let status = response.status();
+            if !status.is_success() {
+                let body = response.text().await.unwrap_or_else(|err| err.to_string());
+                return Err(status_to_provider_error(&provider, status, body, None));
+            }
+            let page = response
+                .json::<ModelList>()
+                .await
+                .map_err(|err| ProviderError::Stream {
+                    provider: provider.clone(),
+                    message: format!("Anthropic models response was not valid JSON: {err}"),
+                })?;
+
+            let has_more = page.has_more;
+            after_id = page.last_id.clone();
+            pages.push(models_from_response(page));
+
+            if !has_more || after_id.is_none() {
+                break;
+            }
         }
-        let models = response
-            .json::<ModelList>()
-            .await
-            .map_err(|err| ProviderError::Stream {
-                provider: provider.clone(),
-                message: format!("Anthropic models response was not valid JSON: {err}"),
-            })?;
-        Ok(models_from_response(models))
+
+        Ok(supplement_known_models(merge_model_pages(pages)))
     }
 
     async fn stream_chat(

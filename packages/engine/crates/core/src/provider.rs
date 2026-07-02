@@ -3,7 +3,7 @@
 //! Providers are the *only* place a model's wire format exists. Their single
 //! obligation beyond transport is normalization: every stream maps into
 //! [`ProviderStreamEvent`]s (the unified stream format), and provider quirks
-//! that must round-trip travel as [`ContentBlock::Opaque`] blocks or the
+//! that must round-trip travel as [`agentloop_contracts::ContentBlock::Opaque`] blocks or the
 //! namespaced [`ChatRequest::extra`] passthrough — never as new core concepts.
 
 use std::collections::BTreeMap;

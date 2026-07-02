@@ -7,23 +7,26 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use futures::StreamExt;
+use tokio_util::sync::CancellationToken;
 
 use agentloop_contracts::{
     AgentCaps, AgentEvent, AgentInfo, Answer, AttachmentCaps, CancelSupport, CommandInfo,
-    McpPassthrough, ModelDiscovery, ModelRef, NewSessionParams, PermissionCaps, PermissionDecision,
-    PermissionMode, PermissionRequestId, PromptInput, QuestionId, ResumeSupport, SessionEvent,
-    SessionId, SessionMeta, StreamingGranularity, TurnOptions, TurnSummary, now_ms,
+    CompactionSummary, McpPassthrough, ModelDiscovery, ModelRef, NewSessionParams, PermissionCaps,
+    PermissionDecision, PermissionMode, PermissionRequestId, PromptInput, QuestionId,
+    ResumeSupport, SessionEvent, SessionId, SessionMeta, StreamingGranularity, TurnOptions,
+    TurnSummary, now_ms,
 };
 use agentloop_core::{
     Agent, AgentError, EventStream, Hook, PendingMap, ProviderRegistry, SessionStore, ToolRegistry,
 };
 
 use crate::builder::LoopLimits;
+use crate::compaction::compact_session;
 use crate::permission::PermissionPolicy;
 use crate::session_handle::SessionHandle;
 use crate::turn;
 
-/// The native agent loop. Construct with [`NativeAgentBuilder`].
+/// The native agent loop. Construct with [`crate::NativeAgentBuilder`].
 pub struct NativeAgent {
     pub(crate) agent_id: String,
     pub(crate) providers: ProviderRegistry,
@@ -244,5 +247,29 @@ impl Agent for NativeAgent {
                 "no pending question with id {id}"
             )))
         }
+    }
+
+    async fn compact(
+        &self,
+        session: &SessionId,
+        opts: TurnOptions,
+    ) -> Result<CompactionSummary, AgentError> {
+        let handle = self.handle(session)?;
+        let gate = handle.clone();
+        let _guard = gate
+            .turn_gate
+            .try_lock()
+            .map_err(|_| AgentError::TurnInProgress(session.clone()))?;
+        let cancel = CancellationToken::new();
+        *handle
+            .current_cancel
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = Some(cancel.clone());
+        let result = compact_session(self, handle.clone(), opts, cancel).await;
+        *handle
+            .current_cancel
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = None;
+        result
     }
 }

@@ -1,0 +1,53 @@
+[package]
+name = "agentloop-cli"
+description = "Interactive terminal client for the agent-loop engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "agenticstudio"
+path = "src/main.rs"
+
+[lib]
+name = "agentloop_cli"
+path = "src/lib.rs"
+
+[dependencies]
+agentloop-cli-core = { workspace = true }
+agentloop-contracts = { workspace = true }
+agentloop-core = { workspace = true }
+agentloop-engine = { workspace = true }
+anyhow = { workspace = true }
+crossterm = { workspace = true }
+futures = { workspace = true }
+ratatui = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-appender = { workspace = true }
+tracing-subscriber = { workspace = true }
+tui-markdown = { workspace = true }
+pulldown-cmark = { workspace = true }
+unicode-width = { workspace = true }
+tui-textarea = { workspace = true }
+ignore = { workspace = true }
+
+[dev-dependencies]
+agentloop-loop = { workspace = true }
+agentloop-session = { workspace = true }
+agentloop-testkit = { workspace = true }
+agentloop-tools = { workspace = true }
+insta = { workspace = true }
+pretty_assertions = { workspace = true }
+tempfile = { workspace = true }
+temp_env = { workspace = true }
+
+[lints]
+workspace = true

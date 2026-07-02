@@ -1,0 +1,28 @@
+---
+source: crates/cli/src/render_snapshots.rs
+expression: rendered
+---
+AgenticStudio 0.1.0 — /help for keys and commands
+
+
+
+
+            ┌ models  filter:  ────────────────────────────────────┐
+            │claude-sonnet-4-5 anthropic                           │
+            │gpt-4.1 copilot                                       │
+            │llama3 ollama                                         │
+            │                                                      │
+            │                                                      │
+            │                                                      │
+            │                                                      │
+            │                                                      │
+            │                                                      │
+            │                                                      │
+            │                                                      │
+            │                                                      │
+            └──────────────────────────────────────────────────────┘
+────────────────────────────────────────────────────────────────────────────────
+┌ prompt ──────────────────────────────────────────────────────────────────────┐
+│ Type a message, / for commands, @ for files                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+native · code · auto · anthropic/claude-sonnet-4-5 · idle · tokens in/out 0 / 0

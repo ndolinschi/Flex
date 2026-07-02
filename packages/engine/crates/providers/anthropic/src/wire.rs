@@ -107,6 +107,10 @@ enum AnthropicToolChoice {
 #[derive(Debug, Deserialize)]
 pub(crate) struct ModelList {
     pub data: Vec<ModelData>,
+    #[serde(default)]
+    pub has_more: bool,
+    #[serde(default)]
+    pub last_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -429,17 +433,44 @@ pub(crate) fn build_request(request: ChatRequest) -> AnthropicMessagesRequest {
 }
 
 pub(crate) fn models_from_response(response: ModelList) -> Vec<ModelInfo> {
-    response
-        .data
-        .into_iter()
-        .map(|model| ModelInfo {
-            id: model.id,
-            display_name: model.display_name,
-            context_window: None,
-            reasoning: false,
-            vision: false,
-        })
-        .collect()
+    response.data.into_iter().map(model_data_to_info).collect()
+}
+
+fn model_data_to_info(model: ModelData) -> ModelInfo {
+    ModelInfo {
+        id: model.id,
+        display_name: model.display_name,
+        context_window: None,
+        reasoning: false,
+        vision: false,
+    }
+}
+
+/// Merge paginated `/models` pages, preserving first-seen order and dropping
+/// duplicate ids.
+pub(crate) fn merge_model_pages(pages: impl IntoIterator<Item = Vec<ModelInfo>>) -> Vec<ModelInfo> {
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for page in pages {
+        for model in page {
+            if seen.insert(model.id.clone()) {
+                out.push(model);
+            }
+        }
+    }
+    out
+}
+
+/// Append baseline Claude ids missing from an API listing so cheaper tiers
+/// (Haiku) stay selectable when pagination or account visibility omits them.
+pub(crate) fn supplement_known_models(mut models: Vec<ModelInfo>) -> Vec<ModelInfo> {
+    let present: std::collections::HashSet<String> = models.iter().map(|m| m.id.clone()).collect();
+    for model in crate::config::known_anthropic_models() {
+        if !present.contains(&model.id) {
+            models.push(model);
+        }
+    }
+    models
 }
 
 fn build_messages(messages: Vec<Message>) -> Vec<AnthropicMessage> {
@@ -581,7 +612,7 @@ fn stop_reason(reason: &str) -> StopReason {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agentloop_contracts::{ContentBlock, Message};
+    use agentloop_contracts::{ContentBlock, Message, ModelInfo};
 
     #[test]
     fn maps_anthropic_text_stream_to_provider_events() {
@@ -694,5 +725,71 @@ mod tests {
             }
             Err(err) => panic!("request should serialize: {err}"),
         }
+    }
+
+    #[test]
+    fn models_from_response_reads_pagination_metadata() {
+        let page: ModelList = serde_json::from_str(
+            r#"{
+                "data":[{"id":"claude-opus-4-6","display_name":"Claude Opus 4.6"}],
+                "has_more":true,
+                "last_id":"claude-opus-4-6"
+            }"#,
+        )
+        .expect("page json");
+        assert!(page.has_more);
+        assert_eq!(page.last_id.as_deref(), Some("claude-opus-4-6"));
+        let models = models_from_response(page);
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].id, "claude-opus-4-6");
+        assert_eq!(models[0].display_name.as_deref(), Some("Claude Opus 4.6"));
+    }
+
+    #[test]
+    fn merge_model_pages_dedupes_across_pages() {
+        let page_one = vec![ModelInfo {
+            id: "claude-sonnet-4-5".to_owned(),
+            display_name: None,
+            context_window: None,
+            reasoning: false,
+            vision: false,
+        }];
+        let page_two = vec![
+            ModelInfo {
+                id: "claude-sonnet-4-5".to_owned(),
+                display_name: Some("duplicate".to_owned()),
+                context_window: None,
+                reasoning: false,
+                vision: false,
+            },
+            ModelInfo {
+                id: "claude-haiku-4-5".to_owned(),
+                display_name: Some("Claude Haiku 4.5".to_owned()),
+                context_window: None,
+                reasoning: false,
+                vision: false,
+            },
+        ];
+        let merged = merge_model_pages([page_one, page_two]);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].id, "claude-sonnet-4-5");
+        assert_eq!(merged[1].id, "claude-haiku-4-5");
+    }
+
+    #[test]
+    fn supplement_known_models_includes_haiku_when_api_omits_it() {
+        let api_only = vec![ModelInfo {
+            id: "claude-sonnet-4-5".to_owned(),
+            display_name: None,
+            context_window: None,
+            reasoning: false,
+            vision: false,
+        }];
+        let merged = supplement_known_models(api_only);
+        assert!(
+            merged.iter().any(|model| model.id == "claude-haiku-4-5"),
+            "catalog should include haiku baseline: {:?}",
+            merged.iter().map(|m| &m.id).collect::<Vec<_>>()
+        );
     }
 }

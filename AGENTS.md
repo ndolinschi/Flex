@@ -10,7 +10,8 @@ An agent-loop engine in Rust. One `Agent` interface with two families of impleme
 a **native loop** that calls LLM provider APIs directly (Anthropic, OpenAI, Gemini, Ollama),
 and **delegators** that drive external coding agents (Claude Code, ACP agents, opencode, Cursor)
 behind the same interface. All output is normalized into one canonical event stream.
-No UI, no interactive CLI — transports (NDJSON stdio, ACP) let future clients attach.
+The engine itself has no UI — transports (NDJSON stdio, ACP) let clients attach.
+`packages/cli` is the first such client: an interactive ratatui terminal UI.
 
 ## Repo map
 
@@ -33,6 +34,11 @@ packages/engine/              # self-contained Rust cargo workspace — run all 
     transports/{stdio,acp}    # serve any Agent to external clients
     testkit/                  # MockProvider, conformance suites, scripted-stdio (dev-dep only)
     runner/                   # composition root; [[bin]] name = "agentic-studio"
+packages/cli/                 # separate cargo workspace — interactive terminal client
+  crates/
+    core/                     # agentloop-cli-core: EngineHub (agent selection), session
+                              # controller, model catalog, copilot login orchestration
+    cli/                      # agentloop-cli: ratatui TUI; [[bin]] name = "agenticstudio"
 ```
 
 ## Layer contract (do not collapse these)
@@ -92,6 +98,26 @@ delegator `EventMapper`). Nothing downstream of `contracts` may see a provider q
 - **JSONL session store first** (append-only maps 1:1, human-greppable); SQLite behind a feature later.
 - **`packages/` monorepo**: `packages/engine` is self-contained; future modules (ui, cli, sdk)
   are siblings with their own toolchains. Repo root stays language-neutral.
+- **`packages/cli` is a second composition root**: it wires engine crates by path and
+  deliberately duplicates the runner's ~100-line agent-resolution pattern (probe + trace).
+  Extract a shared crate only when a third client appears. Engine hard rules (brand gate,
+  runner-only stdout) stop at the engine workspace boundary; the CLI mirrors the lint set
+  and keeps crate names brand-free anyway, with the brand only in its `[[bin]]` name.
+- **Copilot device-flow sign-in lives in `providers/copilot`** (`device_flow.rs` +
+  `store_github_token`): provider crates are the sanctioned I/O edges, and the apps.json
+  format knowledge stays next to `discover_github_token`. The stored token interoperates
+  with VS Code/JetBrains sign-ins (merge-upsert, never clobber).
+- **CLI phase 2+ engine roadmap** (documented only; not started):
+  - **Actor parallelism** — today a single `NativeAgent` tokio loop; phase 2 splits a
+    session actor from a tool worker pool while keeping the canonical event stream.
+  - **Distributed nodes** — node capability tags on `ToolContext`; policy enforced in the
+    permission layer (secret/sandboxed execution).
+  - **Swarms / subagents** — `Subagent*` events exist; native cap `subagents: false` today;
+    enable the cap and add a tree UI in the CLI.
+  - **Token-efficient meta-tools** — extend the eight base tools with `BatchRead`, `RepoMap`,
+    `SymbolSearch`, and structured summaries.
+  - **Reasoning fidelity** — `ThinkingDelta` in contracts today; phase 2 adds provider thinking
+    signatures and thinking duration on `TurnCompleted`.
 
 ## Verify (run before every commit)
 
@@ -100,6 +126,32 @@ cd packages/engine
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
+```
+
+If the change touches `packages/cli`, also:
+
+```bash
+cd packages/cli
+cargo fmt --manifest-path crates/core/Cargo.toml --check
+cargo fmt --manifest-path crates/cli/Cargo.toml --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --all-features
+```
+
+**CLI smoke checklist** (manual, on a machine with API keys):
+
+1. `ANTHROPIC_API_KEY` → launch TUI, one turn streams markdown
+2. `/models` lists anthropic and copilot concurrently
+3. Mid-session `/model copilot/…` ↔ `/model anthropic/…` both stream
+4. Clean `XDG_CONFIG_HOME` tempdir → `/agent copilot` (or `/provider copilot`) triggers inline device-flow sign-in, then copilot streams
+5. Existing VS Code sign-in is picked up automatically (token merge-upsert on new sign-in)
+6. `/agent claude-code` probes and streams (if CLI installed)
+7. Esc cancels a mid-stream turn
+
+Automated subset (env-gated, skipped in CI):
+
+```bash
+AGENTLOOP_SMOKE=1 ANTHROPIC_API_KEY=... cargo test -p agentloop-cli-core smoke -- --ignored --nocapture
 ```
 
 Brand-leak gate (CI runs this; must print nothing):

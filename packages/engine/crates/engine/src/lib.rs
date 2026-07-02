@@ -9,9 +9,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use agentloop_contracts::{
-    AgentEvent, Answer, EngineError, ErrorCode, Hello, ModelRef, NewSessionParams,
-    PermissionDecision, PermissionRequestId, PromptInput, ProviderId, QuestionId, SessionEvent,
-    SessionId, SessionMeta, Transcript, TurnId, TurnOptions, TurnSummary, now_ms, reduce,
+    AgentEvent, Answer, CompactionSummary, EngineError, ErrorCode, Hello, ModelRef,
+    NewSessionParams, PermissionDecision, PermissionRequestId, PromptInput, ProviderId, QuestionId,
+    SessionEvent, SessionId, SessionMeta, Transcript, TurnId, TurnOptions, TurnSummary, now_ms,
+    reduce,
 };
 use agentloop_core::{
     Agent, AgentError, EventStream, ProviderError, ProviderRegistry, SessionStore, StoreError,
@@ -211,6 +212,15 @@ impl EngineService {
     ) -> EngineResult<TurnSummary> {
         let input = self.commands.expand_input(input);
         Ok(self.agent.prompt(session, input, opts).await?)
+    }
+
+    /// Summarize conversation history and record a compaction boundary.
+    pub async fn compact(
+        &self,
+        session: &SessionId,
+        opts: TurnOptions,
+    ) -> EngineResult<CompactionSummary> {
+        Ok(self.agent.compact(session, opts).await?)
     }
 
     pub async fn cancel(&self, session: &SessionId) -> EngineResult<()> {

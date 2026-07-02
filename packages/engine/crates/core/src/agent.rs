@@ -12,9 +12,9 @@ use async_trait::async_trait;
 use futures::Stream;
 
 use agentloop_contracts::{
-    AgentCaps, AgentInfo, Answer, EngineError, NewSessionParams, PermissionDecision,
-    PermissionRequestId, PromptInput, QuestionId, SessionEvent, SessionId, SessionMeta,
-    TurnOptions, TurnSummary,
+    AgentCaps, AgentInfo, Answer, CompactionSummary, EngineError, NewSessionParams,
+    PermissionDecision, PermissionRequestId, PromptInput, QuestionId, SessionEvent, SessionId,
+    SessionMeta, TurnOptions, TurnSummary,
 };
 
 use crate::provider::ProviderError;
@@ -121,5 +121,18 @@ pub trait Agent: Send + Sync {
         Err(AgentError::Other(format!(
             "this agent implementation does not support user questions (pending id {id})"
         )))
+    }
+
+    /// Summarize conversation history and record a compaction boundary so
+    /// future turns send the summary instead of the compacted prefix.
+    /// Default: not supported.
+    async fn compact(
+        &self,
+        _session: &SessionId,
+        _opts: TurnOptions,
+    ) -> Result<CompactionSummary, AgentError> {
+        Err(AgentError::Other(
+            "this agent implementation does not support context compaction".to_owned(),
+        ))
     }
 }

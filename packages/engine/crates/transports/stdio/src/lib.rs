@@ -1,8 +1,8 @@
 //! NDJSON stdio transport boundary.
 //!
-//! The runner composes an [`EngineService`](agentloop_engine::EngineService);
+//! The runner composes an [`EngineService`];
 //! this crate owns the wire framing. Each line is one serialized
-//! [`SessionEvent`](agentloop_contracts::SessionEvent).
+//! [`SessionEvent`].
 
 use std::path::PathBuf;
 

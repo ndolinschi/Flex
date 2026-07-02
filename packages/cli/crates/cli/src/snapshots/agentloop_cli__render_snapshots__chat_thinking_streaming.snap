@@ -1,0 +1,28 @@
+---
+source: crates/cli/src/render_snapshots.rs
+expression: rendered
+---
+AgenticStudio 0.1.0 — /help for keys and commands
+
+┌ Thinking ⠋
+│ Let me reason about this step by step.
+│ First, check the module layout.
+│ ▌
+└
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+┌ prompt ──────────────────────────────────────────────────────────────────────┐
+│ Type a message, / for commands, @ for files                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+native · code · auto · anthropic/claude-sonnet-4-5 · ⠋ streaming 0s · tokens in/

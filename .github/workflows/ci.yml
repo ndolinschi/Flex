@@ -62,3 +62,61 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           manifest-path: packages/engine/Cargo.toml
+
+  cli-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            packages/cli
+            packages/engine
+      - run: cargo fmt --manifest-path crates/core/Cargo.toml --check
+      - run: cargo fmt --manifest-path crates/cli/Cargo.toml --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Docs build (rustdoc warnings are errors)
+        run: cargo doc --workspace --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+      - name: Brand-leak gate (crate names and code stay brand-free)
+        working-directory: .
+        run: |
+          ! git grep -iIl 'agenticstudio' -- packages/cli/crates/ \
+              ':!packages/cli/crates/cli/Cargo.toml' \
+              ':!packages/cli/crates/cli/src/main.rs'
+
+  cli-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: packages/cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            packages/cli
+            packages/engine
+      - run: cargo test --workspace --all-features
+      - name: The interactive binary always links
+        run: cargo build -p agentloop-cli --all-features
+
+  cli-deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: packages/cli/Cargo.toml
