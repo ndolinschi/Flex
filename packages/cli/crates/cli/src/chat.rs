@@ -508,6 +508,7 @@ impl ChatState {
             AgentEvent::SubagentStarted {
                 child_session,
                 task,
+                ..
             } => {
                 self.items.push(ChatItem::Subagent {
                     child: child_session.clone(),
