@@ -22,6 +22,7 @@ use agentloop_prompts::{
     SystemPromptConfig, Vars,
 };
 use agentloop_provider_anthropic::{ANTHROPIC_PROVIDER_ID, AnthropicProvider};
+use agentloop_provider_copilot::{COPILOT_PROVIDER_ID, CopilotConfig, CopilotProvider};
 use agentloop_provider_gemini::{GEMINI_PROVIDER_ID, GeminiProvider};
 use agentloop_provider_ollama::{OLLAMA_PROVIDER_ID, OllamaProvider};
 use agentloop_provider_openai::{OPENAI_PROVIDER_ID, OpenAiProvider};
@@ -244,13 +245,16 @@ fn resolve_real_providers(
         None if env_is_set("OPENAI_API_KEY") => OPENAI_PROVIDER_ID,
         None if env_is_set("ANTHROPIC_API_KEY") => ANTHROPIC_PROVIDER_ID,
         None if env_is_set("GEMINI_API_KEY") => GEMINI_PROVIDER_ID,
+        None if CopilotConfig::discoverable() => COPILOT_PROVIDER_ID,
         None if env_is_set("OLLAMA_HOST") || env_is_set("OLLAMA_MODEL") => OLLAMA_PROVIDER_ID,
         None => {
             return Err(ProviderError::AuthMissing {
                 provider: ProviderId::from("runtime"),
-                hint: "set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, or \
-                       `OLLAMA_HOST`/`OLLAMA_MODEL` for local Ollama (optional model env vars: \
-                       `OPENAI_MODEL`, `ANTHROPIC_MODEL`, `GEMINI_MODEL`, `OLLAMA_MODEL`)"
+                hint: "set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, \
+                       `OLLAMA_HOST`/`OLLAMA_MODEL` for local Ollama, or sign in to GitHub \
+                       Copilot (VS Code / Copilot CLI, or set `COPILOT_GITHUB_TOKEN`); \
+                       optional model env vars: `OPENAI_MODEL`, `ANTHROPIC_MODEL`, \
+                       `GEMINI_MODEL`, `OLLAMA_MODEL`, `COPILOT_MODEL`"
                     .to_owned(),
             }
             .into());
@@ -281,6 +285,16 @@ fn resolve_real_providers(
             let mut providers = ProviderRegistry::new();
             providers.register(Arc::new(provider));
             Ok((providers, ModelRef(format!("{GEMINI_PROVIDER_ID}/{model}"))))
+        }
+        COPILOT_PROVIDER_ID => {
+            let provider = CopilotProvider::from_env()?;
+            let model = model_arg.unwrap_or_else(|| provider.default_model().to_owned());
+            let mut providers = ProviderRegistry::new();
+            providers.register(Arc::new(provider));
+            Ok((
+                providers,
+                ModelRef(format!("{COPILOT_PROVIDER_ID}/{model}")),
+            ))
         }
         OLLAMA_PROVIDER_ID => {
             let provider = OllamaProvider::from_env();

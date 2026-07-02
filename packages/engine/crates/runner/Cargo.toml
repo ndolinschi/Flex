@@ -17,6 +17,7 @@ agentloop-contracts = { workspace = true }
 agentloop-delegator-claude-code = { workspace = true }
 agentloop-delegator-copilot = { workspace = true }
 agentloop-engine = { workspace = true }
+agentloop-provider-copilot = { workspace = true }
 agentloop-session = { workspace = true }
 agentloop-transport-stdio = { workspace = true }
 anyhow = { workspace = true }

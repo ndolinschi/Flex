@@ -4,6 +4,7 @@
 //! Chat Completions wire types are private and normalized into
 //! `ProviderStreamEvent` before leaving this crate.
 
+pub mod compat;
 mod config;
 mod provider;
 mod wire;

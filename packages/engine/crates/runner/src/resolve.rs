@@ -223,6 +223,12 @@ pub(crate) async fn doctor(workdir: &Path) -> anyhow::Result<()> {
         };
         println!("  {key}: {state}");
     }
+    let copilot_auth = if agentloop_provider_copilot::CopilotConfig::discoverable() {
+        "found (env token or editor/CLI sign-in)"
+    } else {
+        "not found (sign in with VS Code or the Copilot CLI, or set COPILOT_GITHUB_TOKEN)"
+    };
+    println!("  github copilot auth: {copilot_auth}");
 
     println!("external agents:");
     let config = ClaudeCodeConfig::default();

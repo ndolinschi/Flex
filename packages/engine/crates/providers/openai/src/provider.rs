@@ -151,7 +151,7 @@ struct StreamState {
     closed: bool,
 }
 
-fn provider_stream(
+pub(crate) fn provider_stream(
     provider: ProviderId,
     model: String,
     chunks: Pin<Box<dyn Stream<Item = Result<String, reqwest::Error>> + Send>>,

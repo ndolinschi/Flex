@@ -14,6 +14,7 @@ members = [
     "crates/mcp",
     "crates/providers/anthropic",
     "crates/providers/common",
+    "crates/providers/copilot",
     "crates/providers/gemini",
     "crates/providers/ollama",
     "crates/providers/openai",
@@ -49,6 +50,7 @@ agentloop-loop = { path = "crates/loop" }
 agentloop-mcp = { path = "crates/mcp" }
 agentloop-provider-anthropic = { path = "crates/providers/anthropic" }
 agentloop-provider-common = { path = "crates/providers/common" }
+agentloop-provider-copilot = { path = "crates/providers/copilot" }
 agentloop-provider-gemini = { path = "crates/providers/gemini" }
 agentloop-provider-ollama = { path = "crates/providers/ollama" }
 agentloop-provider-openai = { path = "crates/providers/openai" }

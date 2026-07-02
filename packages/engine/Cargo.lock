@@ -130,6 +130,7 @@ dependencies = [
  "agentloop-loop",
  "agentloop-prompts",
  "agentloop-provider-anthropic",
+ "agentloop-provider-copilot",
  "agentloop-provider-gemini",
  "agentloop-provider-ollama",
  "agentloop-provider-openai",
@@ -217,6 +218,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "agentloop-provider-copilot"
+version = "0.1.0"
+dependencies = [
+ "agentloop-contracts",
+ "agentloop-core",
+ "agentloop-provider-common",
+ "agentloop-provider-openai",
+ "async-trait",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "agentloop-provider-gemini"
 version = "0.1.0"
 dependencies = [
@@ -272,6 +291,7 @@ dependencies = [
  "agentloop-delegator-claude-code",
  "agentloop-delegator-copilot",
  "agentloop-engine",
+ "agentloop-provider-copilot",
  "agentloop-session",
  "agentloop-transport-stdio",
  "anyhow",
