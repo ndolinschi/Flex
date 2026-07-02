@@ -194,6 +194,9 @@ pub struct App {
     pub mcp_store: McpStore,
     /// Enabled MCP servers in the current native session (status bar).
     pub mcp_enabled: usize,
+    /// Prompts submitted while a turn was running; sent in order after each
+    /// turn completes. Cleared when the user interrupts.
+    pub queued_prompts: std::collections::VecDeque<String>,
     dirty: bool,
 }
 
@@ -236,6 +239,7 @@ impl App {
             file_index,
             mcp_store: McpStore::load(),
             mcp_enabled: bootstrap.mcp_enabled,
+            queued_prompts: std::collections::VecDeque::new(),
             dirty: true,
         };
         let welcome = format!(
@@ -294,6 +298,17 @@ impl App {
     }
 
     /// Enter the running phase and reset the per-turn busy-line state.
+    /// Drop queued prompts (on interrupt): the user is taking back control.
+    fn clear_prompt_queue(&mut self) {
+        if !self.queued_prompts.is_empty() {
+            self.toast(format!(
+                "cleared {} queued prompt(s)",
+                self.queued_prompts.len()
+            ));
+            self.queued_prompts.clear();
+        }
+    }
+
     fn begin_turn(&mut self) {
         if self.session.turn.is_running() {
             return;
@@ -410,6 +425,7 @@ impl App {
         match (key.code, key.modifiers) {
             (KeyCode::Esc, _) if !popup_open => {
                 if self.session.turn.is_running() {
+                    self.clear_prompt_queue();
                     self.toast("interrupting…");
                     return vec![Effect::CancelTurn];
                 }
@@ -473,6 +489,7 @@ impl App {
 
     fn on_ctrl_c(&mut self) -> Vec<Effect> {
         if self.session.turn.is_running() {
+            self.clear_prompt_queue();
             self.toast("interrupting…");
             return vec![Effect::CancelTurn];
         }
@@ -634,7 +651,11 @@ impl App {
 
     fn submit_prompt(&mut self, line: &str) -> Vec<Effect> {
         if self.session.turn.is_running() {
-            self.toast("turn in progress — esc to cancel");
+            self.queued_prompts.push_back(line.to_owned());
+            self.toast(format!(
+                "queued ({}) — sends after this turn · esc interrupts and clears",
+                self.queued_prompts.len()
+            ));
             return Vec::new();
         }
         let input = crate::files::expand_file_mentions(line, &self.workdir, &self.file_index);
@@ -678,6 +699,9 @@ impl App {
             LocalCommand::Permissions { arg } => self.run_permissions_command(arg),
             LocalCommand::Thinking { arg } => self.run_thinking_command(arg),
             LocalCommand::Compact => self.run_compact(),
+            LocalCommand::Connect { arg } => self.run_connect(arg),
+            LocalCommand::Providers => self.run_providers(),
+            LocalCommand::Disconnect { arg } => self.run_disconnect(arg),
             LocalCommand::Mcps => self.open_mcp_list(),
             LocalCommand::Mcp { sub } => self.run_mcp_command(sub),
             LocalCommand::McpInstall { arg } => self.run_mcp_install(arg),
@@ -860,6 +884,125 @@ impl App {
             self.toast("thinking hidden (/thinking on to show)");
         }
         self.persist_mode_prefs();
+        Vec::new()
+    }
+
+    const CONNECT_USAGE: &'static str = "usage: /connect <id> <base_url> <api_key> [default_model] [--force] · \
+         key may be {env:VAR} · e.g. /connect deepseek https://api.deepseek.com/v1 {env:DEEPSEEK_API_KEY}";
+
+    fn run_connect(&mut self, arg: Option<String>) -> Vec<Effect> {
+        let Some(arg) = arg.filter(|a| !a.trim().is_empty()) else {
+            self.chat.push_info(Self::CONNECT_USAGE);
+            return Vec::new();
+        };
+        let mut tokens: Vec<&str> = arg.split_whitespace().collect();
+        if tokens.first() == Some(&"remove") {
+            return self.run_disconnect(tokens.get(1).map(|s| (*s).to_owned()));
+        }
+        let force = tokens.iter().position(|t| *t == "--force").map(|idx| {
+            tokens.remove(idx);
+        });
+        if tokens.len() < 3 {
+            self.chat.push_info(Self::CONNECT_USAGE);
+            return Vec::new();
+        }
+        let id = tokens[0].to_lowercase();
+        if !id
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+            || id.is_empty()
+        {
+            self.chat
+                .push_error(format!("invalid provider id `{id}` — use a-z, 0-9, -, _"));
+            return Vec::new();
+        }
+        if self.providers.iter().any(|p| p == &id) {
+            self.chat
+                .push_error(format!("`{id}` is already a registered provider"));
+            return Vec::new();
+        }
+        let config = agentloop_cli_core::ProviderConfig {
+            name: None,
+            base_url: tokens[1].to_owned(),
+            api_key: tokens[2].to_owned(),
+            models: Vec::new(),
+            default_model: tokens.get(3).map(|s| (*s).to_owned()),
+            thinking: false,
+        };
+        if force.is_some() {
+            return self.save_provider(&id, config, None);
+        }
+        self.toast(format!("validating {id}…"));
+        vec![Effect::ValidateProvider { id, config }]
+    }
+
+    /// Persist a validated (or forced) provider and rebuild the native engine.
+    fn save_provider(
+        &mut self,
+        id: &str,
+        config: agentloop_cli_core::ProviderConfig,
+        model_count: Option<usize>,
+    ) -> Vec<Effect> {
+        if let Err(err) = agentloop_cli_core::CliPrefs::remember_provider(id, config) {
+            self.chat.push_error(format!("could not save {id}: {err}"));
+            return Vec::new();
+        }
+        match model_count {
+            Some(count) => self.toast(format!("connected {id} ({count} models)")),
+            None => self.toast(format!("saved {id} without validation")),
+        }
+        self.pending_provider = Some(id.to_owned());
+        vec![Effect::ReloadEngine { invalidate: true }]
+    }
+
+    fn run_disconnect(&mut self, arg: Option<String>) -> Vec<Effect> {
+        let Some(id) = arg.filter(|a| !a.trim().is_empty()) else {
+            self.chat.push_info("usage: /disconnect <id>");
+            return Vec::new();
+        };
+        match agentloop_cli_core::CliPrefs::forget_provider(id.trim()) {
+            Ok(true) => {
+                self.toast(format!("disconnected {}", id.trim()));
+                vec![Effect::ReloadEngine { invalidate: true }]
+            }
+            Ok(false) => {
+                self.chat
+                    .push_info(format!("no custom provider `{}`", id.trim()));
+                Vec::new()
+            }
+            Err(err) => {
+                self.chat.push_error(err.to_string());
+                Vec::new()
+            }
+        }
+    }
+
+    fn run_providers(&mut self) -> Vec<Effect> {
+        let prefs = agentloop_cli_core::CliPrefs::load();
+        let mut lines = vec!["providers:".to_owned()];
+        for id in &self.providers {
+            let custom = prefs.providers.get(id);
+            match custom {
+                Some(config) => lines.push(format!(
+                    "  {id} · custom · {} · {} models",
+                    config.base_url,
+                    config.models.len()
+                )),
+                None => lines.push(format!("  {id} · built-in")),
+            }
+        }
+        for (id, config) in &prefs.providers {
+            if !self.providers.iter().any(|p| p == id) {
+                lines.push(format!(
+                    "  {id} · custom · {} · not loaded (rebuild pending or env key missing)",
+                    config.base_url
+                ));
+            }
+        }
+        lines.push("add: /connect · remove: /disconnect <id>".to_owned());
+        for line in lines {
+            self.chat.push_info(line);
+        }
         Vec::new()
     }
 
@@ -1556,6 +1699,12 @@ impl App {
                     // is only a fallback signal (e.g. TurnInProgress).
                     self.toast(message);
                 }
+                if let Some(next) = self.queued_prompts.pop_front() {
+                    self.toast(format!("sending queued prompt ({} left)", {
+                        self.queued_prompts.len()
+                    }));
+                    return self.submit_prompt(&next);
+                }
                 Vec::new()
             }
             TaskResult::CompactFinished(outcome) => {
@@ -1565,6 +1714,16 @@ impl App {
                 }
                 Vec::new()
             }
+            TaskResult::ProviderValidated { id, config, result } => match result {
+                Ok(count) => self.save_provider(&id, config, Some(count)),
+                Err(message) => {
+                    self.chat.push_human_error(
+                        format!("could not reach `{id}`: {message}"),
+                        Some("check the URL and key, or append --force to save anyway".to_owned()),
+                    );
+                    Vec::new()
+                }
+            },
             TaskResult::Models(Ok(entries)) => {
                 self.catalog = entries;
                 let mut effects = Vec::new();
@@ -2227,6 +2386,43 @@ mod status_tests {
             session_restarted: false,
         };
         App::new(bootstrap, PathBuf::from("."), FileIndex::default())
+    }
+
+    fn finished_turn() -> TaskResult {
+        TaskResult::TurnFinished(Ok(agentloop_contracts::TurnSummary {
+            turn_id: agentloop_contracts::TurnId::generate(),
+            stop_reason: agentloop_contracts::TurnStopReason::EndTurn,
+            usage: agentloop_contracts::TokenUsage::default(),
+            cost_usd: None,
+            num_model_calls: 1,
+            num_tool_calls: 0,
+            duration_ms: 10,
+        }))
+    }
+
+    #[test]
+    fn prompts_queue_while_running_and_drain_after_turn() {
+        let mut app = test_app();
+        app.begin_turn();
+        let effects = app.submit_prompt("second question");
+        assert!(effects.is_empty(), "running turn queues instead of sending");
+        assert_eq!(app.queued_prompts.len(), 1);
+        // Turn finishes → queued prompt auto-submits.
+        let effects = app.on_task(finished_turn());
+        assert_eq!(effects.len(), 1, "queued prompt submits on turn end");
+        assert!(app.queued_prompts.is_empty());
+        assert!(app.session.turn.is_running());
+    }
+
+    #[test]
+    fn interrupt_clears_the_prompt_queue() {
+        let mut app = test_app();
+        app.begin_turn();
+        app.submit_prompt("queued one");
+        app.clear_prompt_queue();
+        assert!(app.queued_prompts.is_empty());
+        let effects = app.on_task(finished_turn());
+        assert!(effects.is_empty(), "nothing drains after an interrupt");
     }
 
     #[test]

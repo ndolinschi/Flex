@@ -78,6 +78,14 @@ pub enum TaskResult {
     },
     /// `/compact` finished.
     CompactFinished(Result<CompactionSummary, String>),
+    /// `/connect` validation finished. On success `config.models` is filled
+    /// from the endpoint when the user supplied none; the payload is the
+    /// discovered model count.
+    ProviderValidated {
+        id: String,
+        config: agentloop_cli_core::ProviderConfig,
+        result: Result<usize, String>,
+    },
     /// `/mcp-install` finished.
     McpInstallFinished(Result<String, String>),
     /// MCP explorer listed tools for a server.
@@ -163,6 +171,11 @@ pub enum Effect {
     CopyToClipboard { text: String },
     /// Persist the last selected model for the next launch.
     SaveLastModel(ModelRef),
+    /// Probe a candidate custom provider (`/connect`) by listing its models.
+    ValidateProvider {
+        id: String,
+        config: agentloop_cli_core::ProviderConfig,
+    },
     /// Summarize conversation history and record a compaction boundary.
     CompactSession { opts: TurnOptions },
     /// Rebuild the native engine (MCP config changed).

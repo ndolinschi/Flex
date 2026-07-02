@@ -36,6 +36,13 @@ pub enum LocalCommand {
     Thinking { arg: Option<String> },
     /// `/compact` — summarize conversation history to save context.
     Compact,
+    /// `/connect <id> <base_url> <api_key> [model] [--force]` — add a custom
+    /// OpenAI-compatible provider (DeepSeek, GLM, LM Studio, …).
+    Connect { arg: Option<String> },
+    /// `/providers` — list built-in and custom providers.
+    Providers,
+    /// `/disconnect <id>` — remove a custom provider.
+    Disconnect { arg: Option<String> },
     /// `/mcps` — list and toggle installed MCP servers.
     Mcps,
     /// `/mcp <name>` or `/mcp explore <name>`.
@@ -121,6 +128,13 @@ const LOCAL: &[(&str, &str, Option<&str>)] = &[
         "summarize conversation history to save context",
         None,
     ),
+    (
+        "connect",
+        "add a custom OpenAI-compatible provider",
+        Some("<id> <base_url> <api_key> [model] [--force]"),
+    ),
+    ("providers", "list built-in and custom providers", None),
+    ("disconnect", "remove a custom provider", Some("<id>")),
     ("mcps", "list and toggle installed MCP servers", None),
     (
         "mcp",
@@ -231,6 +245,9 @@ impl CommandIndex {
             "mode" => Route::Local(LocalCommand::Mode { arg }),
             "permissions" => Route::Local(LocalCommand::Permissions { arg }),
             "thinking" => Route::Local(LocalCommand::Thinking { arg }),
+            "connect" => Route::Local(LocalCommand::Connect { arg }),
+            "providers" => Route::Local(LocalCommand::Providers),
+            "disconnect" => Route::Local(LocalCommand::Disconnect { arg }),
             "compact" => Route::Local(LocalCommand::Compact),
             "mcps" => Route::Local(LocalCommand::Mcps),
             "mcp" => Route::Local(parse_mcp_command(args)),

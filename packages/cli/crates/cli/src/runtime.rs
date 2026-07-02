@@ -740,6 +740,37 @@ impl EffectExecutor {
                         .await;
                 });
             }
+            Effect::ValidateProvider { id, config } => {
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    let (config, result) =
+                        match agentloop_cli_core::validate_provider(&id, &config).await {
+                            Ok(models) => {
+                                let mut config = config;
+                                if config.models.is_empty() {
+                                    config.models = models
+                                        .iter()
+                                        .map(|model| agentloop_cli_core::ModelEntry {
+                                            id: model.id.clone(),
+                                            name: model.display_name.clone(),
+                                            context_window: model.context_window,
+                                        })
+                                        .collect();
+                                }
+                                let count = config.models.len();
+                                (config, Ok(count))
+                            }
+                            Err(message) => (config, Err(message)),
+                        };
+                    let _ = tx
+                        .send(AppEvent::Task(TaskResult::ProviderValidated {
+                            id,
+                            config,
+                            result,
+                        }))
+                        .await;
+                });
+            }
             Effect::Quit
             | Effect::SetMouseCapture(_)
             | Effect::CopyToClipboard { .. }
