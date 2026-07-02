@@ -19,6 +19,7 @@ mod manager;
 mod messages;
 mod permission;
 mod pool;
+pub mod roles;
 mod rules;
 mod session_handle;
 mod tool_results;

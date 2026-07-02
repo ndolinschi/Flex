@@ -1,0 +1,241 @@
+//! Role definitions for multi-agent orchestration.
+//!
+//! A role names a job (`searcher`, `worker`, `reviewer`, …) and carries an
+//! ordered model-preference chain, a tool profile, and spawn limits. The
+//! interactive session uses the reserved `main` role's chain for mid-turn
+//! failover; subagents spawned by the Task tool get their role's chain,
+//! filtered tools, and prompt.
+
+use agentloop_contracts::ModelRef;
+
+/// Reserved role driving the interactive session; never spawnable.
+pub const MAIN_ROLE: &str = "main";
+
+/// How a role's tool set is derived from the registry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RoleToolProfile {
+    /// Every registry tool whose descriptor says `read_only`.
+    ReadOnly,
+    /// Every registry tool.
+    Full,
+    /// An explicit allow-list of tool names.
+    Allow(Vec<String>),
+}
+
+/// One role definition (user-configured or built-in).
+#[derive(Debug, Clone, PartialEq)]
+pub struct RoleSpec {
+    /// Role name: `^[a-z0-9][a-z0-9_-]{0,31}$`.
+    pub name: String,
+    /// Ordered model preference chain; empty = inherit the spawning
+    /// session's effective model.
+    pub models: Vec<ModelRef>,
+    /// Which tools the role may use.
+    pub tools: RoleToolProfile,
+    /// System-prompt addition delivered via `TurnOptions.system_append`.
+    pub prompt: Option<String>,
+    /// Distribute parallel spawns across the chain (round-robin).
+    pub split: bool,
+    /// Concurrent subagents of this role per batch (clamped 1..=8).
+    pub max_parallel: usize,
+    /// Spawn-tree depth this role may create below itself (clamped 0..=3).
+    pub max_depth: u8,
+}
+
+impl RoleSpec {
+    /// A role with conservative defaults: inherit model, read-only tools.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            models: Vec::new(),
+            tools: RoleToolProfile::ReadOnly,
+            prompt: None,
+            split: true,
+            max_parallel: 4,
+            max_depth: 1,
+        }
+    }
+}
+
+/// Why a role set was rejected.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum RoleError {
+    /// The name violates `^[a-z0-9][a-z0-9_-]{0,31}$`.
+    #[error("role `{0}` has an invalid name (use a-z, 0-9, -, _; max 32 chars)")]
+    InvalidName(String),
+    /// The same role appears twice.
+    #[error("role `{0}` is declared more than once")]
+    Duplicate(String),
+}
+
+/// Built-in defaults overlaid by user specs; the lookup used by the Task
+/// tool and by chain resolution.
+#[derive(Debug, Default)]
+pub struct RoleRegistry {
+    roles: std::collections::BTreeMap<String, RoleSpec>,
+}
+
+impl RoleRegistry {
+    /// Built-ins (`searcher`, `worker`, `reviewer`, `main`) overlaid by
+    /// `user` specs (same-name user specs replace built-ins).
+    pub fn with_defaults(user: Vec<RoleSpec>) -> Result<Self, RoleError> {
+        let mut registry = Self::default();
+        for spec in builtin_roles() {
+            registry.roles.insert(spec.name.clone(), spec);
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        for mut spec in user {
+            if !valid_name(&spec.name) {
+                return Err(RoleError::InvalidName(spec.name));
+            }
+            if !seen.insert(spec.name.clone()) {
+                return Err(RoleError::Duplicate(spec.name));
+            }
+            spec.max_parallel = spec.max_parallel.clamp(1, 8);
+            spec.max_depth = spec.max_depth.min(3);
+            registry.roles.insert(spec.name.clone(), spec);
+        }
+        Ok(registry)
+    }
+
+    /// Look up a role by name.
+    pub fn get(&self, name: &str) -> Option<&RoleSpec> {
+        self.roles.get(name)
+    }
+
+    /// The fallback chain for a session serving `role` (`None` = main).
+    pub fn chain(&self, role: Option<&str>) -> &[ModelRef] {
+        self.roles
+            .get(role.unwrap_or(MAIN_ROLE))
+            .map(|spec| spec.models.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Roles the Task tool may spawn: everything except `main`, as
+    /// `(name, one-line summary)` pairs for the tool description.
+    pub fn spawnable(&self) -> Vec<(String, String)> {
+        self.roles
+            .values()
+            .filter(|spec| spec.name != MAIN_ROLE)
+            .map(|spec| {
+                let access = match &spec.tools {
+                    RoleToolProfile::ReadOnly => "read-only tools",
+                    RoleToolProfile::Full => "full tool access",
+                    RoleToolProfile::Allow(_) => "restricted tool set",
+                };
+                (spec.name.clone(), access.to_owned())
+            })
+            .collect()
+    }
+}
+
+fn valid_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    name.len() <= 32
+        && (first.is_ascii_lowercase() || first.is_ascii_digit())
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+}
+
+fn builtin_roles() -> Vec<RoleSpec> {
+    vec![
+        RoleSpec {
+            name: "searcher".to_owned(),
+            prompt: Some(
+                "You are a read-only research subagent. Explore quickly, verify claims \
+                 against the code you read, and return a token-efficient report with \
+                 absolute file paths and line numbers. You cannot modify anything and \
+                 cannot ask the user questions."
+                    .to_owned(),
+            ),
+            ..RoleSpec::new("searcher")
+        },
+        RoleSpec {
+            name: "worker".to_owned(),
+            tools: RoleToolProfile::Full,
+            prompt: Some(
+                "You are an implementation subagent working one self-contained task. \
+                 Follow the brief exactly, verify your work (build/tests where \
+                 applicable), and report what changed, how you verified it, and any \
+                 assumptions. You cannot ask the user questions."
+                    .to_owned(),
+            ),
+            max_parallel: 3,
+            ..RoleSpec::new("worker")
+        },
+        RoleSpec {
+            name: "reviewer".to_owned(),
+            prompt: Some(
+                "You are a read-only review subagent. Check the described work against \
+                 the stated criteria, cite exact locations for every finding, and rank \
+                 findings by severity. Do not propose fixes unless asked."
+                    .to_owned(),
+            ),
+            ..RoleSpec::new("reviewer")
+        },
+        RoleSpec {
+            name: MAIN_ROLE.to_owned(),
+            tools: RoleToolProfile::Full,
+            ..RoleSpec::new(MAIN_ROLE)
+        },
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn defaults_present_and_main_not_spawnable() {
+        let registry = RoleRegistry::with_defaults(Vec::new()).expect("defaults build");
+        for name in ["searcher", "worker", "reviewer", MAIN_ROLE] {
+            assert!(registry.get(name).is_some(), "{name} missing");
+        }
+        assert!(
+            registry
+                .spawnable()
+                .iter()
+                .all(|(name, _)| name != MAIN_ROLE)
+        );
+    }
+
+    #[test]
+    fn user_specs_override_builtins_and_clamp() {
+        let user = vec![RoleSpec {
+            max_parallel: 99,
+            max_depth: 9,
+            models: vec![ModelRef::from("mock/a")],
+            ..RoleSpec::new("worker")
+        }];
+        let registry = RoleRegistry::with_defaults(user).expect("builds");
+        let worker = registry.get("worker").expect("worker");
+        assert_eq!(worker.max_parallel, 8);
+        assert_eq!(worker.max_depth, 3);
+        assert_eq!(registry.chain(Some("worker")), &[ModelRef::from("mock/a")]);
+    }
+
+    #[test]
+    fn invalid_and_duplicate_names_reject() {
+        assert!(matches!(
+            RoleRegistry::with_defaults(vec![RoleSpec::new("Bad Name")]),
+            Err(RoleError::InvalidName(_))
+        ));
+        assert!(matches!(
+            RoleRegistry::with_defaults(vec![RoleSpec::new("dup"), RoleSpec::new("dup")]),
+            Err(RoleError::Duplicate(_))
+        ));
+    }
+
+    #[test]
+    fn main_chain_feeds_failover() {
+        let user = vec![RoleSpec {
+            models: vec![ModelRef::from("a/x"), ModelRef::from("b/y")],
+            ..RoleSpec::new(MAIN_ROLE.to_owned())
+        }];
+        let registry = RoleRegistry::with_defaults(user).expect("builds");
+        assert_eq!(registry.chain(None).len(), 2);
+    }
+}
