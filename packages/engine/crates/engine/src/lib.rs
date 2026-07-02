@@ -89,6 +89,8 @@ pub struct EngineService {
     agent: Arc<dyn Agent>,
     store: Arc<dyn SessionStore>,
     commands: Arc<CommandRegistry>,
+    /// Providers backing a native service; empty for delegated agents.
+    providers: ProviderRegistry,
 }
 
 impl EngineService {
@@ -97,6 +99,7 @@ impl EngineService {
             agent,
             store,
             commands: Arc::new(CommandRegistry::builtins()),
+            providers: ProviderRegistry::new(),
         }
     }
 
@@ -109,12 +112,44 @@ impl EngineService {
             agent,
             store,
             commands: Arc::new(commands),
+            providers: ProviderRegistry::new(),
         }
     }
 
-    pub fn native(options: EngineOptions) -> EngineResult<Self> {
+    /// Native loop with a single provider resolved from `options.provider` or
+    /// the environment.
+    pub fn native(mut options: EngineOptions) -> EngineResult<Self> {
+        let model = options.model.take();
         let (providers, default_model) =
-            resolve_real_providers(options.provider.as_deref(), options.model)?;
+            resolve_real_providers(options.provider.as_deref(), model)?;
+        Self::build_native(providers, default_model, options)
+    }
+
+    /// Native loop with every provider whose credentials resolve, so
+    /// provider-qualified [`ModelRef`]s can switch providers per turn.
+    ///
+    /// `options.provider` names the preferred provider (it must resolve and
+    /// becomes the priority for bare model refs); `options.model` picks the
+    /// default model, qualified against the preferred provider unless it
+    /// already carries a `provider/` prefix.
+    pub fn native_all(mut options: EngineOptions) -> EngineResult<Self> {
+        let model = options.model.take();
+        let (providers, default_model) =
+            resolve_available_providers(options.provider.as_deref(), model)?;
+        Self::build_native(providers, default_model, options)
+    }
+
+    /// The registry backing a native service; empty for delegated agents.
+    /// Lets clients enumerate providers and list models for pickers.
+    pub fn provider_registry(&self) -> &ProviderRegistry {
+        &self.providers
+    }
+
+    fn build_native(
+        providers: ProviderRegistry,
+        default_model: ModelRef,
+        options: EngineOptions,
+    ) -> EngineResult<Self> {
         let BaseTools {
             registry: tools,
             pending_questions,
@@ -132,14 +167,16 @@ impl EngineService {
 
         let store: Arc<dyn SessionStore> = Arc::new(MemoryStore::new());
         let agent = NativeAgentBuilder::new(store.clone())
-            .providers(providers)
+            .providers(providers.clone())
             .tools(tools)
             .questions(pending_questions)
             .system_prompt(system_prompt)
             .commands(commands.infos())
             .default_model(default_model)
             .build();
-        Ok(Self::with_commands(agent, store, commands))
+        let mut service = Self::with_commands(agent, store, commands);
+        service.providers = providers;
+        Ok(service)
     }
 
     pub fn hello(&self) -> Hello {
@@ -307,6 +344,128 @@ fn resolve_real_providers(
     }
 }
 
+/// Register every provider whose credentials resolve from the environment,
+/// in the same precedence order [`resolve_real_providers`] detects them.
+///
+/// Providers with missing credentials are skipped (debug-traced); any other
+/// construction error propagates. `preferred` must resolve and becomes the
+/// registry priority. The returned [`ModelRef`] is always provider-qualified:
+/// `model_arg` wins (qualified against the priority provider unless it
+/// already names one), else the priority provider's default model.
+fn resolve_available_providers(
+    preferred: Option<&str>,
+    model_arg: Option<String>,
+) -> EngineResult<(ProviderRegistry, ModelRef)> {
+    /// A constructed provider paired with its default model id.
+    type ProviderWithDefault = (Arc<dyn agentloop_core::Provider>, String);
+
+    /// `(provider, its default model)` for a known name; `None` for unknown.
+    fn build_provider(name: &str) -> Result<Option<ProviderWithDefault>, ProviderError> {
+        fn boxed<P: agentloop_core::Provider + 'static>(
+            provider: P,
+            default_model: String,
+        ) -> Option<ProviderWithDefault> {
+            Some((Arc::new(provider), default_model))
+        }
+        match name {
+            OPENAI_PROVIDER_ID => OpenAiProvider::from_env().map(|p| {
+                let model = p.default_model().to_owned();
+                boxed(p, model)
+            }),
+            ANTHROPIC_PROVIDER_ID => AnthropicProvider::from_env().map(|p| {
+                let model = p.default_model().to_owned();
+                boxed(p, model)
+            }),
+            GEMINI_PROVIDER_ID => GeminiProvider::from_env().map(|p| {
+                let model = p.default_model().to_owned();
+                boxed(p, model)
+            }),
+            COPILOT_PROVIDER_ID => CopilotProvider::from_env().map(|p| {
+                let model = p.default_model().to_owned();
+                boxed(p, model)
+            }),
+            OLLAMA_PROVIDER_ID => {
+                let provider = OllamaProvider::from_env();
+                let model = provider.default_model().to_owned();
+                Ok(boxed(provider, model))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    let mut providers = ProviderRegistry::new();
+    let mut defaults: Vec<(ProviderId, String)> = Vec::new();
+    let mut register =
+        |registry: &mut ProviderRegistry, provider: Arc<dyn agentloop_core::Provider>, model| {
+            defaults.push((provider.id(), model));
+            registry.register(provider);
+        };
+
+    for name in [
+        OPENAI_PROVIDER_ID,
+        ANTHROPIC_PROVIDER_ID,
+        GEMINI_PROVIDER_ID,
+        COPILOT_PROVIDER_ID,
+    ] {
+        match build_provider(name) {
+            Ok(Some((provider, model))) => register(&mut providers, provider, model),
+            Ok(None) => {}
+            Err(ProviderError::AuthMissing { .. }) => {
+                tracing::debug!(target: "engine", provider = name, "skipped: no credentials");
+            }
+            Err(err) => return Err(err.into()),
+        }
+    }
+    // Ollama's `from_env` is infallible; auto-register only when its env vars
+    // opt in, so a dead default endpoint doesn't join the registry unasked.
+    if env_is_set("OLLAMA_HOST") || env_is_set("OLLAMA_MODEL") {
+        if let Ok(Some((provider, model))) = build_provider(OLLAMA_PROVIDER_ID) {
+            register(&mut providers, provider, model);
+        }
+    }
+
+    if let Some(name) = preferred {
+        let id = ProviderId::from(name);
+        if providers.get(&id).is_none() {
+            // Not auto-registered: build it explicitly so the caller gets the
+            // precise error (or a working provider, e.g. ollama without env).
+            match build_provider(name).map_err(EngineServiceError::from)? {
+                Some((provider, model)) => register(&mut providers, provider, model),
+                None => return Err(EngineServiceError::UnsupportedProvider(name.to_owned())),
+            }
+        }
+        providers.set_priority(vec![id]);
+    }
+
+    let Some(first) = providers.ids().first().cloned() else {
+        return Err(ProviderError::AuthMissing {
+            provider: ProviderId::from("runtime"),
+            hint: "set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, \
+                   `OLLAMA_HOST`/`OLLAMA_MODEL` for local Ollama, or sign in to GitHub \
+                   Copilot (VS Code / Copilot CLI, or set `COPILOT_GITHUB_TOKEN`); \
+                   optional model env vars: `OPENAI_MODEL`, `ANTHROPIC_MODEL`, \
+                   `GEMINI_MODEL`, `OLLAMA_MODEL`, `COPILOT_MODEL`"
+                .to_owned(),
+        }
+        .into());
+    };
+
+    let default_model = match model_arg {
+        Some(model) if model.contains('/') => ModelRef(model),
+        Some(model) => ModelRef(format!("{first}/{model}")),
+        None => {
+            let model = defaults
+                .iter()
+                .find(|(id, _)| *id == first)
+                .map(|(_, model)| model.clone())
+                .unwrap_or_default();
+            ModelRef(format!("{first}/{model}"))
+        }
+    };
+
+    Ok((providers, default_model))
+}
+
 fn env_is_set(name: &str) -> bool {
     std::env::var(name)
         .ok()
@@ -335,5 +494,24 @@ mod tests {
         };
         let engine_error = err.to_engine_error();
         assert_eq!(engine_error.code, ErrorCode::InvalidRequest);
+    }
+
+    #[test]
+    fn unknown_preferred_provider_is_invalid_request_in_multi_resolver() {
+        let err = match resolve_available_providers(Some("mock"), None) {
+            Ok(_) => panic!("mock provider must not resolve at runtime"),
+            Err(err) => err,
+        };
+        assert_eq!(err.to_engine_error().code, ErrorCode::InvalidRequest);
+    }
+
+    #[test]
+    fn qualified_model_arg_passes_through_multi_resolver() {
+        // Whatever providers the environment yields, an explicit
+        // provider-qualified model must survive verbatim.
+        if let Ok((_, model)) = resolve_available_providers(None, Some("ollama/llama3".to_owned()))
+        {
+            assert_eq!(model.0, "ollama/llama3");
+        }
     }
 }

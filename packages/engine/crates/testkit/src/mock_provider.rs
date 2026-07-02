@@ -76,6 +76,8 @@ impl From<ScriptedError> for ProviderError {
 pub struct MockProvider {
     script: Mutex<VecDeque<ScriptedTurn>>,
     requests: Mutex<Vec<ChatRequest>>,
+    /// Provider id override; [`MOCK_PROVIDER_ID`] when unset.
+    id: Option<ProviderId>,
 }
 
 /// Test doubles must never deadlock a suite on a poisoned lock: a panic in
@@ -95,6 +97,15 @@ impl MockProvider {
         let provider = Self::new();
         provider.push_turns(turns);
         provider
+    }
+
+    /// A provider registering under `id` instead of [`MOCK_PROVIDER_ID`], so
+    /// multi-provider tests can tell two mocks apart in one registry.
+    pub fn with_id(id: impl Into<ProviderId>) -> Self {
+        Self {
+            id: Some(id.into()),
+            ..Self::default()
+        }
     }
 
     /// Append one turn to the end of the script.
@@ -211,7 +222,9 @@ impl MockProvider {
 #[async_trait]
 impl Provider for MockProvider {
     fn id(&self) -> ProviderId {
-        ProviderId::from(MOCK_PROVIDER_ID)
+        self.id
+            .clone()
+            .unwrap_or_else(|| ProviderId::from(MOCK_PROVIDER_ID))
     }
 
     fn capabilities(&self) -> ProviderCaps {

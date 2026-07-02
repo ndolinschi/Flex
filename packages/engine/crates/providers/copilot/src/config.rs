@@ -1,9 +1,12 @@
-//! Copilot configuration: GitHub token discovery and endpoint defaults.
+//! Copilot configuration: GitHub token discovery, persistence, and endpoint
+//! defaults.
 
 use std::path::{Path, PathBuf};
 
 use agentloop_contracts::ProviderId;
 use agentloop_core::ProviderError;
+
+use crate::device_flow::COPILOT_DEVICE_CLIENT_ID;
 
 pub const COPILOT_PROVIDER_ID: &str = "copilot";
 /// Multiplier-free default available on every Copilot plan.
@@ -117,6 +120,79 @@ pub(crate) fn discover_github_token(dir: &Path) -> Option<String> {
     None
 }
 
+/// Persist a GitHub OAuth token where every Copilot client looks for it:
+/// `apps.json` under `~/.config/github-copilot` (honoring `XDG_CONFIG_HOME`),
+/// keyed by the GitHub app id. Entries written by other clients are
+/// preserved. Returns the path of the file written.
+pub fn store_github_token(token: &str) -> Result<PathBuf, ProviderError> {
+    let Some(dir) = default_config_dir() else {
+        return Err(ProviderError::AuthMissing {
+            provider: ProviderId::from(COPILOT_PROVIDER_ID),
+            hint: "cannot store the GitHub sign-in: neither XDG_CONFIG_HOME nor HOME is set"
+                .to_owned(),
+        });
+    };
+    store_github_token_in(&dir, token)
+}
+
+pub(crate) fn store_github_token_in(dir: &Path, token: &str) -> Result<PathBuf, ProviderError> {
+    if !dir.exists() {
+        std::fs::create_dir_all(dir).map_err(|err| store_error("create", dir, &err))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
+                .map_err(|err| store_error("restrict permissions on", dir, &err))?;
+        }
+    }
+
+    let path = dir.join("apps.json");
+    let mut entries = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+        .and_then(|value| match value {
+            serde_json::Value::Object(map) => Some(map),
+            _ => None,
+        })
+        .unwrap_or_default();
+    entries.insert(
+        format!("github.com:{COPILOT_DEVICE_CLIENT_ID}"),
+        serde_json::json!({
+            "oauth_token": token,
+            "githubAppId": COPILOT_DEVICE_CLIENT_ID,
+        }),
+    );
+    let body = serde_json::Value::Object(entries).to_string();
+
+    // Write a sibling temp file, then rename: readers never see a torn file.
+    let tmp = dir.join(format!("apps.json.tmp-{}", std::process::id()));
+    std::fs::write(&tmp, &body).map_err(|err| store_error("write", &tmp, &err))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Err(err) = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600)) {
+            let _ = std::fs::remove_file(&tmp);
+            return Err(store_error("restrict permissions on", &tmp, &err));
+        }
+    }
+    if let Err(err) = std::fs::rename(&tmp, &path) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(store_error("atomically replace", &path, &err));
+    }
+    tracing::debug!(target: "copilot", path = %path.display(), "stored the GitHub sign-in");
+    Ok(path)
+}
+
+fn store_error(action: &str, path: &Path, err: &std::io::Error) -> ProviderError {
+    ProviderError::AuthMissing {
+        provider: ProviderId::from(COPILOT_PROVIDER_ID),
+        hint: format!(
+            "the sign-in could not be saved: failed to {action} {}: {err}",
+            path.display()
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -167,5 +243,96 @@ mod tests {
             discover_github_token(Path::new("/nonexistent/definitely-not-here")),
             None
         );
+    }
+
+    fn our_key() -> String {
+        format!("github.com:{COPILOT_DEVICE_CLIENT_ID}")
+    }
+
+    fn read_apps_json(dir: &Path) -> serde_json::Value {
+        let raw = std::fs::read_to_string(dir.join("apps.json")).expect("read");
+        serde_json::from_str(&raw).expect("apps.json must stay valid JSON")
+    }
+
+    #[test]
+    fn store_creates_the_file_and_directory() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let dir = root.path().join("github-copilot");
+
+        let path = store_github_token_in(&dir, "gho_new").expect("store");
+        assert_eq!(path, dir.join("apps.json"));
+        assert_eq!(discover_github_token(&dir).as_deref(), Some("gho_new"));
+
+        let value = read_apps_json(&dir);
+        assert_eq!(value[our_key()]["oauth_token"], "gho_new");
+        assert_eq!(value[our_key()]["githubAppId"], COPILOT_DEVICE_CLIENT_ID);
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let dir_mode = std::fs::metadata(&dir)
+                .expect("dir meta")
+                .permissions()
+                .mode();
+            assert_eq!(dir_mode & 0o777, 0o700);
+            let file_mode = std::fs::metadata(&path)
+                .expect("file meta")
+                .permissions()
+                .mode();
+            assert_eq!(file_mode & 0o777, 0o600);
+        }
+    }
+
+    #[test]
+    fn store_preserves_foreign_entries() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            dir.path().join("apps.json"),
+            r#"{"github.com:Iv1.deadbeefdeadbeef":{"user":"octocat","oauth_token":"gho_vscode"}}"#,
+        )
+        .expect("write");
+
+        store_github_token_in(dir.path(), "gho_new").expect("store");
+
+        let value = read_apps_json(dir.path());
+        assert_eq!(
+            value["github.com:Iv1.deadbeefdeadbeef"]["oauth_token"], "gho_vscode",
+            "foreign entry must survive"
+        );
+        assert_eq!(value[our_key()]["oauth_token"], "gho_new");
+    }
+
+    #[test]
+    fn store_updates_an_existing_entry() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let existing = format!(
+            r#"{{"{}":{{"user":"octocat","oauth_token":"gho_old"}}}}"#,
+            our_key()
+        );
+        std::fs::write(dir.path().join("apps.json"), existing).expect("write");
+
+        store_github_token_in(dir.path(), "gho_new").expect("store");
+
+        let value = read_apps_json(dir.path());
+        assert_eq!(value[our_key()]["oauth_token"], "gho_new");
+        assert_eq!(
+            value.as_object().map(|entries| entries.len()),
+            Some(1),
+            "the entry is replaced, not duplicated"
+        );
+    }
+
+    #[test]
+    fn store_overwrites_an_unparseable_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("apps.json"), "not json").expect("write");
+
+        store_github_token_in(dir.path(), "gho_new").expect("store");
+
+        assert_eq!(
+            discover_github_token(dir.path()).as_deref(),
+            Some("gho_new")
+        );
+        read_apps_json(dir.path()); // must be valid JSON again
     }
 }

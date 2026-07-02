@@ -6,7 +6,9 @@
 //! 1. A long-lived GitHub OAuth token, discovered from the environment
 //!    (`COPILOT_GITHUB_TOKEN` / `GH_COPILOT_TOKEN`) or from an existing
 //!    sign-in in `~/.config/github-copilot/{apps,hosts}.json` (created by
-//!    VS Code, JetBrains, or the Copilot CLI).
+//!    VS Code, JetBrains, or the Copilot CLI) — or obtained interactively
+//!    with the built-in GitHub device-code sign-in ([`DeviceFlow`]) and
+//!    persisted to the same `apps.json` ([`store_github_token`]).
 //! 2. Exchanged at `https://api.github.com/copilot_internal/v2/token` for a
 //!    short-lived bearer token that also names the API base
 //!    (`https://api.githubcopilot.com` unless the account is routed
@@ -17,10 +19,12 @@
 
 mod auth;
 mod config;
+mod device_flow;
 mod provider;
 
 pub use config::{
     COPILOT_PROVIDER_ID, CopilotConfig, DEFAULT_COPILOT_MODEL, DEFAULT_COPILOT_TOKEN_URL,
-    FALLBACK_COPILOT_API_BASE,
+    FALLBACK_COPILOT_API_BASE, store_github_token,
 };
+pub use device_flow::{COPILOT_DEVICE_CLIENT_ID, DeviceAuthorization, DeviceFlow};
 pub use provider::CopilotProvider;
