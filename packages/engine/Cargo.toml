@@ -1,0 +1,45 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/contracts",
+    "crates/testkit",
+    "crates/runner",
+    "xtask",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/agenticstudio/agenticstudio"
+publish = false
+
+[workspace.dependencies]
+# internal
+agentloop-contracts = { path = "crates/contracts" }
+agentloop-testkit = { path = "crates/testkit" }
+# external
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v7", "serde"] }
+anyhow = "1"
+# dev
+insta = { version = "1", features = ["json", "redactions"] }
+pretty_assertions = "1"
+tempfile = "3"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+dbg_macro = "warn"
+todo = "warn"
+print_stdout = "warn"
+print_stderr = "warn"

@@ -1,0 +1,297 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PromptInput",
+  "description": "What the user submits for one turn: markdown text plus optional image and\nfile attachments.",
+  "type": "object",
+  "properties": {
+    "parts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ContentBlock"
+      }
+    }
+  },
+  "required": [
+    "parts"
+  ],
+  "$defs": {
+    "BlobSource": {
+      "description": "Where binary data (images, files) comes from.\n\nTransports may send small payloads inline (`Base64`), reference remote\ncontent (`Url`), or point at local files (`Path`). The engine resolves\n`Path` sources (read + base64, size-capped) before content reaches a\nprovider, so provider clients only ever see `Base64` or `Url`.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string",
+              "const": "base64"
+            }
+          },
+          "required": [
+            "source",
+            "data"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "url"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "source",
+            "url"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string",
+              "const": "path"
+            }
+          },
+          "required": [
+            "source",
+            "path"
+          ]
+        }
+      ]
+    },
+    "ContentBlock": {
+      "description": "One block of message content.",
+      "oneOf": [
+        {
+          "description": "CommonMark text. The only text kind in the canonical model.",
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "markdown"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ]
+        },
+        {
+          "description": "Image input/output (png/jpeg/webp/gif).",
+          "type": "object",
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/BlobSource"
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "image"
+            }
+          },
+          "required": [
+            "type",
+            "media_type",
+            "data"
+          ]
+        },
+        {
+          "description": "File attachment as prompt input (pdf, documents, arbitrary files).",
+          "type": "object",
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/BlobSource"
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "file"
+            }
+          },
+          "required": [
+            "type",
+            "name",
+            "media_type",
+            "data"
+          ]
+        },
+        {
+          "description": "Model reasoning. `signature` preserves provider-verifiable blobs\n(e.g. Anthropic thinking signatures) so they round-trip on resume.",
+          "type": "object",
+          "properties": {
+            "signature": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "thinking"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ]
+        },
+        {
+          "description": "The model requested a tool invocation.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/ToolCallId"
+            },
+            "input": true,
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "tool_use"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "name",
+            "input"
+          ]
+        },
+        {
+          "description": "A tool result being fed back to the model.",
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ToolResultBlock"
+              }
+            },
+            "is_error": {
+              "type": "boolean",
+              "default": false
+            },
+            "tool_use_id": {
+              "$ref": "#/$defs/ToolCallId"
+            },
+            "type": {
+              "type": "string",
+              "const": "tool_result"
+            }
+          },
+          "required": [
+            "type",
+            "tool_use_id",
+            "content"
+          ]
+        },
+        {
+          "description": "Provider-specific block that must round-trip verbatim (e.g. Anthropic\n`redacted_thinking`). Keyed by provider; the owning provider re-encodes\nit, everyone else treats it as inert.",
+          "type": "object",
+          "properties": {
+            "data": true,
+            "provider": {
+              "$ref": "#/$defs/ProviderId"
+            },
+            "type": {
+              "type": "string",
+              "const": "opaque"
+            }
+          },
+          "required": [
+            "type",
+            "provider",
+            "data"
+          ]
+        }
+      ]
+    },
+    "ProviderId": {
+      "description": "Identifies an LLM provider implementation (`\"anthropic\"`, `\"openai\"`, ...).\n\nNot a UUID — a stable, human-chosen key used in configuration, in\n[`crate::content::ContentBlock::Opaque`] round-tripping, and in\nprovider-namespaced request passthrough.",
+      "type": "string"
+    },
+    "ToolCallId": {
+      "description": "Identifies one tool invocation across its whole lifecycle.",
+      "type": "string"
+    },
+    "ToolResultBlock": {
+      "description": "Content inside a tool result.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "markdown"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/BlobSource"
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "image"
+            }
+          },
+          "required": [
+            "type",
+            "media_type",
+            "data"
+          ]
+        },
+        {
+          "description": "Structured output for tools that return machine-readable data.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "json"
+            },
+            "value": true
+          },
+          "required": [
+            "type",
+            "value"
+          ]
+        }
+      ]
+    }
+  }
+}

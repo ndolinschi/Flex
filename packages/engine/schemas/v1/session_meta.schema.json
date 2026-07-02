@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SessionMeta",
+  "description": "Descriptor of one session (the append-only event log it names is stored\nseparately by a `SessionStore`).",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "description": "Which agent implementation owns this session\n(`\"native\"`, `\"claude-code\"`, ...).",
+      "type": "string"
+    },
+    "created_at_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "cwd": {
+      "type": "string"
+    },
+    "id": {
+      "$ref": "#/$defs/SessionId"
+    },
+    "mode": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "model": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ModelRef"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "parent_id": {
+      "description": "Set for subagent sessions; links the session tree.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SessionId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "provider_session_id": {
+      "description": "The backing agent's own session id, for native resume.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "updated_at_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "id",
+    "agent_id",
+    "cwd",
+    "created_at_ms",
+    "updated_at_ms"
+  ],
+  "$defs": {
+    "ModelRef": {
+      "description": "Reference to a model, optionally provider-qualified:\n`\"anthropic/claude-sonnet-4-5\"` or a bare `\"claude-sonnet-4-5\"`.",
+      "type": "string"
+    },
+    "SessionId": {
+      "description": "Identifies one session: an append-only event log owned by one agent.",
+      "type": "string"
+    }
+  }
+}
