@@ -2,6 +2,24 @@
 resolver = "3"
 members = [
     "crates/contracts",
+    "crates/core",
+    "crates/delegators/acp",
+    "crates/delegators/claude-code",
+    "crates/delegators/common",
+    "crates/delegators/cursor",
+    "crates/delegators/opencode",
+    "crates/engine",
+    "crates/loop",
+    "crates/mcp",
+    "crates/providers/anthropic",
+    "crates/providers/common",
+    "crates/providers/gemini",
+    "crates/providers/ollama",
+    "crates/providers/openai",
+    "crates/prompts",
+    "crates/session",
+    "crates/tools",
+    "crates/transports/stdio",
     "crates/testkit",
     "crates/runner",
     "xtask",
@@ -18,6 +36,24 @@ publish = false
 [workspace.dependencies]
 # internal
 agentloop-contracts = { path = "crates/contracts" }
+agentloop-core = { path = "crates/core" }
+agentloop-delegator-acp = { path = "crates/delegators/acp" }
+agentloop-delegator-claude-code = { path = "crates/delegators/claude-code" }
+agentloop-delegator-common = { path = "crates/delegators/common" }
+agentloop-delegator-cursor = { path = "crates/delegators/cursor" }
+agentloop-delegator-opencode = { path = "crates/delegators/opencode" }
+agentloop-engine = { path = "crates/engine" }
+agentloop-loop = { path = "crates/loop" }
+agentloop-mcp = { path = "crates/mcp" }
+agentloop-provider-anthropic = { path = "crates/providers/anthropic" }
+agentloop-provider-common = { path = "crates/providers/common" }
+agentloop-provider-gemini = { path = "crates/providers/gemini" }
+agentloop-provider-ollama = { path = "crates/providers/ollama" }
+agentloop-provider-openai = { path = "crates/providers/openai" }
+agentloop-prompts = { path = "crates/prompts" }
+agentloop-session = { path = "crates/session" }
+agentloop-tools = { path = "crates/tools" }
+agentloop-transport-stdio = { path = "crates/transports/stdio" }
 agentloop-testkit = { path = "crates/testkit" }
 # external
 serde = { version = "1", features = ["derive"] }
@@ -26,6 +62,19 @@ schemars = "1"
 thiserror = "2"
 uuid = { version = "1", features = ["v7", "serde"] }
 anyhow = "1"
+async-trait = "0.1"
+futures = "0.3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "io-std", "fs", "process", "signal"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tracing = "0.1"
+metrics = "0.24"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "charset", "gzip"] }
+globset = "0.4"
+ignore = "0.4"
+regex = "1"
+htmd = "0.2"
+base64 = "0.22"
 # dev
 insta = { version = "1", features = ["json", "redactions"] }
 pretty_assertions = "1"

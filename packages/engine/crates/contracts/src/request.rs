@@ -10,17 +10,30 @@ use crate::capability::ModelRef;
 use crate::content::ContentBlock;
 use crate::permission::PermissionMode;
 
+/// Metadata for a slash command expanded before a turn starts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ExpandedCommand {
+    /// Command name without the leading slash.
+    pub name: String,
+    /// Raw argument text after the command name.
+    pub args: String,
+}
+
 /// What the user submits for one turn: markdown text plus optional image and
 /// file attachments.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct PromptInput {
     pub parts: Vec<ContentBlock>,
+    /// Present when EngineService expanded a recognized slash command.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<ExpandedCommand>,
 }
 
 impl PromptInput {
     pub fn text(text: impl Into<String>) -> Self {
         Self {
             parts: vec![ContentBlock::markdown(text)],
+            command: None,
         }
     }
 

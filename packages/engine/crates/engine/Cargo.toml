@@ -1,0 +1,25 @@
+[package]
+name = "agentloop-engine"
+description = "Engine service front door and real-provider resolver"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+agentloop-contracts = { workspace = true }
+agentloop-core = { workspace = true }
+agentloop-loop = { workspace = true }
+agentloop-provider-anthropic = { workspace = true }
+agentloop-provider-gemini = { workspace = true }
+agentloop-provider-ollama = { workspace = true }
+agentloop-provider-openai = { workspace = true }
+agentloop-prompts = { workspace = true }
+agentloop-session = { workspace = true }
+agentloop-tools = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

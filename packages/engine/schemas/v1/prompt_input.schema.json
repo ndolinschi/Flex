@@ -4,6 +4,17 @@
   "description": "What the user submits for one turn: markdown text plus optional image and\nfile attachments.",
   "type": "object",
   "properties": {
+    "command": {
+      "description": "Present when EngineService expanded a recognized slash command.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ExpandedCommand"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "parts": {
       "type": "array",
       "items": {
@@ -227,6 +238,24 @@
             "data"
           ]
         }
+      ]
+    },
+    "ExpandedCommand": {
+      "description": "Metadata for a slash command expanded before a turn starts.",
+      "type": "object",
+      "properties": {
+        "args": {
+          "description": "Raw argument text after the command name.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Command name without the leading slash.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "args"
       ]
     },
     "ProviderId": {
