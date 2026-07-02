@@ -463,7 +463,13 @@ impl App {
                 self.chat.toggle_focused_tool_expand();
                 return Vec::new();
             }
-            // Shift+Tab/BackTab stays unbound: reserved for mode cycling.
+            // Shift+Tab (BackTab on most terminals) cycles the working mode.
+            (KeyCode::BackTab, _) => {
+                return self.cycle_ui_mode();
+            }
+            (KeyCode::Tab, KeyModifiers::SHIFT) => {
+                return self.cycle_ui_mode();
+            }
             (KeyCode::Tab, KeyModifiers::NONE) if self.input.is_empty() => {
                 if self.chat.cycle_tool_focus(false) {
                     return Vec::new();
@@ -1148,6 +1154,26 @@ impl App {
             effects.extend(self.grant_pending_permissions_for_bypass());
         }
         effects
+    }
+
+    /// Shift+Tab cycle: (code, require) → (code, accept-edits) → plan → back.
+    /// Bypass is never in the cycle — only `/permissions allow-all` reaches it.
+    fn cycle_ui_mode(&mut self) -> Vec<Effect> {
+        if self.session.session_mode == SessionMode::Plan {
+            self.set_session_mode(SessionMode::Code);
+            return self.set_permission_mode(PermissionMode::Default);
+        }
+        if self.session.permission_mode == PermissionMode::Default
+            && self
+                .caps
+                .permissions
+                .modes
+                .contains(&PermissionMode::AcceptEdits)
+        {
+            return self.set_permission_mode(PermissionMode::AcceptEdits);
+        }
+        self.set_session_mode(SessionMode::Plan);
+        self.sync_turn_permission_mode()
     }
 
     fn sync_turn_permission_mode(&self) -> Vec<Effect> {
@@ -2398,6 +2424,29 @@ mod status_tests {
             num_tool_calls: 0,
             duration_ms: 10,
         }))
+    }
+
+    #[test]
+    fn shift_tab_cycles_require_accept_edits_plan() {
+        let mut app = test_app();
+        app.caps.permissions.modes = vec![
+            PermissionMode::Default,
+            PermissionMode::AcceptEdits,
+            PermissionMode::Plan,
+        ];
+        app.session.session_mode = SessionMode::Code;
+        app.session.permission_mode = PermissionMode::Default;
+
+        app.cycle_ui_mode();
+        assert_eq!(app.session.permission_mode, PermissionMode::AcceptEdits);
+        assert_eq!(app.session.session_mode, SessionMode::Code);
+
+        app.cycle_ui_mode();
+        assert_eq!(app.session.session_mode, SessionMode::Plan);
+
+        app.cycle_ui_mode();
+        assert_eq!(app.session.session_mode, SessionMode::Code);
+        assert_eq!(app.session.permission_mode, PermissionMode::Default);
     }
 
     #[test]
