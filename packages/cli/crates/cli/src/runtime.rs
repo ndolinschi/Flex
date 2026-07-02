@@ -20,8 +20,8 @@ use tokio::sync::{Mutex, mpsc};
 use tokio_util::sync::CancellationToken;
 
 use agentloop_cli_core::{
-    AgentKind, CliPrefs, EngineHub, LoginEvent, ModelCatalog, SessionController, login_copilot,
-    resolve_stored_model,
+    AgentKind, CliPrefs, EngineHub, InstallTarget, LoginEvent, McpStore, ModelCatalog,
+    SessionController, login_copilot, resolve_stored_model,
 };
 use agentloop_contracts::{ModelRef, NewSessionParams, SessionId};
 use agentloop_core::EventStream as EngineEventStream;
@@ -276,6 +276,11 @@ async fn bootstrap_session(
     };
     let session = controller.session_id().clone();
     hub.remember_session(kind, session.clone());
+    let mcp_enabled = if kind == AgentKind::Native {
+        McpStore::load().enabled_count()
+    } else {
+        0
+    };
     let bootstrap = SessionBootstrap {
         kind,
         hello,
@@ -285,6 +290,7 @@ async fn bootstrap_session(
         transcript,
         trace,
         permission_mode: None,
+        mcp_enabled,
     };
     Ok((controller, events, bootstrap))
 }
@@ -604,6 +610,68 @@ impl EffectExecutor {
                     let _ = open_url(&url);
                 });
             }
+            Effect::ReloadEngine { invalidate } => {
+                let hub = self.hub.clone();
+                let controller = self.controller.clone();
+                let current_kind = self.current_kind.clone();
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    let result =
+                        reload_engine(hub, controller, current_kind, invalidate, tx.clone()).await;
+                    let _ = tx
+                        .send(AppEvent::Task(TaskResult::EngineReloaded(Box::new(result))))
+                        .await;
+                });
+            }
+            Effect::McpInstall {
+                target,
+                registry_id,
+                import_path,
+            } => {
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    let result = tokio::task::spawn_blocking(move || {
+                        run_mcp_install(target, registry_id, import_path)
+                    })
+                    .await
+                    .map_err(|err| err.to_string())
+                    .and_then(|inner| inner);
+                    let _ = tx
+                        .send(AppEvent::Task(TaskResult::McpInstallFinished(result)))
+                        .await;
+                });
+            }
+            Effect::McpListTools { server } => {
+                let hub = self.hub.clone();
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    let result = list_mcp_tools(hub, &server).await;
+                    let _ = tx
+                        .send(AppEvent::Task(TaskResult::McpToolsListed {
+                            server,
+                            result,
+                        }))
+                        .await;
+                });
+            }
+            Effect::McpCallTool {
+                server,
+                tool,
+                args_json,
+            } => {
+                let hub = self.hub.clone();
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    let result = call_mcp_tool(hub, &server, &tool, &args_json).await;
+                    let _ = tx
+                        .send(AppEvent::Task(TaskResult::McpToolCalled {
+                            server,
+                            tool,
+                            result,
+                        }))
+                        .await;
+                });
+            }
             Effect::Quit
             | Effect::SetMouseCapture(_)
             | Effect::CopyToClipboard { .. }
@@ -653,6 +721,143 @@ async fn switch_agent(
     }
     spawn_engine_forwarder(events, tx);
     Ok(bootstrap)
+}
+
+async fn reload_engine(
+    hub: Arc<Mutex<EngineHub>>,
+    controller: Arc<Mutex<SessionController>>,
+    current_kind: Arc<Mutex<AgentKind>>,
+    invalidate: bool,
+    tx: mpsc::Sender<AppEvent>,
+) -> Result<SessionBootstrap, String> {
+    let kind = *current_kind.lock().await;
+    if kind != AgentKind::Native {
+        return Err("MCP reload requires the native agent".to_owned());
+    }
+    let session = {
+        let controller = controller.lock().await;
+        controller.session_id().clone()
+    };
+    let mut hub = hub.lock().await;
+    hub.remember_session(kind, session);
+    if invalidate {
+        hub.invalidate(AgentKind::Native);
+    }
+    let service = hub
+        .service(AgentKind::Native)
+        .await
+        .map_err(|err| err.to_string())?;
+    let hello = service.hello();
+    let providers = service
+        .provider_registry()
+        .ids()
+        .into_iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<_>>();
+    let trace = hub.trace(AgentKind::Native).to_vec();
+    let mcp_enabled = McpStore::load().enabled_count();
+    drop(hub);
+
+    let (next, events) = {
+        let controller = controller.lock().await;
+        let session_id = controller.session_id().clone();
+        SessionController::resume(service, session_id)
+            .await
+            .map_err(|err| err.to_string())?
+    };
+    {
+        let mut controller = controller.lock().await;
+        *controller = next;
+    }
+    spawn_engine_forwarder(events, tx);
+    Ok(SessionBootstrap {
+        kind: AgentKind::Native,
+        hello,
+        session: {
+            let controller = controller.lock().await;
+            controller.session_id().clone()
+        },
+        providers,
+        model: None,
+        transcript: None,
+        trace,
+        permission_mode: None,
+        mcp_enabled,
+    })
+}
+
+fn run_mcp_install(
+    target: InstallTarget,
+    registry_id: Option<String>,
+    import_path: Option<std::path::PathBuf>,
+) -> Result<String, String> {
+    let mut store = McpStore::load();
+    let name = if let Some(id) = registry_id {
+        store.install_registry(&id).map_err(|err| err.to_string())?
+    } else if let Some(path) = import_path {
+        let added = store
+            .import_from_file(&path)
+            .map_err(|err| err.to_string())?;
+        if added.is_empty() {
+            return Err("no new servers imported (duplicates skipped)".to_owned());
+        }
+        added
+            .into_iter()
+            .next()
+            .ok_or_else(|| "import produced no servers".to_owned())?
+    } else {
+        match target {
+            InstallTarget::GitHub(repo) => {
+                store.install_github(&repo).map_err(|err| err.to_string())?
+            }
+            InstallTarget::Npm(package) => store
+                .install_npm(&package, None)
+                .map_err(|err| err.to_string())?,
+            InstallTarget::Unknown => {
+                return Err("missing install target".to_owned());
+            }
+        }
+    };
+    store.save().map_err(|err| err.to_string())?;
+    Ok(name)
+}
+
+async fn list_mcp_tools(
+    hub: Arc<Mutex<EngineHub>>,
+    server: &str,
+) -> Result<Vec<agentloop_mcp::McpRemoteTool>, String> {
+    let hub = hub.lock().await;
+    let manager = hub
+        .mcp_manager()
+        .ok_or_else(|| "native engine has no MCP manager — enable servers and reload".to_owned())?;
+    let cancel = CancellationToken::new();
+    manager
+        .list_server_tools(server, cancel)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+async fn call_mcp_tool(
+    hub: Arc<Mutex<EngineHub>>,
+    server: &str,
+    tool: &str,
+    args_json: &str,
+) -> Result<String, String> {
+    let input: serde_json::Value = if args_json.trim().is_empty() {
+        serde_json::json!({})
+    } else {
+        serde_json::from_str(args_json).map_err(|err| format!("invalid JSON args: {err}"))?
+    };
+    let hub = hub.lock().await;
+    let manager = hub
+        .mcp_manager()
+        .ok_or_else(|| "native engine has no MCP manager".to_owned())?;
+    let cancel = CancellationToken::new();
+    let output = manager
+        .call_server_tool(server, tool, input, cancel)
+        .await
+        .map_err(|err| err.to_string())?;
+    Ok(output.render_text())
 }
 
 fn open_url(url: &str) -> io::Result<()> {

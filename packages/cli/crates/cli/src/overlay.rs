@@ -14,6 +14,8 @@ use agentloop_contracts::{
     ToolCallId,
 };
 
+use agentloop_mcp::McpRemoteTool;
+
 use crate::events::Effect;
 
 /// The active modal.
@@ -29,6 +31,12 @@ pub enum Overlay {
     ShellCommand(ShellCommandOverlay),
     /// One-shot confirmation (e.g. allow-all permissions).
     Confirm(ConfirmPrompt),
+    /// `/mcps` — toggle installed servers.
+    McpList(McpListState),
+    /// `/mcp explore` — manual tool calls.
+    McpExplorer(McpExplorerState),
+    /// `/mcp-install` wizard.
+    McpInstall(McpInstallState),
 }
 
 impl Overlay {
@@ -130,35 +138,93 @@ pub struct QuestionPrompt {
     pub current: usize,
     /// Selected option indices per question.
     pub picks: Vec<Vec<usize>>,
+    /// Free-text answers per question (`None` = option picks).
+    pub custom_texts: Vec<Option<String>>,
     /// Cursor within the current page's options.
     pub cursor: usize,
+    /// In-progress custom answer for the current page.
+    pub custom_input: String,
+    /// Whether the user is typing a custom answer on the current page.
+    pub custom_mode: bool,
 }
 
 impl QuestionPrompt {
     pub fn new(id: QuestionId, questions: Vec<Question>) -> Self {
-        let picks = vec![Vec::new(); questions.len()];
+        let len = questions.len();
         Self {
             id,
             questions,
             current: 0,
-            picks,
+            picks: vec![Vec::new(); len],
+            custom_texts: vec![None; len],
             cursor: 0,
+            custom_input: String::new(),
+            custom_mode: false,
         }
+    }
+
+    fn current_question(&self) -> Option<&Question> {
+        self.questions.get(self.current)
+    }
+
+    fn finalize_current_page(&mut self) {
+        let Some(question) = self.questions.get(self.current) else {
+            return;
+        };
+        if self.custom_mode {
+            let trimmed = self.custom_input.trim();
+            if !trimmed.is_empty() {
+                self.custom_texts[self.current] = Some(trimmed.to_owned());
+                self.picks[self.current].clear();
+            }
+        } else if !question.multi_select
+            && self.picks[self.current].is_empty()
+            && !question.options.is_empty()
+        {
+            self.picks[self.current] = vec![self.cursor];
+        }
+    }
+
+    fn advance_page(&mut self) {
+        self.current += 1;
+        self.cursor = 0;
+        self.custom_input.clear();
+        self.custom_mode = false;
     }
 
     fn answers(&self) -> Vec<Answer> {
         self.questions
             .iter()
-            .zip(&self.picks)
-            .map(|(question, picks)| Answer {
-                question: question.question.clone(),
-                selected: picks
-                    .iter()
-                    .filter_map(|&i| question.options.get(i))
-                    .map(|option| option.label.clone())
-                    .collect(),
+            .enumerate()
+            .map(|(idx, question)| {
+                if let Some(text) = self.custom_texts[idx].as_ref() {
+                    Answer {
+                        question: question.question.clone(),
+                        selected: vec![text.clone()],
+                    }
+                } else {
+                    Answer {
+                        question: question.question.clone(),
+                        selected: self.picks[idx]
+                            .iter()
+                            .filter_map(|&i| question.options.get(i))
+                            .map(|option| option.label.clone())
+                            .collect(),
+                    }
+                }
             })
             .collect()
+    }
+
+    fn submit_outcome(&self) -> OverlayOutcome {
+        OverlayOutcome {
+            effects: vec![Effect::RespondQuestion {
+                id: self.id.clone(),
+                answers: self.answers(),
+            }],
+            close: true,
+            ..OverlayOutcome::default()
+        }
     }
 }
 
@@ -192,9 +258,10 @@ pub struct ConfirmPrompt {
 }
 
 /// What confirming the dialog does.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConfirmAction {
     AllowAllPermissions,
+    McpRemove { name: String },
 }
 
 /// `/command` overlay: running spinner or scrollable combined output.
@@ -233,6 +300,63 @@ impl ShellCommandOverlay {
     }
 }
 
+/// `/mcps` picker: Space toggles enabled, Enter saves.
+#[derive(Debug)]
+pub struct McpListState {
+    pub items: Vec<McpListItem>,
+    pub filter: String,
+    pub selected: usize,
+    pub dirty: bool,
+}
+
+/// One row in the MCP list overlay.
+#[derive(Debug, Clone)]
+pub struct McpListItem {
+    pub name: String,
+    pub source: String,
+    pub enabled: bool,
+}
+
+/// `/mcp explore` overlay lifecycle.
+#[derive(Debug)]
+pub struct McpExplorerState {
+    pub server: String,
+    pub phase: McpExplorerPhase,
+    pub selected: usize,
+    pub filter: String,
+    pub args_input: String,
+    pub args_mode: bool,
+    pub scroll: usize,
+}
+
+/// Explorer phases.
+#[derive(Debug)]
+pub enum McpExplorerPhase {
+    Loading,
+    Tools { tools: Vec<McpRemoteTool> },
+    Calling,
+    Result { output: String, is_error: bool },
+    Failed { message: String },
+}
+
+/// `/mcp-install` wizard.
+#[derive(Debug)]
+pub struct McpInstallState {
+    pub mode: McpInstallMode,
+    pub filter: String,
+    pub selected: usize,
+    pub input: String,
+    pub input_mode: bool,
+}
+
+/// Install wizard tabs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum McpInstallMode {
+    Registry,
+    Npm,
+    Import,
+}
+
 /// What an overlay key press produced.
 #[derive(Debug, Default)]
 pub struct OverlayOutcome {
@@ -245,6 +369,10 @@ pub struct OverlayOutcome {
     pub choice: Option<PickerChoice>,
     /// A confirmed dialog action.
     pub confirmed: Option<ConfirmAction>,
+    /// MCP list saved (Enter on `/mcps`).
+    pub mcp_list_saved: bool,
+    /// MCP install wizard selection.
+    pub mcp_install: Option<McpInstallChoice>,
 }
 
 impl OverlayOutcome {
@@ -272,6 +400,9 @@ pub fn handle_key(overlay: &mut Overlay, key: KeyEvent) -> Option<OverlayOutcome
         Overlay::Help => Some(OverlayOutcome::close()),
         Overlay::ShellCommand(state) => Some(shell_command_key(state, key)),
         Overlay::Confirm(prompt) => Some(confirm_key(prompt, key)),
+        Overlay::McpList(state) => Some(mcp_list_key(state, key)),
+        Overlay::McpExplorer(state) => Some(mcp_explorer_key(state, key)),
+        Overlay::McpInstall(state) => Some(mcp_install_key(state, key)),
     }
 }
 
@@ -283,6 +414,14 @@ pub enum PickerChoice {
     SwitchAgent(String),
     SetSessionMode(String),
     SetPermissionMode(String),
+}
+
+/// What the install wizard selected.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum McpInstallChoice {
+    Registry { id: String },
+    Npm { package: String },
+    Import { path: String },
 }
 
 fn picker_key(picker: &mut PickerState, key: KeyEvent) -> OverlayOutcome {
@@ -409,13 +548,15 @@ fn decision_for(kind: PermissionDecisionKind) -> PermissionDecision {
 }
 
 fn question_key(prompt: &mut QuestionPrompt, key: KeyEvent) -> OverlayOutcome {
-    let Some(question) = prompt.questions.get(prompt.current) else {
+    let Some(question) = prompt.current_question().cloned() else {
         return OverlayOutcome::close();
     };
     let option_count = question.options.len();
     let multi = question.multi_select;
+    let allow_custom = question.allow_custom;
+
     match (key.code, key.modifiers) {
-        (KeyCode::Up, _) => {
+        (KeyCode::Up, _) if !prompt.custom_mode => {
             if option_count > 0 {
                 prompt.cursor = if prompt.cursor == 0 {
                     option_count - 1
@@ -425,53 +566,97 @@ fn question_key(prompt: &mut QuestionPrompt, key: KeyEvent) -> OverlayOutcome {
             }
             OverlayOutcome::consumed()
         }
-        (KeyCode::Down, _) => {
+        (KeyCode::Down, _) if !prompt.custom_mode => {
             if option_count > 0 {
                 prompt.cursor = (prompt.cursor + 1) % option_count;
             }
             OverlayOutcome::consumed()
         }
+        (KeyCode::Char(' '), _) if prompt.custom_mode => {
+            prompt.custom_input.push(' ');
+            OverlayOutcome::consumed()
+        }
         (KeyCode::Char(' '), _) if multi => {
-            let picks = &mut prompt.picks[prompt.current];
-            match picks.iter().position(|&i| i == prompt.cursor) {
-                Some(pos) => {
-                    picks.remove(pos);
-                }
-                None => picks.push(prompt.cursor),
-            }
+            toggle_pick(&mut prompt.picks[prompt.current], prompt.cursor);
+            prompt.custom_mode = false;
+            prompt.custom_input.clear();
+            prompt.custom_texts[prompt.current] = None;
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Char(' '), _) if option_count > 0 => {
+            prompt.picks[prompt.current] = vec![prompt.cursor];
+            prompt.custom_mode = false;
+            prompt.custom_input.clear();
+            prompt.custom_texts[prompt.current] = None;
             OverlayOutcome::consumed()
         }
         (KeyCode::Enter, _) => {
-            if !multi {
-                prompt.picks[prompt.current] = vec![prompt.cursor];
-            }
+            prompt.finalize_current_page();
             if prompt.current + 1 < prompt.questions.len() {
-                prompt.current += 1;
-                prompt.cursor = 0;
+                prompt.advance_page();
                 OverlayOutcome::consumed()
             } else {
-                OverlayOutcome {
-                    effects: vec![Effect::RespondQuestion {
-                        id: prompt.id.clone(),
-                        answers: prompt.answers(),
-                    }],
-                    close: true,
-                    ..OverlayOutcome::default()
-                }
+                prompt.submit_outcome()
             }
+        }
+        (KeyCode::Backspace, _) if prompt.custom_mode => {
+            prompt.custom_input.pop();
+            if prompt.custom_input.is_empty() {
+                prompt.custom_mode = false;
+            }
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Char(c), m) if c.is_ascii_digit() && m.is_empty() && !prompt.custom_mode => {
+            let digit = c.to_digit(10).unwrap_or(0) as usize;
+            if digit == 0 || digit > option_count {
+                return OverlayOutcome::consumed();
+            }
+            let idx = digit - 1;
+            if multi {
+                toggle_pick(&mut prompt.picks[prompt.current], idx);
+            } else {
+                prompt.picks[prompt.current] = vec![idx];
+                prompt.cursor = idx;
+            }
+            prompt.custom_mode = false;
+            prompt.custom_input.clear();
+            prompt.custom_texts[prompt.current] = None;
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Char(c), m) if allow_custom && (m.is_empty() || m == KeyModifiers::SHIFT) => {
+            if c == ' ' && !prompt.custom_mode {
+                return OverlayOutcome::consumed();
+            }
+            prompt.custom_mode = true;
+            prompt.picks[prompt.current].clear();
+            prompt.custom_texts[prompt.current] = None;
+            prompt.custom_input.push(c);
+            OverlayOutcome::consumed()
         }
         // Esc submits what was picked so far — the turn is blocked on the
         // answer and there is no cancel channel for questions.
-        (KeyCode::Esc, _) => OverlayOutcome {
-            effects: vec![Effect::RespondQuestion {
-                id: prompt.id.clone(),
-                answers: prompt.answers(),
-            }],
-            close: true,
-            info: Some("question dismissed — sent partial answers".to_owned()),
-            ..OverlayOutcome::default()
-        },
+        (KeyCode::Esc, _) => {
+            prompt.finalize_current_page();
+            OverlayOutcome {
+                effects: vec![Effect::RespondQuestion {
+                    id: prompt.id.clone(),
+                    answers: prompt.answers(),
+                }],
+                close: true,
+                info: Some("question dismissed — sent partial answers".to_owned()),
+                ..OverlayOutcome::default()
+            }
+        }
         _ => OverlayOutcome::consumed(),
+    }
+}
+
+fn toggle_pick(picks: &mut Vec<usize>, idx: usize) {
+    match picks.iter().position(|&i| i == idx) {
+        Some(pos) => {
+            picks.remove(pos);
+        }
+        None => picks.push(idx),
     }
 }
 
@@ -505,10 +690,279 @@ fn confirm_key(prompt: &ConfirmPrompt, key: KeyEvent) -> OverlayOutcome {
     match (key.code, key.modifiers) {
         (KeyCode::Esc, _) => OverlayOutcome::close(),
         (KeyCode::Enter, _) | (KeyCode::Char('y'), KeyModifiers::NONE) => OverlayOutcome {
-            confirmed: Some(prompt.action),
+            confirmed: Some(prompt.action.clone()),
             close: true,
             ..OverlayOutcome::default()
         },
+        _ => OverlayOutcome::consumed(),
+    }
+}
+
+fn mcp_list_visible(state: &McpListState) -> Vec<&McpListItem> {
+    let filter = state.filter.to_lowercase();
+    state
+        .items
+        .iter()
+        .filter(|item| {
+            filter.is_empty()
+                || item.name.to_lowercase().contains(&filter)
+                || item.source.to_lowercase().contains(&filter)
+        })
+        .collect()
+}
+
+fn mcp_list_key(state: &mut McpListState, key: KeyEvent) -> OverlayOutcome {
+    let visible_len = mcp_list_visible(state).len();
+    match (key.code, key.modifiers) {
+        (KeyCode::Esc, _) => OverlayOutcome::close(),
+        (KeyCode::Up, _) => {
+            if visible_len > 0 {
+                state.selected = if state.selected == 0 {
+                    visible_len - 1
+                } else {
+                    state.selected - 1
+                };
+            }
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Down, _) => {
+            if visible_len > 0 {
+                state.selected = (state.selected + 1) % visible_len;
+            }
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Char(' '), _) => {
+            if let Some(item) = mcp_list_visible(state).get(state.selected) {
+                let name = item.name.clone();
+                if let Some(row) = state.items.iter_mut().find(|row| row.name == name) {
+                    row.enabled = !row.enabled;
+                    state.dirty = true;
+                }
+            }
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Backspace, _) => {
+            state.filter.pop();
+            state.selected = 0;
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Enter, _) => OverlayOutcome {
+            mcp_list_saved: true,
+            close: true,
+            ..OverlayOutcome::default()
+        },
+        (KeyCode::Char(c), m) if m.is_empty() || m == KeyModifiers::SHIFT => {
+            state.filter.push(c);
+            state.selected = 0;
+            OverlayOutcome::consumed()
+        }
+        _ => OverlayOutcome::consumed(),
+    }
+}
+
+fn mcp_explorer_visible_tools(state: &McpExplorerState) -> Vec<&McpRemoteTool> {
+    let McpExplorerPhase::Tools { tools } = &state.phase else {
+        return Vec::new();
+    };
+    let filter = state.filter.to_lowercase();
+    tools
+        .iter()
+        .filter(|tool| {
+            filter.is_empty()
+                || tool.name.to_lowercase().contains(&filter)
+                || tool.description.to_lowercase().contains(&filter)
+        })
+        .collect()
+}
+
+fn mcp_explorer_key(state: &mut McpExplorerState, key: KeyEvent) -> OverlayOutcome {
+    match (key.code, key.modifiers) {
+        (KeyCode::Esc, _) => {
+            if state.args_mode {
+                state.args_mode = false;
+                state.args_input.clear();
+                OverlayOutcome::consumed()
+            } else {
+                OverlayOutcome::close()
+            }
+        }
+        (KeyCode::Enter, _) if state.args_mode => {
+            let tool = match &state.phase {
+                McpExplorerPhase::Tools { tools } => mcp_explorer_visible_tools(state)
+                    .get(state.selected)
+                    .map(|tool| tool.name.clone())
+                    .or_else(|| tools.get(state.selected).map(|tool| tool.name.clone())),
+                _ => None,
+            };
+            let Some(tool) = tool else {
+                return OverlayOutcome::consumed();
+            };
+            state.phase = McpExplorerPhase::Calling;
+            OverlayOutcome {
+                effects: vec![Effect::McpCallTool {
+                    server: state.server.clone(),
+                    tool,
+                    args_json: state.args_input.clone(),
+                }],
+                ..OverlayOutcome::default()
+            }
+        }
+        (KeyCode::Enter, _) => match &state.phase {
+            McpExplorerPhase::Tools { .. } => {
+                state.args_mode = true;
+                if state.args_input.is_empty() {
+                    state.args_input = "{}".to_owned();
+                }
+                OverlayOutcome::consumed()
+            }
+            McpExplorerPhase::Result { .. } | McpExplorerPhase::Failed { .. } => {
+                OverlayOutcome::close()
+            }
+            _ => OverlayOutcome::consumed(),
+        },
+        (KeyCode::Up, _) if matches!(state.phase, McpExplorerPhase::Result { .. }) => {
+            state.scroll = state.scroll.saturating_sub(1);
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Down, _) if matches!(state.phase, McpExplorerPhase::Result { .. }) => {
+            state.scroll = state.scroll.saturating_add(1);
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Up, _) if !state.args_mode => {
+            let len = mcp_explorer_visible_tools(state).len();
+            if len > 0 {
+                state.selected = if state.selected == 0 {
+                    len - 1
+                } else {
+                    state.selected - 1
+                };
+            }
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Down, _) if !state.args_mode => {
+            let len = mcp_explorer_visible_tools(state).len();
+            if len > 0 {
+                state.selected = (state.selected + 1) % len;
+            }
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Backspace, _) if state.args_mode => {
+            state.args_input.pop();
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Backspace, _) => {
+            state.filter.pop();
+            state.selected = 0;
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Char(c), m) if state.args_mode && (m.is_empty() || m == KeyModifiers::SHIFT) => {
+            state.args_input.push(c);
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Char(c), m) if !state.args_mode && (m.is_empty() || m == KeyModifiers::SHIFT) => {
+            state.filter.push(c);
+            state.selected = 0;
+            OverlayOutcome::consumed()
+        }
+        _ => OverlayOutcome::consumed(),
+    }
+}
+
+fn mcp_install_key(state: &mut McpInstallState, key: KeyEvent) -> OverlayOutcome {
+    match (key.code, key.modifiers) {
+        (KeyCode::Esc, _) => {
+            if state.input_mode {
+                state.input_mode = false;
+                state.input.clear();
+                OverlayOutcome::consumed()
+            } else {
+                OverlayOutcome::close()
+            }
+        }
+        (KeyCode::Tab, _) => {
+            state.mode = match state.mode {
+                McpInstallMode::Registry => McpInstallMode::Npm,
+                McpInstallMode::Npm => McpInstallMode::Import,
+                McpInstallMode::Import => McpInstallMode::Registry,
+            };
+            state.selected = 0;
+            state.filter.clear();
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Up, _) if !state.input_mode && state.mode == McpInstallMode::Registry => {
+            if state.selected > 0 {
+                state.selected -= 1;
+            }
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Down, _) if !state.input_mode && state.mode == McpInstallMode::Registry => {
+            state.selected = state.selected.saturating_add(1);
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Enter, _) if state.input_mode => {
+            let input = state.input.trim().to_owned();
+            if input.is_empty() {
+                return OverlayOutcome::consumed();
+            }
+            let choice = match state.mode {
+                McpInstallMode::Npm => McpInstallChoice::Npm { package: input },
+                McpInstallMode::Import => McpInstallChoice::Import { path: input },
+                McpInstallMode::Registry => return OverlayOutcome::consumed(),
+            };
+            OverlayOutcome {
+                mcp_install: Some(choice),
+                close: true,
+                ..OverlayOutcome::default()
+            }
+        }
+        (KeyCode::Enter, _) if state.mode == McpInstallMode::Registry => {
+            let entries = agentloop_cli_core::registry();
+            let filter = state.filter.to_lowercase();
+            let visible: Vec<_> = entries
+                .iter()
+                .filter(|entry| {
+                    filter.is_empty()
+                        || entry.name.contains(&filter)
+                        || entry.label.to_lowercase().contains(&filter)
+                })
+                .collect();
+            let Some(entry) = visible.get(state.selected) else {
+                return OverlayOutcome::consumed();
+            };
+            OverlayOutcome {
+                mcp_install: Some(McpInstallChoice::Registry {
+                    id: entry.name.clone(),
+                }),
+                close: true,
+                ..OverlayOutcome::default()
+            }
+        }
+        (KeyCode::Enter, _) => {
+            state.input_mode = true;
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Backspace, _) if state.input_mode => {
+            state.input.pop();
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Backspace, _) => {
+            state.filter.pop();
+            state.selected = 0;
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Char(c), m) if state.input_mode && (m.is_empty() || m == KeyModifiers::SHIFT) => {
+            state.input.push(c);
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Char(c), m)
+            if !state.input_mode
+                && state.mode == McpInstallMode::Registry
+                && (m.is_empty() || m == KeyModifiers::SHIFT) =>
+        {
+            state.filter.push(c);
+            state.selected = 0;
+            OverlayOutcome::consumed()
+        }
         _ => OverlayOutcome::consumed(),
     }
 }
@@ -541,5 +995,129 @@ fn shell_command_key(state: &mut ShellCommandOverlay, key: KeyEvent) -> OverlayO
             OverlayOutcome::consumed()
         }
         _ => OverlayOutcome::consumed(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agentloop_contracts::{Question, QuestionId, QuestionOption};
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn sample_question(multi_select: bool) -> Question {
+        Question {
+            header: "Pick".to_owned(),
+            question: "Which one?".to_owned(),
+            options: vec![
+                QuestionOption {
+                    label: "alpha".to_owned(),
+                    description: None,
+                },
+                QuestionOption {
+                    label: "beta".to_owned(),
+                    description: None,
+                },
+                QuestionOption {
+                    label: "gamma".to_owned(),
+                    description: None,
+                },
+            ],
+            multi_select,
+            allow_custom: true,
+        }
+    }
+
+    fn sample_prompt(multi_select: bool) -> QuestionPrompt {
+        QuestionPrompt::new(
+            QuestionId::from("q-test"),
+            vec![sample_question(multi_select)],
+        )
+    }
+
+    #[test]
+    fn multi_select_space_toggles_options() {
+        let mut prompt = sample_prompt(true);
+        let outcome = question_key(&mut prompt, key(KeyCode::Char(' ')));
+        assert!(!outcome.close);
+        assert_eq!(prompt.picks[0], vec![0]);
+
+        let outcome = question_key(&mut prompt, key(KeyCode::Down));
+        assert!(!outcome.close);
+        let outcome = question_key(&mut prompt, key(KeyCode::Char(' ')));
+        assert!(!outcome.close);
+        assert_eq!(prompt.picks[0], vec![0, 1]);
+
+        let outcome = question_key(&mut prompt, key(KeyCode::Char(' ')));
+        assert!(!outcome.close);
+        assert_eq!(prompt.picks[0], vec![0]);
+    }
+
+    #[test]
+    fn multi_select_enter_submits_all_labels() {
+        let mut prompt = sample_prompt(true);
+        question_key(&mut prompt, key(KeyCode::Char(' ')));
+        question_key(&mut prompt, key(KeyCode::Down));
+        question_key(&mut prompt, key(KeyCode::Char(' ')));
+
+        let outcome = question_key(&mut prompt, key(KeyCode::Enter));
+        assert!(outcome.close);
+        let effect = outcome.effects.first().expect("respond effect");
+        let Effect::RespondQuestion { answers, .. } = effect else {
+            panic!("expected RespondQuestion");
+        };
+        assert_eq!(answers[0].selected, vec!["alpha", "beta"]);
+    }
+
+    #[test]
+    fn custom_answer_replaces_option_picks() {
+        let mut prompt = sample_prompt(false);
+        question_key(&mut prompt, key(KeyCode::Char('1')));
+        assert_eq!(prompt.picks[0], vec![0]);
+
+        question_key(&mut prompt, key(KeyCode::Char('m')));
+        question_key(&mut prompt, key(KeyCode::Char('y')));
+        question_key(&mut prompt, key(KeyCode::Char(' ')));
+        question_key(&mut prompt, key(KeyCode::Char('a')));
+        question_key(&mut prompt, key(KeyCode::Char('n')));
+        question_key(&mut prompt, key(KeyCode::Char('s')));
+        question_key(&mut prompt, key(KeyCode::Char('w')));
+        question_key(&mut prompt, key(KeyCode::Char('e')));
+        question_key(&mut prompt, key(KeyCode::Char('r')));
+        assert!(prompt.custom_mode);
+        assert!(prompt.picks[0].is_empty());
+
+        let outcome = question_key(&mut prompt, key(KeyCode::Enter));
+        assert!(outcome.close);
+        let Effect::RespondQuestion { answers, .. } = &outcome.effects[0] else {
+            panic!("expected RespondQuestion");
+        };
+        assert_eq!(answers[0].selected, vec!["my answer"]);
+    }
+
+    #[test]
+    fn single_select_number_key_picks_option() {
+        let mut prompt = sample_prompt(false);
+        question_key(&mut prompt, key(KeyCode::Char('2')));
+        assert_eq!(prompt.picks[0], vec![1]);
+        assert_eq!(prompt.cursor, 1);
+
+        let outcome = question_key(&mut prompt, key(KeyCode::Enter));
+        assert!(outcome.close);
+        let Effect::RespondQuestion { answers, .. } = &outcome.effects[0] else {
+            panic!("expected RespondQuestion");
+        };
+        assert_eq!(answers[0].selected, vec!["beta"]);
+    }
+
+    #[test]
+    fn toggle_pick_adds_and_removes() {
+        let mut picks = Vec::new();
+        toggle_pick(&mut picks, 2);
+        assert_eq!(picks, vec![2]);
+        toggle_pick(&mut picks, 2);
+        assert!(picks.is_empty());
     }
 }

@@ -15,6 +15,7 @@ use agentloop_contracts::SessionId;
 use agentloop_delegator_claude_code::{ClaudeCodeConfig, DelegatorProbeStatus, claude_code_agent};
 use agentloop_delegator_copilot::{CopilotConfig as CopilotDelegatorConfig, copilot_agent};
 use agentloop_engine::{EngineOptions, EngineService, EngineServiceError};
+use agentloop_mcp::McpManager;
 use agentloop_session::MemoryStore;
 
 /// Which agent implementation serves the conversation.
@@ -95,6 +96,8 @@ pub struct EngineHub {
     services: HashMap<AgentKind, EngineService>,
     traces: HashMap<AgentKind, Vec<String>>,
     last_session: HashMap<AgentKind, SessionId>,
+    /// Live MCP connections for the native service; shut down before rebuild.
+    mcp_manager: Option<Arc<McpManager>>,
 }
 
 impl EngineHub {
@@ -108,6 +111,7 @@ impl EngineHub {
             services: HashMap::new(),
             traces: HashMap::new(),
             last_session: HashMap::new(),
+            mcp_manager: None,
         }
     }
 
@@ -143,9 +147,22 @@ impl EngineHub {
     /// Drop a cached service so the next [`Self::service`] call rebuilds it —
     /// used after a login changes which providers resolve.
     pub fn invalidate(&mut self, kind: AgentKind) {
+        if kind == AgentKind::Native {
+            shutdown_mcp_manager(self.mcp_manager.take());
+        }
         self.services.remove(&kind);
         self.traces.remove(&kind);
         self.last_session.remove(&kind);
+    }
+
+    /// The live MCP manager for the native service, if any.
+    pub fn mcp_manager(&self) -> Option<Arc<McpManager>> {
+        self.mcp_manager.clone()
+    }
+
+    /// Shut down MCP connections without invalidating the cached native service.
+    pub fn shutdown_mcp(&mut self) {
+        shutdown_mcp_manager(self.mcp_manager.take());
     }
 
     /// Remember the session in use for `kind` so switching back can resume.
@@ -158,17 +175,33 @@ impl EngineHub {
         self.last_session.get(&kind)
     }
 
-    fn build_native(&self) -> Result<(EngineService, Vec<String>), HubError> {
+    fn build_native(&mut self) -> Result<(EngineService, Vec<String>), HubError> {
         // Re-read prefs on every (re)build so `/connect` followed by an
         // invalidate picks up new custom providers without extra plumbing.
         let prefs = crate::prefs::CliPrefs::load();
         let (custom, skipped) = crate::prefs::custom_specs(&prefs);
+        let mcp_store = crate::mcp_store::McpStore::load();
+        let mcp_config = mcp_store.to_bridge_config();
+        shutdown_mcp_manager(self.mcp_manager.take());
+        let mcp_manager = if mcp_config.servers.iter().any(|server| server.enabled) {
+            let manager = Arc::new(
+                McpManager::from_config_blocking_default(mcp_config.clone())
+                    .map_err(EngineServiceError::from)?,
+            );
+            self.mcp_manager = Some(manager.clone());
+            Some(manager)
+        } else {
+            self.mcp_manager = None;
+            None
+        };
         let service = EngineService::native_all(EngineOptions {
             provider: self.provider.clone(),
             model: self.model.clone(),
             cwd: self.cwd.clone(),
             date: today(),
             custom,
+            mcp: mcp_config,
+            mcp_manager,
         })?;
         let mut trace = vec!["selected native loop".to_owned()];
         let ids = service
@@ -178,10 +211,28 @@ impl EngineHub {
             .map(ToString::to_string)
             .collect::<Vec<_>>();
         trace.push(format!("registered providers: {}", ids.join(", ")));
+        let enabled_mcps = mcp_store.enabled_count();
+        if enabled_mcps > 0 {
+            trace.push(format!("enabled MCP servers: {enabled_mcps}"));
+        }
         for (id, reason) in skipped {
             trace.push(format!("skipped custom provider {id}: {reason}"));
         }
         Ok((service, trace))
+    }
+}
+
+fn shutdown_mcp_manager(manager: Option<Arc<McpManager>>) {
+    let Some(manager) = manager else {
+        return;
+    };
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        tokio::task::block_in_place(|| handle.block_on(manager.shutdown()));
+    } else if let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        runtime.block_on(manager.shutdown());
     }
 }
 

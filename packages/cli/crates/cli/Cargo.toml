@@ -21,6 +21,7 @@ agentloop-cli-core = { workspace = true }
 agentloop-contracts = { workspace = true }
 agentloop-core = { workspace = true }
 agentloop-engine = { workspace = true }
+agentloop-mcp = { workspace = true }
 anyhow = { workspace = true }
 crossterm = { workspace = true }
 futures = { workspace = true }

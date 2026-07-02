@@ -147,6 +147,7 @@ cargo test --workspace --all-features
 5. Existing VS Code sign-in is picked up automatically (token merge-upsert on new sign-in)
 6. `/agent claude-code` probes and streams (if CLI installed)
 7. Esc cancels a mid-stream turn
+8. `/mcp-install @modelcontextprotocol/server-memory` → `/mcps` toggle on → `/mcp memory` reloads native → `/mcp explore memory` lists tools
 
 Automated subset (env-gated, skipped in CI):
 

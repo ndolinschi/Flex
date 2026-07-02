@@ -12,6 +12,7 @@ publish.workspace = true
 agentloop-contracts = { workspace = true }
 agentloop-core = { workspace = true }
 agentloop-engine = { workspace = true }
+agentloop-mcp = { path = "../../../engine/crates/mcp" }
 agentloop-session = { workspace = true }
 agentloop-delegator-claude-code = { workspace = true }
 agentloop-delegator-copilot = { workspace = true }

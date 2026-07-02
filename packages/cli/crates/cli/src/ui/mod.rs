@@ -13,14 +13,15 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap};
 
-use agentloop_contracts::PermissionDecisionKind;
+use agentloop_contracts::{PermissionDecisionKind, Question};
 
 use crate::app::{App, TurnPhase, permission_mode_label, session_mode_label};
 use crate::chat::{ChatItem, DraftBlock};
 use crate::input::{CommandPopup, FilePopup, InputPopup};
 use crate::overlay::{
-    ConfirmPrompt, LoginState, Overlay, PermissionPrompt, PickerState, QuestionPrompt,
-    ShellCommandOverlay, ShellCommandPhase,
+    ConfirmPrompt, LoginState, McpExplorerPhase, McpExplorerState, McpInstallMode, McpInstallState,
+    McpListState, Overlay, PermissionPrompt, PickerState, QuestionPrompt, ShellCommandOverlay,
+    ShellCommandPhase,
 };
 use crate::theme;
 
@@ -456,6 +457,12 @@ fn draw_status(frame: &mut Frame<'_>, app: &App, area: Rect) {
         spans.push(Span::styled(" · ", theme::STATUS));
         spans.push(Span::styled(format!("{pct}% context"), style));
     }
+    if app.mcp_enabled > 0 {
+        spans.push(Span::styled(
+            format!(" · mcp:{}", app.mcp_enabled),
+            theme::STATUS,
+        ));
+    }
     spans.push(Span::styled(
         format!(" · ↑{} ↓{}", fmt_k(usage.input), fmt_k(usage.output)),
         theme::STATUS,
@@ -601,6 +608,9 @@ fn draw_overlay(frame: &mut Frame<'_>, app: &App, root: Rect) {
         Overlay::Help => draw_help(frame, app, root),
         Overlay::ShellCommand(state) => draw_shell_command(frame, state, app, root),
         Overlay::Confirm(prompt) => draw_confirm(frame, prompt, root),
+        Overlay::McpList(state) => draw_mcp_list(frame, state, root),
+        Overlay::McpExplorer(state) => draw_mcp_explorer(frame, state, root),
+        Overlay::McpInstall(state) => draw_mcp_install(frame, state, root),
     }
 }
 
@@ -678,10 +688,11 @@ fn permission_label(kind: PermissionDecisionKind) -> &'static str {
 }
 
 fn draw_question(frame: &mut Frame<'_>, prompt: &QuestionPrompt, root: Rect) {
-    let area = centered(root, 70, 55);
+    let area = centered(root, 70, 60);
     let Some(question) = prompt.questions.get(prompt.current) else {
         return;
     };
+    let multi = question.multi_select;
     let mut lines = vec![
         Line::from(Span::styled(question.header.clone(), theme::TITLE)),
         Line::from(question.question.clone()),
@@ -689,15 +700,24 @@ fn draw_question(frame: &mut Frame<'_>, prompt: &QuestionPrompt, root: Rect) {
     ];
     for (idx, option) in question.options.iter().enumerate() {
         let picked = prompt.picks[prompt.current].contains(&idx);
-        let cursor = idx == prompt.cursor;
-        let marker = if picked { "[x]" } else { "[ ]" };
-        let style = if cursor {
+        let cursor = idx == prompt.cursor && !prompt.custom_mode;
+        let number = idx + 1;
+        let marker = if multi {
+            if picked { "[x]" } else { "[ ]" }
+        } else if picked {
+            "(*)"
+        } else if cursor {
+            "(>)"
+        } else {
+            "( )"
+        };
+        let style = if cursor || picked {
             theme::SELECTED
         } else {
             Style::default()
         };
         lines.push(Line::from(vec![
-            Span::styled(format!("{marker} {}", option.label), style),
+            Span::styled(format!("{number}. {marker} {}", option.label), style),
             option
                 .description
                 .as_ref()
@@ -705,11 +725,38 @@ fn draw_question(frame: &mut Frame<'_>, prompt: &QuestionPrompt, root: Rect) {
                 .unwrap_or_else(|| Span::raw("")),
         ]));
     }
+    if question.allow_custom {
+        lines.push(Line::default());
+        let custom_style = if prompt.custom_mode {
+            theme::SELECTED
+        } else {
+            theme::DIM
+        };
+        let custom_text = if prompt.custom_input.is_empty() {
+            "type your answer…".to_owned()
+        } else {
+            prompt.custom_input.clone()
+        };
+        lines.push(Line::from(vec![
+            Span::styled("Other: ", custom_style),
+            Span::styled(custom_text, custom_style),
+        ]));
+    }
     lines.push(Line::default());
     lines.push(Line::from(Span::styled(
-        "Enter answers, Space toggles multi-select, Esc submits partial answers",
+        question_hints(question),
         theme::DIM,
     )));
+    if prompt.questions.len() > 1 {
+        lines.push(Line::from(Span::styled(
+            format!(
+                "Question {} of {}",
+                prompt.current + 1,
+                prompt.questions.len()
+            ),
+            theme::DIM,
+        )));
+    }
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(lines)
@@ -717,6 +764,25 @@ fn draw_question(frame: &mut Frame<'_>, prompt: &QuestionPrompt, root: Rect) {
             .wrap(Wrap { trim: false }),
         area,
     );
+}
+
+fn question_hints(question: &Question) -> String {
+    let mut parts = vec!["↑↓ move".to_owned()];
+    if question.multi_select {
+        parts.push("Space toggle".to_owned());
+    } else if !question.options.is_empty() {
+        parts.push("Space select".to_owned());
+    }
+    if !question.options.is_empty() {
+        let n = question.options.len().min(9);
+        parts.push(format!("1-{n} pick"));
+    }
+    if question.allow_custom {
+        parts.push("type custom".to_owned());
+    }
+    parts.push("Enter confirm".to_owned());
+    parts.push("Esc submit partial".to_owned());
+    parts.join(" · ")
 }
 
 fn draw_login(frame: &mut Frame<'_>, state: &LoginState, root: Rect) {
@@ -882,6 +948,181 @@ fn draw_help(frame: &mut Frame<'_>, app: &App, root: Rect) {
     frame.render_widget(
         Paragraph::new(Text::from(lines))
             .block(Block::default().borders(Borders::ALL).title(" help "))
+            .wrap(Wrap { trim: false }),
+        area,
+    );
+}
+
+fn draw_mcp_list(frame: &mut Frame<'_>, state: &McpListState, root: Rect) {
+    let area = centered(root, 72, 60);
+    let filter = state.filter.to_lowercase();
+    let visible: Vec<_> = state
+        .items
+        .iter()
+        .filter(|item| {
+            filter.is_empty()
+                || item.name.to_lowercase().contains(&filter)
+                || item.source.to_lowercase().contains(&filter)
+        })
+        .collect();
+    let items = visible
+        .iter()
+        .enumerate()
+        .map(|(idx, item)| {
+            let style = if idx == state.selected {
+                theme::SELECTED
+            } else {
+                Style::default()
+            };
+            let status = if item.enabled { "on" } else { "off" };
+            ListItem::new(Line::from(vec![
+                Span::styled(format!("[{status}] {}", item.name), style),
+                Span::raw(" "),
+                Span::styled(item.source.clone(), theme::DIM),
+            ]))
+        })
+        .collect::<Vec<_>>();
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        List::new(items).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" MCP servers ")
+                .title_bottom("Space toggle · Enter save · /mcp <name> attach"),
+        ),
+        area,
+    );
+}
+
+fn draw_mcp_explorer(frame: &mut Frame<'_>, state: &McpExplorerState, root: Rect) {
+    let area = centered(root, 78, 65);
+    let title = format!(" MCP explore: {} ", state.server);
+    let lines = match &state.phase {
+        McpExplorerPhase::Loading => vec![Line::from("connecting and listing tools…")],
+        McpExplorerPhase::Calling => vec![Line::from("calling tool…")],
+        McpExplorerPhase::Failed { message } => {
+            vec![Line::from(Span::styled(message, theme::ERROR))]
+        }
+        McpExplorerPhase::Result { output, .. } => {
+            output.lines().map(Line::from).collect::<Vec<_>>()
+        }
+        McpExplorerPhase::Tools { tools } => {
+            if state.args_mode {
+                vec![
+                    Line::from(Span::styled("JSON arguments:", theme::TITLE)),
+                    Line::from(state.args_input.clone()),
+                    Line::default(),
+                    Line::from(Span::styled("Enter call · Esc back", theme::DIM)),
+                ]
+            } else {
+                let filter = state.filter.to_lowercase();
+                tools
+                    .iter()
+                    .filter(|tool| {
+                        filter.is_empty()
+                            || tool.name.to_lowercase().contains(&filter)
+                            || tool.description.to_lowercase().contains(&filter)
+                    })
+                    .enumerate()
+                    .map(|(idx, tool)| {
+                        let style = if idx == state.selected {
+                            theme::SELECTED
+                        } else {
+                            Style::default()
+                        };
+                        Line::from(vec![
+                            Span::styled(tool.name.clone(), style),
+                            Span::raw(" — "),
+                            Span::styled(tool.description.clone(), theme::DIM),
+                        ])
+                    })
+                    .collect()
+            }
+        }
+    };
+    let scroll = if matches!(state.phase, McpExplorerPhase::Result { .. }) {
+        state.scroll
+    } else {
+        0
+    };
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(lines)
+            .block(Block::default().borders(Borders::ALL).title(title))
+            .wrap(Wrap { trim: false })
+            .scroll((scroll as u16, 0)),
+        area,
+    );
+}
+
+fn draw_mcp_install(frame: &mut Frame<'_>, state: &McpInstallState, root: Rect) {
+    let area = centered(root, 74, 62);
+    let mode_label = match state.mode {
+        McpInstallMode::Registry => "registry",
+        McpInstallMode::Npm => "npm package",
+        McpInstallMode::Import => "import file",
+    };
+    let mut lines = vec![
+        Line::from(Span::styled(
+            format!("mode: {mode_label} (Tab to switch)"),
+            theme::TITLE,
+        )),
+        Line::default(),
+    ];
+    match state.mode {
+        McpInstallMode::Registry => {
+            let entries = agentloop_cli_core::registry();
+            let filter = state.filter.to_lowercase();
+            for (idx, entry) in entries
+                .iter()
+                .filter(|entry| {
+                    filter.is_empty()
+                        || entry.name.contains(&filter)
+                        || entry.label.to_lowercase().contains(&filter)
+                })
+                .enumerate()
+            {
+                let style = if idx == state.selected {
+                    theme::SELECTED
+                } else {
+                    Style::default()
+                };
+                lines.push(Line::from(vec![
+                    Span::styled(entry.label.clone(), style),
+                    Span::raw(" "),
+                    Span::styled(entry.npm.clone(), theme::DIM),
+                ]));
+                lines.push(Line::from(Span::styled(
+                    entry.description.clone(),
+                    theme::DIM,
+                )));
+            }
+        }
+        McpInstallMode::Npm | McpInstallMode::Import => {
+            let prompt = if state.mode == McpInstallMode::Npm {
+                "package name (e.g. @scope/pkg)"
+            } else {
+                "path to mcpServers JSON"
+            };
+            lines.push(Line::from(prompt));
+            if state.input_mode {
+                lines.push(Line::from(state.input.clone()));
+            } else {
+                lines.push(Line::from(Span::styled(
+                    "Enter to type · Esc cancel",
+                    theme::DIM,
+                )));
+            }
+        }
+    }
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(lines)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" mcp-install "),
+            )
             .wrap(Wrap { trim: false }),
         area,
     );

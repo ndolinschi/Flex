@@ -34,6 +34,23 @@ pub enum LocalCommand {
     Thinking { arg: Option<String> },
     /// `/compact` — summarize conversation history to save context.
     Compact,
+    /// `/mcps` — list and toggle installed MCP servers.
+    Mcps,
+    /// `/mcp <name>` or `/mcp explore <name>`.
+    Mcp { sub: McpSubcommand },
+    /// `/mcp-install` — install MCP servers.
+    McpInstall { arg: Option<String> },
+    /// `/mcp-remove <name>` — remove an installed server.
+    McpRemove { name: String },
+}
+
+/// `/mcp` subcommands.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum McpSubcommand {
+    /// Enable and attach `name` to the session.
+    Attach { name: String },
+    /// Open the tool explorer for `name`.
+    Explore { name: String },
 }
 
 /// Where a submitted line goes.
@@ -100,6 +117,22 @@ const LOCAL: &[(&str, &str, Option<&str>)] = &[
         "compact",
         "summarize conversation history to save context",
         None,
+    ),
+    ("mcps", "list and toggle installed MCP servers", None),
+    (
+        "mcp",
+        "attach or explore an MCP server",
+        Some("<name> | explore <name>"),
+    ),
+    (
+        "mcp-install",
+        "install MCP servers (registry, npm, or import)",
+        Some("[repo|npm]"),
+    ),
+    (
+        "mcp-remove",
+        "remove an installed MCP server",
+        Some("<name>"),
     ),
 ];
 
@@ -195,6 +228,10 @@ impl CommandIndex {
             "permissions" => Route::Local(LocalCommand::Permissions { arg }),
             "thinking" => Route::Local(LocalCommand::Thinking { arg }),
             "compact" => Route::Local(LocalCommand::Compact),
+            "mcps" => Route::Local(LocalCommand::Mcps),
+            "mcp" => Route::Local(parse_mcp_command(args)),
+            "mcp-install" => Route::Local(LocalCommand::McpInstall { arg: arg.clone() }),
+            "mcp-remove" => Route::Local(parse_mcp_remove(args)),
             other if self.engine_names.iter().any(|n| n == other) => Route::Engine,
             _ => Route::Plain,
         }
@@ -215,6 +252,35 @@ fn source_label(info: &CommandInfo) -> &'static str {
 fn is_subsequence(needle: &str, haystack: &str) -> bool {
     let mut chars = haystack.chars();
     needle.chars().all(|n| chars.any(|h| h == n))
+}
+
+fn parse_mcp_command(args: &str) -> LocalCommand {
+    let trimmed = args.trim();
+    if trimmed.is_empty() {
+        return LocalCommand::Mcps;
+    }
+    if let Some(name) = trimmed.strip_prefix("explore ") {
+        let name = name.trim();
+        if name.is_empty() {
+            return LocalCommand::Mcps;
+        }
+        return LocalCommand::Mcp {
+            sub: McpSubcommand::Explore {
+                name: name.to_owned(),
+            },
+        };
+    }
+    LocalCommand::Mcp {
+        sub: McpSubcommand::Attach {
+            name: trimmed.to_owned(),
+        },
+    }
+}
+
+fn parse_mcp_remove(args: &str) -> LocalCommand {
+    LocalCommand::McpRemove {
+        name: args.trim().to_owned(),
+    }
 }
 
 #[cfg(test)]
@@ -323,9 +389,21 @@ mod tests {
     }
 
     #[test]
-    fn login_not_in_registry() {
-        let index = CommandIndex::new(&[]);
-        assert!(!index.entries().iter().any(|entry| entry.name == "login"));
-        assert_eq!(index.route("/login"), Route::Plain);
+    fn route_mcp_explore() {
+        let index = CommandIndex::default();
+        assert_eq!(
+            index.route("/mcp explore filesystem"),
+            Route::Local(LocalCommand::Mcp {
+                sub: McpSubcommand::Explore {
+                    name: "filesystem".to_owned(),
+                },
+            })
+        );
+    }
+
+    #[test]
+    fn route_mcps_is_local() {
+        let index = CommandIndex::default();
+        assert_eq!(index.route("/mcps"), Route::Local(LocalCommand::Mcps));
     }
 }

@@ -10,21 +10,25 @@ use std::time::{Duration, Instant};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
-use agentloop_cli_core::{AgentKind, CatalogEntry, CliPrefs, LoginEvent, has_copilot_credentials};
+use agentloop_cli_core::{
+    AgentKind, CatalogEntry, CliPrefs, InstallTarget, LoginEvent, McpStore,
+    has_copilot_credentials, parse_install_target,
+};
 use agentloop_contracts::{
     AgentCaps, AgentEvent, ModelDiscovery, ModelInfo, ModelRef, PermissionMode, PromptInput,
     SessionEvent, SessionId, ThinkingConfig, TokenUsage, TurnOptions, TurnStopReason,
 };
 
 use crate::chat::ChatState;
-use crate::commands::{CommandIndex, LocalCommand, Route};
+use crate::commands::{CommandIndex, LocalCommand, McpSubcommand, Route};
 use crate::events::{AppEvent, Effect, SessionBootstrap, ShellCommandOutcome, TaskResult};
 use crate::files::FileIndex;
 use crate::input::{InputOutcome, InputState};
 use crate::overlay::{
-    self, ConfirmAction, ConfirmPrompt, LoginState, Overlay, OverlayOutcome, PermissionPrompt,
-    PickerAction, PickerChoice, PickerItem, PickerState, QuestionPrompt, ShellCommandOverlay,
-    ShellCommandPhase,
+    self, ConfirmAction, ConfirmPrompt, LoginState, McpExplorerPhase, McpExplorerState,
+    McpInstallChoice, McpInstallMode, McpInstallState, McpListItem, McpListState, Overlay,
+    OverlayOutcome, PermissionPrompt, PickerAction, PickerChoice, PickerItem, PickerState,
+    QuestionPrompt, ShellCommandOverlay, ShellCommandPhase,
 };
 use crate::ui::MarkdownCache;
 
@@ -186,6 +190,10 @@ pub struct App {
     pub workdir: PathBuf,
     /// Indexed files under [`Self::workdir`] for `@` mention autocomplete.
     pub file_index: FileIndex,
+    /// Installed MCP servers (`~/.config/agentloop/mcp.json`).
+    pub mcp_store: McpStore,
+    /// Enabled MCP servers in the current native session (status bar).
+    pub mcp_enabled: usize,
     dirty: bool,
 }
 
@@ -226,6 +234,8 @@ impl App {
             should_quit: false,
             workdir,
             file_index,
+            mcp_store: McpStore::load(),
+            mcp_enabled: bootstrap.mcp_enabled,
             dirty: true,
         };
         let welcome = format!(
@@ -490,7 +500,14 @@ impl App {
             self.chat.push_info(info);
         }
         if let Some(action) = outcome.confirmed {
-            self.apply_confirm_action(action);
+            effects.extend(self.apply_confirm_action(action));
+        }
+        if outcome.mcp_list_saved {
+            self.sync_mcp_list_overlay();
+            effects.extend(self.save_mcp_list());
+        }
+        if let Some(choice) = outcome.mcp_install {
+            effects.extend(self.apply_mcp_install_choice(choice));
         }
         if outcome.close {
             self.overlay = Overlay::None;
@@ -502,10 +519,83 @@ impl App {
         effects
     }
 
-    fn apply_confirm_action(&mut self, action: ConfirmAction) {
+    fn save_mcp_list(&mut self) -> Vec<Effect> {
+        if let Err(err) = self.mcp_store.save() {
+            self.chat
+                .push_error(format!("failed to save mcp.json: {err}"));
+            return Vec::new();
+        }
+        if self.kind != AgentKind::Native {
+            self.toast("MCP config saved — switch to native to apply");
+            return Vec::new();
+        }
+        self.toast("reloading MCP servers…");
+        vec![Effect::ReloadEngine { invalidate: true }]
+    }
+
+    fn apply_mcp_install_choice(&mut self, choice: McpInstallChoice) -> Vec<Effect> {
+        if self.session.turn.is_running() {
+            self.toast("turn in progress — esc to cancel first");
+            return Vec::new();
+        }
+        let (target, registry_id, import_path) = match choice {
+            McpInstallChoice::Registry { id } => (InstallTarget::Unknown, Some(id), None),
+            McpInstallChoice::Npm { package } => (InstallTarget::Npm(package), None, None),
+            McpInstallChoice::Import { path } => (
+                InstallTarget::Unknown,
+                None,
+                Some(std::path::PathBuf::from(path)),
+            ),
+        };
+        vec![Effect::McpInstall {
+            target,
+            registry_id,
+            import_path,
+        }]
+    }
+
+    fn apply_confirm_action(&mut self, action: ConfirmAction) -> Vec<Effect> {
         match action {
             ConfirmAction::AllowAllPermissions => {
                 self.set_permission_mode(PermissionMode::BypassPermissions);
+                Vec::new()
+            }
+            ConfirmAction::McpRemove { name } => {
+                if self.session.turn.is_running() {
+                    self.toast("turn in progress — esc to cancel first");
+                    return Vec::new();
+                }
+                if let Err(err) = self.mcp_store.remove(&name) {
+                    self.chat.push_error(err.to_string());
+                    return Vec::new();
+                }
+                if let Err(err) = self.mcp_store.save() {
+                    self.chat
+                        .push_error(format!("failed to save mcp.json: {err}"));
+                    return Vec::new();
+                }
+                self.toast(format!("removed MCP server `{name}`"));
+                if self.kind == AgentKind::Native {
+                    vec![Effect::ReloadEngine { invalidate: true }]
+                } else {
+                    Vec::new()
+                }
+            }
+        }
+    }
+
+    fn sync_mcp_list_overlay(&mut self) {
+        let Overlay::McpList(state) = &self.overlay else {
+            return;
+        };
+        for item in &state.items {
+            if let Some(server) = self
+                .mcp_store
+                .servers
+                .iter_mut()
+                .find(|server| server.config.name == item.name)
+            {
+                server.config.enabled = item.enabled;
             }
         }
     }
@@ -583,7 +673,162 @@ impl App {
             LocalCommand::Permissions { arg } => self.run_permissions_command(arg),
             LocalCommand::Thinking { arg } => self.run_thinking_command(arg),
             LocalCommand::Compact => self.run_compact(),
+            LocalCommand::Mcps => self.open_mcp_list(),
+            LocalCommand::Mcp { sub } => self.run_mcp_command(sub),
+            LocalCommand::McpInstall { arg } => self.run_mcp_install(arg),
+            LocalCommand::McpRemove { name } => self.run_mcp_remove(&name),
         }
+    }
+
+    fn mcp_change_blocked(&mut self) -> bool {
+        if self.session.turn.is_running() {
+            self.toast("turn in progress — esc to cancel first");
+            true
+        } else {
+            false
+        }
+    }
+
+    fn open_mcp_list(&mut self) -> Vec<Effect> {
+        if self.mcp_store.servers.is_empty() {
+            self.toast("no MCP servers — use /mcp-install");
+            return Vec::new();
+        }
+        let items = self
+            .mcp_store
+            .servers
+            .iter()
+            .map(|server| McpListItem {
+                name: server.config.name.clone(),
+                source: server.source_label(),
+                enabled: server.config.enabled,
+            })
+            .collect();
+        self.overlay = Overlay::McpList(McpListState {
+            items,
+            filter: String::new(),
+            selected: 0,
+            dirty: false,
+        });
+        Vec::new()
+    }
+
+    fn run_mcp_command(&mut self, sub: McpSubcommand) -> Vec<Effect> {
+        if self.mcp_change_blocked() {
+            return Vec::new();
+        }
+        match sub {
+            McpSubcommand::Attach { name } => {
+                if !self
+                    .mcp_store
+                    .servers
+                    .iter()
+                    .any(|server| server.config.name == name)
+                {
+                    self.chat.push_error(format!(
+                        "unknown MCP server `{name}` — /mcps to list or /mcp-install"
+                    ));
+                    return Vec::new();
+                }
+                match self.mcp_store.enable(&name) {
+                    Ok(changed) => {
+                        if let Err(err) = self.mcp_store.save() {
+                            self.chat
+                                .push_error(format!("failed to save mcp.json: {err}"));
+                            return Vec::new();
+                        }
+                        if changed {
+                            self.toast(format!("enabled MCP server `{name}` — reloading…"));
+                        } else {
+                            self.toast(format!("MCP server `{name}` already enabled"));
+                        }
+                        if self.kind == AgentKind::Native {
+                            vec![Effect::ReloadEngine { invalidate: true }]
+                        } else {
+                            self.chat
+                                .push_info("switch to native agent for MCP tools in session");
+                            Vec::new()
+                        }
+                    }
+                    Err(err) => {
+                        self.chat.push_error(err.to_string());
+                        Vec::new()
+                    }
+                }
+            }
+            McpSubcommand::Explore { name } => {
+                if !self
+                    .mcp_store
+                    .servers
+                    .iter()
+                    .any(|server| server.config.name == name)
+                {
+                    self.chat.push_error(format!("unknown MCP server `{name}`"));
+                    return Vec::new();
+                }
+                self.overlay = Overlay::McpExplorer(McpExplorerState {
+                    server: name.clone(),
+                    phase: McpExplorerPhase::Loading,
+                    selected: 0,
+                    filter: String::new(),
+                    args_input: "{}".to_owned(),
+                    args_mode: false,
+                    scroll: 0,
+                });
+                vec![Effect::McpListTools { server: name }]
+            }
+        }
+    }
+
+    fn run_mcp_install(&mut self, arg: Option<String>) -> Vec<Effect> {
+        if self.mcp_change_blocked() {
+            return Vec::new();
+        }
+        if let Some(arg) = arg.filter(|text| !text.trim().is_empty()) {
+            let target = parse_install_target(&arg);
+            return vec![Effect::McpInstall {
+                target,
+                registry_id: None,
+                import_path: None,
+            }];
+        }
+        self.overlay = Overlay::McpInstall(McpInstallState {
+            mode: McpInstallMode::Registry,
+            filter: String::new(),
+            selected: 0,
+            input: String::new(),
+            input_mode: false,
+        });
+        Vec::new()
+    }
+
+    fn run_mcp_remove(&mut self, name: &str) -> Vec<Effect> {
+        if self.mcp_change_blocked() {
+            return Vec::new();
+        }
+        let name = name.trim();
+        if name.is_empty() {
+            self.chat.push_error("usage: /mcp-remove <name>");
+            return Vec::new();
+        }
+        if !self
+            .mcp_store
+            .servers
+            .iter()
+            .any(|server| server.config.name == name)
+        {
+            self.chat.push_error(format!("unknown MCP server `{name}`"));
+            return Vec::new();
+        }
+        self.overlay = Overlay::Confirm(ConfirmPrompt {
+            title: format!("Remove MCP server `{name}`?"),
+            message: "This deletes the server from mcp.json (clone dirs are kept on disk)."
+                .to_owned(),
+            action: ConfirmAction::McpRemove {
+                name: name.to_owned(),
+            },
+        });
+        Vec::new()
     }
 
     fn run_compact(&mut self) -> Vec<Effect> {
@@ -1318,6 +1563,96 @@ impl App {
                 self.on_shell_command_finished(&command, outcome);
                 Vec::new()
             }
+            TaskResult::McpInstallFinished(result) => match result {
+                Ok(name) => {
+                    self.mcp_store = McpStore::load();
+                    self.toast(format!("installed MCP server `{name}`"));
+                    if self.kind == AgentKind::Native {
+                        vec![Effect::ReloadEngine { invalidate: true }]
+                    } else {
+                        Vec::new()
+                    }
+                }
+                Err(message) => {
+                    self.toast(message);
+                    Vec::new()
+                }
+            },
+            TaskResult::McpToolsListed { server, result } => {
+                self.on_mcp_tools_listed(&server, result);
+                Vec::new()
+            }
+            TaskResult::McpToolCalled {
+                server,
+                tool,
+                result,
+            } => {
+                self.on_mcp_tool_called(&server, &tool, result);
+                Vec::new()
+            }
+            TaskResult::EngineReloaded(outcome) => match *outcome {
+                Ok(bootstrap) => {
+                    self.mcp_enabled = bootstrap.mcp_enabled;
+                    if self.kind == AgentKind::Native {
+                        let model = self.session.model.clone();
+                        self.install_bootstrap(bootstrap, false);
+                        self.session.model = model;
+                        self.toast("MCP servers reloaded");
+                    }
+                    Vec::new()
+                }
+                Err(message) => {
+                    self.chat
+                        .push_error(format!("engine reload failed: {message}"));
+                    Vec::new()
+                }
+            },
+        }
+    }
+
+    fn on_mcp_tools_listed(
+        &mut self,
+        server: &str,
+        result: Result<Vec<agentloop_mcp::McpRemoteTool>, String>,
+    ) {
+        let Overlay::McpExplorer(state) = &mut self.overlay else {
+            return;
+        };
+        if state.server != server {
+            return;
+        }
+        match result {
+            Ok(tools) => {
+                state.phase = McpExplorerPhase::Tools { tools };
+                state.selected = 0;
+            }
+            Err(message) => {
+                state.phase = McpExplorerPhase::Failed { message };
+            }
+        }
+    }
+
+    fn on_mcp_tool_called(&mut self, server: &str, tool: &str, result: Result<String, String>) {
+        let Overlay::McpExplorer(state) = &mut self.overlay else {
+            return;
+        };
+        if state.server != server {
+            return;
+        }
+        state.args_mode = false;
+        match result {
+            Ok(output) => {
+                state.phase = McpExplorerPhase::Result {
+                    output: format!("{tool}:\n{output}"),
+                    is_error: false,
+                };
+                state.scroll = 0;
+            }
+            Err(message) => {
+                state.phase = McpExplorerPhase::Failed {
+                    message: format!("{tool} failed: {message}"),
+                };
+            }
         }
     }
 
@@ -1410,6 +1745,7 @@ impl App {
             self.chat
                 .push_info(format!("switched to {} — {session_note}", self.kind));
         }
+        self.mcp_enabled = bootstrap.mcp_enabled;
     }
 
     // ── login progress ──────────────────────────────────────────────────────
@@ -1668,6 +2004,7 @@ mod copilot_auth_tests {
             transcript: None,
             trace: Vec::new(),
             permission_mode: None,
+            mcp_enabled: 0,
         }
     }
 
@@ -1760,6 +2097,7 @@ mod status_tests {
             transcript: None,
             trace: Vec::new(),
             permission_mode: None,
+            mcp_enabled: 0,
         };
         App::new(bootstrap, PathBuf::from("."), FileIndex::default())
     }

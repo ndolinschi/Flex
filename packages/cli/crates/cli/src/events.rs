@@ -48,6 +48,8 @@ pub struct SessionBootstrap {
     pub trace: Vec<String>,
     /// Initial permission mode from session creation.
     pub permission_mode: Option<agentloop_contracts::PermissionMode>,
+    /// Enabled MCP servers connected in this native session.
+    pub mcp_enabled: usize,
 }
 
 /// Completion of spawned async work, reported back into the reducer.
@@ -72,6 +74,21 @@ pub enum TaskResult {
     },
     /// `/compact` finished.
     CompactFinished(Result<CompactionSummary, String>),
+    /// `/mcp-install` finished.
+    McpInstallFinished(Result<String, String>),
+    /// MCP explorer listed tools for a server.
+    McpToolsListed {
+        server: String,
+        result: Result<Vec<agentloop_mcp::McpRemoteTool>, String>,
+    },
+    /// MCP explorer manual tool call finished.
+    McpToolCalled {
+        server: String,
+        tool: String,
+        result: Result<String, String>,
+    },
+    /// Native engine reload finished (MCP toggle/install).
+    EngineReloaded(Box<Result<SessionBootstrap, String>>),
 }
 
 /// Result of a `/command` shell invocation.
@@ -140,4 +157,23 @@ pub enum Effect {
     SaveLastModel(ModelRef),
     /// Summarize conversation history and record a compaction boundary.
     CompactSession { opts: TurnOptions },
+    /// Rebuild the native engine (MCP config changed).
+    ReloadEngine {
+        /// Drop the cached native service first.
+        invalidate: bool,
+    },
+    /// Install an MCP server (blocking work in the runtime).
+    McpInstall {
+        target: agentloop_cli_core::InstallTarget,
+        registry_id: Option<String>,
+        import_path: Option<std::path::PathBuf>,
+    },
+    /// List tools for the MCP explorer overlay.
+    McpListTools { server: String },
+    /// Call a tool from the MCP explorer overlay.
+    McpCallTool {
+        server: String,
+        tool: String,
+        args_json: String,
+    },
 }

@@ -30,6 +30,7 @@ pub fn test_bootstrap() -> SessionBootstrap {
         transcript: None,
         trace: Vec::new(),
         permission_mode: None,
+        mcp_enabled: 0,
     }
 }
 
