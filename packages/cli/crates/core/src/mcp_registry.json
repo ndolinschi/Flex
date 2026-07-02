@@ -54,6 +54,12 @@
     "npm": "@modelcontextprotocol/server-puppeteer"
   },
   {
+    "name": "playwright",
+    "label": "Playwright",
+    "description": "Browser automation via Playwright MCP",
+    "npm": "@playwright/mcp"
+  },
+  {
     "name": "slack",
     "label": "Slack",
     "description": "Post messages and read channels",

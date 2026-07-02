@@ -12,6 +12,7 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
 use agentloop_contracts::SessionId;
+use agentloop_core::SessionStore;
 use agentloop_delegator_claude_code::{ClaudeCodeConfig, DelegatorProbeStatus, claude_code_agent};
 use agentloop_delegator_copilot::{CopilotConfig as CopilotDelegatorConfig, copilot_agent};
 use agentloop_engine::{EngineOptions, EngineService, EngineServiceError};
@@ -96,6 +97,8 @@ pub struct EngineHub {
     services: HashMap<AgentKind, EngineService>,
     traces: HashMap<AgentKind, Vec<String>>,
     last_session: HashMap<AgentKind, SessionId>,
+    /// Native session store shared across MCP reload / invalidate rebuilds.
+    native_store: Option<Arc<dyn SessionStore>>,
     /// Live MCP connections for the native service; shut down before rebuild.
     mcp_manager: Option<Arc<McpManager>>,
 }
@@ -111,6 +114,7 @@ impl EngineHub {
             services: HashMap::new(),
             traces: HashMap::new(),
             last_session: HashMap::new(),
+            native_store: None,
             mcp_manager: None,
         }
     }
@@ -183,6 +187,10 @@ impl EngineHub {
         let mcp_store = crate::mcp_store::McpStore::load();
         let mcp_config = mcp_store.to_bridge_config();
         shutdown_mcp_manager(self.mcp_manager.take());
+        let store = self
+            .native_store
+            .get_or_insert_with(|| Arc::new(MemoryStore::new()) as Arc<dyn SessionStore>)
+            .clone();
         let mcp_manager = if mcp_config.servers.iter().any(|server| server.enabled) {
             let manager = Arc::new(
                 McpManager::from_config_blocking_default(mcp_config.clone())
@@ -202,6 +210,7 @@ impl EngineHub {
             custom,
             mcp: mcp_config,
             mcp_manager,
+            session_store: Some(store),
         })?;
         let mut trace = vec!["selected native loop".to_owned()];
         let ids = service
@@ -336,6 +345,9 @@ fn today() -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
     use super::*;
 
     #[test]
@@ -352,5 +364,19 @@ mod tests {
         assert_eq!(date.len(), 10);
         assert_eq!(&date[4..5], "-");
         assert_eq!(&date[7..8], "-");
+    }
+
+    #[test]
+    fn invalidate_does_not_drop_native_store() {
+        let mut hub = EngineHub::new(PathBuf::from("."), None, None);
+        let store: Arc<dyn SessionStore> = Arc::new(MemoryStore::new());
+        let ptr = Arc::as_ptr(&store);
+        hub.native_store = Some(store);
+        hub.invalidate(AgentKind::Native);
+        let kept = hub
+            .native_store
+            .as_ref()
+            .expect("native store survives invalidate");
+        assert_eq!(Arc::as_ptr(kept), ptr);
     }
 }

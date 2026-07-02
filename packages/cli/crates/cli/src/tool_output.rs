@@ -2,6 +2,7 @@
 
 use agentloop_contracts::{ToolCall, ToolOutput};
 
+use crate::terminal_text::terminal_lines;
 use crate::ui::diff::{DiffPreview, diff_preview};
 
 pub(crate) const PREVIEW_MAX_LINES: usize = 4;
@@ -104,7 +105,7 @@ pub(crate) fn display_body_lines(tool_name: &str, result: &ToolOutput) -> Vec<St
     if text.is_empty() {
         return Vec::new();
     }
-    text.lines().map(str::to_owned).collect()
+    terminal_lines(&text)
 }
 
 const SUMMARY_MAX_LEN: usize = 72;
@@ -207,28 +208,28 @@ pub(crate) fn bash_body_lines(result: &ToolOutput) -> Vec<String> {
         }
         let stderr = parts.stderr.trim();
         if !stderr.is_empty() {
-            lines.extend(stderr.lines().map(str::to_owned));
+            lines.extend(terminal_lines(stderr));
         }
         let stdout = parts.stdout.trim();
         if !stdout.is_empty() {
             if !lines.is_empty() {
                 lines.push(String::new());
             }
-            lines.extend(stdout.lines().map(str::to_owned));
+            lines.extend(terminal_lines(stdout));
         }
         return lines;
     }
 
     let stdout = parts.stdout.trim();
     if !stdout.is_empty() {
-        lines.extend(stdout.lines().map(str::to_owned));
+        lines.extend(terminal_lines(stdout));
     }
     let stderr = parts.stderr.trim();
     if !stderr.is_empty() {
         if !lines.is_empty() {
             lines.push(String::new());
         }
-        lines.extend(stderr.lines().map(str::to_owned));
+        lines.extend(terminal_lines(stderr));
     }
     lines
 }

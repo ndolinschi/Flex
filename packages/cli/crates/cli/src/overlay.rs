@@ -480,14 +480,28 @@ fn picker_key(picker: &mut PickerState, key: KeyEvent) -> OverlayOutcome {
 }
 
 fn permission_key(prompt: &mut PermissionPrompt, key: KeyEvent) -> OverlayOutcome {
-    let deny = |prompt: &PermissionPrompt| OverlayOutcome {
-        effects: vec![Effect::RespondPermission {
-            id: prompt.id.clone(),
-            decision: PermissionDecision::Deny { reason: None },
-        }],
-        close: true,
-        info: None,
-        ..OverlayOutcome::default()
+    let deny = |prompt: &PermissionPrompt| {
+        // #region agent log
+        crate::debug_log::agent_debug_log(
+            "J",
+            "overlay.rs:permission_key",
+            "user denied permission",
+            serde_json::json!({
+                "request_id": prompt.id.as_str(),
+                "tool_call_id": prompt.call_id.as_ref().map(|id| id.as_str()),
+                "title": prompt.title,
+            }),
+        );
+        // #endregion
+        OverlayOutcome {
+            effects: vec![Effect::RespondPermission {
+                id: prompt.id.clone(),
+                decision: PermissionDecision::Deny { reason: None },
+            }],
+            close: true,
+            info: None,
+            ..OverlayOutcome::default()
+        }
     };
     match (key.code, key.modifiers) {
         (KeyCode::Up | KeyCode::Left, _) => {

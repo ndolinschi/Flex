@@ -13,6 +13,7 @@ use ratatui::text::{Line, Span};
 use tui_markdown::from_str;
 use unicode_width::UnicodeWidthChar;
 
+use crate::terminal_text::normalize_terminal_text;
 use crate::theme;
 
 /// Byte threshold above which streaming drafts skip markdown parsing.
@@ -58,14 +59,19 @@ pub(super) fn lines_for_block(
         return cached.clone();
     }
 
+    let text = normalize_terminal_text(text);
+    if text.is_empty() {
+        return Vec::new();
+    }
+
     let max_width = viewport_width.max(1);
     let oversized_draft = !complete
         && (text.len() > PLAIN_FALLBACK_BYTES || text.lines().count() > PLAIN_FALLBACK_LINES);
 
     let lines = if oversized_draft {
-        plain_lines(prefix, text, theme::ASSISTANT)
+        plain_lines(prefix, &text, theme::ASSISTANT)
     } else {
-        content_lines(prefix, text, max_width)
+        content_lines(prefix, &text, max_width)
     };
 
     if complete && !oversized_draft {

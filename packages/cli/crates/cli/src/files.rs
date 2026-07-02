@@ -1,4 +1,7 @@
 //! Workdir-scoped file index for `@` mention autocomplete.
+//!
+//! Mentions support an optional line slice suffix: `@path/to/file:[0:12]`
+//! (Python-style 0-based indices; end is exclusive — `[0:12]` is the first 12 lines).
 
 use std::path::{Path, PathBuf};
 
@@ -6,6 +9,51 @@ use thiserror::Error;
 
 /// Maximum files indexed under the workdir (keeps startup and memory bounded).
 const MAX_INDEX_FILES: usize = 20_000;
+
+/// Maximum lines rendered in the inline slice preview panel.
+pub const MENTION_PREVIEW_MAX_LINES: usize = 12;
+
+/// 0-based half-open line range (`[0:12]` → indices 0..12, displayed as lines 1–12).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineSlice {
+    /// 0-based start index (inclusive).
+    pub start: usize,
+    /// 0-based end index (exclusive). `None` = through EOF.
+    pub end: Option<usize>,
+}
+
+/// Loaded lines for the inline preview panel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MentionPreview {
+    pub path: String,
+    pub label: String,
+    pub lines: Vec<(usize, String)>,
+    pub total_lines: usize,
+    pub truncated: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum SliceParseError {
+    #[error("slice must start with '['")]
+    MissingOpen,
+    #[error("slice is incomplete")]
+    Incomplete,
+    #[error("invalid line number: {0}")]
+    InvalidNumber(String),
+    #[error("start line must be ≤ end line")]
+    InvertedRange,
+}
+
+#[derive(Debug, Error)]
+pub enum FileReadError {
+    #[error("not a file: {0}")]
+    NotFile(PathBuf),
+    #[error("failed to read {0}: {1}")]
+    Io(PathBuf, String),
+    #[error("file is not valid UTF-8: {0}")]
+    NotUtf8(PathBuf),
+}
 
 /// Relative paths of files under the workdir, sorted for stable display.
 #[derive(Debug, Clone, Default)]
@@ -172,6 +220,211 @@ pub fn replace_mention(text: &str, span: &MentionSpan, replacement: &str) -> Str
     )
 }
 
+/// Split `@` query into fuzzy-match path prefix and optional `:[slice]` suffix.
+pub fn split_mention_query(query: &str) -> (&str, Option<&str>) {
+    let Some(colon) = query.find(':') else {
+        return (query, None);
+    };
+    let after = &query[colon + 1..];
+    if after.starts_with('[') {
+        (&query[..colon], Some(after))
+    } else {
+        (query, None)
+    }
+}
+
+/// Parse `:[0:12]`, `[:]`, `[20:]`, etc. (0-based indices; end exclusive).
+pub fn parse_line_slice(raw: &str) -> Result<LineSlice, SliceParseError> {
+    let raw = raw.trim();
+    if !raw.starts_with('[') {
+        return Err(SliceParseError::MissingOpen);
+    }
+    if !raw.ends_with(']') {
+        return Err(SliceParseError::Incomplete);
+    }
+    let inner = &raw[1..raw.len() - 1];
+    if inner.is_empty() || inner == ":" {
+        return Ok(LineSlice {
+            start: 0,
+            end: None,
+        });
+    }
+    let (start_str, end_str) = match inner.split_once(':') {
+        Some(parts) => parts,
+        None => {
+            let index = parse_slice_index(inner)?;
+            return Ok(LineSlice {
+                start: index,
+                end: Some(index + 1),
+            });
+        }
+    };
+    let start = if start_str.is_empty() {
+        0
+    } else {
+        parse_slice_index(start_str)?
+    };
+    let end = if end_str.is_empty() {
+        None
+    } else {
+        Some(parse_slice_index(end_str)?)
+    };
+    if let Some(end_idx) = end {
+        if start > end_idx {
+            return Err(SliceParseError::InvertedRange);
+        }
+    }
+    Ok(LineSlice { start, end })
+}
+
+fn parse_slice_index(raw: &str) -> Result<usize, SliceParseError> {
+    raw.parse()
+        .map_err(|_| SliceParseError::InvalidNumber(raw.to_owned()))
+}
+
+/// Human-readable slice label for UI (`lines 1–12`, `lines 21–end`, …).
+pub fn slice_label(slice: &LineSlice) -> String {
+    let first_line = slice.start + 1;
+    match slice.end {
+        None if slice.start == 0 => "all lines".to_owned(),
+        None => format!("lines {first_line}–end"),
+        Some(end) if end == slice.start + 1 => format!("line {first_line}"),
+        Some(end) => format!("lines {first_line}–{end}"),
+    }
+}
+
+/// Pick the file path for preview / expansion.
+pub fn resolve_mention_path(
+    workdir: &Path,
+    path_part: &str,
+    matches: &[String],
+    selected: usize,
+) -> Option<String> {
+    if !path_part.is_empty() {
+        let candidate = workdir.join(path_part);
+        if candidate.is_file() {
+            return Some(path_part.replace('\\', "/"));
+        }
+    }
+    if matches.len() == 1 {
+        return Some(matches[0].clone());
+    }
+    matches.get(selected).cloned()
+}
+
+/// Read a line range from `workdir` / `rel_path`.
+pub fn read_line_range(
+    workdir: &Path,
+    rel_path: &str,
+    slice: &LineSlice,
+) -> Result<Vec<(usize, String)>, FileReadError> {
+    let full = workdir.join(rel_path);
+    if !full.is_file() {
+        return Err(FileReadError::NotFile(full));
+    }
+    let raw = std::fs::read_to_string(&full)
+        .map_err(|err| FileReadError::Io(full.clone(), err.to_string()))?;
+    let all: Vec<&str> = raw.lines().collect();
+    let total = all.len();
+    if total == 0 {
+        return Ok(Vec::new());
+    }
+    let start = slice.start.min(total);
+    let end = slice.end.unwrap_or(total).min(total);
+    if start >= end {
+        return Ok(Vec::new());
+    }
+    Ok(all
+        .iter()
+        .enumerate()
+        .skip(start)
+        .take(end - start)
+        .map(|(idx, line)| (idx + 1, line.to_string()))
+        .collect())
+}
+
+/// Build preview state for the inline panel (truncates to [`MENTION_PREVIEW_MAX_LINES`]).
+pub fn build_mention_preview(workdir: &Path, path: &str, slice: &LineSlice) -> MentionPreview {
+    let label = slice_label(slice);
+    match read_line_range(workdir, path, slice) {
+        Ok(mut lines) => {
+            let total_lines = lines.len();
+            let truncated = total_lines > MENTION_PREVIEW_MAX_LINES;
+            lines.truncate(MENTION_PREVIEW_MAX_LINES);
+            MentionPreview {
+                path: path.to_owned(),
+                label,
+                lines,
+                total_lines,
+                truncated,
+                error: None,
+            }
+        }
+        Err(err) => MentionPreview {
+            path: path.to_owned(),
+            label,
+            lines: Vec::new(),
+            total_lines: 0,
+            truncated: false,
+            error: Some(err.to_string()),
+        },
+    }
+}
+
+/// Expand `@path:[slice]` tokens to include the referenced source in the prompt.
+pub fn expand_file_mentions(text: &str, workdir: &Path, file_index: &FileIndex) -> String {
+    let mut out = String::new();
+    let mut idx = 0;
+    while idx < text.len() {
+        let Some(rel_at) = text[idx..].find('@') else {
+            out.push_str(&text[idx..]);
+            break;
+        };
+        let at = idx + rel_at;
+        if at > 0 && !text.as_bytes()[at - 1].is_ascii_whitespace() {
+            out.push('@');
+            idx = at + 1;
+            continue;
+        }
+        out.push_str(&text[idx..at]);
+        let token_end = mention_token_end(text, at);
+        let token = &text[at + 1..token_end];
+        let (path_part, slice_part) = split_mention_query(token);
+        let matches = file_index.matches(path_part);
+        let expanded = slice_part
+            .and_then(|slice_raw| parse_line_slice(slice_raw).ok())
+            .and_then(|slice| {
+                resolve_mention_path(workdir, path_part, &matches, 0).and_then(|path| {
+                    read_line_range(workdir, &path, &slice)
+                        .ok()
+                        .map(|lines| format_mention_expansion(&path, &slice, &lines))
+                })
+            });
+        if let Some(body) = expanded {
+            out.push_str(&body);
+        } else {
+            out.push('@');
+            out.push_str(token);
+        }
+        idx = token_end;
+    }
+    out
+}
+
+fn format_mention_expansion(path: &str, slice: &LineSlice, lines: &[(usize, String)]) -> String {
+    let mut out = format!("Referenced file `{path}` ({})", slice_label(slice));
+    if lines.is_empty() {
+        out.push_str(" — (empty range)\n");
+        return out;
+    }
+    out.push_str(":\n```\n");
+    for (num, line) in lines {
+        out.push_str(&format!("{num:>4} | {line}\n"));
+    }
+    out.push_str("```\n");
+    out
+}
+
 /// Cursor byte offset from textarea `(row, col)` character positions.
 pub fn cursor_byte_offset(lines: &[String], (row, col): (usize, usize)) -> usize {
     let mut offset = 0usize;
@@ -260,5 +513,93 @@ mod tests {
         let offset = cursor_byte_offset(&lines, (0, 9));
         assert_eq!(offset, 9);
         assert_eq!(byte_offset_to_cursor(&lines, offset), (0, 9));
+    }
+
+    #[test]
+    fn parse_line_slice_variants() {
+        assert_eq!(
+            parse_line_slice("[:]").unwrap(),
+            LineSlice {
+                start: 0,
+                end: None
+            }
+        );
+        assert_eq!(
+            parse_line_slice("[0:12]").unwrap(),
+            LineSlice {
+                start: 0,
+                end: Some(12)
+            }
+        );
+        assert_eq!(
+            parse_line_slice("[20:100]").unwrap(),
+            LineSlice {
+                start: 20,
+                end: Some(100)
+            }
+        );
+        assert_eq!(
+            parse_line_slice("[20:]").unwrap(),
+            LineSlice {
+                start: 20,
+                end: None
+            }
+        );
+        assert_eq!(
+            parse_line_slice("[:50]").unwrap(),
+            LineSlice {
+                start: 0,
+                end: Some(50)
+            }
+        );
+        assert!(matches!(
+            parse_line_slice("[20:100"),
+            Err(SliceParseError::Incomplete)
+        ));
+    }
+
+    #[test]
+    fn split_mention_query_splits_slice() {
+        let (path, slice) = split_mention_query("src/a.rs:[20:30]");
+        assert_eq!(path, "src/a.rs");
+        assert_eq!(slice, Some("[20:30]"));
+    }
+
+    #[test]
+    fn read_line_range_uses_zero_based_half_open_slices() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join("sample.txt");
+        std::fs::write(&file, "a\nb\nc\nd\ne\n").expect("write");
+        let slice = LineSlice {
+            start: 1,
+            end: Some(4),
+        };
+        let lines = read_line_range(dir.path(), "sample.txt", &slice).expect("read");
+        assert_eq!(
+            lines,
+            vec![
+                (2, "b".to_owned()),
+                (3, "c".to_owned()),
+                (4, "d".to_owned()),
+            ]
+        );
+        let first_twelve = LineSlice {
+            start: 0,
+            end: Some(12),
+        };
+        let all = read_line_range(dir.path(), "sample.txt", &first_twelve).expect("read");
+        assert_eq!(all.len(), 5);
+    }
+
+    #[test]
+    fn expand_file_mentions_inlines_slice_content() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("README.md"), "one\ntwo\nthree\n").expect("write");
+        let index = FileIndex::from_paths(vec!["README.md".to_owned()]);
+        let expanded = expand_file_mentions("summarize @README.md:[0:2]", dir.path(), &index);
+        assert!(expanded.contains("Referenced file `README.md`"));
+        assert!(expanded.contains("one"));
+        assert!(expanded.contains("two"));
+        assert!(!expanded.contains("three"));
     }
 }

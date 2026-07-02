@@ -2,11 +2,17 @@
 //! autocomplete popup (non-modal, so it lives here rather than in
 //! [`crate::overlay`]).
 
+use std::path::Path;
+
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tui_textarea::{CursorMove, TextArea};
 
 use crate::commands::{CommandEntry, CommandIndex};
-use crate::files::{FileIndex, MentionSpan, active_mention, cursor_byte_offset, replace_mention};
+use crate::files::{
+    FileIndex, MentionPreview, MentionSpan, active_mention, build_mention_preview,
+    cursor_byte_offset, parse_line_slice, replace_mention, resolve_mention_path,
+    split_mention_query,
+};
 
 /// What a key did to the editor.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +23,29 @@ pub enum InputOutcome {
     Consumed,
     /// Not an editor key.
     Ignored,
+}
+
+/// Max rows shown in the inline `/` and `@` autocomplete lists.
+pub(crate) const POPUP_LIST_MAX_ROWS: usize = 8;
+
+/// Scroll offset so `selected` stays within the visible popup window.
+pub(crate) fn popup_list_scroll_offset(
+    selected: usize,
+    visible_rows: usize,
+    total: usize,
+) -> usize {
+    if total <= visible_rows {
+        return 0;
+    }
+    let window = visible_rows.max(1);
+    let max_scroll = total - window;
+    if selected < window {
+        0
+    } else if selected >= max_scroll {
+        max_scroll
+    } else {
+        selected + 1 - window
+    }
 }
 
 /// Slash-command autocomplete state.
@@ -32,9 +61,11 @@ pub struct CommandPopup {
 #[derive(Debug, Clone)]
 pub struct FilePopup {
     pub filter: String,
+    pub path_part: String,
     pub matches: Vec<String>,
     pub selected: usize,
     pub span: MentionSpan,
+    pub preview: Option<MentionPreview>,
 }
 
 /// Active inline autocomplete.
@@ -68,7 +99,8 @@ impl Default for InputState {
 
 fn new_textarea() -> TextArea<'static> {
     let mut textarea = TextArea::default();
-    textarea.set_placeholder_text("Type a message, / for commands, @ for files");
+    textarea
+        .set_placeholder_text("Type a message, / commands, @ files · @path:[0:12] python slice");
     textarea.set_cursor_line_style(ratatui::style::Style::default());
     textarea
 }
@@ -102,6 +134,7 @@ impl InputState {
         key: KeyEvent,
         commands: &CommandIndex,
         files: &FileIndex,
+        workdir: &Path,
     ) -> InputOutcome {
         if self.popup.is_some() {
             match self.handle_popup_key(key) {
@@ -116,7 +149,7 @@ impl InputState {
             | (KeyCode::Enter, KeyModifiers::SHIFT)
             | (KeyCode::Char('j'), KeyModifiers::CONTROL) => {
                 self.textarea.insert_newline();
-                self.refresh_popup(commands, files);
+                self.refresh_popup(commands, files, workdir);
                 InputOutcome::Consumed
             }
             (KeyCode::Up, KeyModifiers::NONE) if self.single_line() => {
@@ -133,7 +166,7 @@ impl InputState {
                     self.history_pos = None;
                     self.stash = None;
                 }
-                self.refresh_popup(commands, files);
+                self.refresh_popup(commands, files, workdir);
                 InputOutcome::Consumed
             }
         }
@@ -227,8 +260,12 @@ impl InputState {
         let Some(path) = popup.matches.get(popup.selected) else {
             return;
         };
+        let (_, slice_part) = split_mention_query(&popup.span.query);
+        let slice_suffix = slice_part
+            .map(|slice| format!(":{slice}"))
+            .unwrap_or_default();
         let text = self.text();
-        let replacement = format!("@{path} ");
+        let replacement = format!("@{path}{slice_suffix} ");
         let updated = replace_mention(&text, &popup.span, &replacement);
         self.set_text(&updated);
         let cursor_offset = popup.span.start + replacement.len();
@@ -291,12 +328,12 @@ impl InputState {
     }
 
     /// Recompute inline autocomplete from the current text and cursor.
-    pub fn refresh_popup(&mut self, commands: &CommandIndex, files: &FileIndex) {
+    pub fn refresh_popup(&mut self, commands: &CommandIndex, files: &FileIndex, workdir: &Path) {
         if let Some(popup) = self.refresh_command_popup(commands) {
             self.popup = Some(popup);
             return;
         }
-        if let Some(popup) = self.refresh_file_popup(files) {
+        if let Some(popup) = self.refresh_file_popup(files, workdir) {
             self.popup = Some(popup);
             return;
         }
@@ -331,30 +368,39 @@ impl InputState {
         }))
     }
 
-    fn refresh_file_popup(&mut self, files: &FileIndex) -> Option<InputPopup> {
+    fn refresh_file_popup(&mut self, files: &FileIndex, workdir: &Path) -> Option<InputPopup> {
         let lines = self.textarea.lines();
         let text = self.text();
         let cursor = cursor_byte_offset(lines, self.textarea.cursor());
         let span = active_mention(&text, cursor)?;
-        let matches = files.matches(&span.query);
-        if matches.is_empty() {
-            return None;
-        }
+        let (path_part, slice_part) = split_mention_query(&span.query);
+        let matches = files.matches(path_part);
         let selected = self
             .popup
             .as_ref()
             .and_then(|popup| match popup {
                 InputPopup::File(popup) if popup.span == span => {
-                    Some(popup.selected.min(matches.len() - 1))
+                    Some(popup.selected.min(matches.len().saturating_sub(1)))
                 }
                 _ => None,
             })
             .unwrap_or(0);
+        let preview = slice_part
+            .and_then(|slice_raw| parse_line_slice(slice_raw).ok())
+            .and_then(|slice| {
+                resolve_mention_path(workdir, path_part, &matches, selected)
+                    .map(|path| build_mention_preview(workdir, &path, &slice))
+            });
+        if matches.is_empty() && preview.is_none() {
+            return None;
+        }
         Some(InputPopup::File(FilePopup {
             filter: span.query.clone(),
+            path_part: path_part.to_owned(),
             matches,
             selected,
             span,
+            preview,
         }))
     }
 }
@@ -375,26 +421,67 @@ mod tests {
     }
 
     #[test]
+    fn popup_scroll_offset_keeps_selection_visible() {
+        assert_eq!(popup_list_scroll_offset(0, 8, 20), 0);
+        assert_eq!(popup_list_scroll_offset(7, 8, 20), 0);
+        assert_eq!(popup_list_scroll_offset(8, 8, 20), 1);
+        assert_eq!(popup_list_scroll_offset(11, 8, 20), 4);
+        assert_eq!(popup_list_scroll_offset(15, 8, 20), 12);
+        assert_eq!(popup_list_scroll_offset(3, 8, 5), 0);
+    }
+
+    #[test]
     fn file_popup_inserts_selected_path() {
         let files = FileIndex::from_paths(vec!["src/foo.rs".to_owned(), "src/bar.rs".to_owned()]);
+        let workdir = std::env::temp_dir();
         let mut input = InputState::default();
         input.set_text("fix @src/f");
-        input.refresh_popup(&CommandIndex::default(), &files);
+        input.refresh_popup(&CommandIndex::default(), &files, &workdir);
         assert!(matches!(input.popup, Some(InputPopup::File(_))));
 
-        let outcome = input.handle_key(key(KeyCode::Enter), &CommandIndex::default(), &files);
+        let outcome = input.handle_key(
+            key(KeyCode::Enter),
+            &CommandIndex::default(),
+            &files,
+            &workdir,
+        );
         assert_eq!(outcome, InputOutcome::Consumed);
         assert_eq!(input.text(), "fix @src/foo.rs ");
         assert!(input.popup.is_none());
     }
 
     #[test]
+    fn file_popup_preserves_slice_suffix_on_complete() {
+        let files = FileIndex::from_paths(vec!["src/foo.rs".to_owned()]);
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(dir.path().join("src")).expect("mkdir");
+        std::fs::write(dir.path().join("src/foo.rs"), "line\n").expect("write");
+        let mut input = InputState::default();
+        input.set_text("see @src/foo.rs:[2:");
+        input.refresh_popup(&CommandIndex::default(), &files, dir.path());
+        let outcome = input.handle_key(
+            key(KeyCode::Tab),
+            &CommandIndex::default(),
+            &files,
+            dir.path(),
+        );
+        assert_eq!(outcome, InputOutcome::Consumed);
+        assert_eq!(input.text(), "see @src/foo.rs:[2: ");
+    }
+
+    #[test]
     fn file_popup_esc_keeps_partial_mention() {
         let files = FileIndex::from_paths(vec!["src/foo.rs".to_owned()]);
+        let workdir = std::env::temp_dir();
         let mut input = InputState::default();
         input.set_text("see @src");
-        input.refresh_popup(&CommandIndex::default(), &files);
-        let outcome = input.handle_key(key(KeyCode::Esc), &CommandIndex::default(), &files);
+        input.refresh_popup(&CommandIndex::default(), &files, &workdir);
+        let outcome = input.handle_key(
+            key(KeyCode::Esc),
+            &CommandIndex::default(),
+            &files,
+            &workdir,
+        );
         assert_eq!(outcome, InputOutcome::Consumed);
         assert_eq!(input.text(), "see @src");
         assert!(input.popup.is_none());

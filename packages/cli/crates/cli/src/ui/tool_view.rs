@@ -12,6 +12,7 @@ use ratatui::text::{Line, Span};
 
 use agentloop_contracts::{ToolCall, ToolCallStatus};
 
+use crate::terminal_text::normalize_terminal_text;
 use crate::theme;
 use crate::tool_output::{
     DisplayBody, PREVIEW_MAX_LINES, call_is_expandable, collapsed_summary_line, display_body,
@@ -43,7 +44,7 @@ pub(super) fn render_tool_row(row: &ToolRow<'_>) -> Vec<Line<'static>> {
     if let Some(progress) = row.progress {
         lines.push(gutter_line(
             true,
-            vec![Span::styled(progress.to_owned(), theme::DIM)],
+            vec![Span::styled(normalize_terminal_text(progress), theme::DIM)],
         ));
     }
 
@@ -506,5 +507,31 @@ mod tests {
         assert!(!text.contains("stdout:"));
         assert!(!text.contains("exit_code"));
         assert!(text.contains("hello"));
+    }
+
+    #[test]
+    fn bash_playwright_help_renders_one_line_per_row() {
+        let help = concat!(
+            "Usage: npx playwright [options] [command]\r\n",
+            "\r\n",
+            "Commands:\r\n",
+            "  codegen [options] [url]\r\n",
+            "  install [options] [browser...]\r\n",
+        );
+        let mut call = sample_call(
+            "Bash",
+            serde_json::json!({"command": "npx playwright --help"}),
+            ToolCallStatus::Completed,
+        );
+        call.result = Some(bash_result(help, "", 0));
+        let lines = render_tool_row(&row(&call, true));
+        let text = flat(&lines);
+        assert!(text[1].contains("Usage: npx playwright"));
+        assert!(text.iter().any(|line| line.contains("codegen")));
+        assert!(text.iter().any(|line| line.contains("install")));
+        assert!(
+            !text.iter().any(|line| line.contains('\r')),
+            "carriage returns must not reach the renderer: {text:?}"
+        );
     }
 }

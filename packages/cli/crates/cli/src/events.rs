@@ -50,6 +50,8 @@ pub struct SessionBootstrap {
     pub permission_mode: Option<agentloop_contracts::PermissionMode>,
     /// Enabled MCP servers connected in this native session.
     pub mcp_enabled: usize,
+    /// Set when reload could not resume and opened a fresh session instead.
+    pub session_restarted: bool,
 }
 
 /// Completion of spawned async work, reported back into the reducer.
@@ -63,6 +65,8 @@ pub enum TaskResult {
     EngineSwitched(Box<Result<SessionBootstrap, String>>),
     /// `/new` finished: a fresh session on the current service.
     SessionReset(Result<SessionId, String>),
+    /// `/clear` finished: chat wiped and a fresh session on the current service.
+    SessionCleared(Result<SessionId, String>),
     /// Transcript re-fetch after a `Gap` finished.
     Resynced(Result<Transcript, String>),
     /// The device-flow login task finished.
@@ -89,6 +93,8 @@ pub enum TaskResult {
     },
     /// Native engine reload finished (MCP toggle/install).
     EngineReloaded(Box<Result<SessionBootstrap, String>>),
+    /// Permission response could not be delivered to the engine.
+    PermissionRespondFailed { message: String },
 }
 
 /// Result of a `/command` shell invocation.
@@ -135,6 +141,8 @@ pub enum Effect {
     },
     /// Start a fresh session on the current service.
     NewSession,
+    /// Cancel the turn, wipe chat, and start a blank session (`/clear`).
+    ClearSession,
     /// Start the GitHub Copilot device-flow login.
     StartLogin,
     /// Cancel a login in progress.
@@ -175,5 +183,9 @@ pub enum Effect {
         server: String,
         tool: String,
         args_json: String,
+    },
+    /// Sync permission mode into an in-flight native turn.
+    SetTurnPermissionMode {
+        mode: Option<agentloop_contracts::PermissionMode>,
     },
 }

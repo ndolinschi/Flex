@@ -54,6 +54,9 @@ pub fn humanize_engine_error(err: &EngineError) -> Option<HumanError> {
             format!("{agent} CLI not found — install it or use /provider")
         }
         ErrorCode::ContextOverflow => "context window exceeded — /compact to summarize".to_owned(),
+        ErrorCode::InvalidRequest if looks_like_context_overflow_message(&message) => {
+            "context window exceeded — /compact to summarize".to_owned()
+        }
         _ => {
             if message.is_empty() {
                 format!("{:?} error", err.code)
@@ -66,6 +69,24 @@ pub fn humanize_engine_error(err: &EngineError) -> Option<HumanError> {
         headline,
         detail: detail_line(err, &provider, &message),
     })
+}
+
+fn looks_like_context_overflow_message(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    let tokenish = lower.contains("token")
+        || lower.contains("context")
+        || lower.contains("prompt")
+        || lower.contains("maximum");
+    if !tokenish {
+        return false;
+    }
+    lower.contains("exceed")
+        || lower.contains("too large")
+        || lower.contains("too long")
+        || lower.contains("context length")
+        || lower.contains("context window")
+        || lower.contains("maximum context")
+        || lower.contains("max context")
 }
 
 /// Extract a human message from a trailing JSON payload in `text`.
@@ -141,7 +162,8 @@ fn detail_line(err: &EngineError, provider: &Option<String>, cleaned: &str) -> O
             | ErrorCode::RateLimited
             | ErrorCode::NotInstalled
             | ErrorCode::ContextOverflow
-    );
+    ) || (err.code == ErrorCode::InvalidRequest
+        && looks_like_context_overflow_message(cleaned));
     if message_dropped && !cleaned.is_empty() {
         parts.push(cleaned.to_owned());
     }
@@ -258,6 +280,20 @@ mod tests {
             human.headline,
             "context window exceeded — /compact to summarize"
         );
+    }
+
+    #[test]
+    fn copilot_token_limit_invalid_request_shows_compact_hint() {
+        let err = native_error(
+            ErrorCode::InvalidRequest,
+            "invalid request to copilot prompt token count of 383156 exceeds the limit of 136000",
+        );
+        let human = humanize_engine_error(&err).expect("not suppressed");
+        assert_eq!(
+            human.headline,
+            "context window exceeded — /compact to summarize"
+        );
+        assert!(human.detail.unwrap().contains("383156"));
     }
 
     #[test]

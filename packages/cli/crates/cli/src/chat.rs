@@ -440,7 +440,7 @@ impl ChatState {
                     }) = self.items.get_mut(idx)
                     {
                         if call.status == ToolCallStatus::Running {
-                            *progress = Some(note.clone());
+                            *progress = Some(crate::terminal_text::normalize_terminal_text(note));
                             *r = rev;
                         }
                     }
@@ -487,9 +487,13 @@ impl ChatState {
                     }
                     _ => String::new(),
                 };
-                self.push_info(format!(
-                    "Conversation compacted{savings} — earlier messages summarized"
-                ));
+                let is_auto = summary.strategy.starts_with("auto_");
+                let message = if is_auto {
+                    format!("Auto-compacted context{savings} — approaching limit")
+                } else {
+                    format!("Conversation compacted{savings} — earlier messages summarized")
+                };
+                self.push_info(message);
             }
             AgentEvent::SubagentStarted {
                 child_session,
@@ -966,6 +970,50 @@ mod apply_tests {
                 collapsed: false,
                 ..
             } if text == "late thought"
+        ));
+    }
+}
+
+#[cfg(test)]
+mod compaction_ui_tests {
+    use super::{ChatItem, ChatState};
+    use agentloop_contracts::{AgentEvent, CompactionSummary};
+
+    #[test]
+    fn manual_compaction_info_message() {
+        let mut chat = ChatState::default();
+        chat.apply(&AgentEvent::CompactionBoundary {
+            summary: CompactionSummary {
+                summary_markdown: "summary".to_owned(),
+                strategy: "summarize_oldest".to_owned(),
+                tokens_before: Some(1_000),
+                tokens_after: Some(200),
+            },
+        });
+        assert!(matches!(
+            &chat.items[0],
+            ChatItem::Info { text }
+                if text.contains("Conversation compacted")
+                    && text.contains("~1000 → ~200")
+        ));
+    }
+
+    #[test]
+    fn auto_compaction_info_message() {
+        let mut chat = ChatState::default();
+        chat.apply(&AgentEvent::CompactionBoundary {
+            summary: CompactionSummary {
+                summary_markdown: "summary".to_owned(),
+                strategy: "auto_summarize_oldest".to_owned(),
+                tokens_before: Some(120_000),
+                tokens_after: Some(8_000),
+            },
+        });
+        assert!(matches!(
+            &chat.items[0],
+            ChatItem::Info { text }
+                if text.contains("Auto-compacted context")
+                    && text.contains("approaching limit")
         ));
     }
 }

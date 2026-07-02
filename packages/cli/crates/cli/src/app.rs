@@ -15,8 +15,8 @@ use agentloop_cli_core::{
     has_copilot_credentials, parse_install_target,
 };
 use agentloop_contracts::{
-    AgentCaps, AgentEvent, ModelDiscovery, ModelInfo, ModelRef, PermissionMode, PromptInput,
-    SessionEvent, SessionId, ThinkingConfig, TokenUsage, TurnOptions, TurnStopReason,
+    AgentCaps, AgentEvent, ModelDiscovery, ModelInfo, ModelRef, PermissionDecision, PermissionMode,
+    PromptInput, SessionEvent, SessionId, ThinkingConfig, TokenUsage, TurnOptions, TurnStopReason,
 };
 
 use crate::chat::ChatState;
@@ -355,7 +355,8 @@ impl App {
             },
             TermEvent::Paste(text) => {
                 self.input.paste(&text);
-                self.input.refresh_popup(&self.commands, &self.file_index);
+                self.input
+                    .refresh_popup(&self.commands, &self.file_index, &self.workdir);
                 Vec::new()
             }
             _ => Vec::new(),
@@ -461,7 +462,10 @@ impl App {
         }
 
         // Editor (handles popup navigation internally).
-        match self.input.handle_key(key, &self.commands, &self.file_index) {
+        match self
+            .input
+            .handle_key(key, &self.commands, &self.file_index, &self.workdir)
+        {
             InputOutcome::Submitted(line) => self.on_submit(&line),
             InputOutcome::Consumed | InputOutcome::Ignored => Vec::new(),
         }
@@ -557,8 +561,7 @@ impl App {
     fn apply_confirm_action(&mut self, action: ConfirmAction) -> Vec<Effect> {
         match action {
             ConfirmAction::AllowAllPermissions => {
-                self.set_permission_mode(PermissionMode::BypassPermissions);
-                Vec::new()
+                self.set_permission_mode(PermissionMode::BypassPermissions)
             }
             ConfirmAction::McpRemove { name } => {
                 if self.session.turn.is_running() {
@@ -609,10 +612,7 @@ impl App {
                 self.apply_session_mode_arg(&id);
                 Vec::new()
             }
-            PickerChoice::SetPermissionMode(id) => {
-                self.apply_permission_picker_id(&id);
-                Vec::new()
-            }
+            PickerChoice::SetPermissionMode(id) => self.apply_permission_picker_id(&id),
         }
     }
 
@@ -637,9 +637,10 @@ impl App {
             self.toast("turn in progress — esc to cancel");
             return Vec::new();
         }
+        let input = crate::files::expand_file_mentions(line, &self.workdir, &self.file_index);
         self.begin_turn();
         vec![Effect::SubmitPrompt {
-            input: PromptInput::text(line),
+            input: PromptInput::text(&input),
             opts: self.turn_options(),
         }]
     }
@@ -658,6 +659,10 @@ impl App {
             LocalCommand::New => {
                 self.toast("starting new session…");
                 vec![Effect::NewSession]
+            }
+            LocalCommand::Clear => {
+                self.toast("clearing chat…");
+                vec![Effect::ClearSession]
             }
             LocalCommand::Help => {
                 self.overlay = Overlay::Help;
@@ -947,14 +952,15 @@ impl App {
         }
     }
 
-    fn apply_permission_picker_id(&mut self, id: &str) {
+    fn apply_permission_picker_id(&mut self, id: &str) -> Vec<Effect> {
         match id {
             "require" => self.set_permission_mode(PermissionMode::Default),
             "auto" => self.set_permission_mode(PermissionMode::AcceptEdits),
-            "allow-all" => self.confirm_allow_all(),
-            other => {
-                let _ = self.apply_permission_arg(other);
+            "allow-all" => {
+                self.confirm_allow_all();
+                Vec::new()
             }
+            other => self.apply_permission_arg(other),
         }
     }
 
@@ -964,10 +970,7 @@ impl App {
                 self.confirm_allow_all();
                 Vec::new()
             }
-            Some(mode) => {
-                self.set_permission_mode(mode);
-                Vec::new()
-            }
+            Some(mode) => self.set_permission_mode(mode),
             None => {
                 self.chat.push_error(format!(
                     "unknown level `{text}` (use require, auto, or allow-all)"
@@ -983,13 +986,13 @@ impl App {
         self.persist_mode_prefs();
     }
 
-    fn set_permission_mode(&mut self, mode: PermissionMode) {
+    fn set_permission_mode(&mut self, mode: PermissionMode) -> Vec<Effect> {
         if !self.caps.permissions.modes.contains(&mode) {
             self.chat.push_error(format!(
                 "agent does not support {} mode",
                 permission_mode_label(mode)
             ));
-            return;
+            return Vec::new();
         }
         self.session.permission_mode = mode;
         self.toast(format!(
@@ -997,6 +1000,39 @@ impl App {
             permission_mode_label(mode)
         ));
         self.persist_mode_prefs();
+        let mut effects = self.sync_turn_permission_mode();
+        if mode == PermissionMode::BypassPermissions {
+            effects.extend(self.grant_pending_permissions_for_bypass());
+        }
+        effects
+    }
+
+    fn sync_turn_permission_mode(&self) -> Vec<Effect> {
+        if self.kind != AgentKind::Native {
+            return Vec::new();
+        }
+        vec![Effect::SetTurnPermissionMode {
+            mode: Some(self.session.effective_permission_mode()),
+        }]
+    }
+
+    fn grant_pending_permissions_for_bypass(&mut self) -> Vec<Effect> {
+        let mut effects = Vec::new();
+        if let Overlay::Permission(prompt) = &self.overlay {
+            effects.push(Effect::RespondPermission {
+                id: prompt.id.clone(),
+                decision: PermissionDecision::AllowOnce,
+            });
+            self.overlay = Overlay::None;
+        }
+        for prompt in self.pending_permissions.drain(..) {
+            effects.push(Effect::RespondPermission {
+                id: prompt.id,
+                decision: PermissionDecision::AllowOnce,
+            });
+        }
+        self.drain_pending();
+        effects
     }
 
     fn confirm_allow_all(&mut self) {
@@ -1372,9 +1408,32 @@ impl App {
                 } else {
                     self.overlay = Overlay::Permission(prompt);
                 }
+                // #region agent log
+                crate::debug_log::agent_debug_log(
+                    "J",
+                    "app.rs:PermissionRequested",
+                    "permission prompt shown",
+                    serde_json::json!({
+                        "request_id": id.as_str(),
+                        "title": title,
+                        "overlay_active": self.overlay.is_active(),
+                    }),
+                );
+                // #endregion
                 Vec::new()
             }
-            AgentEvent::PermissionResolved { id, .. } => {
+            AgentEvent::PermissionResolved { id, decision } => {
+                // #region agent log
+                crate::debug_log::agent_debug_log(
+                    "L",
+                    "app.rs:PermissionResolved",
+                    "permission resolved event",
+                    serde_json::json!({
+                        "request_id": id.as_str(),
+                        "decision": format!("{decision:?}"),
+                    }),
+                );
+                // #endregion
                 self.pending_permissions.retain(|p| &p.id != id);
                 if matches!(&self.overlay, Overlay::Permission(p) if &p.id == id) {
                     self.overlay = Overlay::None;
@@ -1413,6 +1472,47 @@ impl App {
                 }
                 Vec::new()
             }
+            AgentEvent::ToolCallUpdated { call } => {
+                if matches!(
+                    call.status,
+                    agentloop_contracts::ToolCallStatus::Denied { .. }
+                ) {
+                    // #region agent log
+                    crate::debug_log::agent_debug_log(
+                        "M",
+                        "app.rs:ToolCallUpdated",
+                        "tool call denied",
+                        serde_json::json!({
+                            "tool": call.tool_name,
+                            "call_id": call.id.as_str(),
+                            "reason": match &call.status {
+                                agentloop_contracts::ToolCallStatus::Denied { reason } => {
+                                    reason.clone()
+                                }
+                                _ => None,
+                            },
+                        }),
+                    );
+                    // #endregion
+                }
+                self.chat.apply(&event.payload);
+                Vec::new()
+            }
+            AgentEvent::CompactionBoundary { summary } => {
+                self.chat.apply(&event.payload);
+                if summary.strategy.starts_with("auto_") {
+                    let savings = match (summary.tokens_before, summary.tokens_after) {
+                        (Some(before), Some(after)) if before > after => {
+                            format!(" (~{before} → ~{after} tokens)")
+                        }
+                        _ => String::new(),
+                    };
+                    self.toast(format!(
+                        "Auto-compacted context{savings} — approaching limit"
+                    ));
+                }
+                Vec::new()
+            }
             payload => {
                 self.chat.apply(payload);
                 Vec::new()
@@ -1429,6 +1529,20 @@ impl App {
         } else if let Some(prompt) = self.pending_questions.pop_front() {
             self.overlay = Overlay::Question(prompt);
         }
+    }
+
+    fn apply_fresh_session(&mut self, id: SessionId, banner: &str) {
+        self.session.id = id;
+        self.session.last_seq = 0;
+        self.session.turn = TurnPhase::Idle;
+        self.chat = ChatState::default();
+        self.markdown_cache.clear();
+        self.overlay = Overlay::None;
+        self.pending_permissions.clear();
+        self.pending_questions.clear();
+        self.status.toasts.clear();
+        self.status.turn_output_chars = 0;
+        self.chat.push_info(banner);
     }
 
     // ── task results ────────────────────────────────────────────────────────
@@ -1505,20 +1619,20 @@ impl App {
                 }
             },
             TaskResult::SessionReset(Ok(id)) => {
-                self.session.id = id;
-                self.session.last_seq = 0;
-                self.session.turn = TurnPhase::Idle;
-                self.chat = ChatState::default();
-                self.markdown_cache.clear();
-                self.overlay = Overlay::None;
-                self.pending_permissions.clear();
-                self.pending_questions.clear();
-                self.chat.push_info("new session");
+                self.apply_fresh_session(id, "new session");
                 Vec::new()
             }
             TaskResult::SessionReset(Err(message)) => {
                 self.chat
                     .push_error(format!("new session failed: {message}"));
+                Vec::new()
+            }
+            TaskResult::SessionCleared(Ok(id)) => {
+                self.apply_fresh_session(id, "chat cleared");
+                Vec::new()
+            }
+            TaskResult::SessionCleared(Err(message)) => {
+                self.chat.push_error(format!("clear failed: {message}"));
                 Vec::new()
             }
             TaskResult::Resynced(Ok(transcript)) => {
@@ -1590,14 +1704,27 @@ impl App {
                 self.on_mcp_tool_called(&server, &tool, result);
                 Vec::new()
             }
+            TaskResult::PermissionRespondFailed { message } => {
+                self.toast(format!("permission response failed: {message}"));
+                self.chat.push_error(
+                    "could not deliver permission decision — press Esc to cancel the turn"
+                        .to_owned(),
+                );
+                Vec::new()
+            }
             TaskResult::EngineReloaded(outcome) => match *outcome {
                 Ok(bootstrap) => {
                     self.mcp_enabled = bootstrap.mcp_enabled;
                     if self.kind == AgentKind::Native {
                         let model = self.session.model.clone();
+                        let restarted = bootstrap.session_restarted;
                         self.install_bootstrap(bootstrap, false);
                         self.session.model = model;
-                        self.toast("MCP servers reloaded");
+                        if restarted {
+                            self.toast("session restarted after MCP reload");
+                        } else {
+                            self.toast("MCP servers reloaded");
+                        }
                     }
                     Vec::new()
                 }
@@ -1705,10 +1832,8 @@ impl App {
             model: bootstrap.model,
             turn: TurnPhase::Idle,
             last_seq: 0,
-            permission_mode: bootstrap
-                .permission_mode
-                .unwrap_or(PermissionMode::AcceptEdits),
-            session_mode: SessionMode::Code,
+            permission_mode: bootstrap.permission_mode.unwrap_or(prev_permission_mode),
+            session_mode: prev_session_mode,
         };
         self.providers = bootstrap.providers;
         self.catalog.clear();
@@ -2005,6 +2130,7 @@ mod copilot_auth_tests {
             trace: Vec::new(),
             permission_mode: None,
             mcp_enabled: 0,
+            session_restarted: false,
         }
     }
 
@@ -2098,6 +2224,7 @@ mod status_tests {
             trace: Vec::new(),
             permission_mode: None,
             mcp_enabled: 0,
+            session_restarted: false,
         };
         App::new(bootstrap, PathBuf::from("."), FileIndex::default())
     }
@@ -2156,7 +2283,43 @@ mod status_tests {
 #[cfg(test)]
 mod session_tests {
     use super::*;
-    use agentloop_contracts::SessionId;
+    use crate::commands::LocalCommand;
+    use crate::events::{Effect, SessionBootstrap};
+    use crate::files::FileIndex;
+    use agentloop_cli_core::AgentKind;
+    use agentloop_contracts::{AgentCaps, Hello, PermissionCaps, PermissionMode, SessionId};
+
+    fn native_caps() -> AgentCaps {
+        AgentCaps {
+            permissions: PermissionCaps {
+                interactive: true,
+                modes: vec![
+                    PermissionMode::Default,
+                    PermissionMode::AcceptEdits,
+                    PermissionMode::BypassPermissions,
+                ],
+                tool_scoping: true,
+            },
+            reasoning_visible: true,
+            ..AgentCaps::default()
+        }
+    }
+
+    fn native_test_app() -> App {
+        let bootstrap = SessionBootstrap {
+            kind: AgentKind::Native,
+            hello: Hello::new(native_caps()),
+            session: SessionId::from("sess-test"),
+            providers: vec!["anthropic".to_owned()],
+            model: None,
+            transcript: None,
+            trace: Vec::new(),
+            permission_mode: None,
+            mcp_enabled: 0,
+            session_restarted: false,
+        };
+        App::new(bootstrap, PathBuf::from("."), FileIndex::default())
+    }
 
     fn test_session() -> SessionState {
         SessionState {
@@ -2174,5 +2337,85 @@ mod session_tests {
         let mut session = test_session();
         session.session_mode = SessionMode::Plan;
         assert_eq!(session.effective_permission_mode(), PermissionMode::Plan);
+    }
+
+    #[test]
+    fn bypass_mode_is_sent_on_submit_prompt() {
+        let mut app = native_test_app();
+        app.session.permission_mode = PermissionMode::BypassPermissions;
+        let effects = app.submit_prompt("hello");
+        assert_eq!(effects.len(), 1);
+        match &effects[0] {
+            Effect::SubmitPrompt { opts, .. } => {
+                assert_eq!(
+                    opts.permission_mode,
+                    Some(PermissionMode::BypassPermissions)
+                );
+            }
+            other => panic!("expected SubmitPrompt, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn allow_all_command_syncs_live_turn_mode() {
+        let mut app = native_test_app();
+        app.overlay = Overlay::Confirm(ConfirmPrompt {
+            title: "Bypass all tool permissions?".to_owned(),
+            message: String::new(),
+            action: ConfirmAction::AllowAllPermissions,
+        });
+        let outcome = OverlayOutcome {
+            confirmed: Some(ConfirmAction::AllowAllPermissions),
+            close: true,
+            ..OverlayOutcome::default()
+        };
+        let effects = app.apply_overlay_outcome(outcome);
+        assert_eq!(
+            app.session.permission_mode,
+            PermissionMode::BypassPermissions
+        );
+        assert!(
+            effects.iter().any(|effect| matches!(
+                effect,
+                Effect::SetTurnPermissionMode {
+                    mode: Some(PermissionMode::BypassPermissions)
+                }
+            )),
+            "expected live turn permission sync, got {effects:?}"
+        );
+    }
+
+    #[test]
+    fn install_bootstrap_preserves_permission_mode_on_reload() {
+        let mut app = native_test_app();
+        app.session.permission_mode = PermissionMode::BypassPermissions;
+        app.session.session_mode = SessionMode::Plan;
+        let bootstrap = SessionBootstrap {
+            kind: AgentKind::Native,
+            hello: Hello::new(native_caps()),
+            session: SessionId::from("sess-reloaded"),
+            providers: vec!["anthropic".to_owned()],
+            model: None,
+            transcript: None,
+            trace: Vec::new(),
+            permission_mode: None,
+            mcp_enabled: 1,
+            session_restarted: false,
+        };
+        app.install_bootstrap(bootstrap, false);
+        assert_eq!(
+            app.session.permission_mode,
+            PermissionMode::BypassPermissions
+        );
+        assert_eq!(app.session.session_mode, SessionMode::Plan);
+    }
+
+    #[test]
+    fn permissions_allow_all_routes_to_confirm() {
+        let mut app = native_test_app();
+        app.run_local(LocalCommand::Permissions {
+            arg: Some("allow-all".to_owned()),
+        });
+        assert!(matches!(app.overlay, Overlay::Confirm(_)));
     }
 }

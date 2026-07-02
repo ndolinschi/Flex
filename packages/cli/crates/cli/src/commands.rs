@@ -18,6 +18,8 @@ pub enum LocalCommand {
     Agent { arg: Option<String> },
     /// `/new` — fresh session on the current service.
     New,
+    /// `/clear` — cancel the turn, wipe chat, and start a blank session.
+    Clear,
     /// `/help` — keys and command list.
     Help,
     /// `/command <shell>` — run a shell command in the session cwd.
@@ -94,6 +96,7 @@ const LOCAL: &[(&str, &str, Option<&str>)] = &[
         Some("[native|claude-code|copilot]"),
     ),
     ("new", "start a fresh session", None),
+    ("clear", "clear chat and reset session context", None),
     (
         "command",
         "run a shell command in the current directory",
@@ -218,6 +221,7 @@ impl CommandIndex {
             "provider" => Route::Local(LocalCommand::Provider { arg }),
             "agent" => Route::Local(LocalCommand::Agent { arg }),
             "new" => Route::Local(LocalCommand::New),
+            "clear" => Route::Local(LocalCommand::Clear),
             "help" => Route::Local(LocalCommand::Help),
             "copy" => Route::Local(LocalCommand::Copy),
             "command" => Route::Local(LocalCommand::Command {
@@ -375,6 +379,12 @@ mod tests {
     fn route_compact_is_local() {
         let index = CommandIndex::default();
         assert_eq!(index.route("/compact"), Route::Local(LocalCommand::Compact));
+    }
+
+    #[test]
+    fn route_clear_is_local() {
+        let index = CommandIndex::default();
+        assert_eq!(index.route("/clear"), Route::Local(LocalCommand::Clear));
     }
 
     #[test]

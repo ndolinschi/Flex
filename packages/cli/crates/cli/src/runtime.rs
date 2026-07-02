@@ -60,8 +60,50 @@ async fn run_tui(args: Args) -> Result<()> {
     let requested_model = cli_model
         .clone()
         .or_else(|| saved_model.as_ref().map(|stored| ModelRef(stored.clone())));
+    // #region agent log
+    {
+        use std::io::Write;
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/Users/ndolinschi/Documents/Apps/AgenticStudio/.cursor/debug-79ecfd.log")
+        {
+            let payload = serde_json::json!({
+                "sessionId": "79ecfd",
+                "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0),
+                "hypothesisId": "C",
+                "location": "runtime.rs:run_tui",
+                "message": "before bootstrap_session",
+                "data": { "agent": format!("{:?}", args.agent) },
+                "runId": "pre-fix",
+            });
+            let _ = writeln!(file, "{payload}");
+        }
+    }
+    // #endregion
     let (controller, events, mut bootstrap) =
         bootstrap_session(&mut hub, args.agent, requested_model.clone()).await?;
+    // #region agent log
+    {
+        use std::io::Write;
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/Users/ndolinschi/Documents/Apps/AgenticStudio/.cursor/debug-79ecfd.log")
+        {
+            let payload = serde_json::json!({
+                "sessionId": "79ecfd",
+                "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0),
+                "hypothesisId": "E",
+                "location": "runtime.rs:run_tui",
+                "message": "after bootstrap_session, before terminal enter",
+                "data": { "mcp_enabled": bootstrap.mcp_enabled },
+                "runId": "pre-fix",
+            });
+            let _ = writeln!(file, "{payload}");
+        }
+    }
+    // #endregion
     bootstrap.model = resolve_startup_model(cli_model.as_ref(), saved_model.as_deref(), &bootstrap);
     if cli_model.is_some() {
         if let Some(model) = bootstrap.model.as_ref() {
@@ -291,6 +333,7 @@ async fn bootstrap_session(
         trace,
         permission_mode: None,
         mcp_enabled,
+        session_restarted: false,
     };
     Ok((controller, events, bootstrap))
 }
@@ -430,9 +473,40 @@ impl EffectExecutor {
             }
             Effect::RespondPermission { id, decision } => {
                 let controller = self.controller.clone();
+                let tx = self.tx.clone();
                 tokio::spawn(async move {
                     let (service, session) = current_service_session(&controller).await;
-                    let _ = service.respond_permission(&session, id, decision).await;
+                    let result = service
+                        .respond_permission(&session, id.clone(), decision.clone())
+                        .await;
+                    // #region agent log
+                    crate::debug_log::agent_debug_log(
+                        "K",
+                        "runtime.rs:RespondPermission",
+                        "respond_permission finished",
+                        serde_json::json!({
+                            "request_id": id.as_str(),
+                            "session_id": session.as_str(),
+                            "decision": format!("{decision:?}"),
+                            "ok": result.is_ok(),
+                            "error": result.as_ref().err().map(|err| err.to_string()),
+                        }),
+                    );
+                    // #endregion
+                    if let Err(err) = result {
+                        let _ = tx
+                            .send(AppEvent::Task(TaskResult::PermissionRespondFailed {
+                                message: err.to_string(),
+                            }))
+                            .await;
+                    }
+                });
+            }
+            Effect::SetTurnPermissionMode { mode } => {
+                let controller = self.controller.clone();
+                tokio::spawn(async move {
+                    let (service, session) = current_service_session(&controller).await;
+                    let _ = service.set_turn_permission_mode(&session, mode);
                 });
             }
             Effect::RespondQuestion { id, answers } => {
@@ -479,36 +553,30 @@ impl EffectExecutor {
                 let current_kind = self.current_kind.clone();
                 let tx = self.tx.clone();
                 tokio::spawn(async move {
-                    let service = {
-                        let controller = controller.lock().await;
-                        controller.service().clone()
-                    };
-                    let (cwd, kind) = {
-                        let hub = hub.lock().await;
-                        (Some(hub.cwd().to_path_buf()), *current_kind.lock().await)
-                    };
-                    let params = NewSessionParams {
-                        cwd,
-                        ..NewSessionParams::default()
-                    };
-                    let result = async {
-                        let (next, events) = SessionController::open(service, params).await?;
-                        let id = next.session_id().clone();
-                        {
-                            let mut controller = controller.lock().await;
-                            *controller = next;
-                        }
-                        {
-                            let mut hub = hub.lock().await;
-                            hub.remember_session(kind, id.clone());
-                        }
-                        spawn_engine_forwarder(events, tx.clone());
-                        Ok::<SessionId, agentloop_engine::EngineServiceError>(id)
-                    }
-                    .await
-                    .map_err(|err| err.to_string());
+                    let result = replace_with_fresh_session(
+                        controller,
+                        hub,
+                        current_kind,
+                        tx.clone(),
+                        false,
+                    )
+                    .await;
                     let _ = tx
                         .send(AppEvent::Task(TaskResult::SessionReset(result)))
+                        .await;
+                });
+            }
+            Effect::ClearSession => {
+                let controller = self.controller.clone();
+                let hub = self.hub.clone();
+                let current_kind = self.current_kind.clone();
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    let result =
+                        replace_with_fresh_session(controller, hub, current_kind, tx.clone(), true)
+                            .await;
+                    let _ = tx
+                        .send(AppEvent::Task(TaskResult::SessionCleared(result)))
                         .await;
                 });
             }
@@ -690,6 +758,45 @@ async fn current_service_session(
     )
 }
 
+async fn replace_with_fresh_session(
+    controller: Arc<Mutex<SessionController>>,
+    hub: Arc<Mutex<EngineHub>>,
+    current_kind: Arc<Mutex<AgentKind>>,
+    tx: mpsc::Sender<AppEvent>,
+    cancel_first: bool,
+) -> Result<SessionId, String> {
+    if cancel_first {
+        let (service, session) = current_service_session(&controller).await;
+        let _ = service.cancel(&session).await;
+    }
+    let service = {
+        let controller = controller.lock().await;
+        controller.service().clone()
+    };
+    let (cwd, kind) = {
+        let hub = hub.lock().await;
+        (Some(hub.cwd().to_path_buf()), *current_kind.lock().await)
+    };
+    let params = NewSessionParams {
+        cwd,
+        ..NewSessionParams::default()
+    };
+    let (next, events) = SessionController::open(service, params)
+        .await
+        .map_err(|err| err.to_string())?;
+    let id = next.session_id().clone();
+    {
+        let mut controller = controller.lock().await;
+        *controller = next;
+    }
+    {
+        let mut hub = hub.lock().await;
+        hub.remember_session(kind, id.clone());
+    }
+    spawn_engine_forwarder(events, tx);
+    Ok(id)
+}
+
 async fn switch_agent(
     hub: Arc<Mutex<EngineHub>>,
     controller: Arc<Mutex<SessionController>>,
@@ -734,16 +841,39 @@ async fn reload_engine(
     if kind != AgentKind::Native {
         return Err("MCP reload requires the native agent".to_owned());
     }
-    let session = {
-        let controller = controller.lock().await;
-        controller.session_id().clone()
+    let (session, transcript_fallback, cwd) = {
+        let controller_guard = controller.lock().await;
+        let was_running = {
+            let service = controller_guard.service();
+            // Best-effort: stop any in-flight turn before swapping engine instances.
+            let _ = service.cancel(controller_guard.session_id()).await;
+            true
+        };
+        // #region agent log
+        crate::debug_log::agent_debug_log(
+            "N",
+            "runtime.rs:reload_engine",
+            "cancelling turn before engine reload",
+            serde_json::json!({
+                "session_id": controller_guard.session_id().as_str(),
+                "cancel_attempted": was_running,
+            }),
+        );
+        // #endregion
+        let session = controller_guard.session_id().clone();
+        let transcript_fallback = controller_guard.transcript().await.ok();
+        let cwd = {
+            let hub_guard = hub.lock().await;
+            hub_guard.cwd().to_path_buf()
+        };
+        (session, transcript_fallback, cwd)
     };
-    let mut hub = hub.lock().await;
-    hub.remember_session(kind, session);
+    let mut hub_guard = hub.lock().await;
+    hub_guard.remember_session(kind, session.clone());
     if invalidate {
-        hub.invalidate(AgentKind::Native);
+        hub_guard.invalidate(AgentKind::Native);
     }
-    let service = hub
+    let service = hub_guard
         .service(AgentKind::Native)
         .await
         .map_err(|err| err.to_string())?;
@@ -754,35 +884,46 @@ async fn reload_engine(
         .into_iter()
         .map(|id| id.to_string())
         .collect::<Vec<_>>();
-    let trace = hub.trace(AgentKind::Native).to_vec();
+    let trace = hub_guard.trace(AgentKind::Native).to_vec();
     let mcp_enabled = McpStore::load().enabled_count();
-    drop(hub);
+    drop(hub_guard);
 
-    let (next, events) = {
-        let controller = controller.lock().await;
-        let session_id = controller.session_id().clone();
-        SessionController::resume(service, session_id)
-            .await
-            .map_err(|err| err.to_string())?
+    let resume_result = SessionController::resume(service.clone(), session.clone()).await;
+    let (next, events, session_restarted) = match resume_result {
+        Ok(pair) => (pair.0, pair.1, false),
+        Err(_) => {
+            let params = NewSessionParams {
+                cwd: Some(cwd),
+                ..NewSessionParams::default()
+            };
+            let (opened, events) = SessionController::open(service, params)
+                .await
+                .map_err(|err| err.to_string())?;
+            (opened, events, true)
+        }
     };
+    let transcript = next.transcript().await.ok().or(transcript_fallback);
+    let session_id = next.session_id().clone();
     {
         let mut controller = controller.lock().await;
         *controller = next;
+    }
+    {
+        let mut hub_guard = hub.lock().await;
+        hub_guard.remember_session(kind, session_id.clone());
     }
     spawn_engine_forwarder(events, tx);
     Ok(SessionBootstrap {
         kind: AgentKind::Native,
         hello,
-        session: {
-            let controller = controller.lock().await;
-            controller.session_id().clone()
-        },
+        session: session_id,
         providers,
         model: None,
-        transcript: None,
+        transcript,
         trace,
         permission_mode: None,
         mcp_enabled,
+        session_restarted,
     })
 }
 

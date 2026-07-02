@@ -16,3 +16,5 @@ target/
 # Insta pending snapshots
 *.snap.new
 *.pending-snap
+.cursor/
+.playwright-mcp/

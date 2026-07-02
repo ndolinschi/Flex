@@ -23,6 +23,6 @@ AgenticStudio 0.1.0 — /help for keys and commands
         │                                                              │
 ────────└──────────────────────────────────────────────────────────────┘────────
 ┌ prompt ──────────────────────────────────────────────────────────────────────┐
-│ Type a message, / for commands, @ for files                                  │
+│ Type a message, / commands, @ files · @path:[0:12] python slice              │
 └──────────────────────────────────────────────────────────────────────────────┘
 native · code · auto · anthropic/claude-sonnet-4-5 · ↑0 ↓0

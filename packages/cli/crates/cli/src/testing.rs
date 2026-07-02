@@ -31,6 +31,7 @@ pub fn test_bootstrap() -> SessionBootstrap {
         trace: Vec::new(),
         permission_mode: None,
         mcp_enabled: 0,
+        session_restarted: false,
     }
 }
 

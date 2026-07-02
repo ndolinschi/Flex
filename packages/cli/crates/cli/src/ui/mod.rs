@@ -17,12 +17,16 @@ use agentloop_contracts::{PermissionDecisionKind, Question};
 
 use crate::app::{App, TurnPhase, permission_mode_label, session_mode_label};
 use crate::chat::{ChatItem, DraftBlock};
-use crate::input::{CommandPopup, FilePopup, InputPopup};
+use crate::files::{MENTION_PREVIEW_MAX_LINES, MentionPreview};
+use crate::input::{
+    CommandPopup, FilePopup, InputPopup, POPUP_LIST_MAX_ROWS, popup_list_scroll_offset,
+};
 use crate::overlay::{
     ConfirmPrompt, LoginState, McpExplorerPhase, McpExplorerState, McpInstallMode, McpInstallState,
     McpListState, Overlay, PermissionPrompt, PickerState, QuestionPrompt, ShellCommandOverlay,
     ShellCommandPhase,
 };
+use crate::terminal_text::terminal_lines;
 use crate::theme;
 
 /// Draw one full frame: chat, an optional notification line (busy pulse or
@@ -179,7 +183,7 @@ fn chat_lines(app: &mut App, viewport_width: u16) -> Vec<Line<'static>> {
         let item = &items[idx];
         match item {
             ChatItem::User { text } => {
-                for (line_idx, line) in text.lines().enumerate() {
+                for (line_idx, line) in terminal_lines(text).into_iter().enumerate() {
                     if line_idx == 0 {
                         lines.push(Line::from(vec![
                             Span::styled("> ", theme::DIM),
@@ -530,20 +534,47 @@ fn draw_popup(frame: &mut Frame<'_>, app: &App, input_area: Rect) {
     }
 }
 
-fn draw_command_popup(frame: &mut Frame<'_>, popup: &CommandPopup, input_area: Rect) {
-    let height = (popup.matches.len().min(8) as u16).saturating_add(2).max(3);
-    let y = input_area.y.saturating_sub(height);
+fn popup_list_layout(
+    anchor_y: u16,
+    anchor_x: u16,
+    width: u16,
+    match_count: usize,
+) -> Option<(Rect, usize)> {
+    if anchor_y == 0 {
+        return None;
+    }
+    let list_rows = match_count.min(POPUP_LIST_MAX_ROWS);
+    let desired_height = (list_rows as u16).saturating_add(2).max(3);
+    let height = desired_height.min(anchor_y);
+    if height < 3 {
+        return None;
+    }
+    let visible_rows = height.saturating_sub(2) as usize;
     let area = Rect {
-        x: input_area.x,
-        y,
-        width: input_area.width.min(60),
+        x: anchor_x,
+        y: anchor_y.saturating_sub(height),
+        width: width.min(60),
         height,
     };
+    Some((area, visible_rows.max(1)))
+}
+
+fn draw_command_popup(frame: &mut Frame<'_>, popup: &CommandPopup, input_area: Rect) {
+    let Some((area, visible_rows)) = popup_list_layout(
+        input_area.y,
+        input_area.x,
+        input_area.width,
+        popup.matches.len(),
+    ) else {
+        return;
+    };
+    let scroll_offset = popup_list_scroll_offset(popup.selected, visible_rows, popup.matches.len());
     let items = popup
         .matches
         .iter()
         .enumerate()
-        .take(8)
+        .skip(scroll_offset)
+        .take(visible_rows)
         .map(|(idx, entry)| {
             let style = if idx == popup.selected {
                 theme::SELECTED
@@ -559,26 +590,40 @@ fn draw_command_popup(frame: &mut Frame<'_>, popup: &CommandPopup, input_area: R
         })
         .collect::<Vec<_>>();
     frame.render_widget(Clear, area);
+    let position = format!(" {}/{} ", popup.selected + 1, popup.matches.len());
     frame.render_widget(
-        List::new(items).block(Block::default().borders(Borders::ALL).title(" commands ")),
+        List::new(items).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(format!(" commands{position}")),
+        ),
         area,
     );
 }
 
 fn draw_file_popup(frame: &mut Frame<'_>, popup: &FilePopup, input_area: Rect) {
-    let height = (popup.matches.len().min(8) as u16).saturating_add(2).max(3);
-    let y = input_area.y.saturating_sub(height);
-    let area = Rect {
-        x: input_area.x,
-        y,
-        width: input_area.width.min(60),
-        height,
+    let mut anchor_y = input_area.y;
+    if let Some(preview) = &popup.preview {
+        anchor_y = draw_mention_preview(frame, preview, input_area.x, anchor_y, input_area.width);
+    }
+    if popup.matches.is_empty() {
+        return;
+    }
+    let Some((area, visible_rows)) = popup_list_layout(
+        anchor_y,
+        input_area.x,
+        input_area.width,
+        popup.matches.len(),
+    ) else {
+        return;
     };
+    let scroll_offset = popup_list_scroll_offset(popup.selected, visible_rows, popup.matches.len());
     let items = popup
         .matches
         .iter()
         .enumerate()
-        .take(8)
+        .skip(scroll_offset)
+        .take(visible_rows)
         .map(|(idx, path)| {
             let style = if idx == popup.selected {
                 theme::SELECTED
@@ -592,10 +637,74 @@ fn draw_file_popup(frame: &mut Frame<'_>, popup: &FilePopup, input_area: Rect) {
         })
         .collect::<Vec<_>>();
     frame.render_widget(Clear, area);
+    let position = format!(" {}/{} ", popup.selected + 1, popup.matches.len());
     frame.render_widget(
-        List::new(items).block(Block::default().borders(Borders::ALL).title(" files ")),
+        List::new(items).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(format!(" files{position}")),
+        ),
         area,
     );
+}
+
+fn draw_mention_preview(
+    frame: &mut Frame<'_>,
+    preview: &MentionPreview,
+    x: u16,
+    anchor_y: u16,
+    width: u16,
+) -> u16 {
+    if anchor_y == 0 {
+        return anchor_y;
+    }
+    let content_rows = if preview.error.is_some() {
+        1usize
+    } else {
+        preview.lines.len().max(1)
+    };
+    let note_rows = usize::from(preview.truncated) + usize::from(preview.error.is_some());
+    let body_rows = (content_rows + note_rows).min(MENTION_PREVIEW_MAX_LINES + 2);
+    let height = (body_rows as u16).saturating_add(2).min(anchor_y);
+    if height < 3 {
+        return anchor_y;
+    }
+    let y = anchor_y.saturating_sub(height);
+    let area = Rect {
+        x,
+        y,
+        width: width.min(72),
+        height,
+    };
+    let title = format!(" {} — {} ", preview.path, preview.label);
+    let mut lines = Vec::new();
+    if let Some(err) = &preview.error {
+        lines.push(Line::from(Span::styled(err.clone(), theme::WARN)));
+    } else if preview.lines.is_empty() {
+        lines.push(Line::from(Span::styled("(empty range)", theme::DIM)));
+    } else {
+        for (num, line) in &preview.lines {
+            lines.push(Line::from(vec![
+                Span::styled(format!("{num:>4} "), theme::DIM),
+                Span::raw(line.clone()),
+            ]));
+        }
+        if preview.truncated {
+            let hidden = preview.total_lines.saturating_sub(preview.lines.len());
+            lines.push(Line::from(Span::styled(
+                format!("… {hidden} more lines"),
+                theme::DIM,
+            )));
+        }
+    }
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(lines)
+            .block(Block::default().borders(Borders::ALL).title(title))
+            .wrap(Wrap { trim: false }),
+        area,
+    );
+    y
 }
 
 fn draw_overlay(frame: &mut Frame<'_>, app: &App, root: Rect) {
@@ -872,8 +981,8 @@ fn draw_shell_command(frame: &mut Frame<'_>, state: &ShellCommandOverlay, app: &
             if output.is_empty() {
                 lines.push(Line::from(Span::styled("(no output)", theme::DIM)));
             } else {
-                for line in output.lines() {
-                    lines.push(Line::from(line.to_owned()));
+                for line in terminal_lines(output) {
+                    lines.push(Line::from(line));
                 }
             }
             lines.push(Line::default());
@@ -914,7 +1023,7 @@ fn draw_help(frame: &mut Frame<'_>, app: &App, root: Rect) {
     let mut lines = vec![
         Line::from(Span::styled("Keys", theme::TITLE)),
         Line::from("Enter submit · Alt+Enter/Ctrl+J newline · Esc cancel · Ctrl+C quit"),
-        Line::from("@ attach files · type @ in prompt to fuzzy-search the workdir"),
+        Line::from("@ attach files · @path:[0:12] python slice preview · type @ to search"),
         Line::from("PgUp/PgDn or ↑/↓ (empty prompt) scroll · End follow · drag to select & copy"),
         Line::from("Ctrl+Shift+C or /copy — copy transcript · Ctrl+M — toggle mouse wheel scroll"),
         Line::from(
@@ -1003,9 +1112,10 @@ fn draw_mcp_explorer(frame: &mut Frame<'_>, state: &McpExplorerState, root: Rect
         McpExplorerPhase::Failed { message } => {
             vec![Line::from(Span::styled(message, theme::ERROR))]
         }
-        McpExplorerPhase::Result { output, .. } => {
-            output.lines().map(Line::from).collect::<Vec<_>>()
-        }
+        McpExplorerPhase::Result { output, .. } => terminal_lines(output)
+            .into_iter()
+            .map(Line::from)
+            .collect::<Vec<_>>(),
         McpExplorerPhase::Tools { tools } => {
             if state.args_mode {
                 vec![

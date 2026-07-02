@@ -110,9 +110,13 @@ impl McpStore {
                 });
             }
         };
-        let store: Self = serde_json::from_str(&raw).map_err(|err| McpStoreError::InvalidFile {
-            message: err.to_string(),
-        })?;
+        let mut store: Self =
+            serde_json::from_str(&raw).map_err(|err| McpStoreError::InvalidFile {
+                message: err.to_string(),
+            })?;
+        if store.repair_known_misconfigs() {
+            let _ = store.save_to(path);
+        }
         Ok(store)
     }
 
@@ -195,6 +199,24 @@ impl McpStore {
         let changed = !server.config.enabled;
         server.config.enabled = true;
         Ok(changed)
+    }
+
+    /// Fix known bad installs (e.g. bare `playwright` npm package).
+    pub fn repair_known_misconfigs(&mut self) -> bool {
+        let mut repaired = false;
+        for server in &mut self.servers {
+            if !is_wrong_playwright_install(server) {
+                continue;
+            }
+            if let McpServerTransport::Stdio(ref mut stdio) = server.config.transport {
+                stdio.args = vec!["-y".to_owned(), "@playwright/mcp".to_owned()];
+            }
+            if let McpInstallSource::Npm { ref mut package } = server.meta.source {
+                *package = "@playwright/mcp".to_owned();
+            }
+            repaired = true;
+        }
+        repaired
     }
 
     /// Remove `name` from the store.
@@ -413,7 +435,23 @@ fn stdio_npm_config(name: &str, package: &str, extra_args: Vec<String>) -> McpSe
 }
 
 fn normalize_npm_package(input: &str) -> String {
-    input.trim().to_owned()
+    match input.trim() {
+        "playwright" => "@playwright/mcp".to_owned(),
+        other => other.to_owned(),
+    }
+}
+
+fn is_wrong_playwright_install(server: &InstalledMcpServer) -> bool {
+    let McpServerTransport::Stdio(stdio) = &server.config.transport else {
+        return false;
+    };
+    if stdio.command != "npx" {
+        return false;
+    }
+    let args = &stdio.args;
+    args.first().map(String::as_str) == Some("-y")
+        && args.get(1).map(String::as_str) == Some("playwright")
+        && !args.iter().any(|arg| arg.contains("@playwright/mcp"))
 }
 
 fn npm_server_name(package: &str) -> String {
@@ -740,5 +778,40 @@ mod tests {
     #[test]
     fn registry_has_entries() {
         assert!(registry().len() >= 10);
+    }
+
+    #[test]
+    fn playwright_install_resolves_to_mcp_package() {
+        assert_eq!(
+            parse_install_target("playwright"),
+            InstallTarget::Npm("@playwright/mcp".to_owned())
+        );
+        let mut store = McpStore::default();
+        store.install_npm("playwright", None).expect("install");
+        match &store.servers[0].config.transport {
+            McpServerTransport::Stdio(cfg) => {
+                assert_eq!(cfg.args[1], "@playwright/mcp");
+            }
+            other => panic!("expected stdio transport, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn repair_fixes_wrong_playwright_npm_install() {
+        let mut store = McpStore::default();
+        store.install_npm("playwright", None).expect("install");
+        if let McpServerTransport::Stdio(ref mut stdio) = store.servers[0].config.transport {
+            stdio.args[1] = "playwright".to_owned();
+        }
+        if let McpInstallSource::Npm { ref mut package } = store.servers[0].meta.source {
+            *package = "playwright".to_owned();
+        }
+        assert!(store.repair_known_misconfigs());
+        match &store.servers[0].config.transport {
+            McpServerTransport::Stdio(cfg) => {
+                assert_eq!(cfg.args[1], "@playwright/mcp");
+            }
+            other => panic!("expected stdio transport, got {other:?}"),
+        }
     }
 }
