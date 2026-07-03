@@ -6,12 +6,12 @@
 //! (or each `TextSnapshot`) **replaces** the accumulated state, so delta
 //! loss or duplication self-heals.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use agentloop_contracts::{
     AgentEvent, ContentBlock, MessageId, PlanEntry, Role, SessionId, TokenUsage, ToolCall,
-    ToolCallId, ToolCallStatus, Transcript, TranscriptBlock,
+    ToolCallId, ToolCallStatus, Transcript, TranscriptBlock, TurnStopReason,
 };
 
 /// One block of an assistant item (draft or complete).
@@ -74,12 +74,36 @@ pub enum ChatItem {
         headline: String,
         detail: Option<String>,
     },
-    /// A subagent task marker.
+    /// A subagent row, nested under the Task tool row that spawned it and
+    /// updated live from relayed child events.
     Subagent {
         child: SessionId,
         task: String,
-        done: bool,
+        role: Option<String>,
+        /// Learned from the first relayed `AssistantMessage`/`ModelFallback`
+        /// (`SubagentStarted` carries no model on the wire).
+        model: Option<String>,
+        tool_count: usize,
+        tokens: u64,
+        /// Latest relayed tool call, as `Name(args-summary)`.
+        last_activity: Option<String>,
+        /// Live-elapsed anchor; only meaningful while running.
+        started: Option<Instant>,
+        /// From `SubagentCompleted.summary` — authoritative once done.
+        duration_ms: Option<u64>,
+        outcome: SubagentOutcome,
+        /// Distinct child tool-call ids seen via relay (drives `tool_count`).
+        seen_calls: HashSet<ToolCallId>,
     },
+}
+
+/// Terminal state of a subagent row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SubagentOutcome {
+    Running,
+    Done,
+    Failed,
+    Cancelled,
 }
 
 /// Viewport scroll position.
@@ -171,6 +195,8 @@ pub struct ChatState {
     open: HashMap<MessageId, usize>,
     /// Tool items by call id.
     tools: HashMap<ToolCallId, usize>,
+    /// Subagent items by child session id.
+    subagents: HashMap<SessionId, usize>,
     /// The single trailing plan item, if any.
     plan: Option<usize>,
     /// Scroll position of the viewport.
@@ -184,6 +210,111 @@ impl ChatState {
     fn next_rev(&mut self) -> u64 {
         self.rev += 1;
         self.rev
+    }
+
+    /// Insert at `at`, shifting every stored index >= `at` so the O(1)
+    /// upsert maps stay correct.
+    fn insert_item_at(&mut self, at: usize, item: ChatItem) {
+        self.items.insert(at, item);
+        for idx in self.open.values_mut() {
+            if *idx >= at {
+                *idx += 1;
+            }
+        }
+        for idx in self.tools.values_mut() {
+            if *idx >= at {
+                *idx += 1;
+            }
+        }
+        for idx in self.subagents.values_mut() {
+            if *idx >= at {
+                *idx += 1;
+            }
+        }
+        if let Some(plan) = &mut self.plan {
+            if *plan >= at {
+                *plan += 1;
+            }
+        }
+        if let Some(focused) = &mut self.focused_tool {
+            if *focused >= at {
+                *focused += 1;
+            }
+        }
+    }
+
+    /// Role of a live subagent row (used by the app reducer to badge
+    /// relayed permission prompts).
+    pub fn subagent_role(&self, child: &SessionId) -> Option<String> {
+        self.subagents
+            .get(child)
+            .and_then(|idx| self.items.get(*idx))
+            .and_then(|item| match item {
+                ChatItem::Subagent { role, .. } => role.clone(),
+                _ => None,
+            })
+    }
+
+    /// Project one relayed child event onto its subagent row. Relays are
+    /// ephemeral (never persisted in the parent), so this only decorates a
+    /// live row: after a Gap/resync only Started/Completed replay, and a
+    /// completed row renders fully from its TurnSummary fields.
+    fn project_subagent_event(&mut self, idx: usize, event: &AgentEvent) {
+        if let AgentEvent::ModelFallback {
+            from,
+            to: Some(to),
+            reason,
+        } = event
+        {
+            let badge = match self.items.get_mut(idx) {
+                Some(ChatItem::Subagent { model, role, .. }) => {
+                    *model = Some(to.0.clone());
+                    role.clone().unwrap_or_else(|| "subagent".to_owned())
+                }
+                _ => return,
+            };
+            self.push_info(format!(
+                "\u{21bb} [{badge}] model fallback: {from} \u{2192} {to} ({})",
+                reason.message
+            ));
+            return;
+        }
+        let Some(ChatItem::Subagent {
+            model,
+            tool_count,
+            tokens,
+            last_activity,
+            seen_calls,
+            ..
+        }) = self.items.get_mut(idx)
+        else {
+            return;
+        };
+        match event {
+            AgentEvent::ToolCallUpdated { call } => {
+                if seen_calls.insert(call.id.clone()) {
+                    *tool_count += 1;
+                }
+                *last_activity = Some(crate::tool_output::tool_summary(
+                    &call.tool_name,
+                    &call.input,
+                ));
+            }
+            AgentEvent::AssistantMessage {
+                model: message_model,
+                usage,
+                ..
+            } => {
+                if message_model.is_some() {
+                    *model = message_model.clone();
+                }
+                *tokens += usage.map(|usage| usage.output).unwrap_or(0);
+            }
+            AgentEvent::PermissionRequested { title, .. } => {
+                *last_activity = Some(format!("waiting: {title}"));
+            }
+            _ => {}
+        }
     }
 
     /// Append a CLI-local info line. Skipped when it would repeat the
@@ -295,9 +426,23 @@ impl ChatState {
                     }
                     out.push('\n');
                 }
-                ChatItem::Subagent { task, done, .. } => {
-                    let marker = if *done { "done" } else { "running" };
-                    out.push_str(&format!("subagent {marker}: {task}\n"));
+                ChatItem::Subagent {
+                    task,
+                    role,
+                    outcome,
+                    tool_count,
+                    ..
+                } => {
+                    let marker = match outcome {
+                        SubagentOutcome::Running => "running",
+                        SubagentOutcome::Done => "done",
+                        SubagentOutcome::Failed => "failed",
+                        SubagentOutcome::Cancelled => "cancelled",
+                    };
+                    let badge = role.as_deref().unwrap_or("subagent");
+                    out.push_str(&format!(
+                        "subagent [{badge}] {marker}: {task} \u{b7} {tool_count} tools\n"
+                    ));
                 }
             }
             out.push('\n');
@@ -508,26 +653,74 @@ impl ChatState {
             AgentEvent::SubagentStarted {
                 child_session,
                 task,
-                ..
+                call_id,
+                role,
             } => {
-                self.items.push(ChatItem::Subagent {
+                let item = ChatItem::Subagent {
                     child: child_session.clone(),
                     task: task.clone(),
-                    done: false,
-                });
+                    role: role.clone(),
+                    model: None,
+                    tool_count: 0,
+                    tokens: 0,
+                    last_activity: None,
+                    started: Some(Instant::now()),
+                    duration_ms: None,
+                    outcome: SubagentOutcome::Running,
+                    seen_calls: HashSet::new(),
+                };
+                // Nest under the spawning Task tool row when we can find it;
+                // older logs without call_id append at the end.
+                let at = call_id
+                    .as_ref()
+                    .and_then(|id| self.tools.get(id).copied())
+                    .map(|tool_idx| tool_idx + 1)
+                    .unwrap_or(self.items.len());
+                self.insert_item_at(at, item);
+                self.subagents.insert(child_session.clone(), at);
             }
-            AgentEvent::SubagentCompleted { child_session, .. } => {
-                for item in self.items.iter_mut().rev() {
-                    if let ChatItem::Subagent { child, done, .. } = item {
-                        if child == child_session {
-                            *done = true;
-                            break;
+            AgentEvent::SubagentEvent {
+                child_session,
+                event,
+            } => {
+                if let Some(idx) = self.subagents.get(child_session).copied() {
+                    self.project_subagent_event(idx, event);
+                }
+            }
+            AgentEvent::SubagentCompleted {
+                child_session,
+                summary,
+            } => {
+                if let Some(ChatItem::Subagent {
+                    outcome,
+                    duration_ms,
+                    tool_count,
+                    tokens,
+                    last_activity,
+                    ..
+                }) = self
+                    .subagents
+                    .get(child_session)
+                    .copied()
+                    .and_then(|idx| self.items.get_mut(idx))
+                {
+                    *outcome = match summary.stop_reason {
+                        TurnStopReason::Cancelled => SubagentOutcome::Cancelled,
+                        TurnStopReason::Error | TurnStopReason::MaxIterations => {
+                            SubagentOutcome::Failed
                         }
-                    }
+                        _ => SubagentOutcome::Done,
+                    };
+                    // The summary is authoritative — relayed projections are
+                    // best-effort and absent entirely after a resync.
+                    *duration_ms = Some(summary.duration_ms);
+                    *tool_count = summary.num_tool_calls as usize;
+                    *tokens = summary.usage.output;
+                    *last_activity = None;
                 }
             }
             // Turn lifecycle, permissions, questions, gaps: app reducer.
-            // SubagentEvent, ToolArgsDelta, hooks: not rendered.
+            // ToolArgsDelta, hooks: not rendered.
             _ => {}
         }
     }
@@ -982,6 +1175,214 @@ mod apply_tests {
                 ..
             } if text == "late thought"
         ));
+    }
+}
+
+#[cfg(test)]
+mod subagent_tests {
+    use super::{ChatItem, ChatState, SubagentOutcome};
+    use agentloop_contracts::{
+        AgentEvent, MessageId, SessionId, TokenUsage, ToolCall, ToolCallId, ToolCallOrigin,
+        ToolCallStatus, ToolCallTiming, TurnId, TurnStopReason, TurnSummary,
+    };
+
+    fn task_call(id: &str) -> ToolCall {
+        ToolCall {
+            id: ToolCallId::from(id),
+            session_id: SessionId::from("parent"),
+            turn_id: TurnId::from("t1"),
+            message_id: MessageId::from("m1"),
+            tool_name: "Task".to_owned(),
+            input: serde_json::json!({"role": "searcher", "description": "map events"}),
+            read_only: true,
+            origin: ToolCallOrigin::Model,
+            status: ToolCallStatus::Running,
+            timing: ToolCallTiming::default(),
+            result: None,
+        }
+    }
+
+    fn started(child: &str, call_id: Option<&str>) -> AgentEvent {
+        AgentEvent::SubagentStarted {
+            child_session: SessionId::from(child),
+            task: "map events".to_owned(),
+            call_id: call_id.map(ToolCallId::from),
+            role: Some("searcher".to_owned()),
+        }
+    }
+
+    fn summary(stop_reason: TurnStopReason) -> TurnSummary {
+        TurnSummary {
+            turn_id: TurnId::from("child-t1"),
+            stop_reason,
+            usage: TokenUsage {
+                output: 31_200,
+                ..TokenUsage::default()
+            },
+            cost_usd: None,
+            num_model_calls: 3,
+            num_tool_calls: 9,
+            duration_ms: 42_000,
+        }
+    }
+
+    #[test]
+    fn subagent_started_nests_under_task_row_and_fixes_indices() {
+        let mut chat = ChatState::default();
+        chat.apply(&AgentEvent::ToolCallUpdated {
+            call: task_call("call-1"),
+        });
+        chat.apply(&AgentEvent::ToolCallUpdated {
+            call: task_call("call-2"),
+        });
+        chat.apply(&started("child-1", Some("call-1")));
+
+        assert!(
+            matches!(&chat.items[1], ChatItem::Subagent { child, .. } if child == &SessionId::from("child-1"))
+        );
+        // The shifted call-2 row must still be reachable through the index
+        // map: a completion update lands on the right item.
+        let mut done = task_call("call-2");
+        done.status = ToolCallStatus::Completed;
+        chat.apply(&AgentEvent::ToolCallUpdated { call: done });
+        assert!(matches!(
+            &chat.items[2],
+            ChatItem::Tool { call, .. }
+                if call.id == ToolCallId::from("call-2")
+                    && call.status == ToolCallStatus::Completed
+        ));
+    }
+
+    #[test]
+    fn subagent_started_without_call_id_appends() {
+        let mut chat = ChatState::default();
+        chat.apply(&AgentEvent::ToolCallUpdated {
+            call: task_call("call-1"),
+        });
+        chat.apply(&started("child-1", None));
+        assert!(matches!(&chat.items[1], ChatItem::Subagent { .. }));
+    }
+
+    #[test]
+    fn subagent_event_projects_counts_model_and_activity() {
+        let mut chat = ChatState::default();
+        chat.apply(&AgentEvent::ToolCallUpdated {
+            call: task_call("call-1"),
+        });
+        chat.apply(&started("child-1", Some("call-1")));
+
+        let child = SessionId::from("child-1");
+        let inner_call = ToolCall {
+            id: ToolCallId::from("child-call-1"),
+            tool_name: "Grep".to_owned(),
+            input: serde_json::json!({"pattern": "emit_persistent"}),
+            ..task_call("child-call-1")
+        };
+        // The same child call relayed twice (Running then Completed) counts once.
+        for _ in 0..2 {
+            chat.apply(&AgentEvent::SubagentEvent {
+                child_session: child.clone(),
+                event: Box::new(AgentEvent::ToolCallUpdated {
+                    call: inner_call.clone(),
+                }),
+            });
+        }
+        chat.apply(&AgentEvent::SubagentEvent {
+            child_session: child.clone(),
+            event: Box::new(AgentEvent::ToolCallUpdated {
+                call: ToolCall {
+                    id: ToolCallId::from("child-call-2"),
+                    ..inner_call.clone()
+                },
+            }),
+        });
+        chat.apply(&AgentEvent::SubagentEvent {
+            child_session: child.clone(),
+            event: Box::new(AgentEvent::AssistantMessage {
+                message_id: MessageId::from("child-m1"),
+                content: Vec::new(),
+                model: Some("deepseek/deepseek-chat".to_owned()),
+                usage: Some(TokenUsage {
+                    output: 12_400,
+                    ..TokenUsage::default()
+                }),
+            }),
+        });
+
+        let ChatItem::Subagent {
+            tool_count,
+            tokens,
+            model,
+            last_activity,
+            outcome,
+            ..
+        } = &chat.items[1]
+        else {
+            panic!("expected subagent row");
+        };
+        assert_eq!(*tool_count, 2);
+        assert_eq!(*tokens, 12_400);
+        assert_eq!(model.as_deref(), Some("deepseek/deepseek-chat"));
+        assert!(last_activity.as_deref().is_some_and(|a| a.contains("Grep")));
+        assert_eq!(*outcome, SubagentOutcome::Running);
+        assert_eq!(chat.subagent_role(&child).as_deref(), Some("searcher"));
+    }
+
+    #[test]
+    fn subagent_completed_uses_summary_and_outcome() {
+        for (stop, expected) in [
+            (TurnStopReason::EndTurn, SubagentOutcome::Done),
+            (TurnStopReason::Error, SubagentOutcome::Failed),
+            (TurnStopReason::MaxIterations, SubagentOutcome::Failed),
+            (TurnStopReason::Cancelled, SubagentOutcome::Cancelled),
+        ] {
+            let mut chat = ChatState::default();
+            chat.apply(&started("child-1", None));
+            chat.apply(&AgentEvent::SubagentCompleted {
+                child_session: SessionId::from("child-1"),
+                summary: summary(stop),
+            });
+            let ChatItem::Subagent {
+                outcome,
+                duration_ms,
+                tool_count,
+                tokens,
+                ..
+            } = &chat.items[0]
+            else {
+                panic!("expected subagent row");
+            };
+            assert_eq!(*outcome, expected, "stop reason {stop:?}");
+            assert_eq!(*duration_ms, Some(42_000));
+            assert_eq!(*tool_count, 9);
+            assert_eq!(*tokens, 31_200);
+        }
+    }
+
+    #[test]
+    fn subagent_tree_rebuilds_from_persisted_events_only() {
+        // Relays are ephemeral: a resync replays only Started + Completed.
+        let mut chat = ChatState::default();
+        chat.apply(&AgentEvent::ToolCallUpdated {
+            call: task_call("call-1"),
+        });
+        chat.apply(&started("child-1", Some("call-1")));
+        chat.apply(&AgentEvent::SubagentCompleted {
+            child_session: SessionId::from("child-1"),
+            summary: summary(TurnStopReason::EndTurn),
+        });
+        let ChatItem::Subagent {
+            outcome,
+            duration_ms,
+            tool_count,
+            ..
+        } = &chat.items[1]
+        else {
+            panic!("expected subagent row");
+        };
+        assert_eq!(*outcome, SubagentOutcome::Done);
+        assert_eq!(*duration_ms, Some(42_000));
+        assert_eq!(*tool_count, 9);
     }
 }
 

@@ -411,6 +411,105 @@ fn overlay_shell_command_done_snapshot() {
     assert_snapshot!("overlay_shell_command_done", rendered);
 }
 
+fn subagent_events(outcome: &str) -> Vec<AgentEvent> {
+    use agentloop_contracts::{SessionId, TokenUsage, TurnStopReason, TurnSummary};
+    let child = SessionId::from("child-1");
+    let mut events = vec![
+        AgentEvent::ToolCallUpdated {
+            call: custom_tool_call(
+                "call-task",
+                "Task",
+                serde_json::json!({"role": "searcher", "description": "map session event flow"}),
+                ToolCallStatus::Running,
+                None,
+            ),
+        },
+        AgentEvent::SubagentStarted {
+            child_session: child.clone(),
+            task: "map session event flow".to_owned(),
+            call_id: Some(ToolCallId::from("call-task")),
+            role: Some("searcher".to_owned()),
+        },
+        AgentEvent::SubagentEvent {
+            child_session: child.clone(),
+            event: Box::new(AgentEvent::ToolCallUpdated {
+                call: custom_tool_call(
+                    "child-call-1",
+                    "Grep",
+                    serde_json::json!({"pattern": "emit_persistent"}),
+                    ToolCallStatus::Running,
+                    None,
+                ),
+            }),
+        },
+        AgentEvent::SubagentEvent {
+            child_session: child.clone(),
+            event: Box::new(AgentEvent::AssistantMessage {
+                message_id: MessageId::from("child-m1"),
+                content: Vec::new(),
+                model: Some("deepseek/deepseek-chat".to_owned()),
+                usage: Some(TokenUsage {
+                    output: 12_400,
+                    ..TokenUsage::default()
+                }),
+            }),
+        },
+    ];
+    let stop_reason = match outcome {
+        "done" => Some(TurnStopReason::EndTurn),
+        "failed" => Some(TurnStopReason::Error),
+        _ => None,
+    };
+    if let Some(stop_reason) = stop_reason {
+        events.push(AgentEvent::SubagentCompleted {
+            child_session: child,
+            summary: TurnSummary {
+                turn_id: TurnId::from("child-t1"),
+                stop_reason,
+                usage: TokenUsage {
+                    output: 31_200,
+                    ..TokenUsage::default()
+                },
+                cost_usd: None,
+                num_model_calls: 3,
+                num_tool_calls: 9,
+                duration_ms: 42_000,
+            },
+        });
+    }
+    events
+}
+
+#[test]
+fn subagent_tree_running_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    for event in subagent_events("running") {
+        app.chat.apply(&event);
+    }
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("subagent_tree_running", rendered);
+}
+
+#[test]
+fn subagent_tree_done_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    for event in subagent_events("done") {
+        app.chat.apply(&event);
+    }
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("subagent_tree_done", rendered);
+}
+
+#[test]
+fn subagent_tree_failed_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    for event in subagent_events("failed") {
+        app.chat.apply(&event);
+    }
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("subagent_tree_failed", rendered);
+}
+
 #[test]
 fn chat_follow_shows_last_line() {
     let mut app = test_app(test_bootstrap());

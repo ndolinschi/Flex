@@ -1,0 +1,28 @@
+---
+source: crates/cli/src/render_snapshots.rs
+expression: rendered
+---
+✻ AgenticStudio 0.1.0
+cwd: .
+shift+tab cycles modes · ctrl+o expands tools · enter mid-turn queues · /help
+
+⠋ Task(map session event flow)
+  ⎿ [searcher] failed in 42s · 9 tools · 31.2k tok
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+┌ prompt ──────────────────────────────────────────────────────────────────────┐
+│ Type a message, / commands, @ files · @path:[0:12] python slice              │
+└──────────────────────────────────────────────────────────────────────────────┘
+native · code · auto · anthropic/claude-sonnet-4-5 · ↑0 ↓0

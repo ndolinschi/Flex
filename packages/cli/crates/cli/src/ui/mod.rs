@@ -16,7 +16,7 @@ use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap};
 use agentloop_contracts::{PermissionDecisionKind, Question};
 
 use crate::app::{App, TurnPhase, permission_mode_label, session_mode_label};
-use crate::chat::{ChatItem, DraftBlock};
+use crate::chat::{ChatItem, DraftBlock, SubagentOutcome};
 use crate::files::{MENTION_PREVIEW_MAX_LINES, MentionPreview};
 use crate::input::{
     CommandPopup, FilePopup, InputPopup, POPUP_LIST_MAX_ROWS, popup_list_scroll_offset,
@@ -287,11 +287,54 @@ fn chat_lines(app: &mut App, viewport_width: u16) -> Vec<Line<'static>> {
                     )));
                 }
             }
-            ChatItem::Subagent { task, done, .. } => {
-                let marker = if *done { "done" } else { "running" };
+            ChatItem::Subagent {
+                role,
+                model,
+                tool_count,
+                tokens,
+                last_activity,
+                duration_ms,
+                outcome,
+                ..
+            } => {
+                let badge = role.as_deref().unwrap_or("subagent");
+                let mut segments: Vec<String> = Vec::new();
+                match outcome {
+                    SubagentOutcome::Running => {
+                        if let Some(model) = model {
+                            segments.push(model.clone());
+                        }
+                        segments.push("running".to_owned());
+                    }
+                    SubagentOutcome::Done => segments.push(match duration_ms {
+                        Some(ms) => format!("done in {}s", ms / 1000),
+                        None => "done".to_owned(),
+                    }),
+                    SubagentOutcome::Failed => segments.push(match duration_ms {
+                        Some(ms) => format!("failed in {}s", ms / 1000),
+                        None => "failed".to_owned(),
+                    }),
+                    SubagentOutcome::Cancelled => segments.push("cancelled".to_owned()),
+                }
+                if *tool_count > 0 {
+                    let noun = if *tool_count == 1 { "tool" } else { "tools" };
+                    segments.push(format!("{tool_count} {noun}"));
+                }
+                if *tokens > 0 {
+                    segments.push(format!("{} tok", format_tokens(*tokens)));
+                }
+                if *outcome == SubagentOutcome::Running {
+                    if let Some(activity) = last_activity {
+                        segments.push(activity.clone());
+                    }
+                }
+                let style = match outcome {
+                    SubagentOutcome::Failed => theme::ERROR,
+                    _ => theme::DIM,
+                };
                 lines.push(Line::from(Span::styled(
-                    format!("subagent {marker}: {task}"),
-                    theme::DIM,
+                    format!("  ⎿ [{badge}] {}", segments.join(" · ")),
+                    style,
                 )));
             }
         }
@@ -356,8 +399,9 @@ fn item_produces_lines(
     }
 }
 
-/// Consecutive Info lines and consecutive Tool rows group tightly: no blank
-/// line between them.
+/// Consecutive Info lines, consecutive Tool rows, and Tool/Subagent runs
+/// (a parallel Task batch with nested subagent rows) group tightly: no
+/// blank line between them.
 fn tight_group(items: &[ChatItem], idx: usize) -> bool {
     let Some(next) = items.get(idx + 1) else {
         return false;
@@ -366,7 +410,23 @@ fn tight_group(items: &[ChatItem], idx: usize) -> bool {
         (&items[idx], next),
         (ChatItem::Info { .. }, ChatItem::Info { .. })
             | (ChatItem::Tool { .. }, ChatItem::Tool { .. })
+            | (ChatItem::Tool { .. }, ChatItem::Subagent { .. })
+            | (ChatItem::Subagent { .. }, ChatItem::Tool { .. })
+            | (ChatItem::Subagent { .. }, ChatItem::Subagent { .. })
     )
+}
+
+/// Compact token count: `12_400` → `"12.4k"`, values under 1000 verbatim.
+fn format_tokens(n: u64) -> String {
+    if n < 1000 {
+        return n.to_string();
+    }
+    let k = n as f64 / 1000.0;
+    if k < 100.0 {
+        format!("{k:.1}k")
+    } else {
+        format!("{k:.0}k")
+    }
 }
 
 /// Checkbox marker for one plan entry.
