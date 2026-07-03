@@ -100,6 +100,7 @@ fn native_service(
         cwd: workdir.to_path_buf(),
         date: today(),
         custom: Vec::new(),
+        roles: Vec::new(),
         mcp: Default::default(),
         mcp_manager: None,
         session_store: None,

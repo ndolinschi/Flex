@@ -7,6 +7,7 @@
 //! filtered tools, and prompt.
 
 use agentloop_contracts::ModelRef;
+use agentloop_core::{ToolFilter, ToolRegistry};
 
 /// Reserved role driving the interactive session; never spawnable.
 pub const MAIN_ROLE: &str = "main";
@@ -110,6 +111,40 @@ impl RoleRegistry {
             .get(role.unwrap_or(MAIN_ROLE))
             .map(|spec| spec.models.as_slice())
             .unwrap_or(&[])
+    }
+
+    /// The tool filter for a session serving `role` at spawn `depth`.
+    /// Subagents never get `AskUserQuestion` (they have no user) and lose
+    /// the `Task` tool once they reach their role's `max_depth`.
+    pub fn tool_filter(&self, role: &str, registry: &ToolRegistry, depth: u8) -> ToolFilter {
+        let mut deny = vec![
+            agentloop_core::tool::SUBAGENT_TOOL_NAME.to_owned(),
+            "AskUserQuestion".to_owned(),
+        ];
+        let Some(spec) = self.roles.get(role) else {
+            return ToolFilter {
+                allow: Vec::new(),
+                deny,
+            };
+        };
+        // Re-allow Task below the depth cap so deeper trees can form.
+        if depth < spec.max_depth {
+            deny.retain(|name| name != agentloop_core::tool::SUBAGENT_TOOL_NAME);
+        }
+        let allow = match &spec.tools {
+            RoleToolProfile::Full => Vec::new(),
+            RoleToolProfile::ReadOnly => registry
+                .read_only_names()
+                .into_iter()
+                .filter(|name| !deny.contains(name))
+                .collect(),
+            RoleToolProfile::Allow(list) => list
+                .iter()
+                .filter(|name| !deny.contains(name))
+                .cloned()
+                .collect(),
+        };
+        ToolFilter { allow, deny }
     }
 
     /// Roles the Task tool may spawn: everything except `main`, as

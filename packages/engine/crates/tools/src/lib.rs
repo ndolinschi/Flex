@@ -9,6 +9,7 @@ pub mod fs;
 mod glob;
 mod grep;
 mod registry;
+mod task;
 mod task_list;
 mod web_fetch;
 
@@ -18,5 +19,6 @@ pub use fs::{EditTool, FsState, ReadTool, WriteTool};
 pub use glob::GlobTool;
 pub use grep::GrepTool;
 pub use registry::{BaseTools, base_tools, registry_with_questions};
+pub use task::subagent_tool;
 pub use task_list::TaskListTool;
 pub use web_fetch::WebFetchTool;

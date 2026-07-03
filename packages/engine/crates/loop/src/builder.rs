@@ -48,6 +48,7 @@ pub struct NativeAgentBuilder {
     system_prompt: String,
     default_model: Option<ModelRef>,
     command_infos: Vec<CommandInfo>,
+    roles: Vec<crate::roles::RoleSpec>,
     pending_questions: Arc<PendingMap<QuestionId, Vec<Answer>>>,
     mcp: Option<std::sync::Arc<McpManager>>,
 }
@@ -64,6 +65,7 @@ impl NativeAgentBuilder {
             system_prompt: String::new(),
             default_model: None,
             command_infos: Vec::new(),
+            roles: Vec::new(),
             pending_questions: Arc::new(PendingMap::new()),
             mcp: None,
         }
@@ -116,6 +118,13 @@ impl NativeAgentBuilder {
         self
     }
 
+    /// Role definitions for multi-agent orchestration (built-ins are always
+    /// present; these override or extend them).
+    pub fn roles(mut self, roles: Vec<crate::roles::RoleSpec>) -> Self {
+        self.roles = roles;
+        self
+    }
+
     /// Register bridged MCP tools from a loaded manager after base tools.
     pub fn mcp(mut self, manager: std::sync::Arc<McpManager>) -> Self {
         self.mcp = Some(manager);
@@ -127,9 +136,15 @@ impl NativeAgentBuilder {
         if let Some(manager) = &self.mcp {
             manager.register_tools(&mut tools);
         }
-        Arc::new(NativeAgent {
+        let roles = Arc::new(
+            crate::roles::RoleRegistry::with_defaults(self.roles)
+                .unwrap_or_else(|_| crate::roles::RoleRegistry::default()),
+        );
+        Arc::new_cyclic(|weak| NativeAgent {
             deps: Arc::new(TurnDeps {
                 pool: Arc::new(crate::pool::ToolWorkerPool::new(self.limits.tool_pool_size)),
+                roles,
+                agent: weak.clone(),
                 agent_id: "native".to_owned(),
                 providers: self.providers,
                 tools,

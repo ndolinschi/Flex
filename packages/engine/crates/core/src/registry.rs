@@ -60,6 +60,15 @@ impl ToolRegistry {
         self.tools.keys().cloned().collect()
     }
 
+    /// Names of tools whose descriptor declares them read-only.
+    pub fn read_only_names(&self) -> Vec<String> {
+        self.tools
+            .values()
+            .filter(|tool| tool.descriptor().read_only)
+            .map(|tool| tool.descriptor().name)
+            .collect()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.tools.is_empty()
     }

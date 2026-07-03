@@ -74,6 +74,10 @@ impl ToolDescriptor {
 }
 
 /// Everything a tool execution may need from its surroundings.
+/// The reserved tool name the engine loop intercepts to spawn subagents.
+/// The `tools` crate ships only the descriptor; execution is loop-owned.
+pub const SUBAGENT_TOOL_NAME: &str = "Task";
+
 pub struct ToolContext {
     pub session_id: SessionId,
     pub turn_id: TurnId,

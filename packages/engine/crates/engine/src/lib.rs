@@ -18,6 +18,7 @@ use agentloop_core::{
     Agent, AgentError, EventStream, ProviderError, ProviderRegistry, SessionStore, StoreError,
 };
 use agentloop_loop::NativeAgentBuilder;
+use agentloop_loop::roles::{RoleError, RoleRegistry, RoleSpec};
 use agentloop_mcp::{McpBridgeConfig, McpBridgeError, McpManager};
 use agentloop_prompts::{
     CommandDiscoveryConfig, CommandError, CommandRegistry, PromptError, SystemPromptAssembler,
@@ -61,6 +62,8 @@ pub struct EngineOptions {
     /// Client-configured OpenAI-compatible providers, registered after the
     /// built-ins in vec order.
     pub custom: Vec<CustomProviderSpec>,
+    /// Role definitions for multi-agent orchestration (built-ins always present).
+    pub roles: Vec<RoleSpec>,
     /// MCP servers bridged into the native tool registry.
     pub mcp: McpBridgeConfig,
     /// Pre-built MCP manager; when set, the engine reuses it instead of creating a new one.
@@ -77,6 +80,7 @@ impl Default for EngineOptions {
             cwd: PathBuf::from("."),
             date: String::new(),
             custom: Vec::new(),
+            roles: Vec::new(),
             mcp: McpBridgeConfig::default(),
             mcp_manager: None,
             session_store: None,
@@ -99,6 +103,8 @@ pub enum EngineServiceError {
     Command(#[from] CommandError),
     #[error(transparent)]
     Mcp(#[from] McpBridgeError),
+    #[error(transparent)]
+    Role(#[from] RoleError),
     #[error(
         "provider `{0}` is not available in this build; supported runtime providers: `openai`, `anthropic`, `gemini`, `ollama`, or a provider configured in the client's config"
     )]
@@ -118,6 +124,7 @@ impl EngineServiceError {
             Self::Prompt(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
             Self::Command(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
             Self::Mcp(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
+            Self::Role(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
             Self::UnsupportedProvider(_)
             | Self::CustomProviderConflict(_)
             | Self::CustomProviderInvalid { .. } => {
@@ -196,10 +203,13 @@ impl EngineService {
         mut options: EngineOptions,
     ) -> EngineResult<Self> {
         let BaseTools {
-            registry: tools,
+            registry: mut tools,
             pending_questions,
             ..
         } = agentloop_tools::base_tools();
+        // Advertise the spawnable roles on the Task tool, then register it.
+        let role_registry = RoleRegistry::with_defaults(options.roles.clone())?;
+        tools.register(agentloop_tools::subagent_tool(&role_registry.spawnable()));
         let system_prompt =
             SystemPromptAssembler::new(SystemPromptConfig::default()).assemble(&Vars {
                 cwd: options.cwd.display().to_string(),
@@ -228,7 +238,8 @@ impl EngineService {
             .questions(pending_questions)
             .system_prompt(system_prompt)
             .commands(commands.infos())
-            .default_model(default_model);
+            .default_model(default_model)
+            .roles(options.roles.clone());
         if let Some(manager) = mcp_manager {
             builder = builder.mcp(manager);
         }

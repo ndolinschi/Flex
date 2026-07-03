@@ -40,6 +40,57 @@ impl NativeAgent {
             .ok_or_else(|| AgentError::SessionNotFound(id.clone()))
     }
 
+    /// A live handle for `id`, if the session is attached.
+    pub(crate) fn live_handle(&self, id: &SessionId) -> Option<Arc<SessionHandle>> {
+        self.sessions
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .get(id)
+            .cloned()
+    }
+
+    /// Install a fresh handle for a subagent child session (seq starts at 0).
+    pub(crate) fn install_child_handle(&self, id: &SessionId) -> Arc<SessionHandle> {
+        self.install_handle(id, 0)
+    }
+
+    /// Relay a child's persisted/control events into the parent stream as
+    /// [`AgentEvent::SubagentEvent`], until `stop` is tripped. Token deltas
+    /// are dropped — the tree renders from materialized child events.
+    pub(crate) fn spawn_relay(
+        &self,
+        child: &Arc<SessionHandle>,
+        parent: Arc<SessionHandle>,
+        child_id: &SessionId,
+        stop: &tokio_util::sync::CancellationToken,
+    ) -> tokio::task::JoinHandle<()> {
+        let mut rx = child.broadcast.subscribe();
+        let child_id = child_id.clone();
+        let stop = stop.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    biased;
+                    _ = stop.cancelled() => break,
+                    item = rx.recv() => match item {
+                        Ok(event) if event.payload.is_persistent() => {
+                            parent
+                                .emit_ephemeral(
+                                    None,
+                                    AgentEvent::SubagentEvent {
+                                        child_session: child_id.clone(),
+                                        event: Box::new(event.payload),
+                                    },
+                                );
+                        }
+                        Ok(_) => {}
+                        Err(_) => break,
+                    },
+                }
+            }
+        })
+    }
+
     fn install_handle(&self, id: &SessionId, next_seq: u64) -> Arc<SessionHandle> {
         let mut sessions = self.sessions.lock().unwrap_or_else(|p| p.into_inner());
         sessions

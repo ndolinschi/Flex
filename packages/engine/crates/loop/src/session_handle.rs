@@ -48,6 +48,18 @@ impl SessionHandle {
         }
     }
 
+    /// Trip the current turn's cancel token, if a turn is running.
+    pub(crate) fn request_cancel(&self) {
+        if let Some(token) = self
+            .current_cancel
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .as_ref()
+        {
+            token.cancel();
+        }
+    }
+
     pub(crate) fn set_turn_permission_mode(&self, mode: Option<PermissionMode>) {
         *self
             .turn_permission_mode

@@ -648,3 +648,142 @@ async fn read_only_batch_runs_in_parallel_on_the_pool() {
         "4x200ms read-only calls overlap on the pool (took {elapsed:?})"
     );
 }
+
+/// A descriptor-only stand-in for the Task tool: the loop intercepts by name.
+struct TaskStub;
+
+#[async_trait::async_trait]
+impl Tool for TaskStub {
+    fn descriptor(&self) -> agentloop_core::ToolDescriptor {
+        agentloop_core::ToolDescriptor {
+            name: agentloop_core::tool::SUBAGENT_TOOL_NAME.to_owned(),
+            description: "delegate to a subagent".to_owned(),
+            input_schema: serde_json::json!({"type": "object"}),
+            read_only: true,
+            category: agentloop_core::ToolCategory::Agent,
+            needs_permission: agentloop_core::PermissionHint::Never,
+        }
+    }
+
+    async fn run(
+        &self,
+        _ctx: agentloop_core::ToolContext,
+        _input: serde_json::Value,
+    ) -> Result<ToolOutput, agentloop_core::ToolError> {
+        unreachable!("the loop must intercept Task calls")
+    }
+}
+
+#[tokio::test]
+async fn task_call_spawns_child_and_returns_final_text() {
+    let (turn, ids) = MockProvider::tool_turn(&[(
+        "Task",
+        serde_json::json!({
+            "role": "searcher",
+            "description": "map the code",
+            "prompt": "Find the answer and report it.",
+        }),
+    )]);
+    // FIFO script: parent iter 1 (Task), child turn, parent iter 2.
+    let provider = Arc::new(MockProvider::with_turns(vec![
+        turn,
+        MockProvider::text_turn("child result: 42"),
+        MockProvider::text_turn("done"),
+    ]));
+    let (agent, store) = create_agent(provider.clone(), vec![Arc::new(TaskStub)], Vec::new()).await;
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+
+    let summary = agent
+        .prompt(
+            &session,
+            PromptInput::text("research this"),
+            TurnOptions::default(),
+        )
+        .await
+        .expect("turn succeeds");
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    let child = events
+        .iter()
+        .find_map(|(_, event)| match event {
+            AgentEvent::SubagentStarted {
+                child_session,
+                call_id,
+                role,
+                ..
+            } => {
+                assert_eq!(call_id.as_ref(), Some(&ids[0]));
+                assert_eq!(role.as_deref(), Some("searcher"));
+                Some(child_session.clone())
+            }
+            _ => None,
+        })
+        .expect("SubagentStarted is persisted in the parent log");
+    assert!(
+        events
+            .iter()
+            .any(|(_, event)| matches!(event, AgentEvent::SubagentCompleted { child_session, .. } if *child_session == child)),
+        "SubagentCompleted is persisted"
+    );
+    // The child owns its own log.
+    let child_events = store.read(&child, 0).await.expect("child log");
+    assert!(
+        child_events
+            .iter()
+            .any(|(_, event)| matches!(event, AgentEvent::AssistantMessage { .. })),
+        "child materialized its answer"
+    );
+    // The parent's Task call completed with the child's final text.
+    assert!(
+        events.iter().any(|(_, event)| matches!(
+            event,
+            AgentEvent::ToolCallUpdated { call }
+                if call.id == ids[0]
+                    && matches!(call.status, ToolCallStatus::Completed)
+                    && call.result.as_ref().map(ToolOutput::render_text).unwrap_or_default().contains("child result: 42")
+        )),
+        "Task returned the child's final message"
+    );
+    assert_eq!(provider.requests().len(), 3);
+}
+
+#[tokio::test]
+async fn unknown_role_teaches_and_turn_continues() {
+    let (turn, ids) = MockProvider::tool_turn(&[(
+        "Task",
+        serde_json::json!({
+            "role": "nonexistent",
+            "description": "x",
+            "prompt": "y",
+        }),
+    )]);
+    let provider = Arc::new(MockProvider::with_turns(vec![
+        turn,
+        MockProvider::text_turn("ok"),
+    ]));
+    let (agent, store) = create_agent(provider, vec![Arc::new(TaskStub)], Vec::new()).await;
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+    let summary = agent
+        .prompt(&session, PromptInput::text("go"), TurnOptions::default())
+        .await
+        .expect("turn survives the bad role");
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    assert!(
+        events.iter().any(|(_, event)| matches!(
+            event,
+            AgentEvent::ToolCallUpdated { call }
+                if call.id == ids[0]
+                    && call.result.as_ref().map(ToolOutput::render_text).unwrap_or_default().contains("Available roles")
+        )),
+        "bad role produces a teaching error result"
+    );
+}

@@ -1,7 +1,7 @@
 //! `TurnDeps`: everything a turn needs, `Arc`-shared so turn execution can
 //! move onto child tasks without borrowing [`crate::NativeAgent`].
 
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use agentloop_contracts::{Answer, ModelRef, PermissionDecision, PermissionRequestId, QuestionId};
 use agentloop_core::{Hook, PendingMap, ProviderRegistry, SessionStore, ToolRegistry};
@@ -14,6 +14,11 @@ use crate::permission::PermissionPolicy;
 pub(crate) struct TurnDeps {
     /// Spawned tool execution: bounded, panic-isolated (see [`crate::pool`]).
     pub(crate) pool: Arc<crate::pool::ToolWorkerPool>,
+    /// Role definitions for subagent spawning and failover chains.
+    pub(crate) roles: Arc<crate::roles::RoleRegistry>,
+    /// Back-reference to the owning agent, for spawning child sessions from
+    /// the Task tool. A `Weak` avoids the `Arc` cycle (agent → deps → agent).
+    pub(crate) agent: Weak<crate::agent::NativeAgent>,
     pub(crate) agent_id: String,
     pub(crate) providers: ProviderRegistry,
     pub(crate) tools: ToolRegistry,

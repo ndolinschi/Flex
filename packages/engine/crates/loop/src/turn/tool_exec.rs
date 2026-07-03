@@ -20,9 +20,15 @@ use crate::manager::ToolCallManager;
 use crate::permission::{PermissionPolicy, Verdict};
 use crate::pool::{ToolEvent, ToolJob, ToolJobOutcome};
 use crate::session_handle::SessionHandle;
+use crate::subagent::SubagentRequest;
 use crate::tool_results::output_or_synthetic;
+use agentloop_core::tool::SUBAGENT_TOOL_NAME;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::hooks::run_hooks;
+
+/// Hard cap on subagents spawned in one turn — a runaway-spawn backstop.
+const MAX_CHILDREN_PER_TURN: usize = 8;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn execute_tool_requests(
@@ -63,6 +69,7 @@ pub(super) async fn execute_tool_requests(
     // One turn per session (turn gate) makes this per-turn semaphore the
     // session-level execution bound the pool expects.
     let session_permits = Arc::new(Semaphore::new(deps.limits.tool_concurrency));
+    let children_spawned = Arc::new(AtomicUsize::new(0));
     let manager_shared = Arc::new(Mutex::new(std::mem::take(manager)));
     let mut index = 0;
     while index < tool_requests.len() {
@@ -95,6 +102,7 @@ pub(super) async fn execute_tool_requests(
                         sink,
                         &manager_shared,
                         &session_permits,
+                        &children_spawned,
                         req,
                     )
                 })
@@ -113,6 +121,7 @@ pub(super) async fn execute_tool_requests(
                 sink,
                 &manager_shared,
                 &session_permits,
+                &children_spawned,
                 tool_requests[index].clone(),
             )
             .await;
@@ -169,6 +178,7 @@ async fn execute_one_call(
     sink: &EventSink,
     manager: &Arc<Mutex<ToolCallManager>>,
     session_permits: &Arc<Semaphore>,
+    children_spawned: &Arc<AtomicUsize>,
     request: DraftToolCall,
 ) {
     let emit_update = |call: agentloop_contracts::ToolCall| {
@@ -187,6 +197,35 @@ async fn execute_one_call(
             .transition(&request.id, to, result)
             .ok()
     };
+
+    // Subagent spawn: intercepted and run by the loop, not the pool.
+    if request.name == SUBAGENT_TOOL_NAME {
+        if let Some(call) = transition(ToolCallStatus::Running, None) {
+            emit_update(call).await;
+        }
+        let result =
+            run_subagent_call(deps, handle, turn_id, cancel, children_spawned, &request).await;
+        let final_call = match result {
+            // Tool-level errors (bad role, child failed) teach the model and
+            // never fail the turn; hard failures mark the call failed.
+            Ok(output) => transition(ToolCallStatus::Completed, Some(output)),
+            Err(err @ (ToolError::InvalidInput(_) | ToolError::Execution(_))) => transition(
+                ToolCallStatus::Completed,
+                Some(ToolOutput::error(err.to_string())),
+            ),
+            Err(ToolError::Cancelled) => transition(ToolCallStatus::Cancelled, None),
+            Err(err) => transition(
+                ToolCallStatus::Failed {
+                    error: err.to_string(),
+                },
+                None,
+            ),
+        };
+        if let Some(call) = final_call {
+            emit_update(call).await;
+        }
+        return;
+    }
 
     // Unknown tool: a model mistake — feed a teaching error result back.
     let Some(tool) = deps.tools.get(&request.name) else {
@@ -460,4 +499,61 @@ async fn execute_one_call(
     if let Some(call) = final_call {
         emit_update(call).await;
     }
+}
+
+/// Parse a Task call, enforce the per-turn budget, and run the subagent.
+async fn run_subagent_call(
+    deps: &Arc<TurnDeps>,
+    handle: &Arc<SessionHandle>,
+    _turn_id: &TurnId,
+    cancel: &CancellationToken,
+    children_spawned: &Arc<AtomicUsize>,
+    request: &DraftToolCall,
+) -> Result<ToolOutput, ToolError> {
+    let required = |field: &str| -> Result<String, ToolError> {
+        request
+            .input
+            .get(field)
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.trim().is_empty())
+            .map(str::to_owned)
+            .ok_or_else(|| {
+                ToolError::InvalidInput(format!(
+                    "Task requires string fields `role`, `description`, `prompt`; \
+                     `{field}` is missing or empty."
+                ))
+            })
+    };
+    let role = required("role")?;
+    let description = required("description")?;
+    let prompt = required("prompt")?;
+    let expected_output = request
+        .input
+        .get("expected_output")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.trim().is_empty())
+        .map(str::to_owned);
+
+    if children_spawned.fetch_add(1, Ordering::SeqCst) >= MAX_CHILDREN_PER_TURN {
+        return Err(ToolError::Execution(format!(
+            "subagent budget of {MAX_CHILDREN_PER_TURN} per turn reached — consolidate \
+             remaining work into fewer, larger briefs or finish it yourself."
+        )));
+    }
+
+    let agent = deps.agent.upgrade().ok_or_else(|| {
+        ToolError::Execution("the agent is shutting down; cannot spawn subagents".to_owned())
+    })?;
+
+    let sub = SubagentRequest {
+        call_id: request.id.clone(),
+        role,
+        description,
+        prompt,
+        expected_output,
+        assigned_model: None,
+        permission_mode: handle.turn_permission_mode(),
+        cancel: cancel.child_token(),
+    };
+    agent.run_subagent(&handle.id, sub).await
 }

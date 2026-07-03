@@ -22,6 +22,7 @@ mod pool;
 pub mod roles;
 mod rules;
 mod session_handle;
+mod subagent;
 mod tool_results;
 mod turn;
 

@@ -112,7 +112,12 @@ pub(super) async fn run_iteration(
 
         let mut request = ChatRequest::new(model.clone(), messages);
         request.system = (!system.is_empty()).then_some(system.clone());
-        request.tools = deps.tools.specs(&Default::default());
+        // Role-scoped tools: subagent sessions see only their role's set.
+        let tool_filter = match meta.role.as_deref() {
+            Some(role) => deps.roles.tool_filter(role, &deps.tools, 0),
+            None => Default::default(),
+        };
+        request.tools = deps.tools.specs(&tool_filter);
 
         let tokens_est = estimate_request_tokens(request.system.as_deref().unwrap_or(""), &request);
         let context_limit = resolve_context_limit(&provider);
