@@ -876,6 +876,10 @@ impl ChatState {
         self.items.clear();
         self.open.clear();
         self.tools.clear();
+        // Subagent rows are not reconstructed from the reduced transcript
+        // (relayed child events are ephemeral by design); clear the index
+        // map so no stale entry points into the rebuilt item list.
+        self.subagents.clear();
         self.plan = None;
         self.focused_tool = None;
         for item in &transcript.items {
@@ -1357,6 +1361,33 @@ mod subagent_tests {
             assert_eq!(*tool_count, 9);
             assert_eq!(*tokens, 31_200);
         }
+    }
+
+    #[test]
+    fn rebuild_from_transcript_clears_subagent_index_map() {
+        use agentloop_contracts::Transcript;
+        let mut chat = ChatState::default();
+        chat.apply(&AgentEvent::ToolCallUpdated {
+            call: task_call("call-1"),
+        });
+        chat.apply(&started("child-1", Some("call-1")));
+        assert!(!chat.subagents.is_empty());
+        // A Gap/resync rebuilds the item list; the subagent index map must
+        // reset so no stale index points into the rebuilt list.
+        chat.rebuild_from_transcript(&Transcript::default());
+        assert!(
+            chat.subagents.is_empty(),
+            "stale subagent indices survived resync"
+        );
+        assert!(chat.items.is_empty());
+        // A relayed event for the pre-resync child is now a safe no-op.
+        chat.apply(&AgentEvent::SubagentEvent {
+            child_session: SessionId::from("child-1"),
+            event: Box::new(AgentEvent::ToolCallUpdated {
+                call: task_call("child-call-1"),
+            }),
+        });
+        assert!(chat.items.is_empty());
     }
 
     #[test]
