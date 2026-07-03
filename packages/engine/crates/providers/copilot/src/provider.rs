@@ -105,7 +105,15 @@ impl Provider for CopilotProvider {
                     provider: provider.clone(),
                     message: format!("Copilot models response was not JSON: {err}"),
                 })?;
-        compat::models_from_json(&provider, value)
+        let models = compat::models_from_json(&provider, value)?;
+        // Codex-family models (e.g. `gpt-5.3-codex`) are served by Copilot's
+        // Responses API, not `/chat/completions`, so selecting one only yields
+        // an "not accessible via the /chat/completions endpoint" error. Drop
+        // them from the list this provider can actually run.
+        Ok(models
+            .into_iter()
+            .filter(|model| !is_codex_model(&model.id))
+            .collect())
     }
 
     async fn stream_chat(
@@ -150,5 +158,24 @@ impl Provider for CopilotProvider {
         }
 
         Ok(compat::stream_response(provider, model, response))
+    }
+}
+
+/// Whether a Copilot model id belongs to the Codex family, which is served by
+/// the Responses API rather than `/chat/completions`.
+fn is_codex_model(id: &str) -> bool {
+    id.to_ascii_lowercase().contains("codex")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_codex_model;
+
+    #[test]
+    fn codex_models_are_detected() {
+        assert!(is_codex_model("gpt-5.3-codex"));
+        assert!(is_codex_model("GPT-5-Codex"));
+        assert!(!is_codex_model("gpt-4o"));
+        assert!(!is_codex_model("claude-haiku-4.5"));
     }
 }

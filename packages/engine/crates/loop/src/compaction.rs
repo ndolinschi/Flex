@@ -7,11 +7,13 @@ use futures::StreamExt;
 use tokio_util::sync::CancellationToken;
 
 use agentloop_contracts::{
-    AgentEvent, CompactionSummary, Message, Role, Transcript, TurnOptions, markdown, reduce,
+    AgentEvent, CompactionSummary, Message, Role, Transcript, TranscriptItem, TurnOptions, markdown,
+    reduce,
 };
 use agentloop_core::provider::ChatRequest;
 use agentloop_core::{AgentError, ProviderError};
 
+use crate::context_budget::resolve_context_limit;
 use crate::deps::TurnDeps;
 use crate::draft::AssistantDraft;
 use crate::session_handle::SessionHandle;
@@ -32,13 +34,6 @@ pub(crate) async fn compact_session(
     let events = deps.store.read(&handle.id, 0).await?;
     let transcript = reduce(events.iter().map(|(_, event)| event).collect::<Vec<_>>());
     let items_before = transcript.items.len();
-
-    let source = compact_source_text(&transcript);
-    if source.trim().is_empty() {
-        return Err(AgentError::Other(
-            "nothing to compact — start a conversation first".to_owned(),
-        ));
-    }
 
     let meta = deps.store.get_meta(&handle.id).await?;
     let model_ref = opts
@@ -61,7 +56,19 @@ pub(crate) async fn compact_session(
         ))
     })?;
 
-    let request = ChatRequest::new(
+    // Cap the summarizer input to the model's window so `/compact` never
+    // overflows on an already-oversized history (previously it sent the whole
+    // transcript and hit the same limit): keep the prior summary plus the
+    // newest tail items, dropping older ones.
+    let context_limit = resolve_context_limit(&provider);
+    let source = compact_source_text(&transcript, context_limit);
+    if source.trim().is_empty() {
+        return Err(AgentError::Other(
+            "nothing to compact — start a conversation first".to_owned(),
+        ));
+    }
+
+    let mut request = ChatRequest::new(
         model.clone(),
         vec![Message {
             role: Role::User,
@@ -71,7 +78,6 @@ pub(crate) async fn compact_session(
             cache_hint: false,
         }],
     );
-    let mut request = request;
     request.system = Some(SUMMARIZE_SYSTEM.to_owned());
 
     let tokens_before = estimate_tokens(&source);
@@ -136,26 +142,67 @@ pub(crate) async fn compact_session(
     Ok(summary)
 }
 
-/// Build the text fed to the summarizer: prior compaction summary (if any)
-/// plus the transcript items that would currently be sent to the model.
-fn compact_source_text(transcript: &Transcript) -> String {
+/// Build the text fed to the summarizer: the prior compaction summary (kept
+/// whole) plus as many of the *newest* tail items as fit within a char budget
+/// derived from the model's context window. Older overflowing items are
+/// dropped so the summarization request itself never exceeds the limit.
+///
+/// The budget targets ~half the window (`estimate_tokens` is ~4 chars/token,
+/// so `limit/2` tokens ≈ `limit * 2` chars), leaving room for the system
+/// prompt, the request wrapper, and the model's summary output.
+fn compact_source_text(transcript: &Transcript, context_limit: u64) -> String {
     let (prior, tail) = transcript.context_view();
-    let mut parts = Vec::new();
-    if let Some(summary) = prior {
-        parts.push(format!(
+
+    let prefix = prior.map(|summary| {
+        format!(
             "## Prior summary (from earlier compaction)\n\n{}",
             summary.summary_markdown
-        ));
+        )
+    });
+
+    let max_source_chars = context_limit.saturating_mul(2) as usize;
+    let budget = max_source_chars.saturating_sub(prefix.as_ref().map_or(0, |p| p.len() + 2));
+
+    // Accumulate newest-first until the budget is hit; always keep at least
+    // one item so a single huge message still gets summarized.
+    let mut kept: Vec<TranscriptItem> = Vec::new();
+    let mut used = 0usize;
+    let mut dropped = false;
+    for item in tail.iter().rev() {
+        let len = render_item(item).len() + 2;
+        if !kept.is_empty() && used + len > budget {
+            dropped = true;
+            break;
+        }
+        used += len;
+        kept.push(item.clone());
     }
-    if !tail.is_empty() {
-        let tail_transcript = Transcript {
-            items: tail.to_vec(),
+    kept.reverse();
+
+    let mut parts = Vec::new();
+    if let Some(prefix) = prefix {
+        parts.push(prefix);
+    }
+    if dropped {
+        parts.push("## (older messages omitted to fit the summarization window)".to_owned());
+    }
+    if !kept.is_empty() {
+        parts.push(markdown::transcript_to_markdown(&Transcript {
+            items: kept,
             compaction: None,
             boundary_index: None,
-        };
-        parts.push(markdown::transcript_to_markdown(&tail_transcript));
+        }));
     }
     parts.join("\n\n")
+}
+
+/// Render a single transcript item to markdown (for per-item budget accounting).
+fn render_item(item: &TranscriptItem) -> String {
+    markdown::transcript_to_markdown(&Transcript {
+        items: vec![item.clone()],
+        compaction: None,
+        boundary_index: None,
+    })
 }
 
 fn estimate_tokens(text: &str) -> u64 {
@@ -188,8 +235,35 @@ mod tests {
             }),
             boundary_index: Some(0),
         };
-        let source = compact_source_text(&transcript);
+        let source = compact_source_text(&transcript, 1_000_000);
         assert!(source.contains("old stuff"));
         assert!(source.contains("new question"));
+    }
+
+    #[test]
+    fn compact_source_drops_oldest_tail_when_over_budget() {
+        // A tiny budget forces truncation; the newest item survives, an
+        // omission marker appears, and the request stays bounded.
+        let items: Vec<TranscriptItem> = (0..50)
+            .map(|i| TranscriptItem {
+                message_id: agentloop_contracts::MessageId::from(format!("m{i}")),
+                role: Role::User,
+                blocks: vec![TranscriptBlock::Markdown {
+                    text: format!("message number {i} with some filler content to add length"),
+                }],
+                model: None,
+                usage: None,
+            })
+            .collect();
+        let transcript = Transcript {
+            items,
+            compaction: None,
+            boundary_index: None,
+        };
+        // context_limit 100 -> ~200 char budget, far smaller than 50 messages.
+        let source = compact_source_text(&transcript, 100);
+        assert!(source.contains("older messages omitted"));
+        assert!(source.contains("message number 49"));
+        assert!(!source.contains("message number 0 "));
     }
 }

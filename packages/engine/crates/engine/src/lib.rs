@@ -21,8 +21,8 @@ use agentloop_loop::NativeAgentBuilder;
 pub use agentloop_loop::roles::{RoleError, RoleRegistry, RoleSpec, RoleToolProfile, valid_name};
 use agentloop_mcp::{McpBridgeConfig, McpBridgeError, McpManager};
 use agentloop_prompts::{
-    CommandDiscoveryConfig, CommandError, CommandRegistry, PromptError, SystemPromptAssembler,
-    SystemPromptConfig, Vars,
+    CommandDiscoveryConfig, CommandError, CommandRegistry, PromptError, SkillDiscoveryConfig,
+    SkillRegistry, SystemPromptAssembler, SystemPromptConfig, Vars,
 };
 use agentloop_provider_anthropic::{ANTHROPIC_PROVIDER_ID, AnthropicProvider};
 use agentloop_provider_copilot::{COPILOT_PROVIDER_ID, CopilotConfig, CopilotProvider};
@@ -102,6 +102,8 @@ pub enum EngineServiceError {
     #[error(transparent)]
     Command(#[from] CommandError),
     #[error(transparent)]
+    Skill(#[from] agentloop_prompts::SkillError),
+    #[error(transparent)]
     Mcp(#[from] McpBridgeError),
     #[error(transparent)]
     Role(#[from] RoleError),
@@ -123,6 +125,7 @@ impl EngineServiceError {
             Self::Store(err) => EngineError::engine(ErrorCode::Unknown, err.to_string()),
             Self::Prompt(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
             Self::Command(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
+            Self::Skill(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
             Self::Mcp(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
             Self::Role(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
             Self::UnsupportedProvider(_)
@@ -219,6 +222,22 @@ impl EngineService {
             user_dir: default_user_command_dir(),
             project_dir: Some(options.cwd.join(".agent").join("commands")),
         })?;
+
+        // Skills: `~/.config/agentloop/skills/*/SKILL.md` and
+        // `<project>/.agent/skills/*/SKILL.md`. Only names + descriptions sit
+        // in the `Skill` tool's own description (progressive disclosure); the
+        // full body loads into context on invocation. No tool is registered
+        // when nothing was discovered.
+        let skills = Arc::new(SkillRegistry::discover(SkillDiscoveryConfig {
+            user_dir: default_user_skill_dir(),
+            project_dir: Some(options.cwd.join(".agent").join("skills")),
+        })?);
+        if let Some(tool) = agentloop_tools::skill_tool(&skills.model_visible(), {
+            let skills = skills.clone();
+            Arc::new(move |name: &str| skills.load_body(name).ok())
+        }) {
+            tools.register(tool);
+        }
 
         let mcp_manager = match options.mcp_manager.take() {
             Some(manager) => Some(manager),
@@ -659,6 +678,15 @@ fn default_user_command_dir() -> Option<PathBuf> {
             .join(".config")
             .join("agentloop")
             .join("commands")
+    })
+}
+
+fn default_user_skill_dir() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(|home| {
+        PathBuf::from(home)
+            .join(".config")
+            .join("agentloop")
+            .join("skills")
     })
 }
 

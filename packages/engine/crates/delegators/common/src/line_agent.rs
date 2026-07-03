@@ -176,11 +176,22 @@ where
         };
 
         if !output.status.success {
+            let stderr = output.stderr.trim();
+            let code = output
+                .status
+                .code
+                .map(|code| code.to_string())
+                .unwrap_or_else(|| "signal".to_owned());
+            // An exit with no stderr is almost always a missing or
+            // unauthenticated CLI — point the user there instead of "unknown".
+            let detail = if stderr.is_empty() {
+                "no error output — check that the CLI is installed and signed in".to_owned()
+            } else {
+                stderr.to_owned()
+            };
             let message = format!(
-                "{} process exited with status {:?}: {}",
+                "{} exited with status {code}: {detail}",
                 self.profile.display_name(),
-                output.status.code,
-                output.stderr.trim()
             );
             return self.fail_turn(&handle, &turn_id, started_at, message).await;
         }

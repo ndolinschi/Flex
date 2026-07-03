@@ -161,6 +161,23 @@ pub(super) async fn run_iteration(
             let _enter = llm_span.enter();
             match provider.stream_chat(request, cancel.child_token()).await {
                 Ok(stream) => stream,
+                Err(err) if is_context_overflow(&err) && !auto_compacted => {
+                    tracing::info!(
+                        target: "loop",
+                        session_id = %handle.id,
+                        "context overflow — compacting and retrying the turn"
+                    );
+                    compact_session(
+                        deps,
+                        handle.clone(),
+                        opts.clone(),
+                        cancel.clone(),
+                        AUTO_COMPACT_STRATEGY,
+                    )
+                    .await?;
+                    auto_compacted = true;
+                    continue;
+                }
                 Err(err) if fallback_eligible(&err) => {
                     emit_fallback(
                         handle,
@@ -212,6 +229,25 @@ pub(super) async fn run_iteration(
         }
 
         if let Some(err) = stream_err {
+            if is_context_overflow(&err) && !auto_compacted {
+                // The partial draft is dropped; compaction rewrites the log and
+                // the retry rebuilds a smaller request from it.
+                tracing::info!(
+                    target: "loop",
+                    session_id = %handle.id,
+                    "context overflow mid-stream — compacting and retrying the turn"
+                );
+                compact_session(
+                    deps,
+                    handle.clone(),
+                    opts.clone(),
+                    cancel.clone(),
+                    AUTO_COMPACT_STRATEGY,
+                )
+                .await?;
+                auto_compacted = true;
+                continue;
+            }
             if fallback_eligible(&err) {
                 // The partial draft is dropped here, never materialized —
                 // the retry rebuilds its context from the persisted log.
@@ -337,6 +373,12 @@ pub(super) async fn run_iteration(
 
 /// Whether a provider failure should advance the fallback chain. Terminal
 /// classes (invalid request, context overflow, cancellation) never fall back.
+/// Context overflow is recovered by compacting and retrying — not by failing
+/// over to another model, which would face the same oversized context.
+fn is_context_overflow(err: &ProviderError) -> bool {
+    matches!(err, ProviderError::ContextOverflow { .. })
+}
+
 fn fallback_eligible(err: &ProviderError) -> bool {
     matches!(
         err,

@@ -64,31 +64,10 @@ impl OpenAiProvider {
     pub fn default_model(&self) -> &str {
         &self.config.default_model
     }
-}
 
-#[async_trait]
-impl Provider for OpenAiProvider {
-    fn id(&self) -> ProviderId {
-        self.id.clone()
-    }
-
-    fn capabilities(&self) -> ProviderCaps {
-        ProviderCaps {
-            tool_use: true,
-            parallel_tool_use: true,
-            vision: true,
-            documents: false,
-            thinking: self.thinking,
-            prompt_caching: false,
-            native_json_schema_tools: true,
-            max_context_tokens: None,
-        }
-    }
-
-    async fn list_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
-        if !self.static_models.is_empty() {
-            return Ok(self.static_models.clone());
-        }
+    /// Query the live `/models` endpoint. Errors when the endpoint is
+    /// unreachable, unauthorized, or has no listing route.
+    async fn fetch_models_live(&self) -> Result<Vec<ModelInfo>, ProviderError> {
         let provider = self.id();
         let response = authenticated_request(
             &self.client,
@@ -115,6 +94,51 @@ impl Provider for OpenAiProvider {
                 message: format!("OpenAI models response was not valid JSON: {err}"),
             })?;
         Ok(models_from_response(models))
+    }
+}
+
+#[async_trait]
+impl Provider for OpenAiProvider {
+    fn id(&self) -> ProviderId {
+        self.id.clone()
+    }
+
+    fn capabilities(&self) -> ProviderCaps {
+        ProviderCaps {
+            tool_use: true,
+            parallel_tool_use: true,
+            vision: true,
+            documents: false,
+            thinking: self.thinking,
+            prompt_caching: false,
+            native_json_schema_tools: true,
+            max_context_tokens: None,
+        }
+    }
+
+    async fn list_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        if !self.static_models.is_empty() {
+            return Ok(self.static_models.clone());
+        }
+        match self.fetch_models_live().await {
+            Ok(models) => Ok(models),
+            Err(err) => {
+                // The `/models` endpoint is unreachable (custom endpoint down,
+                // bad key, no listing route). Rather than an empty picker, fall
+                // back to the configured default model so it stays selectable.
+                let default = self.config.default_model.trim();
+                if default.is_empty() {
+                    return Err(err);
+                }
+                Ok(vec![ModelInfo {
+                    id: default.to_owned(),
+                    display_name: None,
+                    context_window: None,
+                    reasoning: false,
+                    vision: false,
+                }])
+            }
+        }
     }
 
     async fn stream_chat(

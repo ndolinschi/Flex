@@ -21,6 +21,8 @@
 
 pub mod assembler;
 pub mod commands;
+pub mod skills;
 
 pub use assembler::{PromptError, SystemPromptAssembler, SystemPromptConfig, Vars};
 pub use commands::{CommandDiscoveryConfig, CommandError, CommandExpansion, CommandRegistry};
+pub use skills::{SkillDiscoveryConfig, SkillError, SkillInfo, SkillRegistry, SkillSource};
