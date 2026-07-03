@@ -70,6 +70,9 @@ pub(super) async fn execute_tool_requests(
     // session-level execution bound the pool expects.
     let session_permits = Arc::new(Semaphore::new(deps.limits.tool_concurrency));
     let children_spawned = Arc::new(AtomicUsize::new(0));
+    // Per-role spawn counters for split mode: parallel Task calls of the
+    // same role in this message round-robin across the role's model chain.
+    let split_counters = Arc::new(Mutex::new(std::collections::HashMap::<String, usize>::new()));
     let manager_shared = Arc::new(Mutex::new(std::mem::take(manager)));
     let mut index = 0;
     while index < tool_requests.len() {
@@ -103,6 +106,7 @@ pub(super) async fn execute_tool_requests(
                         &manager_shared,
                         &session_permits,
                         &children_spawned,
+                        &split_counters,
                         req,
                     )
                 })
@@ -122,6 +126,7 @@ pub(super) async fn execute_tool_requests(
                 &manager_shared,
                 &session_permits,
                 &children_spawned,
+                &split_counters,
                 tool_requests[index].clone(),
             )
             .await;
@@ -179,6 +184,7 @@ async fn execute_one_call(
     manager: &Arc<Mutex<ToolCallManager>>,
     session_permits: &Arc<Semaphore>,
     children_spawned: &Arc<AtomicUsize>,
+    split_counters: &Arc<Mutex<std::collections::HashMap<String, usize>>>,
     request: DraftToolCall,
 ) {
     let emit_update = |call: agentloop_contracts::ToolCall| {
@@ -203,8 +209,16 @@ async fn execute_one_call(
         if let Some(call) = transition(ToolCallStatus::Running, None) {
             emit_update(call).await;
         }
-        let result =
-            run_subagent_call(deps, handle, turn_id, cancel, children_spawned, &request).await;
+        let result = run_subagent_call(
+            deps,
+            handle,
+            turn_id,
+            cancel,
+            children_spawned,
+            split_counters,
+            &request,
+        )
+        .await;
         let final_call = match result {
             // Tool-level errors (bad role, child failed) teach the model and
             // never fail the turn; hard failures mark the call failed.
@@ -502,12 +516,14 @@ async fn execute_one_call(
 }
 
 /// Parse a Task call, enforce the per-turn budget, and run the subagent.
+#[allow(clippy::too_many_arguments)]
 async fn run_subagent_call(
     deps: &Arc<TurnDeps>,
     handle: &Arc<SessionHandle>,
     _turn_id: &TurnId,
     cancel: &CancellationToken,
     children_spawned: &Arc<AtomicUsize>,
+    split_counters: &Arc<Mutex<std::collections::HashMap<String, usize>>>,
     request: &DraftToolCall,
 ) -> Result<ToolOutput, ToolError> {
     let required = |field: &str| -> Result<String, ToolError> {
@@ -545,13 +561,28 @@ async fn run_subagent_call(
         ToolError::Execution("the agent is shutting down; cannot spawn subagents".to_owned())
     })?;
 
+    // Split mode: rotate parallel spawns of the same role across its model
+    // chain (deterministic chain-order assignment per batch). The child puts
+    // the assigned model first and keeps the rest of the chain for failover.
+    // Unknown roles get None and hit the teaching path in run_subagent.
+    let assigned_model = deps.roles.get(&role).and_then(|spec| {
+        if !spec.split || spec.models.len() < 2 {
+            return None;
+        }
+        let mut counters = split_counters.lock().unwrap_or_else(|p| p.into_inner());
+        let counter = counters.entry(role.clone()).or_insert(0);
+        let model = spec.models[*counter % spec.models.len()].clone();
+        *counter += 1;
+        Some(model)
+    });
+
     let sub = SubagentRequest {
         call_id: request.id.clone(),
         role,
         description,
         prompt,
         expected_output,
-        assigned_model: None,
+        assigned_model,
         permission_mode: handle.turn_permission_mode(),
         cancel: cancel.child_token(),
     };

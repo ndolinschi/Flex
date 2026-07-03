@@ -848,6 +848,119 @@ async fn child_permission_relays_and_routes() {
     );
 }
 
+async fn split_agent(
+    split: bool,
+) -> (
+    Arc<agentloop_loop::NativeAgent>,
+    Arc<MemoryStore>,
+    Arc<MockProvider>,
+    Arc<MockProvider>,
+) {
+    use agentloop_loop::roles::RoleSpec;
+
+    let mock_a = Arc::new(MockProvider::with_id("mock-a"));
+    let (turn, _) = MockProvider::tool_turn(&[
+        (
+            "Task",
+            serde_json::json!({"role": "searcher", "description": "left", "prompt": "left half"}),
+        ),
+        (
+            "Task",
+            serde_json::json!({"role": "searcher", "description": "right", "prompt": "right half"}),
+        ),
+    ]);
+    mock_a.push_turn(turn);
+    let mock_b = Arc::new(MockProvider::with_id("mock-b"));
+    if split {
+        // One child lands on each provider.
+        mock_a.push_turn(MockProvider::text_turn("left result"));
+        mock_b.push_turn(MockProvider::text_turn("right result"));
+    } else {
+        // Both children pin chain[0] = mock-a.
+        mock_a.push_turn(MockProvider::text_turn("left result"));
+        mock_a.push_turn(MockProvider::text_turn("right result"));
+    }
+    mock_a.push_turn(MockProvider::text_turn("done"));
+
+    let store = Arc::new(MemoryStore::new());
+    let mut providers = ProviderRegistry::new();
+    providers.register(mock_a.clone());
+    providers.register(mock_b.clone());
+    let agent = NativeAgentBuilder::new(store.clone())
+        .providers(providers)
+        .tools(registry_with(vec![Arc::new(TaskStub)]))
+        .roles(vec![RoleSpec {
+            models: vec![ModelRef::from("mock-a/m1"), ModelRef::from("mock-b/m2")],
+            split,
+            ..RoleSpec::new("searcher")
+        }])
+        .system_prompt("You are a test agent.")
+        .default_model(ModelRef::from("mock-a/model-parent"))
+        .build();
+    (agent, store, mock_a, mock_b)
+}
+
+async fn spawned_child_models(
+    agent: &Arc<agentloop_loop::NativeAgent>,
+    store: &Arc<MemoryStore>,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let session = agent.create_session(NewSessionParams::default()).await?;
+    let summary = agent
+        .prompt(
+            &session,
+            PromptInput::text("split the work"),
+            TurnOptions::default(),
+        )
+        .await?;
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+
+    let events = store.read(&session, 0).await?;
+    let children: Vec<_> = events
+        .iter()
+        .filter_map(|(_, event)| match event {
+            AgentEvent::SubagentStarted { child_session, .. } => Some(child_session.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(children.len(), 2, "both Task calls spawned children");
+    let mut models = Vec::new();
+    for child in children {
+        let meta = store.get_meta(&child).await?;
+        models.push(meta.model.ok_or("child meta records its model")?.0);
+    }
+    Ok(models)
+}
+
+#[tokio::test]
+async fn parallel_tasks_round_robin_models() {
+    let (agent, store, mock_a, mock_b) = split_agent(true).await;
+    let mut models = spawned_child_models(&agent, &store)
+        .await
+        .expect("children spawn and report models");
+    models.sort();
+    assert_eq!(
+        models,
+        vec!["mock-a/m1".to_owned(), "mock-b/m2".to_owned()],
+        "split=true rotates the batch across the role chain"
+    );
+    assert_eq!(mock_b.requests().len(), 1, "second chain model served");
+    assert_eq!(mock_a.requests().len(), 3);
+}
+
+#[tokio::test]
+async fn split_false_pins_first_chain_model() {
+    let (agent, store, _mock_a, mock_b) = split_agent(false).await;
+    let models = spawned_child_models(&agent, &store)
+        .await
+        .expect("children spawn and report models");
+    assert_eq!(
+        models,
+        vec!["mock-a/m1".to_owned(), "mock-a/m1".to_owned()],
+        "split=false keeps every child on chain[0]"
+    );
+    assert!(mock_b.requests().is_empty());
+}
+
 #[tokio::test]
 async fn unknown_role_teaches_and_turn_continues() {
     let (turn, ids) = MockProvider::tool_turn(&[(
