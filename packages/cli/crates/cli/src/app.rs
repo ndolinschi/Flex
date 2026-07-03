@@ -905,8 +905,9 @@ impl App {
         Vec::new()
     }
 
-    const CONNECT_USAGE: &'static str = "usage: /connect <id> <base_url> <api_key> [default_model] [--force] · \
-         key may be {env:VAR} · e.g. /connect deepseek https://api.deepseek.com/v1 {env:DEEPSEEK_API_KEY}";
+    const CONNECT_USAGE: &'static str = "usage: /connect <id> <base_url> [api_key] [default_model] [--force] · \
+         key may be {env:VAR}; omit it for keyless local endpoints (LM Studio) · \
+         e.g. /connect deepseek https://api.deepseek.com/v1 {env:DEEPSEEK_API_KEY}";
 
     fn run_connect(&mut self, arg: Option<String>) -> Vec<Effect> {
         let Some(arg) = arg.filter(|a| !a.trim().is_empty()) else {
@@ -920,7 +921,7 @@ impl App {
         let force = tokens.iter().position(|t| *t == "--force").map(|idx| {
             tokens.remove(idx);
         });
-        if tokens.len() < 3 {
+        if tokens.len() < 2 {
             self.chat.push_info(Self::CONNECT_USAGE);
             return Vec::new();
         }
@@ -942,7 +943,8 @@ impl App {
         let config = agentloop_cli_core::ProviderConfig {
             name: None,
             base_url: tokens[1].to_owned(),
-            api_key: tokens[2].to_owned(),
+            // No third token = keyless local endpoint (LM Studio).
+            api_key: tokens.get(2).map(|s| (*s).to_owned()).unwrap_or_default(),
             models: Vec::new(),
             default_model: tokens.get(3).map(|s| (*s).to_owned()),
             thinking: false,
@@ -2871,6 +2873,20 @@ mod session_tests {
             arg: Some("allow-all".to_owned()),
         });
         assert!(matches!(app.overlay, Overlay::Confirm(_)));
+    }
+
+    #[test]
+    fn connect_two_tokens_defaults_empty_key() {
+        let mut app = native_test_app();
+        let effects = app.run_local(LocalCommand::Connect {
+            arg: Some("lmstudio http://localhost:1234/v1".to_owned()),
+        });
+        let Some(Effect::ValidateProvider { id, config }) = effects.first() else {
+            panic!("expected ValidateProvider, got {effects:?}");
+        };
+        assert_eq!(id, "lmstudio");
+        assert_eq!(config.base_url, "http://localhost:1234/v1");
+        assert_eq!(config.api_key, "", "omitted key means keyless endpoint");
     }
 }
 

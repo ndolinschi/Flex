@@ -36,8 +36,9 @@ pub enum LocalCommand {
     Thinking { arg: Option<String> },
     /// `/compact` — summarize conversation history to save context.
     Compact,
-    /// `/connect <id> <base_url> <api_key> [model] [--force]` — add a custom
-    /// OpenAI-compatible provider (DeepSeek, GLM, LM Studio, …).
+    /// `/connect <id> <base_url> [api_key] [model] [--force]` — add a custom
+    /// OpenAI-compatible provider (DeepSeek, GLM, LM Studio, …); omit the
+    /// key for keyless local endpoints.
     Connect { arg: Option<String> },
     /// `/providers` — list built-in and custom providers.
     Providers,
@@ -133,7 +134,7 @@ const LOCAL: &[(&str, &str, Option<&str>)] = &[
     (
         "connect",
         "add a custom OpenAI-compatible provider",
-        Some("<id> <base_url> <api_key> [model] [--force]"),
+        Some("<id> <base_url> [api_key] [model] [--force]"),
     ),
     ("providers", "list built-in and custom providers", None),
     ("roles", "list orchestration roles for the Task tool", None),
