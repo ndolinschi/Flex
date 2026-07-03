@@ -34,6 +34,8 @@ pub enum LocalCommand {
     Permissions { arg: Option<String> },
     /// `/thinking [off|low|medium|high|on|off]` — budget or visibility.
     Thinking { arg: Option<String> },
+    /// `/theme [name]` — pick or set the color theme.
+    Theme { arg: Option<String> },
     /// `/compact` — summarize conversation history to save context.
     Compact,
     /// `/connect <id> <base_url> [api_key] [model] [--force]` — add a custom
@@ -54,6 +56,12 @@ pub enum LocalCommand {
     McpInstall { arg: Option<String> },
     /// `/mcp-remove <name>` — remove an installed server.
     McpRemove { name: String },
+    /// `/init` — save this project's currently-enabled MCP integrations to
+    /// `.agent/mcp.json` so they travel with the project.
+    Init,
+    /// `/mcp-import` — review and adopt integrations declared in this
+    /// project's `.agent/mcp.json` that aren't installed yet.
+    McpImport,
 }
 
 /// `/mcp` subcommands.
@@ -126,6 +134,7 @@ const LOCAL: &[(&str, &str, Option<&str>)] = &[
         "show or hide reasoning blocks",
         Some("[on|off]"),
     ),
+    ("theme", "switch color theme", Some("[name]")),
     (
         "compact",
         "summarize conversation history to save context",
@@ -154,6 +163,16 @@ const LOCAL: &[(&str, &str, Option<&str>)] = &[
         "mcp-remove",
         "remove an installed MCP server",
         Some("<name>"),
+    ),
+    (
+        "init",
+        "save this project's MCP integrations to .agent/mcp.json",
+        None,
+    ),
+    (
+        "mcp-import",
+        "adopt integrations declared in .agent/mcp.json",
+        None,
     ),
 ];
 
@@ -249,6 +268,7 @@ impl CommandIndex {
             "mode" => Route::Local(LocalCommand::Mode { arg }),
             "permissions" => Route::Local(LocalCommand::Permissions { arg }),
             "thinking" => Route::Local(LocalCommand::Thinking { arg }),
+            "theme" => Route::Local(LocalCommand::Theme { arg }),
             "connect" => Route::Local(LocalCommand::Connect { arg }),
             "providers" => Route::Local(LocalCommand::Providers),
             "roles" => Route::Local(LocalCommand::Roles),
@@ -258,6 +278,8 @@ impl CommandIndex {
             "mcp" => Route::Local(parse_mcp_command(args)),
             "mcp-install" => Route::Local(LocalCommand::McpInstall { arg: arg.clone() }),
             "mcp-remove" => Route::Local(parse_mcp_remove(args)),
+            "init" => Route::Local(LocalCommand::Init),
+            "mcp-import" => Route::Local(LocalCommand::McpImport),
             other if self.engine_names.iter().any(|n| n == other) => Route::Engine,
             _ => Route::Plain,
         }
@@ -398,6 +420,21 @@ mod tests {
     }
 
     #[test]
+    fn route_theme_with_name() {
+        let index = CommandIndex::default();
+        assert_eq!(
+            index.route("/theme nord"),
+            Route::Local(LocalCommand::Theme {
+                arg: Some("nord".to_owned()),
+            })
+        );
+        assert_eq!(
+            index.route("/theme"),
+            Route::Local(LocalCommand::Theme { arg: None })
+        );
+    }
+
+    #[test]
     fn route_compact_is_local() {
         let index = CommandIndex::default();
         assert_eq!(index.route("/compact"), Route::Local(LocalCommand::Compact));
@@ -430,6 +467,16 @@ mod tests {
                     name: "filesystem".to_owned(),
                 },
             })
+        );
+    }
+
+    #[test]
+    fn route_init_and_mcp_import_are_local() {
+        let index = CommandIndex::default();
+        assert_eq!(index.route("/init"), Route::Local(LocalCommand::Init));
+        assert_eq!(
+            index.route("/mcp-import"),
+            Route::Local(LocalCommand::McpImport)
         );
     }
 

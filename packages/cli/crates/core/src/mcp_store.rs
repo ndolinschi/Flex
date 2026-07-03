@@ -163,6 +163,44 @@ impl McpStore {
             .count()
     }
 
+    /// Load a project's declared integrations from `.agent/mcp.json`, or an
+    /// empty store when the project has none. This is a project-local
+    /// snapshot meant to be committed alongside the repo (`/init` writes it,
+    /// `/mcp-import` reads it) — it is never the live source of truth for a
+    /// running session, which always reads/writes the global store, so
+    /// merely having this file present never auto-executes anything.
+    pub fn load_project(project_dir: &Path) -> Result<Self, McpStoreError> {
+        Self::load_from(&project_path(project_dir))
+    }
+
+    /// Snapshot this (global) store's servers into the project's
+    /// `.agent/mcp.json`, so the integrations this project uses travel with
+    /// it (e.g. committed to source control for teammates or future runs).
+    pub fn export_to_project(&self, project_dir: &Path) -> Result<(), McpStoreError> {
+        self.save_to(&project_path(project_dir))
+    }
+
+    /// Merge `incoming` servers whose name isn't already present, returning
+    /// the names actually added. Existing servers are never overwritten —
+    /// review happens before this is called (the caller confirms with the
+    /// user first, since these can point at arbitrary launch commands).
+    pub fn import_missing(&mut self, incoming: Vec<InstalledMcpServer>) -> Vec<String> {
+        let existing: std::collections::HashSet<String> = self
+            .servers
+            .iter()
+            .map(|server| server.config.name.clone())
+            .collect();
+        let mut added = Vec::new();
+        for server in incoming {
+            if existing.contains(&server.config.name) {
+                continue;
+            }
+            added.push(server.config.name.clone());
+            self.servers.push(server);
+        }
+        added
+    }
+
     /// Convert to the engine bridge config (all servers, respecting `enabled`).
     pub fn to_bridge_config(&self) -> McpBridgeConfig {
         McpBridgeConfig {
@@ -387,6 +425,11 @@ pub fn registry() -> Vec<McpRegistryEntry> {
 /// Default path: `~/.config/agentloop/mcp.json`.
 pub fn mcp_path() -> Option<PathBuf> {
     config_dir().map(|dir| dir.join("mcp.json"))
+}
+
+/// A project's declared-integrations path: `<project>/.agent/mcp.json`.
+pub fn project_path(project_dir: &Path) -> PathBuf {
+    project_dir.join(".agent").join("mcp.json")
 }
 
 /// Clone root: `~/.config/agentloop/mcp-servers/`.
@@ -710,6 +753,49 @@ mod tests {
         assert!(enabled);
         let disabled = store.toggle_enabled("memory").expect("toggle");
         assert!(!disabled);
+    }
+
+    #[test]
+    fn export_to_project_then_load_project_round_trips() {
+        let project = tempfile::tempdir().expect("tempdir");
+        let mut store = McpStore::default();
+        store
+            .install_npm("@modelcontextprotocol/server-fetch", Some("fetch"))
+            .expect("install");
+
+        store
+            .export_to_project(project.path())
+            .expect("export to project");
+        assert!(project_path(project.path()).exists());
+
+        let loaded = McpStore::load_project(project.path()).expect("load project");
+        assert_eq!(loaded.servers.len(), 1);
+        assert_eq!(loaded.servers[0].config.name, "fetch");
+    }
+
+    #[test]
+    fn load_project_with_no_file_is_empty() {
+        let project = tempfile::tempdir().expect("tempdir");
+        let loaded = McpStore::load_project(project.path()).expect("load project");
+        assert!(loaded.servers.is_empty());
+    }
+
+    #[test]
+    fn import_missing_skips_existing_names() {
+        let mut store = McpStore::default();
+        store.install_npm("server-memory", Some("memory")).expect("install");
+
+        let mut incoming = McpStore::default();
+        incoming
+            .install_npm("server-memory", Some("memory"))
+            .expect("install");
+        incoming
+            .install_npm("@modelcontextprotocol/server-fetch", Some("fetch"))
+            .expect("install");
+
+        let added = store.import_missing(incoming.servers);
+        assert_eq!(added, vec!["fetch".to_owned()]);
+        assert_eq!(store.servers.len(), 2);
     }
 
     #[test]

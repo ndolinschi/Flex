@@ -41,23 +41,23 @@ pub(super) fn render_thinking_lines(
 fn collapsed_line(text: &str, duration_ms: Option<u64>) -> Line<'static> {
     let seconds = thinking_seconds(duration_ms, text);
     Line::from(vec![
-        Span::styled(format!("{} ", theme::THINKING_MARK), theme::THINKING),
+        Span::styled(format!("{} ", theme::THINKING_MARK), theme::thinking()),
         Span::styled(
             format!("Thought for {seconds}s (ctrl+t to expand)"),
-            theme::THINKING,
+            theme::thinking(),
         ),
     ])
 }
 
 fn streaming_block(text: &str, spinner: usize) -> Vec<Line<'static>> {
     let mut lines = vec![Line::from(vec![
-        Span::styled(format!("{} ", theme::pulse_frame(spinner)), theme::THINKING),
-        Span::styled("Thinking…", theme::THINKING.add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{} ", theme::pulse_frame(spinner)), theme::thinking()),
+        Span::styled("Thinking…", theme::thinking().add_modifier(Modifier::BOLD)),
     ])];
     for line in tail_lines(text, STREAM_TAIL_LINES) {
         lines.push(Line::from(Span::styled(
             format!("  {line}"),
-            theme::THINKING,
+            theme::thinking(),
         )));
     }
     lines
@@ -65,13 +65,13 @@ fn streaming_block(text: &str, spinner: usize) -> Vec<Line<'static>> {
 
 fn expanded_block(text: &str) -> Vec<Line<'static>> {
     let mut lines = vec![Line::from(vec![
-        Span::styled(format!("{} ", theme::THINKING_MARK), theme::THINKING),
-        Span::styled("Thinking", theme::THINKING.add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{} ", theme::THINKING_MARK), theme::thinking()),
+        Span::styled("Thinking", theme::thinking().add_modifier(Modifier::BOLD)),
     ])];
     for line in text.lines() {
         lines.push(Line::from(Span::styled(
             format!("  {line}"),
-            theme::THINKING,
+            theme::thinking(),
         )));
     }
     lines

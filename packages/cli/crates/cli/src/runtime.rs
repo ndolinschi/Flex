@@ -43,7 +43,15 @@ pub async fn run(args: Args) -> Result<()> {
     }
 }
 
-async fn run_tui(args: Args) -> Result<()> {
+async fn run_tui(mut args: Args) -> Result<()> {
+    // Delegated agents (claude-code, copilot) are feature-flagged off by
+    // default — see `delegated_agents_enabled`. A `--agent` requesting one
+    // falls back to native rather than attempting a disabled path.
+    let disabled_agent_requested = args.agent != AgentKind::Native
+        && !agentloop_cli_core::delegated_agents_enabled();
+    if disabled_agent_requested {
+        args.agent = AgentKind::Native;
+    }
     let (tx, mut rx) = mpsc::channel(EVENT_QUEUE);
     let mut hub = EngineHub::new(
         args.workdir.clone(),
@@ -137,6 +145,12 @@ async fn run_tui(args: Args) -> Result<()> {
 
     let mut app = App::new(bootstrap, workdir, file_index);
     app.apply_loaded_prefs(&prefs);
+    if disabled_agent_requested {
+        app.chat.push_info(
+            "--agent is native-only for now — delegated agents are disabled \
+             (set AGENTICSTUDIO_ENABLE_DELEGATED_AGENTS=1 to re-enable)",
+        );
+    }
     let executor = EffectExecutor::new(hub, controller, args.agent, tx.clone());
     let mut terminal = TerminalSession::enter()?;
     terminal.draw(&mut app)?;
@@ -1128,6 +1142,20 @@ async fn run_shell_command(
     }
 }
 
+/// XTerm "alternate scroll mode": while the alternate screen buffer is
+/// active, the terminal translates trackpad/wheel scroll into events for the
+/// foreground app (or arrow-key sequences) instead of applying its own
+/// native scrollback/rubber-band to the window. `crossterm::EnableMouseCapture`
+/// does NOT send this — it only sets modes 1000/1002/1003/1015/1006, which
+/// report clicks and drags but say nothing about wheel-scroll routing. Without
+/// it, terminals like Terminal.app/iTerm2 can still apply their own scroll
+/// physics on top of (or instead of) forwarding wheel events to us, which
+/// looks like blank scrollback rows bleeding into the alternate screen when
+/// scrolling. `vim`, `tmux`, and `less` all send this alongside mouse capture
+/// for the same reason.
+const ENABLE_ALTERNATE_SCROLL: &str = "\x1b[?1007h";
+const DISABLE_ALTERNATE_SCROLL: &str = "\x1b[?1007l";
+
 struct TerminalSession {
     terminal: Terminal<CrosstermBackend<io::Stdout>>,
 }
@@ -1136,7 +1164,15 @@ impl TerminalSession {
     fn enter() -> Result<Self> {
         enable_raw_mode().context("enable raw mode")?;
         let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen).context("enter alternate screen")?;
+        // Capture the mouse from the start so wheel-scroll drives the TUI
+        // transcript (App defaults `mouse_capture` on to match). Ctrl+M
+        // toggles it off for native text selection.
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
+            .context("enter alternate screen")?;
+        stdout
+            .write_all(ENABLE_ALTERNATE_SCROLL.as_bytes())
+            .and_then(|()| stdout.flush())
+            .context("enable alternate scroll mode")?;
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend).context("create terminal")?;
         Ok(Self { terminal })
@@ -1150,12 +1186,19 @@ impl TerminalSession {
     }
 
     fn set_mouse_capture(&mut self, enabled: bool) -> Result<()> {
+        let backend = self.terminal.backend_mut();
         if enabled {
-            execute!(self.terminal.backend_mut(), EnableMouseCapture)
-                .context("enable mouse capture")?;
+            execute!(backend, EnableMouseCapture).context("enable mouse capture")?;
+            backend
+                .write_all(ENABLE_ALTERNATE_SCROLL.as_bytes())
+                .and_then(|()| backend.flush())
+                .context("enable alternate scroll mode")?;
         } else {
-            execute!(self.terminal.backend_mut(), DisableMouseCapture)
-                .context("disable mouse capture")?;
+            backend
+                .write_all(DISABLE_ALTERNATE_SCROLL.as_bytes())
+                .and_then(|()| backend.flush())
+                .context("disable alternate scroll mode")?;
+            execute!(backend, DisableMouseCapture).context("disable mouse capture")?;
         }
         Ok(())
     }
@@ -1163,12 +1206,11 @@ impl TerminalSession {
 
 impl Drop for TerminalSession {
     fn drop(&mut self) {
+        let backend = self.terminal.backend_mut();
+        let _ = backend.write_all(DISABLE_ALTERNATE_SCROLL.as_bytes());
+        let _ = backend.flush();
         let _ = disable_raw_mode();
-        let _ = execute!(
-            self.terminal.backend_mut(),
-            LeaveAlternateScreen,
-            DisableMouseCapture
-        );
+        let _ = execute!(backend, LeaveAlternateScreen, DisableMouseCapture);
         let _ = self.terminal.show_cursor();
     }
 }

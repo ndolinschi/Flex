@@ -24,6 +24,9 @@ pub struct CliPrefs {
     /// Session mode default: `"code"` or `"plan"`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_mode: Option<String>,
+    /// Active color theme id (e.g. `"tokyonight"`); `None` = pick a default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theme: Option<String>,
     /// Permission mode default: `"default"`, `"accept-edits"`, `"plan"`,
     /// `"dont-ask"`, or `"bypass"`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -329,6 +332,13 @@ impl CliPrefs {
         prefs.save()
     }
 
+    /// Update and persist the active color theme.
+    pub fn remember_theme(id: &str) -> Result<(), PrefsError> {
+        let mut prefs = Self::load();
+        prefs.theme = Some(id.to_owned());
+        prefs.save()
+    }
+
     /// Update and persist UI mode defaults.
     pub fn remember_modes(
         session_mode: &str,
@@ -441,6 +451,19 @@ mod tests {
         CliPrefs::save_to(&path, &prefs).expect("save");
         let loaded = CliPrefs::load_from(&path).expect("load");
         assert_eq!(loaded, prefs);
+    }
+
+    #[test]
+    fn theme_round_trip() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("config.json");
+        let prefs = CliPrefs {
+            theme: Some("tokyonight".to_owned()),
+            ..CliPrefs::default()
+        };
+        CliPrefs::save_to(&path, &prefs).expect("save");
+        let loaded = CliPrefs::load_from(&path).expect("load");
+        assert_eq!(loaded.theme.as_deref(), Some("tokyonight"));
     }
 
     #[test]

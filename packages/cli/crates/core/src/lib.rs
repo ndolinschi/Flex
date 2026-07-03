@@ -19,10 +19,10 @@ pub use auth::{AuthError, LoginEvent, has_copilot_credentials, login_copilot};
 pub use catalog::{CatalogEntry, ModelCatalog};
 pub use connect::validate_provider;
 pub use controller::SessionController;
-pub use engines::{AgentKind, EngineHub, HubError};
+pub use engines::{AgentKind, EngineHub, HubError, delegated_agents_enabled};
 pub use mcp_store::{
     InstallTarget, InstalledMcpServer, McpInstallSource, McpRegistryEntry, McpStore, McpStoreError,
-    mcp_path, mcp_servers_dir, parse_install_target, registry,
+    mcp_path, mcp_servers_dir, parse_install_target, project_path as mcp_project_path, registry,
 };
 pub use prefs::{
     CliPrefs, ModelEntry, PrefsError, ProviderConfig, RoleConfig, config_dir, config_path,

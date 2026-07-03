@@ -2,12 +2,12 @@
 source: crates/cli/src/render_snapshots.rs
 expression: rendered
 ---
-✻ AgenticStudio 0.1.0
-cwd: .
-shift+tab cycles modes · ctrl+o expands tools · enter mid-turn queues · /help
 
-        ┌ command ─────────────────────────────────────────────────────┐
-        │$ echo hello                                                  │
+  ✻ AgenticStudio  v0.1.0
+     agentic coding in your terminal
+
+  .     ╭ command ─────────────────────────────────────────────────────╮
+  /help │$ echo hello                                                  │
         │                                                              │
         │hello                                                         │
         │world                                                         │
@@ -21,8 +21,8 @@ shift+tab cycles modes · ctrl+o expands tools · enter mid-turn queues · /help
         │                                                              │
         │                                                              │
         │                                                              │
-────────└──────────────────────────────────────────────────────────────┘────────
-┌ prompt ──────────────────────────────────────────────────────────────────────┐
+        ╰──────────────────────────────────────────────────────────────╯
+╭ prompt ──────────────────────────────────────────────────────────────────────╮
 │ Type a message, / commands, @ files · @path:[0:12] python slice              │
-└──────────────────────────────────────────────────────────────────────────────┘
+╰──────────────────────────────────────────────────────────────────────────────╯
 native · code · auto · anthropic/claude-sonnet-4-5 · ↑0 ↓0

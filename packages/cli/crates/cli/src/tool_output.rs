@@ -121,7 +121,7 @@ pub(crate) fn tool_summary(tool_name: &str, input: &serde_json::Value) -> String
             .get("file_path")
             .or_else(|| input.get("path"))
             .and_then(|v| v.as_str())
-            .map(str::to_owned),
+            .map(short_path),
         "Grep" => {
             let pattern = input.get("pattern").and_then(|v| v.as_str());
             let path = input
@@ -129,7 +129,7 @@ pub(crate) fn tool_summary(tool_name: &str, input: &serde_json::Value) -> String
                 .or_else(|| input.get("glob"))
                 .and_then(|v| v.as_str());
             match (pattern, path) {
-                (Some(p), Some(path)) => Some(format!("{p} in {path}")),
+                (Some(p), Some(path)) => Some(format!("{p} in {}", short_path(path))),
                 (Some(p), None) => Some(p.to_owned()),
                 _ => None,
             }
@@ -149,6 +149,18 @@ pub(crate) fn tool_summary(tool_name: &str, input: &serde_json::Value) -> String
             &format!("{tool_name}({})", compact_json(input)),
             SUMMARY_MAX_LEN,
         ),
+    }
+}
+
+/// Abbreviate a filesystem path to `folder/filename` for compact tool-row
+/// display: `/Users/x/proj/food-website/README.md` → `food-website/README.md`.
+/// Paths of one or two components pass through unchanged.
+fn short_path(path: &str) -> String {
+    let parts: Vec<&str> = path.trim_end_matches('/').split('/').filter(|s| !s.is_empty()).collect();
+    match parts.as_slice() {
+        [] => path.to_owned(),
+        [only] => (*only).to_owned(),
+        [.., parent, name] => format!("{parent}/{name}"),
     }
 }
 
@@ -480,5 +492,22 @@ mod tests {
     fn bash_summary_shows_command() {
         let summary = tool_summary("Bash", &serde_json::json!({"command": "cargo test"}));
         assert_eq!(summary, "Bash(cargo test)");
+    }
+
+    #[test]
+    fn read_summary_abbreviates_absolute_path() {
+        let summary = tool_summary(
+            "Read",
+            &serde_json::json!({"file_path": "/Users/x/proj/food-website/README.md"}),
+        );
+        assert_eq!(summary, "Read(food-website/README.md)");
+    }
+
+    #[test]
+    fn short_path_keeps_folder_and_file() {
+        assert_eq!(short_path("src/main.rs"), "src/main.rs");
+        assert_eq!(short_path("README.md"), "README.md");
+        assert_eq!(short_path("/etc/hosts"), "etc/hosts");
+        assert_eq!(short_path("/a/b/c/d.rs"), "c/d.rs");
     }
 }

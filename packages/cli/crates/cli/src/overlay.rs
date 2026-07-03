@@ -59,6 +59,8 @@ pub enum PickerAction {
     SetSessionMode,
     /// Set permission security level.
     SetPermissionMode,
+    /// Set the color theme to the item id.
+    SetTheme,
 }
 
 /// One selectable picker row.
@@ -273,6 +275,10 @@ pub struct ConfirmPrompt {
 pub enum ConfirmAction {
     AllowAllPermissions,
     McpRemove { name: String },
+    /// Adopt these project-declared MCP servers into the global config.
+    McpImport {
+        servers: Vec<agentloop_cli_core::InstalledMcpServer>,
+    },
 }
 
 /// `/command` overlay: running spinner or scrollable combined output.
@@ -384,6 +390,12 @@ pub struct OverlayOutcome {
     pub mcp_list_saved: bool,
     /// MCP install wizard selection.
     pub mcp_install: Option<McpInstallChoice>,
+    /// Theme id to preview live (highlight moved in the theme picker); the app
+    /// applies it without persisting.
+    pub preview_theme: Option<String>,
+    /// Restore the theme snapshot taken when the theme picker opened (the user
+    /// cancelled the picker).
+    pub revert_theme: bool,
 }
 
 impl OverlayOutcome {
@@ -425,6 +437,7 @@ pub enum PickerChoice {
     SwitchAgent(String),
     SetSessionMode(String),
     SetPermissionMode(String),
+    SetTheme(String),
 }
 
 /// What the install wizard selected.
@@ -435,10 +448,35 @@ pub enum McpInstallChoice {
     Import { path: String },
 }
 
+/// The id under the picker cursor, for live theme preview. `None` unless the
+/// picker is a theme picker with a selectable row highlighted.
+fn picker_theme_preview(picker: &PickerState) -> Option<String> {
+    if picker.action != PickerAction::SetTheme {
+        return None;
+    }
+    picker
+        .visible()
+        .get(picker.selected)
+        .filter(|item| item.enabled)
+        .map(|item| item.id.clone())
+}
+
+/// A navigation outcome that also carries a live theme preview when relevant.
+fn picker_moved(picker: &PickerState) -> OverlayOutcome {
+    OverlayOutcome {
+        preview_theme: picker_theme_preview(picker),
+        ..OverlayOutcome::default()
+    }
+}
+
 fn picker_key(picker: &mut PickerState, key: KeyEvent) -> OverlayOutcome {
     let visible_len = picker.visible().len();
     match (key.code, key.modifiers) {
-        (KeyCode::Esc, _) => OverlayOutcome::close(),
+        (KeyCode::Esc, _) => OverlayOutcome {
+            close: true,
+            revert_theme: picker.action == PickerAction::SetTheme,
+            ..OverlayOutcome::default()
+        },
         (KeyCode::Up, _) => {
             if visible_len > 0 {
                 picker.selected = if picker.selected == 0 {
@@ -447,18 +485,18 @@ fn picker_key(picker: &mut PickerState, key: KeyEvent) -> OverlayOutcome {
                     picker.selected - 1
                 };
             }
-            OverlayOutcome::consumed()
+            picker_moved(picker)
         }
         (KeyCode::Down, _) => {
             if visible_len > 0 {
                 picker.selected = (picker.selected + 1) % visible_len;
             }
-            OverlayOutcome::consumed()
+            picker_moved(picker)
         }
         (KeyCode::Backspace, _) => {
             picker.filter.pop();
             picker.selected = 0;
-            OverlayOutcome::consumed()
+            picker_moved(picker)
         }
         (KeyCode::Enter, _) => {
             let chosen = picker
@@ -474,6 +512,7 @@ fn picker_key(picker: &mut PickerState, key: KeyEvent) -> OverlayOutcome {
                         PickerAction::SwitchAgent => PickerChoice::SwitchAgent(id),
                         PickerAction::SetSessionMode => PickerChoice::SetSessionMode(id),
                         PickerAction::SetPermissionMode => PickerChoice::SetPermissionMode(id),
+                        PickerAction::SetTheme => PickerChoice::SetTheme(id),
                     }),
                     close: true,
                     ..OverlayOutcome::default()
@@ -484,7 +523,7 @@ fn picker_key(picker: &mut PickerState, key: KeyEvent) -> OverlayOutcome {
         (KeyCode::Char(c), m) if m.is_empty() || m == KeyModifiers::SHIFT => {
             picker.filter.push(c);
             picker.selected = 0;
-            OverlayOutcome::consumed()
+            picker_moved(picker)
         }
         _ => OverlayOutcome::consumed(),
     }

@@ -40,6 +40,7 @@ pulldown-cmark = { workspace = true }
 unicode-width = { workspace = true }
 tui-textarea = { workspace = true }
 ignore = { workspace = true }
+syntect = { workspace = true }
 
 [dev-dependencies]
 agentloop-loop = { workspace = true }

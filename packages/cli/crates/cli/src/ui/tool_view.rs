@@ -20,6 +20,7 @@ use crate::tool_output::{
 };
 
 use super::diff::{DiffKind, DiffLine};
+use super::highlight::Highlighter;
 
 /// Duration is only worth showing above this threshold.
 const DURATION_MIN_MS: u64 = 2000;
@@ -44,7 +45,7 @@ pub(super) fn render_tool_row(row: &ToolRow<'_>) -> Vec<Line<'static>> {
     if let Some(progress) = row.progress {
         lines.push(gutter_line(
             true,
-            vec![Span::styled(normalize_terminal_text(progress), theme::DIM)],
+            vec![Span::styled(normalize_terminal_text(progress), theme::dim())],
         ));
     }
 
@@ -61,28 +62,28 @@ fn header_line(row: &ToolRow<'_>) -> Line<'static> {
     let glyph = match &call.status {
         ToolCallStatus::Running => Span::styled(
             format!("{} ", theme::spinner_frame(row.spinner)),
-            theme::WARN,
+            theme::warn(),
         ),
-        ToolCallStatus::Pending => Span::styled("⏺ ".to_owned(), theme::DIM),
-        ToolCallStatus::AwaitingPermission { .. } => Span::styled("⏺ ".to_owned(), theme::WARN),
+        ToolCallStatus::Pending => Span::styled("⏺ ".to_owned(), theme::dim()),
+        ToolCallStatus::AwaitingPermission { .. } => Span::styled("⏺ ".to_owned(), theme::warn()),
         ToolCallStatus::Completed => {
             if bash_exit_code(call).is_some_and(|code| code != 0) {
-                Span::styled("⏺ ".to_owned(), theme::ERROR)
+                Span::styled("⏺ ".to_owned(), theme::error())
             } else {
-                Span::styled("⏺ ".to_owned(), theme::SUCCESS)
+                Span::styled("⏺ ".to_owned(), theme::success())
             }
         }
         ToolCallStatus::Failed { .. } | ToolCallStatus::Denied { .. } => {
-            Span::styled("⏺ ".to_owned(), theme::ERROR)
+            Span::styled("⏺ ".to_owned(), theme::error())
         }
-        ToolCallStatus::Cancelled => Span::styled("⏺ ".to_owned(), theme::DIM),
-        _ => Span::styled("⏺ ".to_owned(), theme::DIM),
+        ToolCallStatus::Cancelled => Span::styled("⏺ ".to_owned(), theme::dim()),
+        _ => Span::styled("⏺ ".to_owned(), theme::dim()),
     };
 
     let summary_style = if row.focused {
-        theme::SELECTED
+        theme::selected()
     } else if matches!(call.status, ToolCallStatus::Running) {
-        theme::TOOL_RUNNING
+        theme::tool_running()
     } else {
         Style::default()
     };
@@ -91,30 +92,30 @@ fn header_line(row: &ToolRow<'_>) -> Line<'static> {
 
     match &call.status {
         ToolCallStatus::AwaitingPermission { .. } => {
-            spans.push(Span::styled(" awaiting permission".to_owned(), theme::DIM));
+            spans.push(Span::styled(" awaiting permission".to_owned(), theme::dim()));
         }
         ToolCallStatus::Completed => {
             if let Some(duration) = call.timing.duration_ms().filter(|ms| *ms > DURATION_MIN_MS) {
                 spans.push(Span::styled(
                     format!(" {}", format_duration(duration)),
-                    theme::DIM,
+                    theme::dim(),
                 ));
             }
         }
         ToolCallStatus::Failed { .. } if row.failed_streak > 1 => {
             spans.push(Span::styled(
                 format!(" ×{} failed", row.failed_streak),
-                theme::ERROR,
+                theme::error(),
             ));
         }
         ToolCallStatus::Denied { .. } if row.failed_streak > 1 => {
             spans.push(Span::styled(
                 format!(" ×{} denied", row.failed_streak),
-                theme::ERROR,
+                theme::error(),
             ));
         }
         ToolCallStatus::Cancelled => {
-            spans.push(Span::styled(" cancelled".to_owned(), theme::DIM));
+            spans.push(Span::styled(" cancelled".to_owned(), theme::dim()));
         }
         _ => {}
     }
@@ -132,11 +133,11 @@ fn result_lines(row: &ToolRow<'_>) -> Vec<Line<'static>> {
     // Failure text moves from the header to the first result line.
     match &call.status {
         ToolCallStatus::Failed { error } => {
-            content.push(vec![Span::styled(error.clone(), theme::ERROR)]);
+            content.push(vec![Span::styled(error.clone(), theme::error())]);
         }
         ToolCallStatus::Denied { reason } => {
             let reason = reason.clone().unwrap_or_else(|| "denied".to_owned());
-            content.push(vec![Span::styled(reason, theme::ERROR)]);
+            content.push(vec![Span::styled(reason, theme::error())]);
         }
         _ => {}
     }
@@ -149,8 +150,14 @@ fn result_lines(row: &ToolRow<'_>) -> Vec<Line<'static>> {
             } else {
                 preview.preview_len()
             };
+            // Highlight context lines by the edited file's extension; `+`/`-`
+            // lines keep their solid add/del color so the diff still reads as a
+            // diff at a glance.
+            let file_path = call.input.get("file_path").and_then(|value| value.as_str());
+            let body_len = preview.lines.iter().map(|line| line.text.len() + 1).sum();
+            let mut highlighter = super::highlight::for_path(file_path, body_len);
             for line in &preview.lines[..shown] {
-                content.push(vec![diff_span(line)]);
+                content.push(diff_spans(line, highlighter.as_mut()));
             }
             if !row.expanded && total > shown {
                 footer = Some(format!("… +{} lines (ctrl+o to expand)", total - shown));
@@ -165,7 +172,7 @@ fn result_lines(row: &ToolRow<'_>) -> Vec<Line<'static>> {
                 .and_then(|result| collapsed_summary_line(&call.tool_name, result));
             match summary {
                 Some(summary) => {
-                    content.push(vec![Span::styled(summary, theme::DIM)]);
+                    content.push(vec![Span::styled(summary, theme::dim())]);
                 }
                 None => {
                     let total = body.len();
@@ -199,7 +206,7 @@ fn result_lines(row: &ToolRow<'_>) -> Vec<Line<'static>> {
         lines.push(gutter_line(idx == 0, spans));
     }
     if let Some(footer) = footer {
-        lines.push(gutter_line(true, vec![Span::styled(footer, theme::DIM)]));
+        lines.push(gutter_line(true, vec![Span::styled(footer, theme::dim())]));
     }
     lines
 }
@@ -208,20 +215,33 @@ fn result_lines(row: &ToolRow<'_>) -> Vec<Line<'static>> {
 /// five spaces on continuations.
 fn gutter_line(anchor: bool, mut spans: Vec<Span<'static>>) -> Line<'static> {
     let prefix = if anchor { "  ⎿ " } else { "     " };
-    let mut all = vec![Span::styled(prefix.to_owned(), theme::DIM)];
+    let mut all = vec![Span::styled(prefix.to_owned(), theme::dim())];
     all.append(&mut spans);
     Line::from(all)
 }
 
-fn diff_span(line: &DiffLine) -> Span<'static> {
+fn diff_spans(line: &DiffLine, highlighter: Option<&mut Highlighter>) -> Vec<Span<'static>> {
     let no = line
         .line_no
         .map(|n| format!("{n:>3}"))
         .unwrap_or_else(|| "   ".to_owned());
     match line.kind {
-        DiffKind::Del => Span::styled(format!("{no} - {}", line.text), theme::DIFF_DEL),
-        DiffKind::Add => Span::styled(format!("{no} + {}", line.text), theme::DIFF_ADD),
-        DiffKind::Ctx => Span::styled(format!("{no}   {}", line.text), theme::DIM),
+        DiffKind::Del => vec![Span::styled(
+            format!("{no} - {}", line.text),
+            theme::diff_del(),
+        )],
+        DiffKind::Add => vec![Span::styled(
+            format!("{no} + {}", line.text),
+            theme::diff_add(),
+        )],
+        DiffKind::Ctx => {
+            let mut spans = vec![Span::styled(format!("{no}   "), theme::dim())];
+            match highlighter {
+                Some(hl) => spans.extend(hl.line(&line.text)),
+                None => spans.push(Span::styled(line.text.clone(), theme::dim())),
+            }
+            spans
+        }
     }
 }
 
@@ -231,9 +251,9 @@ fn body_style(call: &ToolCall, line: &str) -> Style {
         && line.starts_with("exit ")
         && bash_exit_code(call).is_some_and(|code| code != 0)
     {
-        theme::ERROR
+        theme::error()
     } else {
-        theme::DIM
+        theme::dim()
     }
 }
 

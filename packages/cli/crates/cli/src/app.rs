@@ -12,7 +12,7 @@ use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyEventKind, KeyM
 
 use agentloop_cli_core::{
     AgentKind, CatalogEntry, CliPrefs, InstallTarget, LoginEvent, McpStore,
-    has_copilot_credentials, parse_install_target,
+    delegated_agents_enabled, has_copilot_credentials, parse_install_target,
 };
 use agentloop_contracts::{
     AgentCaps, AgentEvent, ModelDiscovery, ModelInfo, ModelRef, PermissionDecision, PermissionMode,
@@ -31,6 +31,7 @@ use crate::overlay::{
     OverlayOutcome, PermissionPrompt, PickerAction, PickerChoice, PickerItem, PickerState,
     QuestionPrompt, ShellCommandOverlay, ShellCommandPhase,
 };
+use crate::theme::{self, BuiltinTheme, Theme};
 use crate::ui::MarkdownCache;
 
 /// PageUp/PageDown scroll step in wrapped lines.
@@ -200,6 +201,15 @@ pub struct App {
     pub queued_prompts: std::collections::VecDeque<String>,
     /// Fallback model chain sent with every turn (from config.json).
     pub fallback_models: Vec<ModelRef>,
+    /// Conversation captured at an agent switch, injected into the next prompt
+    /// so context carries across agents. `None` once consumed or when idle.
+    carried_context: Option<String>,
+    /// Active color theme id (for the picker's "current" marker and persist).
+    pub theme_id: String,
+    /// Whether the terminal supports truecolor; drives theme resolution.
+    truecolor: bool,
+    /// Theme snapshot taken when the picker opens, restored on cancel.
+    saved_theme: Option<Theme>,
     dirty: bool,
 }
 
@@ -233,7 +243,11 @@ impl App {
             pending_model: None,
             status: StatusState::default(),
             markdown_cache: MarkdownCache::default(),
-            mouse_capture: false,
+            // Capture the mouse by default so the wheel scrolls the transcript
+            // instead of the terminal's scrollback (which, under the alternate
+            // screen, bleeds the pre-launch shell buffer in). Ctrl+M toggles
+            // back to native drag-select.
+            mouse_capture: true,
             show_thinking: bootstrap.hello.capabilities.reasoning_visible,
             thinking_budget: None,
             pending_switch_kind: None,
@@ -244,15 +258,17 @@ impl App {
             mcp_enabled: bootstrap.mcp_enabled,
             queued_prompts: std::collections::VecDeque::new(),
             fallback_models: Vec::new(),
+            carried_context: None,
+            theme_id: BuiltinTheme::DEFAULT.id().to_owned(),
+            truecolor: theme::terminal_supports_truecolor(),
+            saved_theme: None,
             dirty: true,
         };
+        let splash_name = app.engine_name.clone();
+        let splash_version = app.engine_version.clone();
+        let splash_cwd = app.workdir.display().to_string();
         app.chat
-            .push_info(format!("✻ {} {}", app.engine_name, app.engine_version));
-        app.chat
-            .push_info(format!("cwd: {}", app.workdir.display()));
-        app.chat.push_info(
-            "shift+tab cycles modes · ctrl+o expands tools · enter mid-turn queues · /help",
-        );
+            .push_splash(splash_name, splash_version, splash_cwd);
         app.install_bootstrap(bootstrap, false);
         app
     }
@@ -294,6 +310,13 @@ impl App {
             .iter()
             .map(|model| ModelRef(model.clone()))
             .collect();
+        let builtin = prefs
+            .theme
+            .as_deref()
+            .and_then(BuiltinTheme::from_id)
+            .unwrap_or(BuiltinTheme::DEFAULT);
+        theme::set_active(builtin.resolve(self.truecolor));
+        self.theme_id = builtin.id().to_owned();
     }
 
     /// Show a transient notification above the input (never in transcript).
@@ -547,6 +570,12 @@ impl App {
         if let Some(choice) = outcome.mcp_install {
             effects.extend(self.apply_mcp_install_choice(choice));
         }
+        if let Some(id) = outcome.preview_theme {
+            self.preview_theme(&id);
+        }
+        if outcome.revert_theme {
+            self.revert_theme();
+        }
         if outcome.close {
             self.overlay = Overlay::None;
             self.drain_pending();
@@ -618,6 +647,31 @@ impl App {
                     Vec::new()
                 }
             }
+            ConfirmAction::McpImport { servers } => {
+                let added = self.mcp_store.import_missing(servers);
+                self.save_mcp_list_reporting(&added)
+            }
+        }
+    }
+
+    /// Save `mcp_store` and report which of `imported` names were actually
+    /// added (used after `/mcp-import`, where some names may have already
+    /// existed between confirming and applying).
+    fn save_mcp_list_reporting(&mut self, imported: &[String]) -> Vec<Effect> {
+        if let Err(err) = self.mcp_store.save() {
+            self.chat
+                .push_error(format!("failed to save mcp.json: {err}"));
+            return Vec::new();
+        }
+        if imported.is_empty() {
+            self.toast("nothing new to import");
+            return Vec::new();
+        }
+        self.toast(format!("imported: {}", imported.join(", ")));
+        if self.kind == AgentKind::Native {
+            vec![Effect::ReloadEngine { invalidate: true }]
+        } else {
+            Vec::new()
         }
     }
 
@@ -647,6 +701,7 @@ impl App {
                 Vec::new()
             }
             PickerChoice::SetPermissionMode(id) => self.apply_permission_picker_id(&id),
+            PickerChoice::SetTheme(id) => self.apply_theme(&id),
         }
     }
 
@@ -666,6 +721,29 @@ impl App {
         }
     }
 
+    /// Snapshot the current conversation to inject into the first prompt on
+    /// the next agent, so context carries across a switch. Capped to bound the
+    /// injected prompt; a no-op when there's nothing to carry.
+    fn capture_carry_context(&mut self) {
+        const CARRY_MAX: usize = 8000;
+        let text = self.chat.plain_text();
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            self.carried_context = None;
+            return;
+        }
+        let digest = if trimmed.len() <= CARRY_MAX {
+            trimmed.to_owned()
+        } else {
+            let start = trimmed.len() - CARRY_MAX;
+            let start = (start..=trimmed.len())
+                .find(|&idx| trimmed.is_char_boundary(idx))
+                .unwrap_or(trimmed.len());
+            format!("[…earlier conversation truncated…]\n{}", &trimmed[start..])
+        };
+        self.carried_context = Some(digest);
+    }
+
     fn submit_prompt(&mut self, line: &str) -> Vec<Effect> {
         if self.session.turn.is_running() {
             self.queued_prompts.push_back(line.to_owned());
@@ -675,7 +753,15 @@ impl App {
             ));
             return Vec::new();
         }
-        let input = crate::files::expand_file_mentions(line, &self.workdir, &self.file_index);
+        let mut input = crate::files::expand_file_mentions(line, &self.workdir, &self.file_index);
+        // Carry the pre-switch conversation into the first prompt on the new
+        // agent (works for every agent, since it's just prompt text).
+        if let Some(context) = self.carried_context.take() {
+            input = format!(
+                "Context from earlier in this conversation, before I switched agents:\n\n\
+                 {context}\n\n---\n\nContinuing from the above, here is my request:\n\n{input}"
+            );
+        }
         self.begin_turn();
         vec![Effect::SubmitPrompt {
             input: PromptInput::text(&input),
@@ -715,6 +801,11 @@ impl App {
             LocalCommand::Mode { arg } => self.run_mode_command(arg),
             LocalCommand::Permissions { arg } => self.run_permissions_command(arg),
             LocalCommand::Thinking { arg } => self.run_thinking_command(arg),
+            LocalCommand::Theme { arg: Some(name) } => self.apply_theme(name.trim()),
+            LocalCommand::Theme { arg: None } => {
+                self.open_theme_picker();
+                Vec::new()
+            }
             LocalCommand::Compact => self.run_compact(),
             LocalCommand::Connect { arg } => self.run_connect(arg),
             LocalCommand::Providers => self.run_providers(),
@@ -724,6 +815,8 @@ impl App {
             LocalCommand::Mcp { sub } => self.run_mcp_command(sub),
             LocalCommand::McpInstall { arg } => self.run_mcp_install(arg),
             LocalCommand::McpRemove { name } => self.run_mcp_remove(&name),
+            LocalCommand::Init => self.run_init(),
+            LocalCommand::McpImport => self.run_mcp_import(),
         }
     }
 
@@ -873,6 +966,93 @@ impl App {
                 .to_owned(),
             action: ConfirmAction::McpRemove {
                 name: name.to_owned(),
+            },
+        });
+        Vec::new()
+    }
+
+    /// `/init` — snapshot the currently-enabled MCP integrations into this
+    /// project's `.agent/mcp.json`, so they're documented and can travel with
+    /// the project (e.g. committed to source control). Never overwrites an
+    /// existing project file — that could clobber a teammate's setup; run
+    /// `/mcp-import` instead to adopt what it declares.
+    fn run_init(&mut self) -> Vec<Effect> {
+        let project_file = agentloop_cli_core::mcp_project_path(&self.workdir);
+        if project_file.exists() {
+            let declared = McpStore::load_project(&self.workdir)
+                .map(|store| store.servers.len())
+                .unwrap_or(0);
+            self.chat.push_info(format!(
+                "{} already declares {declared} MCP integration(s) — \
+                 run /mcp-import to adopt any not yet installed, or edit it directly",
+                project_file.display()
+            ));
+            return Vec::new();
+        }
+        if self.mcp_store.servers.is_empty() {
+            self.chat.push_info(
+                "no MCP servers configured yet — connect some with /mcp-install, \
+                 then run /init again to save them for this project",
+            );
+            return Vec::new();
+        }
+        if let Err(err) = self.mcp_store.export_to_project(&self.workdir) {
+            self.chat
+                .push_error(format!("failed to write {}: {err}", project_file.display()));
+            return Vec::new();
+        }
+        self.chat.push_info(format!(
+            "saved {} MCP integration(s) to {} — commit it so this project's setup travels with it. \
+             Use /permissions auto (or bypass) to run hands-off with them.",
+            self.mcp_store.servers.len(),
+            project_file.display()
+        ));
+        Vec::new()
+    }
+
+    /// `/mcp-import` — review and adopt MCP integrations this project
+    /// declares in `.agent/mcp.json` that aren't installed globally yet.
+    /// Requires confirmation since a project file can point at arbitrary
+    /// launch commands — never applied silently.
+    fn run_mcp_import(&mut self) -> Vec<Effect> {
+        let project = match McpStore::load_project(&self.workdir) {
+            Ok(project) => project,
+            Err(err) => {
+                self.chat.push_error(format!(
+                    "failed to read {}: {err}",
+                    agentloop_cli_core::mcp_project_path(&self.workdir).display()
+                ));
+                return Vec::new();
+            }
+        };
+        let existing: std::collections::HashSet<&str> = self
+            .mcp_store
+            .servers
+            .iter()
+            .map(|server| server.config.name.as_str())
+            .collect();
+        let new_servers: Vec<_> = project
+            .servers
+            .into_iter()
+            .filter(|server| !existing.contains(server.config.name.as_str()))
+            .collect();
+        if new_servers.is_empty() {
+            self.toast("nothing to import — up to date");
+            return Vec::new();
+        }
+        let names = new_servers
+            .iter()
+            .map(|server| server.config.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        self.overlay = Overlay::Confirm(ConfirmPrompt {
+            title: format!("Import {} MCP integration(s)?", new_servers.len()),
+            message: format!(
+                "This project declares: {names}. They'll run with whatever launch \
+                 command is configured — only import from projects you trust."
+            ),
+            action: ConfirmAction::McpImport {
+                servers: new_servers,
             },
         });
         Vec::new()
@@ -1285,6 +1465,69 @@ impl App {
         ));
     }
 
+    /// Open the theme picker. Snapshots the active theme so cancelling (Esc)
+    /// or moving off a live-previewed row restores it.
+    fn open_theme_picker(&mut self) {
+        self.saved_theme = Some(theme::active());
+        let items: Vec<PickerItem> = BuiltinTheme::all()
+            .iter()
+            .map(|builtin| PickerItem {
+                id: builtin.id().to_owned(),
+                label: builtin.id().to_owned(),
+                detail: (builtin.id() == self.theme_id).then(|| "current".to_owned()),
+                enabled: true,
+            })
+            .collect();
+        let mut picker = PickerState::new("theme", items, PickerAction::SetTheme);
+        if let Some(idx) = picker.items.iter().position(|item| item.id == self.theme_id) {
+            picker.selected = idx;
+        }
+        self.overlay = Overlay::Picker(picker);
+        self.dirty = true;
+    }
+
+    /// Apply a theme live without persisting (theme-picker highlight moved).
+    fn preview_theme(&mut self, id: &str) {
+        if let Some(builtin) = BuiltinTheme::from_id(id) {
+            theme::set_active(builtin.resolve(self.truecolor));
+            self.markdown_cache.clear();
+            self.dirty = true;
+        }
+    }
+
+    /// Restore the theme snapshotted when the picker opened (picker cancelled).
+    fn revert_theme(&mut self) {
+        if let Some(saved) = self.saved_theme.take() {
+            theme::set_active(saved);
+            self.markdown_cache.clear();
+            self.dirty = true;
+        }
+    }
+
+    /// Commit a theme by id: activate, remember the choice, and persist it.
+    fn apply_theme(&mut self, id: &str) -> Vec<Effect> {
+        let Some(builtin) = BuiltinTheme::from_id(id.trim()) else {
+            let names = BuiltinTheme::all()
+                .iter()
+                .map(|builtin| builtin.id())
+                .collect::<Vec<_>>()
+                .join(", ");
+            self.chat
+                .push_info(format!("unknown theme `{}` — try: {names}", id.trim()));
+            return Vec::new();
+        };
+        theme::set_active(builtin.resolve(self.truecolor));
+        self.theme_id = builtin.id().to_owned();
+        self.saved_theme = None;
+        self.markdown_cache.clear();
+        self.dirty = true;
+        if let Err(err) = CliPrefs::remember_theme(builtin.id()) {
+            tracing::warn!(target: "prefs", "failed to save theme preference: {err}");
+        }
+        self.toast(format!("theme: {}", builtin.id()));
+        Vec::new()
+    }
+
     fn run_shell_command(&mut self, shell: &str) -> Vec<Effect> {
         let shell = shell.trim();
         if shell.is_empty() {
@@ -1449,7 +1692,7 @@ impl App {
     }
 
     fn open_agent_picker(&mut self) {
-        let items = AgentKind::ALL
+        let items = AgentKind::selectable()
             .iter()
             .map(|kind| PickerItem {
                 id: kind.id().to_owned(),
@@ -1512,6 +1755,17 @@ impl App {
         match AgentKind::parse(id) {
             Some(kind) if kind == self.kind => {
                 self.toast(format!("already on {kind}"));
+                Vec::new()
+            }
+            Some(kind) if kind != AgentKind::Native && !delegated_agents_enabled() => {
+                let alternative = match kind {
+                    AgentKind::Copilot => " — try `/provider copilot` for the same model via the stable native loop",
+                    _ => "",
+                };
+                self.chat.push_info(format!(
+                    "{kind} is disabled for now (native-only mode){alternative}. \
+                     Set AGENTICSTUDIO_ENABLE_DELEGATED_AGENTS=1 to re-enable it."
+                ));
                 Vec::new()
             }
             Some(AgentKind::Copilot) if !has_copilot_credentials() => {
@@ -1797,7 +2051,11 @@ impl App {
         self.pending_questions.clear();
         self.status.toasts.clear();
         self.status.turn_output_chars = 0;
-        self.chat.push_info(banner);
+        let name = self.engine_name.clone();
+        let version = self.engine_version.clone();
+        let cwd = self.workdir.display().to_string();
+        self.chat.push_splash(name, version, cwd);
+        self.toast(banner.to_owned());
     }
 
     // ── task results ────────────────────────────────────────────────────────
@@ -1867,6 +2125,9 @@ impl App {
                     self.pending_switch_kind = None;
                     let pending_model = self.pending_model.take();
                     let pending_provider = self.pending_provider.take();
+                    // Snapshot the conversation before the switch wipes it, so
+                    // the next prompt carries context to the new agent.
+                    self.capture_carry_context();
                     self.install_bootstrap(bootstrap, true);
                     let mut effects = Vec::new();
                     if let Some(model) = pending_model {
@@ -2133,13 +2394,16 @@ impl App {
             None => false,
         };
         if announce {
-            let session_note = if resumed {
-                "resumed previous session"
+            let mut note = if resumed {
+                "resumed previous session".to_owned()
             } else {
-                "new session"
+                "new session".to_owned()
             };
+            if self.carried_context.is_some() {
+                note.push_str(" · your conversation carries into the next message");
+            }
             self.chat
-                .push_info(format!("switched to {} — {session_note}", self.kind));
+                .push_info(format!("switched to {} — {note}", self.kind));
         }
         self.mcp_enabled = bootstrap.mcp_enabled;
     }
@@ -2482,17 +2746,22 @@ mod copilot_auth_tests {
 
     #[test]
     fn switch_to_copilot_agent_without_token_starts_login() {
-        without_copilot_credentials(|| {
-            let mut app = test_app(isolated_bootstrap());
-            let effects = app.run_local(LocalCommand::Agent {
-                arg: Some("copilot".to_owned()),
+        // The copilot delegator is feature-flagged off by default (see
+        // `delegated_agents_enabled`); this test covers its login flow, which
+        // only runs when the flag is on.
+        temp_env::with_var("AGENTICSTUDIO_ENABLE_DELEGATED_AGENTS", Some("1"), || {
+            without_copilot_credentials(|| {
+                let mut app = test_app(isolated_bootstrap());
+                let effects = app.run_local(LocalCommand::Agent {
+                    arg: Some("copilot".to_owned()),
+                });
+                assert!(effects.contains(&Effect::StartLogin));
+                assert!(matches!(app.overlay, Overlay::Login(_)));
+                assert_eq!(
+                    app.pending_copilot_auth,
+                    Some(PendingCopilotAuth::SwitchAgent(AgentKind::Copilot))
+                );
             });
-            assert!(effects.contains(&Effect::StartLogin));
-            assert!(matches!(app.overlay, Overlay::Login(_)));
-            assert_eq!(
-                app.pending_copilot_auth,
-                Some(PendingCopilotAuth::SwitchAgent(AgentKind::Copilot))
-            );
         });
     }
 
@@ -2739,11 +3008,13 @@ mod status_tests {
 #[cfg(test)]
 mod session_tests {
     use super::*;
+    use crate::chat::ChatItem;
     use crate::commands::LocalCommand;
     use crate::events::{Effect, SessionBootstrap};
     use crate::files::FileIndex;
     use agentloop_cli_core::AgentKind;
     use agentloop_contracts::{AgentCaps, Hello, PermissionCaps, PermissionMode, SessionId};
+    use std::path::Path;
 
     fn native_caps() -> AgentCaps {
         AgentCaps {
@@ -2775,6 +3046,160 @@ mod session_tests {
             session_restarted: false,
         };
         App::new(bootstrap, PathBuf::from("."), FileIndex::default())
+    }
+
+    fn native_test_app_at(workdir: PathBuf) -> App {
+        let bootstrap = SessionBootstrap {
+            kind: AgentKind::Native,
+            hello: Hello::new(native_caps()),
+            session: SessionId::from("sess-test"),
+            providers: vec!["anthropic".to_owned()],
+            model: None,
+            transcript: None,
+            trace: Vec::new(),
+            permission_mode: None,
+            mcp_enabled: 0,
+            session_restarted: false,
+        };
+        App::new(bootstrap, workdir, FileIndex::default())
+    }
+
+    /// Run `f` with an isolated `XDG_CONFIG_HOME` — so `App::new`'s internal
+    /// `McpStore::load()` reads/writes a throwaway global config instead of
+    /// the real user's `~/.config/agentloop/mcp.json` — and a fresh project
+    /// directory for `.agent/mcp.json`.
+    fn with_isolated_project<R>(f: impl FnOnce(&Path) -> R) -> R {
+        let config_home = tempfile::tempdir().expect("tempdir");
+        let project_dir = tempfile::tempdir().expect("tempdir");
+        temp_env::with_var(
+            "XDG_CONFIG_HOME",
+            Some(config_home.path().to_str().expect("utf8")),
+            || f(project_dir.path()),
+        )
+    }
+
+    #[test]
+    fn init_writes_project_mcp_json_when_servers_enabled() {
+        with_isolated_project(|project| {
+            let mut app = native_test_app_at(project.to_path_buf());
+            app.mcp_store
+                .install_npm("@modelcontextprotocol/server-fetch", Some("fetch"))
+                .expect("install");
+
+            app.run_init();
+
+            let project_store = McpStore::load_project(project).expect("load project");
+            assert_eq!(project_store.servers.len(), 1);
+            assert_eq!(project_store.servers[0].config.name, "fetch");
+            assert!(
+                matches!(app.chat.items.last(), Some(ChatItem::Info { text }) if text.contains("saved"))
+            );
+        });
+    }
+
+    #[test]
+    fn init_does_not_overwrite_existing_project_file() {
+        with_isolated_project(|project| {
+            let mut seed = McpStore::default();
+            seed.install_npm("server-memory", Some("memory"))
+                .expect("install");
+            seed.export_to_project(project).expect("export");
+
+            let mut app = native_test_app_at(project.to_path_buf());
+            app.mcp_store
+                .install_npm("@modelcontextprotocol/server-fetch", Some("fetch"))
+                .expect("install");
+            app.run_init();
+
+            let project_store = McpStore::load_project(project).expect("load project");
+            assert_eq!(
+                project_store.servers.len(),
+                1,
+                "existing project file must not be overwritten"
+            );
+            assert_eq!(project_store.servers[0].config.name, "memory");
+            assert!(
+                matches!(app.chat.items.last(), Some(ChatItem::Info { text }) if text.contains("already declares"))
+            );
+        });
+    }
+
+    #[test]
+    fn init_with_no_servers_hints_at_mcp_install() {
+        with_isolated_project(|project| {
+            let mut app = native_test_app_at(project.to_path_buf());
+            app.run_init();
+            assert!(!agentloop_cli_core::mcp_project_path(project).exists());
+            assert!(
+                matches!(app.chat.items.last(), Some(ChatItem::Info { text }) if text.contains("/mcp-install"))
+            );
+        });
+    }
+
+    #[test]
+    fn mcp_import_opens_confirm_for_new_project_servers() {
+        with_isolated_project(|project| {
+            let mut seed = McpStore::default();
+            seed.install_npm("@modelcontextprotocol/server-fetch", Some("fetch"))
+                .expect("install");
+            seed.export_to_project(project).expect("export");
+
+            let mut app = native_test_app_at(project.to_path_buf());
+            app.run_mcp_import();
+
+            match &app.overlay {
+                Overlay::Confirm(prompt) => match &prompt.action {
+                    ConfirmAction::McpImport { servers } => {
+                        assert_eq!(servers.len(), 1);
+                        assert_eq!(servers[0].config.name, "fetch");
+                    }
+                    other => panic!("expected McpImport action, got {other:?}"),
+                },
+                other => panic!("expected a confirm overlay, got {other:?}"),
+            }
+        });
+    }
+
+    #[test]
+    fn mcp_import_with_nothing_new_just_toasts() {
+        with_isolated_project(|project| {
+            let mut seed = McpStore::default();
+            seed.install_npm("server-memory", Some("memory"))
+                .expect("install");
+            seed.export_to_project(project).expect("export");
+
+            let mut app = native_test_app_at(project.to_path_buf());
+            app.mcp_store
+                .install_npm("server-memory", Some("memory"))
+                .expect("install");
+            app.run_mcp_import();
+
+            assert!(matches!(app.overlay, Overlay::None));
+            assert!(
+                app.status
+                    .toasts
+                    .back()
+                    .is_some_and(|t| t.text.contains("up to date"))
+            );
+        });
+    }
+
+    #[test]
+    fn confirming_mcp_import_merges_into_global_store() {
+        with_isolated_project(|project| {
+            let mut app = native_test_app_at(project.to_path_buf());
+            let incoming = {
+                let mut seed = McpStore::default();
+                seed.install_npm("@modelcontextprotocol/server-fetch", Some("fetch"))
+                    .expect("install");
+                seed.servers
+            };
+
+            app.apply_confirm_action(ConfirmAction::McpImport { servers: incoming });
+
+            assert_eq!(app.mcp_store.servers.len(), 1);
+            assert_eq!(app.mcp_store.servers[0].config.name, "fetch");
+        });
     }
 
     fn test_session() -> SessionState {
@@ -2810,6 +3235,72 @@ mod session_tests {
             }
             other => panic!("expected SubmitPrompt, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn agent_switch_carries_conversation_into_next_prompt() {
+        let mut app = native_test_app();
+        app.chat.apply(&agentloop_contracts::AgentEvent::UserMessage {
+            message_id: agentloop_contracts::MessageId::from("u1"),
+            content: vec![agentloop_contracts::ContentBlock::markdown(
+                "remember the blue widget",
+            )],
+        });
+        app.capture_carry_context();
+        assert!(app.carried_context.is_some(), "context should be captured");
+
+        let effects = app.submit_prompt("what did I ask about?");
+        assert!(
+            app.carried_context.is_none(),
+            "carry is consumed after one prompt"
+        );
+        match effects.first() {
+            Some(Effect::SubmitPrompt { input, .. }) => {
+                let text = input.joined_text();
+                assert!(
+                    text.contains("remember the blue widget"),
+                    "carried context missing from prompt: {text}"
+                );
+                assert!(
+                    text.contains("what did I ask about?"),
+                    "user request missing from prompt: {text}"
+                );
+            }
+            other => panic!("expected SubmitPrompt, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn switch_agent_to_delegated_kind_is_refused_by_default() {
+        temp_env::with_var_unset("AGENTICSTUDIO_ENABLE_DELEGATED_AGENTS", || {
+            let mut app = native_test_app();
+            let effects = app.switch_agent("claude-code");
+            assert!(effects.is_empty(), "no effect should fire when disabled");
+            assert_eq!(app.kind, AgentKind::Native, "kind must not change");
+            assert!(
+                matches!(
+                    app.chat.items.last(),
+                    Some(ChatItem::Info { text }) if text.contains("disabled")
+                ),
+                "expected a disabled-agent info line, got {:?}",
+                app.chat.items.last()
+            );
+        });
+    }
+
+    #[test]
+    fn open_agent_picker_lists_only_native_by_default() {
+        temp_env::with_var_unset("AGENTICSTUDIO_ENABLE_DELEGATED_AGENTS", || {
+            let mut app = native_test_app();
+            app.open_agent_picker();
+            match &app.overlay {
+                Overlay::Picker(picker) => {
+                    assert_eq!(picker.items.len(), 1);
+                    assert_eq!(picker.items[0].id, "native");
+                }
+                other => panic!("expected a picker overlay, got {other:?}"),
+            }
+        });
     }
 
     #[test]

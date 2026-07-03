@@ -7,14 +7,14 @@ expression: rendered
      agentic coding in your terminal
 
   .
-  /help · sh╭ models  filter:  ────────────────────────────────────╮
-            │claude-sonnet-4-5 anthropic                           │
-            │gpt-4.1 copilot                                       │
-            │llama3 ollama                                         │
-            │                                                      │
-            │                                                      │
-            │                                                      │
-            │                                                      │
+  /help · sh╭ theme  filter:  ─────────────────────────────────────╮
+            │tokyonight current                                    │
+            │catppuccin-mocha                                      │
+            │gruvbox-dark                                          │
+            │nord                                                  │
+            │one-dark                                              │
+            │opencode                                              │
+            │ansi                                                  │
             │                                                      │
             │                                                      │
             │                                                      │

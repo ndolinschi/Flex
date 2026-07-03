@@ -31,9 +31,33 @@ pub enum AgentKind {
     Copilot,
 }
 
+/// Whether delegated (non-native) agents — `claude-code`, `copilot` — are
+/// selectable. Off by default: these shell out to external CLIs whose
+/// process/auth/protocol issues have shown up as user-facing crashes (exit 1
+/// with no stderr, provider `Bad Request`s the delegator can't retry). The
+/// native loop's own provider system reaches the same LLMs (e.g.
+/// `/provider copilot`) without that fragility. Set
+/// `AGENTICSTUDIO_ENABLE_DELEGATED_AGENTS=1` to bring them back.
+pub fn delegated_agents_enabled() -> bool {
+    std::env::var("AGENTICSTUDIO_ENABLE_DELEGATED_AGENTS")
+        .is_ok_and(|value| matches!(value.trim(), "1" | "true" | "yes" | "on"))
+}
+
 impl AgentKind {
-    /// Every selectable kind, in display order.
+    /// Every agent kind that exists, in display order — including ones
+    /// currently feature-flagged off. Use [`Self::selectable`] for anything
+    /// user-facing (pickers, `/agent` validation).
     pub const ALL: [Self; 3] = [Self::Native, Self::ClaudeCode, Self::Copilot];
+
+    /// Kinds a user can actually pick right now. Native-only unless
+    /// [`delegated_agents_enabled`] opts back into the delegators.
+    pub fn selectable() -> Vec<Self> {
+        if delegated_agents_enabled() {
+            Self::ALL.to_vec()
+        } else {
+            vec![Self::Native]
+        }
+    }
 
     /// Stable identifier used in slash commands and flags.
     pub fn id(self) -> &'static str {
@@ -361,6 +385,26 @@ mod tests {
             assert_eq!(AgentKind::parse(kind.id()), Some(kind));
         }
         assert_eq!(AgentKind::parse("nope"), None);
+    }
+
+    #[test]
+    fn delegated_agents_disabled_by_default() {
+        temp_env::with_var_unset("AGENTICSTUDIO_ENABLE_DELEGATED_AGENTS", || {
+            assert!(!delegated_agents_enabled());
+            assert_eq!(AgentKind::selectable(), vec![AgentKind::Native]);
+        });
+    }
+
+    #[test]
+    fn delegated_agents_enabled_via_env_flag() {
+        temp_env::with_var(
+            "AGENTICSTUDIO_ENABLE_DELEGATED_AGENTS",
+            Some("1"),
+            || {
+                assert!(delegated_agents_enabled());
+                assert_eq!(AgentKind::selectable().len(), AgentKind::ALL.len());
+            },
+        );
     }
 
     #[test]

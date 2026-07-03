@@ -69,6 +69,12 @@ pub enum ChatItem {
     Plan { entries: Vec<PlanEntry>, rev: u64 },
     /// CLI-local informational line.
     Info { text: String },
+    /// The welcome splash shown at the top of a fresh transcript.
+    Splash {
+        name: String,
+        version: String,
+        cwd: String,
+    },
     /// An error surfaced by the engine or the CLI.
     Error {
         headline: String,
@@ -327,6 +333,11 @@ impl ChatState {
         self.items.push(ChatItem::Info { text });
     }
 
+    /// Append the welcome splash (logo, version, cwd, hints).
+    pub fn push_splash(&mut self, name: String, version: String, cwd: String) {
+        self.items.push(ChatItem::Splash { name, version, cwd });
+    }
+
     /// Append an error line (headline only).
     pub fn push_error(&mut self, message: impl Into<String>) {
         self.push_human_error(message.into(), None);
@@ -416,6 +427,7 @@ impl ChatState {
                     out.push_str(text);
                     out.push('\n');
                 }
+                ChatItem::Splash { .. } => {}
                 ChatItem::Error { headline, detail } => {
                     out.push_str("error: ");
                     out.push_str(headline);

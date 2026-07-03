@@ -2,8 +2,8 @@
 
 use agentloop_cli_core::AgentKind;
 use agentloop_contracts::{
-    AgentEvent, ContentBlock, MessageId, ToolCall, ToolCallId, ToolCallOrigin, ToolCallStatus,
-    ToolCallTiming, TurnId,
+    AgentEvent, ContentBlock, MessageId, PlanEntry, PlanStatus, ToolCall, ToolCallId,
+    ToolCallOrigin, ToolCallStatus, ToolCallTiming, TurnId,
 };
 use insta::assert_snapshot;
 
@@ -393,6 +393,56 @@ fn overlay_model_picker_snapshot() {
 
     let rendered = render_app(&mut app, 80, 24);
     assert_snapshot!("overlay_model_picker", rendered);
+}
+
+#[test]
+fn sidebar_activity_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    app.chat.apply(&AgentEvent::ToolCallUpdated {
+        call: sample_tool_call(ToolCallStatus::Running),
+    });
+    for event in subagent_events("running") {
+        app.chat.apply(&event);
+    }
+    app.chat.apply(&AgentEvent::PlanUpdated {
+        entries: vec![
+            PlanEntry {
+                content: "explore the repo".to_owned(),
+                status: PlanStatus::Completed,
+            },
+            PlanEntry {
+                content: "summarize findings".to_owned(),
+                status: PlanStatus::InProgress,
+            },
+        ],
+    });
+    // Wide enough to trigger the sidebar (>= 90 cols).
+    let rendered = render_app(&mut app, 110, 24);
+    assert_snapshot!("sidebar_activity", rendered);
+}
+
+#[test]
+fn splash_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    let rendered = render_app(&mut app, 80, 12);
+    assert_snapshot!("splash", rendered);
+}
+
+#[test]
+fn overlay_theme_picker_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    let items = crate::theme::BuiltinTheme::all()
+        .iter()
+        .map(|builtin| PickerItem {
+            id: builtin.id().to_owned(),
+            label: builtin.id().to_owned(),
+            detail: (builtin.id() == "tokyonight").then(|| "current".to_owned()),
+            enabled: true,
+        })
+        .collect();
+    app.overlay = Overlay::Picker(PickerState::new("theme", items, PickerAction::SetTheme));
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("overlay_theme_picker", rendered);
 }
 
 #[test]

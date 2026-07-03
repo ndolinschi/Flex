@@ -8,7 +8,7 @@
 use std::collections::{HashMap, HashSet};
 
 use pulldown_cmark::{Alignment, Event, Options, Parser, Tag, TagEnd};
-use ratatui::style::Style;
+use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use tui_markdown::from_str;
 use unicode_width::UnicodeWidthChar;
@@ -69,7 +69,7 @@ pub(super) fn lines_for_block(
         && (text.len() > PLAIN_FALLBACK_BYTES || text.lines().count() > PLAIN_FALLBACK_LINES);
 
     let lines = if oversized_draft {
-        plain_lines(prefix, &text, theme::ASSISTANT)
+        plain_lines(prefix, &text, theme::assistant())
     } else {
         content_lines(prefix, &text, max_width)
     };
@@ -119,7 +119,7 @@ fn content_lines(prefix: &str, text: &str, max_width: u16) -> Vec<Line<'static>>
         }
     }
     if lines.is_empty() {
-        plain_lines(prefix, text, theme::ASSISTANT)
+        plain_lines(prefix, text, theme::assistant())
     } else {
         lines
     }
@@ -148,7 +148,7 @@ fn markdown_with_tables(prefix: &str, text: &str, max_width: u16) -> Vec<Line<'s
         }
     }
     if lines.is_empty() {
-        plain_lines(prefix, text, theme::ASSISTANT)
+        plain_lines(prefix, text, theme::assistant())
     } else {
         lines
     }
@@ -269,27 +269,34 @@ fn code_fence_lines(
     }
     lines.push(Line::from(vec![
         Span::raw(prefix.to_owned()),
-        Span::styled(header, theme::CODE_BORDER),
+        Span::styled(header, theme::code_border()),
     ]));
 
     if body.is_empty() && !complete {
         return lines;
     }
 
+    // A syntect highlighter for the whole fence (stateful across its lines);
+    // `None` on non-truecolor terminals or unknown/oversized bodies, in which
+    // case we fall back to the flat `code` style.
+    let mut highlighter = super::highlight::for_language(lang, body.len());
     for line in body.lines() {
         let visible = fit_to_width(line, inner_budget.saturating_sub(2));
-        let mut row = String::from("│ ");
-        row.push_str(&visible);
-        lines.push(Line::from(vec![
+        let mut spans = vec![
             Span::raw(prefix.to_owned()),
-            Span::styled(row, theme::CODE),
-        ]));
+            Span::styled("│ ".to_owned(), theme::code_border()),
+        ];
+        match highlighter.as_mut() {
+            Some(hl) => spans.extend(hl.line(&visible)),
+            None => spans.push(Span::styled(visible, theme::code())),
+        }
+        lines.push(Line::from(spans));
     }
 
     if complete {
         lines.push(Line::from(vec![
             Span::raw(prefix.to_owned()),
-            Span::styled("└─".to_owned(), theme::CODE_BORDER),
+            Span::styled("└─".to_owned(), theme::code_border()),
         ]));
     }
 
@@ -299,7 +306,7 @@ fn code_fence_lines(
 fn tui_markdown_lines(prefix: &str, text: &str) -> Vec<Line<'static>> {
     let rendered = from_str(text);
     if rendered.lines.is_empty() {
-        return plain_lines(prefix, text, theme::ASSISTANT);
+        return plain_lines(prefix, text, theme::assistant());
     }
     rendered
         .lines
@@ -307,11 +314,26 @@ fn tui_markdown_lines(prefix: &str, text: &str) -> Vec<Line<'static>> {
         .map(|line| {
             let mut spans = vec![Span::raw(prefix.to_owned())];
             for span in line.spans {
-                spans.push(Span::styled(span.content.into_owned(), span.style));
+                spans.push(Span::styled(span.content.into_owned(), retheme_md(span.style)));
             }
             Line::from(spans)
         })
         .collect()
+}
+
+/// Remap `tui-markdown`'s hardcoded ANSI colors onto the active theme so
+/// markdown stays cohesive. Its list markers ship as electric `LightBlue`,
+/// links as `Blue`, inline code as `White`; everything else (bold/italic
+/// modifiers, uncolored text) is left untouched.
+fn retheme_md(style: Style) -> Style {
+    let mut out = style;
+    out.fg = match style.fg {
+        Some(Color::LightBlue) => theme::dim().fg,
+        Some(Color::Blue) => theme::accent().fg,
+        Some(Color::White) => theme::code().fg,
+        other => other,
+    };
+    out
 }
 
 enum Segment {
@@ -545,7 +567,7 @@ fn border_line(
     content.push(right);
     Line::from(vec![
         Span::raw(prefix.to_owned()),
-        Span::styled(content, theme::BORDER),
+        Span::styled(content, theme::border()),
     ])
 }
 
@@ -567,7 +589,7 @@ fn data_line(
     }
     Line::from(vec![
         Span::raw(prefix.to_owned()),
-        Span::styled(content, theme::BORDER),
+        Span::styled(content, theme::border()),
     ])
 }
 
@@ -801,7 +823,7 @@ mod tests {
     }
 
     #[test]
-    fn streaming_code_fence_uses_code_style() {
+    fn streaming_code_fence_renders_body_under_gutter() {
         let text = "Example:\n\n```rust\nfn main() {\n    println!(\"hi\");\n";
         let lines = render("  ", text, false, 80);
         let rendered = joined(&lines);
@@ -813,13 +835,59 @@ mod tests {
             rendered.contains("fn main()"),
             "expected code body: {rendered}"
         );
+        // The body may be split into several syntax-highlighted spans, so
+        // assert on the concatenated line text plus the code-border gutter
+        // rather than a single flat CODE span.
         assert!(
             lines.iter().any(|line| {
-                line.spans
-                    .iter()
-                    .any(|span| span.style == theme::CODE && span.content.contains("fn main()"))
+                let text: String = line.spans.iter().map(|span| span.content.as_ref()).collect();
+                text.contains("fn main()")
+                    && line
+                        .spans
+                        .iter()
+                        .any(|span| span.content == "│ " && span.style == theme::code_border())
             }),
-            "code body should use CODE style"
+            "code body line should render under the fence gutter"
+        );
+    }
+
+    #[test]
+    fn list_markers_are_rethemed_off_ansi_blue() {
+        theme::set_active(theme::BuiltinTheme::Tokyonight.resolve(true));
+        let lines = render("  ", "1. first item\n2. second item\n", true, 80);
+        // tui-markdown ships list markers as electric LightBlue; none should survive.
+        assert!(
+            lines
+                .iter()
+                .flat_map(|line| line.spans.iter())
+                .all(|span| span.style.fg != Some(Color::LightBlue)),
+            "no span should keep tui-markdown's LightBlue"
+        );
+        // The marker now uses the theme's dim foreground.
+        assert!(
+            lines.iter().flat_map(|line| line.spans.iter()).any(|span| {
+                span.content.trim_start().starts_with("1.") && span.style.fg == theme::dim().fg
+            }),
+            "ordered-list marker should use the dim theme color"
+        );
+    }
+
+    #[test]
+    fn code_fence_syntax_highlights_in_truecolor() {
+        theme::set_active(theme::BuiltinTheme::Tokyonight.resolve(true));
+        let lines = render("  ", "```rust\nfn main() {}\n```", true, 80);
+        let colors: std::collections::HashSet<(u8, u8, u8)> = lines
+            .iter()
+            .flat_map(|line| line.spans.iter())
+            .filter_map(|span| match span.style.fg {
+                Some(ratatui::style::Color::Rgb(r, g, b)) => Some((r, g, b)),
+                _ => None,
+            })
+            .collect();
+        // syntect assigns several distinct token colors across `fn main() {}`.
+        assert!(
+            colors.len() >= 2,
+            "expected multiple syntax-highlight colors, got {colors:?}"
         );
     }
 
@@ -848,3 +916,4 @@ mod tests {
         }));
     }
 }
+

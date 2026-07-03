@@ -1,6 +1,7 @@
 //! Pure ratatui rendering for the app state.
 
 pub(crate) mod diff;
+mod highlight;
 mod markdown;
 mod thinking;
 mod tool_view;
@@ -11,7 +12,9 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap};
+use ratatui::widgets::{
+    Block, BorderType, Borders, Clear, List, ListItem, Padding, Paragraph, Wrap,
+};
 
 use agentloop_contracts::{PermissionDecisionKind, Question};
 
@@ -28,6 +31,11 @@ use crate::overlay::{
 };
 use crate::terminal_text::terminal_lines;
 use crate::theme;
+
+/// Width of the activity sidebar, and the minimum chat width below which it is
+/// suppressed so narrow terminals aren't cramped.
+const SIDEBAR_WIDTH: u16 = 34;
+const SIDEBAR_MIN_TOTAL_WIDTH: u16 = 90;
 
 /// Draw one full frame: chat, an optional notification line (busy pulse or
 /// newest toast), the input box, and the status bar.
@@ -47,14 +55,29 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
         .split(area);
 
     let input_area = chunks[if notify { 2 } else { 1 }];
-    draw_chat(frame, app, chunks[0]);
+    // Carve an activity sidebar off the right of the chat area when there's
+    // live work to show (running tools / subagents / plan) and room for it.
+    let chat_area = chunks[0];
+    let (chat_area, sidebar_area) = if sidebar_visible(app, chat_area) {
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Min(1), Constraint::Length(SIDEBAR_WIDTH)])
+            .split(chat_area);
+        (cols[0], Some(cols[1]))
+    } else {
+        (chat_area, None)
+    };
+    draw_chat(frame, app, chat_area);
+    if let Some(sidebar_area) = sidebar_area {
+        draw_sidebar(frame, app, sidebar_area);
+    }
     if notify {
         draw_notification_line(frame, app, chunks[1]);
     }
     draw_input(frame, app, input_area);
     draw_status(frame, app, chunks[if notify { 3 } else { 2 }]);
     draw_popup(frame, app, input_area);
-    draw_overlay(frame, app, area);
+    draw_overlay(frame, app, area, input_area);
 }
 
 /// The notification line stays reserved while a turn runs or a toast is
@@ -63,27 +86,32 @@ fn notification_line_visible(app: &App) -> bool {
     app.session.turn.is_running() || !app.status.toasts.is_empty()
 }
 
-/// Busy line (priority) or the newest toast.
+/// Busy line (priority) or the newest toast. The busy pulse/timer is
+/// suppressed while the agent is blocked on a decision (permission/question) —
+/// it isn't working, it's waiting on the user, so a ticking timer would lie.
 fn draw_notification_line(frame: &mut Frame<'_>, app: &App, area: Rect) {
-    let line = if let TurnPhase::Running { started } = app.session.turn {
-        let glyph = theme::pulse_frame(app.status.spinner);
-        let verb = theme::spinner_verb(app.status.turn_verb_idx);
-        let tokens = app.status.turn_output_chars / 4;
-        Line::from(vec![
-            Span::styled(format!("{glyph} {verb}… "), theme::WARN),
-            Span::styled(
-                format!(
-                    "({}s · ↑ {} tokens · esc to interrupt)",
-                    started.elapsed().as_secs(),
-                    fmt_k(tokens)
+    let awaiting_decision = matches!(app.overlay, Overlay::Permission(_) | Overlay::Question(_));
+    let line = match app.session.turn {
+        TurnPhase::Running { started } if !awaiting_decision => {
+            let glyph = theme::pulse_frame(app.status.spinner);
+            let verb = theme::spinner_verb(app.status.turn_verb_idx);
+            let tokens = app.status.turn_output_chars / 4;
+            Line::from(vec![
+                Span::styled(format!("{glyph} {verb}… "), theme::warn()),
+                Span::styled(
+                    format!(
+                        "({}s · ↑ {} tokens · esc to interrupt)",
+                        started.elapsed().as_secs(),
+                        fmt_k(tokens)
+                    ),
+                    theme::dim(),
                 ),
-                theme::DIM,
-            ),
-        ])
-    } else if let Some(toast) = app.status.toasts.back() {
-        Line::from(Span::styled(toast.text.clone(), theme::DIM))
-    } else {
-        return;
+            ])
+        }
+        _ => match app.status.toasts.back() {
+            Some(toast) => Line::from(Span::styled(toast.text.clone(), theme::dim())),
+            None => return,
+        },
     };
     frame.render_widget(Paragraph::new(line), area);
 }
@@ -116,9 +144,7 @@ fn input_height(app: &App) -> u16 {
 }
 
 fn draw_chat(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
-    let block = Block::default().borders(Borders::BOTTOM);
-    let inner = block.inner(area);
-    let lines = chat_lines(app, inner.width);
+    let lines = chat_lines(app, area.width);
     if app.chat.scroll.follow {
         app.chat.scroll.offset_from_bottom = 0;
     }
@@ -128,18 +154,16 @@ fn draw_chat(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     let scroll_top = max_offset.saturating_sub(app.chat.scroll.offset_from_bottom);
 
     let paragraph = Paragraph::new(lines)
-        .block(block)
         .wrap(Wrap { trim: false })
         .scroll((scroll_top as u16, 0));
     frame.render_widget(paragraph, area);
 }
 
 /// Scroll budget for the chat pane: `(total_wrapped, viewport, max_offset)`.
+/// The pane has no border, so it uses the full area.
 fn chat_viewport_metrics(lines: &[Line<'_>], area: Rect) -> (usize, usize, usize) {
-    let block = Block::default().borders(Borders::BOTTOM);
-    let inner = block.inner(area);
-    let total_lines = wrapped_line_count(lines, inner.width);
-    let viewport_lines = inner.height as usize;
+    let total_lines = wrapped_line_count(lines, area.width);
+    let viewport_lines = area.height as usize;
     let max_offset = total_lines.saturating_sub(viewport_lines);
     (total_lines, viewport_lines, max_offset)
 }
@@ -186,13 +210,13 @@ fn chat_lines(app: &mut App, viewport_width: u16) -> Vec<Line<'static>> {
                 for (line_idx, line) in terminal_lines(text).into_iter().enumerate() {
                     if line_idx == 0 {
                         lines.push(Line::from(vec![
-                            Span::styled("> ", theme::DIM),
-                            Span::styled(line.to_owned(), theme::USER_TEXT),
+                            Span::styled("> ", theme::dim()),
+                            Span::styled(line.to_owned(), theme::user_text()),
                         ]));
                     } else {
                         lines.push(Line::from(Span::styled(
                             format!("  {line}"),
-                            theme::USER_TEXT,
+                            theme::user_text(),
                         )));
                     }
                 }
@@ -233,7 +257,7 @@ fn chat_lines(app: &mut App, viewport_width: u16) -> Vec<Line<'static>> {
                     }
                 }
                 if should_show_stream_cursor(blocks, *complete, thinking_visible) {
-                    lines.push(Line::from(Span::styled("  ▌", theme::DIM)));
+                    lines.push(Line::from(Span::styled("  ▌", theme::dim())));
                 }
             }
             ChatItem::Assistant { .. } => {}
@@ -258,32 +282,39 @@ fn chat_lines(app: &mut App, viewport_width: u16) -> Vec<Line<'static>> {
                 }
             }
             ChatItem::Plan { entries, .. } => {
-                lines.push(Line::from(Span::styled("plan", theme::DIM)));
+                lines.push(Line::from(Span::styled("plan", theme::dim())));
                 for entry in entries {
                     lines.push(Line::from(Span::styled(
                         format!("  {} {}", plan_marker(entry.status), entry.content),
-                        theme::DIM,
+                        theme::dim(),
                     )));
                 }
             }
             ChatItem::Info { text } => {
                 // The interrupt marker reads as a soft error, not plain info.
                 let style = if text == crate::app::INTERRUPT_NOTE {
-                    theme::ERROR.add_modifier(Modifier::DIM)
+                    theme::error().add_modifier(Modifier::DIM)
                 } else {
-                    theme::DIM
+                    theme::dim()
                 };
                 lines.push(Line::from(Span::styled(text.clone(), style)));
+            }
+            ChatItem::Splash {
+                name,
+                version,
+                cwd,
+            } => {
+                lines.extend(splash_lines(name, version, cwd));
             }
             ChatItem::Error { headline, detail } => {
                 lines.push(Line::from(Span::styled(
                     format!("✗ {headline}"),
-                    theme::ERROR,
+                    theme::error(),
                 )));
                 if let Some(detail) = detail {
                     lines.push(Line::from(Span::styled(
                         detail.clone(),
-                        theme::ERROR.add_modifier(Modifier::DIM),
+                        theme::error().add_modifier(Modifier::DIM),
                     )));
                 }
             }
@@ -329,8 +360,8 @@ fn chat_lines(app: &mut App, viewport_width: u16) -> Vec<Line<'static>> {
                     }
                 }
                 let style = match outcome {
-                    SubagentOutcome::Failed => theme::ERROR,
-                    _ => theme::DIM,
+                    SubagentOutcome::Failed => theme::error(),
+                    _ => theme::dim(),
                 };
                 lines.push(Line::from(Span::styled(
                     format!("  ⎿ [{badge}] {}", segments.join(" · ")),
@@ -346,7 +377,7 @@ fn chat_lines(app: &mut App, viewport_width: u16) -> Vec<Line<'static>> {
     if lines.is_empty() {
         lines.push(Line::from(Span::styled(
             "Start with a prompt or /help.",
-            theme::DIM,
+            theme::dim(),
         )));
     }
     lines
@@ -397,6 +428,194 @@ fn item_produces_lines(
         ChatItem::Assistant { .. } => should_render_assistant(items, idx, thinking_visible),
         _ => true,
     }
+}
+
+/// The welcome splash: accent brand mark, version, cwd, and key hints.
+fn splash_lines(name: &str, version: &str, cwd: &str) -> Vec<Line<'static>> {
+    vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  ✻ ", theme::accent()),
+            Span::styled(name.to_owned(), theme::title()),
+            Span::styled(format!("  v{version}"), theme::dim()),
+        ]),
+        Line::from(Span::styled(
+            "     agentic coding in your terminal".to_owned(),
+            theme::dim(),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(format!("  {cwd}"), theme::dim())),
+        Line::from(Span::styled(
+            "  /help · shift+tab modes · @ files · / commands".to_owned(),
+            theme::dim(),
+        )),
+    ]
+}
+
+/// Whether to show the activity sidebar: only with room to spare, and only
+/// when there's live work worth surfacing (a running turn, active subagents,
+/// or a working plan).
+fn sidebar_visible(app: &App, chat_area: Rect) -> bool {
+    if chat_area.width < SIDEBAR_MIN_TOTAL_WIDTH {
+        return false;
+    }
+    app.session.turn.is_running()
+        || !active_subagents(app).is_empty()
+        || latest_plan(app).is_some_and(|entries| !entries.is_empty())
+}
+
+/// Tool calls currently executing or awaiting permission, newest last.
+fn running_tools(app: &App) -> Vec<&agentloop_contracts::ToolCall> {
+    app.chat
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            ChatItem::Tool { call, .. }
+                if matches!(
+                    call.status,
+                    agentloop_contracts::ToolCallStatus::Running
+                        | agentloop_contracts::ToolCallStatus::AwaitingPermission { .. }
+                ) =>
+            {
+                Some(call.as_ref())
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// Subagents still running.
+fn active_subagents(app: &App) -> Vec<&ChatItem> {
+    app.chat
+        .items
+        .iter()
+        .filter(|item| {
+            matches!(
+                item,
+                ChatItem::Subagent {
+                    outcome: SubagentOutcome::Running,
+                    ..
+                }
+            )
+        })
+        .collect()
+}
+
+/// The most recent plan entries, if any.
+fn latest_plan(app: &App) -> Option<&[agentloop_contracts::PlanEntry]> {
+    app.chat.items.iter().rev().find_map(|item| match item {
+        ChatItem::Plan { entries, .. } => Some(entries.as_slice()),
+        _ => None,
+    })
+}
+
+/// The right-hand activity panel: what's running now, live subagents, and the
+/// working plan. Rebuilt each frame from chat state.
+fn draw_sidebar(frame: &mut Frame<'_>, app: &App, area: Rect) {
+    let inner_width = area.width.saturating_sub(4) as usize;
+    let mut lines: Vec<Line<'static>> = Vec::new();
+
+    let tools = running_tools(app);
+    let subagents = active_subagents(app);
+    let plan = latest_plan(app);
+
+    // ── running tools ──
+    lines.push(section_header("running"));
+    if tools.is_empty() {
+        lines.push(Line::from(Span::styled("  idle".to_owned(), theme::dim())));
+    } else {
+        for call in &tools {
+            let summary =
+                crate::tool_output::tool_summary(&call.tool_name, &call.input);
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("{} ", theme::spinner_frame(app.status.spinner)),
+                    theme::tool_running(),
+                ),
+                Span::styled(truncate_cells(&summary, inner_width.saturating_sub(2)), theme::assistant()),
+            ]));
+        }
+    }
+
+    // ── subagents ──
+    if !subagents.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(section_header("subagents"));
+        for item in &subagents {
+            if let ChatItem::Subagent {
+                role,
+                tool_count,
+                last_activity,
+                ..
+            } = item
+            {
+                let badge = role.as_deref().unwrap_or("subagent");
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        format!("{} ", theme::spinner_frame(app.status.spinner)),
+                        theme::tool(),
+                    ),
+                    Span::styled(badge.to_owned(), theme::tool()),
+                    Span::styled(format!(" · {tool_count} tools"), theme::dim()),
+                ]));
+                if let Some(activity) = last_activity {
+                    lines.push(Line::from(Span::styled(
+                        format!("    {}", truncate_cells(activity, inner_width.saturating_sub(4))),
+                        theme::dim(),
+                    )));
+                }
+            }
+        }
+    }
+
+    // ── plan ──
+    if let Some(entries) = plan.filter(|entries| !entries.is_empty()) {
+        lines.push(Line::from(""));
+        lines.push(section_header("plan"));
+        for entry in entries {
+            lines.push(Line::from(Span::styled(
+                format!(
+                    "  {} {}",
+                    plan_marker(entry.status),
+                    truncate_cells(&entry.content, inner_width.saturating_sub(4))
+                ),
+                theme::dim(),
+            )));
+        }
+    }
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(theme::border())
+        .padding(Padding::horizontal(1))
+        .title(Span::styled(" activity ", theme::title()));
+    frame.render_widget(
+        Paragraph::new(lines).block(block).wrap(Wrap { trim: false }),
+        area,
+    );
+}
+
+/// A dim, uppercase-ish section label for the sidebar.
+fn section_header(label: &str) -> Line<'static> {
+    Line::from(Span::styled(
+        label.to_owned(),
+        theme::accent().add_modifier(Modifier::BOLD),
+    ))
+}
+
+/// Truncate `text` to at most `max` display columns, adding an ellipsis.
+fn truncate_cells(text: &str, max: usize) -> String {
+    if max == 0 {
+        return String::new();
+    }
+    if text.chars().count() <= max {
+        return text.to_owned();
+    }
+    let keep = max.saturating_sub(1);
+    let mut out: String = text.chars().take(keep).collect();
+    out.push('…');
+    out
 }
 
 /// Consecutive Info lines, consecutive Tool rows, and Tool/Subagent runs
@@ -483,7 +702,11 @@ fn count_failed_streak(items: &[ChatItem], start: usize) -> usize {
 }
 
 fn draw_input(frame: &mut Frame<'_>, app: &App, area: Rect) {
-    let block = Block::default().borders(Borders::ALL).title(" prompt ");
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(theme::border())
+        .title(Span::styled(" prompt ", theme::title()));
     frame.render_widget(block, area);
     let inner = area.inner(ratatui::layout::Margin {
         vertical: 1,
@@ -514,33 +737,46 @@ fn draw_status(frame: &mut Frame<'_>, app: &App, area: Rect) {
     if let Some(budget) = app.thinking_budget.filter(|_| app.caps.reasoning_visible) {
         segments.push(format!("think:{}", fmt_thinking_budget_k(budget)));
     }
-    segments.push(model);
 
-    let mut spans = vec![Span::styled(segments.join(" · "), theme::STATUS)];
+    // The model is the status bar's focal point — give it the accent color.
+    let mut spans = vec![
+        Span::styled(segments.join(" · "), theme::status()),
+        Span::styled(" · ", theme::status()),
+        Span::styled(model, theme::accent()),
+    ];
     if let Some((pct, style)) = context_percent(app) {
-        spans.push(Span::styled(" · ", theme::STATUS));
-        spans.push(Span::styled(format!("{pct}% context"), style));
+        spans.push(Span::styled(" · ", theme::status()));
+        spans.push(Span::styled(context_gauge(pct), style));
+        spans.push(Span::styled(format!(" {pct}%"), style));
     }
     if app.mcp_enabled > 0 {
         spans.push(Span::styled(
             format!(" · mcp:{}", app.mcp_enabled),
-            theme::STATUS,
+            theme::status(),
         ));
     }
     spans.push(Span::styled(
         format!(" · ↑{} ↓{}", fmt_k(usage.input), fmt_k(usage.output)),
-        theme::STATUS,
+        theme::status(),
     ));
     if !app.chat.scroll.follow {
         spans.push(Span::styled(
             " · scrolled up (End to follow)",
-            theme::STATUS,
+            theme::status(),
         ));
     }
     if let Some(cost) = app.status.last_cost_usd {
-        spans.push(Span::styled(format!(" · ${cost:.4}"), theme::STATUS));
+        spans.push(Span::styled(format!(" · ${cost:.4}"), theme::status()));
     }
     frame.render_widget(Paragraph::new(Line::from(spans)), area);
+}
+
+/// A compact block gauge for a `0..=100` percentage, e.g. `▕████░░░░▏`.
+fn context_gauge(pct: u8) -> String {
+    const WIDTH: usize = 8;
+    let filled = ((pct as usize * WIDTH) + 50) / 100;
+    let filled = filled.min(WIDTH);
+    format!("▕{}{}▏", "█".repeat(filled), "░".repeat(WIDTH - filled))
 }
 
 /// Context usage as a percentage of the current model's window, colored by
@@ -553,11 +789,11 @@ fn context_percent(app: &App) -> Option<(u8, Style)> {
     }
     let pct = (tokens.saturating_mul(100) / window).min(100) as u8;
     let style = if pct < 50 {
-        theme::SUCCESS
+        theme::success()
     } else if pct < 80 {
-        theme::WARN
+        theme::warn()
     } else {
-        theme::ERROR
+        theme::error()
     };
     Some((pct, style))
 }
@@ -637,15 +873,15 @@ fn draw_command_popup(frame: &mut Frame<'_>, popup: &CommandPopup, input_area: R
         .take(visible_rows)
         .map(|(idx, entry)| {
             let style = if idx == popup.selected {
-                theme::SELECTED
+                theme::selected()
             } else {
                 Style::default()
             };
             ListItem::new(Line::from(vec![
                 Span::styled(format!("/{}", entry.name), style),
                 Span::raw(" "),
-                Span::styled(entry.description.clone(), theme::DIM),
-                Span::styled(format!(" [{}]", entry.source), theme::DIM),
+                Span::styled(entry.description.clone(), theme::dim()),
+                Span::styled(format!(" [{}]", entry.source), theme::dim()),
             ]))
         })
         .collect::<Vec<_>>();
@@ -654,7 +890,7 @@ fn draw_command_popup(frame: &mut Frame<'_>, popup: &CommandPopup, input_area: R
     frame.render_widget(
         List::new(items).block(
             Block::default()
-                .borders(Borders::ALL)
+                .borders(Borders::ALL).border_type(BorderType::Rounded)
                 .title(format!(" commands{position}")),
         ),
         area,
@@ -686,12 +922,12 @@ fn draw_file_popup(frame: &mut Frame<'_>, popup: &FilePopup, input_area: Rect) {
         .take(visible_rows)
         .map(|(idx, path)| {
             let style = if idx == popup.selected {
-                theme::SELECTED
+                theme::selected()
             } else {
                 Style::default()
             };
             ListItem::new(Line::from(vec![
-                Span::styled("@", theme::DIM),
+                Span::styled("@", theme::dim()),
                 Span::styled(path.clone(), style),
             ]))
         })
@@ -701,7 +937,7 @@ fn draw_file_popup(frame: &mut Frame<'_>, popup: &FilePopup, input_area: Rect) {
     frame.render_widget(
         List::new(items).block(
             Block::default()
-                .borders(Borders::ALL)
+                .borders(Borders::ALL).border_type(BorderType::Rounded)
                 .title(format!(" files{position}")),
         ),
         area,
@@ -739,13 +975,13 @@ fn draw_mention_preview(
     let title = format!(" {} — {} ", preview.path, preview.label);
     let mut lines = Vec::new();
     if let Some(err) = &preview.error {
-        lines.push(Line::from(Span::styled(err.clone(), theme::WARN)));
+        lines.push(Line::from(Span::styled(err.clone(), theme::warn())));
     } else if preview.lines.is_empty() {
-        lines.push(Line::from(Span::styled("(empty range)", theme::DIM)));
+        lines.push(Line::from(Span::styled("(empty range)", theme::dim())));
     } else {
         for (num, line) in &preview.lines {
             lines.push(Line::from(vec![
-                Span::styled(format!("{num:>4} "), theme::DIM),
+                Span::styled(format!("{num:>4} "), theme::dim()),
                 Span::raw(line.clone()),
             ]));
         }
@@ -753,33 +989,51 @@ fn draw_mention_preview(
             let hidden = preview.total_lines.saturating_sub(preview.lines.len());
             lines.push(Line::from(Span::styled(
                 format!("… {hidden} more lines"),
-                theme::DIM,
+                theme::dim(),
             )));
         }
     }
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(lines)
-            .block(Block::default().borders(Borders::ALL).title(title))
+            .block(Block::default().borders(Borders::ALL).border_type(BorderType::Rounded).border_style(theme::border()).title(title))
             .wrap(Wrap { trim: false }),
         area,
     );
     y
 }
 
-fn draw_overlay(frame: &mut Frame<'_>, app: &App, root: Rect) {
+fn draw_overlay(frame: &mut Frame<'_>, app: &App, root: Rect, input_area: Rect) {
     match &app.overlay {
         Overlay::None => {}
         Overlay::Picker(picker) => draw_picker(frame, picker, root),
-        Overlay::Permission(prompt) => draw_permission(frame, prompt, root),
+        // Decisions render inline, anchored just above the input (Claude
+        // Code-style), so they sit in the conversation flow rather than
+        // floating in the middle of the screen.
+        Overlay::Permission(prompt) => draw_permission(frame, prompt, root, input_area),
         Overlay::Question(prompt) => draw_question(frame, prompt, root),
         Overlay::Login(state) => draw_login(frame, state, root),
         Overlay::Help => draw_help(frame, app, root),
         Overlay::ShellCommand(state) => draw_shell_command(frame, state, app, root),
-        Overlay::Confirm(prompt) => draw_confirm(frame, prompt, root),
+        Overlay::Confirm(prompt) => draw_confirm(frame, prompt, root, input_area),
         Overlay::McpList(state) => draw_mcp_list(frame, state, root),
         Overlay::McpExplorer(state) => draw_mcp_explorer(frame, state, root),
         Overlay::McpInstall(state) => draw_mcp_install(frame, state, root),
+    }
+}
+
+/// A box anchored directly above the input, aligned to its width — for inline
+/// decisions (permission, confirm). Grows upward from the input by the content
+/// height (+2 for borders), clamped to the room above.
+fn bottom_anchored(root: Rect, input_area: Rect, content_lines: usize) -> Rect {
+    let desired = (content_lines as u16).saturating_add(2);
+    let available = input_area.y.saturating_sub(root.y);
+    let height = desired.min(available).max(3);
+    Rect {
+        x: input_area.x,
+        y: input_area.y.saturating_sub(height),
+        width: input_area.width,
+        height,
     }
 }
 
@@ -791,16 +1045,16 @@ fn draw_picker(frame: &mut Frame<'_>, picker: &PickerState, root: Rect) {
         .enumerate()
         .map(|(idx, item)| {
             let style = if !item.enabled {
-                theme::DIM
+                theme::dim()
             } else if idx == picker.selected {
-                theme::SELECTED
+                theme::selected()
             } else {
                 Style::default()
             };
             let mut spans = vec![Span::styled(item.label.clone(), style)];
             if let Some(detail) = &item.detail {
                 spans.push(Span::raw(" "));
-                spans.push(Span::styled(detail.clone(), theme::DIM));
+                spans.push(Span::styled(detail.clone(), theme::dim()));
             }
             ListItem::new(Line::from(spans))
         })
@@ -809,21 +1063,25 @@ fn draw_picker(frame: &mut Frame<'_>, picker: &PickerState, root: Rect) {
     frame.render_widget(
         List::new(items).block(
             Block::default()
-                .borders(Borders::ALL)
-                .border_style(theme::BORDER)
+                .borders(Borders::ALL).border_type(BorderType::Rounded)
+                .border_style(theme::border())
                 .title(format!(" {}  filter: {} ", picker.title, picker.filter)),
         ),
         area,
     );
 }
 
-fn draw_permission(frame: &mut Frame<'_>, prompt: &PermissionPrompt, root: Rect) {
-    let area = centered(root, 64, 40);
+fn draw_permission(
+    frame: &mut Frame<'_>,
+    prompt: &PermissionPrompt,
+    root: Rect,
+    input_area: Rect,
+) {
     let mut title_spans = Vec::new();
     if let Some(role) = &prompt.role {
-        title_spans.push(Span::styled(format!("[{role}] "), theme::WARN));
+        title_spans.push(Span::styled(format!("[{role}] "), theme::warn()));
     }
-    title_spans.push(Span::styled(prompt.title.clone(), theme::TITLE));
+    title_spans.push(Span::styled(prompt.title.clone(), theme::title()));
     let mut lines = vec![Line::from(title_spans)];
     if let Some(detail) = &prompt.detail {
         lines.push(Line::default());
@@ -832,7 +1090,7 @@ fn draw_permission(frame: &mut Frame<'_>, prompt: &PermissionPrompt, root: Rect)
     lines.push(Line::default());
     for (idx, option) in prompt.options.iter().enumerate() {
         let style = if idx == prompt.selected {
-            theme::SELECTED
+            theme::selected()
         } else {
             Style::default()
         };
@@ -844,12 +1102,20 @@ fn draw_permission(frame: &mut Frame<'_>, prompt: &PermissionPrompt, root: Rect)
     lines.push(Line::default());
     lines.push(Line::from(Span::styled(
         "enter confirm · 1-3 select · y allow · a always · esc/n deny",
-        theme::DIM,
+        theme::dim(),
     )));
+    let area = bottom_anchored(root, input_area, lines.len());
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(lines)
-            .block(Block::default().borders(Borders::ALL).title(" permission "))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(theme::border())
+                    .padding(Padding::horizontal(1))
+                    .title(Span::styled(" permission ", theme::title())),
+            )
             .wrap(Wrap { trim: false }),
         area,
     );
@@ -873,9 +1139,9 @@ fn draw_question(frame: &mut Frame<'_>, prompt: &QuestionPrompt, root: Rect) {
     let multi = question.multi_select;
     let mut header_spans = Vec::new();
     if let Some(role) = &prompt.role {
-        header_spans.push(Span::styled(format!("[{role}] "), theme::WARN));
+        header_spans.push(Span::styled(format!("[{role}] "), theme::warn()));
     }
-    header_spans.push(Span::styled(question.header.clone(), theme::TITLE));
+    header_spans.push(Span::styled(question.header.clone(), theme::title()));
     let mut lines = vec![
         Line::from(header_spans),
         Line::from(question.question.clone()),
@@ -895,7 +1161,7 @@ fn draw_question(frame: &mut Frame<'_>, prompt: &QuestionPrompt, root: Rect) {
             "( )"
         };
         let style = if cursor || picked {
-            theme::SELECTED
+            theme::selected()
         } else {
             Style::default()
         };
@@ -904,16 +1170,16 @@ fn draw_question(frame: &mut Frame<'_>, prompt: &QuestionPrompt, root: Rect) {
             option
                 .description
                 .as_ref()
-                .map(|description| Span::styled(format!(" — {description}"), theme::DIM))
+                .map(|description| Span::styled(format!(" — {description}"), theme::dim()))
                 .unwrap_or_else(|| Span::raw("")),
         ]));
     }
     if question.allow_custom {
         lines.push(Line::default());
         let custom_style = if prompt.custom_mode {
-            theme::SELECTED
+            theme::selected()
         } else {
-            theme::DIM
+            theme::dim()
         };
         let custom_text = if prompt.custom_input.is_empty() {
             "type your answer…".to_owned()
@@ -928,7 +1194,7 @@ fn draw_question(frame: &mut Frame<'_>, prompt: &QuestionPrompt, root: Rect) {
     lines.push(Line::default());
     lines.push(Line::from(Span::styled(
         question_hints(question),
-        theme::DIM,
+        theme::dim(),
     )));
     if prompt.questions.len() > 1 {
         lines.push(Line::from(Span::styled(
@@ -937,13 +1203,13 @@ fn draw_question(frame: &mut Frame<'_>, prompt: &QuestionPrompt, root: Rect) {
                 prompt.current + 1,
                 prompt.questions.len()
             ),
-            theme::DIM,
+            theme::dim(),
         )));
     }
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(lines)
-            .block(Block::default().borders(Borders::ALL).title(" question "))
+            .block(Block::default().borders(Borders::ALL).border_type(BorderType::Rounded).border_style(theme::border()).title(" question "))
             .wrap(Wrap { trim: false }),
         area,
     );
@@ -982,10 +1248,10 @@ fn draw_login(frame: &mut Frame<'_>, state: &LoginState, root: Rect) {
         } => vec![
             Line::from("Open this URL and enter the code:"),
             Line::default(),
-            Line::from(Span::styled(verification_uri.clone(), theme::TITLE)),
+            Line::from(Span::styled(verification_uri.clone(), theme::title())),
             Line::from(Span::styled(
                 user_code.clone(),
-                theme::TITLE.add_modifier(Modifier::BOLD),
+                theme::title().add_modifier(Modifier::BOLD),
             )),
             Line::default(),
             Line::from(Span::styled(
@@ -993,7 +1259,7 @@ fn draw_login(frame: &mut Frame<'_>, state: &LoginState, root: Rect) {
                     "Waiting {}s / expires in {expires_in}s. Press o to open, Esc to cancel.",
                     since.elapsed().as_secs()
                 ),
-                theme::DIM,
+                theme::dim(),
             )),
         ],
         LoginState::Polling { since } => vec![Line::from(format!(
@@ -1002,11 +1268,11 @@ fn draw_login(frame: &mut Frame<'_>, state: &LoginState, root: Rect) {
         ))],
         LoginState::Verifying => vec![Line::from("Verifying Copilot access...")],
         LoginState::Failed { message } => vec![
-            Line::from(Span::styled("Login failed", theme::ERROR)),
+            Line::from(Span::styled("Login failed", theme::error())),
             Line::default(),
             Line::from(message.clone()),
             Line::default(),
-            Line::from(Span::styled("Esc or Enter closes this dialog.", theme::DIM)),
+            Line::from(Span::styled("Esc or Enter closes this dialog.", theme::dim())),
         ],
     };
     frame.render_widget(Clear, area);
@@ -1015,7 +1281,7 @@ fn draw_login(frame: &mut Frame<'_>, state: &LoginState, root: Rect) {
             .alignment(Alignment::Center)
             .block(
                 Block::default()
-                    .borders(Borders::ALL)
+                    .borders(Borders::ALL).border_type(BorderType::Rounded)
                     .title(" GitHub Copilot login "),
             )
             .wrap(Wrap { trim: false }),
@@ -1026,8 +1292,8 @@ fn draw_login(frame: &mut Frame<'_>, state: &LoginState, root: Rect) {
 fn draw_shell_command(frame: &mut Frame<'_>, state: &ShellCommandOverlay, app: &App, root: Rect) {
     let area = centered(root, 80, 70);
     let mut lines = vec![Line::from(vec![
-        Span::styled("$ ", theme::USER),
-        Span::styled(state.command.clone(), theme::ASSISTANT),
+        Span::styled("$ ", theme::user()),
+        Span::styled(state.command.clone(), theme::assistant()),
     ])];
     lines.push(Line::default());
 
@@ -1035,25 +1301,25 @@ fn draw_shell_command(frame: &mut Frame<'_>, state: &ShellCommandOverlay, app: &
         ShellCommandPhase::Running { since } => {
             let spinner = theme::spinner_frame(app.status.spinner);
             lines.push(Line::from(vec![
-                Span::styled(format!("{spinner} "), theme::WARN),
+                Span::styled(format!("{spinner} "), theme::warn()),
                 Span::styled(
                     format!("running… {}s", since.elapsed().as_secs()),
-                    theme::WARN,
+                    theme::warn(),
                 ),
             ]));
             lines.push(Line::default());
-            lines.push(Line::from(Span::styled("Esc cancels", theme::DIM)));
+            lines.push(Line::from(Span::styled("Esc cancels", theme::dim())));
         }
         ShellCommandPhase::Done { output, exit_code } => {
             if let Some(code) = exit_code.filter(|code| *code != 0) {
                 lines.push(Line::from(Span::styled(
                     format!("exit code {code}"),
-                    theme::ERROR,
+                    theme::error(),
                 )));
                 lines.push(Line::default());
             }
             if output.is_empty() {
-                lines.push(Line::from(Span::styled("(no output)", theme::DIM)));
+                lines.push(Line::from(Span::styled("(no output)", theme::dim())));
             } else {
                 for line in terminal_lines(output) {
                     lines.push(Line::from(line));
@@ -1062,13 +1328,13 @@ fn draw_shell_command(frame: &mut Frame<'_>, state: &ShellCommandOverlay, app: &
             lines.push(Line::default());
             lines.push(Line::from(Span::styled(
                 "↑/↓ scroll · Esc close",
-                theme::DIM,
+                theme::dim(),
             )));
         }
         ShellCommandPhase::Failed { message } => {
-            lines.push(Line::from(Span::styled(message.clone(), theme::ERROR)));
+            lines.push(Line::from(Span::styled(message.clone(), theme::error())));
             lines.push(Line::default());
-            lines.push(Line::from(Span::styled("Esc close", theme::DIM)));
+            lines.push(Line::from(Span::styled("Esc close", theme::dim())));
         }
     }
 
@@ -1082,8 +1348,8 @@ fn draw_shell_command(frame: &mut Frame<'_>, state: &ShellCommandOverlay, app: &
         Paragraph::new(lines)
             .block(
                 Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(theme::BORDER)
+                    .borders(Borders::ALL).border_type(BorderType::Rounded)
+                    .border_style(theme::border())
                     .title(" command "),
             )
             .wrap(Wrap { trim: false })
@@ -1095,7 +1361,7 @@ fn draw_shell_command(frame: &mut Frame<'_>, state: &ShellCommandOverlay, app: &
 fn draw_help(frame: &mut Frame<'_>, app: &App, root: Rect) {
     let area = centered(root, 76, 70);
     let mut lines = vec![
-        Line::from(Span::styled("Keys", theme::TITLE)),
+        Line::from(Span::styled("Keys", theme::title())),
         Line::from("Enter submit · Alt+Enter/Ctrl+J newline · Esc cancel · Ctrl+C quit"),
         Line::from("@ attach files · @path:[0:12] python slice preview · type @ to search"),
         Line::from("PgUp/PgDn or ↑/↓ (empty prompt) scroll · End follow · drag to select & copy"),
@@ -1110,19 +1376,19 @@ fn draw_help(frame: &mut Frame<'_>, app: &App, root: Rect) {
             "Shift+Tab cycle mode: require → accept edits → plan · Enter mid-turn queues the prompt",
         ),
         Line::default(),
-        Line::from(Span::styled("Modes", theme::TITLE)),
+        Line::from(Span::styled("Modes", theme::title())),
         Line::from("require — ask before mutating tools · accept edits — file edits auto-allowed"),
         Line::from(
             "plan — read-only research · allow-all — /permissions allow-all (never in the cycle)",
         ),
         Line::default(),
-        Line::from(Span::styled("Backends vs providers", theme::TITLE)),
+        Line::from(Span::styled("Backends vs providers", theme::title())),
         Line::from(
             "/provider switches the LLM API inside the native loop (incl. /connect custom hosts);",
         ),
         Line::from("/agent swaps the whole backend (native loop vs external claude/copilot CLIs)."),
         Line::default(),
-        Line::from(Span::styled("Commands", theme::TITLE)),
+        Line::from(Span::styled("Commands", theme::title())),
     ];
     for entry in app.commands.entries() {
         let hint = entry
@@ -1131,21 +1397,21 @@ fn draw_help(frame: &mut Frame<'_>, app: &App, root: Rect) {
             .map(|hint| format!(" {hint}"))
             .unwrap_or_default();
         lines.push(Line::from(vec![
-            Span::styled(format!("/{}{}", entry.name, hint), theme::ASSISTANT),
+            Span::styled(format!("/{}{}", entry.name, hint), theme::assistant()),
             Span::raw(" — "),
             Span::raw(entry.description.clone()),
-            Span::styled(format!(" [{}]", entry.source), theme::DIM),
+            Span::styled(format!(" [{}]", entry.source), theme::dim()),
         ]));
     }
     lines.push(Line::default());
     lines.push(Line::from(Span::styled(
         "CLI commands win name collisions; engine commands are sent through to the loop.",
-        theme::DIM,
+        theme::dim(),
     )));
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(Text::from(lines))
-            .block(Block::default().borders(Borders::ALL).title(" help "))
+            .block(Block::default().borders(Borders::ALL).border_type(BorderType::Rounded).border_style(theme::border()).title(" help "))
             .wrap(Wrap { trim: false }),
         area,
     );
@@ -1168,7 +1434,7 @@ fn draw_mcp_list(frame: &mut Frame<'_>, state: &McpListState, root: Rect) {
         .enumerate()
         .map(|(idx, item)| {
             let style = if idx == state.selected {
-                theme::SELECTED
+                theme::selected()
             } else {
                 Style::default()
             };
@@ -1176,7 +1442,7 @@ fn draw_mcp_list(frame: &mut Frame<'_>, state: &McpListState, root: Rect) {
             ListItem::new(Line::from(vec![
                 Span::styled(format!("[{status}] {}", item.name), style),
                 Span::raw(" "),
-                Span::styled(item.source.clone(), theme::DIM),
+                Span::styled(item.source.clone(), theme::dim()),
             ]))
         })
         .collect::<Vec<_>>();
@@ -1184,7 +1450,7 @@ fn draw_mcp_list(frame: &mut Frame<'_>, state: &McpListState, root: Rect) {
     frame.render_widget(
         List::new(items).block(
             Block::default()
-                .borders(Borders::ALL)
+                .borders(Borders::ALL).border_type(BorderType::Rounded)
                 .title(" MCP servers ")
                 .title_bottom("Space toggle · Enter save · /mcp <name> attach"),
         ),
@@ -1199,7 +1465,7 @@ fn draw_mcp_explorer(frame: &mut Frame<'_>, state: &McpExplorerState, root: Rect
         McpExplorerPhase::Loading => vec![Line::from("connecting and listing tools…")],
         McpExplorerPhase::Calling => vec![Line::from("calling tool…")],
         McpExplorerPhase::Failed { message } => {
-            vec![Line::from(Span::styled(message, theme::ERROR))]
+            vec![Line::from(Span::styled(message, theme::error()))]
         }
         McpExplorerPhase::Result { output, .. } => terminal_lines(output)
             .into_iter()
@@ -1208,10 +1474,10 @@ fn draw_mcp_explorer(frame: &mut Frame<'_>, state: &McpExplorerState, root: Rect
         McpExplorerPhase::Tools { tools } => {
             if state.args_mode {
                 vec![
-                    Line::from(Span::styled("JSON arguments:", theme::TITLE)),
+                    Line::from(Span::styled("JSON arguments:", theme::title())),
                     Line::from(state.args_input.clone()),
                     Line::default(),
-                    Line::from(Span::styled("Enter call · Esc back", theme::DIM)),
+                    Line::from(Span::styled("Enter call · Esc back", theme::dim())),
                 ]
             } else {
                 let filter = state.filter.to_lowercase();
@@ -1225,14 +1491,14 @@ fn draw_mcp_explorer(frame: &mut Frame<'_>, state: &McpExplorerState, root: Rect
                     .enumerate()
                     .map(|(idx, tool)| {
                         let style = if idx == state.selected {
-                            theme::SELECTED
+                            theme::selected()
                         } else {
                             Style::default()
                         };
                         Line::from(vec![
                             Span::styled(tool.name.clone(), style),
                             Span::raw(" — "),
-                            Span::styled(tool.description.clone(), theme::DIM),
+                            Span::styled(tool.description.clone(), theme::dim()),
                         ])
                     })
                     .collect()
@@ -1247,7 +1513,7 @@ fn draw_mcp_explorer(frame: &mut Frame<'_>, state: &McpExplorerState, root: Rect
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(lines)
-            .block(Block::default().borders(Borders::ALL).title(title))
+            .block(Block::default().borders(Borders::ALL).border_type(BorderType::Rounded).border_style(theme::border()).title(title))
             .wrap(Wrap { trim: false })
             .scroll((scroll as u16, 0)),
         area,
@@ -1264,7 +1530,7 @@ fn draw_mcp_install(frame: &mut Frame<'_>, state: &McpInstallState, root: Rect) 
     let mut lines = vec![
         Line::from(Span::styled(
             format!("mode: {mode_label} (Tab to switch)"),
-            theme::TITLE,
+            theme::title(),
         )),
         Line::default(),
     ];
@@ -1282,18 +1548,18 @@ fn draw_mcp_install(frame: &mut Frame<'_>, state: &McpInstallState, root: Rect) 
                 .enumerate()
             {
                 let style = if idx == state.selected {
-                    theme::SELECTED
+                    theme::selected()
                 } else {
                     Style::default()
                 };
                 lines.push(Line::from(vec![
                     Span::styled(entry.label.clone(), style),
                     Span::raw(" "),
-                    Span::styled(entry.npm.clone(), theme::DIM),
+                    Span::styled(entry.npm.clone(), theme::dim()),
                 ]));
                 lines.push(Line::from(Span::styled(
                     entry.description.clone(),
-                    theme::DIM,
+                    theme::dim(),
                 )));
             }
         }
@@ -1309,7 +1575,7 @@ fn draw_mcp_install(frame: &mut Frame<'_>, state: &McpInstallState, root: Rect) 
             } else {
                 lines.push(Line::from(Span::styled(
                     "Enter to type · Esc cancel",
-                    theme::DIM,
+                    theme::dim(),
                 )));
             }
         }
@@ -1319,7 +1585,7 @@ fn draw_mcp_install(frame: &mut Frame<'_>, state: &McpInstallState, root: Rect) 
         Paragraph::new(lines)
             .block(
                 Block::default()
-                    .borders(Borders::ALL)
+                    .borders(Borders::ALL).border_type(BorderType::Rounded)
                     .title(" mcp-install "),
             )
             .wrap(Wrap { trim: false }),
@@ -1327,19 +1593,26 @@ fn draw_mcp_install(frame: &mut Frame<'_>, state: &McpInstallState, root: Rect) 
     );
 }
 
-fn draw_confirm(frame: &mut Frame<'_>, prompt: &ConfirmPrompt, root: Rect) {
-    let area = centered(root, 64, 35);
+fn draw_confirm(frame: &mut Frame<'_>, prompt: &ConfirmPrompt, root: Rect, input_area: Rect) {
     let lines = vec![
-        Line::from(Span::styled(prompt.title.clone(), theme::TITLE)),
+        Line::from(Span::styled(prompt.title.clone(), theme::title())),
         Line::default(),
         Line::from(prompt.message.clone()),
         Line::default(),
-        Line::from(Span::styled("Enter/y confirm · Esc cancel", theme::DIM)),
+        Line::from(Span::styled("Enter/y confirm · Esc cancel", theme::dim())),
     ];
+    let area = bottom_anchored(root, input_area, lines.len());
     frame.render_widget(Clear, area);
     frame.render_widget(
         Paragraph::new(lines)
-            .block(Block::default().borders(Borders::ALL).title(" confirm "))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .border_style(theme::border())
+                    .padding(Padding::horizontal(1))
+                    .title(Span::styled(" confirm ", theme::title())),
+            )
             .wrap(Wrap { trim: false }),
         area,
     );
@@ -1376,7 +1649,7 @@ mod scroll_tests {
         let area = Rect::new(0, 0, 80, 20);
         let (total, viewport, max_offset) = chat_viewport_metrics(&[], area);
         assert_eq!(total, 0);
-        assert_eq!(viewport, 19);
+        assert_eq!(viewport, 20);
         assert_eq!(max_offset, 0);
     }
 
@@ -1386,7 +1659,7 @@ mod scroll_tests {
         let lines = vec![Line::from("hello"), Line::from("world")];
         let (total, viewport, max_offset) = chat_viewport_metrics(&lines, area);
         assert_eq!(total, 2);
-        assert_eq!(viewport, 9);
+        assert_eq!(viewport, 10);
         assert_eq!(max_offset, 0);
     }
 
@@ -1396,8 +1669,8 @@ mod scroll_tests {
         let lines: Vec<_> = (0..20).map(|i| Line::from(format!("row {i}"))).collect();
         let (total, viewport, max_offset) = chat_viewport_metrics(&lines, area);
         assert_eq!(total, 20);
-        assert_eq!(viewport, 7);
-        assert_eq!(max_offset, 13);
+        assert_eq!(viewport, 8);
+        assert_eq!(max_offset, 12);
     }
 
     #[test]
@@ -1418,7 +1691,7 @@ mod scroll_tests {
     fn bottom_scroll_offset_shows_last_line() {
         use ratatui::Terminal;
         use ratatui::backend::TestBackend;
-        use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
+        use ratatui::widgets::{Paragraph, Wrap};
 
         let marker = "ZZZZ_LAST_LINE";
         let mut lines: Vec<_> = (0..30)
@@ -1427,8 +1700,6 @@ mod scroll_tests {
         lines.push(Line::from(marker));
 
         let area = Rect::new(0, 0, 60, 12);
-        let block = Block::default().borders(Borders::BOTTOM);
-        let inner = block.inner(area);
         let (_, _, max_offset) = chat_viewport_metrics(&lines, area);
 
         let backend = TestBackend::new(area.width, area.height);
@@ -1437,7 +1708,6 @@ mod scroll_tests {
             .draw(|frame| {
                 frame.render_widget(
                     Paragraph::new(lines)
-                        .block(block)
                         .wrap(Wrap { trim: false })
                         .scroll((max_offset as u16, 0)),
                     area,
@@ -1447,8 +1717,8 @@ mod scroll_tests {
 
         let buf = terminal.backend().buffer();
         let mut visible = String::new();
-        for y in inner.y..inner.y + inner.height {
-            for x in inner.x..inner.x + inner.width {
+        for y in area.y..area.y + area.height {
+            for x in area.x..area.x + area.width {
                 visible.push_str(buf[(x, y)].symbol());
             }
             visible.push('\n');
