@@ -471,11 +471,18 @@ impl EffectExecutor {
                     let _ = service.cancel(&session).await;
                 });
             }
-            Effect::RespondPermission { id, decision } => {
+            Effect::RespondPermission {
+                id,
+                decision,
+                session: target,
+            } => {
                 let controller = self.controller.clone();
                 let tx = self.tx.clone();
                 tokio::spawn(async move {
-                    let (service, session) = current_service_session(&controller).await;
+                    let (service, current) = current_service_session(&controller).await;
+                    // Relayed subagent prompts carry the child session id;
+                    // the agent-global pending map resolves it directly.
+                    let session = target.unwrap_or(current);
                     let result = service
                         .respond_permission(&session, id.clone(), decision.clone())
                         .await;
@@ -509,10 +516,15 @@ impl EffectExecutor {
                     let _ = service.set_turn_permission_mode(&session, mode);
                 });
             }
-            Effect::RespondQuestion { id, answers } => {
+            Effect::RespondQuestion {
+                id,
+                answers,
+                session: target,
+            } => {
                 let controller = self.controller.clone();
                 tokio::spawn(async move {
-                    let (service, session) = current_service_session(&controller).await;
+                    let (service, current) = current_service_session(&controller).await;
+                    let session = target.unwrap_or(current);
                     let _ = service.respond_question(&session, id, answers).await;
                 });
             }

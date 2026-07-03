@@ -819,7 +819,12 @@ fn draw_picker(frame: &mut Frame<'_>, picker: &PickerState, root: Rect) {
 
 fn draw_permission(frame: &mut Frame<'_>, prompt: &PermissionPrompt, root: Rect) {
     let area = centered(root, 64, 40);
-    let mut lines = vec![Line::from(Span::styled(prompt.title.clone(), theme::TITLE))];
+    let mut title_spans = Vec::new();
+    if let Some(role) = &prompt.role {
+        title_spans.push(Span::styled(format!("[{role}] "), theme::WARN));
+    }
+    title_spans.push(Span::styled(prompt.title.clone(), theme::TITLE));
+    let mut lines = vec![Line::from(title_spans)];
     if let Some(detail) = &prompt.detail {
         lines.push(Line::default());
         lines.push(Line::from(detail.clone()));
@@ -866,8 +871,13 @@ fn draw_question(frame: &mut Frame<'_>, prompt: &QuestionPrompt, root: Rect) {
         return;
     };
     let multi = question.multi_select;
+    let mut header_spans = Vec::new();
+    if let Some(role) = &prompt.role {
+        header_spans.push(Span::styled(format!("[{role}] "), theme::WARN));
+    }
+    header_spans.push(Span::styled(question.header.clone(), theme::TITLE));
     let mut lines = vec![
-        Line::from(Span::styled(question.header.clone(), theme::TITLE)),
+        Line::from(header_spans),
         Line::from(question.question.clone()),
         Line::default(),
     ];

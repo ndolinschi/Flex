@@ -140,7 +140,7 @@ impl Agent for NativeAgent {
                 files: true,
             },
             mcp_passthrough: McpPassthrough::None,
-            subagents: false,
+            subagents: true,
             cost_reporting: false,
             cancellation: CancelSupport::Graceful,
             emits_structured_events: true,

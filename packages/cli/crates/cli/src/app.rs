@@ -16,7 +16,8 @@ use agentloop_cli_core::{
 };
 use agentloop_contracts::{
     AgentCaps, AgentEvent, ModelDiscovery, ModelInfo, ModelRef, PermissionDecision, PermissionMode,
-    PromptInput, SessionEvent, SessionId, ThinkingConfig, TokenUsage, TurnOptions, TurnStopReason,
+    PermissionRequestId, PromptInput, QuestionId, SessionEvent, SessionId, ThinkingConfig,
+    TokenUsage, TurnOptions, TurnStopReason,
 };
 
 use crate::chat::ChatState;
@@ -1210,6 +1211,7 @@ impl App {
             effects.push(Effect::RespondPermission {
                 id: prompt.id.clone(),
                 decision: PermissionDecision::AllowOnce,
+                session: prompt.session.clone(),
             });
             self.overlay = Overlay::None;
         }
@@ -1217,6 +1219,7 @@ impl App {
             effects.push(Effect::RespondPermission {
                 id: prompt.id,
                 decision: PermissionDecision::AllowOnce,
+                session: prompt.session,
             });
         }
         self.drain_pending();
@@ -1590,12 +1593,10 @@ impl App {
                     detail: detail.clone(),
                     options: options.clone(),
                     selected: 0,
+                    session: None,
+                    role: None,
                 };
-                if self.overlay.is_active() {
-                    self.pending_permissions.push_back(prompt);
-                } else {
-                    self.overlay = Overlay::Permission(prompt);
-                }
+                self.queue_permission(prompt);
                 // #region agent log
                 crate::debug_log::agent_debug_log(
                     "J",
@@ -1622,28 +1623,56 @@ impl App {
                     }),
                 );
                 // #endregion
-                self.pending_permissions.retain(|p| &p.id != id);
-                if matches!(&self.overlay, Overlay::Permission(p) if &p.id == id) {
-                    self.overlay = Overlay::None;
-                }
-                self.drain_pending();
+                self.clear_permission(id);
                 Vec::new()
             }
             AgentEvent::QuestionRequested { id, questions } => {
-                let prompt = QuestionPrompt::new(id.clone(), questions.clone());
-                if self.overlay.is_active() {
-                    self.pending_questions.push_back(prompt);
-                } else {
-                    self.overlay = Overlay::Question(prompt);
-                }
+                self.queue_question(QuestionPrompt::new(id.clone(), questions.clone()));
                 Vec::new()
             }
             AgentEvent::QuestionResolved { id, .. } => {
-                self.pending_questions.retain(|q| &q.id != id);
-                if matches!(&self.overlay, Overlay::Question(q) if &q.id == id) {
-                    self.overlay = Overlay::None;
+                self.clear_question(id);
+                Vec::new()
+            }
+            AgentEvent::SubagentEvent {
+                child_session,
+                event: inner,
+            } => {
+                // Relayed child control-plane events surface in the parent
+                // TUI tagged with the child session and its role badge; the
+                // answer routes back to the child (Effect session field).
+                match inner.as_ref() {
+                    AgentEvent::PermissionRequested {
+                        id,
+                        call_id,
+                        title,
+                        detail,
+                        options,
+                    } => {
+                        self.queue_permission(PermissionPrompt {
+                            id: id.clone(),
+                            call_id: call_id.clone(),
+                            title: title.clone(),
+                            detail: detail.clone(),
+                            options: options.clone(),
+                            selected: 0,
+                            session: Some(child_session.clone()),
+                            role: self.chat.subagent_role(child_session),
+                        });
+                    }
+                    // Covers both user answers and the engine's ask_timeout
+                    // auto-deny — a relayed prompt never dangles.
+                    AgentEvent::PermissionResolved { id, .. } => self.clear_permission(id),
+                    AgentEvent::QuestionRequested { id, questions } => {
+                        let mut prompt = QuestionPrompt::new(id.clone(), questions.clone());
+                        prompt.session = Some(child_session.clone());
+                        prompt.role = self.chat.subagent_role(child_session);
+                        self.queue_question(prompt);
+                    }
+                    AgentEvent::QuestionResolved { id, .. } => self.clear_question(id),
+                    _ => {}
                 }
-                self.drain_pending();
+                self.chat.apply(&event.payload);
                 Vec::new()
             }
             AgentEvent::Gap { from_seq } => vec![Effect::Resync {
@@ -1717,6 +1746,42 @@ impl App {
         } else if let Some(prompt) = self.pending_questions.pop_front() {
             self.overlay = Overlay::Question(prompt);
         }
+    }
+
+    /// Show a permission prompt, or queue it while another modal is open.
+    fn queue_permission(&mut self, prompt: PermissionPrompt) {
+        if self.overlay.is_active() {
+            self.pending_permissions.push_back(prompt);
+        } else {
+            self.overlay = Overlay::Permission(prompt);
+        }
+    }
+
+    /// Drop a permission prompt (answered or auto-denied) wherever it lives.
+    fn clear_permission(&mut self, id: &PermissionRequestId) {
+        self.pending_permissions.retain(|p| &p.id != id);
+        if matches!(&self.overlay, Overlay::Permission(p) if &p.id == id) {
+            self.overlay = Overlay::None;
+        }
+        self.drain_pending();
+    }
+
+    /// Show a question prompt, or queue it while another modal is open.
+    fn queue_question(&mut self, prompt: QuestionPrompt) {
+        if self.overlay.is_active() {
+            self.pending_questions.push_back(prompt);
+        } else {
+            self.overlay = Overlay::Question(prompt);
+        }
+    }
+
+    /// Drop a question prompt (answered elsewhere) wherever it lives.
+    fn clear_question(&mut self, id: &QuestionId) {
+        self.pending_questions.retain(|q| &q.id != id);
+        if matches!(&self.overlay, Overlay::Question(q) if &q.id == id) {
+            self.overlay = Overlay::None;
+        }
+        self.drain_pending();
     }
 
     fn apply_fresh_session(&mut self, id: SessionId, banner: &str) {
@@ -2599,6 +2664,73 @@ mod status_tests {
         app.on_engine(event);
         assert_eq!(app.status.turn_output_chars, 8);
         assert!(app.session.turn.is_running());
+    }
+
+    #[test]
+    fn relayed_permission_prompt_tags_session_and_role_and_clears() {
+        use crate::overlay::Overlay;
+        use agentloop_contracts::{
+            AgentEvent, PermissionDecision, PermissionDecisionKind, PermissionRequestId,
+            SessionEvent, ToolCallId,
+        };
+        let mut app = test_app();
+        let child = SessionId::from("child-1");
+        let mut seq = 0;
+        let mut engine = |app: &mut App, payload: AgentEvent| {
+            seq += 1;
+            app.on_engine(SessionEvent {
+                session_id: SessionId::from("sess-test"),
+                seq,
+                turn_id: None,
+                ts_ms: 0,
+                payload,
+            });
+        };
+        engine(
+            &mut app,
+            AgentEvent::SubagentStarted {
+                child_session: child.clone(),
+                task: "do protected work".to_owned(),
+                call_id: None,
+                role: Some("worker".to_owned()),
+            },
+        );
+        engine(
+            &mut app,
+            AgentEvent::SubagentEvent {
+                child_session: child.clone(),
+                event: Box::new(AgentEvent::PermissionRequested {
+                    id: PermissionRequestId::from("perm-1"),
+                    call_id: Some(ToolCallId::from("c1")),
+                    title: "Allow `Bash`?".to_owned(),
+                    detail: None,
+                    options: vec![PermissionDecisionKind::AllowOnce],
+                }),
+            },
+        );
+        let Overlay::Permission(prompt) = &app.overlay else {
+            panic!("expected permission overlay");
+        };
+        assert_eq!(
+            prompt.session.as_ref().map(SessionId::as_str),
+            Some("child-1")
+        );
+        assert_eq!(prompt.role.as_deref(), Some("worker"));
+
+        engine(
+            &mut app,
+            AgentEvent::SubagentEvent {
+                child_session: child,
+                event: Box::new(AgentEvent::PermissionResolved {
+                    id: PermissionRequestId::from("perm-1"),
+                    decision: PermissionDecision::Deny { reason: None },
+                }),
+            },
+        );
+        assert!(
+            !app.overlay.is_active(),
+            "relayed resolution clears the prompt"
+        );
     }
 }
 

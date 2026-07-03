@@ -1,0 +1,28 @@
+---
+source: crates/cli/src/render_snapshots.rs
+expression: rendered
+---
+✻ AgenticStudio 0.1.0
+cwd: .
+shift+tab cycles modes · ctrl+o expands tools · enter mid-turn queues · /help
+
+
+
+
+              ┌ permission ──────────────────────────────────────┐
+              │[worker] Allow `Bash`?                            │
+              │                                                  │
+              │cargo test --workspace                            │
+              │                                                  │
+              │1. Yes                                            │
+              │2. Yes, don't ask again                           │
+              │3. No (esc)                                       │
+              │                                                  │
+              └──────────────────────────────────────────────────┘
+
+
+────────────────────────────────────────────────────────────────────────────────
+┌ prompt ──────────────────────────────────────────────────────────────────────┐
+│ Type a message, / commands, @ files · @path:[0:12] python slice              │
+└──────────────────────────────────────────────────────────────────────────────┘
+native · code · auto · anthropic/claude-sonnet-4-5 · ↑0 ↓0

@@ -11,7 +11,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use agentloop_contracts::{
     Answer, PermissionDecision, PermissionDecisionKind, PermissionRequestId, Question, QuestionId,
-    ToolCallId,
+    SessionId, ToolCallId,
 };
 
 use agentloop_mcp::McpRemoteTool;
@@ -127,6 +127,10 @@ pub struct PermissionPrompt {
     pub detail: Option<String>,
     pub options: Vec<PermissionDecisionKind>,
     pub selected: usize,
+    /// Child session for relayed subagent prompts; `None` = current.
+    pub session: Option<SessionId>,
+    /// Role badge for relayed subagent prompts (`[worker] Allow ...`).
+    pub role: Option<String>,
 }
 
 /// A multi-page question wizard.
@@ -134,6 +138,10 @@ pub struct PermissionPrompt {
 pub struct QuestionPrompt {
     pub id: QuestionId,
     pub questions: Vec<Question>,
+    /// Child session for relayed subagent prompts; `None` = current.
+    pub session: Option<SessionId>,
+    /// Role badge for relayed subagent prompts.
+    pub role: Option<String>,
     /// Page index.
     pub current: usize,
     /// Selected option indices per question.
@@ -154,6 +162,8 @@ impl QuestionPrompt {
         Self {
             id,
             questions,
+            session: None,
+            role: None,
             current: 0,
             picks: vec![Vec::new(); len],
             custom_texts: vec![None; len],
@@ -221,6 +231,7 @@ impl QuestionPrompt {
             effects: vec![Effect::RespondQuestion {
                 id: self.id.clone(),
                 answers: self.answers(),
+                session: self.session.clone(),
             }],
             close: true,
             ..OverlayOutcome::default()
@@ -497,6 +508,7 @@ fn permission_key(prompt: &mut PermissionPrompt, key: KeyEvent) -> OverlayOutcom
             effects: vec![Effect::RespondPermission {
                 id: prompt.id.clone(),
                 decision: PermissionDecision::Deny { reason: None },
+                session: prompt.session.clone(),
             }],
             close: true,
             info: None,
@@ -528,6 +540,7 @@ fn permission_key(prompt: &mut PermissionPrompt, key: KeyEvent) -> OverlayOutcom
                 effects: vec![Effect::RespondPermission {
                     id: prompt.id.clone(),
                     decision: decision_for(*kind),
+                    session: prompt.session.clone(),
                 }],
                 close: true,
                 ..OverlayOutcome::default()
@@ -542,6 +555,7 @@ fn permission_key(prompt: &mut PermissionPrompt, key: KeyEvent) -> OverlayOutcom
                 effects: vec![Effect::RespondPermission {
                     id: prompt.id.clone(),
                     decision: PermissionDecision::AllowAlways,
+                    session: prompt.session.clone(),
                 }],
                 close: true,
                 ..OverlayOutcome::default()
@@ -557,6 +571,7 @@ fn permission_key(prompt: &mut PermissionPrompt, key: KeyEvent) -> OverlayOutcom
                 effects: vec![Effect::RespondPermission {
                     id: prompt.id.clone(),
                     decision: decision_for(*kind),
+                    session: prompt.session.clone(),
                 }],
                 close: true,
                 ..OverlayOutcome::default()
@@ -670,6 +685,7 @@ fn question_key(prompt: &mut QuestionPrompt, key: KeyEvent) -> OverlayOutcome {
                 effects: vec![Effect::RespondQuestion {
                     id: prompt.id.clone(),
                     answers: prompt.answers(),
+                    session: prompt.session.clone(),
                 }],
                 close: true,
                 info: Some("question dismissed — sent partial answers".to_owned()),
@@ -1139,6 +1155,39 @@ mod tests {
             panic!("expected RespondQuestion");
         };
         assert_eq!(answers[0].selected, vec!["beta"]);
+    }
+
+    #[test]
+    fn permission_answer_carries_prompt_session() {
+        use agentloop_contracts::{PermissionDecisionKind, PermissionRequestId};
+        let mut prompt = PermissionPrompt {
+            id: PermissionRequestId::from("perm-1"),
+            call_id: None,
+            title: "Allow `Bash`?".to_owned(),
+            detail: None,
+            options: vec![PermissionDecisionKind::AllowOnce],
+            selected: 0,
+            session: Some(SessionId::from("child-1")),
+            role: Some("worker".to_owned()),
+        };
+        let outcome = permission_key(&mut prompt, key(KeyCode::Enter));
+        assert!(outcome.close);
+        let Effect::RespondPermission { session, .. } = &outcome.effects[0] else {
+            panic!("expected RespondPermission");
+        };
+        assert_eq!(session.as_ref().map(SessionId::as_str), Some("child-1"));
+    }
+
+    #[test]
+    fn question_answer_carries_prompt_session() {
+        let mut prompt = sample_prompt(false);
+        prompt.session = Some(SessionId::from("child-2"));
+        question_key(&mut prompt, key(KeyCode::Char('1')));
+        let outcome = question_key(&mut prompt, key(KeyCode::Enter));
+        let Effect::RespondQuestion { session, .. } = &outcome.effects[0] else {
+            panic!("expected RespondQuestion");
+        };
+        assert_eq!(session.as_ref().map(SessionId::as_str), Some("child-2"));
     }
 
     #[test]

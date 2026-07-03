@@ -752,6 +752,103 @@ async fn task_call_spawns_child_and_returns_final_text() {
 }
 
 #[tokio::test]
+async fn child_permission_relays_and_routes() {
+    let (turn, ids) = MockProvider::tool_turn(&[(
+        "Task",
+        serde_json::json!({
+            "role": "worker",
+            "description": "do protected work",
+            "prompt": "Run the protected tool.",
+        }),
+    )]);
+    let (child_turn, _) = MockProvider::tool_turn(&[("needs_permission", serde_json::json!({}))]);
+    // FIFO: parent iter 1 (Task) → child ask iter → child final → parent iter 2.
+    let provider = Arc::new(MockProvider::with_turns(vec![
+        turn,
+        child_turn,
+        MockProvider::text_turn("child finished protected work"),
+        MockProvider::text_turn("done"),
+    ]));
+    let (agent, store) = create_agent(
+        provider,
+        vec![Arc::new(TaskStub), Arc::new(PermissionTool)],
+        Vec::new(),
+    )
+    .await;
+    assert!(
+        agent.capabilities().subagents,
+        "native agent advertises subagents"
+    );
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+    let mut stream = agent.events(&session).expect("subscribe succeeds");
+    let prompt_agent = agent.clone();
+    let prompt_session = session.clone();
+    let prompt_task = tokio::spawn(async move {
+        prompt_agent
+            .prompt(
+                &prompt_session,
+                PromptInput::text("delegate protected work"),
+                TurnOptions {
+                    permission_mode: Some(PermissionMode::Default),
+                    ..TurnOptions::default()
+                },
+            )
+            .await
+    });
+
+    // The child's ask reaches parent subscribers wrapped as SubagentEvent,
+    // and responding on the child session id resolves it.
+    let (child, request_id) = loop {
+        let event = stream.next().await.expect("relayed ask arrives");
+        if let AgentEvent::SubagentEvent {
+            child_session,
+            event,
+        } = event.payload
+        {
+            if let AgentEvent::PermissionRequested { id, .. } = *event {
+                break (child_session, id);
+            }
+        }
+    };
+    agent
+        .respond_permission(&child, request_id.clone(), PermissionDecision::AllowOnce)
+        .await
+        .expect("responding on the child session unblocks it");
+
+    // The resolution relays back so clients can clear the prompt.
+    loop {
+        let event = stream.next().await.expect("relayed resolution arrives");
+        if let AgentEvent::SubagentEvent { event, .. } = event.payload {
+            if matches!(
+                *event,
+                AgentEvent::PermissionResolved { ref id, .. }
+                    if id.as_str() == request_id.as_str()
+            ) {
+                break;
+            }
+        }
+    }
+
+    let summary = prompt_task
+        .await
+        .expect("prompt task joins")
+        .expect("turn succeeds");
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+    let events = store.read(&session, 0).await.expect("events replay");
+    assert!(
+        events.iter().any(|(_, event)| matches!(
+            event,
+            AgentEvent::ToolCallUpdated { call }
+                if call.id == ids[0] && matches!(call.status, ToolCallStatus::Completed)
+        )),
+        "the parent Task call completed after the child's ask resolved"
+    );
+}
+
+#[tokio::test]
 async fn unknown_role_teaches_and_turn_continues() {
     let (turn, ids) = MockProvider::tool_turn(&[(
         "Task",

@@ -481,6 +481,28 @@ fn subagent_events(outcome: &str) -> Vec<AgentEvent> {
 }
 
 #[test]
+fn overlay_permission_child_badge_snapshot() {
+    use agentloop_contracts::{PermissionDecisionKind, PermissionRequestId, SessionId};
+    let mut app = test_app(test_bootstrap());
+    app.overlay = Overlay::Permission(crate::overlay::PermissionPrompt {
+        id: PermissionRequestId::from("perm-1"),
+        call_id: Some(ToolCallId::from("child-call-1")),
+        title: "Allow `Bash`?".to_owned(),
+        detail: Some("cargo test --workspace".to_owned()),
+        options: vec![
+            PermissionDecisionKind::AllowOnce,
+            PermissionDecisionKind::AllowAlways,
+            PermissionDecisionKind::Deny,
+        ],
+        selected: 0,
+        session: Some(SessionId::from("child-1")),
+        role: Some("worker".to_owned()),
+    });
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("overlay_permission_child_badge", rendered);
+}
+
+#[test]
 fn subagent_tree_running_snapshot() {
     let mut app = test_app(test_bootstrap());
     for event in subagent_events("running") {

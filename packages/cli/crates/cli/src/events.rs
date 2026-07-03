@@ -133,11 +133,15 @@ pub enum Effect {
     RespondPermission {
         id: PermissionRequestId,
         decision: PermissionDecision,
+        /// Child session for relayed subagent prompts; `None` = current.
+        session: Option<SessionId>,
     },
     /// Answer a pending question round-trip.
     RespondQuestion {
         id: QuestionId,
         answers: Vec<Answer>,
+        /// Child session for relayed subagent prompts; `None` = current.
+        session: Option<SessionId>,
     },
     /// Fetch the model catalog across all registered providers.
     ListModels,
