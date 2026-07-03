@@ -25,21 +25,17 @@ impl OpenAiConfig {
         )
     }
 
+    /// Build a config from explicit values. An empty `api_key` is allowed —
+    /// it means a keyless local endpoint (LM Studio, llama.cpp) and no
+    /// Authorization header is sent. The env path (`from_env`) still
+    /// requires `OPENAI_API_KEY` via [`required_env`].
     pub fn from_values(
         api_key: String,
         base_url: Option<String>,
         model: Option<String>,
     ) -> Result<Self, ProviderError> {
-        let provider = ProviderId::from(OPENAI_PROVIDER_ID);
-        let api_key = api_key.trim().to_owned();
-        if api_key.is_empty() {
-            return Err(ProviderError::AuthMissing {
-                provider,
-                hint: "set `OPENAI_API_KEY` to an OpenAI API key".to_owned(),
-            });
-        }
         Ok(Self {
-            api_key,
+            api_key: api_key.trim().to_owned(),
             base_url: normalize_base_url(base_url.as_deref()),
             default_model: model
                 .as_deref()
@@ -106,8 +102,8 @@ mod tests {
     }
 
     #[test]
-    fn config_rejects_missing_api_key() {
-        let err = OpenAiConfig::from_values(" ".to_owned(), None, None);
-        assert!(matches!(err, Err(ProviderError::AuthMissing { .. })));
+    fn config_accepts_empty_api_key_for_keyless_endpoints() {
+        let config = OpenAiConfig::from_values(" ".to_owned(), None, None).expect("keyless ok");
+        assert_eq!(config.api_key, "");
     }
 }

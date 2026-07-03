@@ -4,17 +4,22 @@ use agentloop_contracts::ProviderId;
 use agentloop_core::ProviderError;
 use reqwest::{Client, Method, RequestBuilder, StatusCode};
 
-/// Build an authenticated request using bearer-token auth.
+/// Build an authenticated request using bearer-token auth. An empty key
+/// sends no Authorization header (keyless local endpoints like LM Studio).
 pub fn authenticated_request(
     client: &Client,
     method: Method,
     url: &str,
     api_key: &str,
 ) -> RequestBuilder {
-    client
+    let request = client
         .request(method, url)
-        .bearer_auth(api_key)
-        .header("accept", "application/json")
+        .header("accept", "application/json");
+    if api_key.is_empty() {
+        request
+    } else {
+        request.bearer_auth(api_key)
+    }
 }
 
 /// Convert a non-success HTTP response into a canonical provider error.
@@ -116,5 +121,27 @@ mod tests {
             None,
         );
         assert!(matches!(err, ProviderError::InvalidRequest { .. }));
+    }
+
+    #[test]
+    fn empty_key_sends_no_authorization_header() {
+        let client = Client::new();
+        let with_key = authenticated_request(&client, Method::GET, "http://localhost/v1", "sk-x")
+            .build()
+            .expect("request builds");
+        assert!(
+            with_key
+                .headers()
+                .contains_key(reqwest::header::AUTHORIZATION)
+        );
+
+        let keyless = authenticated_request(&client, Method::GET, "http://localhost/v1", "")
+            .build()
+            .expect("request builds");
+        assert!(
+            !keyless
+                .headers()
+                .contains_key(reqwest::header::AUTHORIZATION)
+        );
     }
 }

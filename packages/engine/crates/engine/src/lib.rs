@@ -402,9 +402,8 @@ fn build_custom_provider(
     if spec.base_url.trim().is_empty() {
         return Err(invalid("base_url is empty"));
     }
-    if spec.api_key.trim().is_empty() {
-        return Err(invalid("api_key is empty"));
-    }
+    // An empty api_key is deliberate: keyless local endpoints (LM Studio,
+    // llama.cpp) serve OpenAI-compatible APIs without auth.
     let config = OpenAiConfig::from_values(
         spec.api_key.clone(),
         Some(spec.base_url.clone()),
@@ -787,15 +786,15 @@ mod tests {
     }
 
     #[test]
-    fn empty_custom_credentials_are_rejected() {
+    fn empty_base_url_rejected_empty_key_allowed() {
+        // Keyless local endpoints (LM Studio) register with an empty key.
         let no_key = CustomProviderSpec {
             api_key: "  ".to_owned(),
-            ..spec("deepseek")
+            ..spec("lmstudio")
         };
-        assert!(matches!(
-            resolve_available_providers(None, None, &[no_key]),
-            Err(EngineServiceError::CustomProviderInvalid { id, .. }) if id == "deepseek"
-        ));
+        let (registry, _) =
+            resolve_available_providers(None, None, &[no_key]).expect("keyless spec registers");
+        assert!(registry.ids().iter().any(|id| id.as_str() == "lmstudio"));
 
         let no_url = CustomProviderSpec {
             base_url: String::new(),
