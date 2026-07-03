@@ -25,6 +25,7 @@ pub use mcp_store::{
     mcp_path, mcp_servers_dir, parse_install_target, registry,
 };
 pub use prefs::{
-    CliPrefs, ModelEntry, PrefsError, ProviderConfig, config_dir, config_path, custom_specs,
-    model_in_catalog, model_provider_available, resolve_api_key, resolve_stored_model,
+    CliPrefs, ModelEntry, PrefsError, ProviderConfig, RoleConfig, config_dir, config_path,
+    custom_specs, model_in_catalog, model_provider_available, resolve_api_key,
+    resolve_stored_model, role_specs,
 };

@@ -184,6 +184,7 @@ impl EngineHub {
         // invalidate picks up new custom providers without extra plumbing.
         let prefs = crate::prefs::CliPrefs::load();
         let (custom, skipped) = crate::prefs::custom_specs(&prefs);
+        let (roles, skipped_roles) = crate::prefs::role_specs(&prefs);
         let mcp_store = crate::mcp_store::McpStore::load();
         let mcp_config = mcp_store.to_bridge_config();
         shutdown_mcp_manager(self.mcp_manager.take());
@@ -208,7 +209,7 @@ impl EngineHub {
             cwd: self.cwd.clone(),
             date: today(),
             custom,
-            roles: Vec::new(),
+            roles,
             mcp: mcp_config,
             mcp_manager,
             session_store: Some(store),
@@ -227,6 +228,9 @@ impl EngineHub {
         }
         for (id, reason) in skipped {
             trace.push(format!("skipped custom provider {id}: {reason}"));
+        }
+        for (name, reason) in skipped_roles {
+            trace.push(format!("skipped role {name}: {reason}"));
         }
         Ok((service, trace))
     }

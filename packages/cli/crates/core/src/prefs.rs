@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use agentloop_contracts::{ModelInfo, ModelRef};
-use agentloop_engine::CustomProviderSpec;
+use agentloop_engine::{CustomProviderSpec, RoleRegistry, RoleSpec, RoleToolProfile, valid_name};
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::CatalogEntry;
@@ -31,6 +31,9 @@ pub struct CliPrefs {
     /// Custom OpenAI-compatible providers keyed by provider id.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub providers: BTreeMap<String, ProviderConfig>,
+    /// Orchestration roles for the Task tool, keyed by role name.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub roles: BTreeMap<String, RoleConfig>,
     /// Models to fall back to (in order) when the active model's provider
     /// fails mid-turn (`provider/model` refs).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -61,6 +64,31 @@ pub struct ProviderConfig {
     /// (DeepSeek-style `thinking` request field).
     #[serde(default)]
     pub thinking: bool,
+}
+
+/// One user-configured orchestration role. Unset fields inherit the
+/// same-name built-in role's values (or conservative defaults for new roles).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoleConfig {
+    /// Ordered model preference chain (`provider/model` refs).
+    /// Empty = inherit the spawning session's effective model.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub models: Vec<String>,
+    /// `"read-only"`, `"full"`, or a comma-separated tool allow-list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools: Option<String>,
+    /// System-prompt addition for subagents of this role.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
+    /// Distribute parallel spawns across the chain (round-robin).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub split: Option<bool>,
+    /// Concurrent subagents of this role per batch (engine clamps 1..=8).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_parallel: Option<usize>,
+    /// Spawn-tree depth below this role (engine clamps 0..=3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_depth: Option<u8>,
 }
 
 /// One model in a custom provider's static catalog.
@@ -132,6 +160,80 @@ pub fn custom_specs(prefs: &CliPrefs) -> (Vec<CustomProviderSpec>, Vec<(String, 
         }
     }
     (specs, skipped)
+}
+
+/// Translate configured roles into engine specs. Invalid entries are skipped
+/// and reported as `(name, reason)` so callers can surface them in the
+/// resolution trace instead of failing engine startup (one bad role reaching
+/// `RoleRegistry::with_defaults` would fail the whole engine build).
+pub fn role_specs(prefs: &CliPrefs) -> (Vec<RoleSpec>, Vec<(String, String)>) {
+    let builtins = RoleRegistry::with_defaults(Vec::new()).ok();
+    let mut specs = Vec::new();
+    let mut skipped = Vec::new();
+    for (name, config) in &prefs.roles {
+        if !valid_name(name) {
+            skipped.push((
+                name.clone(),
+                "invalid name (use a-z, 0-9, -, _; max 32 chars)".to_owned(),
+            ));
+            continue;
+        }
+        // Seed from the same-name built-in so a partial override (e.g. worker
+        // with only `models`) keeps its full tool access and built-in prompt —
+        // the engine registry replaces same-name built-ins wholesale.
+        let mut spec = builtins
+            .as_ref()
+            .and_then(|registry| registry.get(name).cloned())
+            .unwrap_or_else(|| RoleSpec::new(name.clone()));
+        if !config.models.is_empty() {
+            spec.models = config
+                .models
+                .iter()
+                .map(|model| ModelRef::from(model.as_str()))
+                .collect();
+        }
+        if let Some(raw) = &config.tools {
+            match parse_tool_profile(raw) {
+                Some(profile) => spec.tools = profile,
+                None => {
+                    skipped.push((name.clone(), "tools is empty".to_owned()));
+                    continue;
+                }
+            }
+        }
+        if let Some(prompt) = &config.prompt {
+            spec.prompt = Some(prompt.clone());
+        }
+        if let Some(split) = config.split {
+            spec.split = split;
+        }
+        if let Some(max_parallel) = config.max_parallel {
+            spec.max_parallel = max_parallel;
+        }
+        if let Some(max_depth) = config.max_depth {
+            spec.max_depth = max_depth;
+        }
+        specs.push(spec);
+    }
+    (specs, skipped)
+}
+
+/// `"read-only"`, `"full"`, or a comma-separated tool allow-list.
+/// `None` when the value contains no tool names.
+fn parse_tool_profile(raw: &str) -> Option<RoleToolProfile> {
+    match raw.trim() {
+        "read-only" => Some(RoleToolProfile::ReadOnly),
+        "full" => Some(RoleToolProfile::Full),
+        list => {
+            let names: Vec<String> = list
+                .split(',')
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(str::to_owned)
+                .collect();
+            (!names.is_empty()).then_some(RoleToolProfile::Allow(names))
+        }
+    }
 }
 
 fn model_entry_info(entry: &ModelEntry) -> ModelInfo {
@@ -451,6 +553,127 @@ mod tests {
                 Err(PrefsError::MissingEnv(var)) if var == "PREFS_TEST_MISSING"
             ));
         });
+    }
+
+    #[test]
+    fn roles_round_trip() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("config.json");
+        let mut prefs = CliPrefs::default();
+        prefs.roles.insert(
+            "senior".to_owned(),
+            RoleConfig {
+                models: vec!["anthropic/claude-opus-4-5".to_owned()],
+                tools: Some("full".to_owned()),
+                prompt: Some("Take the hardest subtasks.".to_owned()),
+                split: Some(false),
+                max_parallel: Some(2),
+                max_depth: Some(0),
+            },
+        );
+        CliPrefs::save_to(&path, &prefs).expect("save");
+        let loaded = CliPrefs::load_from(&path).expect("load");
+        assert_eq!(loaded, prefs);
+    }
+
+    #[test]
+    fn role_specs_maps_fields() {
+        let mut prefs = CliPrefs::default();
+        prefs.roles.insert(
+            "senior".to_owned(),
+            RoleConfig {
+                models: vec!["a/x".to_owned(), "b/y".to_owned()],
+                tools: Some("Read, Grep".to_owned()),
+                prompt: Some("p".to_owned()),
+                split: Some(false),
+                max_parallel: Some(2),
+                max_depth: Some(0),
+            },
+        );
+        let (specs, skipped) = role_specs(&prefs);
+        assert!(skipped.is_empty());
+        assert_eq!(specs.len(), 1);
+        let spec = &specs[0];
+        assert_eq!(spec.name, "senior");
+        assert_eq!(
+            spec.models,
+            vec![ModelRef::from("a/x"), ModelRef::from("b/y")]
+        );
+        assert_eq!(
+            spec.tools,
+            RoleToolProfile::Allow(vec!["Read".to_owned(), "Grep".to_owned()])
+        );
+        assert_eq!(spec.prompt.as_deref(), Some("p"));
+        assert!(!spec.split);
+        assert_eq!(spec.max_parallel, 2);
+        assert_eq!(spec.max_depth, 0);
+
+        prefs.roles.get_mut("senior").expect("entry").tools = Some("read-only".to_owned());
+        let (specs, _) = role_specs(&prefs);
+        assert_eq!(specs[0].tools, RoleToolProfile::ReadOnly);
+        prefs.roles.get_mut("senior").expect("entry").tools = Some("full".to_owned());
+        let (specs, _) = role_specs(&prefs);
+        assert_eq!(specs[0].tools, RoleToolProfile::Full);
+    }
+
+    #[test]
+    fn role_specs_reports_invalid_entries() {
+        let mut prefs = CliPrefs::default();
+        prefs.roles.insert("good".to_owned(), RoleConfig::default());
+        prefs
+            .roles
+            .insert("Bad Name!".to_owned(), RoleConfig::default());
+        prefs.roles.insert(
+            "empty-tools".to_owned(),
+            RoleConfig {
+                tools: Some(" , ".to_owned()),
+                ..RoleConfig::default()
+            },
+        );
+        let (specs, skipped) = role_specs(&prefs);
+        assert_eq!(specs.len(), 1);
+        assert_eq!(specs[0].name, "good");
+        assert_eq!(skipped.len(), 2);
+        assert!(skipped.iter().any(|(name, _)| name == "Bad Name!"));
+        assert!(skipped.iter().any(|(name, _)| name == "empty-tools"));
+    }
+
+    #[test]
+    fn role_specs_builtin_override_inherits_unset_fields() {
+        let mut prefs = CliPrefs::default();
+        prefs.roles.insert(
+            "worker".to_owned(),
+            RoleConfig {
+                models: vec!["deepseek/deepseek-chat".to_owned()],
+                ..RoleConfig::default()
+            },
+        );
+        let (specs, skipped) = role_specs(&prefs);
+        assert!(skipped.is_empty());
+        let worker = &specs[0];
+        // A models-only override must keep the built-in worker's full tool
+        // access and prompt, not fall back to read-only/no-prompt defaults.
+        assert_eq!(worker.tools, RoleToolProfile::Full);
+        assert!(worker.prompt.is_some());
+        assert_eq!(
+            worker.models,
+            vec![ModelRef::from("deepseek/deepseek-chat")]
+        );
+    }
+
+    #[test]
+    fn role_specs_passes_unknown_providers_through() {
+        let mut prefs = CliPrefs::default();
+        prefs.roles.insert(
+            "searcher".to_owned(),
+            RoleConfig {
+                models: vec!["notloaded/foo".to_owned()],
+                ..RoleConfig::default()
+            },
+        );
+        let (specs, skipped) = role_specs(&prefs);
+        assert!(skipped.is_empty());
+        assert_eq!(specs[0].models, vec![ModelRef::from("notloaded/foo")]);
     }
 
     #[test]
