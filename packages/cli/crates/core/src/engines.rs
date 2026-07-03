@@ -208,6 +208,7 @@ impl EngineHub {
             cwd: self.cwd.clone(),
             date: today(),
             custom,
+            roles: Vec::new(),
             mcp: mcp_config,
             mcp_manager,
             session_store: Some(store),
