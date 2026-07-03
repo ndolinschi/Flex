@@ -78,7 +78,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "str
 globset = "0.4"
 ignore = "0.4"
 regex = "1"
-htmd = "0.2"
+htmd = "0.5"
 base64 = "0.22"
 # dev
 insta = { version = "1", features = ["json", "redactions"] }
