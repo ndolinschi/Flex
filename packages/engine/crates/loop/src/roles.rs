@@ -165,7 +165,10 @@ impl RoleRegistry {
     }
 }
 
-fn valid_name(name: &str) -> bool {
+/// Whether `name` is a legal role name: `^[a-z0-9][a-z0-9_-]{0,31}$`.
+/// Exposed so clients can pre-validate config entries with the same rule
+/// instead of failing the whole engine build on one bad role.
+pub fn valid_name(name: &str) -> bool {
     let mut chars = name.chars();
     let Some(first) = chars.next() else {
         return false;

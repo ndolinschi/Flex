@@ -18,7 +18,7 @@ use agentloop_core::{
     Agent, AgentError, EventStream, ProviderError, ProviderRegistry, SessionStore, StoreError,
 };
 use agentloop_loop::NativeAgentBuilder;
-use agentloop_loop::roles::{RoleError, RoleRegistry, RoleSpec};
+pub use agentloop_loop::roles::{RoleError, RoleRegistry, RoleSpec, RoleToolProfile, valid_name};
 use agentloop_mcp::{McpBridgeConfig, McpBridgeError, McpManager};
 use agentloop_prompts::{
     CommandDiscoveryConfig, CommandError, CommandRegistry, PromptError, SystemPromptAssembler,
