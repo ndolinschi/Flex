@@ -717,6 +717,7 @@ impl App {
             LocalCommand::Compact => self.run_compact(),
             LocalCommand::Connect { arg } => self.run_connect(arg),
             LocalCommand::Providers => self.run_providers(),
+            LocalCommand::Roles => self.run_roles(),
             LocalCommand::Disconnect { arg } => self.run_disconnect(arg),
             LocalCommand::Mcps => self.open_mcp_list(),
             LocalCommand::Mcp { sub } => self.run_mcp_command(sub),
@@ -1017,6 +1018,14 @@ impl App {
         }
         lines.push("add: /connect · remove: /disconnect <id>".to_owned());
         for line in lines {
+            self.chat.push_info(line);
+        }
+        Vec::new()
+    }
+
+    fn run_roles(&mut self) -> Vec<Effect> {
+        let prefs = agentloop_cli_core::CliPrefs::load();
+        for line in role_lines(&prefs) {
             self.chat.push_info(line);
         }
         Vec::new()
@@ -2282,6 +2291,63 @@ fn is_copilot_model(model: &ModelRef) -> bool {
     model.split().0 == Some("copilot")
 }
 
+/// `/roles` display lines: merged built-in + configured roles, then skipped
+/// entries with reasons, then the config-path footer.
+fn role_lines(prefs: &agentloop_cli_core::CliPrefs) -> Vec<String> {
+    use agentloop_engine::{RoleRegistry, RoleToolProfile};
+    let (specs, skipped) = agentloop_cli_core::role_specs(prefs);
+    let mut lines = vec!["roles:".to_owned()];
+    match RoleRegistry::with_defaults(specs) {
+        Ok(registry) => {
+            let mut names: Vec<String> = registry
+                .spawnable()
+                .into_iter()
+                .map(|(name, _)| name)
+                .collect();
+            names.push("main".to_owned());
+            for name in names {
+                let Some(spec) = registry.get(&name) else {
+                    continue;
+                };
+                let source = if prefs.roles.contains_key(&name) {
+                    "config"
+                } else {
+                    "default"
+                };
+                let chain = if spec.models.is_empty() {
+                    "inherit".to_owned()
+                } else {
+                    spec.models
+                        .iter()
+                        .map(|model| model.0.clone())
+                        .collect::<Vec<_>>()
+                        .join(" → ")
+                };
+                let tools = match &spec.tools {
+                    RoleToolProfile::ReadOnly => "read-only".to_owned(),
+                    RoleToolProfile::Full => "full".to_owned(),
+                    RoleToolProfile::Allow(list) => list.join(","),
+                };
+                lines.push(format!(
+                    "  {name} · {chain} · tools: {tools} · split: {} · max_parallel: {} · {source}",
+                    spec.split, spec.max_parallel
+                ));
+            }
+        }
+        Err(err) => lines.push(format!("  role registry error: {err}")),
+    }
+    for (name, reason) in skipped {
+        lines.push(format!("  {name} · skipped: {reason}"));
+    }
+    lines.push(format!(
+        "edit roles in {}",
+        agentloop_cli_core::config_path()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| "config.json".to_owned())
+    ));
+    lines
+}
+
 /// A pseudo-random verb index; one pick per turn is all the randomness the
 /// busy line needs, so clock jitter beats a rand dependency.
 fn pick_verb_idx() -> usize {
@@ -2673,5 +2739,50 @@ mod session_tests {
             arg: Some("allow-all".to_owned()),
         });
         assert!(matches!(app.overlay, Overlay::Confirm(_)));
+    }
+}
+
+#[cfg(test)]
+mod roles_tests {
+    use super::role_lines;
+    use agentloop_cli_core::{CliPrefs, RoleConfig};
+
+    #[test]
+    fn roles_listing_shows_builtins_when_config_empty() {
+        let lines = role_lines(&CliPrefs::default());
+        for name in ["searcher", "worker", "reviewer", "main"] {
+            assert!(
+                lines
+                    .iter()
+                    .any(|line| line.contains(name) && line.contains("default")),
+                "missing built-in {name} in {lines:?}"
+            );
+        }
+        assert!(!lines.iter().any(|line| line.contains("skipped")));
+        assert!(lines.last().expect("footer").starts_with("edit roles in"));
+    }
+
+    #[test]
+    fn roles_listing_marks_config_source_and_skips() {
+        let mut prefs = CliPrefs::default();
+        prefs.roles.insert(
+            "searcher".to_owned(),
+            RoleConfig {
+                models: vec!["deepseek/deepseek-chat".to_owned()],
+                ..RoleConfig::default()
+            },
+        );
+        prefs
+            .roles
+            .insert("Bad Name!".to_owned(), RoleConfig::default());
+        let lines = role_lines(&prefs);
+        assert!(lines.iter().any(|line| line.contains("searcher")
+            && line.contains("deepseek/deepseek-chat")
+            && line.contains("config")));
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.contains("Bad Name!") && line.contains("skipped:"))
+        );
     }
 }

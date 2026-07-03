@@ -41,6 +41,8 @@ pub enum LocalCommand {
     Connect { arg: Option<String> },
     /// `/providers` — list built-in and custom providers.
     Providers,
+    /// `/roles` — list orchestration roles for the Task tool.
+    Roles,
     /// `/disconnect <id>` — remove a custom provider.
     Disconnect { arg: Option<String> },
     /// `/mcps` — list and toggle installed MCP servers.
@@ -134,6 +136,7 @@ const LOCAL: &[(&str, &str, Option<&str>)] = &[
         Some("<id> <base_url> <api_key> [model] [--force]"),
     ),
     ("providers", "list built-in and custom providers", None),
+    ("roles", "list orchestration roles for the Task tool", None),
     ("disconnect", "remove a custom provider", Some("<id>")),
     ("mcps", "list and toggle installed MCP servers", None),
     (
@@ -247,6 +250,7 @@ impl CommandIndex {
             "thinking" => Route::Local(LocalCommand::Thinking { arg }),
             "connect" => Route::Local(LocalCommand::Connect { arg }),
             "providers" => Route::Local(LocalCommand::Providers),
+            "roles" => Route::Local(LocalCommand::Roles),
             "disconnect" => Route::Local(LocalCommand::Disconnect { arg }),
             "compact" => Route::Local(LocalCommand::Compact),
             "mcps" => Route::Local(LocalCommand::Mcps),
