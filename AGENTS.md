@@ -23,7 +23,8 @@ packages/engine/              # self-contained Rust cargo workspace — run all 
     contracts/                # pure data: events, content blocks, ToolCall, ids, caps, errors,
                               # reducer, markdown projection, branding. serde+schemars+uuid only.
     core/                     # traits (Agent, Provider, Tool, SessionStore, Hook) + registries
-    loop/                     # NativeAgent — the agent loop implementation
+    loop/                     # NativeAgent — the agent loop (roles, subagents, model failover,
+                              # bounded tool worker pool)
     engine/                   # EngineService front door, event bus, resolver
     prompts/                  # system-prompt assembly + slash-command registry/expansion
     session/                  # SessionStore impls (memory, jsonl)
@@ -38,7 +39,8 @@ packages/cli/                 # separate cargo workspace — interactive termina
   crates/
     core/                     # agentloop-cli-core: EngineHub (agent selection), session
                               # controller, model catalog, copilot login orchestration
-    cli/                      # agentloop-cli: ratatui TUI; [[bin]] name = "agenticstudio"
+    cli/                      # agentloop-cli: ratatui TUI (subagent tree, role-tagged
+                              # permission prompts); [[bin]] name = "agenticstudio"
 ```
 
 ## Layer contract (do not collapse these)
@@ -106,21 +108,31 @@ delegator `EventMapper`). Nothing downstream of `contracts` may see a provider q
 - **Model failover is loop-owned**: `TurnOptions.fallback_models` + the persisted
   `ModelFallback` event; eligible provider failures advance the chain mid-turn with
   partial drafts discarded pre-materialization. Role chains (v3) feed the same field.
+- **Tools run on a bounded worker pool; subagents are loop-intercepted**: tool jobs
+  are spawned tasks behind a semaphore (real parallelism, panic isolation via
+  `JoinError::is_panic`); `Task` calls bypass the pool entirely — control plane ≠
+  worker plane. Children are plain sessions of the same agent (role-scoped tools,
+  role model chains, split round-robin), relayed into the parent as ephemeral
+  `SubagentEvent`s; clients route child permission asks back by session id against
+  the agent-global pending map.
 - **Copilot device-flow sign-in lives in `providers/copilot`** (`device_flow.rs` +
   `store_github_token`): provider crates are the sanctioned I/O edges, and the apps.json
   format knowledge stays next to `discover_github_token`. The stored token interoperates
   with VS Code/JetBrains sign-ins (merge-upsert, never clobber).
-- **CLI phase 2+ engine roadmap** (documented only; not started):
-  - **Actor parallelism** — today a single `NativeAgent` tokio loop; phase 2 splits a
-    session actor from a tool worker pool while keeping the canonical event stream.
+- **Engine roadmap** (north star: true parallelism and fault isolation via actors,
+  distribution by default, swarms/metaswarms of any models, no bloat):
+  - **Session actor** — the tool worker pool ships; remaining: a single-writer
+    SessionActor mailbox (fixes the latent append→broadcast ordering race),
+    turn-panic supervision, and a testkit conformance suite.
   - **Distributed nodes** — node capability tags on `ToolContext`; policy enforced in the
-    permission layer (secret/sandboxed execution).
-  - **Swarms / subagents** — `Subagent*` events exist; native cap `subagents: false` today;
-    enable the cap and add a tree UI in the CLI.
+    permission layer (secret/sandboxed execution) — e.g. only some cluster nodes may
+    read secret code.
+  - **Metaswarms** — subagents ship (roles, tree UI, permission relay, cap enabled);
+    deeper trees = raise `max_depth` (children currently lose `Task` at depth 1).
   - **Token-efficient meta-tools** — extend the eight base tools with `BatchRead`, `RepoMap`,
     `SymbolSearch`, and structured summaries.
-  - **Reasoning fidelity** — `ThinkingDelta` in contracts today; phase 2 adds provider thinking
-    signatures and thinking duration on `TurnCompleted`.
+  - **Reasoning fidelity** — provider thinking signatures ship (v2); remaining: thinking
+    duration on `TurnCompleted`.
 
 ## Verify (run before every commit)
 
