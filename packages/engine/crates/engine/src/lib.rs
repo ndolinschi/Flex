@@ -182,7 +182,7 @@ impl EngineService {
         let model = options.model.take();
         let (providers, default_model) =
             resolve_real_providers(options.provider.as_deref(), model, &options.custom)?;
-        Self::build_native(providers, default_model, options)
+        Self::build_native(providers, Some(default_model), options)
     }
 
     /// Native loop with every provider whose credentials resolve, so
@@ -191,7 +191,9 @@ impl EngineService {
     /// `options.provider` names the preferred provider (it must resolve and
     /// becomes the priority for bare model refs); `options.model` picks the
     /// default model, qualified against the preferred provider unless it
-    /// already carries a `provider/` prefix.
+    /// already carries a `provider/` prefix. Succeeds with an empty registry
+    /// and no default model when nothing resolves — see
+    /// [`resolve_available_providers`].
     pub fn native_all(mut options: EngineOptions) -> EngineResult<Self> {
         let model = options.model.take();
         let (providers, default_model) =
@@ -207,7 +209,7 @@ impl EngineService {
 
     fn build_native(
         providers: ProviderRegistry,
-        default_model: ModelRef,
+        default_model: Option<ModelRef>,
         mut options: EngineOptions,
     ) -> EngineResult<Self> {
         let BaseTools {
@@ -266,9 +268,11 @@ impl EngineService {
             .questions(pending_questions)
             .system_prompt(system_prompt)
             .commands(commands.infos())
-            .default_model(default_model)
             .roles(options.roles.clone())
             .limits(limits);
+        if let Some(model) = default_model {
+            builder = builder.default_model(model);
+        }
         if let Some(manager) = mcp_manager {
             builder = builder.mcp(manager);
         }
@@ -605,14 +609,20 @@ fn resolve_real_providers(
 /// rejected with [`EngineServiceError::CustomProviderConflict`]; malformed or
 /// duplicate specs with [`EngineServiceError::CustomProviderInvalid`].
 /// `preferred` must resolve (it may name a custom id) and becomes the
-/// registry priority. The returned [`ModelRef`] is always provider-qualified:
+/// registry priority. The returned [`ModelRef`] is provider-qualified:
 /// `model_arg` wins (qualified against the priority provider unless it
 /// already names one), else the priority provider's default model.
+///
+/// No credentials anywhere and no custom provider configured is not an
+/// error here: it returns an empty registry and `None` default model,
+/// deferring the failure to turn time (`AgentError::Other("no model
+/// configured…")`) so a client can open with no provider configured and let
+/// the user add one (e.g. via `/connect`) before prompting.
 fn resolve_available_providers(
     preferred: Option<&str>,
     model_arg: Option<String>,
     custom: &[CustomProviderSpec],
-) -> EngineResult<(ProviderRegistry, ModelRef)> {
+) -> EngineResult<(ProviderRegistry, Option<ModelRef>)> {
     /// `(provider, its default model)` for a known name; `None` for unknown.
     fn build_provider(name: &str) -> Result<Option<ProviderWithDefault>, ProviderError> {
         fn boxed<P: agentloop_core::Provider + 'static>(
@@ -717,30 +727,23 @@ fn resolve_available_providers(
         providers.set_priority(vec![id]);
     }
 
-    let Some(first) = providers.ids().first().cloned() else {
-        return Err(ProviderError::AuthMissing {
-            provider: ProviderId::from("runtime"),
-            hint: "set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, \
-                   `DEEPSEEK_API_KEY`, `OLLAMA_HOST`/`OLLAMA_MODEL` for local Ollama, or sign \
-                   in to GitHub Copilot (VS Code / Copilot CLI, or set `COPILOT_GITHUB_TOKEN`); \
-                   optional model env vars: `OPENAI_MODEL`, `ANTHROPIC_MODEL`, \
-                   `GEMINI_MODEL`, `DEEPSEEK_MODEL`, `OLLAMA_MODEL`, `COPILOT_MODEL`"
-                .to_owned(),
-        }
-        .into());
-    };
-
+    // A qualified model ref (`provider/model`) names its own provider and
+    // needs no priority provider to resolve against; the other two branches
+    // do, and simply yield `None` when the registry is empty.
     let default_model = match model_arg {
-        Some(model) if model.contains('/') => ModelRef(model),
-        Some(model) => ModelRef(format!("{first}/{model}")),
-        None => {
+        Some(model) if model.contains('/') => Some(ModelRef(model)),
+        Some(model) => providers
+            .ids()
+            .first()
+            .map(|first| ModelRef(format!("{first}/{model}"))),
+        None => providers.ids().first().cloned().map(|first| {
             let model = defaults
                 .iter()
                 .find(|(id, _)| *id == first)
                 .map(|(_, model)| model.clone())
                 .unwrap_or_default();
             ModelRef(format!("{first}/{model}"))
-        }
+        }),
     };
 
     Ok((providers, default_model))
@@ -829,12 +832,26 @@ mod tests {
 
     #[test]
     fn qualified_model_arg_passes_through_multi_resolver() {
-        // Whatever providers the environment yields, an explicit
-        // provider-qualified model must survive verbatim.
-        if let Ok((_, model)) =
-            resolve_available_providers(None, Some("ollama/llama3".to_owned()), &[])
-        {
-            assert_eq!(model.0, "ollama/llama3");
+        // A provider-qualified model names its own provider, so it survives
+        // verbatim even with zero providers registered.
+        let (_, model) = resolve_available_providers(None, Some("ollama/llama3".to_owned()), &[])
+            .expect("qualified model arg never requires a resolvable provider");
+        assert_eq!(model.expect("qualified model arg yields Some").0, "ollama/llama3");
+    }
+
+    #[test]
+    fn no_providers_and_no_custom_specs_never_errors() {
+        // Zero credentials anywhere and no custom provider configured must
+        // not be a startup error — the CLI opens with no default model and
+        // the user adds a provider later (e.g. via `/connect`). Whether the
+        // registry actually ends up empty depends on the ambient
+        // environment (a dev shell may export a real provider key), so only
+        // the success outcome is asserted unconditionally; the empty-model
+        // invariant is checked when the registry happens to be empty.
+        let (providers, model) = resolve_available_providers(None, None, &[])
+            .expect("no providers configured must not error");
+        if providers.ids().is_empty() {
+            assert!(model.is_none());
         }
     }
 
@@ -900,7 +917,7 @@ mod tests {
             providers.ids().first().map(|id| id.as_str().to_owned()),
             Some("deepseek".to_owned())
         );
-        assert_eq!(model.0, "deepseek/test-chat");
+        assert_eq!(model.expect("preferred provider yields Some").0, "deepseek/test-chat");
     }
 
     #[test]
@@ -914,7 +931,7 @@ mod tests {
             Ok(resolved) => resolved,
             Err(err) => panic!("custom provider should resolve: {err}"),
         };
-        assert_eq!(model.0, "glm/glm-4");
+        assert_eq!(model.expect("preferred provider yields Some").0, "glm/glm-4");
     }
 
     #[test]

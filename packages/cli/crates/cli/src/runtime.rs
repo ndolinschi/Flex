@@ -161,6 +161,14 @@ async fn run_tui(mut args: Args, resume: ResumeMode) -> Result<()> {
              (set FLEX_ENABLE_DELEGATED_AGENTS=1 to re-enable)",
         );
     }
+    if app.kind == AgentKind::Native && app.providers.is_empty() {
+        app.chat.push_info(
+            "no LLM provider configured — set an API key env var and restart \
+             (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`, \
+             `OLLAMA_HOST`/`OLLAMA_MODEL`, or sign in to Copilot with `flex auth login`), \
+             or run /connect <id> <base_url> [api_key] to add one now.",
+        );
+    }
     let executor = EffectExecutor::new(hub, controller, args.agent, tx.clone());
     let mut terminal = TerminalSession::enter()?;
     // Sync the terminal to the app's mouse-capture state (default on, or a
