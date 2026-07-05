@@ -741,6 +741,18 @@ fn resolve_real_providers(
         }
         BEDROCK_PROVIDER_ID => {
             let provider = BedrockProvider::from_env();
+            // Bedrock is unusable without a credential — fail here with an
+            // actionable message rather than deferring to the first turn.
+            if !provider.has_credentials() {
+                return Err(ProviderError::AuthMissing {
+                    provider: ProviderId::from(BEDROCK_PROVIDER_ID),
+                    hint: "set `AWS_BEARER_TOKEN_BEDROCK` (a Bedrock API key), or AWS SigV4 \
+                           credentials (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, optional \
+                           `AWS_SESSION_TOKEN`); optional `BEDROCK_REGION`/`BEDROCK_MODEL`"
+                        .to_owned(),
+                }
+                .into());
+            }
             let model = model_arg.unwrap_or_else(|| provider.default_model().to_owned());
             let mut providers = ProviderRegistry::new();
             providers.register(Arc::new(provider));

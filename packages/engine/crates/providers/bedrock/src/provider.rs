@@ -46,6 +46,12 @@ impl BedrockProvider {
         &self.config.default_model
     }
 
+    /// Whether a usable credential (Bedrock API key or SigV4 creds) is present.
+    /// Bedrock is unusable without one, so callers gate on this before use.
+    pub fn has_credentials(&self) -> bool {
+        self.config.auth.is_present()
+    }
+
     fn provider_id() -> ProviderId {
         ProviderId::from(BEDROCK_PROVIDER_ID)
     }
@@ -445,6 +451,14 @@ mod tests {
             .err()
             .expect("should error when cancelled");
         assert!(matches!(err, ProviderError::Cancelled { .. }));
+    }
+
+    #[test]
+    fn has_credentials_reflects_config() {
+        let without = BedrockProvider::new(BedrockConfig::bearer("us-east-1", "", None));
+        assert!(!without.has_credentials());
+        let with = BedrockProvider::new(BedrockConfig::bearer("us-east-1", "key", None));
+        assert!(with.has_credentials());
     }
 
     #[test]
