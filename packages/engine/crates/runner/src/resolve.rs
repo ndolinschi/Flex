@@ -105,6 +105,11 @@ fn native_service(
         mcp_manager: None,
         session_store: None,
         max_iterations: None,
+        // The headless runner is one-shot; workspace isolation (with its
+        // review/merge step) belongs to the interactive client. Left off here.
+        workspace: None,
+        isolation_default: Default::default(),
+        verify_command: None,
     })
 }
 

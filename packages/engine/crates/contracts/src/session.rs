@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::capability::ModelRef;
 use crate::ids::{SessionId, TurnId};
+use crate::workspace::IsolationPolicy;
 
 /// Descriptor of one session (the append-only event log it names is stored
 /// separately by a `SessionStore`).
@@ -32,11 +33,27 @@ pub struct SessionMeta {
     /// The backing agent's own session id, for native resume.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_session_id: Option<String>,
+    /// Where this session's tools operate. When isolation is active this is
+    /// the workspace (worktree) root, not the original project directory —
+    /// see [`Self::base_cwd`].
     pub cwd: PathBuf,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<ModelRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<String>,
+    /// Isolation posture this session was created with. `None` = legacy /
+    /// never isolated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub isolation: Option<IsolationPolicy>,
+    /// Identifier of the provisioned workspace when isolation is active;
+    /// `None` when the session runs directly in [`Self::cwd`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+    /// The original project directory before isolation redirected [`Self::cwd`]
+    /// to a workspace root. Lets resume fall back if the workspace is gone and
+    /// tells integration where to merge back. `None` when not isolated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_cwd: Option<PathBuf>,
     pub created_at_ms: u64,
     pub updated_at_ms: u64,
 }
@@ -52,6 +69,10 @@ pub struct SessionMetaPatch {
     pub model: Option<ModelRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<String>,
+    /// Repoint the session's working directory (e.g. back to the base tree
+    /// after an isolated workspace was integrated or removed).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<PathBuf>,
 }
 
 /// Token accounting for one model call or aggregated over a turn.

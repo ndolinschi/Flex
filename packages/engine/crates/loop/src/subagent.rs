@@ -100,9 +100,15 @@ impl NativeAgent {
             role: Some(req.role.clone()),
             depth: parent_meta.depth.saturating_add(1),
             provider_session_id: None,
+            // A subagent inherits the parent's working directory — including the
+            // parent's isolated worktree, when the root session is isolated —
+            // but does not own a workspace of its own (top-level isolation).
             cwd: parent_meta.cwd.clone(),
             model: child_model,
             mode: None,
+            isolation: None,
+            workspace_id: None,
+            base_cwd: None,
             created_at_ms: now,
             updated_at_ms: now,
         };

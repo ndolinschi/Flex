@@ -8,12 +8,20 @@
       "description": "Which agent implementation owns this session\n(`\"native\"`, `\"claude-code\"`, ...).",
       "type": "string"
     },
+    "base_cwd": {
+      "description": "The original project directory before isolation redirected [`Self::cwd`]\nto a workspace root. Lets resume fall back if the workspace is gone and\ntells integration where to merge back. `None` when not isolated.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "created_at_ms": {
       "type": "integer",
       "format": "uint64",
       "minimum": 0
     },
     "cwd": {
+      "description": "Where this session's tools operate. When isolation is active this is\nthe workspace (worktree) root, not the original project directory —\nsee [`Self::base_cwd`].",
       "type": "string"
     },
     "depth": {
@@ -26,6 +34,17 @@
     },
     "id": {
       "$ref": "#/$defs/SessionId"
+    },
+    "isolation": {
+      "description": "Isolation posture this session was created with. `None` = legacy /\nnever isolated.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/IsolationPolicy"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "mode": {
       "type": [
@@ -78,6 +97,13 @@
       "type": "integer",
       "format": "uint64",
       "minimum": 0
+    },
+    "workspace_id": {
+      "description": "Identifier of the provisioned workspace when isolation is active;\n`None` when the session runs directly in [`Self::cwd`].",
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "required": [
@@ -88,6 +114,26 @@
     "updated_at_ms"
   ],
   "$defs": {
+    "IsolationPolicy": {
+      "description": "Whether a root session runs inside an isolated working copy, and how\nstrictly that is required.",
+      "oneOf": [
+        {
+          "description": "Never isolate; the session works directly in the base directory.",
+          "type": "string",
+          "const": "never"
+        },
+        {
+          "description": "Isolate when possible; fall back to the base directory (with a warning)\nif a workspace can't be provisioned.",
+          "type": "string",
+          "const": "optional"
+        },
+        {
+          "description": "Isolation is mandatory; session creation fails if a workspace can't be\nprovisioned.",
+          "type": "string",
+          "const": "required"
+        }
+      ]
+    },
     "ModelRef": {
       "description": "Reference to a model, optionally provider-qualified:\n`\"anthropic/claude-sonnet-4-5\"` or a bare `\"claude-sonnet-4-5\"`.",
       "type": "string"

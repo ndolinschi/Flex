@@ -190,6 +190,26 @@ pub enum AgentEvent {
         summary: TurnSummary,
     },
 
+    // ── environment isolation (persisted) ─────────────────────────────────────
+    /// A session's tools were redirected into an isolated working copy
+    /// (e.g. a git worktree) branched from `base_ref`.
+    WorkspaceProvisioned {
+        workspace_id: String,
+        /// The isolated working-copy root the session's tools now operate in.
+        path: std::path::PathBuf,
+        /// The base commit/ref the workspace was branched from.
+        base_ref: String,
+    },
+    /// An isolated workspace was integrated back into its base tree.
+    WorkspaceIntegrated {
+        workspace_id: String,
+        outcome: crate::workspace::IntegrationOutcome,
+    },
+    /// An isolated workspace was discarded without integrating.
+    WorkspaceDiscarded {
+        workspace_id: String,
+    },
+
     // ── transport hygiene ───────────────────────────────────────────────────
     /// A live subscriber lagged and missed events; re-sync from the store
     /// starting at `from_seq`. Never persisted.
@@ -248,6 +268,9 @@ impl AgentEvent {
             Self::SubagentStarted { .. } => "subagent_started",
             Self::SubagentEvent { .. } => "subagent_event",
             Self::SubagentCompleted { .. } => "subagent_completed",
+            Self::WorkspaceProvisioned { .. } => "workspace_provisioned",
+            Self::WorkspaceIntegrated { .. } => "workspace_integrated",
+            Self::WorkspaceDiscarded { .. } => "workspace_discarded",
             Self::Gap { .. } => "gap",
             Self::Unknown { .. } => "unknown",
         }

@@ -13,8 +13,8 @@ use agentloop_contracts::{
     AgentCaps, AgentEvent, AgentInfo, Answer, AttachmentCaps, CancelSupport, CommandInfo,
     CompactionSummary, McpPassthrough, ModelDiscovery, NewSessionParams, PermissionCaps,
     PermissionDecision, PermissionMode, PermissionRequestId, PromptInput, QuestionId,
-    ResumeSupport, SessionEvent, SessionId, SessionMeta, StreamingGranularity, TurnOptions,
-    TurnSummary, now_ms,
+    ResumeSupport, SessionEvent, SessionId, SessionMeta, SessionMetaPatch, StreamingGranularity,
+    TurnOptions, TurnSummary, now_ms,
 };
 use agentloop_core::{Agent, AgentError, EventStream};
 
@@ -150,11 +150,69 @@ impl Agent for NativeAgent {
 
     async fn create_session(&self, params: NewSessionParams) -> Result<SessionId, AgentError> {
         let id = SessionId::generate();
-        let cwd = match params.cwd {
+        let base_cwd = match params.cwd {
             Some(cwd) => cwd,
             None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
         };
         let now = now_ms();
+
+        // Effective isolation for this root session: an explicit request wins,
+        // else the (main) role's declared policy. Subagents never reach here —
+        // they inherit the parent's cwd (top-level isolation).
+        let policy = params
+            .isolation
+            .unwrap_or_else(|| self.deps.roles.isolation(None));
+
+        // Provision an isolated workspace when asked and a backend exists. On
+        // success the session's cwd is redirected into the workspace root and
+        // the original directory is kept as `base_cwd` (for integration and for
+        // resume fallback). Optional isolation degrades to running in place;
+        // Required isolation fails the session if it can't be provisioned.
+        let mut cwd = base_cwd.clone();
+        let mut isolation = None;
+        let mut workspace_id = None;
+        let mut base = None;
+        let mut provisioned_event = None;
+        if policy.wants_isolation() {
+            isolation = Some(policy);
+            match &self.deps.workspace {
+                Some(backend) => match backend.provision(&base_cwd, &id, policy).await {
+                    Ok(Some(workspace)) => {
+                        cwd = workspace.root.clone();
+                        base = Some(base_cwd.clone());
+                        workspace_id = Some(workspace.id.clone());
+                        provisioned_event = Some(AgentEvent::WorkspaceProvisioned {
+                            workspace_id: workspace.id,
+                            path: workspace.root,
+                            base_ref: workspace.base_ref,
+                        });
+                    }
+                    Ok(None) => tracing::warn!(
+                        target: "workspace", session = %id,
+                        "isolation optional but base cannot be isolated; continuing in place"
+                    ),
+                    Err(err) if policy.is_required() => {
+                        return Err(AgentError::Other(format!(
+                            "isolation required but could not be provisioned: {err}"
+                        )));
+                    }
+                    Err(err) => tracing::warn!(
+                        target: "workspace", session = %id,
+                        "isolation failed; continuing in place: {err}"
+                    ),
+                },
+                None if policy.is_required() => {
+                    return Err(AgentError::Other(
+                        "isolation required but no workspace backend is configured".to_owned(),
+                    ));
+                }
+                None => tracing::warn!(
+                    target: "workspace", session = %id,
+                    "isolation requested but no workspace backend configured; continuing in place"
+                ),
+            }
+        }
+
         let meta = SessionMeta {
             id: id.clone(),
             title: params.title,
@@ -166,6 +224,9 @@ impl Agent for NativeAgent {
             cwd,
             model: params.model.or_else(|| self.deps.default_model.clone()),
             mode: params.mode,
+            isolation,
+            workspace_id,
+            base_cwd: base,
             created_at_ms: now,
             updated_at_ms: now,
         };
@@ -174,6 +235,9 @@ impl Agent for NativeAgent {
         handle
             .emit_persistent(None, AgentEvent::SessionCreated { meta })
             .await?;
+        if let Some(event) = provisioned_event {
+            handle.emit_persistent(None, event).await?;
+        }
         handle
             .emit_persistent(
                 None,
@@ -189,9 +253,30 @@ impl Agent for NativeAgent {
     }
 
     async fn resume_session(&self, id: &SessionId) -> Result<(), AgentError> {
-        // The log is the ground truth: resuming is just re-attaching a
-        // handle at the right sequence number.
-        let _meta = self.deps.store.get_meta(id).await?;
+        // The log is the ground truth: resuming is just re-attaching a handle
+        // at the right sequence number. One exception: if this session ran in
+        // an isolated workspace that has since been integrated or removed, its
+        // stored cwd points at a directory that no longer exists — repoint it
+        // to the base directory so tools keep working after the resume.
+        let meta = self.deps.store.get_meta(id).await?;
+        if meta.workspace_id.is_some() {
+            if let Some(base) = meta.base_cwd.filter(|_| !meta.cwd.exists()) {
+                self.deps
+                    .store
+                    .update_meta(
+                        id,
+                        SessionMetaPatch {
+                            cwd: Some(base),
+                            ..Default::default()
+                        },
+                    )
+                    .await?;
+                tracing::info!(
+                    target: "workspace", session = %id,
+                    "isolated workspace is gone; resuming in the base directory"
+                );
+            }
+        }
         let events = self.deps.store.read(id, 0).await?;
         let next_seq = events.last().map(|(seq, _)| seq + 1).unwrap_or(0);
         self.install_handle(id, next_seq);

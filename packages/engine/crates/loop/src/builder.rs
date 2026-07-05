@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use agentloop_contracts::{Answer, CommandInfo, ModelRef, PermissionMode, QuestionId};
-use agentloop_core::{Hook, PendingMap, ProviderRegistry, SessionStore, ToolRegistry};
+use agentloop_core::{Hook, PendingMap, ProviderRegistry, SessionStore, ToolRegistry, Workspaces};
 use agentloop_mcp::McpManager;
 
 use crate::agent::NativeAgent;
@@ -55,6 +55,7 @@ pub struct NativeAgentBuilder {
     roles: Vec<crate::roles::RoleSpec>,
     pending_questions: Arc<PendingMap<QuestionId, Vec<Answer>>>,
     mcp: Option<std::sync::Arc<McpManager>>,
+    workspace: Option<Arc<dyn Workspaces>>,
 }
 
 impl NativeAgentBuilder {
@@ -72,6 +73,7 @@ impl NativeAgentBuilder {
             roles: Vec::new(),
             pending_questions: Arc::new(PendingMap::new()),
             mcp: None,
+            workspace: None,
         }
     }
 
@@ -135,6 +137,13 @@ impl NativeAgentBuilder {
         self
     }
 
+    /// Inject an isolation backend. When set, a root session whose effective
+    /// policy asks for isolation runs in an isolated workspace it provisions.
+    pub fn workspace(mut self, workspace: Arc<dyn Workspaces>) -> Self {
+        self.workspace = Some(workspace);
+        self
+    }
+
     pub fn build(self) -> Arc<NativeAgent> {
         let mut tools = self.tools;
         if let Some(manager) = &self.mcp {
@@ -158,6 +167,7 @@ impl NativeAgentBuilder {
                 limits: self.limits,
                 system_prompt: self.system_prompt,
                 default_model: self.default_model,
+                workspace: self.workspace,
                 pending_permissions: Arc::new(PendingMap::new()),
                 pending_questions: self.pending_questions,
             }),

@@ -15,6 +15,17 @@
       "type": "object",
       "additionalProperties": true
     },
+    "isolation": {
+      "description": "Requested isolation posture for this session. `None` defers to the\nengine/role default. Only honored for root sessions; subagents inherit\ntheir parent's working directory.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/IsolationPolicy"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "mode": {
       "type": [
         "string",
@@ -49,6 +60,26 @@
     }
   },
   "$defs": {
+    "IsolationPolicy": {
+      "description": "Whether a root session runs inside an isolated working copy, and how\nstrictly that is required.",
+      "oneOf": [
+        {
+          "description": "Never isolate; the session works directly in the base directory.",
+          "type": "string",
+          "const": "never"
+        },
+        {
+          "description": "Isolate when possible; fall back to the base directory (with a warning)\nif a workspace can't be provisioned.",
+          "type": "string",
+          "const": "optional"
+        },
+        {
+          "description": "Isolation is mandatory; session creation fails if a workspace can't be\nprovisioned.",
+          "type": "string",
+          "const": "required"
+        }
+      ]
+    },
     "ModelRef": {
       "description": "Reference to a model, optionally provider-qualified:\n`\"anthropic/claude-sonnet-4-5\"` or a bare `\"claude-sonnet-4-5\"`.",
       "type": "string"

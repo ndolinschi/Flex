@@ -59,9 +59,8 @@ fn string_field<'v>(input: &'v serde_json::Value, key: &str) -> Option<&'v str> 
 /// easy-to-verify allowlist-of-danger, not a full shell parser: it may cause
 /// a few legitimate compound commands to re-prompt, which is the correct
 /// tradeoff for a permission gate.
-const SHELL_METACHARACTERS: &[&str] = &[
-    "&&", "||", ";", "|", "`", "$(", "\n", "\r", "$((", ">", "<",
-];
+const SHELL_METACHARACTERS: &[&str] =
+    &["&&", "||", ";", "|", "`", "$(", "\n", "\r", "$((", ">", "<"];
 
 fn has_shell_metacharacters(command: &str) -> bool {
     SHELL_METACHARACTERS

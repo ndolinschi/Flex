@@ -24,5 +24,11 @@ agentloop-tools = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
+[dev-dependencies]
+agentloop-testkit = { workspace = true }
+agentloop-workspace = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+
 [lints]
 workspace = true

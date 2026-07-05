@@ -125,6 +125,18 @@ fn all_variants() -> Vec<AgentEvent> {
                 duration_ms: 900,
             },
         },
+        AgentEvent::WorkspaceProvisioned {
+            workspace_id: "ws-1".to_owned(),
+            path: std::path::PathBuf::from("/tmp/worktrees/session-sess-1"),
+            base_ref: "abc1234".to_owned(),
+        },
+        AgentEvent::WorkspaceIntegrated {
+            workspace_id: "ws-1".to_owned(),
+            outcome: IntegrationOutcome::Merged { files_changed: 3 },
+        },
+        AgentEvent::WorkspaceDiscarded {
+            workspace_id: "ws-1".to_owned(),
+        },
         AgentEvent::Gap { from_seq: 17 },
         AgentEvent::Unknown {
             raw: serde_json::json!({"kind": "from_the_future", "x": 1}),
@@ -177,6 +189,51 @@ fn persistence_classes_are_stable() {
             "tool_progress",
         ]
     );
+}
+
+#[test]
+fn legacy_session_meta_loads_without_isolation_fields() {
+    // A SessionMeta persisted before isolation existed has none of the new
+    // fields; it must deserialize with them defaulted to None, and re-serialize
+    // without introducing them (skip_serializing_if keeps old logs byte-stable).
+    let legacy = serde_json::json!({
+        "id": "sess-1",
+        "agent_id": "native",
+        "cwd": "/tmp/demo",
+        "created_at_ms": 1_000,
+        "updated_at_ms": 1_000
+    });
+    let meta: SessionMeta = serde_json::from_value(legacy).expect("legacy meta loads");
+    assert_eq!(meta.isolation, None);
+    assert_eq!(meta.workspace_id, None);
+    assert_eq!(meta.base_cwd, None);
+
+    let reserialized = serde_json::to_value(&meta).expect("serialize");
+    let obj = reserialized.as_object().expect("object");
+    assert!(
+        !obj.contains_key("isolation"),
+        "must not emit isolation when None"
+    );
+    assert!(
+        !obj.contains_key("workspace_id"),
+        "must not emit workspace_id when None"
+    );
+    assert!(
+        !obj.contains_key("base_cwd"),
+        "must not emit base_cwd when None"
+    );
+
+    // And a fully-isolated meta round-trips unchanged.
+    let isolated = SessionMeta {
+        isolation: Some(IsolationPolicy::Required),
+        workspace_id: Some("ws-9".to_owned()),
+        base_cwd: Some(std::path::PathBuf::from("/repo")),
+        ..meta
+    };
+    let back: SessionMeta =
+        serde_json::from_value(serde_json::to_value(&isolated).expect("serialize"))
+            .expect("deserialize");
+    assert_eq!(isolated, back);
 }
 
 #[test]

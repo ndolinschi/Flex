@@ -107,10 +107,11 @@ impl AssistantDraft {
                 call_id,
                 json_fragment,
             } => {
-                if let Some(DraftBlock::Tool { args, .. }) =
-                    self.blocks.iter_mut().rev().find(
-                        |b| matches!(b, DraftBlock::Tool { id, .. } if *id == call_id),
-                    )
+                if let Some(DraftBlock::Tool { args, .. }) = self
+                    .blocks
+                    .iter_mut()
+                    .rev()
+                    .find(|b| matches!(b, DraftBlock::Tool { id, .. } if *id == call_id))
                 {
                     args.push_str(&json_fragment);
                 }

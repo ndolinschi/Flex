@@ -6,7 +6,7 @@
 //! failover; subagents spawned by the Task tool get their role's chain,
 //! filtered tools, and prompt.
 
-use agentloop_contracts::ModelRef;
+use agentloop_contracts::{IsolationPolicy, ModelRef};
 use agentloop_core::{ToolFilter, ToolRegistry};
 
 /// Reserved role driving the interactive session; never spawnable.
@@ -41,10 +41,16 @@ pub struct RoleSpec {
     pub max_parallel: usize,
     /// Spawn-tree depth this role may create below itself (clamped 0..=3).
     pub max_depth: u8,
+    /// Whether a root session serving this role runs in an isolated workspace.
+    /// Only consulted for root sessions (depth 0); subagents inherit the
+    /// parent's working directory. Defaults to [`IsolationPolicy::Never`], so
+    /// isolation is opt-in.
+    pub isolation: IsolationPolicy,
 }
 
 impl RoleSpec {
-    /// A role with conservative defaults: inherit model, read-only tools.
+    /// A role with conservative defaults: inherit model, read-only tools, no
+    /// isolation.
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -54,6 +60,7 @@ impl RoleSpec {
             split: true,
             max_parallel: 4,
             max_depth: 1,
+            isolation: IsolationPolicy::Never,
         }
     }
 }
@@ -111,6 +118,15 @@ impl RoleRegistry {
             .get(role.unwrap_or(MAIN_ROLE))
             .map(|spec| spec.models.as_slice())
             .unwrap_or(&[])
+    }
+
+    /// The isolation policy for a session serving `role` (`None` = main).
+    /// Unknown roles fall back to [`IsolationPolicy::Never`].
+    pub fn isolation(&self, role: Option<&str>) -> IsolationPolicy {
+        self.roles
+            .get(role.unwrap_or(MAIN_ROLE))
+            .map(|spec| spec.isolation)
+            .unwrap_or(IsolationPolicy::Never)
     }
 
     /// The tool filter for a session serving `role` at spawn `depth`.

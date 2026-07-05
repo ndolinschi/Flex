@@ -24,6 +24,7 @@ fn user_message(text: &str) -> Message {
     }
 }
 
+#[allow(clippy::expect_used)] // test helper: a bad config is a test bug, not a runtime path
 fn config(server: &MockServer) -> OpenAiConfig {
     OpenAiConfig::from_values(
         "sk-test".to_owned(),
@@ -45,7 +46,10 @@ impl SequenceResponder {
 
 impl Respond for SequenceResponder {
     fn respond(&self, _request: &Request) -> ResponseTemplate {
-        let mut queue = self.0.lock().expect("responder lock");
+        let mut queue = self
+            .0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         if queue.len() > 1 {
             queue.remove(0)
         } else {

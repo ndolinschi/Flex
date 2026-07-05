@@ -17,6 +17,7 @@ pub mod provider;
 pub mod registry;
 pub mod store;
 pub mod tool;
+pub mod workspace;
 
 pub use agent::{Agent, AgentError, EventStream};
 pub use event_sink::EventSink;
@@ -31,6 +32,7 @@ pub use store::{SessionStore, StoreError};
 pub use tool::{
     PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError, typed_tool,
 };
+pub use workspace::{Workspace, WorkspaceError, WorkspaceStatus, Workspaces};
 
 /// Re-export of the contracts crate for convenience.
 pub use agentloop_contracts as contracts;

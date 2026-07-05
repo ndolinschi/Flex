@@ -4,6 +4,17 @@
   "description": "Per-turn options.",
   "type": "object",
   "properties": {
+    "effort": {
+      "description": "How hard to work this turn: scales the thinking budget, the\nreasoning-guidance prompt text, and (at xhigh/max) the orchestration\nposture. `None` leaves behavior unchanged (engine default); the CLI\nalways sets it.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Effort"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "extra": {
       "description": "Namespaced passthrough for agent-specific options.",
       "type": "object",
@@ -44,7 +55,7 @@
       ]
     },
     "thinking": {
-      "description": "Extended-thinking budget for this turn; `None` = provider default\n(off). Forwarded only to providers that declare the thinking\ncapability.",
+      "description": "Extended-thinking budget for this turn; `None` = provider default\n(off). Forwarded only to providers that declare the thinking\ncapability. When set, an explicit budget here wins over the one the\nloop would derive from [`Self::effort`].",
       "anyOf": [
         {
           "$ref": "#/$defs/ThinkingConfig"
@@ -56,6 +67,36 @@
     }
   },
   "$defs": {
+    "Effort": {
+      "description": "How hard the agent should work on a turn. Maps (in the loop) to an\nextended-thinking budget scaled per provider and per role, to\nreasoning-guidance prompt text, and — at the top tiers — to a more\naggressive orchestration posture. Ordered low → high.",
+      "oneOf": [
+        {
+          "description": "Favor speed: minimal reasoning, terse, fewest tool calls.",
+          "type": "string",
+          "const": "low"
+        },
+        {
+          "description": "Balanced speed and rigor.",
+          "type": "string",
+          "const": "medium"
+        },
+        {
+          "description": "Think before acting, read touched code, verify. The default.",
+          "type": "string",
+          "const": "high"
+        },
+        {
+          "description": "Long-horizon or tricky work: broad exploration, edge cases,\ndecompose across parallel subagents, mandatory reviewer pass.",
+          "type": "string",
+          "const": "xhigh"
+        },
+        {
+          "description": "Correctness dominates cost: exhaustive exploration and cross-verification.",
+          "type": "string",
+          "const": "max"
+        }
+      ]
+    },
     "ModelRef": {
       "description": "Reference to a model, optionally provider-qualified:\n`\"anthropic/claude-sonnet-4-5\"` or a bare `\"claude-sonnet-4-5\"`.",
       "type": "string"

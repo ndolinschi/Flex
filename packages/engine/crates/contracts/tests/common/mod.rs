@@ -21,6 +21,9 @@ pub fn sample_meta() -> SessionMeta {
         cwd: PathBuf::from("/tmp/demo"),
         model: Some(ModelRef::from("anthropic/claude-sonnet-4-5")),
         mode: None,
+        isolation: None,
+        workspace_id: None,
+        base_cwd: None,
         created_at_ms: 1_000,
         updated_at_ms: 1_000,
     }

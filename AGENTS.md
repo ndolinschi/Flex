@@ -13,6 +13,38 @@ behind the same interface. All output is normalized into one canonical event str
 The engine itself has no UI — transports (NDJSON stdio, ACP) let clients attach.
 `packages/cli` is the first such client: an interactive ratatui terminal UI.
 
+## Flex as a harness
+
+An *agent harness* is the runtime scaffolding around a model that turns a raw
+completion API into an agent that safely does work. Flex owns every part of
+that anatomy, and it helps to name where each lives:
+
+- **Loop / control** — `loop` (`NativeAgent`): turn iteration, tool dispatch on
+  a bounded worker pool, cancellation, mid-turn model failover.
+- **Tool interface & dispatch** — `core::Tool` + `ToolContext`; every path-taking
+  tool sandboxes to `ToolContext.cwd` (populated from `SessionMeta.cwd`).
+- **Context & memory** — `session` (append-only JSONL log = ground truth) +
+  loop compaction; the transcript is a pure `reduce(events)` projection.
+- **Model adapter** — `core::Provider` + `providers/*`; provider quirks die at
+  the normalization boundary.
+- **Guardrails / permissions** — `loop::permission` + rules; every tool call is
+  a tracked `ToolCall` with a persisted verdict.
+- **Observability** — persisted `AgentEvent`s (append-then-broadcast) with
+  tracing/metrics derived at the choke point.
+- **Environment / isolation** — `core::Workspaces` + `workspace` (git worktrees):
+  a root session can run in an isolated working copy, reviewed and merged back.
+- **Composition / subagents** — the `Task` tool spawns role-scoped child
+  sessions; children inherit the parent's cwd (and thus its isolated workspace).
+
+Isolation is opt-in and top-level only: a root session whose effective
+`IsolationPolicy` (from `NewSessionParams.isolation`, else its role's policy,
+else the engine default) asks for it is provisioned a git worktree at
+`create_session` (depth 0); `EngineService::{integrate,discard}_session` verify
+and merge it back or drop it. Subagents never provision their own — they share
+the parent's tree. The loop stays free of process code: it calls the injected
+`Workspaces` trait, whose only implementation (`workspace` crate) shells out to
+`git`.
+
 ## Repo map
 
 ```
@@ -22,13 +54,14 @@ packages/engine/              # self-contained Rust cargo workspace — run all 
   crates/
     contracts/                # pure data: events, content blocks, ToolCall, ids, caps, errors,
                               # reducer, markdown projection, branding. serde+schemars+uuid only.
-    core/                     # traits (Agent, Provider, Tool, SessionStore, Hook) + registries
+    core/                     # traits (Agent, Provider, Tool, SessionStore, Hook, Workspaces) + registries
     loop/                     # NativeAgent — the agent loop (roles, subagents, model failover,
-                              # bounded tool worker pool)
-    engine/                   # EngineService front door, event bus, resolver
+                              # bounded tool worker pool, workspace provisioning at depth 0)
+    engine/                   # EngineService front door, event bus, resolver, workspace integrate/discard
     prompts/                  # system-prompt assembly + slash-command registry/expansion
     session/                  # SessionStore impls (memory, jsonl)
     tools/                    # base tool set (Read/Write/Edit/Glob/Grep/Bash/WebFetch/...)
+    workspace/                # Workspaces impl: git-worktree session isolation (the sole git edge)
     mcp/                      # MCP client (rmcp) -> Tool bridge
     providers/{common,...}    # LLM provider clients (one crate per provider)
     delegators/{common,...}   # external-agent adapters (one crate per agent)
@@ -119,6 +152,17 @@ delegator `EventMapper`). Nothing downstream of `contracts` may see a provider q
   `store_github_token`): provider crates are the sanctioned I/O edges, and the apps.json
   format knowledge stays next to `discover_github_token`. The stored token interoperates
   with VS Code/JetBrains sign-ins (merge-upsert, never clobber).
+- **Workspace isolation is an injected trait, top-level only, opt-in**: `core::Workspaces`
+  (impl `workspace` crate, the sole `git` edge) keeps process code out of `loop`, mirroring
+  `SessionStore`/`Provider` injection. Only depth-0 sessions provision a worktree (subagents
+  inherit the parent's cwd — no per-child worktrees, no N-way merge); redirecting the single
+  `SessionMeta.cwd → ToolContext.cwd` value sandboxes every tool with no tool changes.
+  Trigger is role-declared (`RoleSpec.isolation`) with a `NewSessionParams.isolation` /
+  `--isolate` override; default `Never` keeps behavior byte-identical. Lifecycle is
+  verify-then-merge (`integrate_session` commits, runs the configured verify command, and
+  fast-forwards the base — else keeps the worktree); `SessionMeta.base_cwd` lets resume fall
+  back when a workspace is gone. Wire additions (`IsolationPolicy`, the `Workspace*` events,
+  `SessionMeta.{isolation,workspace_id,base_cwd}`) are additive.
 - **Engine roadmap** (north star: true parallelism and fault isolation via actors,
   distribution by default, swarms/metaswarms of any models, no bloat):
   - **Session actor** — the tool worker pool ships; remaining: a single-writer
@@ -129,6 +173,8 @@ delegator `EventMapper`). Nothing downstream of `contracts` may see a provider q
     read secret code.
   - **Metaswarms** — subagents ship (roles, tree UI, permission relay, cap enabled);
     deeper trees = raise `max_depth` (children currently lose `Task` at depth 1).
+    Per-subagent worktree isolation (each parallel worker in its own tree, merged
+    independently) is a planned extension of today's top-level-only isolation.
   - **Token-efficient meta-tools** — extend the eight base tools with `BatchRead`, `RepoMap`,
     `SymbolSearch`, and structured summaries.
   - **Reasoning fidelity** — provider thinking signatures ship (v2); remaining: thinking
@@ -191,6 +237,18 @@ context window is registered in `context_budget` so auto-compaction is accurate.
 don't use them. A user's own `/connect deepseek …` (a custom spec) still wins over the built-in —
 so `deepseek` is deliberately **not** in `BUILTIN_PROVIDER_IDS` (it would otherwise reject that
 custom spec as a conflict).
+
+OpenAI credentials in-app: the built-in OpenAI provider normally reads `OPENAI_API_KEY` (optional
+`OPENAI_MODEL`/`OPENAI_BASE_URL`), but its key can also be set from inside the CLI with the same
+known-provider shortcut — `/connect openai <api_key> [model]` infers `base_url`
+(`https://api.openai.com/v1`) and the default model (`gpt-4.1-mini`; see `known_provider_defaults`).
+Like DeepSeek, `openai` is deliberately **not** in `BUILTIN_PROVIDER_IDS`, so a user's `/connect
+openai …` spec resolves and **wins over** the env built-in instead of erroring with
+`CustomProviderConflict`; the env registration in `resolve_available_providers` /
+`resolve_real_providers` is skipped when a custom `openai` spec claims the id, so it's never
+registered twice. (The CLI's own "already a registered provider" guard still applies: if
+`OPENAI_API_KEY` is already loaded, `/connect openai` is rejected as redundant — unset the env var
+first, or just use the env var.)
 
 DeepSeek auto-orchestration: when the active provider/model is DeepSeek and the user hasn't
 overridden the `searcher`/`worker` roles, `engines.rs::build_native` **automatically** applies the

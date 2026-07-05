@@ -123,6 +123,7 @@ impl SessionStore for MemoryStore {
             provider_session_id,
             model,
             mode,
+            cwd,
         } = patch;
         if let Some(title) = title {
             record.meta.title = Some(title);
@@ -132,6 +133,9 @@ impl SessionStore for MemoryStore {
         }
         if let Some(model) = model {
             record.meta.model = Some(model);
+        }
+        if let Some(cwd) = cwd {
+            record.meta.cwd = cwd;
         }
         if let Some(mode) = mode {
             record.meta.mode = Some(mode);
@@ -189,6 +193,9 @@ mod tests {
             cwd: PathBuf::from("/workspace"),
             model: None,
             mode: None,
+            isolation: None,
+            workspace_id: None,
+            base_cwd: None,
             created_at_ms: 1,
             updated_at_ms: 1,
         }
@@ -346,6 +353,7 @@ mod tests {
                     provider_session_id: None,
                     model: Some(ModelRef::from("anthropic/model-x")),
                     mode: None,
+                    cwd: None,
                 },
             )
             .await

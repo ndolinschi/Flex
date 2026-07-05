@@ -19,8 +19,8 @@ use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, info_span};
 
 use agentloop_contracts::{
-    AgentEvent, HookPoint, MessageId, PromptInput, TokenUsage, TurnId, TurnOptions, TurnStopReason,
-    TurnSummary, now_ms,
+    AgentEvent, HookPoint, MessageId, PromptInput, SessionMetaPatch, TokenUsage, TurnId,
+    TurnOptions, TurnStopReason, TurnSummary, now_ms,
 };
 use agentloop_core::hook::{HookData, HookOutcome};
 use agentloop_core::{AgentError, EventSink};
@@ -109,6 +109,23 @@ pub(crate) async fn run_turn(
                 },
             )
             .await?;
+        if meta.title.is_none() && input.command.is_none() {
+            let text = input.joined_text();
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                let title: String = trimmed.chars().take(60).collect();
+                let _ = deps
+                    .store
+                    .update_meta(
+                        &handle.id,
+                        SessionMetaPatch {
+                            title: Some(title),
+                            ..Default::default()
+                        },
+                    )
+                    .await;
+            }
+        }
 
         // ── side-channel events (tools emit progress/plans/questions) ──────
         let (sink, mut sink_rx) = EventSink::channel();

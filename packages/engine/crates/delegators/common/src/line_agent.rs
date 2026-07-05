@@ -543,6 +543,9 @@ where
             cwd,
             model: params.model,
             mode: params.mode,
+            isolation: None,
+            workspace_id: None,
+            base_cwd: None,
             created_at_ms: now,
             updated_at_ms: now,
         };

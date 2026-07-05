@@ -713,6 +713,71 @@
           ]
         },
         {
+          "description": "A session's tools were redirected into an isolated working copy\n(e.g. a git worktree) branched from `base_ref`.",
+          "type": "object",
+          "properties": {
+            "base_ref": {
+              "description": "The base commit/ref the workspace was branched from.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "workspace_provisioned"
+            },
+            "path": {
+              "description": "The isolated working-copy root the session's tools now operate in.",
+              "type": "string"
+            },
+            "workspace_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "workspace_id",
+            "path",
+            "base_ref"
+          ]
+        },
+        {
+          "description": "An isolated workspace was integrated back into its base tree.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "workspace_integrated"
+            },
+            "outcome": {
+              "$ref": "#/$defs/IntegrationOutcome"
+            },
+            "workspace_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "workspace_id",
+            "outcome"
+          ]
+        },
+        {
+          "description": "An isolated workspace was discarded without integrating.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "workspace_discarded"
+            },
+            "workspace_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "workspace_id"
+          ]
+        },
+        {
           "description": "A live subscriber lagged and missed events; re-sync from the store\nstarting at `from_seq`. Never persisted.",
           "type": "object",
           "properties": {
@@ -1204,6 +1269,100 @@
         "session_end"
       ]
     },
+    "IntegrationOutcome": {
+      "description": "What happened when an isolated workspace was integrated back into its base.",
+      "oneOf": [
+        {
+          "description": "Changes verified and merged back onto the base; the workspace was\nremoved.",
+          "type": "object",
+          "properties": {
+            "files_changed": {
+              "description": "Files changed, for a human-readable summary.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "status": {
+              "type": "string",
+              "const": "merged"
+            }
+          },
+          "required": [
+            "status",
+            "files_changed"
+          ]
+        },
+        {
+          "description": "The verify step failed; the workspace was kept for review.",
+          "type": "object",
+          "properties": {
+            "detail": {
+              "description": "Short reason / tail of the verify output.",
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "const": "verify_failed"
+            }
+          },
+          "required": [
+            "status",
+            "detail"
+          ]
+        },
+        {
+          "description": "The base could not be fast-forwarded; the work was kept on a branch for\na manual merge.",
+          "type": "object",
+          "properties": {
+            "branch": {
+              "description": "The branch holding the isolated work.",
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "const": "diverged"
+            }
+          },
+          "required": [
+            "status",
+            "branch"
+          ]
+        },
+        {
+          "description": "Nothing to integrate — the workspace had no changes.",
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "const": "empty"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        }
+      ]
+    },
+    "IsolationPolicy": {
+      "description": "Whether a root session runs inside an isolated working copy, and how\nstrictly that is required.",
+      "oneOf": [
+        {
+          "description": "Never isolate; the session works directly in the base directory.",
+          "type": "string",
+          "const": "never"
+        },
+        {
+          "description": "Isolate when possible; fall back to the base directory (with a warning)\nif a workspace can't be provisioned.",
+          "type": "string",
+          "const": "optional"
+        },
+        {
+          "description": "Isolation is mandatory; session creation fails if a workspace can't be\nprovisioned.",
+          "type": "string",
+          "const": "required"
+        }
+      ]
+    },
     "McpPassthrough": {
       "description": "How MCP server configuration reaches a delegated agent.",
       "oneOf": [
@@ -1646,12 +1805,20 @@
           "description": "Which agent implementation owns this session\n(`\"native\"`, `\"claude-code\"`, ...).",
           "type": "string"
         },
+        "base_cwd": {
+          "description": "The original project directory before isolation redirected [`Self::cwd`]\nto a workspace root. Lets resume fall back if the workspace is gone and\ntells integration where to merge back. `None` when not isolated.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "created_at_ms": {
           "type": "integer",
           "format": "uint64",
           "minimum": 0
         },
         "cwd": {
+          "description": "Where this session's tools operate. When isolation is active this is\nthe workspace (worktree) root, not the original project directory —\nsee [`Self::base_cwd`].",
           "type": "string"
         },
         "depth": {
@@ -1664,6 +1831,17 @@
         },
         "id": {
           "$ref": "#/$defs/SessionId"
+        },
+        "isolation": {
+          "description": "Isolation posture this session was created with. `None` = legacy /\nnever isolated.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IsolationPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "mode": {
           "type": [
@@ -1716,6 +1894,13 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0
+        },
+        "workspace_id": {
+          "description": "Identifier of the provisioned workspace when isolation is active;\n`None` when the session runs directly in [`Self::cwd`].",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [

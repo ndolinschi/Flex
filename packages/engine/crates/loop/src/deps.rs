@@ -4,7 +4,7 @@
 use std::sync::{Arc, Weak};
 
 use agentloop_contracts::{Answer, ModelRef, PermissionDecision, PermissionRequestId, QuestionId};
-use agentloop_core::{Hook, PendingMap, ProviderRegistry, SessionStore, ToolRegistry};
+use agentloop_core::{Hook, PendingMap, ProviderRegistry, SessionStore, ToolRegistry, Workspaces};
 
 use crate::builder::LoopLimits;
 use crate::permission::PermissionPolicy;
@@ -28,6 +28,9 @@ pub(crate) struct TurnDeps {
     pub(crate) limits: LoopLimits,
     pub(crate) system_prompt: String,
     pub(crate) default_model: Option<ModelRef>,
+    /// Optional isolation backend. When set, root sessions whose effective
+    /// policy asks for isolation are provisioned an isolated workspace.
+    pub(crate) workspace: Option<Arc<dyn Workspaces>>,
     pub(crate) pending_permissions: Arc<PendingMap<PermissionRequestId, PermissionDecision>>,
     pub(crate) pending_questions: Arc<PendingMap<QuestionId, Vec<Answer>>>,
 }

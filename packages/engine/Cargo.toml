@@ -21,6 +21,7 @@ members = [
     "crates/prompts",
     "crates/session",
     "crates/tools",
+    "crates/workspace",
     "crates/transports/stdio",
     "crates/testkit",
     "crates/runner",
@@ -57,6 +58,7 @@ agentloop-provider-openai = { path = "crates/providers/openai" }
 agentloop-prompts = { path = "crates/prompts" }
 agentloop-session = { path = "crates/session" }
 agentloop-tools = { path = "crates/tools" }
+agentloop-workspace = { path = "crates/workspace" }
 agentloop-transport-stdio = { path = "crates/transports/stdio" }
 agentloop-testkit = { path = "crates/testkit" }
 # external

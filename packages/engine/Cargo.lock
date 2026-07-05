@@ -136,8 +136,12 @@ dependencies = [
  "agentloop-provider-ollama",
  "agentloop-provider-openai",
  "agentloop-session",
+ "agentloop-testkit",
  "agentloop-tools",
+ "agentloop-workspace",
+ "tempfile",
  "thiserror",
+ "tokio",
  "tracing",
 ]
 
@@ -377,6 +381,19 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "agentloop-workspace"
+version = "0.1.0"
+dependencies = [
+ "agentloop-contracts",
+ "agentloop-core",
+ "async-trait",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

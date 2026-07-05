@@ -479,7 +479,10 @@ const MAX_STREAM_RETRIES: u32 = 2;
 const STREAM_RETRY_BASE_BACKOFF_MS: u64 = 250;
 
 fn mid_stream_retryable(err: &ProviderError) -> bool {
-    matches!(err, ProviderError::Stream { .. } | ProviderError::Http { .. })
+    matches!(
+        err,
+        ProviderError::Stream { .. } | ProviderError::Http { .. }
+    )
 }
 
 fn stream_retry_backoff_ms(attempt: u32) -> u64 {

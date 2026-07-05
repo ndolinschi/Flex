@@ -83,6 +83,7 @@ where
             model: None,
             mode: None,
             permission_mode: None,
+            isolation: None,
             extra: Default::default(),
         })
         .await?;

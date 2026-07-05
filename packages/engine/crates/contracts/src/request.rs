@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::capability::ModelRef;
 use crate::content::ContentBlock;
 use crate::permission::PermissionMode;
+use crate::workspace::IsolationPolicy;
 
 /// Metadata for a slash command expanded before a turn starts.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -127,6 +128,11 @@ pub struct NewSessionParams {
     pub mode: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permission_mode: Option<PermissionMode>,
+    /// Requested isolation posture for this session. `None` defers to the
+    /// engine/role default. Only honored for root sessions; subagents inherit
+    /// their parent's working directory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub isolation: Option<IsolationPolicy>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub extra: BTreeMap<String, serde_json::Value>,
 }

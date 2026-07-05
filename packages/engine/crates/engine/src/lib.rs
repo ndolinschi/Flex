@@ -9,16 +9,17 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use agentloop_contracts::{
-    AgentEvent, Answer, CompactionSummary, EngineError, ErrorCode, Hello, ModelInfo, ModelRef,
-    NewSessionParams, PermissionDecision, PermissionMode, PermissionRequestId, PromptInput,
-    ProviderId, QuestionId, SessionEvent, SessionId, SessionMeta, Transcript, TurnId, TurnOptions,
-    TurnSummary, now_ms, reduce,
+    AgentEvent, Answer, CompactionSummary, EngineError, ErrorCode, Hello, IntegrationOutcome,
+    IsolationPolicy, ModelInfo, ModelRef, NewSessionParams, PermissionDecision, PermissionMode,
+    PermissionRequestId, PromptInput, ProviderId, QuestionId, SessionEvent, SessionId, SessionMeta,
+    Transcript, TurnId, TurnOptions, TurnSummary, now_ms, reduce,
 };
 use agentloop_core::{
     Agent, AgentError, EventStream, ProviderError, ProviderRegistry, SessionStore, StoreError,
+    WorkspaceError, WorkspaceStatus, Workspaces,
 };
-use agentloop_loop::{LoopLimits, NativeAgentBuilder};
 pub use agentloop_loop::roles::{RoleError, RoleRegistry, RoleSpec, RoleToolProfile, valid_name};
+use agentloop_loop::{LoopLimits, NativeAgentBuilder};
 use agentloop_mcp::{McpBridgeConfig, McpBridgeError, McpManager};
 use agentloop_prompts::{
     CommandDiscoveryConfig, CommandError, CommandRegistry, PromptError, SkillDiscoveryConfig,
@@ -74,6 +75,15 @@ pub struct EngineOptions {
     /// (currently 500 — a backstop against a runaway loop, not a budget for
     /// normal work).
     pub max_iterations: Option<u32>,
+    /// Isolation backend. When set, root sessions can run in an isolated
+    /// workspace; when `None`, isolation requests degrade or fail per policy.
+    pub workspace: Option<Arc<dyn Workspaces>>,
+    /// Run-level default isolation applied to a root session that doesn't
+    /// request its own (and whose role doesn't force one). `Never` = off.
+    pub isolation_default: IsolationPolicy,
+    /// Command run inside an isolated workspace before integrating it back
+    /// (e.g. `"cargo test"`). `None` skips verification.
+    pub verify_command: Option<String>,
 }
 
 impl Default for EngineOptions {
@@ -89,6 +99,9 @@ impl Default for EngineOptions {
             mcp_manager: None,
             session_store: None,
             max_iterations: None,
+            workspace: None,
+            isolation_default: IsolationPolicy::Never,
+            verify_command: None,
         }
     }
 }
@@ -112,6 +125,12 @@ pub enum EngineServiceError {
     Mcp(#[from] McpBridgeError),
     #[error(transparent)]
     Role(#[from] RoleError),
+    #[error(transparent)]
+    Workspace(#[from] WorkspaceError),
+    #[error("session {0} is not isolated")]
+    NotIsolated(SessionId),
+    #[error("no workspace backend is configured")]
+    NoWorkspaceBackend,
     #[error(
         "provider `{0}` is not available in this build; supported runtime providers: `openai`, `anthropic`, `gemini`, `ollama`, or a provider configured in the client's config"
     )]
@@ -133,6 +152,10 @@ impl EngineServiceError {
             Self::Skill(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
             Self::Mcp(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
             Self::Role(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
+            Self::Workspace(err) => EngineError::engine(ErrorCode::Unknown, err.to_string()),
+            Self::NotIsolated(_) | Self::NoWorkspaceBackend => {
+                EngineError::engine(ErrorCode::InvalidRequest, self.to_string())
+            }
             Self::UnsupportedProvider(_)
             | Self::CustomProviderConflict(_)
             | Self::CustomProviderInvalid { .. } => {
@@ -151,6 +174,12 @@ pub struct EngineService {
     commands: Arc<CommandRegistry>,
     /// Providers backing a native service; empty for delegated agents.
     providers: ProviderRegistry,
+    /// Isolation backend, for integrating/discarding a session's workspace.
+    workspace: Option<Arc<dyn Workspaces>>,
+    /// Run-level default isolation for sessions that don't request their own.
+    isolation_default: IsolationPolicy,
+    /// Verify command run before integrating a workspace back.
+    verify_command: Option<String>,
 }
 
 impl EngineService {
@@ -160,6 +189,9 @@ impl EngineService {
             store,
             commands: Arc::new(CommandRegistry::builtins()),
             providers: ProviderRegistry::new(),
+            workspace: None,
+            isolation_default: IsolationPolicy::Never,
+            verify_command: None,
         }
     }
 
@@ -173,6 +205,9 @@ impl EngineService {
             store,
             commands: Arc::new(commands),
             providers: ProviderRegistry::new(),
+            workspace: None,
+            isolation_default: IsolationPolicy::Never,
+            verify_command: None,
         }
     }
 
@@ -276,9 +311,15 @@ impl EngineService {
         if let Some(manager) = mcp_manager {
             builder = builder.mcp(manager);
         }
+        if let Some(workspace) = &options.workspace {
+            builder = builder.workspace(workspace.clone());
+        }
         let agent = builder.build();
         let mut service = Self::with_commands(agent, store, commands);
         service.providers = providers;
+        service.workspace = options.workspace;
+        service.isolation_default = options.isolation_default;
+        service.verify_command = options.verify_command;
         Ok(service)
     }
 
@@ -290,8 +331,92 @@ impl EngineService {
         Hello::new(caps)
     }
 
-    pub async fn create_session(&self, params: NewSessionParams) -> EngineResult<SessionId> {
+    pub async fn create_session(&self, mut params: NewSessionParams) -> EngineResult<SessionId> {
+        // Apply the run-level isolation default when the caller didn't request
+        // one (the role's own policy still applies if this default is Never).
+        if params.isolation.is_none() && self.isolation_default.wants_isolation() {
+            params.isolation = Some(self.isolation_default);
+        }
         Ok(self.agent.create_session(params).await?)
+    }
+
+    /// Whether the session currently runs in an isolated workspace (still
+    /// pointing at its worktree — false once integrated/discarded).
+    pub async fn is_isolated(&self, session: &SessionId) -> EngineResult<bool> {
+        Ok(active_workspace(&self.store.get_meta(session).await?).is_some())
+    }
+
+    /// Report the pending changes in a session's isolated workspace. `Ok(None)`
+    /// when the session isn't isolated or no backend is configured.
+    pub async fn workspace_status(
+        &self,
+        session: &SessionId,
+    ) -> EngineResult<Option<WorkspaceStatus>> {
+        let meta = self.store.get_meta(session).await?;
+        let Some((_, _, root)) = active_workspace(&meta) else {
+            return Ok(None);
+        };
+        match &self.workspace {
+            Some(backend) => Ok(Some(backend.status(&root).await?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Verify and integrate a session's isolated workspace back into its base
+    /// tree. On a clean merge the workspace is removed and the session's cwd is
+    /// repointed to the base directory; the outcome is returned to the caller.
+    pub async fn integrate_session(&self, session: &SessionId) -> EngineResult<IntegrationOutcome> {
+        let meta = self.store.get_meta(session).await?;
+        let Some((_workspace_id, base, root)) = active_workspace(&meta) else {
+            return Err(EngineServiceError::NotIsolated(session.clone()));
+        };
+        let backend = self
+            .workspace
+            .as_ref()
+            .ok_or(EngineServiceError::NoWorkspaceBackend)?;
+        let outcome = backend
+            .integrate(&root, &base, self.verify_command.as_deref())
+            .await?;
+        // A merged/empty workspace is gone: repoint the session to the base so
+        // subsequent turns keep working — and so it no longer reads as isolated.
+        if matches!(
+            outcome,
+            IntegrationOutcome::Merged { .. } | IntegrationOutcome::Empty
+        ) {
+            self.repoint_to_base(session, base).await?;
+        }
+        Ok(outcome)
+    }
+
+    /// Discard a session's isolated workspace without integrating, repointing
+    /// the session to its base directory.
+    pub async fn discard_session(&self, session: &SessionId) -> EngineResult<()> {
+        let meta = self.store.get_meta(session).await?;
+        let Some((_workspace_id, base, root)) = active_workspace(&meta) else {
+            return Err(EngineServiceError::NotIsolated(session.clone()));
+        };
+        let backend = self
+            .workspace
+            .as_ref()
+            .ok_or(EngineServiceError::NoWorkspaceBackend)?;
+        backend.discard(&root, &base).await?;
+        self.repoint_to_base(session, base).await?;
+        Ok(())
+    }
+
+    /// Point the session's cwd back at the base tree after its workspace is
+    /// integrated or discarded (which also makes it read as no longer isolated).
+    async fn repoint_to_base(&self, session: &SessionId, base: PathBuf) -> EngineResult<()> {
+        self.store
+            .update_meta(
+                session,
+                agentloop_contracts::SessionMetaPatch {
+                    cwd: Some(base),
+                    ..Default::default()
+                },
+            )
+            .await?;
+        Ok(())
     }
 
     pub async fn resume_session(&self, id: &SessionId) -> EngineResult<()> {
@@ -394,9 +519,12 @@ impl EngineService {
     }
 }
 
-/// The built-in provider ids custom specs may not shadow.
-const BUILTIN_PROVIDER_IDS: [&str; 5] = [
-    OPENAI_PROVIDER_ID,
+/// The built-in provider ids custom specs may not shadow. `openai` and
+/// `deepseek` are deliberately absent: both are OpenAI-compatible endpoints a
+/// user can supply credentials for via `/connect <id> <key>`, so a custom spec
+/// of either id must resolve (and win over the env built-in) rather than be
+/// rejected as a conflict.
+const BUILTIN_PROVIDER_IDS: [&str; 4] = [
     ANTHROPIC_PROVIDER_ID,
     GEMINI_PROVIDER_ID,
     COPILOT_PROVIDER_ID,
@@ -533,7 +661,9 @@ fn resolve_real_providers(
     };
 
     match provider_name {
-        OPENAI_PROVIDER_ID => {
+        // A custom `/connect openai …` spec wins over the env built-in: when one
+        // exists this arm is skipped and the `other` branch below uses the spec.
+        OPENAI_PROVIDER_ID if !custom.iter().any(|spec| spec.id == OPENAI_PROVIDER_ID) => {
             let provider = OpenAiProvider::from_env()?;
             let model = model_arg.unwrap_or_else(|| provider.default_model().to_owned());
             let mut providers = ProviderRegistry::new();
@@ -671,6 +801,12 @@ fn resolve_available_providers(
         GEMINI_PROVIDER_ID,
         COPILOT_PROVIDER_ID,
     ] {
+        // A custom `/connect openai …` spec wins over the env built-in; skip the
+        // env registration here so the id is never registered twice (the custom
+        // loop below registers it). Mirrors the DeepSeek guard.
+        if name == OPENAI_PROVIDER_ID && custom.iter().any(|spec| spec.id == OPENAI_PROVIDER_ID) {
+            continue;
+        }
         match build_provider(name) {
             Ok(Some((provider, model))) => register(&mut providers, provider, model),
             Ok(None) => {}
@@ -749,6 +885,20 @@ fn resolve_available_providers(
     Ok((providers, default_model))
 }
 
+/// A session's *active* isolated workspace: `Some((workspace_id, base, root))`
+/// only while its cwd still points at the worktree. Once integrate/discard
+/// repoints cwd back to `base_cwd`, this returns `None` — so a session reads as
+/// isolated exactly once, and a second integrate/discard is a clean no-op error
+/// rather than operating on the base tree.
+fn active_workspace(meta: &SessionMeta) -> Option<(String, PathBuf, PathBuf)> {
+    let workspace_id = meta.workspace_id.clone()?;
+    let base = meta.base_cwd.clone()?;
+    if meta.cwd == base {
+        return None;
+    }
+    Some((workspace_id, base, meta.cwd.clone()))
+}
+
 fn env_is_set(name: &str) -> bool {
     std::env::var(name)
         .ok()
@@ -808,7 +958,10 @@ mod tests {
     #[test]
     fn resolve_max_iterations_uses_configured_value_or_falls_back_to_loop_default() {
         assert_eq!(resolve_max_iterations(Some(2_000)), 2_000);
-        assert_eq!(resolve_max_iterations(None), LoopLimits::default().max_iterations);
+        assert_eq!(
+            resolve_max_iterations(None),
+            LoopLimits::default().max_iterations
+        );
     }
 
     #[test]
@@ -836,7 +989,10 @@ mod tests {
         // verbatim even with zero providers registered.
         let (_, model) = resolve_available_providers(None, Some("ollama/llama3".to_owned()), &[])
             .expect("qualified model arg never requires a resolvable provider");
-        assert_eq!(model.expect("qualified model arg yields Some").0, "ollama/llama3");
+        assert_eq!(
+            model.expect("qualified model arg yields Some").0,
+            "ollama/llama3"
+        );
     }
 
     #[test]
@@ -917,7 +1073,10 @@ mod tests {
             providers.ids().first().map(|id| id.as_str().to_owned()),
             Some("deepseek".to_owned())
         );
-        assert_eq!(model.expect("preferred provider yields Some").0, "deepseek/test-chat");
+        assert_eq!(
+            model.expect("preferred provider yields Some").0,
+            "deepseek/test-chat"
+        );
     }
 
     #[test]
@@ -931,20 +1090,57 @@ mod tests {
             Ok(resolved) => resolved,
             Err(err) => panic!("custom provider should resolve: {err}"),
         };
-        assert_eq!(model.expect("preferred provider yields Some").0, "glm/glm-4");
+        assert_eq!(
+            model.expect("preferred provider yields Some").0,
+            "glm/glm-4"
+        );
     }
 
     #[test]
     fn custom_spec_shadowing_a_builtin_is_rejected() {
-        let err = match resolve_available_providers(None, None, &[spec("openai")]) {
+        let err = match resolve_available_providers(None, None, &[spec("anthropic")]) {
             Ok(_) => panic!("builtin id collision must be rejected"),
             Err(err) => err,
         };
         assert!(matches!(
             &err,
-            EngineServiceError::CustomProviderConflict(id) if id == "openai"
+            EngineServiceError::CustomProviderConflict(id) if id == "anthropic"
         ));
         assert_eq!(err.to_engine_error().code, ErrorCode::InvalidRequest);
+    }
+
+    #[test]
+    fn custom_openai_does_not_conflict_with_builtin() {
+        // `openai` is intentionally NOT in BUILTIN_PROVIDER_IDS, so a user's
+        // `/connect openai <key>` (a custom spec) resolves rather than erroring
+        // with CustomProviderConflict, and registers exactly one `openai` even
+        // when OPENAI_API_KEY is also set in the ambient environment.
+        let (providers, _) = resolve_available_providers(None, None, &[spec("openai")])
+            .expect("custom openai must resolve without conflict");
+        let openai_count = providers
+            .ids()
+            .iter()
+            .filter(|id| id.as_str() == OPENAI_PROVIDER_ID)
+            .count();
+        assert_eq!(openai_count, 1, "exactly one openai: {:?}", providers.ids());
+    }
+
+    #[test]
+    fn single_provider_resolver_prefers_custom_openai_over_env() {
+        // With a custom `openai` spec the env built-in arm is skipped and the
+        // spec's endpoint (not api.openai.com) is used, even if OPENAI_API_KEY
+        // is set — so this resolves without needing a real key.
+        let (providers, model) = resolve_real_providers(Some("openai"), None, &[spec("openai")])
+            .expect("custom openai spec must resolve");
+        assert_eq!(
+            providers
+                .ids()
+                .iter()
+                .map(|id| id.as_str().to_owned())
+                .collect::<Vec<_>>(),
+            vec!["openai".to_owned()]
+        );
+        assert_eq!(model.0, "openai/test-chat");
     }
 
     #[test]
@@ -1011,5 +1207,107 @@ mod tests {
             vec!["deepseek".to_owned()]
         );
         assert_eq!(model.0, "deepseek/test-chat");
+    }
+
+    // ── workspace isolation lifecycle (EngineService orchestration) ───────────
+
+    use agentloop_loop::NativeAgentBuilder;
+    use agentloop_session::MemoryStore;
+    use agentloop_testkit::MockWorkspaces;
+
+    /// An `EngineService` wired to a mock isolation backend that provisions
+    /// successfully, over a real (empty) native agent and an in-memory store.
+    fn isolated_service(
+        store: std::sync::Arc<MemoryStore>,
+    ) -> (EngineService, std::sync::Arc<MockWorkspaces>) {
+        let mock = std::sync::Arc::new(MockWorkspaces::new());
+        let agent = NativeAgentBuilder::new(store.clone())
+            .workspace(mock.clone())
+            .build();
+        let mut service = EngineService::new(agent, store);
+        service.workspace = Some(mock.clone());
+        service.isolation_default = IsolationPolicy::Required;
+        (service, mock)
+    }
+
+    async fn open_isolated(service: &EngineService) -> SessionId {
+        service
+            .create_session(NewSessionParams {
+                cwd: Some(PathBuf::from("/repo")),
+                ..NewSessionParams::default()
+            })
+            .await
+            .expect("isolated session opens")
+    }
+
+    #[tokio::test]
+    async fn integrate_repoints_cwd_and_records_outcome() {
+        let store = std::sync::Arc::new(MemoryStore::new());
+        let (service, mock) = isolated_service(store.clone());
+        let id = open_isolated(&service).await;
+        assert_ne!(
+            store.get_meta(&id).await.expect("meta").cwd,
+            PathBuf::from("/repo")
+        );
+
+        let outcome = service.integrate_session(&id).await.expect("integrate");
+        assert!(matches!(outcome, IntegrationOutcome::Merged { .. }));
+        assert_eq!(mock.integrate_calls(), 1);
+
+        let meta = store.get_meta(&id).await.expect("meta");
+        assert_eq!(
+            meta.cwd,
+            PathBuf::from("/repo"),
+            "cwd repointed to base after merge"
+        );
+        // Repointed cwd means the session no longer reads as isolated.
+        assert!(!service.is_isolated(&id).await.expect("meta"));
+    }
+
+    #[tokio::test]
+    async fn discard_repoints_cwd_to_base() {
+        let store = std::sync::Arc::new(MemoryStore::new());
+        let (service, mock) = isolated_service(store.clone());
+        let id = open_isolated(&service).await;
+
+        service.discard_session(&id).await.expect("discard");
+        assert_eq!(mock.discard_calls(), 1);
+        let meta = store.get_meta(&id).await.expect("meta");
+        assert_eq!(meta.cwd, PathBuf::from("/repo"));
+        assert!(!service.is_isolated(&id).await.expect("meta"));
+    }
+
+    #[tokio::test]
+    async fn status_reports_for_isolated_only() {
+        let store = std::sync::Arc::new(MemoryStore::new());
+        let (service, _mock) = isolated_service(store.clone());
+        let id = open_isolated(&service).await;
+        assert!(
+            service
+                .workspace_status(&id)
+                .await
+                .expect("status")
+                .is_some()
+        );
+    }
+
+    #[tokio::test]
+    async fn integrate_on_a_non_isolated_session_errors() {
+        let store = std::sync::Arc::new(MemoryStore::new());
+        let mock = std::sync::Arc::new(MockWorkspaces::new());
+        let agent = NativeAgentBuilder::new(store.clone()).build();
+        let service = EngineService::new(agent, store.clone()); // isolation_default = Never
+        let id = service
+            .create_session(NewSessionParams {
+                cwd: Some(PathBuf::from("/repo")),
+                ..NewSessionParams::default()
+            })
+            .await
+            .expect("plain session");
+        assert!(matches!(
+            service.integrate_session(&id).await,
+            Err(EngineServiceError::NotIsolated(_))
+        ));
+        assert_eq!(mock.integrate_calls(), 0);
     }
 }

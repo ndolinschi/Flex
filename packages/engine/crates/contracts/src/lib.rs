@@ -29,6 +29,7 @@ pub mod request;
 pub mod session;
 pub mod time;
 pub mod tool_call;
+pub mod workspace;
 
 pub use capability::{
     AgentCaps, AgentInfo, AttachmentCaps, CancelSupport, CommandInfo, CommandSource,
@@ -57,3 +58,4 @@ pub use session::{
 };
 pub use time::now_ms;
 pub use tool_call::{ToolCall, ToolCallOrigin, ToolCallStatus, ToolCallTiming, ToolOutput};
+pub use workspace::{IntegrationOutcome, IsolationPolicy};

@@ -592,7 +592,9 @@ async fn truncated_stream_without_terminal_event_surfaces_as_error_not_phantom_s
             },
         ])
     }
-    let provider = Arc::new(MockProvider::with_turns(std::iter::repeat_with(truncated_turn).take(3)));
+    let provider = Arc::new(MockProvider::with_turns(
+        std::iter::repeat_with(truncated_turn).take(3),
+    ));
     let (agent, store) = create_agent(provider.clone(), Vec::new(), Vec::new()).await;
     let session = agent
         .create_session(NewSessionParams::default())
@@ -639,7 +641,9 @@ async fn mid_stream_failure_is_retried_on_same_model_before_falling_back() {
     // immediately burning through the fallback chain (there is none
     // configured here) or failing the turn outright.
     let provider = Arc::new(MockProvider::with_turns(vec![
-        Err(ScriptedError::Stream("connection reset mid-frame".to_owned())),
+        Err(ScriptedError::Stream(
+            "connection reset mid-frame".to_owned(),
+        )),
         MockProvider::text_turn("recovered"),
     ]));
     let (agent, store) = create_agent(provider.clone(), Vec::new(), Vec::new()).await;
