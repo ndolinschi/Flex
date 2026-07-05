@@ -539,7 +539,7 @@ fn build_authorize_url(redirect_uri: &str, pkce: &PkceCodes, state: &str) -> Str
         url_encode("openid profile email offline_access"),
         url_encode(&pkce.challenge),
         url_encode(state),
-        url_encode("flex"),
+        url_encode(branding::PRODUCT_SLUG),
     )
 }
 

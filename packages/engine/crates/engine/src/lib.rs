@@ -28,6 +28,7 @@ use agentloop_prompts::{
     SkillRegistry, SystemPromptAssembler, SystemPromptConfig, Vars,
 };
 use agentloop_provider_anthropic::{ANTHROPIC_PROVIDER_ID, AnthropicProvider};
+use agentloop_provider_bedrock::{BEDROCK_PROVIDER_ID, BedrockProvider};
 use agentloop_provider_copilot::{COPILOT_PROVIDER_ID, CopilotConfig, CopilotProvider};
 use agentloop_provider_gemini::{GEMINI_PROVIDER_ID, GeminiProvider};
 use agentloop_provider_ollama::{OLLAMA_PROVIDER_ID, OllamaProvider};
@@ -554,8 +555,9 @@ impl EngineService {
 /// user can supply credentials for via `/connect <id> <key>`, so a custom spec
 /// of either id must resolve (and win over the env built-in) rather than be
 /// rejected as a conflict.
-const BUILTIN_PROVIDER_IDS: [&str; 4] = [
+const BUILTIN_PROVIDER_IDS: [&str; 5] = [
     ANTHROPIC_PROVIDER_ID,
+    BEDROCK_PROVIDER_ID,
     GEMINI_PROVIDER_ID,
     COPILOT_PROVIDER_ID,
     OLLAMA_PROVIDER_ID,
@@ -674,16 +676,19 @@ fn resolve_real_providers(
         None if env_is_set("ANTHROPIC_API_KEY") => ANTHROPIC_PROVIDER_ID,
         None if env_is_set("GEMINI_API_KEY") => GEMINI_PROVIDER_ID,
         None if env_is_set("DEEPSEEK_API_KEY") => DEEPSEEK_PROVIDER_ID,
+        None if env_is_set("AWS_BEARER_TOKEN_BEDROCK") => BEDROCK_PROVIDER_ID,
         None if CopilotConfig::discoverable() => COPILOT_PROVIDER_ID,
         None if env_is_set("OLLAMA_HOST") || env_is_set("OLLAMA_MODEL") => OLLAMA_PROVIDER_ID,
         None => {
             return Err(ProviderError::AuthMissing {
                 provider: ProviderId::from("runtime"),
                 hint: "set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, \
-                       `DEEPSEEK_API_KEY`, `OLLAMA_HOST`/`OLLAMA_MODEL` for local Ollama, or sign \
+                       `DEEPSEEK_API_KEY`, `AWS_BEARER_TOKEN_BEDROCK` for AWS Bedrock, \
+                       `OLLAMA_HOST`/`OLLAMA_MODEL` for local Ollama, or sign \
                        in to GitHub Copilot (VS Code / Copilot CLI, or set `COPILOT_GITHUB_TOKEN`); \
                        optional model env vars: `OPENAI_MODEL`, `ANTHROPIC_MODEL`, \
-                       `GEMINI_MODEL`, `DEEPSEEK_MODEL`, `OLLAMA_MODEL`, `COPILOT_MODEL`"
+                       `GEMINI_MODEL`, `DEEPSEEK_MODEL`, `BEDROCK_MODEL`, `OLLAMA_MODEL`, \
+                       `COPILOT_MODEL`"
                     .to_owned(),
             }
             .into());
@@ -733,6 +738,16 @@ fn resolve_real_providers(
             let mut providers = ProviderRegistry::new();
             providers.register(Arc::new(provider));
             Ok((providers, ModelRef(format!("{OLLAMA_PROVIDER_ID}/{model}"))))
+        }
+        BEDROCK_PROVIDER_ID => {
+            let provider = BedrockProvider::from_env();
+            let model = model_arg.unwrap_or_else(|| provider.default_model().to_owned());
+            let mut providers = ProviderRegistry::new();
+            providers.register(Arc::new(provider));
+            Ok((
+                providers,
+                ModelRef(format!("{BEDROCK_PROVIDER_ID}/{model}")),
+            ))
         }
         other => {
             // A custom spec of the same id wins over a built-in (lets a user's
@@ -813,6 +828,11 @@ fn resolve_available_providers(
                 let model = provider.default_model().to_owned();
                 Ok(boxed(provider, model))
             }
+            BEDROCK_PROVIDER_ID => {
+                let provider = BedrockProvider::from_env();
+                let model = provider.default_model().to_owned();
+                Ok(boxed(provider, model))
+            }
             _ => Ok(None),
         }
     }
@@ -850,6 +870,13 @@ fn resolve_available_providers(
     // opt in, so a dead default endpoint doesn't join the registry unasked.
     if env_is_set("OLLAMA_HOST") || env_is_set("OLLAMA_MODEL") {
         if let Ok(Some((provider, model))) = build_provider(OLLAMA_PROVIDER_ID) {
+            register(&mut providers, provider, model);
+        }
+    }
+    // Bedrock: a real built-in crate, env-gated by its API key so it doesn't
+    // join the registry unless the user opted in.
+    if env_is_set("AWS_BEARER_TOKEN_BEDROCK") {
+        if let Ok(Some((provider, model))) = build_provider(BEDROCK_PROVIDER_ID) {
             register(&mut providers, provider, model);
         }
     }

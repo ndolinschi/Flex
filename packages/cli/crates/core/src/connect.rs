@@ -185,6 +185,21 @@ pub fn provider_templates() -> &'static [ProviderTemplate] {
             description: "Ultra-fast inference · OpenAI-compatible",
             thinking: false,
         },
+        // AWS Bedrock is a first-party engine provider (not OpenAI-compatible):
+        // it registers from AWS_BEARER_TOKEN_BEDROCK, so `base_url` is None and
+        // auth is env-only (Converse API, region from AWS_REGION).
+        ProviderTemplate {
+            id: "bedrock",
+            label: "AWS Bedrock",
+            category: ProviderCategory::Cloud,
+            base_url: None,
+            default_model: None,
+            auth: ProviderAuth::EnvOnly {
+                env_var: "AWS_BEARER_TOKEN_BEDROCK",
+            },
+            description: "Claude/Llama/Nova · set AWS_BEARER_TOKEN_BEDROCK",
+            thinking: false,
+        },
         ProviderTemplate {
             id: "ollama",
             label: "Ollama",

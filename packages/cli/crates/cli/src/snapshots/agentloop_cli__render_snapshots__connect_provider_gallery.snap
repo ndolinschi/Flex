@@ -1,6 +1,5 @@
 ---
 source: crates/cli/src/render_snapshots.rs
-assertion_line: 757
 expression: rendered
 ---
 Start with a prompt or /help.                                     ╭ context ───────────────────────╮
@@ -22,7 +21,7 @@ Start with a prompt or /help.                                     ╭ context �
                │  xAI Grok  Grok models · OpenAI-compatible                         │              │
                │  OpenRouter  Gateway to many models · auto-routing                 │              │
                │  Cerebras  Ultra-fast inference · OpenAI-compatible                │              │
-               │Local                                                               │              │
+               │  AWS Bedrock  Claude/Llama/Nova · set AWS_BEARER_TOKEN_BEDROCK (AWS│              │
                ╰ esc ───────────────────────────────────────────────────────────────╯              │
                                                                   │                                │
                                                                   ╰────────────────────────────────╯

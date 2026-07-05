@@ -132,6 +132,7 @@ dependencies = [
  "agentloop-mcp",
  "agentloop-prompts",
  "agentloop-provider-anthropic",
+ "agentloop-provider-bedrock",
  "agentloop-provider-copilot",
  "agentloop-provider-gemini",
  "agentloop-provider-ollama",
@@ -230,6 +231,23 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-util",
+]
+
+[[package]]
+name = "agentloop-provider-bedrock"
+version = "0.1.0"
+dependencies = [
+ "agentloop-contracts",
+ "agentloop-core",
+ "agentloop-provider-common",
+ "async-trait",
+ "futures",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
 ]
 
 [[package]]
