@@ -42,6 +42,11 @@ pub struct CliPrefs {
     /// Custom OpenAI-compatible providers keyed by provider id.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub providers: BTreeMap<String, ProviderConfig>,
+    /// API keys for built-in, non-OpenAI-compatible providers connected from
+    /// the CLI (e.g. `bedrock`), keyed by provider id. Literal or `{env:VAR}`.
+    /// The engine consults these before the environment.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub provider_keys: BTreeMap<String, String>,
     /// Orchestration roles for the Task tool, keyed by role name.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub roles: BTreeMap<String, RoleConfig>,
@@ -199,6 +204,24 @@ pub fn custom_specs(prefs: &CliPrefs) -> (Vec<CustomProviderSpec>, Vec<(String, 
         }
     }
     (specs, skipped)
+}
+
+/// Resolve connected built-in-provider API keys (`id → key`) for the engine,
+/// expanding `{env:VAR}` references. Unresolvable or empty entries are skipped
+/// and reported as `(id, reason)` for the resolution trace.
+pub fn provider_keys(prefs: &CliPrefs) -> (BTreeMap<String, String>, Vec<(String, String)>) {
+    let mut keys = BTreeMap::new();
+    let mut skipped = Vec::new();
+    for (id, raw) in &prefs.provider_keys {
+        match resolve_api_key(raw) {
+            Ok(key) if !key.is_empty() => {
+                keys.insert(id.clone(), key);
+            }
+            Ok(_) => skipped.push((id.clone(), "empty key".to_owned())),
+            Err(err) => skipped.push((id.clone(), err.to_string())),
+        }
+    }
+    (keys, skipped)
 }
 
 /// Translate configured roles into engine specs. Invalid entries are skipped
@@ -486,6 +509,25 @@ impl CliPrefs {
     pub fn forget_provider(id: &str) -> Result<bool, PrefsError> {
         let mut prefs = Self::load();
         let existed = prefs.providers.remove(id).is_some();
+        prefs.save()?;
+        Ok(existed)
+    }
+
+    /// Store an API key for a built-in provider (e.g. Bedrock) and persist.
+    /// `key` may be a literal or an `{env:VAR}` reference.
+    pub fn remember_provider_key(id: &str, key: &str) -> Result<(), PrefsError> {
+        let mut prefs = Self::load();
+        prefs
+            .provider_keys
+            .insert(id.to_owned(), key.trim().to_owned());
+        prefs.save()
+    }
+
+    /// Remove a stored built-in-provider key and persist. Returns whether it
+    /// existed.
+    pub fn forget_provider_key(id: &str) -> Result<bool, PrefsError> {
+        let mut prefs = Self::load();
+        let existed = prefs.provider_keys.remove(id).is_some();
         prefs.save()?;
         Ok(existed)
     }

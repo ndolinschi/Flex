@@ -1336,7 +1336,8 @@ impl App {
     const CONNECT_USAGE: &'static str = "usage: /connect <name> <base_url> [api_key] [model] [--force] · \
          template form (name it anything): /connect <name> <openai|deepseek> <api_key> [model] · \
          key may be {env:VAR}; omit it for keyless local endpoints (LM Studio) · \
-         a known id skips the URL: /connect deepseek <api_key>";
+         a known id skips the URL: /connect deepseek <api_key> · \
+         AWS Bedrock: /connect bedrock <api_key>";
 
     /// `/isolation [on|off|required]`: no arg shows status; an arg toggles
     /// workspace mode for future sessions (persisted; rebuilds the native
@@ -1399,6 +1400,12 @@ impl App {
             self.chat
                 .push_error(format!("`{id}` is already a registered provider"));
             return Vec::new();
+        }
+        // First-party providers that aren't OpenAI-compatible (Bedrock) connect
+        // by storing an API key the engine builds them from — not as a custom
+        // OpenAI endpoint. Form: `/connect bedrock <api-key>`.
+        if id == "bedrock" {
+            return self.save_provider_key(&id, tokens[1]);
         }
         let second_is_url = tokens[1].contains("://");
         let config = if let Some((base_url, default_model, thinking)) =
@@ -1481,6 +1488,29 @@ impl App {
         vec![Effect::ReloadEngine { invalidate: true }]
     }
 
+    /// Persist an API key for a built-in provider (Bedrock) and rebuild the
+    /// native engine, which picks the key up via `EngineOptions.provider_keys`.
+    fn save_provider_key(&mut self, id: &str, key: &str) -> Vec<Effect> {
+        if key.trim().is_empty() {
+            self.chat.push_info(format!(
+                "usage: /connect {id} <api-key>  (pick a model with /model)"
+            ));
+            return Vec::new();
+        }
+        self.dismiss_getting_started();
+        if let Err(err) = agentloop_cli_core::CliPrefs::remember_provider_key(id, key) {
+            self.chat.push_error(format!("could not save {id}: {err}"));
+            return Vec::new();
+        }
+        self.toast(format!("connected {id}"));
+        self.pending_provider = Some(id.to_owned());
+        if self.connect_then_pick_model {
+            self.connect_then_pick_model = false;
+            self.awaiting_model_picker = true;
+        }
+        vec![Effect::ReloadEngine { invalidate: true }]
+    }
+
     fn run_disconnect(&mut self, arg: Option<String>) -> Vec<Effect> {
         let Some(id) = arg.filter(|a| !a.trim().is_empty()) else {
             self.chat.push_info("usage: /disconnect <id>");
@@ -1491,11 +1521,23 @@ impl App {
                 self.toast(format!("disconnected {}", id.trim()));
                 vec![Effect::ReloadEngine { invalidate: true }]
             }
-            Ok(false) => {
-                self.chat
-                    .push_info(format!("no custom provider `{}`", id.trim()));
-                Vec::new()
-            }
+            // Not a custom OpenAI-compatible provider — maybe a built-in whose
+            // API key was connected from the CLI (e.g. Bedrock).
+            Ok(false) => match agentloop_cli_core::CliPrefs::forget_provider_key(id.trim()) {
+                Ok(true) => {
+                    self.toast(format!("disconnected {}", id.trim()));
+                    vec![Effect::ReloadEngine { invalidate: true }]
+                }
+                Ok(false) => {
+                    self.chat
+                        .push_info(format!("no connected provider `{}`", id.trim()));
+                    Vec::new()
+                }
+                Err(err) => {
+                    self.chat.push_error(err.to_string());
+                    Vec::new()
+                }
+            },
             Err(err) => {
                 self.chat.push_error(err.to_string());
                 Vec::new()

@@ -112,6 +112,9 @@ fn native_service(
         verify_command: None,
         formatters: Vec::new(),
         diagnostics: agentloop_engine::DiagnosticsConfig::default(),
+        // Headless runner is environment-only; the interactive client supplies
+        // connected keys via `provider_keys`.
+        provider_keys: std::collections::BTreeMap::new(),
     })
 }
 

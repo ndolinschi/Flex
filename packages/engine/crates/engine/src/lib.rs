@@ -28,7 +28,9 @@ use agentloop_prompts::{
     SkillRegistry, SystemPromptAssembler, SystemPromptConfig, Vars,
 };
 use agentloop_provider_anthropic::{ANTHROPIC_PROVIDER_ID, AnthropicProvider};
-use agentloop_provider_bedrock::{BEDROCK_PROVIDER_ID, BedrockProvider};
+use agentloop_provider_bedrock::{
+    BEDROCK_PROVIDER_ID, BedrockAuth, BedrockConfig, BedrockProvider,
+};
 use agentloop_provider_copilot::{COPILOT_PROVIDER_ID, CopilotConfig, CopilotProvider};
 use agentloop_provider_gemini::{GEMINI_PROVIDER_ID, GeminiProvider};
 use agentloop_provider_ollama::{OLLAMA_PROVIDER_ID, OllamaProvider};
@@ -93,6 +95,11 @@ pub struct EngineOptions {
     /// Diagnostics feedback run after `Write`/`Edit`. Disabled by default;
     /// availability-gated on the check command resolving on `$PATH`.
     pub diagnostics: DiagnosticsConfig,
+    /// Explicit API keys for built-in providers (`provider id → key`), supplied
+    /// by a client's `/connect` flow. Consulted *before* the environment, so a
+    /// user can connect a provider from the client without exporting env vars.
+    /// Empty = environment-only (the baseline).
+    pub provider_keys: std::collections::BTreeMap<String, String>,
 }
 
 impl Default for EngineOptions {
@@ -113,6 +120,7 @@ impl Default for EngineOptions {
             verify_command: None,
             formatters: Vec::new(),
             diagnostics: DiagnosticsConfig::default(),
+            provider_keys: std::collections::BTreeMap::new(),
         }
     }
 }
@@ -226,8 +234,9 @@ impl EngineService {
     /// the environment.
     pub fn native(mut options: EngineOptions) -> EngineResult<Self> {
         let model = options.model.take();
-        let (providers, default_model) =
+        let (mut providers, default_model) =
             resolve_real_providers(options.provider.as_deref(), model, &options.custom)?;
+        connect_bedrock(&mut providers, &options.provider_keys);
         Self::build_native(providers, Some(default_model), options)
     }
 
@@ -242,8 +251,14 @@ impl EngineService {
     /// [`resolve_available_providers`].
     pub fn native_all(mut options: EngineOptions) -> EngineResult<Self> {
         let model = options.model.take();
-        let (providers, default_model) =
+        let (mut providers, mut default_model) =
             resolve_available_providers(options.provider.as_deref(), model, &options.custom)?;
+        // A Bedrock API key connected from the client (persisted, not env)
+        // registers/overrides Bedrock here — so `/connect bedrock <key>` works
+        // without exporting `AWS_BEARER_TOKEN_BEDROCK`.
+        if let Some(bedrock_model) = connect_bedrock(&mut providers, &options.provider_keys) {
+            default_model = default_model.or(Some(bedrock_model));
+        }
         Self::build_native(providers, default_model, options)
     }
 
@@ -665,6 +680,27 @@ fn build_deepseek(
     Ok((Arc::new(provider), model))
 }
 
+/// Register a Bedrock provider built from a client-connected API key
+/// (`provider_keys["bedrock"]`), overriding any credential-less Bedrock the
+/// environment may have registered. Region/model still come from the
+/// environment (or Bedrock defaults). Returns its default model ref so callers
+/// can adopt it when they have no other default; no-op without a bedrock key.
+fn connect_bedrock(
+    providers: &mut ProviderRegistry,
+    provider_keys: &std::collections::BTreeMap<String, String>,
+) -> Option<ModelRef> {
+    let key = provider_keys.get(BEDROCK_PROVIDER_ID)?;
+    if key.trim().is_empty() {
+        return None;
+    }
+    let mut config = BedrockConfig::from_env();
+    config.auth = BedrockAuth::Bearer(key.clone());
+    let provider = BedrockProvider::new(config);
+    let model = provider.default_model().to_owned();
+    providers.register(Arc::new(provider));
+    Some(ModelRef(format!("{BEDROCK_PROVIDER_ID}/{model}")))
+}
+
 fn resolve_real_providers(
     provider_arg: Option<&str>,
     model_arg: Option<String>,
@@ -1012,6 +1048,37 @@ mod tests {
             models: Vec::new(),
             thinking: false,
         }
+    }
+
+    #[test]
+    fn connect_bedrock_registers_a_provider_from_a_key() {
+        let mut providers = ProviderRegistry::new();
+        let keys = std::collections::BTreeMap::from([(
+            BEDROCK_PROVIDER_ID.to_owned(),
+            "bedrock-api-key".to_owned(),
+        )]);
+        let default = connect_bedrock(&mut providers, &keys);
+        assert!(default.is_some_and(|m| m.0.starts_with("bedrock/")));
+        assert!(
+            providers
+                .get(&ProviderId::from(BEDROCK_PROVIDER_ID))
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn connect_bedrock_is_a_noop_without_a_key() {
+        let mut providers = ProviderRegistry::new();
+        assert!(connect_bedrock(&mut providers, &std::collections::BTreeMap::new()).is_none());
+        // An empty key is also ignored.
+        let empty =
+            std::collections::BTreeMap::from([(BEDROCK_PROVIDER_ID.to_owned(), " ".to_owned())]);
+        assert!(connect_bedrock(&mut providers, &empty).is_none());
+        assert!(
+            providers
+                .get(&ProviderId::from(BEDROCK_PROVIDER_ID))
+                .is_none()
+        );
     }
 
     fn model_info(id: &str) -> ModelInfo {

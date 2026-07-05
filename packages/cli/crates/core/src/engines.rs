@@ -235,6 +235,7 @@ impl EngineHub {
         // invalidate picks up new custom providers without extra plumbing.
         let prefs = crate::prefs::CliPrefs::load();
         let (custom, skipped) = crate::prefs::custom_specs(&prefs);
+        let (provider_keys, skipped_keys) = crate::prefs::provider_keys(&prefs);
         let (mut roles, skipped_roles) = crate::prefs::role_specs(&prefs);
         // Auto-apply the DeepSeek orchestration split — research subagents
         // (searcher) on the fast v4-flash, implementation (worker) on the
@@ -296,6 +297,7 @@ impl EngineHub {
             verify_command: self.verify_command.clone(),
             formatters: Vec::new(),
             diagnostics: agentloop_engine::DiagnosticsConfig::default(),
+            provider_keys,
         })?;
         let mut trace = vec!["selected native loop".to_owned()];
         let ids = service
@@ -311,6 +313,9 @@ impl EngineHub {
         }
         for (id, reason) in skipped {
             trace.push(format!("skipped custom provider {id}: {reason}"));
+        }
+        for (id, reason) in skipped_keys {
+            trace.push(format!("skipped provider key {id}: {reason}"));
         }
         for (name, reason) in skipped_roles {
             trace.push(format!("skipped role {name}: {reason}"));
