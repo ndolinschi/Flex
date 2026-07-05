@@ -365,7 +365,7 @@ fn status_shows_auto_badge_for_deepseek() {
 #[test]
 fn busy_line_running_snapshot() {
     let mut app = test_app(test_bootstrap());
-    app.status.spinner = 0;
+    app.status.spinner = 2; // mid-sweep: bright head with its dim trail (`·⬩◆··`)
     app.status.turn_verb_idx = 0;
     app.status.turn_output_chars = 4_900; // ≈ 1.2k tokens
     app.session.turn = TurnPhase::Running {

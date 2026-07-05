@@ -115,6 +115,33 @@ fn notification_line_visible(app: &App) -> bool {
     app.session.turn.is_running() || !app.status.toasts.is_empty()
 }
 
+/// A bouncing "scanner" activity glyph (opencode-style): a bright diamond head
+/// with a dim trailing diamond, sweeping back and forth across five cells. The
+/// trail sits one cell opposite the direction of travel, and vanishes at each
+/// wall — reading as a comet reversing course.
+fn scanner_spans(tick: usize) -> Vec<Span<'static>> {
+    const POSITIONS: [usize; 8] = [0, 1, 2, 3, 4, 3, 2, 1];
+    let idx = tick % POSITIONS.len();
+    let head = POSITIONS[idx];
+    // First half sweeps right (trail to the left), second half sweeps left.
+    let trail = if idx < 4 {
+        head.wrapping_sub(1)
+    } else {
+        head + 1
+    };
+    (0..5usize)
+        .map(|cell| {
+            if cell == head {
+                Span::styled("◆", theme::warn())
+            } else if cell == trail {
+                Span::styled("⬩", theme::dim())
+            } else {
+                Span::styled("·", theme::dim())
+            }
+        })
+        .collect()
+}
+
 /// Busy line (priority) or the newest toast. The busy pulse/timer is
 /// suppressed while the agent is blocked on a decision (permission/question) —
 /// it isn't working, it's waiting on the user, so a ticking timer would lie.
@@ -122,20 +149,19 @@ fn draw_notification_line(frame: &mut Frame<'_>, app: &App, area: Rect) {
     let awaiting_decision = matches!(app.overlay, Overlay::Permission(_) | Overlay::Question(_));
     let line = match app.session.turn {
         TurnPhase::Running { started } if !awaiting_decision => {
-            let glyph = theme::pulse_frame(app.status.spinner);
             let verb = theme::spinner_verb(app.status.turn_verb_idx);
             let tokens = app.status.turn_output_chars / 4;
-            Line::from(vec![
-                Span::styled(format!("{glyph} {verb}… "), theme::warn()),
-                Span::styled(
-                    format!(
-                        "({}s · ↑ {} tokens · esc to interrupt)",
-                        started.elapsed().as_secs(),
-                        fmt_k(tokens)
-                    ),
-                    theme::dim(),
+            let mut spans = scanner_spans(app.status.spinner);
+            spans.push(Span::styled(format!("  {verb}… "), theme::warn()));
+            spans.push(Span::styled(
+                format!(
+                    "({}s · ↑ {} tokens · esc to interrupt)",
+                    started.elapsed().as_secs(),
+                    fmt_k(tokens)
                 ),
-            ])
+                theme::dim(),
+            ));
+            Line::from(spans)
         }
         _ => match app.status.toasts.back() {
             Some(toast) => Line::from(Span::styled(toast.text.clone(), theme::dim())),
