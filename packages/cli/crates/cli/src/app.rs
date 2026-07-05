@@ -532,17 +532,8 @@ impl App {
                 let skip_refresh = text.len() > crate::input::PASTE_PLACEHOLDER_MIN_CHARS
                     || self.input.has_pasted_blocks();
                 if !skip_refresh {
-                    let refresh_start = std::time::Instant::now();
                     self.input
                         .refresh_popup(&self.commands, &self.file_index, &self.workdir);
-                    // #region agent log
-                    if text.len() > 1_000 {
-                        crate::debug_agent::log_refresh_popup(
-                            self.input.text().len(),
-                            refresh_start.elapsed().as_micros(),
-                        );
-                    }
-                    // #endregion
                 }
                 self.dirty = true;
                 Vec::new()
@@ -3326,23 +3317,6 @@ impl App {
                 })
             );
         self.status.spinner = self.status.spinner.wrapping_add(1);
-        // #region agent log
-        if self.status.spinner % 10 == 0 {
-            crate::debug_agent::log(
-                "C",
-                "app.rs:on_tick",
-                "tick sample",
-                serde_json::json!({
-                    "spinner": self.status.spinner,
-                    "isHomeRoute": self.is_home_route(),
-                    "isHomeScreen": self.chat.is_home_screen(),
-                    "inputEmpty": self.input.is_empty(),
-                    "providersEmpty": self.providers.is_empty(),
-                    "busy": busy,
-                }),
-            );
-        }
-        // #endregion
         if busy {
             self.dirty = true;
         } else if self.is_home_route() && self.input.is_empty() {

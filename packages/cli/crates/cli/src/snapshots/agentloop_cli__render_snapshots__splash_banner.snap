@@ -1,5 +1,6 @@
 ---
 source: crates/cli/src/render_snapshots.rs
+assertion_line: 495
 expression: rendered
 ---
 
@@ -10,7 +11,7 @@ expression: rendered
 
   ~/code/flex
 
-> hi
+▌ hi
 
 
 

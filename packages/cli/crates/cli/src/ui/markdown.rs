@@ -825,7 +825,7 @@ mod tests {
         let lines = render("  ", text, false, 80);
         let rendered = joined(&lines);
         assert!(
-            rendered.contains("┌─ rust"),
+            rendered.contains("┃ rust"),
             "expected code fence header: {rendered}"
         );
         assert!(
@@ -846,7 +846,7 @@ mod tests {
                     && line
                         .spans
                         .iter()
-                        .any(|span| span.content == "│ " && span.style == theme::code_border())
+                        .any(|span| span.content == "┃ " && span.style == theme::code_border())
             }),
             "code body line should render under the fence gutter"
         );
@@ -897,9 +897,10 @@ mod tests {
         let text = "```\nline one\nline two\n```";
         let lines = render("  ", text, true, 80);
         let rendered = joined(&lines);
-        assert!(rendered.contains('┌'), "{rendered}");
+        // The fence now renders as an opencode-style left rail (`┃`), not a box.
+        assert!(rendered.contains('┃'), "{rendered}");
         assert!(rendered.contains("line one"));
-        assert!(rendered.contains('└'), "{rendered}");
+        assert!(rendered.contains("line two"));
     }
 
     #[test]

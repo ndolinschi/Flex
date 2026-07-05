@@ -222,11 +222,7 @@ fn draw_chat(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
 /// Empty home: centered brand block, no transcript scroll area.
 fn draw_home_centered(frame: &mut Frame<'_>, app: &App, area: Rect) {
     let sidebar_shown = sidebar_visible(app, area);
-    // #region agent log
     let splash_rotate = app.status.spinner;
-    let hint_idx = (splash_rotate / crate::input::ROTATE_HINT_TICKS) % 3;
-    crate::debug_agent::log_splash_hint_if_changed(splash_rotate, hint_idx);
-    // #endregion
     let lines = splash_lines(
         &app.engine_name,
         &app.engine_version,
@@ -290,18 +286,13 @@ fn chat_lines(app: &mut App, viewport_width: u16, sidebar_shown: bool) -> Vec<Li
         let item = &items[idx];
         match item {
             ChatItem::User { text } => {
-                for (line_idx, line) in terminal_lines(text).into_iter().enumerate() {
-                    if line_idx == 0 {
-                        lines.push(Line::from(vec![
-                            Span::styled("> ", theme::dim()),
-                            Span::styled(line.to_owned(), theme::user_text()),
-                        ]));
-                    } else {
-                        lines.push(Line::from(Span::styled(
-                            format!("  {line}"),
-                            theme::user_text(),
-                        )));
-                    }
+                // A continuous accent rail down the left edge marks the whole
+                // user turn (opencode's message-rail look), title-free.
+                for line in terminal_lines(text) {
+                    lines.push(Line::from(vec![
+                        Span::styled("▌ ", theme::user()),
+                        Span::styled(line.to_owned(), theme::user_text()),
+                    ]));
                 }
             }
             ChatItem::Assistant {

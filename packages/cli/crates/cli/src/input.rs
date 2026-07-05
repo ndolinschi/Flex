@@ -192,9 +192,6 @@ impl InputState {
             return;
         }
         let idx = (tick / crate::input::ROTATE_HINT_TICKS) % PLACEHOLDER_HINTS.len();
-        // #region agent log
-        crate::debug_agent::log_placeholder_if_changed(tick, idx);
-        // #endregion
         self.textarea.set_placeholder_text(PLACEHOLDER_HINTS[idx]);
     }
 
@@ -207,33 +204,11 @@ impl InputState {
     /// Insert pasted text at the cursor. Large pastes are collapsed to a
     /// short placeholder; the full text is restored at submit time.
     pub fn paste(&mut self, text: &str) {
-        let bytes = text.len();
-        // #region agent log
-        crate::debug_agent::log_paste_begin(bytes);
-        // #endregion
-        let count_start = std::time::Instant::now();
-        let is_large = paste_is_large(text);
-        if !is_large {
+        if !paste_is_large(text) {
             self.textarea.insert_str(text);
-            let line_count = text.lines().count();
-            let count_us = count_start.elapsed().as_micros();
-            // #region agent log
-            crate::debug_agent::log_paste(
-                bytes,
-                line_count,
-                count_us,
-                false,
-                self.textarea.lines().len(),
-            );
-            // #endregion
             return;
         }
         let suffix = paste_placeholder_suffix(text);
-        let line_count = if text.len() <= 32_768 {
-            text.lines().count()
-        } else {
-            0
-        };
         let index = self.pasted_blocks.len() + 1;
         let placeholder = format!("[Pasted text #{index} {suffix}]");
         self.textarea.insert_str(&placeholder);
@@ -241,16 +216,6 @@ impl InputState {
             placeholder,
             full_text: text.to_owned(),
         });
-        let count_us = count_start.elapsed().as_micros();
-        // #region agent log
-        crate::debug_agent::log_paste(
-            bytes,
-            line_count,
-            count_us,
-            true,
-            self.textarea.lines().len(),
-        );
-        // #endregion
     }
 
     /// Substitute every pasted-block placeholder in `text` with its stored
@@ -426,16 +391,7 @@ impl InputState {
         if trimmed.is_empty() {
             return InputOutcome::Consumed;
         }
-        let expand_start = std::time::Instant::now();
-        let input_bytes = trimmed.len();
-        let blocks = self.pasted_blocks.len();
         let line = self.expand_pasted_blocks(trimmed);
-        let expand_us = expand_start.elapsed().as_micros();
-        // #region agent log
-        if blocks > 0 || input_bytes > 10_000 {
-            crate::debug_agent::log_submit_expand(input_bytes, line.len(), expand_us, blocks);
-        }
-        // #endregion
         if line.len() <= HISTORY_MAX_BYTES && self.history.last() != Some(&line) {
             self.history.push(line.clone());
         }
