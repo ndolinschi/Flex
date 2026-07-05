@@ -15,9 +15,11 @@ use agentloop_contracts::{
     Transcript, TurnId, TurnOptions, TurnSummary, now_ms, reduce,
 };
 use agentloop_core::{
-    Agent, AgentError, EventStream, ProviderError, ProviderRegistry, SessionStore, StoreError,
-    WorkspaceError, WorkspaceStatus, Workspaces,
+    Agent, AgentError, EventStream, Hook, ProviderError, ProviderRegistry, SessionStore,
+    StoreError, WorkspaceError, WorkspaceStatus, Workspaces,
 };
+pub use agentloop_hooks::{CheckSpec, DiagnosticsConfig, FormatterSpec};
+use agentloop_hooks::{DiagnosticsHook, FormatOnEditHook};
 pub use agentloop_loop::roles::{RoleError, RoleRegistry, RoleSpec, RoleToolProfile, valid_name};
 use agentloop_loop::{LoopLimits, NativeAgentBuilder};
 use agentloop_mcp::{McpBridgeConfig, McpBridgeError, McpManager};
@@ -84,6 +86,12 @@ pub struct EngineOptions {
     /// Command run inside an isolated workspace before integrating it back
     /// (e.g. `"cargo test"`). `None` skips verification.
     pub verify_command: Option<String>,
+    /// Formatters run after `Write`/`Edit` (format-on-edit). Empty = off.
+    /// Each spec is availability-gated on its command resolving on `$PATH`.
+    pub formatters: Vec<FormatterSpec>,
+    /// Diagnostics feedback run after `Write`/`Edit`. Disabled by default;
+    /// availability-gated on the check command resolving on `$PATH`.
+    pub diagnostics: DiagnosticsConfig,
 }
 
 impl Default for EngineOptions {
@@ -102,6 +110,8 @@ impl Default for EngineOptions {
             workspace: None,
             isolation_default: IsolationPolicy::Never,
             verify_command: None,
+            formatters: Vec::new(),
+            diagnostics: DiagnosticsConfig::default(),
         }
     }
 }
@@ -311,6 +321,21 @@ impl EngineService {
         if let Some(manager) = mcp_manager {
             builder = builder.mcp(manager);
         }
+        // Post-edit hooks (format-on-edit, diagnostics feedback). Each is
+        // included only when configured and active; otherwise the loop keeps
+        // its default empty hook set and behaves byte-identically.
+        let mut hooks: Vec<Arc<dyn Hook>> = Vec::new();
+        let formatter = FormatOnEditHook::new(options.formatters.clone());
+        if formatter.is_active() {
+            hooks.push(Arc::new(formatter));
+        }
+        let diagnostics = DiagnosticsHook::new(options.diagnostics.clone());
+        if diagnostics.is_active() {
+            hooks.push(Arc::new(diagnostics));
+        }
+        if !hooks.is_empty() {
+            builder = builder.hooks(hooks);
+        }
         if let Some(workspace) = &options.workspace {
             builder = builder.workspace(workspace.clone());
         }
@@ -421,6 +446,11 @@ impl EngineService {
 
     pub async fn resume_session(&self, id: &SessionId) -> EngineResult<()> {
         Ok(self.agent.resume_session(id).await?)
+    }
+
+    /// Load persisted metadata for a session.
+    pub async fn session_meta(&self, session: &SessionId) -> EngineResult<SessionMeta> {
+        Ok(self.store.get_meta(session).await?)
     }
 
     pub async fn list_sessions(&self) -> EngineResult<Vec<SessionMeta>> {

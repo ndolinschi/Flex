@@ -59,12 +59,22 @@ pub enum LocalCommand {
     McpInstall { arg: Option<String> },
     /// `/mcp-remove <name>` — remove an installed server.
     McpRemove { name: String },
+    /// `/merge` — verify and integrate the isolated workspace back into the
+    /// base tree.
+    Merge,
+    /// `/discard` — throw away the isolated workspace without integrating.
+    Discard,
+    /// `/isolation [on|off|required]` — no arg shows status + pending diff;
+    /// an arg toggles workspace mode for new sessions.
+    Isolation { arg: Option<String> },
     /// `/init` — save this project's currently-enabled MCP integrations to
     /// `.agent/mcp.json` so they travel with the project.
     Init,
     /// `/mcp-import` — review and adopt integrations declared in this
     /// project's `.agent/mcp.json` that aren't installed yet.
     McpImport,
+    /// `/sessions` — pick and resume a past session in this directory.
+    Sessions,
 }
 
 /// `/mcp` subcommands.
@@ -96,91 +106,156 @@ pub struct CommandEntry {
     pub args_hint: Option<String>,
     /// Dim source tag: `cli`, `builtin`, `user`, `project`, `agent`.
     pub source: &'static str,
+    /// Grouping for the slash popup: `session`, `provider`, `mcp`, `workspace`, `ui`, `other`.
+    pub category: &'static str,
 }
 
-/// CLI-local command table: `(name, description, args_hint)`.
-const LOCAL: &[(&str, &str, Option<&str>)] = &[
+/// CLI-local command table: `(name, description, args_hint, category)`.
+const LOCAL: &[(&str, &str, Option<&str>, &str)] = &[
     (
         "model",
         "pick or set the session model",
         Some("[provider/model]"),
+        "provider",
     ),
-    ("models", "alias of /model", None),
+    ("models", "alias of /model", None, "provider"),
     (
         "provider",
         "pick a provider (sets its default model)",
         Some("[name]"),
+        "provider",
     ),
     (
         "agent",
         "switch agent implementation",
         Some("[native|claude-code|copilot]"),
+        "provider",
     ),
-    ("new", "start a fresh session", None),
-    ("clear", "clear chat and reset session context", None),
+    ("new", "start a fresh session", None, "session"),
+    (
+        "clear",
+        "clear chat and reset session context",
+        None,
+        "session",
+    ),
     (
         "command",
         "run a shell command in the current directory",
         Some("<shell command>"),
+        "workspace",
     ),
-    ("help", "keys and commands", None),
-    ("copy", "copy chat transcript to clipboard", None),
-    ("quit", "exit", None),
-    ("mode", "switch code/plan session mode", Some("[code|plan]")),
+    ("help", "keys and commands", None, "ui"),
+    ("copy", "copy chat transcript to clipboard", None, "session"),
+    ("quit", "exit", None, "session"),
+    (
+        "mode",
+        "switch code/plan session mode",
+        Some("[code|plan]"),
+        "ui",
+    ),
     (
         "permissions",
         "set permission security level",
         Some("[require|auto|allow-all]"),
+        "ui",
     ),
     (
         "thinking",
         "show or hide reasoning blocks",
         Some("[on|off]"),
+        "ui",
     ),
-    ("theme", "switch color theme", Some("[name]")),
+    ("theme", "switch color theme", Some("[name]"), "ui"),
     (
         "effort",
         "set agent effort level",
         Some("[low|medium|high|xhigh|max]"),
+        "provider",
     ),
     (
         "compact",
         "summarize conversation history to save context",
         None,
+        "session",
     ),
     (
         "connect",
-        "add a custom OpenAI-compatible provider",
-        Some("<id> <base_url> [api_key] [model] [--force]"),
+        "connect an LLM provider",
+        Some("[gallery]"),
+        "provider",
     ),
-    ("providers", "list built-in and custom providers", None),
-    ("roles", "list orchestration roles for the Task tool", None),
-    ("disconnect", "remove a custom provider", Some("<id>")),
-    ("mcps", "list and toggle installed MCP servers", None),
+    (
+        "providers",
+        "list built-in and custom providers",
+        None,
+        "provider",
+    ),
+    (
+        "roles",
+        "list orchestration roles for the Task tool",
+        None,
+        "provider",
+    ),
+    (
+        "disconnect",
+        "remove a custom provider",
+        Some("<id>"),
+        "provider",
+    ),
+    ("mcps", "list and toggle installed MCP servers", None, "mcp"),
     (
         "mcp",
         "attach or explore an MCP server",
         Some("<name> | explore <name>"),
+        "mcp",
     ),
     (
         "mcp-install",
         "install MCP servers (registry, npm, or import)",
         Some("[repo|npm]"),
+        "mcp",
     ),
     (
         "mcp-remove",
         "remove an installed MCP server",
         Some("<name>"),
+        "mcp",
+    ),
+    (
+        "merge",
+        "verify and merge the isolated workspace back",
+        None,
+        "workspace",
+    ),
+    (
+        "discard",
+        "discard the isolated workspace",
+        None,
+        "workspace",
+    ),
+    (
+        "isolation",
+        "show workspace status, or toggle workspace mode",
+        Some("[on|off|required]"),
+        "workspace",
     ),
     (
         "init",
         "save this project's MCP integrations to .agent/mcp.json",
         None,
+        "mcp",
     ),
     (
         "mcp-import",
         "adopt integrations declared in .agent/mcp.json",
         None,
+        "mcp",
+    ),
+    (
+        "sessions",
+        "resume a past session in this directory",
+        None,
+        "session",
     ),
 ];
 
@@ -197,11 +272,12 @@ impl CommandIndex {
     pub fn new(engine_commands: &[CommandInfo]) -> Self {
         let mut entries: Vec<CommandEntry> = LOCAL
             .iter()
-            .map(|(name, description, hint)| CommandEntry {
+            .map(|(name, description, hint, category)| CommandEntry {
                 name: (*name).to_owned(),
                 description: (*description).to_owned(),
                 args_hint: hint.map(str::to_owned),
                 source: "cli",
+                category,
             })
             .collect();
         let mut engine_names = Vec::new();
@@ -215,6 +291,7 @@ impl CommandIndex {
                 description: info.description.clone(),
                 args_hint: info.args_hint.clone(),
                 source: source_label(info),
+                category: "other",
             });
         }
         Self {
@@ -287,8 +364,12 @@ impl CommandIndex {
             "mcp" => Route::Local(parse_mcp_command(args)),
             "mcp-install" => Route::Local(LocalCommand::McpInstall { arg: arg.clone() }),
             "mcp-remove" => Route::Local(parse_mcp_remove(args)),
+            "merge" => Route::Local(LocalCommand::Merge),
+            "discard" => Route::Local(LocalCommand::Discard),
+            "isolation" => Route::Local(LocalCommand::Isolation { arg }),
             "init" => Route::Local(LocalCommand::Init),
             "mcp-import" => Route::Local(LocalCommand::McpImport),
+            "sessions" => Route::Local(LocalCommand::Sessions),
             other if self.engine_names.iter().any(|n| n == other) => Route::Engine,
             _ => Route::Plain,
         }
@@ -527,5 +608,22 @@ mod tests {
     fn route_mcps_is_local() {
         let index = CommandIndex::default();
         assert_eq!(index.route("/mcps"), Route::Local(LocalCommand::Mcps));
+    }
+
+    #[test]
+    fn route_isolation_commands_are_local() {
+        let index = CommandIndex::default();
+        assert_eq!(index.route("/merge"), Route::Local(LocalCommand::Merge));
+        assert_eq!(index.route("/discard"), Route::Local(LocalCommand::Discard));
+        assert_eq!(
+            index.route("/isolation"),
+            Route::Local(LocalCommand::Isolation { arg: None })
+        );
+        assert_eq!(
+            index.route("/isolation on"),
+            Route::Local(LocalCommand::Isolation {
+                arg: Some("on".to_owned())
+            })
+        );
     }
 }

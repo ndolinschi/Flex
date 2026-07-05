@@ -12,7 +12,8 @@ use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyEventKind, KeyM
 
 use agentloop_cli_core::{
     AgentKind, CatalogEntry, CliPrefs, InstallTarget, LoginEvent, McpStore,
-    delegated_agents_enabled, has_copilot_credentials, parse_install_target,
+    delegated_agents_enabled, format_relative_time, has_copilot_credentials,
+    model_provider_available, needs_provider_setup, parse_install_target, session_display_label,
 };
 use agentloop_contracts::{
     AgentCaps, AgentEvent, Effort, ModelDiscovery, ModelInfo, ModelRef, PermissionDecision,
@@ -22,13 +23,16 @@ use agentloop_contracts::{
 
 use crate::chat::ChatState;
 use crate::commands::{CommandIndex, LocalCommand, McpSubcommand, Route};
-use crate::events::{AppEvent, Effect, SessionBootstrap, ShellCommandOutcome, TaskResult};
+use crate::events::{
+    AppEvent, Effect, EngineBootstrap, SessionBootstrap, ShellCommandOutcome, TaskResult,
+};
 use crate::files::FileIndex;
 use crate::input::{InputOutcome, InputState};
 use crate::overlay::{
-    self, ConfirmAction, ConfirmPrompt, LoginState, McpExplorerPhase, McpExplorerState,
-    McpInstallChoice, McpInstallMode, McpInstallState, McpListItem, McpListState, Overlay,
-    OverlayOutcome, PermissionPrompt, PickerAction, PickerChoice, PickerItem, PickerState,
+    self, CommandPaletteAction, CommandPaletteEntry, CommandPaletteState, ConfirmAction,
+    ConfirmPrompt, ConnectWizardState, ConnectWizardStep, LoginState, McpExplorerPhase,
+    McpExplorerState, McpInstallChoice, McpInstallMode, McpInstallState, McpListItem, McpListState,
+    Overlay, OverlayOutcome, PermissionPrompt, PickerAction, PickerChoice, PickerItem, PickerState,
     QuestionPrompt, ShellCommandOverlay, ShellCommandPhase,
 };
 use crate::theme::{self, BuiltinTheme, Theme};
@@ -69,6 +73,13 @@ pub enum SessionMode {
     #[default]
     Code,
     Plan,
+}
+
+/// Top-level screen: empty home vs active session chat.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AppRoute {
+    Home,
+    Session,
 }
 
 /// The live session's identity and per-turn preferences.
@@ -217,10 +228,80 @@ pub struct App {
     truecolor: bool,
     /// Theme snapshot taken when the picker opens, restored on cancel.
     saved_theme: Option<Theme>,
+    /// Show centered home hints when the transcript is empty.
+    pub home_screen: bool,
+    /// User dismissed the getting-started connect card.
+    pub getting_started_dismissed: bool,
+    /// Cached `git rev-parse --abbrev-ref HEAD` for the sidebar footer.
+    pub git_branch: Option<String>,
+    /// Open the model picker after the next successful provider connect.
+    connect_then_pick_model: bool,
+    /// Home vs session chat route.
+    pub route: AppRoute,
+    /// First user message held until lazy session creation completes.
+    pending_first_prompt: Option<String>,
+    /// Sidebar session label (title or formatted timestamp).
+    pub session_label: Option<String>,
     dirty: bool,
 }
 
 impl App {
+    /// Build the app on the home screen (engine ready, no session yet).
+    pub fn new_home(engine: EngineBootstrap, workdir: PathBuf, file_index: FileIndex) -> Self {
+        Self {
+            kind: engine.kind,
+            caps: engine.hello.capabilities.clone(),
+            engine_name: engine.hello.engine.name.clone(),
+            engine_version: engine.hello.engine.version.clone(),
+            session: SessionState {
+                id: SessionId(String::new()),
+                model: None,
+                turn: TurnPhase::Idle,
+                last_seq: 0,
+                permission_mode: PermissionMode::AcceptEdits,
+                session_mode: SessionMode::Code,
+                effort: Effort::default(),
+            },
+            chat: ChatState::default(),
+            input: InputState::default(),
+            commands: CommandIndex::new(&engine.hello.capabilities.commands),
+            overlay: Overlay::None,
+            pending_permissions: VecDeque::new(),
+            pending_questions: VecDeque::new(),
+            providers: engine.providers,
+            catalog: Vec::new(),
+            pending_provider: None,
+            awaiting_model_picker: false,
+            pending_copilot_auth: None,
+            pending_model: None,
+            status: StatusState::default(),
+            markdown_cache: MarkdownCache::default(),
+            mouse_capture: true,
+            show_thinking: engine.hello.capabilities.reasoning_visible,
+            thinking_budget: None,
+            pending_switch_kind: None,
+            should_quit: false,
+            workdir,
+            file_index,
+            mcp_store: McpStore::load(),
+            mcp_enabled: engine.mcp_enabled,
+            queued_prompts: std::collections::VecDeque::new(),
+            fallback_models: Vec::new(),
+            carried_context: None,
+            theme_id: BuiltinTheme::DEFAULT.id().to_owned(),
+            truecolor: theme::terminal_supports_truecolor(),
+            saved_theme: None,
+            home_screen: true,
+            getting_started_dismissed: false,
+            git_branch: None,
+            connect_then_pick_model: false,
+            route: AppRoute::Home,
+            pending_first_prompt: None,
+            session_label: None,
+            dirty: true,
+        }
+    }
+
     /// Build the app around the initial session.
     pub fn new(bootstrap: SessionBootstrap, workdir: PathBuf, file_index: FileIndex) -> Self {
         let mut app = Self {
@@ -277,15 +358,22 @@ impl App {
             theme_id: BuiltinTheme::DEFAULT.id().to_owned(),
             truecolor: theme::terminal_supports_truecolor(),
             saved_theme: None,
+            home_screen: true,
+            getting_started_dismissed: false,
+            git_branch: None,
+            connect_then_pick_model: false,
+            route: AppRoute::Session,
+            pending_first_prompt: None,
+            session_label: None,
             dirty: true,
         };
-        let splash_name = app.engine_name.clone();
-        let splash_version = app.engine_version.clone();
-        let splash_cwd = app.workdir.display().to_string();
-        app.chat
-            .push_splash(splash_name, splash_version, splash_cwd);
         app.install_bootstrap(bootstrap, false);
         app
+    }
+
+    /// Whether the UI is on the empty home screen (no session transcript).
+    pub fn is_home_route(&self) -> bool {
+        self.route == AppRoute::Home
     }
 
     /// Whether a redraw is needed. Cleared by [`Self::clear_dirty`] after a
@@ -326,6 +414,12 @@ impl App {
         }
         if let Some(capture) = prefs.mouse_capture {
             self.mouse_capture = capture;
+        }
+        if let Some(home) = prefs.home_screen {
+            self.home_screen = home;
+        }
+        if prefs.getting_started_dismissed == Some(true) {
+            self.getting_started_dismissed = true;
         }
         self.thinking_budget = prefs.thinking_budget;
         self.fallback_models = prefs
@@ -397,6 +491,11 @@ impl App {
                 self.on_login(event);
                 Vec::new()
             }
+            AppEvent::OpenAiOAuth(event) => {
+                self.dirty = true;
+                self.on_openai_oauth(event);
+                Vec::new()
+            }
             AppEvent::Tick => {
                 self.on_tick();
                 Vec::new()
@@ -426,9 +525,26 @@ impl App {
                 _ => Vec::new(),
             },
             TermEvent::Paste(text) => {
+                if self.overlay.is_active() && overlay::handle_paste(&mut self.overlay, &text) {
+                    return Vec::new();
+                }
                 self.input.paste(&text);
-                self.input
-                    .refresh_popup(&self.commands, &self.file_index, &self.workdir);
+                let skip_refresh = text.len() > crate::input::PASTE_PLACEHOLDER_MIN_CHARS
+                    || self.input.has_pasted_blocks();
+                if !skip_refresh {
+                    let refresh_start = std::time::Instant::now();
+                    self.input
+                        .refresh_popup(&self.commands, &self.file_index, &self.workdir);
+                    // #region agent log
+                    if text.len() > 1_000 {
+                        crate::debug_agent::log_refresh_popup(
+                            self.input.text().len(),
+                            refresh_start.elapsed().as_micros(),
+                        );
+                    }
+                    // #endregion
+                }
+                self.dirty = true;
                 Vec::new()
             }
             _ => Vec::new(),
@@ -473,6 +589,23 @@ impl App {
         if self.overlay.is_active() {
             if let Some(outcome) = overlay::handle_key(&mut self.overlay, key) {
                 return self.apply_overlay_outcome(outcome);
+            }
+        }
+
+        // Global chords before the editor (when no modal is open).
+        if !self.overlay.is_active() {
+            if matches!(key.code, KeyCode::Char('p') | KeyCode::Char('P'))
+                && key.modifiers.contains(KeyModifiers::CONTROL)
+            {
+                return self.open_command_palette();
+            }
+            if matches!(key.code, KeyCode::Char('?'))
+                && (key.modifiers.is_empty()
+                    || key.modifiers == KeyModifiers::CONTROL
+                    || key.modifiers == KeyModifiers::SHIFT)
+            {
+                self.overlay = Overlay::WhichKey;
+                return Vec::new();
             }
         }
 
@@ -580,6 +713,12 @@ impl App {
         {
             self.pending_copilot_auth = None;
         }
+        if effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::CancelOpenAiOAuth))
+        {
+            // OAuth overlay stays open until user picks another method.
+        }
         if let Some(info) = outcome.info {
             self.chat.push_info(info);
         }
@@ -605,6 +744,24 @@ impl App {
         }
         if let Some(choice) = outcome.choice {
             effects.extend(self.apply_picker_choice(choice));
+        }
+        if let Some(action) = outcome.palette_action {
+            effects.extend(self.apply_palette_action(action));
+        }
+        if let Some((id, config)) = outcome.connect_wizard {
+            self.dismiss_getting_started();
+            self.toast(format!("validating {id}…"));
+            effects.push(Effect::ValidateProvider { id, config });
+        }
+        if outcome.start_copilot_login {
+            self.dismiss_getting_started();
+            effects.extend(
+                self.start_copilot_login(PendingCopilotAuth::ApplyProvider("copilot".to_owned())),
+            );
+        }
+        if let Some(method) = outcome.start_openai_oauth {
+            self.dismiss_getting_started();
+            effects.push(Effect::StartOpenAiOAuth { method });
         }
         effects
     }
@@ -674,7 +831,23 @@ impl App {
                 let added = self.mcp_store.import_missing(servers);
                 self.save_mcp_list_reporting(&added)
             }
+            ConfirmAction::SaveProviderAnyway { id, config } => {
+                self.save_provider(&id, config, None)
+            }
         }
+    }
+
+    fn dismiss_getting_started(&mut self) {
+        if self.getting_started_dismissed {
+            return;
+        }
+        self.getting_started_dismissed = true;
+        let _ = CliPrefs::dismiss_getting_started();
+    }
+
+    /// Whether the getting-started connect card should render.
+    pub fn show_getting_started(&self) -> bool {
+        !self.getting_started_dismissed && needs_provider_setup(&self.providers, &CliPrefs::load())
     }
 
     /// Save `mcp_store` and report which of `imported` names were actually
@@ -729,6 +902,17 @@ impl App {
                 self.apply_effort_arg(&id);
                 Vec::new()
             }
+            PickerChoice::ResumeSession(id) => {
+                if id == self.session.id.0 {
+                    self.toast("already on this session");
+                    Vec::new()
+                } else {
+                    self.toast(format!("resuming {id}…"));
+                    vec![Effect::ResumeSession {
+                        id: SessionId::from(id),
+                    }]
+                }
+            }
         }
     }
 
@@ -772,12 +956,16 @@ impl App {
     }
 
     fn submit_prompt(&mut self, line: &str) -> Vec<Effect> {
+        if self.route == AppRoute::Home {
+            self.pending_first_prompt = Some(line.to_owned());
+            self.dirty = true;
+            return vec![Effect::OpenSession {
+                model: self.session.model.clone(),
+            }];
+        }
         if self.session.turn.is_running() {
             self.queued_prompts.push_back(line.to_owned());
-            self.toast(format!(
-                "queued ({}) — sends after this turn · esc interrupts and clears",
-                self.queued_prompts.len()
-            ));
+            self.dirty = true;
             return Vec::new();
         }
         let mut input = crate::files::expand_file_mentions(line, &self.workdir, &self.file_index);
@@ -851,8 +1039,32 @@ impl App {
             LocalCommand::Mcp { sub } => self.run_mcp_command(sub),
             LocalCommand::McpInstall { arg } => self.run_mcp_install(arg),
             LocalCommand::McpRemove { name } => self.run_mcp_remove(&name),
+            LocalCommand::Merge => {
+                if self.session.turn.is_running() {
+                    self.chat.push_error(
+                        "a turn is running — wait for it to finish or press Esc, \
+                         then /merge (git can't safely touch the worktree mid-turn)",
+                    );
+                    return Vec::new();
+                }
+                self.toast("verifying and merging the isolated workspace…");
+                vec![Effect::IntegrateWorkspace]
+            }
+            LocalCommand::Discard => {
+                if self.session.turn.is_running() {
+                    self.chat.push_error(
+                        "a turn is running — wait for it to finish or press Esc, \
+                         then /discard (git can't safely touch the worktree mid-turn)",
+                    );
+                    return Vec::new();
+                }
+                self.toast("discarding the isolated workspace…");
+                vec![Effect::DiscardWorkspace]
+            }
+            LocalCommand::Isolation { arg } => self.run_isolation(arg),
             LocalCommand::Init => self.run_init(),
             LocalCommand::McpImport => self.run_mcp_import(),
+            LocalCommand::Sessions => self.open_sessions_picker(),
         }
     }
 
@@ -1121,13 +1333,45 @@ impl App {
         Vec::new()
     }
 
-    const CONNECT_USAGE: &'static str = "usage: /connect <id> <base_url> [api_key] [default_model] [--force] · \
+    const CONNECT_USAGE: &'static str = "usage: /connect <name> <base_url> [api_key] [model] [--force] · \
+         template form (name it anything): /connect <name> <openai|deepseek> <api_key> [model] · \
          key may be {env:VAR}; omit it for keyless local endpoints (LM Studio) · \
-         known providers skip the URL: /connect deepseek <api_key>";
+         a known id skips the URL: /connect deepseek <api_key>";
+
+    /// `/isolation [on|off|required]`: no arg shows status; an arg toggles
+    /// workspace mode for future sessions (persisted; rebuilds the native
+    /// service so the next `/new` honors it; the current session is unchanged).
+    fn run_isolation(&mut self, arg: Option<String>) -> Vec<Effect> {
+        let Some(arg) = arg.filter(|a| !a.trim().is_empty()) else {
+            return vec![Effect::WorkspaceStatus];
+        };
+        let policy = match arg.trim().to_lowercase().as_str() {
+            "on" | "optional" => agentloop_contracts::IsolationPolicy::Optional,
+            "required" | "force" => agentloop_contracts::IsolationPolicy::Required,
+            "off" | "never" => agentloop_contracts::IsolationPolicy::Never,
+            other => {
+                self.chat.push_error(format!(
+                    "unknown isolation mode `{other}` — use `on`, `off`, or `required`"
+                ));
+                return Vec::new();
+            }
+        };
+        if let Err(err) = agentloop_cli_core::CliPrefs::remember_isolation(policy) {
+            self.chat
+                .push_error(format!("could not save isolation preference: {err}"));
+            return Vec::new();
+        }
+        if policy == agentloop_contracts::IsolationPolicy::Never {
+            self.toast("workspace mode OFF — new sessions run directly in the project");
+        } else {
+            self.toast("workspace mode ON — run /new to start an isolated session");
+        }
+        vec![Effect::SetIsolation { policy }]
+    }
 
     fn run_connect(&mut self, arg: Option<String>) -> Vec<Effect> {
         let Some(arg) = arg.filter(|a| !a.trim().is_empty()) else {
-            self.chat.push_info(Self::CONNECT_USAGE);
+            self.open_connect_wizard();
             return Vec::new();
         };
         let mut tokens: Vec<&str> = arg.split_whitespace().collect();
@@ -1156,27 +1400,47 @@ impl App {
                 .push_error(format!("`{id}` is already a registered provider"));
             return Vec::new();
         }
-        // Known-provider shortcut: `/connect deepseek <api_key> [model]` —
-        // when the id is a known OpenAI-compatible provider and the second
-        // token isn't a URL, treat it as the key and infer base_url + model.
         let second_is_url = tokens[1].contains("://");
-        let config = match known_provider_defaults(&id) {
-            Some((base_url, default_model, thinking)) if !second_is_url => {
-                agentloop_cli_core::ProviderConfig {
-                    name: None,
-                    base_url: base_url.to_owned(),
-                    api_key: tokens[1].to_owned(),
-                    models: Vec::new(),
-                    default_model: Some(
-                        tokens
-                            .get(2)
-                            .map(|s| (*s).to_owned())
-                            .unwrap_or_else(|| default_model.to_owned()),
-                    ),
-                    thinking,
-                }
+        let config = if let Some((base_url, default_model, thinking)) =
+            agentloop_cli_core::known_provider_defaults(&id).filter(|_| !second_is_url)
+        {
+            // (1) The id is itself a known provider: `/connect deepseek <key> [model]`.
+            agentloop_cli_core::ProviderConfig {
+                name: None,
+                base_url: base_url.to_owned(),
+                api_key: tokens[1].to_owned(),
+                models: Vec::new(),
+                default_model: Some(
+                    tokens
+                        .get(2)
+                        .map(|s| (*s).to_owned())
+                        .unwrap_or_else(|| default_model.to_owned()),
+                ),
+                thinking,
             }
-            _ => agentloop_cli_core::ProviderConfig {
+        } else if let Some((base_url, default_model, thinking)) =
+            agentloop_cli_core::known_provider_defaults(&tokens[1].to_lowercase())
+                .filter(|_| !second_is_url)
+        {
+            // (2) Custom name + provider template: `/connect mygpt openai <key> [model]`.
+            // The second token names a known template that supplies the base URL,
+            // so any provider can be connected under an arbitrary name.
+            agentloop_cli_core::ProviderConfig {
+                name: None,
+                base_url: base_url.to_owned(),
+                api_key: tokens.get(2).map(|s| (*s).to_owned()).unwrap_or_default(),
+                models: Vec::new(),
+                default_model: Some(
+                    tokens
+                        .get(3)
+                        .map(|s| (*s).to_owned())
+                        .unwrap_or_else(|| default_model.to_owned()),
+                ),
+                thinking,
+            }
+        } else {
+            // (3) Explicit base URL: `/connect <id> <base_url> [key] [model]`.
+            agentloop_cli_core::ProviderConfig {
                 name: None,
                 base_url: tokens[1].to_owned(),
                 // No third token = keyless local endpoint (LM Studio).
@@ -1184,7 +1448,7 @@ impl App {
                 models: Vec::new(),
                 default_model: tokens.get(3).map(|s| (*s).to_owned()),
                 thinking: false,
-            },
+            }
         };
         if force.is_some() {
             return self.save_provider(&id, config, None);
@@ -1200,6 +1464,7 @@ impl App {
         config: agentloop_cli_core::ProviderConfig,
         model_count: Option<usize>,
     ) -> Vec<Effect> {
+        self.dismiss_getting_started();
         if let Err(err) = agentloop_cli_core::CliPrefs::remember_provider(id, config) {
             self.chat.push_error(format!("could not save {id}: {err}"));
             return Vec::new();
@@ -1209,6 +1474,10 @@ impl App {
             None => self.toast(format!("saved {id} without validation")),
         }
         self.pending_provider = Some(id.to_owned());
+        if self.connect_then_pick_model {
+            self.connect_then_pick_model = false;
+            self.awaiting_model_picker = true;
+        }
         vec![Effect::ReloadEngine { invalidate: true }]
     }
 
@@ -1853,6 +2122,43 @@ impl App {
     fn open_catalog_picker(&mut self) {
         let current = self.current_provider();
         let mut items: Vec<PickerItem> = Vec::new();
+        let prefs = CliPrefs::load();
+        if self.catalog.is_empty() || prefs.recent_models.is_empty() {
+            // no section headers when there's nothing to section
+        } else {
+            let recent: Vec<PickerItem> = prefs
+                .recent_models
+                .iter()
+                .filter_map(|stored| {
+                    let model = ModelRef(stored.clone());
+                    if !model_provider_available(&model, &self.providers) {
+                        return None;
+                    }
+                    if let Some(provider) = current.as_deref() {
+                        let (entry_provider, _) = model.split();
+                        if entry_provider != Some(provider) {
+                            return None;
+                        }
+                    }
+                    Some(catalog_item_from_ref(&model, self.session.model.as_ref()))
+                })
+                .collect();
+            if !recent.is_empty() {
+                items.push(PickerItem {
+                    id: "__section_recent".to_owned(),
+                    label: "Recent".to_owned(),
+                    detail: None,
+                    enabled: false,
+                });
+                items.extend(recent);
+                items.push(PickerItem {
+                    id: "__section_all".to_owned(),
+                    label: "All".to_owned(),
+                    detail: None,
+                    enabled: false,
+                });
+            }
+        }
         // First row: the provider's "auto" smart-orchestration mode, if it has
         // one (DeepSeek). Offered by provider name, independent of the fetched
         // catalog, so it shows even if listing failed.
@@ -1935,6 +2241,237 @@ impl App {
             items,
             PickerAction::SwitchAgent,
         ));
+    }
+
+    fn open_command_palette(&mut self) -> Vec<Effect> {
+        let entries = self.build_command_palette();
+        self.overlay = Overlay::CommandPalette(CommandPaletteState {
+            entries,
+            filter: String::new(),
+            selected: 0,
+        });
+        Vec::new()
+    }
+
+    fn build_command_palette(&self) -> Vec<CommandPaletteEntry> {
+        let mut entries = Vec::new();
+        if self.providers.is_empty() {
+            entries.push(CommandPaletteEntry {
+                title: "/connect".to_owned(),
+                description: "connect an LLM provider".to_owned(),
+                category: "suggested",
+                section_header: Some("Suggested".to_owned()),
+                key_hint: None,
+                action: CommandPaletteAction::Local(LocalCommand::Connect { arg: None }),
+            });
+        }
+        entries.push(CommandPaletteEntry {
+            title: "/model".to_owned(),
+            description: "pick or set the session model".to_owned(),
+            category: "suggested",
+            section_header: if self.providers.is_empty() {
+                None
+            } else {
+                Some("Suggested".to_owned())
+            },
+            key_hint: None,
+            action: CommandPaletteAction::OpenModelPicker,
+        });
+        entries.push(CommandPaletteEntry {
+            title: "/sessions".to_owned(),
+            description: "resume a past session".to_owned(),
+            category: "suggested",
+            section_header: None,
+            key_hint: None,
+            action: CommandPaletteAction::OpenSessionsPicker,
+        });
+        entries.push(CommandPaletteEntry {
+            title: "/help".to_owned(),
+            description: "keys and commands".to_owned(),
+            category: "suggested",
+            section_header: None,
+            key_hint: None,
+            action: CommandPaletteAction::Local(LocalCommand::Help),
+        });
+        for entry in self.commands.entries() {
+            let title = format!("/{}", entry.name);
+            let key_hint = entry.args_hint.clone();
+            let action = if entry.source == "cli" {
+                match self.commands.route(&title) {
+                    Route::Local(command) => CommandPaletteAction::Local(command),
+                    Route::Engine => CommandPaletteAction::EngineCommand(entry.name.clone()),
+                    Route::Plain => continue,
+                }
+            } else {
+                CommandPaletteAction::EngineCommand(entry.name.clone())
+            };
+            entries.push(CommandPaletteEntry {
+                title,
+                description: entry.description.clone(),
+                category: entry.category,
+                section_header: None,
+                key_hint,
+                action,
+            });
+        }
+        entries.extend([
+            CommandPaletteEntry {
+                title: "Open model picker".to_owned(),
+                description: "browse models for the active provider".to_owned(),
+                category: "action",
+                section_header: Some("Actions".to_owned()),
+                key_hint: Some("/model".to_owned()),
+                action: CommandPaletteAction::OpenModelPicker,
+            },
+            CommandPaletteEntry {
+                title: "Open provider picker".to_owned(),
+                description: "switch LLM provider".to_owned(),
+                category: "action",
+                section_header: None,
+                key_hint: Some("/provider".to_owned()),
+                action: CommandPaletteAction::OpenProviderPicker,
+            },
+            CommandPaletteEntry {
+                title: "Open agent picker".to_owned(),
+                description: "switch agent implementation".to_owned(),
+                category: "action",
+                section_header: None,
+                key_hint: Some("/agent".to_owned()),
+                action: CommandPaletteAction::OpenAgentPicker,
+            },
+            CommandPaletteEntry {
+                title: "Resume past session".to_owned(),
+                description: "pick from saved sessions".to_owned(),
+                category: "action",
+                section_header: None,
+                key_hint: Some("/sessions".to_owned()),
+                action: CommandPaletteAction::OpenSessionsPicker,
+            },
+            CommandPaletteEntry {
+                title: "Scroll to bottom".to_owned(),
+                description: "follow live transcript".to_owned(),
+                category: "action",
+                section_header: None,
+                key_hint: Some("End".to_owned()),
+                action: CommandPaletteAction::ScrollToBottom,
+            },
+            CommandPaletteEntry {
+                title: "Toggle thinking blocks".to_owned(),
+                description: "show or hide reasoning".to_owned(),
+                category: "action",
+                section_header: None,
+                key_hint: Some("Ctrl+T".to_owned()),
+                action: CommandPaletteAction::ToggleThinking,
+            },
+            CommandPaletteEntry {
+                title: "Copy transcript".to_owned(),
+                description: "copy chat to clipboard".to_owned(),
+                category: "action",
+                section_header: None,
+                key_hint: Some("Ctrl+Shift+C".to_owned()),
+                action: CommandPaletteAction::CopyTranscript,
+            },
+            CommandPaletteEntry {
+                title: "Cycle permission mode".to_owned(),
+                description: "shift through security levels".to_owned(),
+                category: "action",
+                section_header: None,
+                key_hint: Some("Shift+Tab".to_owned()),
+                action: CommandPaletteAction::CyclePermissionMode,
+            },
+            CommandPaletteEntry {
+                title: "Toggle mouse capture".to_owned(),
+                description: "wheel scroll vs text selection".to_owned(),
+                category: "action",
+                section_header: None,
+                key_hint: Some("Ctrl+M".to_owned()),
+                action: CommandPaletteAction::ToggleMouseCapture,
+            },
+        ]);
+        entries
+    }
+
+    fn apply_palette_action(&mut self, action: CommandPaletteAction) -> Vec<Effect> {
+        match action {
+            CommandPaletteAction::Local(command) => self.run_local(command),
+            CommandPaletteAction::EngineCommand(name) => self.submit_prompt(&format!("/{name}")),
+            CommandPaletteAction::OpenModelPicker => self.open_model_picker(),
+            CommandPaletteAction::OpenProviderPicker => self.open_provider_picker(),
+            CommandPaletteAction::OpenAgentPicker => {
+                self.open_agent_picker();
+                Vec::new()
+            }
+            CommandPaletteAction::OpenSessionsPicker => self.open_sessions_picker(),
+            CommandPaletteAction::ScrollToBottom => {
+                self.chat.scroll.scroll_to_bottom();
+                Vec::new()
+            }
+            CommandPaletteAction::ToggleThinking => self.run_thinking_command(None),
+            CommandPaletteAction::CopyTranscript => self.copy_chat(),
+            CommandPaletteAction::CyclePermissionMode => self.cycle_ui_mode(),
+            CommandPaletteAction::ToggleMouseCapture => self.toggle_mouse_capture(),
+        }
+    }
+
+    fn open_sessions_picker(&mut self) -> Vec<Effect> {
+        self.toast("loading sessions…");
+        vec![Effect::ListSessions]
+    }
+
+    fn open_sessions_picker_with(&mut self, summaries: Vec<agentloop_cli_core::SessionSummary>) {
+        if summaries.is_empty() {
+            self.chat
+                .push_info("no saved sessions for this directory yet");
+            return;
+        }
+        let current = self.session.id.0.clone();
+        let items = summaries
+            .into_iter()
+            .map(|summary| {
+                let label = session_display_label(&summary).to_owned();
+                let when = format_relative_time(summary.updated_at_ms);
+                let is_current = summary.id.0 == current;
+                PickerItem {
+                    id: summary.id.0,
+                    label,
+                    detail: Some(if is_current {
+                        format!("{when} · current")
+                    } else {
+                        when
+                    }),
+                    enabled: !is_current,
+                }
+            })
+            .collect();
+        self.overlay = Overlay::Picker(PickerState::new(
+            "sessions",
+            items,
+            PickerAction::ResumeSession,
+        ));
+    }
+
+    fn open_connect_wizard(&mut self) {
+        self.dismiss_getting_started();
+        self.overlay = Overlay::ConnectWizard(ConnectWizardState::new_gallery());
+        self.skip_connect_gallery_headers();
+    }
+
+    /// Auto-open the connect gallery once on startup when no providers exist.
+    pub fn open_connect_gallery_on_startup(&mut self) {
+        self.overlay = Overlay::ConnectWizard(ConnectWizardState::new_gallery());
+        self.skip_connect_gallery_headers();
+    }
+
+    fn skip_connect_gallery_headers(&mut self) {
+        if let Overlay::ConnectWizard(state) = &mut self.overlay {
+            let rows = state.gallery_rows();
+            if let Some(idx) = rows
+                .iter()
+                .position(|row| !matches!(row, crate::overlay::ConnectGalleryRow::Header(_)))
+            {
+                state.selected = idx;
+            }
+        }
     }
 
     fn current_provider(&self) -> Option<String> {
@@ -2075,17 +2612,15 @@ impl App {
                 detail,
                 options,
             } => {
-                let prompt = PermissionPrompt {
-                    id: id.clone(),
-                    call_id: call_id.clone(),
-                    title: title.clone(),
-                    detail: detail.clone(),
-                    options: options.clone(),
-                    selected: 0,
-                    session: None,
-                    role: None,
-                };
-                self.queue_permission(prompt);
+                self.queue_permission(make_permission_prompt(
+                    id.clone(),
+                    call_id.clone(),
+                    title.clone(),
+                    detail.clone(),
+                    options.clone(),
+                    None,
+                    None,
+                ));
                 Vec::new()
             }
             AgentEvent::PermissionResolved { id, .. } => {
@@ -2115,16 +2650,15 @@ impl App {
                         detail,
                         options,
                     } => {
-                        self.queue_permission(PermissionPrompt {
-                            id: id.clone(),
-                            call_id: call_id.clone(),
-                            title: title.clone(),
-                            detail: detail.clone(),
-                            options: options.clone(),
-                            selected: 0,
-                            session: Some(child_session.clone()),
-                            role: self.chat.subagent_role(child_session),
-                        });
+                        self.queue_permission(make_permission_prompt(
+                            id.clone(),
+                            call_id.clone(),
+                            title.clone(),
+                            detail.clone(),
+                            options.clone(),
+                            Some(child_session.clone()),
+                            self.chat.subagent_role(child_session),
+                        ));
                     }
                     // Covers both user answers and the engine's ask_timeout
                     // auto-deny — a relayed prompt never dangles.
@@ -2273,12 +2807,19 @@ impl App {
                 Vec::new()
             }
             TaskResult::ProviderValidated { id, config, result } => match result {
-                Ok(count) => self.save_provider(&id, config, Some(count)),
+                Ok(count) => {
+                    self.connect_then_pick_model = true;
+                    self.save_provider(&id, config, Some(count))
+                }
                 Err(message) => {
-                    self.chat.push_human_error(
-                        format!("could not reach `{id}`: {message}"),
-                        Some("check the URL and key, or append --force to save anyway".to_owned()),
-                    );
+                    self.connect_then_pick_model = true;
+                    self.overlay = Overlay::Confirm(ConfirmPrompt {
+                        title: format!("Could not reach `{id}`"),
+                        message: format!(
+                            "{message}\n\nSave this provider anyway? Chat may fail until the endpoint works."
+                        ),
+                        action: ConfirmAction::SaveProviderAnyway { id, config },
+                    });
                     Vec::new()
                 }
             },
@@ -2454,6 +2995,85 @@ impl App {
                     Vec::new()
                 }
             },
+            TaskResult::WorkspaceIntegrated(Ok(message)) => {
+                self.chat.push_info(message);
+                Vec::new()
+            }
+            TaskResult::WorkspaceIntegrated(Err(message)) => {
+                self.chat.push_error(message);
+                Vec::new()
+            }
+            TaskResult::WorkspaceDiscarded(Ok(message)) => {
+                self.chat.push_info(message);
+                Vec::new()
+            }
+            TaskResult::WorkspaceDiscarded(Err(message)) => {
+                self.chat.push_error(message);
+                Vec::new()
+            }
+            TaskResult::WorkspaceStatusReported(Ok(message)) => {
+                self.chat.push_info(message);
+                Vec::new()
+            }
+            TaskResult::WorkspaceStatusReported(Err(message)) => {
+                self.chat.push_error(message);
+                Vec::new()
+            }
+            TaskResult::SessionsListed(summaries) => {
+                self.open_sessions_picker_with(summaries);
+                Vec::new()
+            }
+            TaskResult::SessionResumed(outcome) => match *outcome {
+                Ok(bootstrap) => {
+                    self.install_bootstrap(bootstrap, true);
+                    Vec::new()
+                }
+                Err(message) => {
+                    self.chat.push_error(format!("resume failed: {message}"));
+                    Vec::new()
+                }
+            },
+            TaskResult::SessionOpened(result) => match result {
+                Ok(bootstrap) => {
+                    self.install_bootstrap(bootstrap, false);
+                    if let Some(line) = self.pending_first_prompt.take() {
+                        return self.submit_prompt(&line);
+                    }
+                    Vec::new()
+                }
+                Err(message) => {
+                    self.pending_first_prompt = None;
+                    self.toast(message);
+                    Vec::new()
+                }
+            },
+            TaskResult::OpenAiOAuthFinished(result) => {
+                self.overlay = Overlay::None;
+                match result {
+                    Ok(()) => {
+                        self.dismiss_getting_started();
+                        self.connect_then_pick_model = true;
+                        let config = agentloop_cli_core::ProviderConfig {
+                            name: Some("OpenAI".to_owned()),
+                            base_url: "https://api.openai.com/v1".to_owned(),
+                            api_key: String::new(),
+                            default_model: Some("gpt-4.1-mini".to_owned()),
+                            thinking: false,
+                            models: Vec::new(),
+                        };
+                        self.toast("OpenAI signed in — validating…");
+                        vec![Effect::ValidateProvider {
+                            id: "openai".to_owned(),
+                            config,
+                        }]
+                    }
+                    Err(message) => {
+                        self.toast(message);
+                        self.open_connect_wizard();
+                        Vec::new()
+                    }
+                }
+            }
         }
     }
 
@@ -2557,6 +3177,11 @@ impl App {
             session_mode: prev_session_mode,
             effort: prev_effort,
         };
+        self.route = AppRoute::Session;
+        self.session_label = bootstrap
+            .session_title
+            .clone()
+            .or_else(|| bootstrap.session_created_at_ms.map(format_relative_time));
         self.providers = bootstrap.providers;
         self.catalog.clear();
         self.pending_provider = None;
@@ -2632,6 +3257,32 @@ impl App {
         }
     }
 
+    fn on_openai_oauth(&mut self, event: agentloop_cli_core::OpenAiOAuthEvent) {
+        let Overlay::ConnectWizard(state) = &mut self.overlay else {
+            return;
+        };
+        if state.step != ConnectWizardStep::OAuthWaiting {
+            return;
+        }
+        use agentloop_cli_core::OpenAiOAuthEvent;
+        match event {
+            OpenAiOAuthEvent::Started {
+                url, instructions, ..
+            } => {
+                state.oauth_url = Some(url);
+                state.oauth_instructions = Some(instructions);
+                state.oauth_waiting = true;
+            }
+            OpenAiOAuthEvent::Waiting => {
+                state.oauth_waiting = true;
+            }
+            OpenAiOAuthEvent::Succeeded => {
+                // Terminal state arrives via TaskResult::OpenAiOAuthFinished.
+            }
+            _ => {}
+        }
+    }
+
     // ── ticks ───────────────────────────────────────────────────────────────
 
     fn on_tick(&mut self) {
@@ -2644,8 +3295,33 @@ impl App {
                     ..
                 })
             );
+        self.status.spinner = self.status.spinner.wrapping_add(1);
+        // #region agent log
+        if self.status.spinner % 10 == 0 {
+            crate::debug_agent::log(
+                "C",
+                "app.rs:on_tick",
+                "tick sample",
+                serde_json::json!({
+                    "spinner": self.status.spinner,
+                    "isHomeRoute": self.is_home_route(),
+                    "isHomeScreen": self.chat.is_home_screen(),
+                    "inputEmpty": self.input.is_empty(),
+                    "providersEmpty": self.providers.is_empty(),
+                    "busy": busy,
+                }),
+            );
+        }
+        // #endregion
         if busy {
-            self.status.spinner = self.status.spinner.wrapping_add(1);
+            self.dirty = true;
+        } else if self.is_home_route() && self.input.is_empty() {
+            if self.status.spinner % crate::input::ROTATE_HINT_TICKS == 0 {
+                self.input.rotate_placeholder(self.status.spinner);
+                self.dirty = true;
+            }
+        } else if self.providers.is_empty() && self.status.spinner % 50 == 0 {
+            // Narrow-terminal connect hint alternates every 5s; no need to repaint every tick.
             self.dirty = true;
         }
         let live_toasts = self.status.toasts.len();
@@ -2699,6 +3375,41 @@ fn catalog_item(entry: &CatalogEntry) -> PickerItem {
         label: format!("{}/{}", entry.provider, entry.model.id),
         detail: model_badges(&entry.model),
         enabled: true,
+    }
+}
+
+fn catalog_item_from_ref(model: &ModelRef, current: Option<&ModelRef>) -> PickerItem {
+    PickerItem {
+        id: model.0.clone(),
+        label: model.0.clone(),
+        detail: current
+            .filter(|active| active.0 == model.0)
+            .map(|_| "current".to_owned()),
+        enabled: true,
+    }
+}
+
+fn make_permission_prompt(
+    id: PermissionRequestId,
+    call_id: Option<agentloop_contracts::ToolCallId>,
+    title: String,
+    detail: Option<String>,
+    options: Vec<agentloop_contracts::PermissionDecisionKind>,
+    session: Option<SessionId>,
+    role: Option<String>,
+) -> PermissionPrompt {
+    let diff = crate::tool_output::diff_from_permission_detail(&title, detail.as_deref());
+    PermissionPrompt {
+        id,
+        call_id,
+        title,
+        detail,
+        options,
+        selected: 0,
+        session,
+        role,
+        diff,
+        diff_expanded: false,
     }
 }
 
@@ -2786,15 +3497,6 @@ impl App {
         if let Err(err) = CliPrefs::remember_thinking_budget(self.thinking_budget) {
             tracing::warn!(target: "prefs", "failed to save thinking budget: {err}");
         }
-    }
-}
-
-/// Known OpenAI-compatible providers: `(base_url, default_model, thinking)`.
-/// Lets `/connect <id> <api_key>` skip the base URL for these ids.
-fn known_provider_defaults(id: &str) -> Option<(&'static str, &'static str, bool)> {
-    match id {
-        "deepseek" => Some(("https://api.deepseek.com/v1", "deepseek-v4-pro", true)),
-        _ => None,
     }
 }
 
@@ -2957,6 +3659,9 @@ mod copilot_auth_tests {
             permission_mode: None,
             mcp_enabled: 0,
             session_restarted: false,
+            isolated: false,
+            session_title: None,
+            session_created_at_ms: None,
         }
     }
 
@@ -3056,6 +3761,9 @@ mod status_tests {
             permission_mode: None,
             mcp_enabled: 0,
             session_restarted: false,
+            isolated: false,
+            session_title: None,
+            session_created_at_ms: None,
         };
         App::new(bootstrap, PathBuf::from("."), FileIndex::default())
     }
@@ -3277,6 +3985,9 @@ mod session_tests {
             permission_mode: None,
             mcp_enabled: 0,
             session_restarted: false,
+            isolated: false,
+            session_title: None,
+            session_created_at_ms: None,
         };
         App::new(bootstrap, PathBuf::from("."), FileIndex::default())
     }
@@ -3293,6 +4004,9 @@ mod session_tests {
             permission_mode: None,
             mcp_enabled: 0,
             session_restarted: false,
+            isolated: false,
+            session_title: None,
+            session_created_at_ms: None,
         };
         App::new(bootstrap, workdir, FileIndex::default())
     }
@@ -3585,6 +4299,36 @@ mod session_tests {
     }
 
     #[test]
+    fn connect_openai_shortcut_infers_url_and_model() {
+        let mut app = native_test_app();
+        let effects = app.run_connect(Some("openai sk-proj-abc".to_owned()));
+        match effects.first() {
+            Some(Effect::ValidateProvider { id, config }) => {
+                assert_eq!(id, "openai");
+                assert_eq!(config.base_url, "https://api.openai.com/v1");
+                assert_eq!(config.api_key, "sk-proj-abc");
+                assert_eq!(config.default_model.as_deref(), Some("gpt-4.1-mini"));
+                assert!(!config.thinking);
+            }
+            other => panic!("expected ValidateProvider, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn connect_openai_shortcut_honors_explicit_model() {
+        let mut app = native_test_app();
+        let effects = app.run_connect(Some("openai sk-proj-abc gpt-4o".to_owned()));
+        match effects.first() {
+            Some(Effect::ValidateProvider { id, config }) => {
+                assert_eq!(id, "openai");
+                assert_eq!(config.base_url, "https://api.openai.com/v1");
+                assert_eq!(config.default_model.as_deref(), Some("gpt-4o"));
+            }
+            other => panic!("expected ValidateProvider, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn connect_full_form_still_uses_given_url() {
         let mut app = native_test_app();
         let effects = app.run_connect(Some("myllm http://localhost:1234/v1".to_owned()));
@@ -3748,6 +4492,9 @@ mod session_tests {
             permission_mode: None,
             mcp_enabled: 1,
             session_restarted: false,
+            isolated: false,
+            session_title: None,
+            session_created_at_ms: None,
         };
         app.install_bootstrap(bootstrap, false);
         assert_eq!(

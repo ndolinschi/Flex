@@ -19,6 +19,7 @@ agentloop-core = { path = "../engine/crates/core" }
 agentloop-engine = { path = "../engine/crates/engine" }
 agentloop-mcp = { path = "../engine/crates/mcp" }
 agentloop-session = { path = "../engine/crates/session" }
+agentloop-workspace = { path = "../engine/crates/workspace" }
 agentloop-delegator-claude-code = { path = "../engine/crates/delegators/claude-code" }
 agentloop-delegator-copilot = { path = "../engine/crates/delegators/copilot" }
 agentloop-provider-copilot = { path = "../engine/crates/providers/copilot" }

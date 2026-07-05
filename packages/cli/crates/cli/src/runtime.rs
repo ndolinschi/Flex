@@ -21,14 +21,16 @@ use tokio_util::sync::CancellationToken;
 
 use agentloop_cli_core::{
     AgentKind, CliPrefs, EngineHub, InstallTarget, LoginEvent, McpStore, ModelCatalog,
-    SessionController, login_copilot, resolve_stored_model,
+    SessionController, login_copilot, login_openai, resolve_stored_model,
 };
-use agentloop_contracts::{ModelRef, NewSessionParams, SessionId};
+use agentloop_contracts::{IntegrationOutcome, ModelRef, NewSessionParams, SessionId};
 use agentloop_core::EventStream as EngineEventStream;
 
 use crate::app::App;
 use crate::args::{Args, Command, ResumeMode};
-use crate::events::{AppEvent, Effect, SessionBootstrap, ShellCommandOutcome, TaskResult};
+use crate::events::{
+    AppEvent, Effect, EngineBootstrap, SessionBootstrap, ShellCommandOutcome, TaskResult,
+};
 use crate::files::FileIndex;
 
 const EVENT_QUEUE: usize = 1024;
@@ -55,7 +57,8 @@ async fn run_list_sessions(args: Args) -> Result<()> {
     }
     writeln!(out, "Recent sessions for {}:", args.workdir.display())?;
     for summary in sessions {
-        writeln!(out, "  {}  {}", summary.id.0, summary.preview)?;
+        let label = agentloop_cli_core::session_display_label(&summary);
+        writeln!(out, "  {}  {}", summary.id.0, label)?;
     }
     writeln!(
         out,
@@ -88,13 +91,15 @@ async fn run_tui(mut args: Args, resume: ResumeMode) -> Result<()> {
     // degrades to a new session rather than failing startup.
     match &resume {
         ResumeMode::New => {}
-        ResumeMode::Continue => match agentloop_cli_core::most_recent_session(&args.workdir).await {
-            Some(id) => hub.remember_session(args.agent, id),
-            None => tracing::info!(
-                target: "session",
-                "no prior session for this directory; starting fresh"
-            ),
-        },
+        ResumeMode::Continue => {
+            match agentloop_cli_core::most_recent_session(&args.workdir).await {
+                Some(id) => hub.remember_session(args.agent, id),
+                None => tracing::info!(
+                    target: "session",
+                    "no prior session for this directory; starting fresh"
+                ),
+            }
+        }
         ResumeMode::Session(id) => {
             let session = SessionId::from(id.clone());
             if agentloop_cli_core::session_exists(&session).await {
@@ -106,6 +111,13 @@ async fn run_tui(mut args: Args, resume: ResumeMode) -> Result<()> {
     }
     let cli_model = args.model.clone().map(ModelRef);
     let prefs = CliPrefs::load();
+    // Resolve isolation before the native service is built: a `--isolate` flag
+    // wins over the saved default. The verify command comes from prefs.
+    let isolation = args
+        .isolation
+        .or_else(|| prefs.isolation_policy())
+        .unwrap_or_default();
+    hub.set_isolation(isolation, prefs.verify_command.clone());
     let saved_model = if cli_model.is_none() {
         prefs.last_model.clone()
     } else {
@@ -114,42 +126,76 @@ async fn run_tui(mut args: Args, resume: ResumeMode) -> Result<()> {
     let requested_model = cli_model
         .clone()
         .or_else(|| saved_model.as_ref().map(|stored| ModelRef(stored.clone())));
-    let (controller, events, mut bootstrap) =
-        bootstrap_session(&mut hub, args.agent, requested_model.clone()).await?;
-    bootstrap.model = resolve_startup_model(cli_model.as_ref(), saved_model.as_deref(), &bootstrap);
-    if cli_model.is_some() {
-        if let Some(model) = bootstrap.model.as_ref() {
+    let lazy_home = matches!(resume, ResumeMode::New) && hub.last_session(args.agent).is_none();
+    let (mut app, executor, isolated_session) = if lazy_home {
+        let engine = bootstrap_engine(&mut hub, args.agent).await?;
+        let workdir_for_app = args.workdir.clone();
+        let file_index = match tokio::task::spawn_blocking({
+            let workdir = workdir_for_app.clone();
+            move || FileIndex::build(&workdir)
+        })
+        .await
+        {
+            Ok(Ok(index)) => index,
+            Ok(Err(err)) => {
+                tracing::warn!(target: "files", "file index unavailable: {err}");
+                FileIndex::default()
+            }
+            Err(err) => {
+                tracing::warn!(target: "files", "file index worker failed: {err}");
+                FileIndex::default()
+            }
+        };
+        let app = App::new_home(engine, workdir_for_app, file_index);
+        let executor = EffectExecutor::new_without_session(
+            hub,
+            args.agent,
+            tx.clone(),
+            requested_model.clone(),
+        );
+        (app, executor, false)
+    } else {
+        let (controller, events, mut bootstrap) =
+            bootstrap_session(&mut hub, args.agent, requested_model.clone()).await?;
+        bootstrap.model =
+            resolve_startup_model(cli_model.as_ref(), saved_model.as_deref(), &bootstrap);
+        spawn_engine_forwarder(events, tx.clone());
+        let workdir_for_app = args.workdir.clone();
+        let file_index = match tokio::task::spawn_blocking({
+            let workdir = workdir_for_app.clone();
+            move || FileIndex::build(&workdir)
+        })
+        .await
+        {
+            Ok(Ok(index)) => index,
+            Ok(Err(err)) => {
+                tracing::warn!(target: "files", "file index unavailable: {err}");
+                FileIndex::default()
+            }
+            Err(err) => {
+                tracing::warn!(target: "files", "file index worker failed: {err}");
+                FileIndex::default()
+            }
+        };
+        let isolated = bootstrap.isolated;
+        let app = App::new(bootstrap, workdir_for_app, file_index);
+        let executor =
+            EffectExecutor::new(hub, controller, args.agent, tx.clone(), requested_model);
+        (app, executor, isolated)
+    };
+    if !lazy_home && cli_model.is_some() {
+        if let Some(model) = app.session.model.as_ref() {
             if let Err(err) = CliPrefs::remember_model(model) {
                 tracing::warn!(target: "prefs", "failed to save --model preference: {err}");
             }
         }
     }
-    spawn_engine_forwarder(events, tx.clone());
+    app.apply_loaded_prefs(&prefs);
     spawn_terminal_forwarder(tx.clone());
     spawn_tick_forwarder(tx.clone());
     spawn_interrupt_forwarder(tx.clone());
     spawn_signal_restore();
-
-    let workdir = args.workdir.clone();
-    let file_index = match tokio::task::spawn_blocking({
-        let workdir = workdir.clone();
-        move || FileIndex::build(&workdir)
-    })
-    .await
-    {
-        Ok(Ok(index)) => index,
-        Ok(Err(err)) => {
-            tracing::warn!(target: "files", "file index unavailable: {err}");
-            FileIndex::default()
-        }
-        Err(err) => {
-            tracing::warn!(target: "files", "file index worker failed: {err}");
-            FileIndex::default()
-        }
-    };
-
-    let mut app = App::new(bootstrap, workdir, file_index);
-    app.apply_loaded_prefs(&prefs);
+    let mut app = app;
     // A `--effort` flag overrides the saved default for this run (and persists,
     // like `--model`).
     if let Some(effort) = args.effort.as_deref() {
@@ -161,15 +207,36 @@ async fn run_tui(mut args: Args, resume: ResumeMode) -> Result<()> {
              (set FLEX_ENABLE_DELEGATED_AGENTS=1 to re-enable)",
         );
     }
+    app.git_branch = read_git_branch(&app.workdir);
     if app.kind == AgentKind::Native && app.providers.is_empty() {
-        app.chat.push_info(
-            "no LLM provider configured — set an API key env var and restart \
-             (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`, \
-             `OLLAMA_HOST`/`OLLAMA_MODEL`, or sign in to Copilot with `flex auth login`), \
-             or run /connect <id> <base_url> [api_key] to add one now.",
-        );
+        app.open_connect_gallery_on_startup();
     }
-    let executor = EffectExecutor::new(hub, controller, args.agent, tx.clone());
+    if isolated_session {
+        app.chat.push_info(
+            "isolated workspace active — edits stay in a git worktree and won't touch \
+             your project until you run /merge (verify + merge back) or /discard. \
+             /isolation shows the pending diff.",
+        );
+    } else if isolation.wants_isolation() {
+        // Isolation was asked for but the session isn't isolated — explain why,
+        // matched to the actual reason so the hint doesn't misdirect.
+        if app.kind != AgentKind::Native {
+            app.chat.push_info(
+                "workspace isolation applies only to the native agent — this \
+                 delegated agent runs directly in the project directory.",
+            );
+        } else if matches!(resume, ResumeMode::New) {
+            // A fresh native session that still isn't isolated: most likely the
+            // directory isn't a git repository.
+            app.chat.push_info(
+                "isolation was requested but isn't active (is this a git repository?) — \
+                 running directly in the project directory.",
+            );
+        }
+        // A resumed native session simply can't be isolated retroactively; stay
+        // quiet rather than blame the git repo.
+    }
+    let executor = executor;
     let mut terminal = TerminalSession::enter()?;
     // Sync the terminal to the app's mouse-capture state (default on, or a
     // persisted Ctrl+M choice from `apply_loaded_prefs`) — `enter()` leaves
@@ -351,6 +418,33 @@ async fn run_auth_login() -> Result<()> {
     }
 }
 
+async fn bootstrap_engine(
+    hub: &mut EngineHub,
+    kind: AgentKind,
+) -> Result<EngineBootstrap, anyhow::Error> {
+    let service = hub.service(kind).await?;
+    let hello = service.hello();
+    let providers = service
+        .provider_registry()
+        .ids()
+        .into_iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<_>>();
+    let trace = hub.trace(kind).to_vec();
+    let mcp_enabled = if kind == AgentKind::Native {
+        McpStore::load().enabled_count()
+    } else {
+        0
+    };
+    Ok(EngineBootstrap {
+        kind,
+        hello,
+        providers,
+        trace,
+        mcp_enabled,
+    })
+}
+
 async fn bootstrap_session(
     hub: &mut EngineHub,
     kind: AgentKind,
@@ -389,6 +483,12 @@ async fn bootstrap_session(
     } else {
         0
     };
+    let isolated = controller
+        .service()
+        .is_isolated(&session)
+        .await
+        .unwrap_or(false);
+    let meta = controller.service().session_meta(&session).await.ok();
     let bootstrap = SessionBootstrap {
         kind,
         hello,
@@ -400,8 +500,75 @@ async fn bootstrap_session(
         permission_mode: None,
         mcp_enabled,
         session_restarted: false,
+        isolated,
+        session_title: meta.as_ref().and_then(|m| m.title.clone()),
+        session_created_at_ms: meta.as_ref().map(|m| m.created_at_ms),
     };
     Ok((controller, events, bootstrap))
+}
+
+async fn resume_session_by_id(
+    hub: Arc<Mutex<EngineHub>>,
+    controller: Arc<Mutex<Option<SessionController>>>,
+    current_kind: Arc<Mutex<AgentKind>>,
+    session_id: SessionId,
+    tx: mpsc::Sender<AppEvent>,
+) -> Result<SessionBootstrap, String> {
+    let kind = *current_kind.lock().await;
+    let previous = {
+        let controller = controller.lock().await;
+        controller
+            .as_ref()
+            .map(|c| c.session_id().clone())
+            .unwrap_or_else(|| SessionId(String::new()))
+    };
+    let (service, hello, providers, trace, mcp_enabled) = {
+        let mut hub = hub.lock().await;
+        hub.remember_session(kind, previous);
+        hub.remember_session(kind, session_id.clone());
+        let service = hub.service(kind).await.map_err(|err| err.to_string())?;
+        let hello = service.hello();
+        let providers = service
+            .provider_registry()
+            .ids()
+            .into_iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>();
+        let trace = hub.trace(kind).to_vec();
+        let mcp_enabled = if kind == AgentKind::Native {
+            McpStore::load().enabled_count()
+        } else {
+            0
+        };
+        (service, hello, providers, trace, mcp_enabled)
+    };
+    let (next, events) = SessionController::resume(service, session_id)
+        .await
+        .map_err(|err| err.to_string())?;
+    let transcript = next.transcript().await.ok();
+    let session = next.session_id().clone();
+    let isolated = next.service().is_isolated(&session).await.unwrap_or(false);
+    let meta = next.service().session_meta(&session).await.ok();
+    {
+        let mut controller = controller.lock().await;
+        *controller = Some(next);
+    }
+    spawn_engine_forwarder(events, tx);
+    Ok(SessionBootstrap {
+        kind,
+        hello,
+        session,
+        providers,
+        model: None,
+        transcript,
+        trace,
+        permission_mode: None,
+        mcp_enabled,
+        session_restarted: false,
+        isolated,
+        session_title: meta.as_ref().and_then(|m| m.title.clone()),
+        session_created_at_ms: meta.as_ref().map(|m| m.created_at_ms),
+    })
 }
 
 /// Pick the session model after bootstrap: honor `--model`, else restore a
@@ -528,10 +695,12 @@ fn spawn_signal_restore() {}
 /// Executes reducer effects on background tasks.
 pub struct EffectExecutor {
     hub: Arc<Mutex<EngineHub>>,
-    controller: Arc<Mutex<SessionController>>,
+    controller: Arc<Mutex<Option<SessionController>>>,
     current_kind: Arc<Mutex<AgentKind>>,
+    pending_model: Arc<Mutex<Option<ModelRef>>>,
     tx: mpsc::Sender<AppEvent>,
     login_cancel: Arc<Mutex<Option<CancellationToken>>>,
+    oauth_cancel: Arc<Mutex<Option<CancellationToken>>>,
     shell_cancel: Arc<Mutex<Option<CancellationToken>>>,
 }
 
@@ -541,13 +710,34 @@ impl EffectExecutor {
         controller: SessionController,
         kind: AgentKind,
         tx: mpsc::Sender<AppEvent>,
+        pending_model: Option<ModelRef>,
     ) -> Self {
         Self {
             hub: Arc::new(Mutex::new(hub)),
-            controller: Arc::new(Mutex::new(controller)),
+            controller: Arc::new(Mutex::new(Some(controller))),
             current_kind: Arc::new(Mutex::new(kind)),
+            pending_model: Arc::new(Mutex::new(pending_model)),
             tx,
             login_cancel: Arc::new(Mutex::new(None)),
+            oauth_cancel: Arc::new(Mutex::new(None)),
+            shell_cancel: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    fn new_without_session(
+        hub: EngineHub,
+        kind: AgentKind,
+        tx: mpsc::Sender<AppEvent>,
+        pending_model: Option<ModelRef>,
+    ) -> Self {
+        Self {
+            hub: Arc::new(Mutex::new(hub)),
+            controller: Arc::new(Mutex::new(None)),
+            current_kind: Arc::new(Mutex::new(kind)),
+            pending_model: Arc::new(Mutex::new(pending_model)),
+            tx,
+            login_cancel: Arc::new(Mutex::new(None)),
+            oauth_cancel: Arc::new(Mutex::new(None)),
             shell_cancel: Arc::new(Mutex::new(None)),
         }
     }
@@ -564,11 +754,13 @@ impl EffectExecutor {
                 let controller = self.controller.clone();
                 let tx = self.tx.clone();
                 tokio::spawn(async move {
-                    let (service, session) = current_service_session(&controller).await;
-                    let result = service
-                        .prompt(&session, input, opts)
-                        .await
-                        .map_err(|err| err.to_string());
+                    let result = match current_service_session(&controller).await {
+                        Ok((service, session)) => service
+                            .prompt(&session, input, opts)
+                            .await
+                            .map_err(|err| err.to_string()),
+                        Err(message) => Err(message),
+                    };
                     let _ = tx
                         .send(AppEvent::Task(TaskResult::TurnFinished(result)))
                         .await;
@@ -578,11 +770,16 @@ impl EffectExecutor {
                 let controller = self.controller.clone();
                 let tx = self.tx.clone();
                 tokio::spawn(async move {
-                    let controller = controller.lock().await;
-                    let result = controller
-                        .compact(opts)
-                        .await
-                        .map_err(|err| err.to_string());
+                    let result = {
+                        let controller = controller.lock().await;
+                        match controller.as_ref() {
+                            Some(controller) => controller
+                                .compact(opts)
+                                .await
+                                .map_err(|err| err.to_string()),
+                            None => Err("no active session".to_owned()),
+                        }
+                    };
                     let _ = tx
                         .send(AppEvent::Task(TaskResult::CompactFinished(result)))
                         .await;
@@ -591,8 +788,9 @@ impl EffectExecutor {
             Effect::CancelTurn => {
                 let controller = self.controller.clone();
                 tokio::spawn(async move {
-                    let (service, session) = current_service_session(&controller).await;
-                    let _ = service.cancel(&session).await;
+                    if let Ok((service, session)) = current_service_session(&controller).await {
+                        let _ = service.cancel(&session).await;
+                    }
                 });
             }
             Effect::RespondPermission {
@@ -603,13 +801,15 @@ impl EffectExecutor {
                 let controller = self.controller.clone();
                 let tx = self.tx.clone();
                 tokio::spawn(async move {
-                    let (service, current) = current_service_session(&controller).await;
-                    // Relayed subagent prompts carry the child session id;
-                    // the agent-global pending map resolves it directly.
-                    let session = target.unwrap_or(current);
-                    let result = service
-                        .respond_permission(&session, id.clone(), decision.clone())
-                        .await;
+                    let result = match current_service_session(&controller).await {
+                        Ok((service, current)) => {
+                            let session = target.unwrap_or(current);
+                            service
+                                .respond_permission(&session, id.clone(), decision.clone())
+                                .await
+                        }
+                        Err(_) => Ok(()),
+                    };
                     if let Err(err) = result {
                         let _ = tx
                             .send(AppEvent::Task(TaskResult::PermissionRespondFailed {
@@ -622,8 +822,9 @@ impl EffectExecutor {
             Effect::SetTurnPermissionMode { mode } => {
                 let controller = self.controller.clone();
                 tokio::spawn(async move {
-                    let (service, session) = current_service_session(&controller).await;
-                    let _ = service.set_turn_permission_mode(&session, mode);
+                    if let Ok((service, session)) = current_service_session(&controller).await {
+                        let _ = service.set_turn_permission_mode(&session, mode);
+                    }
                 });
             }
             Effect::RespondQuestion {
@@ -633,9 +834,10 @@ impl EffectExecutor {
             } => {
                 let controller = self.controller.clone();
                 tokio::spawn(async move {
-                    let (service, current) = current_service_session(&controller).await;
-                    let session = target.unwrap_or(current);
-                    let _ = service.respond_question(&session, id, answers).await;
+                    if let Ok((service, current)) = current_service_session(&controller).await {
+                        let session = target.unwrap_or(current);
+                        let _ = service.respond_question(&session, id, answers).await;
+                    }
                 });
             }
             Effect::ListModels => {
@@ -644,7 +846,17 @@ impl EffectExecutor {
                 tokio::spawn(async move {
                     let registry = {
                         let controller = controller.lock().await;
-                        controller.service().provider_registry().clone()
+                        match controller.as_ref() {
+                            Some(controller) => controller.service().provider_registry().clone(),
+                            None => {
+                                let _ = tx
+                                    .send(AppEvent::Task(TaskResult::Models(Err(
+                                        "no active session".to_owned(),
+                                    ))))
+                                    .await;
+                                return;
+                            }
+                        }
                     };
                     let catalog = ModelCatalog::fetch(&registry).await;
                     for (provider, message) in &catalog.errors {
@@ -779,14 +991,22 @@ impl EffectExecutor {
                 let controller = self.controller.clone();
                 let tx = self.tx.clone();
                 tokio::spawn(async move {
-                    let result = {
+                    let replay_ok = {
                         let controller = controller.lock().await;
-                        controller.replay(from_seq).await
+                        match controller.as_ref() {
+                            Some(controller) => controller.replay(from_seq).await.is_ok(),
+                            None => false,
+                        }
                     };
-                    if result.is_ok() {
+                    if replay_ok {
                         let transcript = {
                             let controller = controller.lock().await;
-                            controller.transcript().await
+                            match controller.as_ref() {
+                                Some(controller) => controller.transcript().await,
+                                None => {
+                                    return;
+                                }
+                            }
                         }
                         .map_err(|err| err.to_string());
                         let _ = tx
@@ -893,6 +1113,185 @@ impl EffectExecutor {
                         .await;
                 });
             }
+            Effect::IntegrateWorkspace => {
+                let controller = self.controller.clone();
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    let result = match current_service_session(&controller).await {
+                        Ok((service, session)) => match service.integrate_session(&session).await {
+                            Ok(IntegrationOutcome::Merged { files_changed }) => Ok(format!(
+                                "✓ merged {files_changed} file(s) back into the project; workspace removed"
+                            )),
+                            Ok(IntegrationOutcome::Empty) => {
+                                Ok("workspace had no changes — removed".to_owned())
+                            }
+                            Ok(IntegrationOutcome::VerifyFailed { detail }) => Err(format!(
+                                "verify failed — workspace kept for review:\n{detail}"
+                            )),
+                            Ok(IntegrationOutcome::Diverged { branch }) => Err(format!(
+                                "the project moved — work kept on branch `{branch}` for a manual merge"
+                            )),
+                            Ok(other) => Ok(format!("workspace integrated: {other:?}")),
+                            Err(err) => Err(err.to_string()),
+                        },
+                        Err(message) => Err(message),
+                    };
+                    let _ = tx
+                        .send(AppEvent::Task(TaskResult::WorkspaceIntegrated(result)))
+                        .await;
+                });
+            }
+            Effect::DiscardWorkspace => {
+                let controller = self.controller.clone();
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    let result = match current_service_session(&controller).await {
+                        Ok((service, session)) => service
+                            .discard_session(&session)
+                            .await
+                            .map(|()| {
+                                "discarded the isolated workspace; changes dropped".to_owned()
+                            })
+                            .map_err(|err| err.to_string()),
+                        Err(message) => Err(message),
+                    };
+                    let _ = tx
+                        .send(AppEvent::Task(TaskResult::WorkspaceDiscarded(result)))
+                        .await;
+                });
+            }
+            Effect::WorkspaceStatus => {
+                let controller = self.controller.clone();
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    let result = match current_service_session(&controller).await {
+                        Ok((service, session)) => match service.workspace_status(&session).await {
+                            Ok(Some(status)) => Ok(format!(
+                                "isolated workspace — {} file(s) changed:\n{}",
+                                status.files_changed, status.summary
+                            )),
+                            Ok(None) => Ok(
+                                "this session is not isolated — tools run directly in the project"
+                                    .to_owned(),
+                            ),
+                            Err(err) => Err(err.to_string()),
+                        },
+                        Err(message) => Err(message),
+                    };
+                    let _ = tx
+                        .send(AppEvent::Task(TaskResult::WorkspaceStatusReported(result)))
+                        .await;
+                });
+            }
+            Effect::SetIsolation { policy } => {
+                let hub = self.hub.clone();
+                let controller = self.controller.clone();
+                let current_kind = self.current_kind.clone();
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    hub.lock().await.set_isolation_policy(policy);
+                    // Rebuild the native service so the new policy is baked in
+                    // for the next session (the current session is untouched).
+                    // Only the native agent isolates, so skip for delegators.
+                    if *current_kind.lock().await == AgentKind::Native {
+                        let result =
+                            reload_engine(hub, controller, current_kind, true, tx.clone()).await;
+                        let _ = tx
+                            .send(AppEvent::Task(TaskResult::EngineReloaded(Box::new(result))))
+                            .await;
+                    }
+                });
+            }
+            Effect::ListSessions => {
+                let hub = self.hub.clone();
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    let workdir = {
+                        let hub = hub.lock().await;
+                        hub.cwd().to_path_buf()
+                    };
+                    let summaries = agentloop_cli_core::list_recent_sessions(&workdir, 50).await;
+                    let _ = tx
+                        .send(AppEvent::Task(TaskResult::SessionsListed(summaries)))
+                        .await;
+                });
+            }
+            Effect::ResumeSession { id } => {
+                let hub = self.hub.clone();
+                let controller = self.controller.clone();
+                let current_kind = self.current_kind.clone();
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    let result =
+                        resume_session_by_id(hub, controller, current_kind, id, tx.clone()).await;
+                    let _ = tx
+                        .send(AppEvent::Task(TaskResult::SessionResumed(Box::new(result))))
+                        .await;
+                });
+            }
+            Effect::OpenSession { model } => {
+                let hub = self.hub.clone();
+                let controller_slot = self.controller.clone();
+                let current_kind = self.current_kind.clone();
+                let pending_model = self.pending_model.clone();
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    let kind = *current_kind.lock().await;
+                    let model = if model.is_some() {
+                        model
+                    } else {
+                        pending_model.lock().await.clone()
+                    };
+                    let result =
+                        open_first_session(hub, controller_slot, kind, model, tx.clone()).await;
+                    let _ = tx
+                        .send(AppEvent::Task(TaskResult::SessionOpened(result)))
+                        .await;
+                });
+            }
+            Effect::StartOpenAiOAuth { method } => {
+                let tx = self.tx.clone();
+                let cancel_slot = self.oauth_cancel.clone();
+                tokio::spawn(async move {
+                    let (progress_tx, mut progress_rx) = mpsc::channel(16);
+                    let cancel = CancellationToken::new();
+                    {
+                        let mut slot = cancel_slot.lock().await;
+                        *slot = Some(cancel.clone());
+                    }
+                    let progress_events = tx.clone();
+                    tokio::spawn(async move {
+                        while let Some(event) = progress_rx.recv().await {
+                            if progress_events
+                                .send(AppEvent::OpenAiOAuth(event))
+                                .await
+                                .is_err()
+                            {
+                                break;
+                            }
+                        }
+                    });
+                    let result = login_openai(method, progress_tx, cancel)
+                        .await
+                        .map(|_| ())
+                        .map_err(|err| err.to_string());
+                    {
+                        let mut slot = cancel_slot.lock().await;
+                        *slot = None;
+                    }
+                    let _ = tx
+                        .send(AppEvent::Task(TaskResult::OpenAiOAuthFinished(result)))
+                        .await;
+                });
+            }
+            Effect::CancelOpenAiOAuth => {
+                let cancel_slot = self.oauth_cancel.clone();
+                tokio::spawn(async move {
+                    if let Some(cancel) = cancel_slot.lock().await.take() {
+                        cancel.cancel();
+                    }
+                });
+            }
             Effect::Quit
             | Effect::SetMouseCapture(_)
             | Effect::CopyToClipboard { .. }
@@ -902,28 +1301,52 @@ impl EffectExecutor {
 }
 
 async fn current_service_session(
-    controller: &Arc<Mutex<SessionController>>,
-) -> (agentloop_engine::EngineService, SessionId) {
+    controller: &Arc<Mutex<Option<SessionController>>>,
+) -> Result<(agentloop_engine::EngineService, SessionId), String> {
     let controller = controller.lock().await;
-    (
+    let Some(controller) = controller.as_ref() else {
+        return Err("no active session — send a message first".to_owned());
+    };
+    Ok((
         controller.service().clone(),
         controller.session_id().clone(),
-    )
+    ))
+}
+
+async fn open_first_session(
+    hub: Arc<Mutex<EngineHub>>,
+    controller_slot: Arc<Mutex<Option<SessionController>>>,
+    kind: AgentKind,
+    model: Option<ModelRef>,
+    tx: mpsc::Sender<AppEvent>,
+) -> Result<SessionBootstrap, String> {
+    let mut hub = hub.lock().await;
+    let (controller, events, bootstrap) = bootstrap_session(&mut hub, kind, model)
+        .await
+        .map_err(|err| err.to_string())?;
+    drop(hub);
+    spawn_engine_forwarder(events, tx);
+    *controller_slot.lock().await = Some(controller);
+    Ok(bootstrap)
 }
 
 async fn replace_with_fresh_session(
-    controller: Arc<Mutex<SessionController>>,
+    controller: Arc<Mutex<Option<SessionController>>>,
     hub: Arc<Mutex<EngineHub>>,
     current_kind: Arc<Mutex<AgentKind>>,
     tx: mpsc::Sender<AppEvent>,
     cancel_first: bool,
 ) -> Result<SessionId, String> {
     if cancel_first {
-        let (service, session) = current_service_session(&controller).await;
-        let _ = service.cancel(&session).await;
+        if let Ok((service, session)) = current_service_session(&controller).await {
+            let _ = service.cancel(&session).await;
+        }
     }
     let service = {
         let controller = controller.lock().await;
+        let Some(controller) = controller.as_ref() else {
+            return Err("no active session".to_owned());
+        };
         controller.service().clone()
     };
     let (cwd, kind) = {
@@ -940,7 +1363,7 @@ async fn replace_with_fresh_session(
     let id = next.session_id().clone();
     {
         let mut controller = controller.lock().await;
-        *controller = next;
+        *controller = Some(next);
     }
     {
         let mut hub = hub.lock().await;
@@ -952,7 +1375,7 @@ async fn replace_with_fresh_session(
 
 async fn switch_agent(
     hub: Arc<Mutex<EngineHub>>,
-    controller: Arc<Mutex<SessionController>>,
+    controller: Arc<Mutex<Option<SessionController>>>,
     current_kind: Arc<Mutex<AgentKind>>,
     kind: AgentKind,
     invalidate: bool,
@@ -960,7 +1383,10 @@ async fn switch_agent(
 ) -> Result<SessionBootstrap, String> {
     let previous_session = {
         let controller = controller.lock().await;
-        controller.session_id().clone()
+        controller
+            .as_ref()
+            .map(|c| c.session_id().clone())
+            .unwrap_or_else(|| SessionId(String::new()))
     };
     let previous_kind = *current_kind.lock().await;
     let mut hub = hub.lock().await;
@@ -973,7 +1399,7 @@ async fn switch_agent(
         .map_err(|err| err.to_string())?;
     {
         let mut controller = controller.lock().await;
-        *controller = next;
+        *controller = Some(next);
     }
     {
         let mut current_kind = current_kind.lock().await;
@@ -985,7 +1411,7 @@ async fn switch_agent(
 
 async fn reload_engine(
     hub: Arc<Mutex<EngineHub>>,
-    controller: Arc<Mutex<SessionController>>,
+    controller: Arc<Mutex<Option<SessionController>>>,
     current_kind: Arc<Mutex<AgentKind>>,
     invalidate: bool,
     tx: mpsc::Sender<AppEvent>,
@@ -996,6 +1422,9 @@ async fn reload_engine(
     }
     let (session, transcript_fallback, cwd) = {
         let controller_guard = controller.lock().await;
+        let Some(controller_guard) = controller_guard.as_ref() else {
+            return Err("no active session".to_owned());
+        };
         {
             let service = controller_guard.service();
             // Best-effort: stop any in-flight turn before swapping engine instances.
@@ -1033,8 +1462,14 @@ async fn reload_engine(
     let (next, events, session_restarted) = match resume_result {
         Ok(pair) => (pair.0, pair.1, false),
         Err(_) => {
+            // Resume failed (log gone/unreadable): open a fresh session, but do
+            // NOT re-isolate. Provisioning a new worktree here would strand the
+            // original isolated session's edits under an orphaned worktree; a
+            // recovery session should stay in the base tree. The user can
+            // re-enable with /isolation on + /new.
             let params = NewSessionParams {
                 cwd: Some(cwd),
+                isolation: Some(agentloop_contracts::IsolationPolicy::Never),
                 ..NewSessionParams::default()
             };
             let (opened, events) = SessionController::open(service, params)
@@ -1045,9 +1480,15 @@ async fn reload_engine(
     };
     let transcript = next.transcript().await.ok().or(transcript_fallback);
     let session_id = next.session_id().clone();
+    let isolated = next
+        .service()
+        .is_isolated(&session_id)
+        .await
+        .unwrap_or(false);
+    let meta = next.service().session_meta(&session_id).await.ok();
     {
         let mut controller = controller.lock().await;
-        *controller = next;
+        *controller = Some(next);
     }
     {
         let mut hub_guard = hub.lock().await;
@@ -1065,6 +1506,9 @@ async fn reload_engine(
         permission_mode: None,
         mcp_enabled,
         session_restarted,
+        isolated,
+        session_title: meta.as_ref().and_then(|m| m.title.clone()),
+        session_created_at_ms: meta.as_ref().map(|m| m.created_at_ms),
     })
 }
 
@@ -1368,6 +1812,23 @@ impl Drop for TerminalSession {
     fn drop(&mut self) {
         restore_terminal(self.terminal.backend_mut());
         let _ = self.terminal.show_cursor();
+    }
+}
+
+fn read_git_branch(workdir: &std::path::Path) -> Option<String> {
+    let output = ProcessCommand::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(workdir)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let branch = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    if branch.is_empty() || branch == "HEAD" {
+        None
+    } else {
+        Some(branch)
     }
 }
 

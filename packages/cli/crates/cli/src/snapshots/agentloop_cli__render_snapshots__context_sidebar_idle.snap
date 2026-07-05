@@ -1,0 +1,34 @@
+---
+source: crates/cli/src/render_snapshots.rs
+expression: rendered
+---
+Start with a prompt or /help.                                                         ╭ context ───────────────────────╮
+                                                                                      │ context                        │
+                                                                                      │   16.4k tokens                 │
+                                                                                      │   $0.0420 session cost         │
+                                                                                      │   native · anthropic/claude-s… │
+                                                                                      │                                │
+                                                                                      │ mcp                            │
+                                                                                      │   none installed               │
+                                                                                      │   /mcp-install                 │
+                                                                                      │                                │
+                                                                                      │ .:main                         │
+                                                                                      │ Flex v0.1.0                    │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      ╰────────────────────────────────╯
+╭ prompt ──────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Fix a TODO in the codebase                                                                                           │
+│code · anthropic/claude-sonnet-4-5 · anthropic · tab mode · ctrl+p commands                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+native · code · auto · anthropic/claude-sonnet-4-5 · ↑12.3k ↓4.1k · $0.0420 · ctrl+p commands

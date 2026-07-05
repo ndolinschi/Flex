@@ -46,7 +46,7 @@ pub use ids::{
 };
 pub use permission::{
     Answer, PermissionDecision, PermissionDecisionKind, PermissionMode, PermissionRule, Question,
-    QuestionOption,
+    QuestionOption, RuleEffect,
 };
 pub use reduce::{Transcript, TranscriptBlock, TranscriptItem, reduce};
 pub use request::{

@@ -13,21 +13,32 @@ pub mod connect;
 pub mod controller;
 pub mod engines;
 pub mod mcp_store;
+pub mod openai_auth;
 pub mod prefs;
 pub mod sessions;
 
+pub use agentloop_provider_openai::OpenAiOAuthMethod;
 pub use auth::{AuthError, LoginEvent, has_copilot_credentials, login_copilot};
 pub use catalog::{CatalogEntry, ModelCatalog};
-pub use connect::validate_provider;
+pub use connect::{
+    AuthMethodKind, AuthMethodSpec, CUSTOM_PROVIDER_ROW, ProviderAuth, ProviderCategory,
+    ProviderTemplate, auth_methods, env_var_configured, known_provider_defaults,
+    needs_provider_setup, provider_template, provider_templates, template_is_connected,
+    validate_provider,
+};
 pub use controller::SessionController;
 pub use engines::{AgentKind, EngineHub, HubError, delegated_agents_enabled};
 pub use mcp_store::{
     InstallTarget, InstalledMcpServer, McpInstallSource, McpRegistryEntry, McpStore, McpStoreError,
     mcp_path, mcp_servers_dir, parse_install_target, project_path as mcp_project_path, registry,
 };
+pub use openai_auth::{OpenAiAuthError, OpenAiOAuthEvent, login_openai};
 pub use prefs::{
     CliPrefs, ModelEntry, PrefsError, ProviderConfig, RoleConfig, config_dir, config_path,
     custom_specs, model_in_catalog, model_provider_available, resolve_api_key,
     resolve_stored_model, role_specs,
 };
-pub use sessions::{SessionSummary, list_recent_sessions, most_recent_session, session_exists};
+pub use sessions::{
+    SessionSummary, format_relative_time, list_recent_sessions, most_recent_session,
+    session_display_label, session_exists,
+};

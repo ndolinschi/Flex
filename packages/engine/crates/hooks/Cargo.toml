@@ -1,6 +1,6 @@
 [package]
-name = "agentloop-provider-openai"
-description = "OpenAI provider client"
+name = "agentloop-hooks"
+description = "Post-tool-use hooks: format-on-edit and availability-gated diagnostics feedback"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,22 +11,14 @@ publish.workspace = true
 [dependencies]
 agentloop-contracts = { workspace = true }
 agentloop-core = { workspace = true }
-agentloop-provider-common = { workspace = true }
 async-trait = { workspace = true }
-futures = { workspace = true }
-reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
-tokio-util = { workspace = true }
-sha2 = { workspace = true }
-getrandom = { workspace = true }
-base64 = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
-wiremock = { workspace = true }
 tempfile = { workspace = true }
-temp_env = { workspace = true }
 
 [lints]
 workspace = true

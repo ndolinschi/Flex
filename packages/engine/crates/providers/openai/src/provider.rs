@@ -10,7 +10,7 @@ use futures::{Stream, StreamExt};
 use reqwest::{Client, Method, Response};
 use tokio_util::sync::CancellationToken;
 
-use agentloop_contracts::{ModelInfo, ProviderCaps, ProviderId, StopReason};
+use agentloop_contracts::{ModelInfo, ProviderCaps, ProviderId, StopReason, branding};
 use agentloop_core::{ChatRequest, Provider, ProviderError, ProviderStream, ProviderStreamEvent};
 use agentloop_provider_common::{
     SseDecoder, authenticated_request, is_retryable_transport_error, retry_after_ms_from_headers,
@@ -86,18 +86,15 @@ impl OpenAiProvider {
     /// unreachable, unauthorized, or has no listing route.
     async fn fetch_models_live(&self) -> Result<Vec<ModelInfo>, ProviderError> {
         let provider = self.id();
-        let response = authenticated_request(
-            &self.client,
-            Method::GET,
-            &self.config.models_url(),
-            &self.config.api_key,
-        )
-        .send()
-        .await
-        .map_err(|err| ProviderError::Http {
-            provider: provider.clone(),
-            message: err.to_string(),
-        })?;
+        let token = self.resolve_auth_token().await?;
+        let response = self
+            .auth_request(Method::GET, &self.config.models_url(), &token)
+            .send()
+            .await
+            .map_err(|err| ProviderError::Http {
+                provider: provider.clone(),
+                message: err.to_string(),
+            })?;
         let status = response.status();
         if !status.is_success() {
             let body = response.text().await.unwrap_or_else(|err| err.to_string());
@@ -111,6 +108,24 @@ impl OpenAiProvider {
                 message: format!("OpenAI models response was not valid JSON: {err}"),
             })?;
         Ok(models_from_response(models))
+    }
+
+    async fn resolve_auth_token(&self) -> Result<String, ProviderError> {
+        if self.config.oauth_account_id.is_some() {
+            if let Some(token) = crate::oauth::resolve_oauth_access_token().await? {
+                return Ok(token);
+            }
+        }
+        Ok(self.config.api_key.clone())
+    }
+
+    fn auth_request(&self, method: Method, url: &str, token: &str) -> reqwest::RequestBuilder {
+        let mut request = authenticated_request(&self.client, method, url, token)
+            .header("User-Agent", branding::USER_AGENT);
+        if let Some(account) = &self.config.oauth_account_id {
+            request = request.header("ChatGPT-Account-Id", account);
+        }
+        request
     }
 }
 
@@ -254,20 +269,19 @@ impl OpenAiProvider {
         body: &(impl serde::Serialize + Sync),
         cancel: &CancellationToken,
     ) -> Result<Response, AttemptError> {
+        let token = self
+            .resolve_auth_token()
+            .await
+            .map_err(AttemptError::Terminal)?;
+        let url = self.config.chat_completions_url();
+        let request = self.auth_request(Method::POST, &url, &token).json(body);
         let response = tokio::select! {
             _ = cancel.cancelled() => {
                 return Err(AttemptError::Terminal(ProviderError::Cancelled {
                     provider: provider.clone(),
                 }));
             }
-            result = authenticated_request(
-                &self.client,
-                Method::POST,
-                &self.config.chat_completions_url(),
-                &self.config.api_key,
-            )
-            .json(body)
-            .send() => result,
+            result = request.send() => result,
         };
 
         let response = response.map_err(|err| {

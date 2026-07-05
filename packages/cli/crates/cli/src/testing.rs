@@ -32,6 +32,9 @@ pub fn test_bootstrap() -> SessionBootstrap {
         permission_mode: None,
         mcp_enabled: 0,
         session_restarted: false,
+        isolated: false,
+        session_title: None,
+        session_created_at_ms: None,
     }
 }
 

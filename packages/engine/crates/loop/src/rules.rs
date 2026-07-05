@@ -48,6 +48,16 @@ pub fn any_rule_matches(rules: &[PermissionRule], facts: &CallFacts<'_>) -> bool
     rules.iter().any(|rule| rule_matches(rule, facts))
 }
 
+/// The rule that decides this call under **last-match-wins** semantics: the
+/// last rule in `rules` that matches, or `None` when none match. The caller
+/// reads `rule.effect` to allow or deny.
+pub fn resolve<'a>(
+    rules: &'a [PermissionRule],
+    facts: &CallFacts<'_>,
+) -> Option<&'a PermissionRule> {
+    rules.iter().rev().find(|rule| rule_matches(rule, facts))
+}
+
 fn string_field<'v>(input: &'v serde_json::Value, key: &str) -> Option<&'v str> {
     input.get(key).and_then(|v| v.as_str())
 }

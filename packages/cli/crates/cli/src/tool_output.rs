@@ -56,6 +56,23 @@ pub(crate) fn display_body(
     DisplayBody::Lines(lines)
 }
 
+/// Build a diff preview from a permission prompt's JSON tool-input detail.
+pub(crate) fn diff_from_permission_detail(
+    title: &str,
+    detail: Option<&str>,
+) -> Option<DiffPreview> {
+    let detail = detail?;
+    let input: serde_json::Value = serde_json::from_str(detail).ok()?;
+    let tool = title
+        .strip_prefix("Allow `")
+        .and_then(|rest| rest.strip_suffix("`?"))
+        .unwrap_or("");
+    match display_body(tool, &input, None) {
+        DisplayBody::Diff(preview) => Some(preview),
+        DisplayBody::Lines(_) => None,
+    }
+}
+
 /// One-line collapsed summary for read-ish tools (`Read 214 lines`).
 pub(crate) fn collapsed_summary_line(tool_name: &str, result: &ToolOutput) -> Option<String> {
     if result.is_error {

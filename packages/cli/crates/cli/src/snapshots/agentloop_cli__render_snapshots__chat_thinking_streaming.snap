@@ -2,13 +2,6 @@
 source: crates/cli/src/render_snapshots.rs
 expression: rendered
 ---
-
-  ✻ Flex  v0.1.0
-     agentic coding in your terminal
-
-  .
-  /help · shift+tab modes · @ files · / commands
-
 · Thinking…
   Let me reason about this step by step.
   First, check the module layout.
@@ -21,8 +14,15 @@ expression: rendered
 
 
 
+
+
+
+
+
+
 · Pondering… (0s · ↑ 0 tokens · esc to interrupt)
 ╭ prompt ──────────────────────────────────────────────────────────────────────╮
-│ Type a message, / commands, @ files · @path:[0:12] python slice              │
+│ Fix a TODO in the codebase                                                   │
+│code · anthropic/claude-sonnet-4-5 · anthropic · tab mode · ctrl+p commands   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 native · code · auto · anthropic/claude-sonnet-4-5 · ↑0 ↓0

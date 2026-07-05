@@ -338,6 +338,13 @@ impl ChatState {
         self.items.push(ChatItem::Splash { name, version, cwd });
     }
 
+    /// True when only splash/info lines are present (empty session home).
+    pub fn is_home_screen(&self) -> bool {
+        self.items
+            .iter()
+            .all(|item| matches!(item, ChatItem::Splash { .. } | ChatItem::Info { .. }))
+    }
+
     /// Append an error line (headline only).
     pub fn push_error(&mut self, message: impl Into<String>) {
         self.push_human_error(message.into(), None);

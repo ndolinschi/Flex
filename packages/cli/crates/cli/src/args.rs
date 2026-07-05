@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use agentloop_cli_core::AgentKind;
+use agentloop_contracts::IsolationPolicy;
 
 /// What the process should do.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +38,9 @@ pub struct Args {
     /// Effort level (`low|medium|high|xhigh|max`); validated at startup, where
     /// an unrecognized value surfaces an error and the saved default is kept.
     pub effort: Option<String>,
+    /// Requested workspace isolation (`--isolate[=optional|required|never]`).
+    /// `None` = use the saved/default policy.
+    pub isolation: Option<IsolationPolicy>,
 }
 
 impl Args {
@@ -63,6 +67,7 @@ impl Args {
                 message: format!("could not determine current directory: {err}"),
             })?,
             effort: None,
+            isolation: None,
         };
         let mut iter = args.into_iter().map(Into::into).peekable();
         while let Some(arg) = iter.next() {
@@ -142,6 +147,26 @@ impl Args {
                         .ok_or_else(|| ArgError::MissingValue(flag.to_owned()))?;
                     out.workdir = PathBuf::from(value);
                 }
+                "--isolate" => {
+                    // Bare `--isolate` means best-effort (Optional); an explicit
+                    // value can force or disable it.
+                    let policy = match inline.as_deref() {
+                        None | Some("") | Some("optional") | Some("on") => {
+                            IsolationPolicy::Optional
+                        }
+                        Some("required") | Some("force") => IsolationPolicy::Required,
+                        Some("never") | Some("off") => IsolationPolicy::Never,
+                        Some(other) => {
+                            return Err(ArgError::Invalid {
+                                flag: "--isolate".to_owned(),
+                                message: format!(
+                                    "unknown value `{other}` (expected optional, required, or never)"
+                                ),
+                            });
+                        }
+                    };
+                    out.isolation = Some(policy);
+                }
                 "-h" | "--help" => return Err(ArgError::Help),
                 other => return Err(ArgError::Unknown(other.to_owned())),
             }
@@ -172,7 +197,7 @@ pub enum ArgError {
 
 /// Short usage text.
 pub fn usage() -> &'static str {
-    "usage: flex [--agent native|claude-code|copilot] [--provider id] [--model ref] [--effort low|medium|high|xhigh|max] [--workdir path] [--continue | -c] [--resume <id>]\n       flex sessions\n       flex auth login"
+    "usage: flex [--agent native|claude-code|copilot] [--provider id] [--model ref] [--effort low|medium|high|xhigh|max] [--isolate[=optional|required|never]] [--workdir path] [--continue | -c] [--resume <id>]\n       flex sessions\n       flex auth login"
 }
 
 #[cfg(test)]
@@ -251,10 +276,7 @@ mod tests {
 
     #[test]
     fn effort_flag_takes_a_value() {
-        for spec in [
-            vec!["--effort", "max"],
-            vec!["--effort=max"],
-        ] {
+        for spec in [vec!["--effort", "max"], vec!["--effort=max"]] {
             let args = Args::parse(spec).expect("parses");
             assert_eq!(args.effort.as_deref(), Some("max"));
         }

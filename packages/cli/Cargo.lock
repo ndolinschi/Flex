@@ -62,6 +62,7 @@ dependencies = [
  "agentloop-session",
  "agentloop-testkit",
  "agentloop-tools",
+ "agentloop-workspace",
  "async-trait",
  "futures",
  "pretty_assertions",
@@ -152,6 +153,7 @@ version = "0.1.0"
 dependencies = [
  "agentloop-contracts",
  "agentloop-core",
+ "agentloop-hooks",
  "agentloop-loop",
  "agentloop-mcp",
  "agentloop-prompts",
@@ -163,6 +165,19 @@ dependencies = [
  "agentloop-session",
  "agentloop-tools",
  "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
+name = "agentloop-hooks"
+version = "0.1.0"
+dependencies = [
+ "agentloop-contracts",
+ "agentloop-core",
+ "async-trait",
+ "serde",
+ "serde_json",
+ "tokio",
  "tracing",
 ]
 
@@ -296,10 +311,13 @@ dependencies = [
  "agentloop-core",
  "agentloop-provider-common",
  "async-trait",
+ "base64",
  "futures",
+ "getrandom 0.2.17",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
  "tokio-util",
 ]
@@ -353,6 +371,18 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "agentloop-workspace"
+version = "0.1.0"
+dependencies = [
+ "agentloop-contracts",
+ "agentloop-core",
+ "async-trait",
+ "thiserror 2.0.18",
+ "tokio",
  "tracing",
 ]
 

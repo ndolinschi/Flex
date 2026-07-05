@@ -11,13 +11,14 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 
-use agentloop_contracts::SessionId;
+use agentloop_contracts::{IsolationPolicy, SessionId};
 use agentloop_core::SessionStore;
 use agentloop_delegator_claude_code::{ClaudeCodeConfig, DelegatorProbeStatus, claude_code_agent};
 use agentloop_delegator_copilot::{CopilotConfig as CopilotDelegatorConfig, copilot_agent};
 use agentloop_engine::{EngineOptions, EngineService, EngineServiceError};
 use agentloop_mcp::McpManager;
 use agentloop_session::{JsonlStore, MemoryStore};
+use agentloop_workspace::GitWorktrees;
 
 /// Which agent implementation serves the conversation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -125,6 +126,10 @@ pub struct EngineHub {
     native_store: Option<Arc<dyn SessionStore>>,
     /// Live MCP connections for the native service; shut down before rebuild.
     mcp_manager: Option<Arc<McpManager>>,
+    /// Run-level isolation posture for new native root sessions.
+    isolation: IsolationPolicy,
+    /// Command run inside an isolated workspace before integrating it back.
+    verify_command: Option<String>,
 }
 
 impl EngineHub {
@@ -140,7 +145,29 @@ impl EngineHub {
             last_session: HashMap::new(),
             native_store: None,
             mcp_manager: None,
+            isolation: IsolationPolicy::Never,
+            verify_command: None,
         }
+    }
+
+    /// Set the run-level isolation posture and the verify command used before
+    /// integrating an isolated workspace. Takes effect on the next native
+    /// (re)build. `Never` (the default) keeps sessions unisolated.
+    pub fn set_isolation(&mut self, policy: IsolationPolicy, verify_command: Option<String>) {
+        self.isolation = policy;
+        self.verify_command = verify_command;
+    }
+
+    /// Change only the isolation policy (keeping the verify command), for a
+    /// runtime `/isolation on|off` toggle. Takes effect on the next native
+    /// (re)build.
+    pub fn set_isolation_policy(&mut self, policy: IsolationPolicy) {
+        self.isolation = policy;
+    }
+
+    /// The current run-level isolation policy.
+    pub fn isolation(&self) -> IsolationPolicy {
+        self.isolation
     }
 
     /// The working directory sessions run in.
@@ -233,7 +260,10 @@ impl EngineHub {
         let mcp_store = crate::mcp_store::McpStore::load();
         let mcp_config = mcp_store.to_bridge_config();
         shutdown_mcp_manager(self.mcp_manager.take());
-        let store = self.native_store.get_or_insert_with(open_native_store).clone();
+        let store = self
+            .native_store
+            .get_or_insert_with(open_native_store)
+            .clone();
         let mcp_manager = if mcp_config.servers.iter().any(|server| server.enabled) {
             let manager = Arc::new(
                 McpManager::from_config_blocking_default(mcp_config.clone())
@@ -245,6 +275,11 @@ impl EngineHub {
             self.mcp_manager = None;
             None
         };
+        // Provision isolated workspaces under the state dir when isolation is
+        // on; falls back to no backend if the state dir can't be resolved
+        // (isolation then degrades or fails per policy).
+        let workspace = crate::sessions::worktrees_dir()
+            .map(|root| Arc::new(GitWorktrees::new(root)) as Arc<dyn agentloop_core::Workspaces>);
         let service = EngineService::native_all(EngineOptions {
             provider: self.provider.clone(),
             model: self.model.clone(),
@@ -256,6 +291,11 @@ impl EngineHub {
             mcp_manager,
             session_store: Some(store),
             max_iterations: prefs.max_iterations,
+            workspace,
+            isolation_default: self.isolation,
+            verify_command: self.verify_command.clone(),
+            formatters: Vec::new(),
+            diagnostics: agentloop_engine::DiagnosticsConfig::default(),
         })?;
         let mut trace = vec!["selected native loop".to_owned()];
         let ids = service

@@ -5,7 +5,9 @@
 //! [`crate::runtime::EffectExecutor`]. Keeping both as plain data is what
 //! makes the reducer testable without a terminal or a tokio runtime.
 
-use agentloop_cli_core::{AgentKind, CatalogEntry, LoginEvent};
+use agentloop_cli_core::{
+    AgentKind, CatalogEntry, LoginEvent, OpenAiOAuthEvent, OpenAiOAuthMethod,
+};
 use agentloop_contracts::{
     Answer, CompactionSummary, Hello, ModelRef, PermissionDecision, PermissionRequestId,
     PromptInput, QuestionId, SessionEvent, SessionId, Transcript, TurnOptions, TurnSummary,
@@ -13,6 +15,7 @@ use agentloop_contracts::{
 
 /// One unit of input to [`crate::app::App::update`].
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum AppEvent {
     /// Terminal input: keys, paste, resize, mouse.
     Term(crossterm::event::Event),
@@ -22,10 +25,22 @@ pub enum AppEvent {
     Task(TaskResult),
     /// Progress of a running device-flow login.
     Login(LoginEvent),
+    /// Progress of a running OpenAI OAuth sign-in.
+    OpenAiOAuth(OpenAiOAuthEvent),
     /// 100ms heartbeat: spinner animation and toast expiry.
     Tick,
     /// OS interrupt (Ctrl+C / SIGINT) delivered outside the key stream.
     Interrupt,
+}
+
+/// Engine hello + providers without an active session (home screen).
+#[derive(Debug, Clone)]
+pub struct EngineBootstrap {
+    pub kind: AgentKind,
+    pub hello: Hello,
+    pub providers: Vec<String>,
+    pub trace: Vec<String>,
+    pub mcp_enabled: usize,
 }
 
 /// Everything the reducer needs to (re)configure itself around a session:
@@ -52,10 +67,17 @@ pub struct SessionBootstrap {
     pub mcp_enabled: usize,
     /// Set when reload could not resume and opened a fresh session instead.
     pub session_restarted: bool,
+    /// Whether this session runs in an isolated workspace (git worktree).
+    pub isolated: bool,
+    /// Session title when set by the engine.
+    pub session_title: Option<String>,
+    /// Session creation time (epoch ms) for the sidebar.
+    pub session_created_at_ms: Option<u64>,
 }
 
 /// Completion of spawned async work, reported back into the reducer.
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum TaskResult {
     /// The `prompt()` future resolved (the turn ended, for any reason).
     TurnFinished(Result<TurnSummary, String>),
@@ -103,6 +125,21 @@ pub enum TaskResult {
     EngineReloaded(Box<Result<SessionBootstrap, String>>),
     /// Permission response could not be delivered to the engine.
     PermissionRespondFailed { message: String },
+    /// `/merge` finished: on success the (display) message; the session is no
+    /// longer isolated.
+    WorkspaceIntegrated(Result<String, String>),
+    /// `/discard` finished.
+    WorkspaceDiscarded(Result<String, String>),
+    /// `/isolation` status finished.
+    WorkspaceStatusReported(Result<String, String>),
+    /// `/sessions` list finished.
+    SessionsListed(Vec<agentloop_cli_core::SessionSummary>),
+    /// In-TUI session resume finished.
+    SessionResumed(Box<Result<SessionBootstrap, String>>),
+    /// First prompt on the home screen opened a session.
+    SessionOpened(Result<SessionBootstrap, String>),
+    /// OpenAI OAuth via `/connect` finished.
+    OpenAiOAuthFinished(Result<(), String>),
 }
 
 /// Result of a `/command` shell invocation.
@@ -205,4 +242,25 @@ pub enum Effect {
     SetTurnPermissionMode {
         mode: Option<agentloop_contracts::PermissionMode>,
     },
+    /// Verify and integrate the current session's isolated workspace.
+    IntegrateWorkspace,
+    /// Discard the current session's isolated workspace.
+    DiscardWorkspace,
+    /// Report isolation status and pending diff for the current session.
+    WorkspaceStatus,
+    /// Change the workspace-isolation policy for future sessions, then rebuild
+    /// the native service so it takes effect (current session is unaffected).
+    SetIsolation {
+        policy: agentloop_contracts::IsolationPolicy,
+    },
+    /// List recent sessions for the working directory (`/sessions`).
+    ListSessions,
+    /// Switch to a persisted session by id.
+    ResumeSession { id: SessionId },
+    /// Open the first session after the home screen (lazy session creation).
+    OpenSession { model: Option<ModelRef> },
+    /// Start OpenAI ChatGPT OAuth from the connect wizard.
+    StartOpenAiOAuth { method: OpenAiOAuthMethod },
+    /// Cancel an in-flight OpenAI OAuth sign-in.
+    CancelOpenAiOAuth,
 }

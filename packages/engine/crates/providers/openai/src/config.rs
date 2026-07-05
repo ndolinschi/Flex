@@ -13,16 +13,57 @@ pub struct OpenAiConfig {
     pub api_key: String,
     pub base_url: String,
     pub default_model: String,
+    /// Set when ChatGPT OAuth credentials are active.
+    pub oauth_account_id: Option<String>,
 }
 
 impl OpenAiConfig {
     pub fn from_env() -> Result<Self, ProviderError> {
         let provider = ProviderId::from(OPENAI_PROVIDER_ID);
-        Self::from_values(
-            required_env(&provider, "OPENAI_API_KEY", "an OpenAI API key")?,
-            std::env::var("OPENAI_BASE_URL").ok(),
-            std::env::var("OPENAI_MODEL").ok(),
-        )
+        if let Ok(api_key) = required_env(&provider, "OPENAI_API_KEY", "an OpenAI API key") {
+            return Self::from_values(
+                api_key,
+                std::env::var("OPENAI_BASE_URL").ok(),
+                std::env::var("OPENAI_MODEL").ok(),
+            );
+        }
+        if crate::oauth::oauth_tokens_discoverable() {
+            return Self::from_oauth(
+                None,
+                std::env::var("OPENAI_BASE_URL").ok(),
+                std::env::var("OPENAI_MODEL").ok(),
+            );
+        }
+        Err(ProviderError::AuthMissing {
+            provider,
+            hint: "set OPENAI_API_KEY or sign in with ChatGPT via /connect openai".to_owned(),
+        })
+    }
+
+    /// Build a config backed by stored OAuth tokens (access token as api_key).
+    pub fn from_oauth(
+        access_token: Option<String>,
+        base_url: Option<String>,
+        model: Option<String>,
+    ) -> Result<Self, ProviderError> {
+        let (token, account_id) = match access_token.filter(|t| !t.trim().is_empty()) {
+            Some(token) => (token, crate::oauth::oauth_account_id()),
+            None => {
+                let stored = crate::oauth::load_oauth_tokens()?;
+                (stored.access_token, stored.account_id)
+            }
+        };
+        Ok(Self {
+            api_key: token,
+            base_url: normalize_base_url(base_url.as_deref()),
+            default_model: model
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or(DEFAULT_OPENAI_MODEL)
+                .to_owned(),
+            oauth_account_id: account_id,
+        })
     }
 
     /// Build a config from explicit values. An empty `api_key` is allowed —
@@ -43,6 +84,7 @@ impl OpenAiConfig {
                 .filter(|value| !value.is_empty())
                 .unwrap_or(DEFAULT_OPENAI_MODEL)
                 .to_owned(),
+            oauth_account_id: None,
         })
     }
 

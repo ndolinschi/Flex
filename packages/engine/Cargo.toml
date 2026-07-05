@@ -10,6 +10,7 @@ members = [
     "crates/delegators/cursor",
     "crates/delegators/opencode",
     "crates/engine",
+    "crates/hooks",
     "crates/loop",
     "crates/mcp",
     "crates/providers/anthropic",
@@ -47,6 +48,7 @@ agentloop-delegator-common = { path = "crates/delegators/common" }
 agentloop-delegator-cursor = { path = "crates/delegators/cursor" }
 agentloop-delegator-opencode = { path = "crates/delegators/opencode" }
 agentloop-engine = { path = "crates/engine" }
+agentloop-hooks = { path = "crates/hooks" }
 agentloop-loop = { path = "crates/loop" }
 agentloop-mcp = { path = "crates/mcp" }
 agentloop-provider-anthropic = { path = "crates/providers/anthropic" }
@@ -82,10 +84,13 @@ ignore = "0.4"
 regex = "1"
 htmd = "0.2"
 base64 = "0.22"
+sha2 = "0.10"
+getrandom = "0.2"
 # dev
 insta = { version = "1", features = ["json", "redactions"] }
 pretty_assertions = "1"
 tempfile = "3"
+temp_env = { package = "temp-env", version = "0.3" }
 wiremock = "0.6"
 rmcp = { version = "2.1.0", default-features = false, features = [
     "client",

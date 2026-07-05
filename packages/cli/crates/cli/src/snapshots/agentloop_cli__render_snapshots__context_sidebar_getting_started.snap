@@ -1,0 +1,35 @@
+---
+source: crates/cli/src/render_snapshots.rs
+assertion_line: 746
+expression: rendered
+---
+Start with a prompt or /help.                                                         ╭ context ───────────────────────╮
+                                                                                      │ context                        │
+                                                                                      │   0 tokens                     │
+                                                                                      │   native · no model            │
+                                                                                      │                                │
+                                                                                      │ mcp                            │
+                                                                                      │   none installed               │
+                                                                                      │   /mcp-install                 │
+                                                                                      │                                │
+                                                                                      │ ┌ getting started ─            │
+                                                                                      │ │ Connect a provider           │
+                                                                                      │ │ /connect                     │
+                                                                                      │ └──────────────────            │
+                                                                                      │                                │
+                                                                                      │ .:feature/ui                   │
+                                                                                      │ Flex v0.1.0                    │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      │                                │
+                                                                                      ╰────────────────────────────────╯
+╭ prompt ──────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Fix a TODO in the codebase                                                                                           │
+│code · default · no provider · tab mode · ctrl+p commands                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+native · code · auto · default model · ↑0 ↓0 · ctrl+p commands

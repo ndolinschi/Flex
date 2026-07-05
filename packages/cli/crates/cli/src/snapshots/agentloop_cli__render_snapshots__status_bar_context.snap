@@ -2,27 +2,27 @@
 source: crates/cli/src/render_snapshots.rs
 expression: rendered
 ---
-
-  ✻ Flex  v0.1.0
-     agentic coding in your terminal
-
-  .
-  /help · shift+tab modes · @ files · / commands
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Start with a prompt or /help.                                     ╭ context ───────────────────────╮
+                                                                  │ context                        │
+                                                                  │   16.4k tokens · 47%           │
+                                                                  │   $0.0421 session cost         │
+                                                                  │   native · anthropic/claude-s… │
+                                                                  │                                │
+                                                                  │ mcp                            │
+                                                                  │   none installed               │
+                                                                  │   /mcp-install                 │
+                                                                  │                                │
+                                                                  │ .:no branch                    │
+                                                                  │ Flex v0.1.0                    │
+                                                                  │                                │
+                                                                  │                                │
+                                                                  │                                │
+                                                                  │                                │
+                                                                  │                                │
+                                                                  │                                │
+                                                                  ╰────────────────────────────────╯
 ╭ prompt ──────────────────────────────────────────────────────────────────────────────────────────╮
-│ Type a message, / commands, @ files · @path:[0:12] python slice                                  │
+│ Fix a TODO in the codebase                                                                       │
+│code · anthropic/claude-sonnet-4-5 · anthropic · tab mode · ctrl+p commands                       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-native · code · auto · anthropic/claude-sonnet-4-5 · ▕████░░░░▏ 47% · ↑12.3k ↓4.1k · $0.0421
+native · code · auto · anthropic/claude-sonnet-4-5 · ▕████░░░░▏ 47% · ↑12.3k ↓4.1k · $0.0421 · ctrl+

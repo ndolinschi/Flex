@@ -127,6 +127,7 @@ version = "0.1.0"
 dependencies = [
  "agentloop-contracts",
  "agentloop-core",
+ "agentloop-hooks",
  "agentloop-loop",
  "agentloop-mcp",
  "agentloop-prompts",
@@ -141,6 +142,20 @@ dependencies = [
  "agentloop-workspace",
  "tempfile",
  "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "agentloop-hooks"
+version = "0.1.0"
+dependencies = [
+ "agentloop-contracts",
+ "agentloop-core",
+ "async-trait",
+ "serde",
+ "serde_json",
+ "tempfile",
  "tokio",
  "tracing",
 ]
@@ -286,10 +301,15 @@ dependencies = [
  "agentloop-core",
  "agentloop-provider-common",
  "async-trait",
+ "base64",
  "futures",
+ "getrandom 0.2.17",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
+ "sha2",
+ "temp-env",
+ "tempfile",
  "tokio",
  "tokio-util",
  "wiremock",
@@ -2262,6 +2282,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "temp-env"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96374855068f47402c3121c6eed88d29cb1de8f3ab27090e273e420bdabcf050"
+dependencies = [
+ "parking_lot",
 ]
 
 [[package]]

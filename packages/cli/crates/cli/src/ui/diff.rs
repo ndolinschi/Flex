@@ -39,15 +39,6 @@ impl DiffPreview {
     }
 }
 
-/// Diff `old` → `new` with `context` unchanged lines around each change.
-///
-/// Not yet called outside tests: the permission-dialog diff preview (a
-/// later phase) renders through this entry point.
-#[allow(dead_code)]
-pub(crate) fn diff_lines(old: &str, new: &str, context: usize) -> Vec<DiffLine> {
-    diff_preview(old, new, context).lines
-}
-
 /// Diff `old` → `new`, keeping the first-hunk boundary for collapsed rows.
 pub(crate) fn diff_preview(old: &str, new: &str, context: usize) -> DiffPreview {
     let diff = TextDiff::from_lines(old, new);
@@ -84,7 +75,7 @@ mod tests {
 
     #[test]
     fn single_line_replacement() {
-        let lines = diff_lines("let x = old();\n", "let x = new();\n", 1);
+        let lines = diff_preview("let x = old();\n", "let x = new();\n", 1).lines;
         assert_eq!(lines.len(), 2);
         assert_eq!(lines[0].kind, DiffKind::Del);
         assert_eq!(lines[0].line_no, Some(1));
@@ -98,7 +89,7 @@ mod tests {
     fn context_lines_surround_changes() {
         let old = "a\nb\nc\nd\ne\n";
         let new = "a\nb\nC\nd\ne\n";
-        let lines = diff_lines(old, new, 1);
+        let lines = diff_preview(old, new, 1).lines;
         let kinds: Vec<DiffKind> = lines.iter().map(|line| line.kind).collect();
         assert_eq!(
             kinds,

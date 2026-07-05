@@ -17,6 +17,65 @@ use agentloop_contracts::{
 use agentloop_mcp::McpRemoteTool;
 
 use crate::events::Effect;
+use crate::ui::diff::DiffPreview;
+
+/// Lightweight subsequence fuzzy score: higher is better. Empty filter matches
+/// everything with score 0.
+pub(crate) fn fuzzy_score(filter: &str, text: &str) -> Option<i32> {
+    let filter = filter.trim();
+    if filter.is_empty() {
+        return Some(0);
+    }
+    let needle: Vec<char> = filter.to_lowercase().chars().collect();
+    let haystack: Vec<char> = text.to_lowercase().chars().collect();
+    if needle.is_empty() {
+        return Some(0);
+    }
+    if haystack
+        .windows(needle.len())
+        .any(|window| window == needle.as_slice())
+    {
+        return Some(10_000);
+    }
+    let mut score = 0i32;
+    let mut last_match: Option<usize> = None;
+    let mut needle_idx = 0usize;
+    for (idx, ch) in haystack.iter().enumerate() {
+        if needle_idx < needle.len() && *ch == needle[needle_idx] {
+            let gap = last_match.map(|prev| idx.saturating_sub(prev).saturating_sub(1));
+            score += 100;
+            if let Some(gap) = gap {
+                score -= (gap as i32).saturating_mul(5);
+            }
+            last_match = Some(idx);
+            needle_idx += 1;
+        }
+    }
+    (needle_idx == needle.len()).then_some(score)
+}
+
+/// Rank searchable rows by fuzzy score (desc), then label/id (asc).
+pub(crate) fn fuzzy_rank<'a, I, F>(filter: &str, items: I, searchable: F) -> Vec<usize>
+where
+    I: IntoIterator<Item = (usize, &'a str)>,
+    F: Fn(&str) -> Vec<&'a str>,
+{
+    let filter = filter.trim();
+    let mut ranked: Vec<(i32, usize, String)> = items
+        .into_iter()
+        .filter_map(|(idx, primary)| {
+            let mut best = fuzzy_score(filter, primary)?;
+            for field in searchable(primary) {
+                if let Some(score) = fuzzy_score(filter, field) {
+                    best = best.max(score);
+                }
+            }
+            Some((best, idx, primary.to_lowercase()))
+        })
+        .collect();
+    ranked.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.2.cmp(&b.2)));
+    ranked.into_iter().map(|(_, idx, _)| idx).collect()
+}
 
 /// The active modal.
 #[derive(Debug, Default)]
@@ -37,6 +96,12 @@ pub enum Overlay {
     McpExplorer(McpExplorerState),
     /// `/mcp-install` wizard.
     McpInstall(McpInstallState),
+    /// Ctrl+P — fuzzy search over commands and actions.
+    CommandPalette(CommandPaletteState),
+    /// `?` / Ctrl+? — context-sensitive key hints.
+    WhichKey,
+    /// `/connect` step-through wizard (no args).
+    ConnectWizard(ConnectWizardState),
 }
 
 impl Overlay {
@@ -63,6 +128,8 @@ pub enum PickerAction {
     SetTheme,
     /// Set the effort level to the item id.
     SetEffort,
+    /// Resume a past session by id (`/sessions`).
+    ResumeSession,
 }
 
 /// One selectable picker row.
@@ -108,16 +175,35 @@ impl PickerState {
         }
     }
 
-    /// Rows matching the current filter (case-insensitive substring).
+    /// Rows matching the current filter (fuzzy subsequence rank).
     pub fn visible(&self) -> Vec<&PickerItem> {
-        let filter = self.filter.to_lowercase();
-        self.items
-            .iter()
-            .filter(|item| {
-                filter.is_empty()
-                    || item.label.to_lowercase().contains(&filter)
-                    || item.id.to_lowercase().contains(&filter)
-            })
+        let filter = self.filter.trim();
+        if filter.is_empty() {
+            return self.items.iter().collect();
+        }
+        let ranked = fuzzy_rank(
+            filter,
+            self.items
+                .iter()
+                .enumerate()
+                .map(|(idx, item)| (idx, item.label.as_str())),
+            |primary| {
+                self.items
+                    .iter()
+                    .find(|item| item.label == primary)
+                    .map(|item| {
+                        let mut fields = vec![item.id.as_str()];
+                        if let Some(detail) = item.detail.as_deref() {
+                            fields.push(detail);
+                        }
+                        fields
+                    })
+                    .unwrap_or_default()
+            },
+        );
+        ranked
+            .into_iter()
+            .filter_map(|idx| self.items.get(idx))
             .collect()
     }
 }
@@ -135,6 +221,10 @@ pub struct PermissionPrompt {
     pub session: Option<SessionId>,
     /// Role badge for relayed subagent prompts (`[worker] Allow ...`).
     pub role: Option<String>,
+    /// Inline diff preview for Edit/Write permission prompts.
+    pub(crate) diff: Option<DiffPreview>,
+    /// Whether the diff preview is expanded (`d` toggles).
+    pub diff_expanded: bool,
 }
 
 /// A multi-page question wizard.
@@ -283,6 +373,11 @@ pub enum ConfirmAction {
     McpImport {
         servers: Vec<agentloop_cli_core::InstalledMcpServer>,
     },
+    /// Save a provider after validation failed.
+    SaveProviderAnyway {
+        id: String,
+        config: agentloop_cli_core::ProviderConfig,
+    },
 }
 
 /// `/command` overlay: running spinner or scrollable combined output.
@@ -378,6 +473,115 @@ pub enum McpInstallMode {
     Import,
 }
 
+/// One row in the command palette.
+#[derive(Debug, Clone)]
+pub struct CommandPaletteEntry {
+    pub title: String,
+    pub description: String,
+    pub category: &'static str,
+    /// When true, render a dim section header row above this entry.
+    pub section_header: Option<String>,
+    pub key_hint: Option<String>,
+    pub action: CommandPaletteAction,
+}
+
+/// What selecting a palette row does (handled by the app reducer).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommandPaletteAction {
+    Local(crate::commands::LocalCommand),
+    EngineCommand(String),
+    OpenModelPicker,
+    OpenProviderPicker,
+    OpenAgentPicker,
+    OpenSessionsPicker,
+    ScrollToBottom,
+    ToggleThinking,
+    CopyTranscript,
+    CyclePermissionMode,
+    ToggleMouseCapture,
+}
+
+/// Ctrl+P fuzzy command palette.
+#[derive(Debug)]
+pub struct CommandPaletteState {
+    pub entries: Vec<CommandPaletteEntry>,
+    pub filter: String,
+    pub selected: usize,
+}
+
+impl CommandPaletteState {
+    pub fn visible(&self) -> Vec<&CommandPaletteEntry> {
+        let filter = self.filter.trim();
+        if filter.is_empty() {
+            return self.entries.iter().collect();
+        }
+        let ranked = fuzzy_rank(
+            filter,
+            self.entries
+                .iter()
+                .enumerate()
+                .filter(|(_, entry)| entry.section_header.is_none())
+                .map(|(idx, entry)| (idx, entry.title.as_str())),
+            |primary| {
+                self.entries
+                    .iter()
+                    .find(|entry| entry.title == primary)
+                    .map(|entry| {
+                        let mut fields = vec![entry.category, entry.description.as_str()];
+                        if let Some(hint) = entry.key_hint.as_deref() {
+                            fields.push(hint);
+                        }
+                        fields
+                    })
+                    .unwrap_or_default()
+            },
+        );
+        ranked
+            .into_iter()
+            .filter_map(|idx| self.entries.get(idx))
+            .collect()
+    }
+}
+
+/// `/connect` wizard step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectWizardStep {
+    /// Categorized provider gallery.
+    PickProvider,
+    /// Choose browser / headless / API key (OpenAI).
+    PickAuthMethod,
+    /// Free-text id for a custom OpenAI-compatible endpoint.
+    CustomProviderId,
+    BaseUrl,
+    ApiKey,
+    /// Browser or headless OAuth in progress.
+    OAuthWaiting,
+    Model,
+}
+
+/// Step-through custom provider setup.
+#[derive(Debug)]
+pub struct ConnectWizardState {
+    pub step: ConnectWizardStep,
+    pub filter: String,
+    pub selected: usize,
+    pub id: String,
+    pub base_url: String,
+    pub api_key: String,
+    pub model: String,
+    pub input: String,
+    /// Gallery template id when defaults are pre-filled.
+    pub template_id: Option<String>,
+    /// Auth methods for the current template.
+    pub auth_methods: Vec<agentloop_cli_core::AuthMethodSpec>,
+    /// Label shown on the OAuth waiting step.
+    pub auth_method_label: Option<String>,
+    pub oauth_url: Option<String>,
+    pub oauth_instructions: Option<String>,
+    pub oauth_waiting: bool,
+    pending_oauth_method: Option<agentloop_cli_core::OpenAiOAuthMethod>,
+}
+
 /// What an overlay key press produced.
 #[derive(Debug, Default)]
 pub struct OverlayOutcome {
@@ -400,6 +604,14 @@ pub struct OverlayOutcome {
     /// Restore the theme snapshot taken when the theme picker opened (the user
     /// cancelled the picker).
     pub revert_theme: bool,
+    /// A command-palette selection for the app to apply.
+    pub palette_action: Option<CommandPaletteAction>,
+    /// Connect wizard finished — validate the assembled provider.
+    pub connect_wizard: Option<(String, agentloop_cli_core::ProviderConfig)>,
+    /// Gallery picked Copilot — start device-flow sign-in.
+    pub start_copilot_login: bool,
+    /// OpenAI OAuth method to start when the wizard enters OAuthWaiting.
+    pub start_openai_oauth: Option<agentloop_cli_core::OpenAiOAuthMethod>,
 }
 
 impl OverlayOutcome {
@@ -417,6 +629,87 @@ impl OverlayOutcome {
 
 /// Handle a key while a modal is active. Returns `None` when the overlay
 /// did not consume the key.
+/// Strip line breaks from a bracketed paste destined for a single-line field.
+fn single_line_paste(text: &str) -> String {
+    text.chars().filter(|c| *c != '\n' && *c != '\r').collect()
+}
+
+/// Handle a bracketed paste while a modal is active. Returns `true` when the
+/// paste was consumed (including modals with no text field).
+pub fn handle_paste(overlay: &mut Overlay, text: &str) -> bool {
+    let pasted = single_line_paste(text);
+    match overlay {
+        Overlay::None => false,
+        Overlay::Picker(picker) => {
+            picker.filter.push_str(&pasted);
+            picker.selected = 0;
+            true
+        }
+        Overlay::Permission(_)
+        | Overlay::Help
+        | Overlay::ShellCommand(_)
+        | Overlay::WhichKey
+        | Overlay::Login(_)
+        | Overlay::Confirm(_) => true,
+        Overlay::Question(prompt) => {
+            if prompt
+                .current_question()
+                .is_some_and(|question| question.allow_custom)
+            {
+                prompt.custom_mode = true;
+                prompt.picks[prompt.current].clear();
+                prompt.custom_texts[prompt.current] = None;
+                prompt.custom_input.push_str(&pasted);
+            }
+            true
+        }
+        Overlay::McpList(state) => {
+            state.filter.push_str(&pasted);
+            state.selected = 0;
+            true
+        }
+        Overlay::McpExplorer(state) => {
+            if state.args_mode {
+                state.args_input.push_str(&pasted);
+            } else {
+                state.filter.push_str(&pasted);
+                state.selected = 0;
+            }
+            true
+        }
+        Overlay::McpInstall(state) => {
+            if state.input_mode {
+                state.input.push_str(&pasted);
+            } else {
+                state.filter.push_str(&pasted);
+                state.selected = 0;
+            }
+            true
+        }
+        Overlay::CommandPalette(state) => {
+            state.filter.push_str(&pasted);
+            state.selected = 0;
+            true
+        }
+        Overlay::ConnectWizard(state) => {
+            match state.step {
+                ConnectWizardStep::PickProvider => {
+                    state.filter.push_str(&pasted);
+                    state.selected = 0;
+                }
+                ConnectWizardStep::CustomProviderId
+                | ConnectWizardStep::BaseUrl
+                | ConnectWizardStep::ApiKey
+                | ConnectWizardStep::Model => {
+                    state.input.push_str(&pasted);
+                }
+                ConnectWizardStep::PickAuthMethod | ConnectWizardStep::OAuthWaiting => {}
+            }
+            true
+        }
+    }
+}
+
 pub fn handle_key(overlay: &mut Overlay, key: KeyEvent) -> Option<OverlayOutcome> {
     match overlay {
         Overlay::None => None,
@@ -430,6 +723,9 @@ pub fn handle_key(overlay: &mut Overlay, key: KeyEvent) -> Option<OverlayOutcome
         Overlay::McpList(state) => Some(mcp_list_key(state, key)),
         Overlay::McpExplorer(state) => Some(mcp_explorer_key(state, key)),
         Overlay::McpInstall(state) => Some(mcp_install_key(state, key)),
+        Overlay::CommandPalette(state) => Some(command_palette_key(state, key)),
+        Overlay::WhichKey => Some(which_key_key(key)),
+        Overlay::ConnectWizard(state) => Some(connect_wizard_key(state, key)),
     }
 }
 
@@ -443,6 +739,7 @@ pub enum PickerChoice {
     SetPermissionMode(String),
     SetTheme(String),
     SetEffort(String),
+    ResumeSession(String),
 }
 
 /// What the install wizard selected.
@@ -474,8 +771,34 @@ fn picker_moved(picker: &PickerState) -> OverlayOutcome {
     }
 }
 
+fn advance_picker_selection(picker: &mut PickerState, delta: isize) {
+    let visible = picker.visible();
+    let selectable: Vec<usize> = visible
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, item)| item.enabled.then_some(idx))
+        .collect();
+    if selectable.is_empty() {
+        picker.selected = 0;
+        return;
+    }
+    let current_pos = selectable
+        .iter()
+        .position(|&idx| idx == picker.selected)
+        .unwrap_or(0);
+    let next_pos = if delta < 0 {
+        if current_pos == 0 {
+            selectable.len() - 1
+        } else {
+            current_pos - 1
+        }
+    } else {
+        (current_pos + 1) % selectable.len()
+    };
+    picker.selected = selectable[next_pos];
+}
+
 fn picker_key(picker: &mut PickerState, key: KeyEvent) -> OverlayOutcome {
-    let visible_len = picker.visible().len();
     match (key.code, key.modifiers) {
         (KeyCode::Esc, _) => OverlayOutcome {
             close: true,
@@ -483,19 +806,11 @@ fn picker_key(picker: &mut PickerState, key: KeyEvent) -> OverlayOutcome {
             ..OverlayOutcome::default()
         },
         (KeyCode::Up, _) => {
-            if visible_len > 0 {
-                picker.selected = if picker.selected == 0 {
-                    visible_len - 1
-                } else {
-                    picker.selected - 1
-                };
-            }
+            advance_picker_selection(picker, -1);
             picker_moved(picker)
         }
         (KeyCode::Down, _) => {
-            if visible_len > 0 {
-                picker.selected = (picker.selected + 1) % visible_len;
-            }
+            advance_picker_selection(picker, 1);
             picker_moved(picker)
         }
         (KeyCode::Backspace, _) => {
@@ -519,6 +834,7 @@ fn picker_key(picker: &mut PickerState, key: KeyEvent) -> OverlayOutcome {
                         PickerAction::SetPermissionMode => PickerChoice::SetPermissionMode(id),
                         PickerAction::SetTheme => PickerChoice::SetTheme(id),
                         PickerAction::SetEffort => PickerChoice::SetEffort(id),
+                        PickerAction::ResumeSession => PickerChoice::ResumeSession(id),
                     }),
                     close: true,
                     ..OverlayOutcome::default()
@@ -610,6 +926,10 @@ fn permission_key(prompt: &mut PermissionPrompt, key: KeyEvent) -> OverlayOutcom
         }
         // Esc never leaves a request dangling while the turn blocks on it.
         (KeyCode::Esc, _) | (KeyCode::Char('n'), KeyModifiers::NONE) => deny(prompt),
+        (KeyCode::Char('d'), KeyModifiers::NONE) if prompt.diff.is_some() => {
+            prompt.diff_expanded = !prompt.diff_expanded;
+            OverlayOutcome::consumed()
+        }
         _ => OverlayOutcome::consumed(),
     }
 }
@@ -775,15 +1095,29 @@ fn confirm_key(prompt: &ConfirmPrompt, key: KeyEvent) -> OverlayOutcome {
 }
 
 fn mcp_list_visible(state: &McpListState) -> Vec<&McpListItem> {
-    let filter = state.filter.to_lowercase();
-    state
-        .items
-        .iter()
-        .filter(|item| {
-            filter.is_empty()
-                || item.name.to_lowercase().contains(&filter)
-                || item.source.to_lowercase().contains(&filter)
-        })
+    let filter = state.filter.trim();
+    if filter.is_empty() {
+        return state.items.iter().collect();
+    }
+    let ranked = fuzzy_rank(
+        filter,
+        state
+            .items
+            .iter()
+            .enumerate()
+            .map(|(idx, item)| (idx, item.name.as_str())),
+        |primary| {
+            state
+                .items
+                .iter()
+                .find(|item| item.name == primary)
+                .map(|item| vec![item.source.as_str()])
+                .unwrap_or_default()
+        },
+    );
+    ranked
+        .into_iter()
+        .filter_map(|idx| state.items.get(idx))
         .collect()
 }
 
@@ -840,14 +1174,27 @@ fn mcp_explorer_visible_tools(state: &McpExplorerState) -> Vec<&McpRemoteTool> {
     let McpExplorerPhase::Tools { tools } = &state.phase else {
         return Vec::new();
     };
-    let filter = state.filter.to_lowercase();
-    tools
-        .iter()
-        .filter(|tool| {
-            filter.is_empty()
-                || tool.name.to_lowercase().contains(&filter)
-                || tool.description.to_lowercase().contains(&filter)
-        })
+    let filter = state.filter.trim();
+    if filter.is_empty() {
+        return tools.iter().collect();
+    }
+    let ranked = fuzzy_rank(
+        filter,
+        tools
+            .iter()
+            .enumerate()
+            .map(|(idx, tool)| (idx, tool.name.as_str())),
+        |primary| {
+            tools
+                .iter()
+                .find(|tool| tool.name == primary)
+                .map(|tool| vec![tool.description.as_str()])
+                .unwrap_or_default()
+        },
+    );
+    ranked
+        .into_iter()
+        .filter_map(|idx| tools.get(idx))
         .collect()
 }
 
@@ -1074,6 +1421,467 @@ fn shell_command_key(state: &mut ShellCommandOverlay, key: KeyEvent) -> OverlayO
     }
 }
 
+fn advance_palette_selection(state: &mut CommandPaletteState, delta: isize) {
+    let visible = state.visible();
+    if visible.is_empty() {
+        state.selected = 0;
+        return;
+    }
+    let mut idx = state.selected;
+    for _ in 0..visible.len() {
+        idx = if delta < 0 {
+            if idx == 0 { visible.len() - 1 } else { idx - 1 }
+        } else {
+            (idx + 1) % visible.len()
+        };
+        if visible[idx].section_header.is_none() {
+            state.selected = idx;
+            return;
+        }
+    }
+}
+
+fn command_palette_key(state: &mut CommandPaletteState, key: KeyEvent) -> OverlayOutcome {
+    match (key.code, key.modifiers) {
+        (KeyCode::Esc, _) => OverlayOutcome::close(),
+        (KeyCode::Up, _) => {
+            advance_palette_selection(state, -1);
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Down, _) => {
+            advance_palette_selection(state, 1);
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Backspace, _) => {
+            state.filter.pop();
+            state.selected = 0;
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Enter, _) => {
+            let action = state
+                .visible()
+                .get(state.selected)
+                .filter(|entry| entry.section_header.is_none())
+                .map(|entry| entry.action.clone());
+            match action {
+                Some(action) => OverlayOutcome {
+                    palette_action: Some(action),
+                    close: true,
+                    ..OverlayOutcome::default()
+                },
+                None => OverlayOutcome::consumed(),
+            }
+        }
+        (KeyCode::Char(c), m) if m.is_empty() || m == KeyModifiers::SHIFT => {
+            state.filter.push(c);
+            state.selected = 0;
+            OverlayOutcome::consumed()
+        }
+        _ => OverlayOutcome::consumed(),
+    }
+}
+
+fn which_key_key(key: KeyEvent) -> OverlayOutcome {
+    match (key.code, key.modifiers) {
+        (KeyCode::Esc, _) | (KeyCode::Char('?'), _) => OverlayOutcome::close(),
+        _ => OverlayOutcome::consumed(),
+    }
+}
+
+fn connect_wizard_key(state: &mut ConnectWizardState, key: KeyEvent) -> OverlayOutcome {
+    match state.step {
+        ConnectWizardStep::PickProvider => connect_gallery_key(state, key),
+        ConnectWizardStep::PickAuthMethod => connect_auth_method_key(state, key),
+        ConnectWizardStep::OAuthWaiting => connect_oauth_waiting_key(state, key),
+        _ => connect_form_key(state, key),
+    }
+}
+
+fn connect_gallery_key(state: &mut ConnectWizardState, key: KeyEvent) -> OverlayOutcome {
+    let rows = connect_gallery_rows(state);
+    match (key.code, key.modifiers) {
+        (KeyCode::Esc, _) => OverlayOutcome::close(),
+        (KeyCode::Up, _) | (KeyCode::Char('k'), KeyModifiers::CONTROL) => {
+            advance_gallery_selection(state, &rows, -1);
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Down, _) | (KeyCode::Char('j'), KeyModifiers::CONTROL) => {
+            advance_gallery_selection(state, &rows, 1);
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Enter, _) => {
+            let Some(row) = rows.get(state.selected) else {
+                return OverlayOutcome::consumed();
+            };
+            match row {
+                ConnectGalleryRow::Header(_) => OverlayOutcome::consumed(),
+                ConnectGalleryRow::Template(id) => {
+                    apply_connect_template(state, id);
+                    connect_after_template_pick(state)
+                }
+                ConnectGalleryRow::Custom => {
+                    state.step = ConnectWizardStep::CustomProviderId;
+                    state.id.clear();
+                    state.input.clear();
+                    state.template_id = None;
+                    OverlayOutcome::consumed()
+                }
+            }
+        }
+        (KeyCode::Backspace, _) => {
+            state.filter.pop();
+            state.selected = 0;
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Char(c), m) if m.is_empty() || m == KeyModifiers::SHIFT => {
+            state.filter.push(c);
+            state.selected = 0;
+            OverlayOutcome::consumed()
+        }
+        _ => OverlayOutcome::consumed(),
+    }
+}
+
+fn connect_after_template_pick(state: &mut ConnectWizardState) -> OverlayOutcome {
+    let Some(template) = state
+        .template_id
+        .as_deref()
+        .and_then(agentloop_cli_core::provider_template)
+    else {
+        return OverlayOutcome::consumed();
+    };
+    let methods = agentloop_cli_core::auth_methods(template);
+    state.auth_methods = methods.to_vec();
+    if methods.len() > 1 {
+        state.step = ConnectWizardStep::PickAuthMethod;
+        state.selected = 0;
+        return OverlayOutcome::consumed();
+    }
+    if let Some(spec) = methods.first() {
+        return connect_after_auth_method_pick(state, spec.kind);
+    }
+    match template.auth {
+        agentloop_cli_core::ProviderAuth::DeviceFlow => OverlayOutcome {
+            close: true,
+            start_copilot_login: true,
+            ..OverlayOutcome::default()
+        },
+        agentloop_cli_core::ProviderAuth::EnvOnly { env_var } => OverlayOutcome {
+            close: true,
+            info: Some(format!("set {env_var} then run /provider {}", template.id)),
+            ..OverlayOutcome::default()
+        },
+        agentloop_cli_core::ProviderAuth::ApiKey { env_var } => {
+            if let Some(var) = env_var.filter(|v| agentloop_cli_core::env_var_configured(v)) {
+                state.api_key = format!("{{env:{var}}}");
+                state.step = ConnectWizardStep::Model;
+                state.input = state.model.clone();
+            } else {
+                state.step = ConnectWizardStep::ApiKey;
+                state.input.clear();
+            }
+            OverlayOutcome::consumed()
+        }
+        agentloop_cli_core::ProviderAuth::MultiMethod => OverlayOutcome::consumed(),
+    }
+}
+
+fn connect_after_auth_method_pick(
+    state: &mut ConnectWizardState,
+    kind: agentloop_cli_core::AuthMethodKind,
+) -> OverlayOutcome {
+    use agentloop_cli_core::AuthMethodKind;
+    use agentloop_cli_core::OpenAiOAuthMethod;
+    match kind {
+        AuthMethodKind::DeviceFlow => OverlayOutcome {
+            close: true,
+            start_copilot_login: true,
+            ..OverlayOutcome::default()
+        },
+        AuthMethodKind::OAuthBrowser => {
+            state.auth_method_label = state
+                .auth_methods
+                .iter()
+                .find(|m| m.kind == AuthMethodKind::OAuthBrowser)
+                .map(|m| m.label.to_owned());
+            state.step = ConnectWizardStep::OAuthWaiting;
+            state.oauth_waiting = false;
+            state.oauth_url = None;
+            state.oauth_instructions = None;
+            state.pending_oauth_method = Some(OpenAiOAuthMethod::Browser);
+            OverlayOutcome {
+                start_openai_oauth: Some(OpenAiOAuthMethod::Browser),
+                ..OverlayOutcome::default()
+            }
+        }
+        AuthMethodKind::OAuthHeadless => {
+            state.auth_method_label = state
+                .auth_methods
+                .iter()
+                .find(|m| m.kind == AuthMethodKind::OAuthHeadless)
+                .map(|m| m.label.to_owned());
+            state.step = ConnectWizardStep::OAuthWaiting;
+            state.oauth_waiting = false;
+            state.oauth_url = None;
+            state.oauth_instructions = None;
+            state.pending_oauth_method = Some(OpenAiOAuthMethod::Headless);
+            OverlayOutcome {
+                start_openai_oauth: Some(OpenAiOAuthMethod::Headless),
+                ..OverlayOutcome::default()
+            }
+        }
+        AuthMethodKind::ApiKey => {
+            if let Some(var) = state.template_id.as_deref().and_then(|id| {
+                agentloop_cli_core::provider_template(id).and_then(|t| match t.auth {
+                    agentloop_cli_core::ProviderAuth::ApiKey { env_var } => env_var,
+                    agentloop_cli_core::ProviderAuth::MultiMethod if id == "openai" => {
+                        Some("OPENAI_API_KEY")
+                    }
+                    _ => None,
+                })
+            }) && agentloop_cli_core::env_var_configured(var)
+            {
+                state.api_key = format!("{{env:{var}}}");
+                state.step = ConnectWizardStep::Model;
+                state.input = state.model.clone();
+            } else {
+                state.step = ConnectWizardStep::ApiKey;
+                state.input.clear();
+            }
+            OverlayOutcome::consumed()
+        }
+    }
+}
+
+fn connect_auth_method_key(state: &mut ConnectWizardState, key: KeyEvent) -> OverlayOutcome {
+    let count = state.auth_methods.len();
+    match (key.code, key.modifiers) {
+        (KeyCode::Esc, _) => OverlayOutcome::close(),
+        (KeyCode::Up, _) | (KeyCode::Char('k'), KeyModifiers::CONTROL) => {
+            if state.selected > 0 {
+                state.selected -= 1;
+            } else if count > 0 {
+                state.selected = count - 1;
+            }
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Down, _) | (KeyCode::Char('j'), KeyModifiers::CONTROL) => {
+            if count > 0 {
+                state.selected = (state.selected + 1) % count;
+            }
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Enter, _) => {
+            let Some(spec) = state.auth_methods.get(state.selected) else {
+                return OverlayOutcome::consumed();
+            };
+            connect_after_auth_method_pick(state, spec.kind)
+        }
+        _ => OverlayOutcome::consumed(),
+    }
+}
+
+fn connect_oauth_waiting_key(state: &mut ConnectWizardState, key: KeyEvent) -> OverlayOutcome {
+    match (key.code, key.modifiers) {
+        (KeyCode::Esc, _) => OverlayOutcome {
+            close: true,
+            effects: vec![Effect::CancelOpenAiOAuth],
+            ..OverlayOutcome::default()
+        },
+        (KeyCode::Char('c'), _) => {
+            if let Some(url) = state.oauth_url.clone() {
+                OverlayOutcome {
+                    effects: vec![Effect::CopyToClipboard { text: url }],
+                    ..OverlayOutcome::default()
+                }
+            } else {
+                OverlayOutcome::consumed()
+            }
+        }
+        _ => OverlayOutcome::consumed(),
+    }
+}
+
+fn apply_connect_template(state: &mut ConnectWizardState, id: &str) {
+    state.id = id.to_owned();
+    state.template_id = Some(id.to_owned());
+    if let Some(template) = agentloop_cli_core::provider_template(id) {
+        state.base_url = template.base_url.unwrap_or_default().to_owned();
+        state.model = template.default_model.unwrap_or_default().to_owned();
+    }
+}
+
+fn connect_form_key(state: &mut ConnectWizardState, key: KeyEvent) -> OverlayOutcome {
+    match (key.code, key.modifiers) {
+        (KeyCode::Esc, _) => OverlayOutcome::close(),
+        (KeyCode::Backspace, _) => {
+            state.input.pop();
+            OverlayOutcome::consumed()
+        }
+        (KeyCode::Enter, _) => {
+            let value = state.input.trim().to_owned();
+            if value.is_empty() {
+                return OverlayOutcome::consumed();
+            }
+            match state.step {
+                ConnectWizardStep::CustomProviderId => {
+                    state.id = value.to_lowercase();
+                    state.template_id = None;
+                    if let Some((base_url, default_model, _)) =
+                        agentloop_cli_core::known_provider_defaults(&state.id)
+                    {
+                        state.base_url = base_url.to_owned();
+                        state.model = default_model.to_owned();
+                        state.template_id = Some(state.id.clone());
+                        state.step = ConnectWizardStep::ApiKey;
+                    } else {
+                        state.step = ConnectWizardStep::BaseUrl;
+                    }
+                    state.input.clear();
+                    OverlayOutcome::consumed()
+                }
+                ConnectWizardStep::BaseUrl => {
+                    state.base_url = value;
+                    state.step = ConnectWizardStep::ApiKey;
+                    state.input.clear();
+                    OverlayOutcome::consumed()
+                }
+                ConnectWizardStep::ApiKey => {
+                    state.api_key = value;
+                    state.step = ConnectWizardStep::Model;
+                    state.input = state.model.clone();
+                    OverlayOutcome::consumed()
+                }
+                ConnectWizardStep::Model => {
+                    state.model = value;
+                    let config = agentloop_cli_core::ProviderConfig {
+                        name: None,
+                        base_url: state.base_url.clone(),
+                        api_key: state.api_key.clone(),
+                        models: Vec::new(),
+                        default_model: Some(state.model.clone()),
+                        thinking: state
+                            .template_id
+                            .as_deref()
+                            .and_then(agentloop_cli_core::known_provider_defaults)
+                            .map(|(_, _, thinking)| thinking)
+                            .unwrap_or(false),
+                    };
+                    OverlayOutcome {
+                        connect_wizard: Some((state.id.clone(), config)),
+                        close: true,
+                        ..OverlayOutcome::default()
+                    }
+                }
+                ConnectWizardStep::PickProvider
+                | ConnectWizardStep::PickAuthMethod
+                | ConnectWizardStep::OAuthWaiting => OverlayOutcome::consumed(),
+            }
+        }
+        (KeyCode::Char(c), m) if m.is_empty() || m == KeyModifiers::SHIFT => {
+            state.input.push(c);
+            OverlayOutcome::consumed()
+        }
+        _ => OverlayOutcome::consumed(),
+    }
+}
+
+fn advance_gallery_selection(
+    state: &mut ConnectWizardState,
+    rows: &[ConnectGalleryRow],
+    delta: isize,
+) {
+    if rows.is_empty() {
+        state.selected = 0;
+        return;
+    }
+    let mut idx = state.selected;
+    for _ in 0..rows.len() {
+        idx = if delta < 0 {
+            if idx == 0 { rows.len() - 1 } else { idx - 1 }
+        } else {
+            (idx + 1) % rows.len()
+        };
+        if !matches!(rows[idx], ConnectGalleryRow::Header(_)) {
+            state.selected = idx;
+            return;
+        }
+    }
+}
+
+pub(crate) enum ConnectGalleryRow {
+    Header(&'static str),
+    Template(&'static str),
+    Custom,
+}
+
+fn connect_gallery_rows(state: &ConnectWizardState) -> Vec<ConnectGalleryRow> {
+    let filter = state.filter.trim();
+    let mut rows = Vec::new();
+    let mut last_category: Option<agentloop_cli_core::ProviderCategory> = None;
+    for template in agentloop_cli_core::provider_templates() {
+        if !filter.is_empty() {
+            let haystack = format!(
+                "{} {} {}",
+                template.id, template.label, template.description
+            );
+            if fuzzy_score(filter, &haystack).is_none() {
+                continue;
+            }
+        }
+        if last_category != Some(template.category) {
+            rows.push(ConnectGalleryRow::Header(template.category.label()));
+            last_category = Some(template.category);
+        }
+        rows.push(ConnectGalleryRow::Template(template.id));
+    }
+    if filter.is_empty() || fuzzy_score(filter, "custom provider").is_some() {
+        rows.push(ConnectGalleryRow::Header(
+            agentloop_cli_core::ProviderCategory::Custom.label(),
+        ));
+        rows.push(ConnectGalleryRow::Custom);
+    }
+    rows
+}
+
+impl ConnectWizardState {
+    /// Empty gallery wizard.
+    pub fn new_gallery() -> Self {
+        Self {
+            step: ConnectWizardStep::PickProvider,
+            filter: String::new(),
+            selected: 0,
+            id: String::new(),
+            base_url: String::new(),
+            api_key: String::new(),
+            model: String::new(),
+            input: String::new(),
+            template_id: None,
+            auth_methods: Vec::new(),
+            auth_method_label: None,
+            oauth_url: None,
+            oauth_instructions: None,
+            oauth_waiting: false,
+            pending_oauth_method: None,
+        }
+    }
+
+    /// Gallery rows for rendering and keyboard navigation.
+    pub(crate) fn gallery_rows(&self) -> Vec<ConnectGalleryRow> {
+        connect_gallery_rows(self)
+    }
+
+    /// Clamp selection after the visible row list changes.
+    pub fn clamp_gallery_selection(&mut self) {
+        let len = connect_gallery_rows(self).len();
+        if len == 0 {
+            self.selected = 0;
+        } else if self.selected >= len {
+            self.selected = len - 1;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1200,6 +2008,8 @@ mod tests {
             selected: 0,
             session: Some(SessionId::from("child-1")),
             role: Some("worker".to_owned()),
+            diff: None,
+            diff_expanded: false,
         };
         let outcome = permission_key(&mut prompt, key(KeyCode::Enter));
         assert!(outcome.close);
@@ -1228,5 +2038,57 @@ mod tests {
         assert_eq!(picks, vec![2]);
         toggle_pick(&mut picks, 2);
         assert!(picks.is_empty());
+    }
+
+    #[test]
+    fn fuzzy_score_prefers_substring_over_subsequence() {
+        let sub = fuzzy_score("anth", "anthropic/claude").expect("match");
+        let seq = fuzzy_score("anth", "a nice theory helps").expect("match");
+        assert!(sub > seq);
+    }
+
+    #[test]
+    fn fuzzy_score_ranks_closer_matches_higher() {
+        let anth = fuzzy_score("anth", "anthropic").expect("match");
+        let ant = fuzzy_score("ant", "anthropic").expect("match");
+        assert!(anth >= ant);
+    }
+
+    #[test]
+    fn fuzzy_score_rejects_unrelated_strings() {
+        assert!(fuzzy_score("xyz", "anthropic").is_none());
+    }
+
+    #[test]
+    fn connect_wizard_api_key_paste_appends_to_wizard_input() {
+        let mut overlay = Overlay::ConnectWizard(ConnectWizardState::new_gallery());
+        if let Overlay::ConnectWizard(state) = &mut overlay {
+            state.step = ConnectWizardStep::ApiKey;
+            state.id = "openai".to_owned();
+            state.base_url = "https://api.openai.com/v1".to_owned();
+            state.template_id = Some("openai".to_owned());
+        }
+        assert!(handle_paste(&mut overlay, "sk-test-key\n"));
+        let Overlay::ConnectWizard(state) = overlay else {
+            panic!("expected connect wizard");
+        };
+        assert_eq!(state.input, "sk-test-key");
+    }
+
+    #[test]
+    fn connect_wizard_gallery_paste_appends_to_filter() {
+        let mut overlay = Overlay::ConnectWizard(ConnectWizardState::new_gallery());
+        assert!(handle_paste(&mut overlay, "deep"));
+        let Overlay::ConnectWizard(state) = overlay else {
+            panic!("expected connect wizard");
+        };
+        assert_eq!(state.filter, "deep");
+    }
+
+    #[test]
+    fn login_overlay_paste_is_consumed_without_text_field() {
+        let mut overlay = Overlay::Login(LoginState::Starting);
+        assert!(handle_paste(&mut overlay, "should-not-appear"));
+        assert!(matches!(overlay, Overlay::Login(LoginState::Starting)));
     }
 }

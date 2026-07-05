@@ -595,6 +595,8 @@ fn overlay_permission_child_badge_snapshot() {
         selected: 0,
         session: Some(SessionId::from("child-1")),
         role: Some("worker".to_owned()),
+        diff: None,
+        diff_expanded: false,
     });
     let rendered = render_app(&mut app, 80, 24);
     assert_snapshot!("overlay_permission_child_badge", rendered);
@@ -631,6 +633,66 @@ fn subagent_tree_failed_snapshot() {
 }
 
 #[test]
+fn overlay_command_palette_snapshot() {
+    use crate::overlay::{CommandPaletteAction, CommandPaletteEntry, CommandPaletteState};
+    let mut app = test_app(test_bootstrap());
+    app.overlay = Overlay::CommandPalette(CommandPaletteState {
+        entries: vec![
+            CommandPaletteEntry {
+                title: "/model".to_owned(),
+                description: "pick or set the session model".to_owned(),
+                category: "cli",
+                section_header: None,
+                key_hint: Some("[provider/model]".to_owned()),
+                action: CommandPaletteAction::OpenModelPicker,
+            },
+            CommandPaletteEntry {
+                title: "Open model picker".to_owned(),
+                description: "browse models".to_owned(),
+                category: "action",
+                section_header: None,
+                key_hint: Some("/model".to_owned()),
+                action: CommandPaletteAction::OpenModelPicker,
+            },
+        ],
+        filter: "mod".to_owned(),
+        selected: 0,
+    });
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("overlay_command_palette", rendered);
+}
+
+#[test]
+fn overlay_permission_edit_diff_snapshot() {
+    use crate::tool_output::diff_from_permission_detail;
+    use agentloop_contracts::{PermissionDecisionKind, PermissionRequestId};
+    let mut app = test_app(test_bootstrap());
+    let title = "Allow `Edit`?".to_owned();
+    let detail = Some(
+        r#"{"file_path":"src/main.rs","old_string":"fn old();\n","new_string":"fn new();\n"}"#
+            .to_owned(),
+    );
+    app.overlay = Overlay::Permission(crate::overlay::PermissionPrompt {
+        id: PermissionRequestId::from("perm-edit"),
+        call_id: None,
+        title: title.clone(),
+        detail: detail.clone(),
+        options: vec![
+            PermissionDecisionKind::AllowOnce,
+            PermissionDecisionKind::AllowAlways,
+            PermissionDecisionKind::Deny,
+        ],
+        selected: 0,
+        session: None,
+        role: None,
+        diff: diff_from_permission_detail(&title, detail.as_deref()),
+        diff_expanded: false,
+    });
+    let rendered = render_app(&mut app, 80, 24);
+    assert_snapshot!("overlay_permission_edit_diff", rendered);
+}
+
+#[test]
 fn chat_follow_shows_last_line() {
     let mut app = test_app(test_bootstrap());
     let marker = "ZZZZ_LAST_LINE_MARKER";
@@ -658,4 +720,39 @@ fn chat_follow_shows_last_line() {
         rendered.contains("Final paragraph after heading"),
         "content below the last heading should be visible; rendered:\n{rendered}"
     );
+}
+
+#[test]
+fn context_sidebar_idle_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    app.status.total_usage.input = 12_300;
+    app.status.total_usage.output = 4_100;
+    app.status.last_cost_usd = Some(0.042);
+    app.status.last_context_tokens = Some(48_000);
+    app.git_branch = Some("main".to_owned());
+    let rendered = render_app(&mut app, 120, 30);
+    assert_snapshot!("context_sidebar_idle", rendered);
+}
+
+#[test]
+fn context_sidebar_getting_started_snapshot() {
+    let mut bootstrap = test_bootstrap();
+    bootstrap.providers = Vec::new();
+    bootstrap.model = None;
+    let mut app = test_app(bootstrap);
+    app.getting_started_dismissed = false;
+    app.git_branch = Some("feature/ui".to_owned());
+    let rendered = render_app(&mut app, 120, 30);
+    assert_snapshot!("context_sidebar_getting_started", rendered);
+}
+
+#[test]
+fn connect_provider_gallery_snapshot() {
+    use crate::overlay::ConnectWizardState;
+    let mut bootstrap = test_bootstrap();
+    bootstrap.providers = vec!["anthropic".to_owned()];
+    let mut app = test_app(bootstrap);
+    app.overlay = Overlay::ConnectWizard(ConnectWizardState::new_gallery());
+    let rendered = render_app(&mut app, 100, 28);
+    assert_snapshot!("connect_provider_gallery", rendered);
 }

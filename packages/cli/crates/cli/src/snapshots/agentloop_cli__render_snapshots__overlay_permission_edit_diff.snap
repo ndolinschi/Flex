@@ -11,15 +11,15 @@ Start with a prompt or /help.
 
 
 ╭ permission ──────────────────────────────────────────────────────────────────╮
-│ [worker] Allow `Bash`?                                                       │
-│                                                                              │
-│ cargo test --workspace                                                       │
+│ Allow `Edit`?                                                                │
+│   1 - fn old();                                                              │
+│   1 + fn new();                                                              │
 │                                                                              │
 │ 1. Yes                                                                       │
 │ 2. Yes, don't ask again                                                      │
 │ 3. No (esc)                                                                  │
 │                                                                              │
-│ enter confirm · 1-3 select · y allow · a always · esc/n deny                 │
+│ enter confirm · 1-3 select · y allow · a always · esc/n deny · d diff        │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭ prompt ──────────────────────────────────────────────────────────────────────╮
 │ Fix a TODO in the codebase                                                   │

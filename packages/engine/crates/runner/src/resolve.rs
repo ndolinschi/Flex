@@ -110,6 +110,8 @@ fn native_service(
         workspace: None,
         isolation_default: Default::default(),
         verify_command: None,
+        formatters: Vec::new(),
+        diagnostics: agentloop_engine::DiagnosticsConfig::default(),
     })
 }
 

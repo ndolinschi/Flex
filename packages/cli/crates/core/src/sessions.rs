@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use agentloop_contracts::{AgentEvent, ContentBlock, SessionId};
+use agentloop_contracts::{AgentEvent, ContentBlock, SessionId, now_ms};
 use agentloop_core::SessionStore;
 use agentloop_session::JsonlStore;
 
@@ -11,11 +11,7 @@ use agentloop_session::JsonlStore;
 pub fn sessions_dir() -> Option<PathBuf> {
     if let Ok(state_home) = std::env::var("XDG_STATE_HOME") {
         if !state_home.trim().is_empty() {
-            return Some(
-                PathBuf::from(state_home)
-                    .join("flex")
-                    .join("sessions"),
-            );
+            return Some(PathBuf::from(state_home).join("flex").join("sessions"));
         }
     }
     std::env::var("HOME")
@@ -30,12 +26,33 @@ pub fn sessions_dir() -> Option<PathBuf> {
         })
 }
 
-/// One past session, summarized for a picker: id, last-touched time, and a
-/// preview of the first user message (session titles are never set today).
+/// `~/.local/state/flex/worktrees` (honoring `XDG_STATE_HOME`) — a sibling of
+/// [`sessions_dir`], where isolated session workspaces are provisioned.
+pub fn worktrees_dir() -> Option<PathBuf> {
+    if let Ok(state_home) = std::env::var("XDG_STATE_HOME") {
+        if !state_home.trim().is_empty() {
+            return Some(PathBuf::from(state_home).join("flex").join("worktrees"));
+        }
+    }
+    std::env::var("HOME")
+        .ok()
+        .filter(|home| !home.trim().is_empty())
+        .map(|home| {
+            PathBuf::from(home)
+                .join(".local")
+                .join("state")
+                .join("flex")
+                .join("worktrees")
+        })
+}
+
+/// One past session, summarized for a picker: id, last-touched time, optional
+/// title, and a preview fallback when no title was set.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionSummary {
     pub id: SessionId,
     pub updated_at_ms: u64,
+    pub title: Option<String>,
     pub preview: String,
 }
 
@@ -83,7 +100,8 @@ async fn list_recent_sessions_in(root: &Path, cwd: &Path, limit: usize) -> Vec<S
             break;
         }
         summaries.push(SessionSummary {
-            preview: preview_for(&store, &meta.id).await,
+            title: meta.title.clone(),
+            preview: preview_for(&store, &meta.id, meta.title.as_deref()).await,
             id: meta.id,
             updated_at_ms: meta.updated_at_ms,
         });
@@ -98,7 +116,10 @@ async fn session_exists_in(root: &Path, id: &SessionId) -> bool {
     }
 }
 
-async fn preview_for(store: &JsonlStore, id: &SessionId) -> String {
+async fn preview_for(store: &JsonlStore, id: &SessionId, title: Option<&str>) -> String {
+    if let Some(title) = title.filter(|text| !text.trim().is_empty()) {
+        return truncate_preview(title.trim());
+    }
     let Ok(events) = store.read(id, 0).await else {
         return "(no messages)".to_owned();
     };
@@ -126,6 +147,30 @@ fn truncate_preview(text: &str) -> String {
     }
 }
 
+/// Human-readable label for a session row (title when set, else preview).
+pub fn session_display_label(summary: &SessionSummary) -> &str {
+    summary
+        .title
+        .as_deref()
+        .filter(|text| !text.trim().is_empty())
+        .unwrap_or(summary.preview.as_str())
+}
+
+/// Relative time label such as `2h ago` for picker rows.
+pub fn format_relative_time(updated_at_ms: u64) -> String {
+    let elapsed_ms = now_ms().saturating_sub(updated_at_ms);
+    let secs = elapsed_ms / 1000;
+    if secs < 60 {
+        "just now".to_owned()
+    } else if secs < 3600 {
+        format!("{}m ago", secs / 60)
+    } else if secs < 86_400 {
+        format!("{}h ago", secs / 3600)
+    } else {
+        format!("{}d ago", secs / 86_400)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use agentloop_contracts::{MessageId, SessionMeta};
@@ -145,6 +190,9 @@ mod tests {
             cwd: cwd.to_path_buf(),
             model: None,
             mode: None,
+            isolation: None,
+            workspace_id: None,
+            base_cwd: None,
             created_at_ms: updated_at_ms,
             updated_at_ms,
         }
@@ -177,21 +225,59 @@ mod tests {
 
         store.create(meta("older", &here, 100)).await.unwrap();
         store
-            .append(&SessionId::from("older"), &[user_message("first project chat")])
+            .append(
+                &SessionId::from("older"),
+                &[user_message("first project chat")],
+            )
             .await
             .unwrap();
         store.create(meta("newer", &here, 200)).await.unwrap();
         store
-            .append(&SessionId::from("newer"), &[user_message("second project chat")])
+            .append(
+                &SessionId::from("newer"),
+                &[user_message("second project chat")],
+            )
             .await
             .unwrap();
-        store.create(meta("unrelated", &elsewhere, 300)).await.unwrap();
+        store
+            .create(meta("unrelated", &elsewhere, 300))
+            .await
+            .unwrap();
 
         let summaries = list_recent_sessions_in(dir.path(), &here, 10).await;
         assert_eq!(summaries.len(), 2);
         assert_eq!(summaries[0].id, SessionId::from("newer"));
         assert_eq!(summaries[0].preview, "second project chat");
         assert_eq!(summaries[1].id, SessionId::from("older"));
+    }
+
+    #[tokio::test]
+    async fn session_summary_prefers_title_over_preview() {
+        let dir = tempdir().expect("tempdir");
+        let store = JsonlStore::open(dir.path()).expect("open store");
+        let cwd = PathBuf::from("/project");
+        store.create(meta("s1", &cwd, 1)).await.unwrap();
+        store
+            .update_meta(
+                &SessionId::from("s1"),
+                agentloop_contracts::SessionMetaPatch {
+                    title: Some("Fix login".to_owned()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        store
+            .append(
+                &SessionId::from("s1"),
+                &[user_message("long fallback preview")],
+            )
+            .await
+            .unwrap();
+        let summaries = list_recent_sessions_in(dir.path(), &cwd, 10).await;
+        assert_eq!(summaries[0].title.as_deref(), Some("Fix login"));
+        assert_eq!(summaries[0].preview, "Fix login");
+        assert_eq!(session_display_label(&summaries[0]), "Fix login");
     }
 
     #[tokio::test]

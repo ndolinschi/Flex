@@ -32,4 +32,4 @@ pub use builder::{LoopLimits, NativeAgentBuilder};
 pub use manager::{InvalidTransition, ToolCallManager};
 pub use messages::transcript_to_messages;
 pub use permission::{PermissionPolicy, Verdict};
-pub use rules::{CallFacts, any_rule_matches, rule_matches};
+pub use rules::{CallFacts, any_rule_matches, resolve, rule_matches};

@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use agentloop_contracts::{ModelInfo, ModelRef};
+use agentloop_contracts::{IsolationPolicy, ModelInfo, ModelRef};
 use agentloop_engine::{CustomProviderSpec, RoleRegistry, RoleSpec, RoleToolProfile, valid_name};
 use serde::{Deserialize, Serialize};
 
@@ -60,6 +60,23 @@ pub struct CliPrefs {
     /// (at the top) orchestration. `None` = the app default (high).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
+    /// Default workspace-isolation posture (`"never"`, `"optional"`,
+    /// `"required"`); `None` = off. A `--isolate` flag overrides this per run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub isolation: Option<String>,
+    /// Recently selected models (`provider/model`), most recent first (cap 10).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recent_models: Vec<String>,
+    /// Show the empty-session home hints above the input; default on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home_screen: Option<bool>,
+    /// User dismissed the sidebar/getting-started connect card.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub getting_started_dismissed: Option<bool>,
+    /// Command run inside an isolated workspace before merging it back (e.g.
+    /// `"cargo test"`); `None` skips verification.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verify_command: Option<String>,
     /// Forward-compat catch-all: preserves keys this build doesn't know
     /// across load-mutate-save cycles.
     #[serde(flatten)]
@@ -291,6 +308,17 @@ fn model_entry_info(entry: &ModelEntry) -> ModelInfo {
 }
 
 impl CliPrefs {
+    /// Parse the saved isolation posture. An unknown or absent value yields
+    /// `None` (the caller then treats it as off / uses a flag override).
+    pub fn isolation_policy(&self) -> Option<IsolationPolicy> {
+        match self.isolation.as_deref()?.trim().to_lowercase().as_str() {
+            "never" | "off" => Some(IsolationPolicy::Never),
+            "optional" | "on" => Some(IsolationPolicy::Optional),
+            "required" | "force" => Some(IsolationPolicy::Required),
+            _ => None,
+        }
+    }
+
     /// Load preferences from the default config path, or defaults on missing file.
     pub fn load() -> Self {
         match config_path() {
@@ -363,6 +391,9 @@ impl CliPrefs {
     pub fn remember_model(model: &ModelRef) -> Result<(), PrefsError> {
         let mut prefs = Self::load();
         prefs.last_model = Some(model.0.clone());
+        prefs.recent_models.retain(|entry| entry != &model.0);
+        prefs.recent_models.insert(0, model.0.clone());
+        prefs.recent_models.truncate(10);
         prefs.save()
     }
 
@@ -387,10 +418,33 @@ impl CliPrefs {
         prefs.save()
     }
 
+    /// Update and persist the default workspace-isolation posture
+    /// (`/isolation on|off|required`).
+    pub fn remember_isolation(policy: IsolationPolicy) -> Result<(), PrefsError> {
+        let mut prefs = Self::load();
+        prefs.isolation = Some(
+            match policy {
+                IsolationPolicy::Never => "never",
+                IsolationPolicy::Optional => "optional",
+                IsolationPolicy::Required => "required",
+                _ => "never",
+            }
+            .to_owned(),
+        );
+        prefs.save()
+    }
+
     /// Update and persist the mouse-capture preference (toggled with Ctrl+M).
     pub fn remember_mouse_capture(enabled: bool) -> Result<(), PrefsError> {
         let mut prefs = Self::load();
         prefs.mouse_capture = Some(enabled);
+        prefs.save()
+    }
+
+    /// Persist dismissal of the getting-started connect card.
+    pub fn dismiss_getting_started() -> Result<(), PrefsError> {
+        let mut prefs = Self::load();
+        prefs.getting_started_dismissed = Some(true);
         prefs.save()
     }
 

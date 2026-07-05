@@ -50,21 +50,45 @@ pub enum PermissionDecisionKind {
     Deny,
 }
 
+/// Whether a matching [`PermissionRule`] grants or refuses the call.
+///
+/// Rules are evaluated **last-match-wins**, so a later `Deny` overrides an
+/// earlier `Allow` and vice versa. The default is `Allow`, so a plain rule
+/// string (no `!` prefix) is an allow rule — every pre-existing rule keeps its
+/// meaning.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum RuleEffect {
+    #[default]
+    Allow,
+    Deny,
+}
+
 /// A permission rule in the `ToolName(specifier)` format:
 /// `Bash(git *)`, `Read(~/secrets/**)`, `WebFetch(domain:example.com)`,
-/// or a bare tool name (`WebSearch`).
+/// or a bare tool name (`WebSearch`). A leading `!` makes it a **deny** rule
+/// (gitignore style): `!Edit(**/.env*)` refuses edits to dotenv files.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "String", into = "String")]
 pub struct PermissionRule {
     pub tool: String,
     pub specifier: Option<String>,
+    /// Allow (default) or Deny. Encoded on the wire by a leading `!`.
+    #[serde(default)]
+    pub effect: RuleEffect,
 }
 
 impl PermissionRule {
-    /// Parse `Tool(spec)` / `Tool`. Returns `None` for malformed input
-    /// (empty tool name, unbalanced parentheses).
+    /// Parse `Tool(spec)` / `Tool`, with an optional leading `!` for a deny
+    /// rule. Returns `None` for malformed input (empty tool name, unbalanced
+    /// parentheses).
     pub fn parse(raw: &str) -> Option<Self> {
         let raw = raw.trim();
+        let (effect, raw) = match raw.strip_prefix('!') {
+            Some(rest) => (RuleEffect::Deny, rest.trim_start()),
+            None => (RuleEffect::Allow, raw),
+        };
         if raw.is_empty() {
             return None;
         }
@@ -76,6 +100,7 @@ impl PermissionRule {
                     Some(Self {
                         tool: raw.to_owned(),
                         specifier: None,
+                        effect,
                     })
                 }
             }
@@ -88,6 +113,7 @@ impl PermissionRule {
                 Some(Self {
                     tool: tool.to_owned(),
                     specifier: Some(spec.to_owned()),
+                    effect,
                 })
             }
         }
@@ -96,6 +122,9 @@ impl PermissionRule {
 
 impl fmt::Display for PermissionRule {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.effect == RuleEffect::Deny {
+            f.write_str("!")?;
+        }
         match &self.specifier {
             Some(spec) => write!(f, "{}({})", self.tool, spec),
             None => f.write_str(&self.tool),

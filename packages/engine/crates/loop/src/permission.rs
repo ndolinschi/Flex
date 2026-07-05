@@ -5,12 +5,22 @@ use std::sync::RwLock;
 use std::time::Duration;
 
 use agentloop_contracts::PermissionMode;
-use agentloop_contracts::PermissionRule;
+use agentloop_contracts::{PermissionRule, RuleEffect};
 use agentloop_core::tool::{PermissionHint, ToolDescriptor};
 
-use crate::rules::{CallFacts, any_rule_matches};
+use crate::rules::{CallFacts, resolve};
 
 type RuleSink = Box<dyn Fn(&PermissionRule) + Send + Sync>;
+
+/// Always-on deny rules seeded into every policy: secrets stay unreadable and
+/// unwritable unless a later user rule explicitly re-allows them
+/// (last-match-wins). Dotenv files are the classic footgun.
+fn builtin_deny_rules() -> Vec<PermissionRule> {
+    ["!Read(**/.env*)", "!Edit(**/.env*)", "!Write(**/.env*)"]
+        .iter()
+        .filter_map(|raw| PermissionRule::parse(raw))
+        .collect()
+}
 
 /// What the policy decided for one call.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,6 +35,9 @@ pub enum Verdict {
 pub struct PermissionPolicy {
     default_mode: PermissionMode,
     rules: RwLock<Vec<PermissionRule>>,
+    /// Always-on deny rules, evaluated *before* user rules so a user allow
+    /// rule can still override them (last-match-wins).
+    builtin_denies: Vec<PermissionRule>,
     /// How long an `Ask` waits for a client decision before denying.
     pub ask_timeout: Duration,
     /// Called when an `AllowAlways` decision adds a rule (for persistence).
@@ -37,6 +50,7 @@ impl PermissionPolicy {
         Self {
             default_mode,
             rules: RwLock::new(Vec::new()),
+            builtin_denies: builtin_deny_rules(),
             ask_timeout: Duration::from_secs(300),
             rule_sink: None,
             home: None,
@@ -106,7 +120,9 @@ impl PermissionPolicy {
             };
         }
 
-        // Explicit allow rules.
+        // Explicit rules, last-match-wins. User rules take precedence over the
+        // built-in denies (so a user allow can re-enable a denied path); within
+        // each set the last matching rule decides.
         {
             let rules = self.rules.read().unwrap_or_else(|p| p.into_inner());
             let facts = CallFacts {
@@ -115,8 +131,19 @@ impl PermissionPolicy {
                 cwd,
                 home: self.home.as_deref(),
             };
-            if any_rule_matches(&rules, &facts) {
-                return Verdict::Allow;
+            if let Some(rule) =
+                resolve(&rules, &facts).or_else(|| resolve(&self.builtin_denies, &facts))
+            {
+                return match rule.effect {
+                    RuleEffect::Allow => Verdict::Allow,
+                    RuleEffect::Deny => Verdict::Deny {
+                        reason: format!(
+                            "`{}` is denied by permission rule `{rule}`",
+                            descriptor.name
+                        ),
+                    },
+                    _ => Verdict::Ask,
+                };
             }
         }
 
@@ -164,12 +191,14 @@ impl PermissionPolicy {
                 return PermissionRule {
                     tool: descriptor.name.clone(),
                     specifier: Some(format!("{first_word} *")),
+                    effect: RuleEffect::Allow,
                 };
             }
         }
         PermissionRule {
             tool: descriptor.name.clone(),
             specifier: None,
+            effect: RuleEffect::Allow,
         }
     }
 }
@@ -197,6 +226,99 @@ mod tests {
 
     fn eval(policy: &PermissionPolicy, desc: &ToolDescriptor, input: serde_json::Value) -> Verdict {
         policy.evaluate(desc, &input, Path::new("/work"), None)
+    }
+
+    #[test]
+    fn builtin_denies_dotenv_reads_and_edits() {
+        let policy = PermissionPolicy::new(PermissionMode::Default);
+        let read = descriptor("Read", true, PermissionHint::Never);
+        let edit = descriptor("Edit", false, PermissionHint::IfMutating);
+        for file in ["/work/.env", "/work/config/.env.local"] {
+            assert!(
+                matches!(
+                    eval(&policy, &read, serde_json::json!({ "file_path": file })),
+                    Verdict::Deny { .. }
+                ),
+                "reading {file} should be denied"
+            );
+            assert!(matches!(
+                eval(&policy, &edit, serde_json::json!({ "file_path": file })),
+                Verdict::Deny { .. }
+            ));
+        }
+        // A non-dotenv file is unaffected (read-only → allowed).
+        assert_eq!(
+            eval(
+                &policy,
+                &read,
+                serde_json::json!({ "file_path": "/work/src/main.rs" })
+            ),
+            Verdict::Allow
+        );
+    }
+
+    #[test]
+    fn user_allow_rule_overrides_builtin_dotenv_deny() {
+        // User rules are evaluated after the built-in denies, so an explicit
+        // allow wins (last-match-wins).
+        let policy = PermissionPolicy::new(PermissionMode::Default)
+            .with_rules(vec![PermissionRule::parse("Read(**/.env*)").expect("rule")]);
+        let read = descriptor("Read", true, PermissionHint::Never);
+        assert_eq!(
+            eval(
+                &policy,
+                &read,
+                serde_json::json!({ "file_path": "/work/.env" })
+            ),
+            Verdict::Allow
+        );
+    }
+
+    #[test]
+    fn deny_rule_blocks_matching_call() {
+        let policy = PermissionPolicy::new(PermissionMode::Default)
+            .with_rules(vec![PermissionRule::parse("!Bash(rm *)").expect("rule")]);
+        let bash = descriptor("Bash", false, PermissionHint::Always);
+        assert!(matches!(
+            eval(
+                &policy,
+                &bash,
+                serde_json::json!({ "command": "rm -rf build" })
+            ),
+            Verdict::Deny { .. }
+        ));
+        // A command the deny rule does not match still falls through to Ask.
+        assert_eq!(
+            eval(&policy, &bash, serde_json::json!({ "command": "ls" })),
+            Verdict::Ask
+        );
+    }
+
+    #[test]
+    fn last_match_wins_between_allow_and_deny() {
+        // Allow all git, then deny the dangerous subcommand: the later deny wins
+        // for a push, the earlier allow still covers a status.
+        let policy = PermissionPolicy::new(PermissionMode::Default).with_rules(vec![
+            PermissionRule::parse("Bash(git *)").expect("rule"),
+            PermissionRule::parse("!Bash(git push *)").expect("rule"),
+        ]);
+        let bash = descriptor("Bash", false, PermissionHint::Always);
+        assert!(matches!(
+            eval(
+                &policy,
+                &bash,
+                serde_json::json!({ "command": "git push origin main" })
+            ),
+            Verdict::Deny { .. }
+        ));
+        assert_eq!(
+            eval(
+                &policy,
+                &bash,
+                serde_json::json!({ "command": "git status" })
+            ),
+            Verdict::Allow
+        );
     }
 
     #[test]

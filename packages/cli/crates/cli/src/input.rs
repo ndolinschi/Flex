@@ -89,7 +89,46 @@ struct PastedBlock {
 /// Pastes past either threshold are collapsed to a `[Pasted text #N +K
 /// lines]` placeholder instead of being inserted inline.
 const PASTE_PLACEHOLDER_MIN_LINES: usize = 5;
-const PASTE_PLACEHOLDER_MIN_CHARS: usize = 400;
+pub(crate) const PASTE_PLACEHOLDER_MIN_CHARS: usize = 400;
+/// Prompts larger than this are not stored in up/down history.
+const HISTORY_MAX_BYTES: usize = 8_192;
+
+fn paste_is_large(text: &str) -> bool {
+    if text.len() > PASTE_PLACEHOLDER_MIN_CHARS {
+        return true;
+    }
+    paste_exceeds_line_threshold(text, PASTE_PLACEHOLDER_MIN_LINES)
+}
+
+/// Early-exit newline scan for large buffers; full `lines().count()` only on small text.
+fn paste_exceeds_line_threshold(text: &str, min_lines: usize) -> bool {
+    if text.len() <= 8_192 {
+        return text.lines().count() > min_lines;
+    }
+    let mut lines = 1usize;
+    for b in text.bytes() {
+        if b == b'\n' {
+            lines += 1;
+            if lines > min_lines {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn paste_placeholder_suffix(text: &str) -> String {
+    if text.len() > 32_768 {
+        if text.len() >= 1_048_576 {
+            return format!("+{:.1} MB", text.len() as f64 / 1_048_576.0);
+        }
+        return format!("+{:.1} KB", text.len() as f64 / 1024.0);
+    }
+    format!("+{} lines", text.lines().count())
+}
+
+/// Ticks between home hint / placeholder rotations (~3s at 100ms/tick).
+pub(crate) const ROTATE_HINT_TICKS: usize = 30;
 
 /// The prompt editor state.
 pub struct InputState {
@@ -118,11 +157,18 @@ impl Default for InputState {
 
 fn new_textarea() -> TextArea<'static> {
     let mut textarea = TextArea::default();
-    textarea
-        .set_placeholder_text("Type a message, / commands, @ files · @path:[0:12] python slice");
+    textarea.set_placeholder_text(PLACEHOLDER_HINTS[0]);
     textarea.set_cursor_line_style(ratatui::style::Style::default());
     textarea
 }
+
+const PLACEHOLDER_HINTS: &[&str] = &[
+    "Fix a TODO in the codebase",
+    "What is the tech stack?",
+    "Explain how authentication works",
+    "Find and fix the failing test",
+    "Type a message, / commands, @ files",
+];
 
 impl InputState {
     /// The current editor text (lines joined by newlines).
@@ -135,6 +181,23 @@ impl InputState {
         self.textarea.is_empty()
     }
 
+    /// Whether a collapsed paste block is pending expansion on submit.
+    pub fn has_pasted_blocks(&self) -> bool {
+        !self.pasted_blocks.is_empty()
+    }
+
+    /// Advance the rotating placeholder (home screen, idle).
+    pub fn rotate_placeholder(&mut self, tick: usize) {
+        if tick % crate::input::ROTATE_HINT_TICKS != 0 {
+            return;
+        }
+        let idx = (tick / crate::input::ROTATE_HINT_TICKS) % PLACEHOLDER_HINTS.len();
+        // #region agent log
+        crate::debug_agent::log_placeholder_if_changed(tick, idx);
+        // #endregion
+        self.textarea.set_placeholder_text(PLACEHOLDER_HINTS[idx]);
+    }
+
     /// Replace the editor contents.
     pub fn set_text(&mut self, text: &str) {
         self.textarea = new_textarea();
@@ -144,26 +207,65 @@ impl InputState {
     /// Insert pasted text at the cursor. Large pastes are collapsed to a
     /// short placeholder; the full text is restored at submit time.
     pub fn paste(&mut self, text: &str) {
-        let line_count = text.lines().count();
-        let is_large =
-            line_count > PASTE_PLACEHOLDER_MIN_LINES || text.chars().count() > PASTE_PLACEHOLDER_MIN_CHARS;
+        let bytes = text.len();
+        // #region agent log
+        crate::debug_agent::log_paste_begin(bytes);
+        // #endregion
+        let count_start = std::time::Instant::now();
+        let is_large = paste_is_large(text);
         if !is_large {
             self.textarea.insert_str(text);
+            let line_count = text.lines().count();
+            let count_us = count_start.elapsed().as_micros();
+            // #region agent log
+            crate::debug_agent::log_paste(
+                bytes,
+                line_count,
+                count_us,
+                false,
+                self.textarea.lines().len(),
+            );
+            // #endregion
             return;
         }
+        let suffix = paste_placeholder_suffix(text);
+        let line_count = if text.len() <= 32_768 {
+            text.lines().count()
+        } else {
+            0
+        };
         let index = self.pasted_blocks.len() + 1;
-        let placeholder = format!("[Pasted text #{index} +{line_count} lines]");
+        let placeholder = format!("[Pasted text #{index} {suffix}]");
         self.textarea.insert_str(&placeholder);
         self.pasted_blocks.push(PastedBlock {
             placeholder,
             full_text: text.to_owned(),
         });
+        let count_us = count_start.elapsed().as_micros();
+        // #region agent log
+        crate::debug_agent::log_paste(
+            bytes,
+            line_count,
+            count_us,
+            true,
+            self.textarea.lines().len(),
+        );
+        // #endregion
     }
 
     /// Substitute every pasted-block placeholder in `text` with its stored
     /// full text (in insertion order). The visible editor only ever shows
     /// the short placeholder; the submitted message carries the real paste.
     fn expand_pasted_blocks(&self, text: &str) -> String {
+        if self.pasted_blocks.is_empty() {
+            return text.to_owned();
+        }
+        if self.pasted_blocks.len() == 1 {
+            let block = &self.pasted_blocks[0];
+            if text == block.placeholder {
+                return block.full_text.clone();
+            }
+        }
         let mut expanded = text.to_owned();
         for block in &self.pasted_blocks {
             expanded = expanded.replace(&block.placeholder, &block.full_text);
@@ -324,8 +426,17 @@ impl InputState {
         if trimmed.is_empty() {
             return InputOutcome::Consumed;
         }
+        let expand_start = std::time::Instant::now();
+        let input_bytes = trimmed.len();
+        let blocks = self.pasted_blocks.len();
         let line = self.expand_pasted_blocks(trimmed);
-        if self.history.last() != Some(&line) {
+        let expand_us = expand_start.elapsed().as_micros();
+        // #region agent log
+        if blocks > 0 || input_bytes > 10_000 {
+            crate::debug_agent::log_submit_expand(input_bytes, line.len(), expand_us, blocks);
+        }
+        // #endregion
+        if line.len() <= HISTORY_MAX_BYTES && self.history.last() != Some(&line) {
             self.history.push(line.clone());
         }
         self.history_pos = None;
@@ -461,6 +572,15 @@ mod tests {
     use super::*;
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
+    #[test]
+    fn splash_hint_stable_within_rotate_window() {
+        let hint = |spinner: usize| (spinner / ROTATE_HINT_TICKS) % 3;
+        let base = hint(0);
+        for spinner in 1..ROTATE_HINT_TICKS {
+            assert_eq!(hint(spinner), base, "hint must not change every tick");
+        }
+    }
+
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
     }
@@ -525,7 +645,10 @@ mod tests {
     #[test]
     fn paste_collapses_large_block_to_placeholder() {
         let mut input = InputState::default();
-        let big = (0..50).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
+        let big = (0..50)
+            .map(|i| format!("line {i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
         input.paste(&big);
         assert_eq!(input.text(), "[Pasted text #1 +50 lines]");
         assert_eq!(input.pasted_blocks.len(), 1);
@@ -543,7 +666,10 @@ mod tests {
     #[test]
     fn submit_expands_placeholder_back_to_full_pasted_text() {
         let mut input = InputState::default();
-        let big = (0..20).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
+        let big = (0..20)
+            .map(|i| format!("line {i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
         input.paste(&big);
         let outcome = input.handle_key(
             key(KeyCode::Enter),
@@ -558,8 +684,14 @@ mod tests {
     #[test]
     fn submit_expands_multiple_pasted_blocks_in_order() {
         let mut input = InputState::default();
-        let first = (0..10).map(|i| format!("a{i}")).collect::<Vec<_>>().join("\n");
-        let second = (0..10).map(|i| format!("b{i}")).collect::<Vec<_>>().join("\n");
+        let first = (0..10)
+            .map(|i| format!("a{i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let second = (0..10)
+            .map(|i| format!("b{i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
         input.paste(&first);
         input.textarea.insert_str(" then ");
         input.paste(&second);
@@ -578,13 +710,13 @@ mod tests {
     #[test]
     fn text_around_pasted_placeholder_is_still_editable() {
         let mut input = InputState::default();
-        let big = (0..30).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
+        let big = (0..30)
+            .map(|i| format!("line {i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
         input.paste(&big);
         input.textarea.insert_str(" — please review");
-        assert_eq!(
-            input.text(),
-            "[Pasted text #1 +30 lines] — please review"
-        );
+        assert_eq!(input.text(), "[Pasted text #1 +30 lines] — please review");
     }
 
     #[test]

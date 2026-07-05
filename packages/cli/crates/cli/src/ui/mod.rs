@@ -18,16 +18,16 @@ use ratatui::widgets::{
 
 use agentloop_contracts::{PermissionDecisionKind, Question};
 
-use crate::app::{App, TurnPhase, permission_mode_label, session_mode_label};
+use crate::app::{App, AppRoute, TurnPhase, permission_mode_label, session_mode_label};
 use crate::chat::{ChatItem, DraftBlock, SubagentOutcome};
 use crate::files::{MENTION_PREVIEW_MAX_LINES, MentionPreview};
 use crate::input::{
     CommandPopup, FilePopup, InputPopup, POPUP_LIST_MAX_ROWS, popup_list_scroll_offset,
 };
 use crate::overlay::{
-    ConfirmPrompt, LoginState, McpExplorerPhase, McpExplorerState, McpInstallMode, McpInstallState,
-    McpListState, Overlay, PermissionPrompt, PickerState, QuestionPrompt, ShellCommandOverlay,
-    ShellCommandPhase,
+    CommandPaletteState, ConfirmPrompt, ConnectGalleryRow, ConnectWizardState, ConnectWizardStep,
+    LoginState, McpExplorerPhase, McpExplorerState, McpInstallMode, McpInstallState, McpListState,
+    Overlay, PermissionPrompt, PickerState, QuestionPrompt, ShellCommandOverlay, ShellCommandPhase,
 };
 use crate::terminal_text::terminal_lines;
 use crate::theme;
@@ -43,8 +43,12 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     let area = frame.area();
     let input_height = input_height(app);
     let notify = notification_line_visible(app);
+    let queue = !app.queued_prompts.is_empty();
     let mut constraints = vec![Constraint::Min(1)];
     if notify {
+        constraints.push(Constraint::Length(1));
+    }
+    if queue {
         constraints.push(Constraint::Length(1));
     }
     constraints.push(Constraint::Length(input_height));
@@ -54,10 +58,21 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
         .constraints(constraints)
         .split(area);
 
-    let input_area = chunks[if notify { 2 } else { 1 }];
-    // Carve an activity sidebar off the right of the chat area when there's
-    // live work to show (running tools / subagents / plan) and room for it.
-    let chat_area = chunks[0];
+    let mut idx = 0;
+    let chat_area = chunks[idx];
+    idx += 1;
+    let notify_area = notify.then(|| {
+        let area = chunks[idx];
+        idx += 1;
+        area
+    });
+    let queue_area = queue.then(|| {
+        let area = chunks[idx];
+        idx += 1;
+        area
+    });
+    let input_area = chunks[idx];
+    let status_area = chunks[idx + 1];
     let (chat_area, sidebar_area) = if sidebar_visible(app, chat_area) {
         let cols = Layout::default()
             .direction(Direction::Horizontal)
@@ -71,13 +86,27 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     if let Some(sidebar_area) = sidebar_area {
         draw_sidebar(frame, app, sidebar_area);
     }
-    if notify {
-        draw_notification_line(frame, app, chunks[1]);
+    if let Some(area) = notify_area {
+        draw_notification_line(frame, app, area);
+    }
+    if let Some(queue_area) = queue_area {
+        draw_queue_banner(frame, app, queue_area);
     }
     draw_input(frame, app, input_area);
-    draw_status(frame, app, chunks[if notify { 3 } else { 2 }]);
+    draw_status(frame, app, status_area);
     draw_popup(frame, app, input_area);
     draw_overlay(frame, app, area, input_area);
+}
+
+/// One-line banner for prompts queued while a turn runs.
+fn draw_queue_banner(frame: &mut Frame<'_>, app: &App, area: Rect) {
+    let count = app.queued_prompts.len();
+    let noun = if count == 1 { "message" } else { "messages" };
+    let line = Line::from(vec![
+        Span::styled(format!("{count} {noun} queued"), theme::warn()),
+        Span::styled(" · esc to clear queue", theme::dim()),
+    ]);
+    frame.render_widget(Paragraph::new(line), area);
 }
 
 /// The notification line stays reserved while a turn runs or a toast is
@@ -140,11 +169,16 @@ pub(crate) fn fmt_thinking_budget_k(tokens: u32) -> String {
 
 fn input_height(app: &App) -> u16 {
     let lines = app.input.textarea.lines().len().clamp(1, 6);
-    (lines as u16 + 2).clamp(3, 8)
+    (lines as u16 + 3).clamp(4, 9)
 }
 
 fn draw_chat(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
-    let lines = chat_lines(app, area.width);
+    if app.is_home_route() {
+        draw_home_centered(frame, app, area);
+        return;
+    }
+    let sidebar_shown = sidebar_visible(app, area);
+    let lines = chat_lines(app, area.width, sidebar_shown);
     if app.chat.scroll.follow {
         app.chat.scroll.offset_from_bottom = 0;
     }
@@ -156,6 +190,29 @@ fn draw_chat(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
     let paragraph = Paragraph::new(lines)
         .wrap(Wrap { trim: false })
         .scroll((scroll_top as u16, 0));
+    frame.render_widget(paragraph, area);
+}
+
+/// Empty home: centered brand block, no transcript scroll area.
+fn draw_home_centered(frame: &mut Frame<'_>, app: &App, area: Rect) {
+    let sidebar_shown = sidebar_visible(app, area);
+    // #region agent log
+    let splash_rotate = app.status.spinner;
+    let hint_idx = (splash_rotate / crate::input::ROTATE_HINT_TICKS) % 3;
+    crate::debug_agent::log_splash_hint_if_changed(splash_rotate, hint_idx);
+    // #endregion
+    let lines = splash_lines(
+        &app.engine_name,
+        &app.engine_version,
+        &app.workdir.display().to_string(),
+        true,
+        splash_rotate,
+        app.show_getting_started() && sidebar_shown,
+    );
+    let block = Block::default();
+    let paragraph = Paragraph::new(lines)
+        .block(block)
+        .alignment(Alignment::Center);
     frame.render_widget(paragraph, area);
 }
 
@@ -180,7 +237,7 @@ fn wrapped_line_count(lines: &[Line<'_>], width: u16) -> usize {
         .line_count(width)
 }
 
-fn chat_lines(app: &mut App, viewport_width: u16) -> Vec<Line<'static>> {
+fn chat_lines(app: &mut App, viewport_width: u16, sidebar_shown: bool) -> Vec<Line<'static>> {
     let thinking_visible = app.thinking_visible();
     let live_keys = app
         .chat
@@ -300,7 +357,18 @@ fn chat_lines(app: &mut App, viewport_width: u16) -> Vec<Line<'static>> {
                 lines.push(Line::from(Span::styled(text.clone(), style)));
             }
             ChatItem::Splash { name, version, cwd } => {
-                lines.extend(splash_lines(name, version, cwd));
+                let home = app.home_screen && app.chat.is_home_screen();
+                lines.extend(splash_lines(
+                    name,
+                    version,
+                    cwd,
+                    home,
+                    app.status.spinner,
+                    app.show_getting_started() && sidebar_shown,
+                ));
+                if home && app.show_getting_started() && !sidebar_shown {
+                    lines.extend(home_getting_started_card(viewport_width));
+                }
             }
             ChatItem::Error { headline, detail } => {
                 lines.push(Line::from(Span::styled(
@@ -427,8 +495,15 @@ fn item_produces_lines(
 }
 
 /// The welcome splash: accent brand mark, version, cwd, and key hints.
-fn splash_lines(name: &str, version: &str, cwd: &str) -> Vec<Line<'static>> {
-    vec![
+fn splash_lines(
+    name: &str,
+    version: &str,
+    cwd: &str,
+    home: bool,
+    rotate: usize,
+    sidebar_getting_started: bool,
+) -> Vec<Line<'static>> {
+    let mut lines = vec![
         Line::from(""),
         Line::from(vec![
             Span::styled("  ✻ ", theme::accent()),
@@ -441,23 +516,63 @@ fn splash_lines(name: &str, version: &str, cwd: &str) -> Vec<Line<'static>> {
         )),
         Line::from(""),
         Line::from(Span::styled(format!("  {cwd}"), theme::dim())),
-        Line::from(Span::styled(
-            "  /help · shift+tab modes · @ files · / commands".to_owned(),
+    ];
+    if home && !sidebar_getting_started {
+        let hints = [
+            "Try: \"explain this repo\" or \"fix the failing test\"",
+            "Ctrl+P opens the command palette · /sessions resumes past work",
+            "/model picks a model · shift+tab cycles code/plan modes",
+        ];
+        let idx = (rotate / crate::input::ROTATE_HINT_TICKS) % hints.len();
+        lines.push(Line::from(Span::styled(
+            format!("  {}", hints[idx]),
+            theme::accent(),
+        )));
+        lines.push(Line::from(Span::styled(
+            "  /help · Ctrl+P · /sessions · @ files".to_owned(),
             theme::dim(),
-        )),
+        )));
+    } else if home {
+        lines.push(Line::from(Span::styled(
+            "  /help · Ctrl+P · /sessions · @ files".to_owned(),
+            theme::dim(),
+        )));
+    }
+    lines
+}
+
+/// Compact getting-started card for narrow terminals (sidebar hidden).
+fn home_getting_started_card(width: u16) -> Vec<Line<'static>> {
+    let inner = width.saturating_sub(6) as usize;
+    let border = "─".repeat(inner.min(40));
+    vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  ┌", theme::border()),
+            Span::styled(border.clone(), theme::border()),
+            Span::styled("┐", theme::border()),
+        ]),
+        Line::from(vec![
+            Span::styled("  │ ", theme::border()),
+            Span::styled("Connect a provider to get started", theme::title()),
+        ]),
+        Line::from(vec![
+            Span::styled("  │ ", theme::border()),
+            Span::styled("Run ", theme::dim()),
+            Span::styled("/connect", theme::accent()),
+            Span::styled(" to pick a model", theme::dim()),
+        ]),
+        Line::from(vec![
+            Span::styled("  └", theme::border()),
+            Span::styled(border, theme::border()),
+            Span::styled("┘", theme::border()),
+        ]),
     ]
 }
 
-/// Whether to show the activity sidebar: only with room to spare, and only
-/// when there's live work worth surfacing (a running turn, active subagents,
-/// or a working plan).
-fn sidebar_visible(app: &App, chat_area: Rect) -> bool {
-    if chat_area.width < SIDEBAR_MIN_TOTAL_WIDTH {
-        return false;
-    }
-    app.session.turn.is_running()
-        || !active_subagents(app).is_empty()
-        || latest_plan(app).is_some_and(|entries| !entries.is_empty())
+/// Whether to show the context sidebar: wide terminals always get it.
+fn sidebar_visible(_app: &App, chat_area: Rect) -> bool {
+    chat_area.width >= SIDEBAR_MIN_TOTAL_WIDTH
 }
 
 /// Tool calls currently executing or awaiting permission, newest last.
@@ -505,98 +620,199 @@ fn latest_plan(app: &App) -> Option<&[agentloop_contracts::PlanEntry]> {
     })
 }
 
-/// The right-hand activity panel: what's running now, live subagents, and the
-/// working plan. Rebuilt each frame from chat state.
+/// The right-hand context panel: usage, MCP, optional activity, getting started,
+/// and cwd/branch/version footer.
 fn draw_sidebar(frame: &mut Frame<'_>, app: &App, area: Rect) {
     let inner_width = area.width.saturating_sub(4) as usize;
     let mut lines: Vec<Line<'static>> = Vec::new();
 
-    let tools = running_tools(app);
-    let subagents = active_subagents(app);
-    let plan = latest_plan(app);
-
-    // ── running tools ──
-    lines.push(section_header("running"));
-    if tools.is_empty() {
-        lines.push(Line::from(Span::styled("  idle".to_owned(), theme::dim())));
-    } else {
-        for call in &tools {
-            let summary = crate::tool_output::tool_summary(&call.tool_name, &call.input);
-            lines.push(Line::from(vec![
-                Span::styled(
-                    format!("{} ", theme::spinner_frame(app.status.spinner)),
-                    theme::tool_running(),
-                ),
-                Span::styled(
-                    truncate_cells(&summary, inner_width.saturating_sub(2)),
-                    theme::assistant(),
-                ),
-            ]));
+    if app.route == AppRoute::Session {
+        if let Some(label) = app.session_label.as_deref() {
+            lines.push(Line::from(Span::styled(
+                truncate_cells(label, inner_width),
+                theme::title(),
+            )));
+            lines.push(Line::from(""));
         }
     }
 
-    // ── subagents ──
-    if !subagents.is_empty() {
+    // ── context ──
+    lines.push(section_header("context"));
+    let usage = app.status.total_usage;
+    let total_tokens = usage.input + usage.output;
+    let mut ctx_line = format!("  {} tokens", format_tokens(total_tokens));
+    if let Some((pct, _)) = context_percent(app) {
+        ctx_line.push_str(&format!(" · {pct}%"));
+    }
+    lines.push(Line::from(Span::styled(ctx_line, theme::dim())));
+    if let Some(cost) = app.status.last_cost_usd {
+        lines.push(Line::from(Span::styled(
+            format!("  ${cost:.4} session cost"),
+            theme::dim(),
+        )));
+    }
+    let model = app
+        .session
+        .model
+        .as_ref()
+        .map(ToString::to_string)
+        .unwrap_or_else(|| "no model".to_owned());
+    lines.push(Line::from(Span::styled(
+        truncate_cells(&format!("  {} · {}", app.kind, model), inner_width),
+        theme::dim(),
+    )));
+
+    // ── mcp ──
+    lines.push(Line::from(""));
+    lines.push(section_header("mcp"));
+    let mcp_total = app.mcp_store.servers.len();
+    let mcp_enabled = app.mcp_enabled;
+    if mcp_total == 0 {
+        lines.push(Line::from(Span::styled(
+            "  none installed".to_owned(),
+            theme::dim(),
+        )));
+        lines.push(Line::from(Span::styled(
+            "  /mcp-install".to_owned(),
+            theme::accent(),
+        )));
+    } else {
+        lines.push(Line::from(Span::styled(
+            format!("  {mcp_enabled}/{mcp_total} connected"),
+            theme::dim(),
+        )));
+    }
+
+    // ── activity (when busy) ──
+    let tools = running_tools(app);
+    let subagents = active_subagents(app);
+    let plan = latest_plan(app);
+    let has_activity = !tools.is_empty()
+        || !subagents.is_empty()
+        || plan.is_some_and(|entries| !entries.is_empty());
+    if has_activity {
         lines.push(Line::from(""));
-        lines.push(section_header("subagents"));
-        for item in &subagents {
-            if let ChatItem::Subagent {
-                role,
-                tool_count,
-                last_activity,
-                ..
-            } = item
-            {
-                let badge = role.as_deref().unwrap_or("subagent");
+        lines.push(section_header("activity"));
+        if tools.is_empty() {
+            lines.push(Line::from(Span::styled("  idle".to_owned(), theme::dim())));
+        } else {
+            for call in &tools {
+                let summary = crate::tool_output::tool_summary(&call.tool_name, &call.input);
                 lines.push(Line::from(vec![
                     Span::styled(
                         format!("{} ", theme::spinner_frame(app.status.spinner)),
-                        theme::tool(),
+                        theme::tool_running(),
                     ),
-                    Span::styled(badge.to_owned(), theme::tool()),
-                    Span::styled(format!(" · {tool_count} tools"), theme::dim()),
+                    Span::styled(
+                        truncate_cells(&summary, inner_width.saturating_sub(2)),
+                        theme::assistant(),
+                    ),
                 ]));
-                if let Some(activity) = last_activity {
-                    lines.push(Line::from(Span::styled(
-                        format!(
-                            "    {}",
-                            truncate_cells(activity, inner_width.saturating_sub(4))
+            }
+        }
+        if !subagents.is_empty() {
+            for item in &subagents {
+                if let ChatItem::Subagent {
+                    role,
+                    tool_count,
+                    last_activity,
+                    ..
+                } = item
+                {
+                    let badge = role.as_deref().unwrap_or("subagent");
+                    lines.push(Line::from(vec![
+                        Span::styled(
+                            format!("{} ", theme::spinner_frame(app.status.spinner)),
+                            theme::tool(),
                         ),
-                        theme::dim(),
-                    )));
+                        Span::styled(badge.to_owned(), theme::tool()),
+                        Span::styled(format!(" · {tool_count} tools"), theme::dim()),
+                    ]));
+                    if let Some(activity) = last_activity {
+                        lines.push(Line::from(Span::styled(
+                            format!(
+                                "    {}",
+                                truncate_cells(activity, inner_width.saturating_sub(4))
+                            ),
+                            theme::dim(),
+                        )));
+                    }
                 }
+            }
+        }
+        if let Some(entries) = plan.filter(|entries| !entries.is_empty()) {
+            for entry in entries {
+                lines.push(Line::from(Span::styled(
+                    format!(
+                        "  {} {}",
+                        plan_marker(entry.status),
+                        truncate_cells(&entry.content, inner_width.saturating_sub(4))
+                    ),
+                    theme::dim(),
+                )));
             }
         }
     }
 
-    // ── plan ──
-    if let Some(entries) = plan.filter(|entries| !entries.is_empty()) {
+    // ── getting started ──
+    if app.show_getting_started() && (app.is_home_route() || app.route == AppRoute::Session) {
         lines.push(Line::from(""));
-        lines.push(section_header("plan"));
-        for entry in entries {
-            lines.push(Line::from(Span::styled(
-                format!(
-                    "  {} {}",
-                    plan_marker(entry.status),
-                    truncate_cells(&entry.content, inner_width.saturating_sub(4))
-                ),
-                theme::dim(),
-            )));
-        }
+        lines.push(Line::from(Span::styled(
+            "┌ getting started ─",
+            theme::border(),
+        )));
+        lines.push(Line::from(Span::styled(
+            "│ Connect a provider".to_owned(),
+            theme::title(),
+        )));
+        lines.push(Line::from(vec![
+            Span::styled("│ ", theme::border()),
+            Span::styled("/connect", theme::accent()),
+        ]));
+        lines.push(Line::from(Span::styled(
+            "└──────────────────",
+            theme::border(),
+        )));
     }
+
+    // ── footer: path · branch · version ──
+    lines.push(Line::from(""));
+    let cwd = abbreviate_home(&app.workdir.display().to_string());
+    let branch = app.git_branch.as_deref().unwrap_or("no branch");
+    lines.push(Line::from(Span::styled(
+        truncate_cells(&format!("{cwd}:{branch}"), inner_width),
+        theme::dim(),
+    )));
+    lines.push(Line::from(Span::styled(
+        format!("{} v{}", app.engine_name, app.engine_version),
+        theme::dim(),
+    )));
 
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(theme::border())
         .padding(Padding::horizontal(1))
-        .title(Span::styled(" activity ", theme::title()));
+        .title(Span::styled(" context ", theme::title()));
     frame.render_widget(
         Paragraph::new(lines)
             .block(block)
             .wrap(Wrap { trim: false }),
         area,
     );
+}
+
+fn abbreviate_home(path: &str) -> String {
+    if let Ok(home) = std::env::var("HOME") {
+        let home = home.trim_end_matches('/');
+        if path == home {
+            return "~".to_owned();
+        }
+        if let Some(rest) = path.strip_prefix(&format!("{home}/")) {
+            return format!("~/{rest}");
+        }
+    }
+    path.to_owned()
 }
 
 /// A dim, uppercase-ish section label for the sidebar.
@@ -715,13 +931,59 @@ fn draw_input(frame: &mut Frame<'_>, app: &App, area: Rect) {
         vertical: 1,
         horizontal: 1,
     });
-    frame.render_widget(&app.input.textarea, inner);
+    let chrome_h = 1u16;
+    let input_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Length(chrome_h)])
+        .split(inner);
+    frame.render_widget(&app.input.textarea, input_chunks[0]);
+    draw_prompt_chrome(frame, app, input_chunks[1]);
+}
+
+fn draw_prompt_chrome(frame: &mut Frame<'_>, app: &App, area: Rect) {
+    let mode = session_mode_label(app.session.session_mode);
+    let model = app
+        .session
+        .model
+        .as_ref()
+        .map(|m| m.0.as_str())
+        .unwrap_or("default");
+    let provider = app
+        .session
+        .model
+        .as_ref()
+        .and_then(|m| m.0.split_once('/').map(|(p, _)| p))
+        .or_else(|| app.providers.first().map(String::as_str))
+        .unwrap_or("no provider");
+    let line = Line::from(vec![
+        Span::styled(format!("{mode} · {model} · {provider}"), theme::dim()),
+        Span::styled(" · tab mode · ctrl+p commands", theme::dim()),
+    ]);
+    frame.render_widget(Paragraph::new(line), area);
 }
 
 /// One line: `native · code · auto · <model> · 47% context · ↑12.3k ↓4.1k`
 /// plus scrolled-up and cost suffixes. Busy state lives on the notification
 /// line, errors in the transcript — neither renders here.
 fn draw_status(frame: &mut Frame<'_>, app: &App, area: Rect) {
+    if app.is_home_route() {
+        let mut spans = vec![Span::styled(
+            format!("{} v{}", app.engine_name, app.engine_version),
+            theme::dim(),
+        )];
+        if area.width >= 100 {
+            spans.push(Span::styled(" · ", theme::dim()));
+            spans.push(Span::styled("ctrl+p commands", theme::dim()));
+        } else if app.providers.is_empty() {
+            let phase = (app.status.spinner / 50) % 3;
+            if phase < 2 {
+                spans.push(Span::styled(" · ", theme::dim()));
+                spans.push(Span::styled("connect /connect", theme::dim()));
+            }
+        }
+        frame.render_widget(Paragraph::new(Line::from(spans)), area);
+        return;
+    }
     let model = app
         .session
         .model
@@ -787,6 +1049,17 @@ fn draw_status(frame: &mut Frame<'_>, app: &App, area: Rect) {
     }
     if let Some(cost) = app.status.last_cost_usd {
         spans.push(Span::styled(format!(" · ${cost:.4}"), theme::status()));
+    }
+    if area.width >= 100 {
+        spans.push(Span::styled(" · ", theme::status()));
+        spans.push(Span::styled("ctrl+p commands", theme::dim()));
+    } else if app.providers.is_empty() {
+        // 5s on / 10s off at 100ms ticks → 50 on, 100 off (15s cycle).
+        let phase = (app.status.spinner / 50) % 3;
+        if phase < 2 {
+            spans.push(Span::styled(" · ", theme::status()));
+            spans.push(Span::styled("connect /connect", theme::dim()));
+        }
     }
     frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
@@ -884,27 +1157,48 @@ fn draw_command_popup(frame: &mut Frame<'_>, popup: &CommandPopup, input_area: R
     ) else {
         return;
     };
+    let filter_empty = popup.filter.is_empty();
+    let cmd_width = popup
+        .matches
+        .iter()
+        .map(|e| e.name.len() + 1)
+        .max()
+        .unwrap_or(8)
+        .max(8);
+    let row_width = area.width.saturating_sub(2) as usize;
     let scroll_offset = popup_list_scroll_offset(popup.selected, visible_rows, popup.matches.len());
-    let items = popup
+    let mut items = Vec::new();
+    let mut last_category: Option<&str> = None;
+    for (idx, entry) in popup
         .matches
         .iter()
         .enumerate()
         .skip(scroll_offset)
         .take(visible_rows)
-        .map(|(idx, entry)| {
-            let style = if idx == popup.selected {
-                theme::selected()
-            } else {
-                Style::default()
-            };
-            ListItem::new(Line::from(vec![
-                Span::styled(format!("/{}", entry.name), style),
-                Span::raw(" "),
-                Span::styled(entry.description.clone(), theme::dim()),
-                Span::styled(format!(" [{}]", entry.source), theme::dim()),
-            ]))
-        })
-        .collect::<Vec<_>>();
+    {
+        if filter_empty && last_category != Some(entry.category) {
+            items.push(ListItem::new(Line::from(Span::styled(
+                command_category_label(entry.category),
+                theme::accent().add_modifier(Modifier::BOLD),
+            ))));
+            last_category = Some(entry.category);
+        }
+        let cmd = format!("/{:<width$}", entry.name, width = cmd_width);
+        let mut spans = vec![
+            Span::raw(cmd),
+            Span::raw(" "),
+            Span::styled(entry.description.clone(), theme::dim()),
+        ];
+        if filter_empty {
+            spans.push(Span::styled(format!(" [{}]", entry.source), theme::dim()));
+        }
+        let line = Line::from(spans);
+        if idx == popup.selected {
+            items.push(ListItem::new(pad_line_to_width(line, row_width)).style(theme::selected()));
+        } else {
+            items.push(ListItem::new(line));
+        }
+    }
     frame.render_widget(Clear, area);
     let position = format!(" {}/{} ", popup.selected + 1, popup.matches.len());
     frame.render_widget(
@@ -916,6 +1210,28 @@ fn draw_command_popup(frame: &mut Frame<'_>, popup: &CommandPopup, input_area: R
         ),
         area,
     );
+}
+
+fn command_category_label(category: &str) -> String {
+    match category {
+        "session" => "Session".to_owned(),
+        "provider" => "Provider".to_owned(),
+        "mcp" => "MCP".to_owned(),
+        "workspace" => "Workspace".to_owned(),
+        "ui" => "UI".to_owned(),
+        _ => "Other".to_owned(),
+    }
+}
+
+fn pad_line_to_width(mut line: Line<'static>, width: usize) -> Line<'static> {
+    let mut used = 0usize;
+    for span in &line.spans {
+        used += span.content.chars().count();
+    }
+    if used < width {
+        line.spans.push(Span::raw(" ".repeat(width - used)));
+    }
+    line
 }
 
 fn draw_file_popup(frame: &mut Frame<'_>, popup: &FilePopup, input_area: Rect) {
@@ -1047,6 +1363,9 @@ fn draw_overlay(frame: &mut Frame<'_>, app: &App, root: Rect, input_area: Rect) 
         Overlay::McpList(state) => draw_mcp_list(frame, state, root),
         Overlay::McpExplorer(state) => draw_mcp_explorer(frame, state, root),
         Overlay::McpInstall(state) => draw_mcp_install(frame, state, root),
+        Overlay::CommandPalette(state) => draw_command_palette(frame, state, root),
+        Overlay::WhichKey => draw_which_key(frame, app, root, input_area),
+        Overlay::ConnectWizard(state) => draw_connect_wizard(frame, state, app, root),
     }
 }
 
@@ -1107,7 +1426,28 @@ fn draw_permission(frame: &mut Frame<'_>, prompt: &PermissionPrompt, root: Rect,
     }
     title_spans.push(Span::styled(prompt.title.clone(), theme::title()));
     let mut lines = vec![Line::from(title_spans)];
-    if let Some(detail) = &prompt.detail {
+    if let Some(preview) = &prompt.diff {
+        let total = preview.lines.len();
+        let shown = if prompt.diff_expanded {
+            total
+        } else {
+            preview.preview_len()
+        };
+        for line in &preview.lines[..shown] {
+            lines.push(diff_permission_line(line));
+        }
+        if !prompt.diff_expanded && total > shown {
+            lines.push(Line::from(Span::styled(
+                format!("… +{} lines (d to expand)", total - shown),
+                theme::dim(),
+            )));
+        } else if prompt.diff_expanded && total > preview.preview_len() {
+            lines.push(Line::from(Span::styled(
+                "(d to collapse)".to_owned(),
+                theme::dim(),
+            )));
+        }
+    } else if let Some(detail) = &prompt.detail {
         lines.push(Line::default());
         lines.push(Line::from(detail.clone()));
     }
@@ -1124,10 +1464,11 @@ fn draw_permission(frame: &mut Frame<'_>, prompt: &PermissionPrompt, root: Rect,
         )));
     }
     lines.push(Line::default());
-    lines.push(Line::from(Span::styled(
-        "enter confirm · 1-3 select · y allow · a always · esc/n deny",
-        theme::dim(),
-    )));
+    let mut footer = "enter confirm · 1-3 select · y allow · a always · esc/n deny".to_owned();
+    if prompt.diff.is_some() {
+        footer.push_str(" · d diff");
+    }
+    lines.push(Line::from(Span::styled(footer, theme::dim())));
     let area = bottom_anchored(root, input_area, lines.len());
     frame.render_widget(Clear, area);
     frame.render_widget(
@@ -1153,6 +1494,346 @@ fn permission_label(kind: PermissionDecisionKind, number: usize) -> String {
         _ => "unknown",
     };
     format!("{number}. {text}")
+}
+
+fn diff_permission_line(line: &crate::ui::diff::DiffLine) -> Line<'static> {
+    use crate::ui::diff::DiffKind;
+    let no = line
+        .line_no
+        .map(|n| format!("{n:>3}"))
+        .unwrap_or_else(|| "   ".to_owned());
+    let span = match line.kind {
+        DiffKind::Del => Span::styled(format!("{no} - {}", line.text), theme::diff_del()),
+        DiffKind::Add => Span::styled(format!("{no} + {}", line.text), theme::diff_add()),
+        DiffKind::Ctx => Span::styled(format!("{no}   {}", line.text), theme::dim()),
+    };
+    Line::from(span)
+}
+
+fn draw_command_palette(frame: &mut Frame<'_>, state: &CommandPaletteState, root: Rect) {
+    let area = centered(root, 72, 60);
+    let visible = state.visible();
+    let row_width = area.width.saturating_sub(2) as usize;
+    let title_width = visible
+        .iter()
+        .map(|e| e.title.len())
+        .max()
+        .unwrap_or(8)
+        .max(8);
+    let items = visible
+        .iter()
+        .enumerate()
+        .map(|(idx, entry)| {
+            if let Some(header) = &entry.section_header {
+                return ListItem::new(Line::from(Span::styled(
+                    header.clone(),
+                    theme::accent().add_modifier(Modifier::BOLD),
+                )));
+            }
+            let title = format!("{:<width$}", entry.title, width = title_width);
+            let mut spans = vec![
+                Span::raw(title),
+                Span::raw("  "),
+                Span::styled(entry.description.clone(), theme::dim()),
+            ];
+            if let Some(hint) = &entry.key_hint {
+                spans.push(Span::raw(" "));
+                spans.push(Span::styled(hint.clone(), theme::dim()));
+            }
+            let line = Line::from(spans);
+            if idx == state.selected && entry.section_header.is_none() {
+                ListItem::new(pad_line_to_width(line, row_width)).style(theme::selected())
+            } else {
+                ListItem::new(line)
+            }
+        })
+        .collect::<Vec<_>>();
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        List::new(items).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(theme::border())
+                .title(format!(" commands  filter: {} ", state.filter)),
+        ),
+        area,
+    );
+}
+
+fn draw_which_key(frame: &mut Frame<'_>, app: &App, root: Rect, input_area: Rect) {
+    let lines = if app.input.popup.is_some() {
+        vec![
+            Line::from(Span::styled("Slash / file popup", theme::title())),
+            Line::from("↑↓ move · enter insert · esc dismiss · type to filter"),
+        ]
+    } else if matches!(app.overlay, Overlay::CommandPalette(_)) {
+        vec![
+            Line::from(Span::styled("Command palette", theme::title())),
+            Line::from("↑↓ move · enter run · esc close · type to filter"),
+        ]
+    } else if app.session.turn.is_running() {
+        vec![
+            Line::from(Span::styled("Turn running", theme::title())),
+            Line::from("esc interrupt · end scroll bottom · ctrl+p palette"),
+        ]
+    } else if app.overlay.is_active() {
+        vec![
+            Line::from(Span::styled("Overlay", theme::title())),
+            Line::from("↑↓ move · enter select · esc cancel"),
+            Line::from("y/n/a on permission · d diff"),
+        ]
+    } else {
+        vec![
+            Line::from(Span::styled("Chat", theme::title())),
+            Line::from("enter send · esc interrupt/clear queue · end scroll bottom"),
+            Line::from("ctrl+p palette · /sessions · ? which-key · ctrl+o expand tool"),
+            Line::from("shift+tab cycle mode · ctrl+shift+c copy transcript"),
+            Line::from(Span::styled("Pickers", theme::title())),
+            Line::from("↑↓ move · enter select · esc cancel · type to filter"),
+            Line::from(Span::styled("Permission", theme::title())),
+            Line::from("y/n/a · 1-3 · d diff · esc deny"),
+        ]
+    };
+    let area = bottom_anchored(root, input_area, lines.len());
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(lines).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(theme::border())
+                .title(Span::styled(" keys ", theme::title())),
+        ),
+        area,
+    );
+}
+
+fn draw_connect_wizard(frame: &mut Frame<'_>, state: &ConnectWizardState, app: &App, root: Rect) {
+    let area = centered(root, 70, 50);
+    match state.step {
+        ConnectWizardStep::PickProvider => {
+            draw_connect_gallery(frame, state, app, area);
+            return;
+        }
+        ConnectWizardStep::PickAuthMethod => {
+            draw_connect_auth_method(frame, state, area);
+            return;
+        }
+        ConnectWizardStep::OAuthWaiting => {
+            draw_connect_oauth_waiting(frame, state, app, area);
+            return;
+        }
+        _ => {}
+    }
+    let (step_label, prompt) = match state.step {
+        ConnectWizardStep::CustomProviderId => ("custom id", "Unique id (e.g. myllm, glm):"),
+        ConnectWizardStep::BaseUrl => ("base URL", "OpenAI-compatible base URL:"),
+        ConnectWizardStep::ApiKey => ("API key", "API key (leave empty for local endpoints):"),
+        ConnectWizardStep::Model => ("default model", "Default model id:"),
+        ConnectWizardStep::PickProvider
+        | ConnectWizardStep::PickAuthMethod
+        | ConnectWizardStep::OAuthWaiting => unreachable!(),
+    };
+    let mut lines = vec![
+        Line::from(Span::styled("Connect provider", theme::title())),
+        Line::from(Span::styled(step_label, theme::dim())),
+        Line::default(),
+        Line::from(prompt),
+        Line::from(Span::styled(
+            if state.input.is_empty() {
+                "type value…".to_owned()
+            } else {
+                state.input.clone()
+            },
+            theme::selected(),
+        )),
+    ];
+    if !state.id.is_empty() {
+        lines.push(Line::from(Span::styled(
+            format!("id: {}", state.id),
+            theme::dim(),
+        )));
+    }
+    lines.push(Line::default());
+    lines.push(Line::from(Span::styled(
+        "enter next · esc cancel",
+        theme::dim(),
+    )));
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(lines).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(theme::border())
+                .title(" connect "),
+        ),
+        area,
+    );
+}
+
+fn draw_connect_gallery(frame: &mut Frame<'_>, state: &ConnectWizardState, app: &App, area: Rect) {
+    use agentloop_cli_core::{CliPrefs, provider_template, template_is_connected};
+    let prefs = CliPrefs::load();
+    let rows = state.gallery_rows();
+    let row_width = area.width.saturating_sub(2) as usize;
+    let items = rows
+        .iter()
+        .enumerate()
+        .map(|(idx, row)| match row {
+            ConnectGalleryRow::Header(label) => ListItem::new(Line::from(Span::styled(
+                label.to_string(),
+                theme::accent().add_modifier(Modifier::BOLD),
+            ))),
+            ConnectGalleryRow::Template(id) => {
+                let Some(template) = provider_template(id) else {
+                    return ListItem::new(Line::from(""));
+                };
+                let connected = template_is_connected(template, &app.providers, &prefs);
+                let gutter = if connected { "✓ " } else { "  " };
+                let label = format!("{gutter}{}", template.label);
+                let mut spans = vec![
+                    Span::raw(label),
+                    Span::raw("  "),
+                    Span::styled(template.description.to_owned(), theme::dim()),
+                ];
+                if let agentloop_cli_core::ProviderAuth::EnvOnly { env_var } = template.auth {
+                    spans.push(Span::raw(" "));
+                    spans.push(Span::styled(format!("({env_var})"), theme::dim()));
+                }
+                let line = Line::from(spans);
+                if idx == state.selected {
+                    ListItem::new(pad_line_to_width(line, row_width)).style(theme::selected())
+                } else {
+                    ListItem::new(line)
+                }
+            }
+            ConnectGalleryRow::Custom => {
+                let line = Line::from(vec![
+                    Span::raw("  Custom provider…"),
+                    Span::raw("  "),
+                    Span::styled("enter your own base URL", theme::dim()),
+                ]);
+                if idx == state.selected {
+                    ListItem::new(pad_line_to_width(line, row_width)).style(theme::selected())
+                } else {
+                    ListItem::new(line)
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        List::new(items).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(theme::border())
+                .title(Span::styled(" Connect a provider ", theme::title()))
+                .title_bottom(Span::styled(" esc ", theme::dim())),
+        ),
+        area,
+    );
+    if !state.filter.is_empty() {
+        let filter_line = Line::from(Span::styled(
+            format!("filter: {}", state.filter),
+            theme::dim(),
+        ));
+        let filter_area = Rect {
+            x: area.x + 2,
+            y: area.y + 1,
+            width: area.width.saturating_sub(4),
+            height: 1,
+        };
+        frame.render_widget(Paragraph::new(filter_line), filter_area);
+    }
+}
+
+fn draw_connect_auth_method(frame: &mut Frame<'_>, state: &ConnectWizardState, area: Rect) {
+    let items = state
+        .auth_methods
+        .iter()
+        .enumerate()
+        .map(|(idx, spec)| {
+            let marker = if idx == state.selected { "› " } else { "  " };
+            let line = Line::from(format!("{marker}{}", spec.label));
+            if idx == state.selected {
+                ListItem::new(line).style(theme::selected())
+            } else {
+                ListItem::new(line)
+            }
+        })
+        .collect::<Vec<_>>();
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        List::new(items).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(theme::border())
+                .title(Span::styled(
+                    state
+                        .template_id
+                        .as_deref()
+                        .and_then(agentloop_cli_core::provider_template)
+                        .map(|t| t.label)
+                        .unwrap_or("Connect"),
+                    theme::title(),
+                ))
+                .title_bottom(Span::styled(" esc ", theme::dim())),
+        ),
+        area,
+    );
+}
+
+fn draw_connect_oauth_waiting(
+    frame: &mut Frame<'_>,
+    state: &ConnectWizardState,
+    app: &App,
+    area: Rect,
+) {
+    let title = state
+        .auth_method_label
+        .as_deref()
+        .unwrap_or("ChatGPT sign-in");
+    let url = state.oauth_url.as_deref().unwrap_or("…");
+    let instructions = state
+        .oauth_instructions
+        .as_deref()
+        .unwrap_or("Waiting to start…");
+    let pulse = if state.oauth_waiting {
+        theme::spinner_frame(app.status.spinner)
+    } else {
+        "…"
+    };
+    let lines = vec![
+        Line::from(Span::styled(title.to_owned(), theme::title())),
+        Line::default(),
+        Line::from(Span::styled(
+            truncate_cells(url, area.width.saturating_sub(4) as usize),
+            theme::accent(),
+        )),
+        Line::from(Span::styled(instructions.to_owned(), theme::dim())),
+        Line::default(),
+        Line::from(vec![
+            Span::styled(format!("{pulse} "), theme::accent()),
+            Span::styled("Waiting for authorization…", theme::dim()),
+        ]),
+        Line::default(),
+        Line::from(Span::styled("c copy url · esc cancel", theme::dim())),
+    ];
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(lines).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(theme::border())
+                .title(Span::styled(" connect ", theme::title())),
+        ),
+        area,
+    );
 }
 
 fn draw_question(frame: &mut Frame<'_>, prompt: &QuestionPrompt, root: Rect) {
