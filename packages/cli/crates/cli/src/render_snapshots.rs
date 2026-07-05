@@ -477,6 +477,25 @@ fn splash_snapshot() {
 }
 
 #[test]
+fn splash_banner_snapshot() {
+    let mut app = test_app(test_bootstrap());
+    app.chat.push_splash(
+        "Flex".to_owned(),
+        "0.1.0".to_owned(),
+        "~/code/flex".to_owned(),
+    );
+    // A user message leaves the home route so the transcript — with the splash
+    // banner and its block-letter wordmark — renders.
+    app.chat.apply(&AgentEvent::UserMessage {
+        message_id: MessageId::from("m1"),
+        content: vec![ContentBlock::markdown("hi")],
+    });
+    app.chat.finalize_drafts();
+    let rendered = render_app(&mut app, 80, 18);
+    assert_snapshot!("splash_banner", rendered);
+}
+
+#[test]
 fn overlay_theme_picker_snapshot() {
     let mut app = test_app(test_bootstrap());
     let items = crate::theme::BuiltinTheme::all()

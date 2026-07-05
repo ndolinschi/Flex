@@ -520,6 +520,9 @@ fn item_produces_lines(
     }
 }
 
+/// Block-letter wordmark for the splash (opencode-inspired half-block font).
+const BRAND_LOGO: [&str; 3] = ["█▀▀ █   █▀▀ ▀▄▀", "█▀  █   █▀   █ ", "▀   ▀▀▀ ▀▀▀ ▀ ▀"];
+
 /// The welcome splash: accent brand mark, version, cwd, and key hints.
 fn splash_lines(
     name: &str,
@@ -529,20 +532,33 @@ fn splash_lines(
     rotate: usize,
     sidebar_getting_started: bool,
 ) -> Vec<Line<'static>> {
-    let mut lines = vec![
-        Line::from(""),
-        Line::from(vec![
+    let mut lines = vec![Line::from("")];
+    // A block-letter wordmark when the display name is the brand; any other
+    // name (a rename) degrades to a plain accent mark.
+    if name.eq_ignore_ascii_case("flex") {
+        for row in BRAND_LOGO {
+            lines.push(Line::from(Span::styled(
+                format!("  {row}"),
+                theme::accent(),
+            )));
+        }
+        lines.push(Line::from(vec![
+            Span::styled("  agentic coding in your terminal".to_owned(), theme::dim()),
+            Span::styled(format!("   v{version}"), theme::dim()),
+        ]));
+    } else {
+        lines.push(Line::from(vec![
             Span::styled("  ✻ ", theme::accent()),
             Span::styled(name.to_owned(), theme::title()),
             Span::styled(format!("  v{version}"), theme::dim()),
-        ]),
-        Line::from(Span::styled(
+        ]));
+        lines.push(Line::from(Span::styled(
             "     agentic coding in your terminal".to_owned(),
             theme::dim(),
-        )),
-        Line::from(""),
-        Line::from(Span::styled(format!("  {cwd}"), theme::dim())),
-    ];
+        )));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(format!("  {cwd}"), theme::dim())));
     if home && !sidebar_getting_started {
         let hints = [
             "Try: \"explain this repo\" or \"fix the failing test\"",

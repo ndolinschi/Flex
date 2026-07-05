@@ -1,0 +1,22 @@
+---
+source: crates/cli/src/render_snapshots.rs
+expression: rendered
+---
+
+  █▀▀ █   █▀▀ ▀▄▀
+  █▀  █   █▀   █
+  ▀   ▀▀▀ ▀▀▀ ▀ ▀
+  agentic coding in your terminal   v0.1.0
+
+  ~/code/flex
+
+> hi
+
+
+
+
+╭ prompt ──────────────────────────────────────────────────────────────────────╮
+│ Fix a TODO in the codebase                                                   │
+│code · anthropic/claude-sonnet-4-5 · anthropic · tab mode · ctrl+p commands   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+native · code · auto · anthropic/claude-sonnet-4-5 · ↑0 ↓0
