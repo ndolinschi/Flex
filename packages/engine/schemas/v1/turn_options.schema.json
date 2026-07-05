@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TurnOptions",
+  "description": "Per-turn options.",
+  "type": "object",
+  "properties": {
+    "extra": {
+      "description": "Namespaced passthrough for agent-specific options.",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "fallback_models": {
+      "description": "Models to fall back to (in order) when the effective model's provider\nfails mid-turn (rate limit, outage). The conversation continues on the\nnext chain entry; partial output from the failed attempt is discarded.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ModelRef"
+      }
+    },
+    "model": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ModelRef"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "permission_mode": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PermissionMode"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "system_append": {
+      "description": "Extra system-prompt text appended for this turn only.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "thinking": {
+      "description": "Extended-thinking budget for this turn; `None` = provider default\n(off). Forwarded only to providers that declare the thinking\ncapability.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ThinkingConfig"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "ModelRef": {
+      "description": "Reference to a model, optionally provider-qualified:\n`\"anthropic/claude-sonnet-4-5\"` or a bare `\"claude-sonnet-4-5\"`.",
+      "type": "string"
+    },
+    "PermissionMode": {
+      "description": "How the engine treats tool calls that would normally ask the user.",
+      "oneOf": [
+        {
+          "description": "Ask on anything not covered by a rule.",
+          "type": "string",
+          "const": "default"
+        },
+        {
+          "description": "Auto-allow file edits (the `Fs` category); ask for the rest.",
+          "type": "string",
+          "const": "accept_edits"
+        },
+        {
+          "description": "Deny all mutating tools; read-only research still runs.",
+          "type": "string",
+          "const": "plan"
+        },
+        {
+          "description": "Never ask: deny anything that would prompt.",
+          "type": "string",
+          "const": "dont_ask"
+        },
+        {
+          "description": "Allow everything. Requires an explicit opt-in flag on the runner.",
+          "type": "string",
+          "const": "bypass_permissions"
+        }
+      ]
+    },
+    "ThinkingConfig": {
+      "description": "Canonical extended-thinking configuration.",
+      "type": "object",
+      "properties": {
+        "budget_tokens": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "budget_tokens"
+      ]
+    }
+  }
+}

@@ -1,0 +1,80 @@
+[
+  {
+    "name": "filesystem",
+    "label": "Filesystem",
+    "description": "Read and write files under allowed directories",
+    "npm": "@modelcontextprotocol/server-filesystem"
+  },
+  {
+    "name": "fetch",
+    "label": "Fetch",
+    "description": "Fetch web pages and convert to markdown",
+    "npm": "@modelcontextprotocol/server-fetch"
+  },
+  {
+    "name": "github",
+    "label": "GitHub",
+    "description": "GitHub API: issues, PRs, repos",
+    "npm": "@modelcontextprotocol/server-github"
+  },
+  {
+    "name": "gitlab",
+    "label": "GitLab",
+    "description": "GitLab API integration",
+    "npm": "@modelcontextprotocol/server-gitlab"
+  },
+  {
+    "name": "postgres",
+    "label": "Postgres",
+    "description": "Read-only SQL queries against PostgreSQL",
+    "npm": "@modelcontextprotocol/server-postgres"
+  },
+  {
+    "name": "sqlite",
+    "label": "SQLite",
+    "description": "Query SQLite databases",
+    "npm": "@modelcontextprotocol/server-sqlite"
+  },
+  {
+    "name": "brave-search",
+    "label": "Brave Search",
+    "description": "Web search via Brave Search API",
+    "npm": "@modelcontextprotocol/server-brave-search"
+  },
+  {
+    "name": "google-maps",
+    "label": "Google Maps",
+    "description": "Geocoding and places via Google Maps",
+    "npm": "@modelcontextprotocol/server-google-maps"
+  },
+  {
+    "name": "puppeteer",
+    "label": "Puppeteer",
+    "description": "Browser automation for scraping",
+    "npm": "@modelcontextprotocol/server-puppeteer"
+  },
+  {
+    "name": "playwright",
+    "label": "Playwright",
+    "description": "Browser automation via Playwright MCP",
+    "npm": "@playwright/mcp"
+  },
+  {
+    "name": "slack",
+    "label": "Slack",
+    "description": "Post messages and read channels",
+    "npm": "@modelcontextprotocol/server-slack"
+  },
+  {
+    "name": "memory",
+    "label": "Memory",
+    "description": "Persistent key-value memory for agents",
+    "npm": "@modelcontextprotocol/server-memory"
+  },
+  {
+    "name": "sequential-thinking",
+    "label": "Sequential Thinking",
+    "description": "Structured step-by-step reasoning tool",
+    "npm": "@modelcontextprotocol/server-sequential-thinking"
+  }
+]

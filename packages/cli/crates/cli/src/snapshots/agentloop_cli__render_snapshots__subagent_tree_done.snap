@@ -1,0 +1,28 @@
+---
+source: crates/cli/src/render_snapshots.rs
+expression: rendered
+---
+
+  ✻ Flex  v0.1.0
+     agentic coding in your terminal
+
+  .
+  /help · shift+tab modes · @ files · / commands
+
+⠋ Task(map session event flow)
+  ⎿ [searcher] done in 42s · 9 tools · 31.2k tok
+
+
+
+
+
+
+
+
+
+
+
+╭ prompt ──────────────────────────────────────────────────────────────────────╮
+│ Type a message, / commands, @ files · @path:[0:12] python slice              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+native · code · auto · anthropic/claude-sonnet-4-5 · ↑0 ↓0

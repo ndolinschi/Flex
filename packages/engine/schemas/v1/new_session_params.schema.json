@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NewSessionParams",
+  "description": "Options for creating a session.",
+  "type": "object",
+  "properties": {
+    "cwd": {
+      "description": "Working directory; defaults to the engine process's cwd.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "extra": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "mode": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "model": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ModelRef"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "permission_mode": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PermissionMode"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "$defs": {
+    "ModelRef": {
+      "description": "Reference to a model, optionally provider-qualified:\n`\"anthropic/claude-sonnet-4-5\"` or a bare `\"claude-sonnet-4-5\"`.",
+      "type": "string"
+    },
+    "PermissionMode": {
+      "description": "How the engine treats tool calls that would normally ask the user.",
+      "oneOf": [
+        {
+          "description": "Ask on anything not covered by a rule.",
+          "type": "string",
+          "const": "default"
+        },
+        {
+          "description": "Auto-allow file edits (the `Fs` category); ask for the rest.",
+          "type": "string",
+          "const": "accept_edits"
+        },
+        {
+          "description": "Deny all mutating tools; read-only research still runs.",
+          "type": "string",
+          "const": "plan"
+        },
+        {
+          "description": "Never ask: deny anything that would prompt.",
+          "type": "string",
+          "const": "dont_ask"
+        },
+        {
+          "description": "Allow everything. Requires an explicit opt-in flag on the runner.",
+          "type": "string",
+          "const": "bypass_permissions"
+        }
+      ]
+    }
+  }
+}

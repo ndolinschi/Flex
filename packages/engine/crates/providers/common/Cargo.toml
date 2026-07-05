@@ -1,0 +1,18 @@
+[package]
+name = "agentloop-provider-common"
+description = "Shared provider client utilities: env config, HTTP errors, and SSE parsing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+agentloop-contracts = { workspace = true }
+agentloop-core = { workspace = true }
+reqwest = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

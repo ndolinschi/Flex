@@ -1,0 +1,28 @@
+---
+source: crates/cli/src/render_snapshots.rs
+expression: rendered
+---
+
+  ✻ Flex  v0.1.0
+     agentic coding in your terminal
+
+  .
+  /help · shift+tab modes · @ files · / commands
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+╭ prompt ──────────────────────────────────────────────────────────────────────╮
+│ Type a message, / commands, @ files · @path:[0:12] python slice              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+native · code · auto · anthropic/claude-sonnet-4-5 · ↑120 ↓45

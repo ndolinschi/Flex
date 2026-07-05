@@ -1,0 +1,28 @@
+---
+source: crates/cli/src/render_snapshots.rs
+expression: rendered
+---
+                                                                            ╭ activity ──────────────────────╮
+  ✻ Flex  v0.1.0                                                            │ running                        │
+     agentic coding in your terminal                                        │ ⠋ Read(src/main.rs)            │
+                                                                            │ ⠋ Task(map session event flow) │
+  .                                                                         │                                │
+  /help · shift+tab modes · @ files · / commands                            │ subagents                      │
+                                                                            │ ⠋ searcher · 1 tools           │
+⠋ Read(src/main.rs)                                                         │     Grep(emit_persistent)      │
+⠋ Task(map session event flow)                                              │                                │
+  ⎿ [searcher] deepseek/deepseek-chat · running · 1 tool · 12.4k tok ·      │ plan                           │
+Grep(emit_persistent)                                                       │   ☑ explore the repo           │
+                                                                            │   ◐ summarize findings         │
+plan                                                                        │                                │
+  ☑ explore the repo                                                        │                                │
+  ◐ summarize findings                                                      │                                │
+                                                                            │                                │
+                                                                            │                                │
+                                                                            │                                │
+                                                                            │                                │
+                                                                            ╰────────────────────────────────╯
+╭ prompt ────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Type a message, / commands, @ files · @path:[0:12] python slice                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+native · code · auto · anthropic/claude-sonnet-4-5 · ↑0 ↓0

@@ -1,0 +1,2222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SessionEvent",
+  "description": "Envelope around one event as it travels the wire or sits in the log.\n\n`seq` is assigned by the session store (monotonic per session, gapless for\npersisted events); adapters and transports never mint sequence numbers.",
+  "type": "object",
+  "properties": {
+    "payload": {
+      "$ref": "#/$defs/AgentEvent"
+    },
+    "seq": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "session_id": {
+      "$ref": "#/$defs/SessionId"
+    },
+    "ts_ms": {
+      "description": "Unix epoch milliseconds.",
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "turn_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TurnId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "session_id",
+    "seq",
+    "ts_ms",
+    "payload"
+  ],
+  "$defs": {
+    "AgentCaps": {
+      "description": "Everything an `Agent` implementation declares about itself.\n\nMerged from static profile defaults and startup probes; flows to clients\nverbatim via the `Hello` handshake and transport initialization.",
+      "type": "object",
+      "properties": {
+        "attachments": {
+          "$ref": "#/$defs/AttachmentCaps"
+        },
+        "cancellation": {
+          "$ref": "#/$defs/CancelSupport"
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CommandInfo"
+          }
+        },
+        "cost_reporting": {
+          "type": "boolean"
+        },
+        "emits_structured_events": {
+          "description": "False for agents that emit only plain markdown (no structured events).",
+          "type": "boolean"
+        },
+        "mcp_passthrough": {
+          "$ref": "#/$defs/McpPassthrough"
+        },
+        "models": {
+          "$ref": "#/$defs/ModelDiscovery"
+        },
+        "modes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModeInfo"
+          }
+        },
+        "permissions": {
+          "$ref": "#/$defs/PermissionCaps"
+        },
+        "reasoning_visible": {
+          "description": "Whether reasoning/thinking output is visible in the stream.",
+          "type": "boolean"
+        },
+        "resume": {
+          "$ref": "#/$defs/ResumeSupport"
+        },
+        "streaming": {
+          "$ref": "#/$defs/StreamingGranularity"
+        },
+        "subagents": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "models",
+        "permissions",
+        "reasoning_visible",
+        "streaming",
+        "resume",
+        "attachments",
+        "mcp_passthrough",
+        "subagents",
+        "cost_reporting",
+        "cancellation",
+        "emits_structured_events"
+      ]
+    },
+    "AgentEvent": {
+      "description": "One canonical event.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "session_created"
+            },
+            "meta": {
+              "$ref": "#/$defs/SessionMeta"
+            }
+          },
+          "required": [
+            "kind",
+            "meta"
+          ]
+        },
+        {
+          "description": "Emitted once per session start: which implementation is serving it,\nwhat it can do, and how it was selected.",
+          "type": "object",
+          "properties": {
+            "agent_id": {
+              "type": "string"
+            },
+            "capabilities": {
+              "$ref": "#/$defs/AgentCaps"
+            },
+            "kind": {
+              "type": "string",
+              "const": "engine_info"
+            },
+            "provider_session_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "resolution_trace": {
+              "description": "Human-readable trace of how this agent/provider was resolved.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "agent_id",
+            "capabilities"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "turn_started"
+            },
+            "turn_id": {
+              "$ref": "#/$defs/TurnId"
+            }
+          },
+          "required": [
+            "kind",
+            "turn_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "turn_completed"
+            },
+            "summary": {
+              "$ref": "#/$defs/TurnSummary"
+            },
+            "turn_id": {
+              "$ref": "#/$defs/TurnId"
+            }
+          },
+          "required": [
+            "kind",
+            "turn_id",
+            "summary"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "$ref": "#/$defs/EngineError"
+            },
+            "kind": {
+              "type": "string",
+              "const": "session_error"
+            }
+          },
+          "required": [
+            "kind",
+            "error"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "message_started"
+            },
+            "message_id": {
+              "$ref": "#/$defs/MessageId"
+            },
+            "role": {
+              "$ref": "#/$defs/Role"
+            }
+          },
+          "required": [
+            "kind",
+            "message_id",
+            "role"
+          ]
+        },
+        {
+          "description": "A fragment of markdown text appended to the open message.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "markdown_delta"
+            },
+            "message_id": {
+              "$ref": "#/$defs/MessageId"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "message_id",
+            "text"
+          ]
+        },
+        {
+          "description": "A fragment of reasoning text.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "thinking_delta"
+            },
+            "message_id": {
+              "$ref": "#/$defs/MessageId"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "message_id",
+            "text"
+          ]
+        },
+        {
+          "description": "Full-text snapshot superseding all earlier text of the message.\nEmitted by snapshot-only sources instead of deltas.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "text_snapshot"
+            },
+            "message_id": {
+              "$ref": "#/$defs/MessageId"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "message_id",
+            "text"
+          ]
+        },
+        {
+          "description": "A fragment of a tool call's JSON arguments, as the model streams them.",
+          "type": "object",
+          "properties": {
+            "call_id": {
+              "$ref": "#/$defs/ToolCallId"
+            },
+            "json_fragment": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "tool_args_delta"
+            }
+          },
+          "required": [
+            "kind",
+            "call_id",
+            "json_fragment"
+          ]
+        },
+        {
+          "description": "Progress note from a running tool.",
+          "type": "object",
+          "properties": {
+            "call_id": {
+              "$ref": "#/$defs/ToolCallId"
+            },
+            "kind": {
+              "type": "string",
+              "const": "tool_progress"
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "call_id",
+            "note"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ContentBlock"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "user_message"
+            },
+            "message_id": {
+              "$ref": "#/$defs/MessageId"
+            }
+          },
+          "required": [
+            "kind",
+            "message_id",
+            "content"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ContentBlock"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "assistant_message"
+            },
+            "message_id": {
+              "$ref": "#/$defs/MessageId"
+            },
+            "model": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "usage": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/TokenUsage"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "message_id",
+            "content"
+          ]
+        },
+        {
+          "description": "The full [`ToolCall`] record, re-emitted on every status transition.\nThe log keeps the history; the transcript keeps the latest.",
+          "type": "object",
+          "properties": {
+            "call": {
+              "$ref": "#/$defs/ToolCall"
+            },
+            "kind": {
+              "type": "string",
+              "const": "tool_call_updated"
+            }
+          },
+          "required": [
+            "kind",
+            "call"
+          ]
+        },
+        {
+          "description": "The agent's working plan changed (task list tools, ACP plan updates).",
+          "type": "object",
+          "properties": {
+            "entries": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PlanEntry"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "plan_updated"
+            }
+          },
+          "required": [
+            "kind",
+            "entries"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "call_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolCallId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "detail": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "$ref": "#/$defs/PermissionRequestId"
+            },
+            "kind": {
+              "type": "string",
+              "const": "permission_requested"
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PermissionDecisionKind"
+              }
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "title",
+            "options"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "decision": {
+              "$ref": "#/$defs/PermissionDecision"
+            },
+            "id": {
+              "$ref": "#/$defs/PermissionRequestId"
+            },
+            "kind": {
+              "type": "string",
+              "const": "permission_resolved"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "decision"
+          ]
+        },
+        {
+          "description": "The agent asked the user structured questions (`AskUserQuestion`).",
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/QuestionId"
+            },
+            "kind": {
+              "type": "string",
+              "const": "question_requested"
+            },
+            "questions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Question"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "questions"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "answers": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Answer"
+              }
+            },
+            "id": {
+              "$ref": "#/$defs/QuestionId"
+            },
+            "kind": {
+              "type": "string",
+              "const": "question_resolved"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "answers"
+          ]
+        },
+        {
+          "description": "A slash command was resolved into this turn's prompt.",
+          "type": "object",
+          "properties": {
+            "args": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "command_expanded"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "args"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "compaction_boundary"
+            },
+            "summary": {
+              "$ref": "#/$defs/CompactionSummary"
+            }
+          },
+          "required": [
+            "kind",
+            "summary"
+          ]
+        },
+        {
+          "description": "The turn's model was switched mid-work (provider failure, rate limit).",
+          "type": "object",
+          "properties": {
+            "from": {
+              "$ref": "#/$defs/ModelRef"
+            },
+            "kind": {
+              "type": "string",
+              "const": "model_fallback"
+            },
+            "reason": {
+              "$ref": "#/$defs/EngineError"
+            },
+            "to": {
+              "description": "The next model being tried; `None` = the chain is exhausted and\nthe turn is about to fail.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ModelRef"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "from",
+            "reason"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "hook_fired"
+            },
+            "outcome": {
+              "$ref": "#/$defs/HookOutcomeKind"
+            },
+            "point": {
+              "$ref": "#/$defs/HookPoint"
+            }
+          },
+          "required": [
+            "kind",
+            "point",
+            "outcome"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "call_id": {
+              "description": "The Task tool call that spawned the child, when tool-driven.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ToolCallId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "child_session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "kind": {
+              "type": "string",
+              "const": "subagent_started"
+            },
+            "role": {
+              "description": "The child's role (e.g. `searcher`, `worker`).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "task": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "child_session",
+            "task"
+          ]
+        },
+        {
+          "description": "Live relay of a child event into the parent stream (ephemeral — the\nchild persists its own log).",
+          "type": "object",
+          "properties": {
+            "child_session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "event": {
+              "$ref": "#/$defs/AgentEvent"
+            },
+            "kind": {
+              "type": "string",
+              "const": "subagent_event"
+            }
+          },
+          "required": [
+            "kind",
+            "child_session",
+            "event"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "child_session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "kind": {
+              "type": "string",
+              "const": "subagent_completed"
+            },
+            "summary": {
+              "$ref": "#/$defs/TurnSummary"
+            }
+          },
+          "required": [
+            "kind",
+            "child_session",
+            "summary"
+          ]
+        },
+        {
+          "description": "A live subscriber lagged and missed events; re-sync from the store\nstarting at `from_seq`. Never persisted.",
+          "type": "object",
+          "properties": {
+            "from_seq": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "kind": {
+              "type": "string",
+              "const": "gap"
+            }
+          },
+          "required": [
+            "kind",
+            "from_seq"
+          ]
+        },
+        {
+          "description": "An event this build doesn't know. Preserved verbatim — never dropped,\nnever a crash.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "unknown"
+            },
+            "raw": true
+          },
+          "required": [
+            "kind",
+            "raw"
+          ]
+        }
+      ]
+    },
+    "Answer": {
+      "description": "The user's answer to one [`Question`].",
+      "type": "object",
+      "properties": {
+        "question": {
+          "description": "The question text being answered.",
+          "type": "string"
+        },
+        "selected": {
+          "description": "Selected option labels (one unless `multi_select`), or free text.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "question",
+        "selected"
+      ]
+    },
+    "AttachmentCaps": {
+      "description": "Which attachment kinds a prompt may carry.",
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "boolean"
+        },
+        "images": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "images",
+        "files"
+      ]
+    },
+    "BlobSource": {
+      "description": "Where binary data (images, files) comes from.\n\nTransports may send small payloads inline (`Base64`), reference remote\ncontent (`Url`), or point at local files (`Path`). The engine resolves\n`Path` sources (read + base64, size-capped) before content reaches a\nprovider, so provider clients only ever see `Base64` or `Url`.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string",
+              "const": "base64"
+            }
+          },
+          "required": [
+            "source",
+            "data"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "url"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "source",
+            "url"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string",
+              "const": "path"
+            }
+          },
+          "required": [
+            "source",
+            "path"
+          ]
+        }
+      ]
+    },
+    "CancelSupport": {
+      "description": "How a turn can be interrupted.",
+      "oneOf": [
+        {
+          "description": "Clean interrupt; the session survives.",
+          "type": "string",
+          "const": "graceful"
+        },
+        {
+          "description": "Only by killing the backing process.",
+          "type": "string",
+          "const": "kill_only"
+        }
+      ]
+    },
+    "CommandInfo": {
+      "description": "One available slash command, declared so clients can render autocomplete.",
+      "type": "object",
+      "properties": {
+        "args_hint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "name": {
+          "description": "Name without the leading slash.",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/CommandSource"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "source"
+      ]
+    },
+    "CommandSource": {
+      "description": "Where a slash command comes from.",
+      "oneOf": [
+        {
+          "description": "Shipped with the engine (template or engine-control command).",
+          "type": "string",
+          "const": "builtin"
+        },
+        {
+          "description": "From the user's config directory.",
+          "type": "string",
+          "const": "user"
+        },
+        {
+          "description": "From the project's config directory.",
+          "type": "string",
+          "const": "project"
+        },
+        {
+          "description": "Native to a delegated agent, passed through.",
+          "type": "string",
+          "const": "agent"
+        }
+      ]
+    },
+    "CompactionSummary": {
+      "description": "Record of a context compaction.",
+      "type": "object",
+      "properties": {
+        "strategy": {
+          "description": "Which strategy produced it (`\"summarize_oldest\"`, `\"truncate\"`, ...).",
+          "type": "string"
+        },
+        "summary_markdown": {
+          "description": "Markdown summary that replaces the compacted prefix when building\nmodel context.",
+          "type": "string"
+        },
+        "tokens_after": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "tokens_before": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "summary_markdown",
+        "strategy"
+      ]
+    },
+    "ContentBlock": {
+      "description": "One block of message content.",
+      "oneOf": [
+        {
+          "description": "CommonMark text. The only text kind in the canonical model.",
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "markdown"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ]
+        },
+        {
+          "description": "Image input/output (png/jpeg/webp/gif).",
+          "type": "object",
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/BlobSource"
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "image"
+            }
+          },
+          "required": [
+            "type",
+            "media_type",
+            "data"
+          ]
+        },
+        {
+          "description": "File attachment as prompt input (pdf, documents, arbitrary files).",
+          "type": "object",
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/BlobSource"
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "file"
+            }
+          },
+          "required": [
+            "type",
+            "name",
+            "media_type",
+            "data"
+          ]
+        },
+        {
+          "description": "Model reasoning. `signature` preserves provider-verifiable blobs\n(e.g. Anthropic thinking signatures) so they round-trip on resume.",
+          "type": "object",
+          "properties": {
+            "signature": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "thinking"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ]
+        },
+        {
+          "description": "The model requested a tool invocation.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/ToolCallId"
+            },
+            "input": true,
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "tool_use"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "name",
+            "input"
+          ]
+        },
+        {
+          "description": "A tool result being fed back to the model.",
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ToolResultBlock"
+              }
+            },
+            "is_error": {
+              "type": "boolean",
+              "default": false
+            },
+            "tool_use_id": {
+              "$ref": "#/$defs/ToolCallId"
+            },
+            "type": {
+              "type": "string",
+              "const": "tool_result"
+            }
+          },
+          "required": [
+            "type",
+            "tool_use_id",
+            "content"
+          ]
+        },
+        {
+          "description": "Provider-specific block that must round-trip verbatim (e.g. Anthropic\n`redacted_thinking`). Keyed by provider; the owning provider re-encodes\nit, everyone else treats it as inert.",
+          "type": "object",
+          "properties": {
+            "data": true,
+            "provider": {
+              "$ref": "#/$defs/ProviderId"
+            },
+            "type": {
+              "type": "string",
+              "const": "opaque"
+            }
+          },
+          "required": [
+            "type",
+            "provider",
+            "data"
+          ]
+        }
+      ]
+    },
+    "EngineError": {
+      "description": "A normalized failure. The `message` must be actionable: what failed, why,\nand what to do about it.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ErrorCode"
+        },
+        "detail": {
+          "description": "Source-specific payload for debugging; never required to handle."
+        },
+        "message": {
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "retry_after_ms": {
+          "description": "Suggested wait before retrying (from rate-limit headers etc.).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "retryable": {
+          "description": "Whether retrying the same request may succeed.",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "provenance"
+      ]
+    },
+    "ErrorCode": {
+      "description": "Machine-readable failure category.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "rate_limited",
+            "model_unavailable",
+            "permission_denied",
+            "cancelled",
+            "timeout",
+            "invalid_request",
+            "context_overflow",
+            "unknown"
+          ]
+        },
+        {
+          "description": "No credentials configured for the selected provider/agent.",
+          "type": "string",
+          "const": "auth_missing"
+        },
+        {
+          "description": "Credentials present but rejected.",
+          "type": "string",
+          "const": "auth_expired"
+        },
+        {
+          "description": "A delegated agent's process died unexpectedly.",
+          "type": "string",
+          "const": "process_crashed"
+        },
+        {
+          "description": "The remote side violated its own wire protocol.",
+          "type": "string",
+          "const": "protocol_violation"
+        },
+        {
+          "description": "Required external CLI is not installed.",
+          "type": "string",
+          "const": "not_installed"
+        }
+      ]
+    },
+    "HookOutcomeKind": {
+      "description": "What a hook did (as recorded in the event stream).",
+      "type": "string",
+      "enum": [
+        "continue",
+        "block",
+        "mutated"
+      ]
+    },
+    "HookPoint": {
+      "description": "Where in the loop a hook fires.",
+      "type": "string",
+      "enum": [
+        "session_start",
+        "user_prompt_submit",
+        "pre_tool_use",
+        "post_tool_use",
+        "stop",
+        "subagent_start",
+        "subagent_stop",
+        "pre_compact",
+        "session_end"
+      ]
+    },
+    "McpPassthrough": {
+      "description": "How MCP server configuration reaches a delegated agent.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "none"
+          ]
+        },
+        {
+          "description": "Via a launch flag (e.g. `--mcp-config`).",
+          "type": "string",
+          "const": "flag"
+        },
+        {
+          "description": "Via the protocol's session setup (e.g. ACP `session/new.mcpServers`).",
+          "type": "string",
+          "const": "session_new"
+        }
+      ]
+    },
+    "MessageId": {
+      "description": "Identifies one message (user or assistant) within a session.",
+      "type": "string"
+    },
+    "ModeInfo": {
+      "description": "An operating mode a delegated agent exposes (e.g. build/plan).",
+      "type": "object",
+      "properties": {
+        "display_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "ModelDiscovery": {
+      "description": "How an agent's model list is discovered.",
+      "oneOf": [
+        {
+          "description": "A fixed list known up front.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "static"
+            },
+            "models": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ModelInfo"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "models"
+          ]
+        },
+        {
+          "description": "Probed at runtime (e.g. opencode's `/config/providers`).",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "dynamic"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "description": "The agent owns model selection; the engine cannot choose.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "none"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    },
+    "ModelInfo": {
+      "description": "One selectable model.",
+      "type": "object",
+      "properties": {
+        "context_window": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "display_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "reasoning": {
+          "type": "boolean",
+          "default": false
+        },
+        "vision": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "ModelRef": {
+      "description": "Reference to a model, optionally provider-qualified:\n`\"anthropic/claude-sonnet-4-5\"` or a bare `\"claude-sonnet-4-5\"`.",
+      "type": "string"
+    },
+    "PermissionCaps": {
+      "description": "Permission-related capabilities of an agent implementation.",
+      "type": "object",
+      "properties": {
+        "interactive": {
+          "description": "Can surface live permission round-trips (vs static policy only).",
+          "type": "boolean"
+        },
+        "modes": {
+          "description": "Which modes the agent honors.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PermissionMode"
+          }
+        },
+        "tool_scoping": {
+          "description": "Supports `ToolName(specifier)` scoping.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "interactive",
+        "modes",
+        "tool_scoping"
+      ]
+    },
+    "PermissionDecision": {
+      "description": "A user's answer to a permission request.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "decision": {
+              "type": "string",
+              "const": "allow_once"
+            }
+          },
+          "required": [
+            "decision"
+          ]
+        },
+        {
+          "description": "Allow and persist a rule so this is never asked again.",
+          "type": "object",
+          "properties": {
+            "decision": {
+              "type": "string",
+              "const": "allow_always"
+            }
+          },
+          "required": [
+            "decision"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "decision": {
+              "type": "string",
+              "const": "deny"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "decision"
+          ]
+        }
+      ]
+    },
+    "PermissionDecisionKind": {
+      "description": "The options a client may present for a pending permission request.",
+      "type": "string",
+      "enum": [
+        "allow_once",
+        "allow_always",
+        "deny"
+      ]
+    },
+    "PermissionMode": {
+      "description": "How the engine treats tool calls that would normally ask the user.",
+      "oneOf": [
+        {
+          "description": "Ask on anything not covered by a rule.",
+          "type": "string",
+          "const": "default"
+        },
+        {
+          "description": "Auto-allow file edits (the `Fs` category); ask for the rest.",
+          "type": "string",
+          "const": "accept_edits"
+        },
+        {
+          "description": "Deny all mutating tools; read-only research still runs.",
+          "type": "string",
+          "const": "plan"
+        },
+        {
+          "description": "Never ask: deny anything that would prompt.",
+          "type": "string",
+          "const": "dont_ask"
+        },
+        {
+          "description": "Allow everything. Requires an explicit opt-in flag on the runner.",
+          "type": "string",
+          "const": "bypass_permissions"
+        }
+      ]
+    },
+    "PermissionRequestId": {
+      "description": "Identifies one permission request round-trip.",
+      "type": "string"
+    },
+    "PlanEntry": {
+      "description": "One entry of the agent's working plan (task list).",
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/PlanStatus"
+        }
+      },
+      "required": [
+        "content",
+        "status"
+      ]
+    },
+    "PlanStatus": {
+      "description": "Status of one plan/task entry.",
+      "type": "string",
+      "enum": [
+        "pending",
+        "in_progress",
+        "completed"
+      ]
+    },
+    "Provenance": {
+      "description": "Where a failure originated.",
+      "oneOf": [
+        {
+          "description": "A native provider client.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "const": "native"
+            },
+            "provider": {
+              "$ref": "#/$defs/ProviderId"
+            }
+          },
+          "required": [
+            "from",
+            "provider"
+          ]
+        },
+        {
+          "description": "A delegated external agent.",
+          "type": "object",
+          "properties": {
+            "agent_id": {
+              "type": "string"
+            },
+            "exit_code": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
+            },
+            "from": {
+              "type": "string",
+              "const": "delegator"
+            },
+            "stderr_tail": {
+              "description": "Last lines of the process's stderr, for diagnosis.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "from",
+            "agent_id"
+          ]
+        },
+        {
+          "description": "The engine itself.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "const": "engine"
+            }
+          },
+          "required": [
+            "from"
+          ]
+        }
+      ]
+    },
+    "ProviderId": {
+      "description": "Identifies an LLM provider implementation (`\"anthropic\"`, `\"openai\"`, ...).\n\nNot a UUID — a stable, human-chosen key used in configuration, in\n[`crate::content::ContentBlock::Opaque`] round-tripping, and in\nprovider-namespaced request passthrough.",
+      "type": "string"
+    },
+    "Question": {
+      "description": "A structured question the agent asks the user (`AskUserQuestion` tool).",
+      "type": "object",
+      "properties": {
+        "allow_custom": {
+          "description": "When true the user may type a free-text answer instead of picking options.",
+          "type": "boolean",
+          "default": true
+        },
+        "header": {
+          "description": "Short chip/tag label (e.g. \"Auth method\").",
+          "type": "string"
+        },
+        "multi_select": {
+          "type": "boolean",
+          "default": false
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QuestionOption"
+          }
+        },
+        "question": {
+          "description": "The full question text.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "header",
+        "question",
+        "options"
+      ]
+    },
+    "QuestionId": {
+      "description": "Identifies one user-question round-trip.",
+      "type": "string"
+    },
+    "QuestionOption": {
+      "description": "One option of a multiple-choice question.",
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label"
+      ]
+    },
+    "ResumeSupport": {
+      "description": "Whether and how a session can be resumed.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "none"
+          ]
+        },
+        {
+          "description": "The backing agent resumes its own session natively.",
+          "type": "string",
+          "const": "native"
+        },
+        {
+          "description": "Resumed by replaying seed history into a fresh session.",
+          "type": "string",
+          "const": "replay"
+        }
+      ]
+    },
+    "Role": {
+      "description": "Who authored a message.",
+      "type": "string",
+      "enum": [
+        "user",
+        "assistant",
+        "system"
+      ]
+    },
+    "SessionId": {
+      "description": "Identifies one session: an append-only event log owned by one agent.",
+      "type": "string"
+    },
+    "SessionMeta": {
+      "description": "Descriptor of one session (the append-only event log it names is stored\nseparately by a `SessionStore`).",
+      "type": "object",
+      "properties": {
+        "agent_id": {
+          "description": "Which agent implementation owns this session\n(`\"native\"`, `\"claude-code\"`, ...).",
+          "type": "string"
+        },
+        "created_at_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "depth": {
+          "description": "Spawn-tree depth of this session: 0 for a root/main session, else the\nparent session's depth + 1. Used to enforce a role's `max_depth` so\nsubagents cannot spawn indefinitely deep trees.",
+          "type": "integer",
+          "format": "uint8",
+          "default": 0,
+          "maximum": 255,
+          "minimum": 0
+        },
+        "id": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "mode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parent_id": {
+          "description": "Set for subagent sessions; links the session tree.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "provider_session_id": {
+          "description": "The backing agent's own session id, for native resume.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "description": "The role this session serves (e.g. `searcher`); `None` = main.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "updated_at_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "agent_id",
+        "cwd",
+        "created_at_ms",
+        "updated_at_ms"
+      ]
+    },
+    "StreamingGranularity": {
+      "description": "Granularity of the event stream an agent emits.",
+      "oneOf": [
+        {
+          "description": "Token-level deltas.",
+          "type": "string",
+          "const": "token_deltas"
+        },
+        {
+          "description": "Whole messages as they complete.",
+          "type": "string",
+          "const": "message_level"
+        },
+        {
+          "description": "Full-text snapshots that supersede earlier ones.",
+          "type": "string",
+          "const": "snapshot_only"
+        }
+      ]
+    },
+    "TokenUsage": {
+      "description": "Token accounting for one model call or aggregated over a turn.",
+      "type": "object",
+      "properties": {
+        "cache_read": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "cache_write": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "input": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "output": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "reasoning": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "input",
+        "output"
+      ]
+    },
+    "ToolCall": {
+      "description": "The durable, inspectable record of one tool invocation.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ToolCallId"
+        },
+        "input": true,
+        "message_id": {
+          "description": "The assistant message that requested this call.",
+          "$ref": "#/$defs/MessageId"
+        },
+        "origin": {
+          "$ref": "#/$defs/ToolCallOrigin"
+        },
+        "read_only": {
+          "description": "Read-only calls may execute concurrently; mutating calls run\nsequentially. Also feeds the permission policy.",
+          "type": "boolean"
+        },
+        "result": {
+          "description": "Present once `Completed` or `Failed`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolOutput"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "status": {
+          "$ref": "#/$defs/ToolCallStatus"
+        },
+        "timing": {
+          "$ref": "#/$defs/ToolCallTiming"
+        },
+        "tool_name": {
+          "type": "string"
+        },
+        "turn_id": {
+          "$ref": "#/$defs/TurnId"
+        }
+      },
+      "required": [
+        "id",
+        "session_id",
+        "turn_id",
+        "message_id",
+        "tool_name",
+        "input",
+        "read_only",
+        "origin",
+        "status",
+        "timing"
+      ]
+    },
+    "ToolCallId": {
+      "description": "Identifies one tool invocation across its whole lifecycle.",
+      "type": "string"
+    },
+    "ToolCallOrigin": {
+      "description": "Who initiated the call.",
+      "oneOf": [
+        {
+          "description": "Requested by the model through native tool use.",
+          "type": "object",
+          "properties": {
+            "origin": {
+              "type": "string",
+              "const": "model"
+            }
+          },
+          "required": [
+            "origin"
+          ]
+        },
+        {
+          "description": "Injected by a hook.",
+          "type": "object",
+          "properties": {
+            "origin": {
+              "type": "string",
+              "const": "hook"
+            }
+          },
+          "required": [
+            "origin"
+          ]
+        },
+        {
+          "description": "Issued on behalf of a subagent.",
+          "type": "object",
+          "properties": {
+            "origin": {
+              "type": "string",
+              "const": "subagent"
+            }
+          },
+          "required": [
+            "origin"
+          ]
+        },
+        {
+          "description": "Observed from an external (delegated) agent.",
+          "type": "object",
+          "properties": {
+            "agent_id": {
+              "type": "string"
+            },
+            "origin": {
+              "type": "string",
+              "const": "external"
+            }
+          },
+          "required": [
+            "origin",
+            "agent_id"
+          ]
+        }
+      ]
+    },
+    "ToolCallStatus": {
+      "description": "Lifecycle state of a tool call.\n\n```text\nPending ──► AwaitingPermission ──► Running ──► Completed\n   │                │                 │  └───► Failed\n   │                └───► Denied      └──────► Cancelled\n   └─────► Running | Denied | Cancelled\n```",
+      "oneOf": [
+        {
+          "description": "Parsed from model output, queued for execution.",
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "const": "pending"
+            }
+          },
+          "required": [
+            "state"
+          ]
+        },
+        {
+          "description": "Waiting on a user permission decision.",
+          "type": "object",
+          "properties": {
+            "request_id": {
+              "$ref": "#/$defs/PermissionRequestId"
+            },
+            "state": {
+              "type": "string",
+              "const": "awaiting_permission"
+            }
+          },
+          "required": [
+            "state",
+            "request_id"
+          ]
+        },
+        {
+          "description": "Executing.",
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "const": "running"
+            }
+          },
+          "required": [
+            "state"
+          ]
+        },
+        {
+          "description": "Finished. The result may still carry `is_error: true` (a *tool-level*\nerror fed back to the model, e.g. \"file not found\").",
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "const": "completed"
+            }
+          },
+          "required": [
+            "state"
+          ]
+        },
+        {
+          "description": "Engine-level failure: panic, timeout, I/O error in the tool runtime.",
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string",
+              "const": "failed"
+            }
+          },
+          "required": [
+            "state",
+            "error"
+          ]
+        },
+        {
+          "description": "Refused by the permission policy, a hook, or the user.",
+          "type": "object",
+          "properties": {
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "state": {
+              "type": "string",
+              "const": "denied"
+            }
+          },
+          "required": [
+            "state"
+          ]
+        },
+        {
+          "description": "The turn was interrupted while this call was pending or running.",
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "const": "cancelled"
+            }
+          },
+          "required": [
+            "state"
+          ]
+        }
+      ]
+    },
+    "ToolCallTiming": {
+      "description": "Wall-clock milestones of one call. All fields are unix epoch milliseconds.",
+      "type": "object",
+      "properties": {
+        "finished_at_ms": {
+          "description": "When a terminal state was reached.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "permission_wait_ms": {
+          "description": "Time spent waiting for a permission decision, if any.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "queued_at_ms": {
+          "description": "When the call was admitted (status `Pending`).",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "started_at_ms": {
+          "description": "When execution started (status `Running`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "queued_at_ms"
+      ]
+    },
+    "ToolOutput": {
+      "description": "What a tool returned.",
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolResultBlock"
+          }
+        },
+        "is_error": {
+          "description": "Tool-level error: fed back to the model as a failed result, never a\nloop failure.",
+          "type": "boolean",
+          "default": false
+        },
+        "structured": {
+          "description": "Machine-readable payload for consumers that don't want to parse text."
+        }
+      },
+      "required": [
+        "content"
+      ]
+    },
+    "ToolResultBlock": {
+      "description": "Content inside a tool result.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "markdown"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/BlobSource"
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "image"
+            }
+          },
+          "required": [
+            "type",
+            "media_type",
+            "data"
+          ]
+        },
+        {
+          "description": "Structured output for tools that return machine-readable data.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "json"
+            },
+            "value": true
+          },
+          "required": [
+            "type",
+            "value"
+          ]
+        }
+      ]
+    },
+    "TurnId": {
+      "description": "Identifies one turn: one user prompt and everything until the loop idles.",
+      "type": "string"
+    },
+    "TurnStopReason": {
+      "description": "Why a whole turn ended (loop level).",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "max_tokens",
+            "refusal",
+            "cancelled",
+            "error"
+          ]
+        },
+        {
+          "description": "The model finished without requesting more tools.",
+          "type": "string",
+          "const": "end_turn"
+        },
+        {
+          "description": "The loop hit its per-turn iteration bound.",
+          "type": "string",
+          "const": "max_iterations"
+        }
+      ]
+    },
+    "TurnSummary": {
+      "description": "Aggregated result of one turn.",
+      "type": "object",
+      "properties": {
+        "cost_usd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "num_model_calls": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "num_tool_calls": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "stop_reason": {
+          "$ref": "#/$defs/TurnStopReason"
+        },
+        "turn_id": {
+          "$ref": "#/$defs/TurnId"
+        },
+        "usage": {
+          "$ref": "#/$defs/TokenUsage"
+        }
+      },
+      "required": [
+        "turn_id",
+        "stop_reason",
+        "usage",
+        "num_model_calls",
+        "num_tool_calls",
+        "duration_ms"
+      ]
+    }
+  }
+}
