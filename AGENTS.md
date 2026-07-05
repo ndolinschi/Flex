@@ -270,9 +270,10 @@ genuinely runs v4-flash and a `worker` child v4-pro. Split round-robin (`assigne
 engages for a role with a **multi-model** chain (`spec.split && models.len() >= 2`); DeepSeek's
 single-model role chains are unaffected.
 
-The model picker (`/model`, `open_catalog_picker`) is **scoped to the active provider** — a
-DeepSeek session lists only DeepSeek models, not Copilot/Anthropic (filtered by
-`current_provider()`; falls back to the full catalog when nothing matches). Its first row is an
+The model picker (`/model`, `open_catalog_picker`) lists **the active provider's models first,
+then every other provider's** — so selecting any model (each row labelled `provider/model`) switches
+provider *and* model in one step; nothing is hidden. (It used to hard-scope to `current_provider()`,
+which blocked cross-provider selection.) Its first row is an
 **`auto`** entry for providers that have a smart mode (`auto_mode_detail` gates it; only DeepSeek
 today). Selecting `auto` (or `/model deepseek/auto`) is a UX shortcut that routes through
 `apply_auto_model` → `run_roles_preset("deepseek")` — i.e. v4-pro planner+worker, v4-flash

@@ -2176,12 +2176,6 @@ impl App {
                     if !model_provider_available(&model, &self.providers) {
                         return None;
                     }
-                    if let Some(provider) = current.as_deref() {
-                        let (entry_provider, _) = model.split();
-                        if entry_provider != Some(provider) {
-                            return None;
-                        }
-                    }
                     Some(catalog_item_from_ref(&model, self.session.model.as_ref()))
                 })
                 .collect();
@@ -2214,28 +2208,22 @@ impl App {
                 });
             }
         }
-        // Scope the model list to the active provider so, e.g., a DeepSeek
-        // session doesn't list Copilot/Anthropic models. Fall back to the full
-        // catalog when nothing matches (no active provider, or it listed none).
-        let scoped: Vec<&CatalogEntry> = match current.as_deref() {
-            Some(provider) => self
-                .catalog
-                .iter()
-                .filter(|entry| entry.provider.as_str() == provider)
-                .collect(),
-            None => self.catalog.iter().collect(),
-        };
-        let entries = if scoped.is_empty() {
-            self.catalog.iter().collect::<Vec<_>>()
-        } else {
-            scoped
-        };
-        items.extend(entries.into_iter().map(catalog_item));
-        let title = match current.as_deref() {
-            Some(provider) => format!("select model · {provider}"),
-            None => "select model".to_owned(),
-        };
-        self.overlay = Overlay::Picker(PickerState::new(title, items, PickerAction::SetModel));
+        // List the active provider's models first, then every other provider's,
+        // so switching provider *and* model is a single selection and nothing is
+        // hidden. (It used to hard-scope to the active provider, which blocked
+        // cross-provider selection from `/model`.) Each row is labelled
+        // `provider/model`, so the source stays clear.
+        let (current_entries, other_entries): (Vec<&CatalogEntry>, Vec<&CatalogEntry>) = self
+            .catalog
+            .iter()
+            .partition(|entry| current.as_deref() == Some(entry.provider.as_str()));
+        items.extend(current_entries.into_iter().map(catalog_item));
+        items.extend(other_entries.into_iter().map(catalog_item));
+        self.overlay = Overlay::Picker(PickerState::new(
+            "select model",
+            items,
+            PickerAction::SetModel,
+        ));
     }
 
     fn open_provider_picker(&mut self) -> Vec<Effect> {
@@ -4422,7 +4410,7 @@ mod session_tests {
     }
 
     #[test]
-    fn model_picker_scopes_to_active_provider_and_offers_auto() {
+    fn model_picker_lists_active_provider_first_then_all() {
         let mut app = native_test_app();
         app.session.model = Some(ModelRef::from("deepseek/deepseek-v4-pro"));
         app.catalog = vec![
@@ -4435,24 +4423,26 @@ mod session_tests {
         let crate::overlay::Overlay::Picker(picker) = &app.overlay else {
             panic!("expected a picker overlay");
         };
-        // First row is the DeepSeek auto mode.
+        // First row is the active provider's auto mode.
         assert_eq!(picker.items[0].label, "auto");
         assert_eq!(picker.items[0].id, "deepseek/auto");
-        // No Copilot or Anthropic models leak into a DeepSeek session.
+        let ids: Vec<&str> = picker.items.iter().map(|i| i.id.as_str()).collect();
+        // Every provider's models are selectable in one step (cross-provider).
+        assert!(ids.contains(&"deepseek/deepseek-v4-flash"));
+        assert!(ids.contains(&"copilot/gpt-5"));
+        assert!(ids.contains(&"anthropic/claude-sonnet-5"));
+        // The active provider's models come before other providers'.
+        let active = ids
+            .iter()
+            .position(|id| *id == "deepseek/deepseek-v4-flash")
+            .expect("deepseek model listed");
+        let other = ids
+            .iter()
+            .position(|id| *id == "copilot/gpt-5")
+            .expect("copilot model listed");
         assert!(
-            picker
-                .items
-                .iter()
-                .all(|item| item.label == "auto" || item.id.starts_with("deepseek/")),
-            "picker leaked non-deepseek models: {:?}",
-            picker.items.iter().map(|i| &i.id).collect::<Vec<_>>()
-        );
-        // Both DeepSeek models are present.
-        assert!(
-            picker
-                .items
-                .iter()
-                .any(|i| i.id == "deepseek/deepseek-v4-flash")
+            active < other,
+            "active provider models should come first: {ids:?}"
         );
     }
 
