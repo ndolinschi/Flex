@@ -257,12 +257,13 @@ fn code_fence_lines(
     let inner_budget = max_width.saturating_sub(prefix_w).max(8) as usize;
     let mut lines = Vec::new();
 
-    let mut header = String::from("┌─");
+    // opencode-style left rail: a heavy vertical (`┃`) down the block instead
+    // of a full box. The header carries the language label; there is no bottom
+    // corner (the rail simply stops).
+    let mut header = String::from("┃");
     if let Some(lang) = lang.filter(|l| !l.is_empty()) {
         header.push(' ');
         header.push_str(lang);
-    } else {
-        header.push('─');
     }
     if !complete {
         header.push('…');
@@ -284,20 +285,13 @@ fn code_fence_lines(
         let visible = fit_to_width(line, inner_budget.saturating_sub(2));
         let mut spans = vec![
             Span::raw(prefix.to_owned()),
-            Span::styled("│ ".to_owned(), theme::code_border()),
+            Span::styled("┃ ".to_owned(), theme::code_border()),
         ];
         match highlighter.as_mut() {
             Some(hl) => spans.extend(hl.line(&visible)),
             None => spans.push(Span::styled(visible, theme::code())),
         }
         lines.push(Line::from(spans));
-    }
-
-    if complete {
-        lines.push(Line::from(vec![
-            Span::raw(prefix.to_owned()),
-            Span::styled("└─".to_owned(), theme::code_border()),
-        ]));
     }
 
     lines

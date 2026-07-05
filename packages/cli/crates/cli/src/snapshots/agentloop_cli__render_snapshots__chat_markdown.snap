@@ -8,9 +8,9 @@ expression: rendered
 
 
   This is bold and inline.
-  ┌─ rust
-  │ fn main() {}
-  └─
+  ┃ rust
+  ┃ fn main() {}
+
 
 
 
