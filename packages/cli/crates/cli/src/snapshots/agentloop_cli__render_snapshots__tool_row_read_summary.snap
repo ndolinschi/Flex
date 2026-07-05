@@ -2,7 +2,7 @@
 source: crates/cli/src/render_snapshots.rs
 expression: rendered
 ---
-⏺ Read(src/main.rs)
+◇ Read(src/main.rs)
   ⎿ Read 5 lines
 
 

@@ -2,7 +2,7 @@
 source: crates/cli/src/render_snapshots.rs
 expression: rendered
 ---
-⏺ Bash(cargo test)
+❯ Bash(cargo test)
   ⎿ exit 101
      error[E0308]: mismatched types
       --> src/main.rs:4:5

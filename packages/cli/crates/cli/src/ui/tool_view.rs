@@ -62,25 +62,30 @@ fn header_line(row: &ToolRow<'_>) -> Line<'static> {
     let call = row.call;
     let summary = tool_summary(&call.tool_name, &call.input);
 
+    // A per-tool icon (opencode style), colored by status so a glance still
+    // reads run/ok/error. Running keeps the animated spinner.
+    let icon = tool_glyph(&call.tool_name);
     let glyph = match &call.status {
         ToolCallStatus::Running => Span::styled(
             format!("{} ", theme::spinner_frame(row.spinner)),
             theme::warn(),
         ),
-        ToolCallStatus::Pending => Span::styled("⏺ ".to_owned(), theme::dim()),
-        ToolCallStatus::AwaitingPermission { .. } => Span::styled("⏺ ".to_owned(), theme::warn()),
+        ToolCallStatus::Pending => Span::styled(format!("{icon} "), theme::dim()),
+        ToolCallStatus::AwaitingPermission { .. } => {
+            Span::styled(format!("{icon} "), theme::warn())
+        }
         ToolCallStatus::Completed => {
             if bash_exit_code(call).is_some_and(|code| code != 0) {
-                Span::styled("⏺ ".to_owned(), theme::error())
+                Span::styled(format!("{icon} "), theme::error())
             } else {
-                Span::styled("⏺ ".to_owned(), theme::success())
+                Span::styled(format!("{icon} "), theme::success())
             }
         }
         ToolCallStatus::Failed { .. } | ToolCallStatus::Denied { .. } => {
-            Span::styled("⏺ ".to_owned(), theme::error())
+            Span::styled(format!("{icon} "), theme::error())
         }
-        ToolCallStatus::Cancelled => Span::styled("⏺ ".to_owned(), theme::dim()),
-        _ => Span::styled("⏺ ".to_owned(), theme::dim()),
+        ToolCallStatus::Cancelled => Span::styled(format!("{icon} "), theme::dim()),
+        _ => Span::styled(format!("{icon} "), theme::dim()),
     };
 
     let summary_style = if row.focused {
@@ -127,6 +132,19 @@ fn header_line(row: &ToolRow<'_>) -> Line<'static> {
     }
 
     Line::from(spans)
+}
+
+/// A per-tool header icon. Only reliably-narrow geometric glyphs are used so
+/// column alignment holds across terminals. Filled diamond = mutating, open
+/// diamond = read-only, chevron = shell, lozenge = subagent.
+fn tool_glyph(tool_name: &str) -> &'static str {
+    match tool_name {
+        "Write" | "Edit" => "◆",
+        "Bash" => "❯",
+        "Task" => "◈",
+        "Read" | "Grep" | "Glob" | "WebFetch" | "WebSearch" | "TaskList" => "◇",
+        _ => "⏺",
+    }
 }
 
 /// The `⎿`-guttered result area: error line first, then the body preview,

@@ -2,7 +2,7 @@
 source: crates/cli/src/render_snapshots.rs
 expression: rendered
 ---
-⏺ Edit(src/app.rs)
+◆ Edit(src/app.rs)
   ⎿   1   fn main() {
        2 -     let x = old();
        2 +     let x = new();
