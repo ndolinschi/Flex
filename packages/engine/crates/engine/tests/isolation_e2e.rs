@@ -41,7 +41,7 @@ async fn engine_provisions_a_real_worktree_and_merges_it_back() {
         ProviderRegistry::new(),
         None,
         EngineConfig {
-            cwd: base.path().to_path_buf(),
+            cwd: Some(base.path().to_path_buf()),
             workspace: Some(Arc::new(GitWorktrees::new(worktrees.path()))),
             isolation_default: IsolationPolicy::Required,
             ..EngineConfig::default()

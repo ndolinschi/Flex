@@ -17,7 +17,7 @@ use agentloop_mcp::{McpBridgeConfig, McpManager};
 
 #[derive(Clone)]
 pub struct EngineConfig {
-    pub cwd: PathBuf,
+    pub cwd: Option<PathBuf>,
     pub date: String,
     /// Role definitions for multi-agent orchestration (built-ins always present).
     pub roles: Vec<RoleSpec>,
@@ -55,7 +55,7 @@ pub struct EngineConfig {
 impl Default for EngineConfig {
     fn default() -> Self {
         Self {
-            cwd: PathBuf::from("."),
+            cwd: None,
             date: String::new(),
             roles: Vec::new(),
             mcp: McpBridgeConfig::default(),

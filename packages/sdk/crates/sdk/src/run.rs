@@ -16,7 +16,7 @@ pub(crate) async fn run(args: RunArgs) -> anyhow::Result<()> {
         args.agent.as_deref(),
         args.provider.as_deref(),
         args.model.clone(),
-        &args.workdir,
+        args.workdir.as_deref(),
     )
     .await?;
     for line in &resolution.trace {

@@ -20,12 +20,12 @@ use agentloop_engine::{EngineService, EngineServiceError};
 pub struct OneTurnRequest {
     pub prompt: String,
     pub title: Option<String>,
-    pub cwd: PathBuf,
+    pub cwd: Option<PathBuf>,
     pub permission_mode: PermissionMode,
 }
 
 impl OneTurnRequest {
-    pub fn new(prompt: impl Into<String>, cwd: PathBuf) -> Self {
+    pub fn new(prompt: impl Into<String>, cwd: Option<PathBuf>) -> Self {
         let prompt = prompt.into();
         Self {
             title: Some(prompt.chars().take(60).collect()),
@@ -79,7 +79,7 @@ where
     let session = service
         .create_session(NewSessionParams {
             title: request.title,
-            cwd: Some(request.cwd),
+            cwd: request.cwd,
             model: None,
             mode: None,
             permission_mode: None,

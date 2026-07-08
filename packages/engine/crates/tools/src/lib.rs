@@ -21,7 +21,7 @@ pub use exit_plan_mode::ExitPlanModeTool;
 pub use fs::{EditTool, FsState, ReadTool, WriteTool};
 pub use glob::GlobTool;
 pub use grep::GrepTool;
-pub use registry::{BaseTools, base_tools, registry_with_questions};
+pub use registry::{BaseTools, base_tools, base_tools_read_only, registry_with_questions};
 pub use skill::{SkillLoader, skill_tool};
 pub use task::subagent_tool;
 pub use task_list::TaskListTool;

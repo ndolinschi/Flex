@@ -12,7 +12,7 @@ pub(crate) struct RunArgs {
     pub(crate) provider: Option<String>,
     pub(crate) model: Option<String>,
     pub(crate) prompt: String,
-    pub(crate) workdir: PathBuf,
+    pub(crate) workdir: Option<PathBuf>,
     pub(crate) output_format: OutputFormat,
 }
 
@@ -67,10 +67,7 @@ pub(crate) fn parse_run_args(args: &[String]) -> anyhow::Result<RunArgs> {
         provider,
         model,
         prompt: prompt.context("missing prompt: pass -p \"...\" or --prompt \"...\"")?,
-        workdir: match workdir {
-            Some(path) => path,
-            None => std::env::current_dir().context("cannot determine current directory")?,
-        },
+        workdir,
         output_format,
     })
 }

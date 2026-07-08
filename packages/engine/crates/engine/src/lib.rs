@@ -123,7 +123,11 @@ impl EngineService {
             registry: mut tools,
             pending_questions,
             ..
-        } = agentloop_tools::base_tools();
+        } = if config.cwd.is_some() {
+            agentloop_tools::base_tools()
+        } else {
+            agentloop_tools::base_tools_read_only()
+        };
         for tool in plugins.tools() {
             tools.register(tool);
         }
@@ -134,22 +138,36 @@ impl EngineService {
         let role_registry = RoleRegistry::with_defaults(roles.clone())?;
         tools.register(agentloop_tools::subagent_tool(&role_registry.spawnable()));
 
+        let cwd_display = config
+            .cwd
+            .as_deref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "headless".to_string());
         let system_prompt = SystemPromptAssembler::new(SystemPromptConfig {
             appends: plugins.prompt_fragments(),
             ..SystemPromptConfig::default()
         })
         .assemble(&Vars {
-            cwd: config.cwd.display().to_string(),
+            cwd: cwd_display,
             date: config.date.clone(),
         })?;
+
+        let project_cmd_dir = config
+            .cwd
+            .as_ref()
+            .map(|cwd| cwd.join(".agent").join("commands"));
         let commands = CommandRegistry::discover(CommandDiscoveryConfig {
             user_dir: default_user_command_dir(),
-            project_dir: Some(config.cwd.join(".agent").join("commands")),
+            project_dir: project_cmd_dir,
         })?;
 
+        let project_skill_dir = config
+            .cwd
+            .as_ref()
+            .map(|cwd| cwd.join(".agent").join("skills"));
         let skills = Arc::new(SkillRegistry::discover(SkillDiscoveryConfig {
             user_dir: default_user_skill_dir(),
-            project_dir: Some(config.cwd.join(".agent").join("skills")),
+            project_dir: project_skill_dir,
         })?);
         if let Some(tool) = agentloop_tools::skill_tool(&skills.model_visible(), {
             let skills = skills.clone();

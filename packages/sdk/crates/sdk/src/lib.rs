@@ -59,7 +59,14 @@ impl AgentBuilder {
 
     /// Working directory the session (and its tools) are sandboxed to.
     pub fn cwd(mut self, cwd: impl Into<PathBuf>) -> Self {
-        self.config.cwd = cwd.into();
+        self.config.cwd = Some(cwd.into());
+        self
+    }
+
+    /// Run in headless/research mode with no project directory and read-only
+    /// tools. The agent can still use the search plugin if enabled.
+    pub fn headless(mut self) -> Self {
+        self.config.cwd = None;
         self
     }
 
@@ -93,9 +100,9 @@ impl AgentBuilder {
         self
     }
 
-    /// Add an already-constructed plugin.
-    pub fn plugin(mut self, plugin: Arc<dyn Plugin>) -> Self {
-        self.plugins.push(plugin);
+    /// Add a plugin (the builder wraps it in `Arc` internally).
+    pub fn plugin(mut self, plugin: impl Plugin + 'static) -> Self {
+        self.plugins.push(Arc::new(plugin));
         self
     }
 

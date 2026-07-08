@@ -33,7 +33,7 @@ pub(crate) async fn resolve_service(
     agent: Option<&str>,
     provider: Option<&str>,
     model: Option<String>,
-    workdir: &Path,
+    workdir: Option<&Path>,
 ) -> anyhow::Result<Resolution> {
     let mut trace = Vec::new();
 
@@ -95,9 +95,12 @@ pub(crate) async fn resolve_service(
 fn native_service(
     provider: Option<&str>,
     model: Option<String>,
-    workdir: &Path,
+    workdir: Option<&Path>,
 ) -> Result<EngineService, EngineServiceError> {
-    let mut builder = AgentBuilder::new().cwd(workdir.to_path_buf()).date(today());
+    let mut builder = AgentBuilder::new().date(today());
+    if let Some(workdir) = workdir {
+        builder = builder.cwd(workdir.to_path_buf());
+    }
     if let Some(provider) = provider {
         builder = builder.provider(provider);
     }
@@ -108,11 +111,11 @@ fn native_service(
 }
 
 async fn claude_code_service(
-    workdir: &Path,
+    workdir: Option<&Path>,
     trace: &mut Vec<String>,
 ) -> anyhow::Result<EngineService> {
     let config = ClaudeCodeConfig {
-        cwd: Some(workdir.to_path_buf()),
+        cwd: workdir.map(|p| p.to_path_buf()),
         ..ClaudeCodeConfig::default()
     };
     let store = Arc::new(MemoryStore::new());
@@ -137,9 +140,9 @@ async fn claude_code_service(
     }
 }
 
-async fn copilot_service(workdir: &Path, trace: &mut Vec<String>) -> anyhow::Result<EngineService> {
+async fn copilot_service(workdir: Option<&Path>, trace: &mut Vec<String>) -> anyhow::Result<EngineService> {
     let config = CopilotConfig {
-        cwd: Some(workdir.to_path_buf()),
+        cwd: workdir.map(|p| p.to_path_buf()),
         ..CopilotConfig::default()
     };
     let store = Arc::new(MemoryStore::new());
@@ -212,6 +215,7 @@ fn today() -> String {
 
 /// The `doctor` subcommand: explain what the resolver would do and why.
 pub(crate) async fn doctor(workdir: &Path) -> anyhow::Result<()> {
+    let workdir = Some(workdir);
     println!("environment:");
     for key in [
         "OPENAI_API_KEY",
