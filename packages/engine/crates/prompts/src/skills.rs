@@ -30,6 +30,10 @@ use std::path::{Path, PathBuf};
 /// Where a skill was discovered from, for display and override precedence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SkillSource {
+    /// Skills the agent distilled from its own completed work
+    /// (`~/.config/agentloop/skills/learned/*/SKILL.md`). Lowest precedence:
+    /// any human-authored skill of the same name overrides a learned one.
+    Learned,
     /// `~/.config/agentloop/skills/*/SKILL.md`.
     User,
     /// `<project>/.agent/skills/*/SKILL.md`.
@@ -58,6 +62,9 @@ struct Skill {
 /// Where skill directories are discovered from.
 #[derive(Debug, Clone, Default)]
 pub struct SkillDiscoveryConfig {
+    /// Agent-distilled skills; discovered first so human-authored skills of
+    /// the same name override them.
+    pub learned_dir: Option<PathBuf>,
     pub user_dir: Option<PathBuf>,
     pub project_dir: Option<PathBuf>,
 }
@@ -98,11 +105,15 @@ pub struct SkillRegistry {
 }
 
 impl SkillRegistry {
-    /// Discover from user then project directories; project skills override
-    /// user skills (and user overrides nothing, since there are no built-ins)
-    /// when names collide, so a project can pin its own version of a skill.
+    /// Discover from learned, then user, then project directories; when names
+    /// collide the later source wins (project > user > learned), so a human-
+    /// authored skill always overrides an agent-distilled one and a project
+    /// can pin its own version of any skill.
     pub fn discover(config: SkillDiscoveryConfig) -> Result<Self, SkillError> {
         let mut registry = Self::default();
+        if let Some(dir) = config.learned_dir {
+            registry.discover_dir(&dir, SkillSource::Learned)?;
+        }
         if let Some(dir) = config.user_dir {
             registry.discover_dir(&dir, SkillSource::User)?;
         }
@@ -283,6 +294,7 @@ mod tests {
         write_skill(dir.path(), "tdd", "", "Write a failing test first.");
 
         let registry = SkillRegistry::discover(SkillDiscoveryConfig {
+            learned_dir: None,
             user_dir: None,
             project_dir: Some(dir.path().to_path_buf()),
         })
@@ -310,6 +322,7 @@ mod tests {
         );
 
         let registry = SkillRegistry::discover(SkillDiscoveryConfig {
+            learned_dir: None,
             user_dir: None,
             project_dir: Some(dir.path().to_path_buf()),
         })
@@ -322,6 +335,24 @@ mod tests {
     }
 
     #[test]
+    fn user_skills_override_learned_skills_by_name() {
+        let learned_dir = tempdir().expect("tempdir");
+        let user_dir = tempdir().expect("tempdir");
+        write_skill(learned_dir.path(), "review", "", "learned version");
+        write_skill(user_dir.path(), "review", "", "user version");
+
+        let registry = SkillRegistry::discover(SkillDiscoveryConfig {
+            learned_dir: Some(learned_dir.path().to_path_buf()),
+            user_dir: Some(user_dir.path().to_path_buf()),
+            project_dir: None,
+        })
+        .expect("discover");
+
+        assert_eq!(registry.load_body("review").expect("body"), "user version");
+        assert_eq!(registry.infos()[0].source, SkillSource::User);
+    }
+
+    #[test]
     fn project_skills_override_user_skills_by_name() {
         let user_dir = tempdir().expect("tempdir");
         let project_dir = tempdir().expect("tempdir");
@@ -329,6 +360,7 @@ mod tests {
         write_skill(project_dir.path(), "review", "", "project version");
 
         let registry = SkillRegistry::discover(SkillDiscoveryConfig {
+            learned_dir: None,
             user_dir: Some(user_dir.path().to_path_buf()),
             project_dir: Some(project_dir.path().to_path_buf()),
         })
@@ -343,6 +375,7 @@ mod tests {
     #[test]
     fn missing_discovery_dirs_are_empty() {
         let registry = SkillRegistry::discover(SkillDiscoveryConfig {
+            learned_dir: None,
             user_dir: Some(PathBuf::from("/definitely/missing/skills")),
             project_dir: None,
         })
@@ -362,6 +395,7 @@ mod tests {
         .unwrap();
 
         let err = SkillRegistry::discover(SkillDiscoveryConfig {
+            learned_dir: None,
             user_dir: None,
             project_dir: Some(dir.path().to_path_buf()),
         })
@@ -381,6 +415,7 @@ mod tests {
         .unwrap();
 
         let registry = SkillRegistry::discover(SkillDiscoveryConfig {
+            learned_dir: None,
             user_dir: None,
             project_dir: Some(dir.path().to_path_buf()),
         })

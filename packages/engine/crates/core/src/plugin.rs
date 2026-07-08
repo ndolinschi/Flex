@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use agentloop_contracts::{IsolationPolicy, ModelRef};
 
+use crate::hook::Hook;
 use crate::tool::Tool;
 
 /// How a plugin-declared role derives its tool set — mirrors the loop's
@@ -80,6 +81,12 @@ pub trait Plugin: Send + Sync {
     fn roles(&self) -> Vec<PluginRole> {
         Vec::new()
     }
+
+    /// Hooks the plugin installs into the loop's lifecycle points, appended
+    /// after the engine's built-in hooks in registration order.
+    fn hooks(&self) -> Vec<Arc<dyn Hook>> {
+        Vec::new()
+    }
 }
 
 /// An ordered set of enabled plugins, consulted during engine composition.
@@ -127,6 +134,14 @@ impl PluginRegistry {
         self.plugins
             .iter()
             .filter_map(|plugin| plugin.system_prompt_fragment())
+            .collect()
+    }
+
+    /// All hooks contributed by every plugin, in registration order.
+    pub fn hooks(&self) -> Vec<Arc<dyn Hook>> {
+        self.plugins
+            .iter()
+            .flat_map(|plugin| plugin.hooks())
             .collect()
     }
 
