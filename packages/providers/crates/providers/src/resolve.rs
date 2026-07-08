@@ -140,6 +140,85 @@ pub(crate) fn build_deepseek(
     Ok((Arc::new(provider), model))
 }
 
+/// An OpenAI-compatible provider preset, gated on its API-key env var —
+/// exactly the DeepSeek pattern, table-driven. Preset ids are deliberately
+/// NOT in [`BUILTIN_PROVIDER_IDS`], so a user's custom spec of the same id
+/// resolves and wins over the env built-in.
+pub(crate) struct CompatPreset {
+    pub(crate) id: &'static str,
+    pub(crate) key_env: &'static str,
+    pub(crate) model_env: &'static str,
+    pub(crate) base_url: &'static str,
+    pub(crate) default_model: &'static str,
+}
+
+/// Built-in OpenAI-compatible presets. OpenRouter is the aggregator route to
+/// GLM/Kimi/MiniMax and hundreds of other models without a bespoke client.
+pub(crate) const COMPAT_PRESETS: [CompatPreset; 4] = [
+    CompatPreset {
+        id: "openrouter",
+        key_env: "OPENROUTER_API_KEY",
+        model_env: "OPENROUTER_MODEL",
+        base_url: "https://openrouter.ai/api/v1",
+        default_model: "openrouter/auto",
+    },
+    CompatPreset {
+        id: "groq",
+        key_env: "GROQ_API_KEY",
+        model_env: "GROQ_MODEL",
+        base_url: "https://api.groq.com/openai/v1",
+        default_model: "llama-3.3-70b-versatile",
+    },
+    CompatPreset {
+        id: "mistral",
+        key_env: "MISTRAL_API_KEY",
+        model_env: "MISTRAL_MODEL",
+        base_url: "https://api.mistral.ai/v1",
+        default_model: "mistral-large-latest",
+    },
+    CompatPreset {
+        id: "xai",
+        key_env: "XAI_API_KEY",
+        model_env: "XAI_MODEL",
+        base_url: "https://api.x.ai/v1",
+        default_model: "grok-4",
+    },
+];
+
+/// Pure builder for a compat preset (no env access, directly testable).
+pub(crate) fn build_compat(
+    preset: &CompatPreset,
+    api_key: String,
+    model: Option<String>,
+) -> Result<ProviderWithDefault, ProviderError> {
+    let model = model
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| preset.default_model.to_owned());
+    let config = OpenAiConfig::from_values(
+        api_key,
+        Some(preset.base_url.to_owned()),
+        Some(model.clone()),
+    )?;
+    let provider = OpenAiProvider::with_identity(preset.id, config, Vec::new(), false);
+    Ok((Arc::new(provider), model))
+}
+
+/// Build a preset from its env vars; `Ok(None)` when the key is unset.
+fn build_compat_from_env(
+    preset: &CompatPreset,
+) -> Result<Option<ProviderWithDefault>, ProviderError> {
+    let Some(api_key) = std::env::var(preset.key_env)
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(None);
+    };
+    let model = std::env::var(preset.model_env).ok();
+    build_compat(preset, api_key, model).map(Some)
+}
+
 /// Register a Bedrock provider built from a client-connected API key
 /// (`provider_keys["bedrock"]`), overriding any credential-less Bedrock the
 /// environment may have registered. Region/model still come from the
@@ -181,6 +260,7 @@ pub fn resolve_real_providers(
         None if env_is_set("ANTHROPIC_API_KEY") => ANTHROPIC_PROVIDER_ID,
         None if env_is_set("GEMINI_API_KEY") => GEMINI_PROVIDER_ID,
         None if env_is_set("DEEPSEEK_API_KEY") => DEEPSEEK_PROVIDER_ID,
+        None if env_is_set("OPENROUTER_API_KEY") => "openrouter",
         None if env_is_set("AWS_BEARER_TOKEN_BEDROCK") => BEDROCK_PROVIDER_ID,
         None if CopilotConfig::discoverable() => COPILOT_PROVIDER_ID,
         None if env_is_set("OLLAMA_HOST") || env_is_set("OLLAMA_MODEL") => OLLAMA_PROVIDER_ID,
@@ -303,6 +383,19 @@ pub fn resolve_real_providers(
                             hint: "set `DEEPSEEK_API_KEY` (optional `DEEPSEEK_MODEL`)".to_owned(),
                         })?
                     };
+                let model = model_arg.unwrap_or(default_model);
+                let mut providers = ProviderRegistry::new();
+                providers.register(provider);
+                Ok((providers, ModelRef(format!("{other}/{model}"))))
+            } else if let Some(preset) = COMPAT_PRESETS.iter().find(|preset| preset.id == other) {
+                let (provider, default_model) = if let Some(key) = provider_keys.get(preset.id) {
+                    build_compat(preset, key.clone(), None)?
+                } else {
+                    build_compat_from_env(preset)?.ok_or_else(|| ProviderError::AuthMissing {
+                        provider: ProviderId::from(preset.id),
+                        hint: format!("set `{}` (optional `{}`)", preset.key_env, preset.model_env),
+                    })?
+                };
                 let model = model_arg.unwrap_or(default_model);
                 let mut providers = ProviderRegistry::new();
                 providers.register(provider);
@@ -446,6 +539,20 @@ pub fn resolve_available_providers(
             build_deepseek_from_env().ok().flatten()
         };
         if let Some((provider, model)) = deepseek_opt {
+            register(&mut providers, provider, model);
+        }
+    }
+
+    for preset in &COMPAT_PRESETS {
+        if custom.iter().any(|spec| spec.id == preset.id) {
+            continue;
+        }
+        let built = if let Some(key) = provider_keys.get(preset.id) {
+            build_compat(preset, key.clone(), None).ok()
+        } else {
+            build_compat_from_env(preset).ok().flatten()
+        };
+        if let Some((provider, model)) = built {
             register(&mut providers, provider, model);
         }
     }
