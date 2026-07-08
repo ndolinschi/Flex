@@ -1,0 +1,42 @@
+[workspace]
+resolver = "3"
+members = ["crates/search"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/flex/flex"
+publish = false
+
+[workspace.dependencies]
+# Engine path deps
+agentloop-contracts = { path = "../engine/crates/contracts" }
+agentloop-core = { path = "../engine/crates/core" }
+agentloop-engine = { path = "../engine/crates/engine" }
+agentloop-tools = { path = "../engine/crates/tools" }
+# External
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1"
+thiserror = "2"
+async-trait = "0.1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "fs", "process"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tracing = "0.1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "charset", "gzip"] }
+htmd = "0.2"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+dbg_macro = "warn"
+todo = "warn"
+print_stdout = "warn"
+print_stderr = "warn"

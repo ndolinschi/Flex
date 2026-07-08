@@ -1,0 +1,20 @@
+# Rust
+target/
+*.profraw
+
+# Environment / secrets
+.env
+.env.*
+
+# OS noise
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
+
+# Insta pending snapshots
+*.snap.new
+*.pending-snap
+.cursor/
+.playwright-mcp/

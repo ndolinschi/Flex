@@ -1,0 +1,88 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/contracts",
+    "crates/core",
+    "crates/engine",
+    "crates/hooks",
+    "crates/loop",
+    "crates/mcp",
+    "crates/prompts",
+    "crates/session",
+    "crates/tools",
+    "crates/workspace",
+    "crates/transports/stdio",
+    "crates/testkit",
+    "xtask",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/flex/flex"
+publish = false
+
+[workspace.dependencies]
+# internal
+agentloop-contracts = { path = "crates/contracts" }
+agentloop-core = { path = "crates/core" }
+agentloop-engine = { path = "crates/engine" }
+agentloop-hooks = { path = "crates/hooks" }
+agentloop-loop = { path = "crates/loop" }
+agentloop-mcp = { path = "crates/mcp" }
+agentloop-prompts = { path = "crates/prompts" }
+agentloop-session = { path = "crates/session" }
+agentloop-tools = { path = "crates/tools" }
+agentloop-workspace = { path = "crates/workspace" }
+agentloop-transport-stdio = { path = "crates/transports/stdio" }
+agentloop-testkit = { path = "crates/testkit" }
+# external
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v7", "serde"] }
+anyhow = "1"
+async-trait = "0.1"
+futures = "0.3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "io-std", "fs", "process", "signal"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+metrics = "0.24"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "charset", "gzip"] }
+globset = "0.4"
+ignore = "0.4"
+regex = "1"
+htmd = "0.2"
+base64 = "0.22"
+sha2 = "0.10"
+getrandom = "0.2"
+# dev
+insta = { version = "1", features = ["json", "redactions"] }
+pretty_assertions = "1"
+tempfile = "3"
+temp_env = { package = "temp-env", version = "0.3" }
+wiremock = "0.6"
+rmcp = { version = "2.1.0", default-features = false, features = [
+    "client",
+    "transport-child-process",
+    "transport-streamable-http-client-reqwest",
+] }
+http = "1"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+dbg_macro = "warn"
+todo = "warn"
+print_stdout = "warn"
+print_stderr = "warn"

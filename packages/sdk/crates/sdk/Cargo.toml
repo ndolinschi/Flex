@@ -1,0 +1,38 @@
+[package]
+name = "agentloop-sdk"
+description = "Composable agent builder — providers + native engine + plugins, plus the headless runner binary"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "flex"
+path = "src/main.rs"
+# This is the only file that may mention the product brand name (per brand-gate exemption).
+
+[dependencies]
+agentloop-contracts = { workspace = true }
+agentloop-core = { workspace = true }
+agentloop-engine = { workspace = true }
+agentloop-session = { workspace = true }
+agentloop-transport-stdio = { workspace = true }
+agentloop-providers = { workspace = true }
+agentloop-search = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[features]
+search = ["agentloop-search"]
+
+[lints]
+workspace = true

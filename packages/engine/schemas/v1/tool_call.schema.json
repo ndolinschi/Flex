@@ -1,0 +1,428 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ToolCall",
+  "description": "The durable, inspectable record of one tool invocation.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/ToolCallId"
+    },
+    "input": true,
+    "message_id": {
+      "description": "The assistant message that requested this call.",
+      "$ref": "#/$defs/MessageId"
+    },
+    "origin": {
+      "$ref": "#/$defs/ToolCallOrigin"
+    },
+    "read_only": {
+      "description": "Read-only calls may execute concurrently; mutating calls run\nsequentially. Also feeds the permission policy.",
+      "type": "boolean"
+    },
+    "result": {
+      "description": "Present once `Completed` or `Failed`.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ToolOutput"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "session_id": {
+      "$ref": "#/$defs/SessionId"
+    },
+    "status": {
+      "$ref": "#/$defs/ToolCallStatus"
+    },
+    "timing": {
+      "$ref": "#/$defs/ToolCallTiming"
+    },
+    "tool_name": {
+      "type": "string"
+    },
+    "turn_id": {
+      "$ref": "#/$defs/TurnId"
+    }
+  },
+  "required": [
+    "id",
+    "session_id",
+    "turn_id",
+    "message_id",
+    "tool_name",
+    "input",
+    "read_only",
+    "origin",
+    "status",
+    "timing"
+  ],
+  "$defs": {
+    "BlobSource": {
+      "description": "Where binary data (images, files) comes from.\n\nTransports may send small payloads inline (`Base64`), reference remote\ncontent (`Url`), or point at local files (`Path`). The engine resolves\n`Path` sources (read + base64, size-capped) before content reaches a\nprovider, so provider clients only ever see `Base64` or `Url`.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string",
+              "const": "base64"
+            }
+          },
+          "required": [
+            "source",
+            "data"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "url"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "source",
+            "url"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string",
+              "const": "path"
+            }
+          },
+          "required": [
+            "source",
+            "path"
+          ]
+        }
+      ]
+    },
+    "MessageId": {
+      "description": "Identifies one message (user or assistant) within a session.",
+      "type": "string"
+    },
+    "PermissionRequestId": {
+      "description": "Identifies one permission request round-trip.",
+      "type": "string"
+    },
+    "SessionId": {
+      "description": "Identifies one session: an append-only event log owned by one agent.",
+      "type": "string"
+    },
+    "ToolCallId": {
+      "description": "Identifies one tool invocation across its whole lifecycle.",
+      "type": "string"
+    },
+    "ToolCallOrigin": {
+      "description": "Who initiated the call.",
+      "oneOf": [
+        {
+          "description": "Requested by the model through native tool use.",
+          "type": "object",
+          "properties": {
+            "origin": {
+              "type": "string",
+              "const": "model"
+            }
+          },
+          "required": [
+            "origin"
+          ]
+        },
+        {
+          "description": "Injected by a hook.",
+          "type": "object",
+          "properties": {
+            "origin": {
+              "type": "string",
+              "const": "hook"
+            }
+          },
+          "required": [
+            "origin"
+          ]
+        },
+        {
+          "description": "Issued on behalf of a subagent.",
+          "type": "object",
+          "properties": {
+            "origin": {
+              "type": "string",
+              "const": "subagent"
+            }
+          },
+          "required": [
+            "origin"
+          ]
+        },
+        {
+          "description": "Observed from an external (delegated) agent.",
+          "type": "object",
+          "properties": {
+            "agent_id": {
+              "type": "string"
+            },
+            "origin": {
+              "type": "string",
+              "const": "external"
+            }
+          },
+          "required": [
+            "origin",
+            "agent_id"
+          ]
+        }
+      ]
+    },
+    "ToolCallStatus": {
+      "description": "Lifecycle state of a tool call.\n\n```text\nPending ──► AwaitingPermission ──► Running ──► Completed\n   │                │                 │  └───► Failed\n   │                └───► Denied      └──────► Cancelled\n   └─────► Running | Denied | Cancelled\n```",
+      "oneOf": [
+        {
+          "description": "Parsed from model output, queued for execution.",
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "const": "pending"
+            }
+          },
+          "required": [
+            "state"
+          ]
+        },
+        {
+          "description": "Waiting on a user permission decision.",
+          "type": "object",
+          "properties": {
+            "request_id": {
+              "$ref": "#/$defs/PermissionRequestId"
+            },
+            "state": {
+              "type": "string",
+              "const": "awaiting_permission"
+            }
+          },
+          "required": [
+            "state",
+            "request_id"
+          ]
+        },
+        {
+          "description": "Executing.",
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "const": "running"
+            }
+          },
+          "required": [
+            "state"
+          ]
+        },
+        {
+          "description": "Finished. The result may still carry `is_error: true` (a *tool-level*\nerror fed back to the model, e.g. \"file not found\").",
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "const": "completed"
+            }
+          },
+          "required": [
+            "state"
+          ]
+        },
+        {
+          "description": "Engine-level failure: panic, timeout, I/O error in the tool runtime.",
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string",
+              "const": "failed"
+            }
+          },
+          "required": [
+            "state",
+            "error"
+          ]
+        },
+        {
+          "description": "Refused by the permission policy, a hook, or the user.",
+          "type": "object",
+          "properties": {
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "state": {
+              "type": "string",
+              "const": "denied"
+            }
+          },
+          "required": [
+            "state"
+          ]
+        },
+        {
+          "description": "The turn was interrupted while this call was pending or running.",
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "const": "cancelled"
+            }
+          },
+          "required": [
+            "state"
+          ]
+        }
+      ]
+    },
+    "ToolCallTiming": {
+      "description": "Wall-clock milestones of one call. All fields are unix epoch milliseconds.",
+      "type": "object",
+      "properties": {
+        "finished_at_ms": {
+          "description": "When a terminal state was reached.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "permission_wait_ms": {
+          "description": "Time spent waiting for a permission decision, if any.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "queued_at_ms": {
+          "description": "When the call was admitted (status `Pending`).",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "started_at_ms": {
+          "description": "When execution started (status `Running`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "queued_at_ms"
+      ]
+    },
+    "ToolOutput": {
+      "description": "What a tool returned.",
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolResultBlock"
+          }
+        },
+        "is_error": {
+          "description": "Tool-level error: fed back to the model as a failed result, never a\nloop failure.",
+          "type": "boolean",
+          "default": false
+        },
+        "structured": {
+          "description": "Machine-readable payload for consumers that don't want to parse text."
+        }
+      },
+      "required": [
+        "content"
+      ]
+    },
+    "ToolResultBlock": {
+      "description": "Content inside a tool result.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "markdown"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/BlobSource"
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "image"
+            }
+          },
+          "required": [
+            "type",
+            "media_type",
+            "data"
+          ]
+        },
+        {
+          "description": "Structured output for tools that return machine-readable data.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "json"
+            },
+            "value": true
+          },
+          "required": [
+            "type",
+            "value"
+          ]
+        }
+      ]
+    },
+    "TurnId": {
+      "description": "Identifies one turn: one user prompt and everything until the loop idles.",
+      "type": "string"
+    }
+  }
+}

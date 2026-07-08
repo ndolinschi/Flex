@@ -1,0 +1,221 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── engine ────────────────────────────────────────────────────────────────
+  engine-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/engine
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Docs build (rustdoc warnings are errors)
+        run: cargo doc --workspace --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+      - name: Schema drift gate
+        run: cargo xtask schema --check
+      - name: Brand-leak gate
+        working-directory: .
+        run: |
+          ! git grep -iIl 'flex' -- packages/engine/crates/ \
+              ':!packages/engine/crates/contracts/src/branding.rs'
+
+  engine-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: packages/engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/engine
+      - run: cargo test --workspace --all-features
+
+  engine-deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: packages/engine/Cargo.toml
+
+  # ── providers ───────────────────────────────────────────────────────────────
+  providers-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/providers
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            packages/providers
+            packages/engine
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Brand-leak gate (crate names and code stay brand-free)
+        working-directory: .
+        run: |
+          ! git grep -iIl 'flex' -- packages/providers/crates/
+
+  providers-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: packages/providers
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            packages/providers
+            packages/engine
+      - run: cargo test --workspace --all-features
+
+  providers-deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: packages/providers/Cargo.toml
+
+  # ── search ────────────────────────────────────────────────────────────────
+  search-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/search
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            packages/search
+            packages/engine
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Brand-leak gate (crate names and code stay brand-free)
+        working-directory: .
+        run: |
+          ! git grep -iIl 'flex' -- packages/search/crates/
+
+  search-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: packages/search
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            packages/search
+            packages/engine
+      - run: cargo test --workspace --all-features
+
+  search-deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: packages/search/Cargo.toml
+
+  # ── sdk ───────────────────────────────────────────────────────────────────
+  sdk-lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/sdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            packages/sdk
+            packages/providers
+            packages/search
+            packages/engine
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Brand-leak gate (only the flex bin crate carries the brand)
+        working-directory: .
+        run: |
+          ! git grep -iIl 'flex' -- packages/sdk/crates/ \
+              ':!packages/sdk/crates/sdk/Cargo.toml'
+
+  sdk-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: packages/sdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            packages/sdk
+            packages/providers
+            packages/search
+            packages/engine
+      - run: cargo test --workspace --all-features
+      - name: The shippable binary always links
+        run: cargo build -p agentloop-sdk --all-features
+
+  sdk-deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: packages/sdk/Cargo.toml

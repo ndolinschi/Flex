@@ -1,0 +1,47 @@
+---
+source: crates/contracts/tests/markdown_test.rs
+expression: rendered
+---
+## User
+
+Read hello.txt for me
+
+## Assistant
+
+```thinking
+The user wants the file contents. I should read it.
+```
+
+Reading the file.
+
+**Tool: Read** · completed in 45ms
+
+```json
+{
+  "file_path": "/tmp/demo/hello.txt"
+}
+```
+
+Result:
+
+````
+hello world
+````
+
+## Assistant
+
+The file contains: `hello world`.
+
+---
+
+> **Context compacted** (summarize_oldest) — earlier conversation summarized:
+>
+> Earlier: read hello.txt ('hello world').
+
+## User
+
+Now attach this screenshot and the spec.
+
+_[image: image/png]_
+
+_[file: spec.pdf (application/pdf)]_

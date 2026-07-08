@@ -1,0 +1,31 @@
+//! Metric name constants — the observability vocabulary.
+//!
+//! The persisted event stream is the ground truth (timings, usage, cost, and
+//! statuses all live in events); metrics are a derived view recorded at the
+//! single choke point where events are appended and broadcast. Keeping the
+//! names here means native and delegated agents can't drift apart.
+//!
+//! The `metrics` facade itself is not a dependency of this crate — recording
+//! happens in the core crate.
+
+pub const METRIC_TURNS_TOTAL: &str = "engine_turns_total";
+pub const METRIC_TURN_DURATION_MS: &str = "engine_turn_duration_ms";
+pub const METRIC_LLM_REQUESTS_TOTAL: &str = "engine_llm_requests_total";
+pub const METRIC_LLM_LATENCY_MS: &str = "engine_llm_latency_ms";
+pub const METRIC_TOKENS_TOTAL: &str = "engine_tokens_total";
+pub const METRIC_COST_USD_MICROS_TOTAL: &str = "engine_cost_usd_micros_total";
+pub const METRIC_TOOL_CALLS_TOTAL: &str = "engine_tool_calls_total";
+pub const METRIC_TOOL_DURATION_MS: &str = "engine_tool_duration_ms";
+pub const METRIC_PERMISSION_WAIT_MS: &str = "engine_permission_wait_ms";
+pub const METRIC_ERRORS_TOTAL: &str = "engine_errors_total";
+pub const METRIC_COMPACTIONS_TOTAL: &str = "engine_compactions_total";
+
+/// Common metric label keys.
+pub const LABEL_AGENT: &str = "agent";
+pub const LABEL_PROVIDER: &str = "provider";
+pub const LABEL_MODEL: &str = "model";
+pub const LABEL_TOOL: &str = "tool";
+pub const LABEL_STATUS: &str = "status";
+pub const LABEL_STOP_REASON: &str = "stop_reason";
+pub const LABEL_DIRECTION: &str = "direction";
+pub const LABEL_KIND: &str = "kind";

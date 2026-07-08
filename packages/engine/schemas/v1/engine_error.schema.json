@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EngineError",
+  "description": "A normalized failure. The `message` must be actionable: what failed, why,\nand what to do about it.",
+  "type": "object",
+  "properties": {
+    "code": {
+      "$ref": "#/$defs/ErrorCode"
+    },
+    "detail": {
+      "description": "Source-specific payload for debugging; never required to handle."
+    },
+    "message": {
+      "type": "string"
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance"
+    },
+    "retry_after_ms": {
+      "description": "Suggested wait before retrying (from rate-limit headers etc.).",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
+    },
+    "retryable": {
+      "description": "Whether retrying the same request may succeed.",
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "code",
+    "message",
+    "provenance"
+  ],
+  "$defs": {
+    "ErrorCode": {
+      "description": "Machine-readable failure category.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "rate_limited",
+            "model_unavailable",
+            "permission_denied",
+            "cancelled",
+            "timeout",
+            "invalid_request",
+            "context_overflow",
+            "unknown"
+          ]
+        },
+        {
+          "description": "No credentials configured for the selected provider/agent.",
+          "type": "string",
+          "const": "auth_missing"
+        },
+        {
+          "description": "Credentials present but rejected.",
+          "type": "string",
+          "const": "auth_expired"
+        },
+        {
+          "description": "A delegated agent's process died unexpectedly.",
+          "type": "string",
+          "const": "process_crashed"
+        },
+        {
+          "description": "The remote side violated its own wire protocol.",
+          "type": "string",
+          "const": "protocol_violation"
+        },
+        {
+          "description": "Required external CLI is not installed.",
+          "type": "string",
+          "const": "not_installed"
+        }
+      ]
+    },
+    "Provenance": {
+      "description": "Where a failure originated.",
+      "oneOf": [
+        {
+          "description": "A native provider client.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "const": "native"
+            },
+            "provider": {
+              "$ref": "#/$defs/ProviderId"
+            }
+          },
+          "required": [
+            "from",
+            "provider"
+          ]
+        },
+        {
+          "description": "A delegated external agent.",
+          "type": "object",
+          "properties": {
+            "agent_id": {
+              "type": "string"
+            },
+            "exit_code": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32"
+            },
+            "from": {
+              "type": "string",
+              "const": "delegator"
+            },
+            "stderr_tail": {
+              "description": "Last lines of the process's stderr, for diagnosis.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "from",
+            "agent_id"
+          ]
+        },
+        {
+          "description": "The engine itself.",
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "const": "engine"
+            }
+          },
+          "required": [
+            "from"
+          ]
+        }
+      ]
+    },
+    "ProviderId": {
+      "description": "Identifies an LLM provider implementation (`\"anthropic\"`, `\"openai\"`, ...).\n\nNot a UUID — a stable, human-chosen key used in configuration, in\n[`crate::content::ContentBlock::Opaque`] round-tripping, and in\nprovider-namespaced request passthrough.",
+      "type": "string"
+    }
+  }
+}

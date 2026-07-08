@@ -1,0 +1,73 @@
+//! Composition inputs for the native engine service.
+//!
+//! These are the engine-scoped knobs only. Provider selection and construction
+//! live outside the engine (in the `providers` facade), which resolves a
+//! [`ProviderRegistry`] and default model and hands them to
+//! [`EngineService::native`](crate::EngineService::native) together with an
+//! [`EngineConfig`].
+
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use agentloop_contracts::IsolationPolicy;
+use agentloop_core::{Plugin, SessionStore, Workspaces};
+use agentloop_hooks::{DiagnosticsConfig, FormatterSpec};
+use agentloop_loop::roles::RoleSpec;
+use agentloop_mcp::{McpBridgeConfig, McpManager};
+
+#[derive(Clone)]
+pub struct EngineConfig {
+    pub cwd: PathBuf,
+    pub date: String,
+    /// Role definitions for multi-agent orchestration (built-ins always present).
+    pub roles: Vec<RoleSpec>,
+    /// MCP servers bridged into the native tool registry.
+    pub mcp: McpBridgeConfig,
+    /// Pre-built MCP manager; when set, the engine reuses it instead of creating a new one.
+    pub mcp_manager: Option<std::sync::Arc<McpManager>>,
+    /// Reuse an existing session store across native service rebuilds.
+    pub session_store: Option<Arc<dyn SessionStore>>,
+    /// Model-call iterations per turn; `None` keeps the engine default
+    /// (currently 500 — a backstop against a runaway loop, not a budget for
+    /// normal work).
+    pub max_iterations: Option<u32>,
+    /// Isolation backend. When set, root sessions can run in an isolated
+    /// workspace; when `None`, isolation requests degrade or fail per policy.
+    pub workspace: Option<Arc<dyn Workspaces>>,
+    /// Run-level default isolation applied to a root session that doesn't
+    /// request its own (and whose role doesn't force one). `Never` = off.
+    pub isolation_default: IsolationPolicy,
+    /// Command run inside an isolated workspace before integrating it back
+    /// (e.g. `"cargo test"`). `None` skips verification.
+    pub verify_command: Option<String>,
+    /// Formatters run after `Write`/`Edit` (format-on-edit). Empty = off.
+    /// Each spec is availability-gated on its command resolving on `$PATH`.
+    pub formatters: Vec<FormatterSpec>,
+    /// Diagnostics feedback run after `Write`/`Edit`. Disabled by default;
+    /// availability-gated on the check command resolving on `$PATH`.
+    pub diagnostics: DiagnosticsConfig,
+    /// Enabled plugins, each contributing tools, prompt fragments, and roles at
+    /// composition time. Empty = the base tool set only (byte-identical to the
+    /// pre-plugin engine).
+    pub plugins: Vec<Arc<dyn Plugin>>,
+}
+
+impl Default for EngineConfig {
+    fn default() -> Self {
+        Self {
+            cwd: PathBuf::from("."),
+            date: String::new(),
+            roles: Vec::new(),
+            mcp: McpBridgeConfig::default(),
+            mcp_manager: None,
+            session_store: None,
+            max_iterations: None,
+            workspace: None,
+            isolation_default: IsolationPolicy::Never,
+            verify_command: None,
+            formatters: Vec::new(),
+            diagnostics: DiagnosticsConfig::default(),
+            plugins: Vec::new(),
+        }
+    }
+}
