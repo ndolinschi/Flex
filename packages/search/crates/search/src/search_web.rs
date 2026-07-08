@@ -35,11 +35,9 @@ struct SearchWebInput {
     /// How many results to return (1–20, default 15). Fewer results are
     /// faster but less comprehensive; more results give broader coverage.
     max_results: Option<usize>,
-    /// Search depth: `"broad"` for overview queries that cast a wide net,
-    /// `"specific"` for targeted searches on a narrow topic. Affects query
-    /// interpretation; the model should use `"broad"` when exploring a
-    /// new domain and `"specific"` when drilling into known topics.
-    #[allow(dead_code)]
+    /// Search depth: `"broad"` for overview queries (appends "overview" to
+    /// the query), `"specific"` or absent for targeted searches. The model
+    /// should use `"broad"` when exploring a new domain.
     depth: Option<String>,
 }
 
@@ -97,12 +95,18 @@ impl Tool for SearchWebTool {
             ))
         })?;
 
-        let query = parsed.query.trim();
-        if query.is_empty() {
+        let raw_query = parsed.query.trim();
+        if raw_query.is_empty() {
             return Err(ToolError::InvalidInput(
                 "`query` must be a non-empty search string for `search_web`.".to_owned(),
             ));
         }
+
+        let query = if parsed.depth.as_deref() == Some("broad") {
+            format!("{raw_query} overview")
+        } else {
+            raw_query.to_owned()
+        };
 
         let max_results = parsed
             .max_results
@@ -111,7 +115,7 @@ impl Tool for SearchWebTool {
 
         let results = tokio::select! {
             _ = ctx.cancel.cancelled() => return Err(ToolError::Cancelled),
-            result = self.backend.search(query) => match result {
+            result = self.backend.search(&query) => match result {
                 Ok(r) => r,
                 Err(SearchError::RateLimited) => {
                     return Err(ToolError::Execution(
@@ -149,14 +153,14 @@ impl Tool for SearchWebTool {
 
         // Apply re-ranker if configured.
         let reranked = if let Some(ref reranker) = self.reranker {
-            reranker.rerank(query, &results)
+            reranker.rerank(&query, &results)
         } else {
             results
         };
 
         let truncated: Vec<_> = reranked.into_iter().take(max_results).collect();
         let result_count = truncated.len();
-        let rendered = format_search_results(query, &truncated);
+        let rendered = format_search_results(&query, &truncated);
 
         let (rendered, output_truncated) = truncate_chars(&rendered, MAX_OUTPUT_CHARS);
 

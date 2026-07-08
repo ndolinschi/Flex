@@ -2,7 +2,7 @@
 //!
 //! ## Quick start
 //!
-//! ```ignore
+//! ```no_run
 //! use agentloop_search::SearchPlugin;
 //!
 //! let plugin = SearchPlugin::default();
@@ -10,7 +10,7 @@
 //!
 //! Swap the search backend:
 //!
-//! ```ignore
+//! ```no_run
 //! use std::sync::Arc;
 //! use agentloop_search::{SearchPlugin, DuckDuckGoBackend};
 //!
