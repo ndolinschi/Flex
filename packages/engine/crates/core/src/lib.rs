@@ -10,6 +10,7 @@
 
 pub mod agent;
 pub mod event_sink;
+pub mod executor;
 pub mod hook;
 pub mod observe;
 pub mod pending;
@@ -22,6 +23,7 @@ pub mod workspace;
 
 pub use agent::{Agent, AgentError, EventStream};
 pub use event_sink::EventSink;
+pub use executor::{ExecError, ExecOutcome, ExecSpec, Executor, ExecutorHealth, NetworkPolicy};
 pub use hook::{Hook, HookContext, HookData, HookError, HookOutcome};
 pub use pending::PendingMap;
 pub use plugin::{Plugin, PluginRegistry, PluginRole, PluginRoleTools};

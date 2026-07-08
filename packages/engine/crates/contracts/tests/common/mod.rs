@@ -21,6 +21,7 @@ pub fn sample_meta() -> SessionMeta {
         mode: None,
         isolation: None,
         workspace_id: None,
+        executor: None,
         base_cwd: None,
         created_at_ms: 1_000,
         updated_at_ms: 1_000,

@@ -41,11 +41,18 @@ name = "agentloop-delegator-acp"
 version = "0.1.0"
 dependencies = [
  "agentloop-contracts",
+ "agentloop-core",
  "agentloop-delegator-common",
+ "agentloop-session",
+ "async-trait",
+ "futures",
  "schemars",
  "serde",
  "serde_json",
  "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
 ]
 
 [[package]]
@@ -100,10 +107,16 @@ name = "agentloop-delegator-cursor"
 version = "0.1.0"
 dependencies = [
  "agentloop-contracts",
+ "agentloop-core",
  "agentloop-delegator-common",
+ "agentloop-session",
+ "async-trait",
  "schemars",
  "serde",
+ "serde_json",
  "thiserror",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -111,11 +124,16 @@ name = "agentloop-delegator-opencode"
 version = "0.1.0"
 dependencies = [
  "agentloop-contracts",
+ "agentloop-core",
  "agentloop-delegator-common",
+ "agentloop-session",
+ "async-trait",
  "schemars",
  "serde",
  "serde_json",
  "thiserror",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -124,6 +142,7 @@ version = "0.1.0"
 dependencies = [
  "agentloop-contracts",
  "agentloop-core",
+ "agentloop-executors",
  "agentloop-hooks",
  "agentloop-loop",
  "agentloop-mcp",
@@ -131,6 +150,18 @@ dependencies = [
  "agentloop-session",
  "agentloop-tools",
  "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "agentloop-executors"
+version = "0.1.0"
+dependencies = [
+ "agentloop-core",
+ "async-trait",
+ "thiserror",
+ "tokio",
+ "tokio-util",
  "tracing",
 ]
 
@@ -192,6 +223,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]

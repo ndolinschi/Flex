@@ -24,6 +24,8 @@ use agentloop_providers::{ProviderOptions, native, native_all};
 pub use agentloop_engine::{
     EngineConfig, EngineResult, EngineService, EngineServiceError, OutputVerbosity,
 };
+#[cfg(feature = "learning")]
+pub use agentloop_learning::{self as learning, LearningPlugin};
 pub use agentloop_providers::{self as providers, CustomProviderSpec};
 #[cfg(feature = "search")]
 pub use agentloop_search::{self as search, SearchPlugin};
@@ -97,13 +99,19 @@ impl AgentBuilder {
         self
     }
 
-    /// Enable a built-in plugin by id. Currently recognizes `"search"` (when
-    /// the `search` feature is enabled); unknown ids are ignored. Use
-    /// [`AgentBuilder::plugin`] for custom plugins.
+    /// Enable a built-in plugin by id. Currently recognizes `"search"` and
+    /// `"learning"` (when the matching feature is enabled); unknown ids are
+    /// ignored. Use [`AgentBuilder::plugin`] for custom plugins.
     pub fn enable_plugin(mut self, id: &str) -> Self {
         #[cfg(feature = "search")]
         if id == "search" {
             self.plugins.push(Arc::new(SearchPlugin::default()));
+        }
+        #[cfg(feature = "learning")]
+        if id == "learning" {
+            if let Some(plugin) = LearningPlugin::with_default_dir() {
+                self.plugins.push(Arc::new(plugin));
+            }
         }
         self
     }
@@ -111,6 +119,27 @@ impl AgentBuilder {
     /// Add a plugin (the builder wraps it in `Arc` internally).
     pub fn plugin(mut self, plugin: impl Plugin + 'static) -> Self {
         self.plugins.push(Arc::new(plugin));
+        self
+    }
+
+    /// Set the command-execution backend shell tools run through (e.g. an
+    /// `agentloop_executors::DockerExecutor`). Default: local host execution.
+    pub fn executor(mut self, executor: Arc<dyn agentloop_core::Executor>) -> Self {
+        self.config.executor = Some(executor);
+        self
+    }
+
+    /// Scan tool results with prompt-injection heuristics, fencing flagged
+    /// content in an explicit warning before the model reads it.
+    pub fn injection_scan(mut self, on: bool) -> Self {
+        self.config.injection_scan = on;
+        self
+    }
+
+    /// Network posture for shell commands (`Denied` requires a backend with
+    /// network isolation, e.g. docker).
+    pub fn network(mut self, network: agentloop_core::NetworkPolicy) -> Self {
+        self.config.network = network;
         self
     }
 

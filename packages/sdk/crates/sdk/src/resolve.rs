@@ -13,11 +13,18 @@ use anyhow::bail;
 use tokio_util::sync::CancellationToken;
 
 use agentloop_engine::{EngineService, EngineServiceError};
+use agentloop_providers::delegator_acp::{AcpLaunchConfig, acp_agent};
 use agentloop_providers::delegator_claude_code::{
     ClaudeCodeConfig, DelegatorProbeStatus, claude_code_agent, ephemeral_claude_code_agent,
 };
 use agentloop_providers::delegator_copilot::{
     CopilotConfig, copilot_agent, ephemeral_copilot_agent,
+};
+use agentloop_providers::delegator_cursor::{
+    CursorCliConfig, cursor_agent, ephemeral_cursor_agent,
+};
+use agentloop_providers::delegator_opencode::{
+    OpencodeConfig, ephemeral_opencode_agent, opencode_agent,
 };
 use agentloop_session::MemoryStore;
 
@@ -31,6 +38,7 @@ pub(crate) struct Resolution {
 
 pub(crate) async fn resolve_service(
     agent: Option<&str>,
+    agent_cmd: Option<&str>,
     provider: Option<&str>,
     model: Option<String>,
     workdir: Option<&Path>,
@@ -38,6 +46,17 @@ pub(crate) async fn resolve_service(
     let mut trace = Vec::new();
 
     match agent {
+        Some("acp") => {
+            trace.push("explicit --agent acp".to_owned());
+            let Some(program) = agent_cmd else {
+                bail!(
+                    "--agent acp needs --agent-cmd <program>: the ACP delegator has no \
+                     default binary to launch"
+                );
+            };
+            let service = acp_service(program, workdir, &mut trace).await?;
+            return Ok(Resolution { service, trace });
+        }
         Some("claude-code") => {
             trace.push("explicit --agent claude-code".to_owned());
             let service = claude_code_service(workdir, &mut trace).await?;
@@ -46,6 +65,16 @@ pub(crate) async fn resolve_service(
         Some("copilot") => {
             trace.push("explicit --agent copilot".to_owned());
             let service = copilot_service(workdir, &mut trace).await?;
+            return Ok(Resolution { service, trace });
+        }
+        Some("opencode") => {
+            trace.push("explicit --agent opencode".to_owned());
+            let service = opencode_service(workdir, &mut trace).await?;
+            return Ok(Resolution { service, trace });
+        }
+        Some("cursor") => {
+            trace.push("explicit --agent cursor".to_owned());
+            let service = cursor_service(workdir, &mut trace).await?;
             return Ok(Resolution { service, trace });
         }
         Some("native") | None if provider.is_some() => {
@@ -63,7 +92,10 @@ pub(crate) async fn resolve_service(
             trace.push("selected native loop (provider from environment)".to_owned());
             return Ok(Resolution { service, trace });
         }
-        Some(other) => bail!("unknown agent `{other}`; available: native, claude-code, copilot"),
+        Some(other) => bail!(
+            "unknown agent `{other}`; available: native, claude-code, copilot, opencode, \
+             cursor, acp"
+        ),
         None => {}
     }
 
@@ -78,7 +110,13 @@ pub(crate) async fn resolve_service(
             if let Ok(service) = claude_code_service(workdir, &mut trace).await {
                 return Ok(Resolution { service, trace });
             }
-            match copilot_service(workdir, &mut trace).await {
+            if let Ok(service) = copilot_service(workdir, &mut trace).await {
+                return Ok(Resolution { service, trace });
+            }
+            if let Ok(service) = opencode_service(workdir, &mut trace).await {
+                return Ok(Resolution { service, trace });
+            }
+            match cursor_service(workdir, &mut trace).await {
                 Ok(service) => Ok(Resolution { service, trace }),
                 Err(delegator_err) => bail!(
                     "no way to run: {err}\n\
@@ -166,6 +204,83 @@ async fn copilot_service(
         Err(err) => {
             trace.push(format!("probed `copilot`: failed ({err})"));
             bail!("failed to probe copilot: {err}")
+        }
+    }
+}
+
+async fn acp_service(
+    program: &str,
+    workdir: Option<&Path>,
+    trace: &mut Vec<String>,
+) -> anyhow::Result<EngineService> {
+    let config = AcpLaunchConfig {
+        program: program.to_owned(),
+        args: Vec::new(),
+        env: Default::default(),
+        cwd: workdir.map(|p| p.to_path_buf()),
+    };
+    let store = Arc::new(MemoryStore::new());
+    let agent = Arc::new(acp_agent(config, store.clone()));
+    trace.push(format!("launching ACP agent `{program}` (explicit only)"));
+    Ok(EngineService::new(agent, store))
+}
+
+async fn opencode_service(
+    workdir: Option<&Path>,
+    trace: &mut Vec<String>,
+) -> anyhow::Result<EngineService> {
+    let config = OpencodeConfig {
+        cwd: workdir.map(|p| p.to_path_buf()),
+        ..OpencodeConfig::default()
+    };
+    let store = Arc::new(MemoryStore::new());
+    let agent = Arc::new(opencode_agent(config, store.clone()));
+    match agent.probe(CancellationToken::new()).await {
+        Ok(DelegatorProbeStatus::Installed { version }) => {
+            trace.push(format!(
+                "probed `opencode`: installed ({})",
+                version.as_deref().unwrap_or("version unknown")
+            ));
+            trace.push("selected delegator opencode".to_owned());
+            Ok(EngineService::new(agent, store))
+        }
+        Ok(DelegatorProbeStatus::NotInstalled { hint }) => {
+            trace.push("probed `opencode`: not installed".to_owned());
+            bail!("opencode is not available: {hint}")
+        }
+        Err(err) => {
+            trace.push(format!("probed `opencode`: failed ({err})"));
+            bail!("failed to probe opencode: {err}")
+        }
+    }
+}
+
+async fn cursor_service(
+    workdir: Option<&Path>,
+    trace: &mut Vec<String>,
+) -> anyhow::Result<EngineService> {
+    let config = CursorCliConfig {
+        cwd: workdir.map(|p| p.to_path_buf()),
+        ..CursorCliConfig::default()
+    };
+    let store = Arc::new(MemoryStore::new());
+    let agent = Arc::new(cursor_agent(config, store.clone()));
+    match agent.probe(CancellationToken::new()).await {
+        Ok(DelegatorProbeStatus::Installed { version }) => {
+            trace.push(format!(
+                "probed `cursor-agent`: installed ({})",
+                version.as_deref().unwrap_or("version unknown")
+            ));
+            trace.push("selected delegator cursor".to_owned());
+            Ok(EngineService::new(agent, store))
+        }
+        Ok(DelegatorProbeStatus::NotInstalled { hint }) => {
+            trace.push("probed `cursor-agent`: not installed".to_owned());
+            bail!("cursor is not available: {hint}")
+        }
+        Err(err) => {
+            trace.push(format!("probed `cursor-agent`: failed ({err})"));
+            bail!("failed to probe cursor: {err}")
         }
     }
 }
@@ -268,9 +383,62 @@ pub(crate) async fn doctor(workdir: &Path) -> anyhow::Result<()> {
         }
         Err(err) => println!("  copilot: probe failed ({err})"),
     }
+    let opencode = ephemeral_opencode_agent(OpencodeConfig::default());
+    match opencode.probe(CancellationToken::new()).await {
+        Ok(DelegatorProbeStatus::Installed { version }) => {
+            println!(
+                "  opencode: installed ({})",
+                version.as_deref().unwrap_or("version unknown")
+            );
+        }
+        Ok(DelegatorProbeStatus::NotInstalled { hint }) => {
+            println!("  opencode: not installed ({hint})");
+        }
+        Err(err) => println!("  opencode: probe failed ({err})"),
+    }
+    let cursor = ephemeral_cursor_agent(CursorCliConfig::default());
+    match cursor.probe(CancellationToken::new()).await {
+        Ok(DelegatorProbeStatus::Installed { version }) => {
+            println!(
+                "  cursor: installed ({})",
+                version.as_deref().unwrap_or("version unknown")
+            );
+        }
+        Ok(DelegatorProbeStatus::NotInstalled { hint }) => {
+            println!("  cursor: not installed ({hint})");
+        }
+        Err(err) => println!("  cursor: probe failed ({err})"),
+    }
+
+    println!("execution backends:");
+    {
+        use agentloop_core::Executor as _;
+        let local = agentloop_executors::LocalExecutor;
+        let health = local.probe().await;
+        println!("  local: available ({})", health.detail);
+        let docker = agentloop_executors::DockerExecutor::new("(configured image)");
+        let health = docker.probe().await;
+        let state = if health.available {
+            "available"
+        } else {
+            "unavailable"
+        };
+        println!("  docker: {state} ({})", health.detail);
+        let image = agentloop_executors::ContainerImageExecutor::new("(configured image)");
+        let health = image.probe().await;
+        let state = if health.available {
+            "available"
+        } else {
+            "unavailable"
+        };
+        println!("  container-image: {state} ({})", health.detail);
+        let remote = agentloop_executors::RemoteFnExecutor;
+        let health = remote.probe().await;
+        println!("  remote-fn: unavailable ({})", health.detail);
+    }
 
     println!("resolution:");
-    match resolve_service(None, None, None, workdir).await {
+    match resolve_service(None, None, None, None, workdir).await {
         Ok(resolution) => {
             for line in &resolution.trace {
                 println!("  - {line}");

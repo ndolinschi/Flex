@@ -1,15 +1,17 @@
-//! `Bash`: run a shell command in the session cwd.
+//! `Bash`: run a shell command in the session cwd through the composed
+//! execution backend.
 
-use std::process::Stdio;
-use std::time::Duration;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
-use tokio::process::Command;
 
 use agentloop_contracts::ToolOutput;
-use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
+use agentloop_core::{
+    ExecError, ExecSpec, Executor, NetworkPolicy, PermissionHint, Tool, ToolCategory, ToolContext,
+    ToolDescriptor, ToolError,
+};
 
 use crate::fs::{schema_of, truncate_chars};
 
@@ -26,9 +28,28 @@ struct BashInput {
     timeout_ms: Option<u64>,
 }
 
-/// Execute a shell command through `/bin/sh -lc`.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct BashTool;
+/// Execute a shell command with `sh -lc` semantics through the injected
+/// [`Executor`] backend (local process by default; container/remote backends
+/// at composition time).
+pub struct BashTool {
+    executor: Arc<dyn Executor>,
+    network: NetworkPolicy,
+}
+
+impl BashTool {
+    pub fn new(executor: Arc<dyn Executor>) -> Self {
+        Self {
+            executor,
+            network: NetworkPolicy::Allowed,
+        }
+    }
+
+    /// Set the network posture every command runs under.
+    pub fn with_network(mut self, network: NetworkPolicy) -> Self {
+        self.network = network;
+        self
+    }
+}
 
 #[async_trait]
 impl Tool for BashTool {
@@ -69,50 +90,33 @@ impl Tool for BashTool {
             .unwrap_or(DEFAULT_TIMEOUT_MS)
             .min(MAX_TIMEOUT_MS);
 
-        let child = Command::new("/bin/sh")
-            .arg("-lc")
-            .arg(&input.command)
-            .current_dir(&ctx.cwd)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true)
-            .spawn()
-            .map_err(|err| {
-                ToolError::Execution(format!(
-                    "Cannot start Bash command in `{}`: {err}.",
+        let spec = ExecSpec {
+            command: input.command,
+            cwd: ctx.cwd.clone(),
+            env: Vec::new(),
+            timeout_ms,
+            network: self.network,
+        };
+        let outcome = match self.executor.exec(spec, ctx.cancel.clone()).await {
+            Ok(outcome) => outcome,
+            Err(ExecError::Cancelled) => return Err(ToolError::Cancelled),
+            Err(ExecError::Timeout(ms)) => return Err(ToolError::Timeout(ms)),
+            Err(err) => {
+                return Err(ToolError::Execution(format!(
+                    "Bash command failed in `{}`: {err}.",
                     ctx.cwd.display()
-                ))
-            })?;
-
-        let mut wait_task = tokio::spawn(async move { child.wait_with_output().await });
-        let output = tokio::select! {
-            _ = ctx.cancel.cancelled() => {
-                wait_task.abort();
-                return Err(ToolError::Cancelled);
-            }
-            result = tokio::time::timeout(Duration::from_millis(timeout_ms), &mut wait_task) => {
-                match result {
-                    Ok(output) => output.map_err(|err| {
-                        ToolError::Execution(format!("Bash worker failed before producing output: {err}."))
-                    })?.map_err(|err| {
-                        ToolError::Execution(format!("Bash command failed while collecting output: {err}."))
-                    })?,
-                    Err(_) => {
-                        wait_task.abort();
-                        return Err(ToolError::Timeout(timeout_ms));
-                    }
-                }
+                )));
             }
         };
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let exit_code = output.status.code();
+        let stdout = String::from_utf8_lossy(&outcome.stdout);
+        let stderr = String::from_utf8_lossy(&outcome.stderr);
+        let success = outcome.exit_code == Some(0);
         let mut rendered = String::new();
         rendered.push_str("exit_code: ");
         rendered.push_str(
-            &exit_code
+            &outcome
+                .exit_code
                 .map(|code| code.to_string())
                 .unwrap_or_else(|| "terminated_by_signal".to_owned()),
         );
@@ -124,10 +128,10 @@ impl Tool for BashTool {
 
         Ok(ToolOutput {
             content: vec![agentloop_contracts::ToolResultBlock::markdown(rendered)],
-            is_error: !output.status.success(),
+            is_error: !success,
             structured: Some(serde_json::json!({
-                "exit_code": exit_code,
-                "success": output.status.success(),
+                "exit_code": outcome.exit_code,
+                "success": success,
                 "truncated": truncated,
             })),
         })

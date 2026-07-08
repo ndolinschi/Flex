@@ -45,6 +45,7 @@ version = "0.1.0"
 dependencies = [
  "agentloop-contracts",
  "agentloop-core",
+ "agentloop-executors",
  "agentloop-hooks",
  "agentloop-loop",
  "agentloop-mcp",
@@ -56,6 +57,19 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "agentloop-executors"
+version = "0.1.0"
+dependencies = [
+ "agentloop-core",
+ "async-trait",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
  "tracing",
 ]
 
@@ -74,11 +88,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "agentloop-learning"
+version = "0.1.0"
+dependencies = [
+ "agentloop-contracts",
+ "agentloop-core",
+ "async-trait",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "agentloop-loop"
 version = "0.1.0"
 dependencies = [
  "agentloop-contracts",
  "agentloop-core",
+ "agentloop-executors",
  "agentloop-mcp",
  "agentloop-session",
  "agentloop-testkit",
@@ -127,6 +159,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]

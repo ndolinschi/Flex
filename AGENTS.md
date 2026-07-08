@@ -1,12 +1,14 @@
 # AGENTS.md — the one guide
 
 This is the single source of truth for humans and coding agents working on this repo.
-There is deliberately no CLAUDE.md, no CONTRIBUTING.md, no docs/ folder, no ADR files:
-everything lives here or in code. Keep it that way.
+There is deliberately no CONTRIBUTING.md and no ADR files: everything lives here or in
+code. `CLAUDE.md` is a thin pointer to this file (nothing else goes there), and
+`.claude/` holds harness config (permissions, skills) — never prose guidance. Keep it
+that way.
 
 ## What this project is
 
-An agent-loop engine in Rust, split into four sibling `packages/*` cargo workspaces:
+An agent-loop engine in Rust, split into five sibling `packages/*` cargo workspaces:
 
 - **`packages/engine`** — the provider-agnostic native loop and `EngineService`. Knows nothing
   about concrete providers; it composes over a prebuilt `ProviderRegistry` and a config-gated
@@ -19,6 +21,10 @@ An agent-loop engine in Rust, split into four sibling `packages/*` cargo workspa
   `scrape_page` tools and a `researcher` role, enabled/disabled by config.
 - **`packages/sdk`** — a builder API composing providers + engine + plugins, and the `flex`
   headless runner bin.
+- **`packages/gateway`** — the chat-channel *contract*: a `Channel` trait plus normalized
+  `ChatKey`/`Inbound`/`Outbound` wire types (`channel` crate). Adapters (Telegram, Slack,
+  Discord) and the session router are deliberately not implemented yet — they build on this
+  trait later.
 
 One `Agent` interface with two families of implementations: a **native loop** that calls LLM
 provider APIs directly, and **connectors** that drive external coding agents behind the same
@@ -48,7 +54,7 @@ that anatomy, and it helps to name where each lives:
   The same trait also snapshots the working tree per turn (git `stash create` →
   a shadow ref, no HEAD/branch pollution) so `/undo` and `/redo` can rewind file
   changes; availability-gated on git, works with or without isolation.
-- **Composition / subagents** — the `Task` tool spawns role-scoped child
+- **Composition / subagents** — the `Agent` tool spawns role-scoped child
   sessions; children inherit the parent's cwd (and thus its isolated workspace).
 
 Isolation is opt-in and top-level only: a root session whose effective
@@ -83,6 +89,10 @@ packages/engine/              # provider-agnostic engine — the hub workspace
                               # bounded tool worker pool, workspace provisioning at depth 0)
     engine/                   # EngineService front door (provider-agnostic: takes a prebuilt
                               # ProviderRegistry + default ModelRef + EngineConfig, folds in plugins)
+    executors/                # Executor impls: local /bin/sh, docker, ssh(+rsync), apptainer,
+                              # serverless stub — command execution behind core::Executor
+    learning/                 # LearningPlugin: SkillSave/MemoryWrite tools + Stop-point
+                              # reflection hook (self-learning skills, local memory)
     prompts/                  # system-prompt assembly + slash-command registry/expansion
     session/                  # SessionStore impls (memory, jsonl)
     tools/                    # base tool set (Read/Write/Edit/Glob/Grep/Bash/WebFetch/...)
@@ -102,6 +112,10 @@ packages/search/              # deep-search plugin — its own workspace
 packages/sdk/                 # embeddable SDK + runner — its own workspace
   crates/
     sdk/                      # AgentBuilder + flex runner bin (NDJSON/stdio + doctor)
+    eval/                     # eval harness: TOML task benchmark, `flex eval` subcommand
+  evals/tasks/                # benchmark task definitions + fixtures
+.claude/                      # coding-agent harness config: permissions + skills
+CLAUDE.md                     # thin pointer to this file
 ```
 
 ## Layer contract (do not collapse these)
@@ -189,7 +203,7 @@ at the composition root (`AgentBuilder::enable_plugin("search")`).
   in `loop`). The SDK's `AgentBuilder::enable_plugin` decides which ship.
 - **`packages/search` is the first plugin**: `search_web` (DuckDuckGo HTML, no paid API, swappable
   `SearchBackend`) + `scrape_page` (reqwest + htmd) tools and a `researcher` role whose prompt
-  encodes an Analyze/Plan → Execute/Evaluate → Synthesis/Citation workflow. Dispatchable via `Task`.
+  encodes an Analyze/Plan → Execute/Evaluate → Synthesis/Citation workflow. Dispatchable via `Agent`.
 - **`packages/sdk` is the composition root**: `AgentBuilder` composes the providers facade + native
   `EngineService` + enabled plugins; the `flex` `[[bin]]` (runner, NDJSON/stdio + doctor) lives
   here. The brand-gate exemption moved from the engine's `crates/runner/Cargo.toml` to the SDK's.
@@ -198,7 +212,7 @@ at the composition root (`AgentBuilder::enable_plugin("search")`).
   partial drafts discarded pre-materialization. Role chains (v3) feed the same field.
 - **Tools run on a bounded worker pool; subagents are loop-intercepted**: tool jobs
   are spawned tasks behind a semaphore (real parallelism, panic isolation via
-  `JoinError::is_panic`); `Task` calls bypass the pool entirely — control plane ≠
+  `JoinError::is_panic`); `Agent` calls bypass the pool entirely — control plane ≠
   worker plane. Children are plain sessions of the same agent (role-scoped tools,
   role model chains, split round-robin), relayed into the parent as ephemeral
   `SubagentEvent`s; clients route child permission asks back by session id against
@@ -227,7 +241,7 @@ at the composition root (`AgentBuilder::enable_plugin("search")`).
     permission layer (secret/sandboxed execution) — e.g. only some cluster nodes may
     read secret code.
   - **Metaswarms** — subagents ship (roles, tree UI, permission relay, cap enabled);
-    deeper trees = raise `max_depth` (children currently lose `Task` at depth 1).
+    deeper trees = raise `max_depth` (children currently lose `Agent` at depth 1).
     Per-subagent worktree isolation (each parallel worker in its own tree, merged
     independently) is a planned extension of today's top-level-only isolation.
   - **Token-efficient meta-tools** — extend the eight base tools with `BatchRead`, `RepoMap`,
@@ -238,11 +252,11 @@ at the composition root (`AgentBuilder::enable_plugin("search")`).
 ## Verify (run before every commit)
 
 Each package is its own workspace; run the full verify in every package the change touches.
-`providers`, `search`, and `sdk` compile the engine crates as path deps, so a change to
-`packages/engine` should be verified in the downstream packages too.
+`providers`, `search`, `sdk`, and `gateway` compile the engine crates as path deps, so a change
+to `packages/engine` should be verified in the downstream packages too.
 
 ```bash
-for pkg in engine providers search sdk; do
+for pkg in engine providers search sdk gateway; do
   ( cd packages/$pkg
     cargo fmt --all --check
     cargo clippy --workspace --all-targets --all-features -- -D warnings
@@ -272,7 +286,7 @@ built-in (the env registration is skipped when a custom spec claims the id, so i
 registered twice). dSpark speculative decoding is applied server-side and is transparent to API
 clients — no request-time knob.
 
-Task-based model routing: the `Task` tool's role list (`RoleRegistry::spawnable`) advertises each
+Task-based model routing: the `Agent` tool's role list (`RoleRegistry::spawnable`) advertises each
 role's **model** (e.g. `searcher — …-flash, read-only tools` · `worker — …-pro, full tool
 access`), so the planner routes research → fast model, implementation → strong model. `subagent.rs`
 runs the child turn with `model: chain.first()`. Split round-robin (`assigned_model`) engages only
@@ -290,6 +304,42 @@ git grep -iIl 'flex' -- packages/sdk/crates/ ':!packages/sdk/crates/sdk/Cargo.to
 
 Snapshot tests use `insta`. To (re)generate intentionally:
 `INSTA_UPDATE=always cargo test -p <crate>` — then review the `.snap` diff like code.
+
+- **Command execution is an injected trait**: `core::Executor` (`ExecSpec`/`ExecOutcome`/
+  `NetworkPolicy`, `probe` for diagnostics, `sync_in/out` for remote backends) mirrors
+  `Workspaces` — trait in core, CLIs shelled from the `executors` crate (local `/bin/sh`,
+  `docker run --rm -v cwd:/work`, `ssh`+`rsync`, apptainer/singularity, a serverless stub that
+  probes unavailable). `BashTool` takes an `Arc<dyn Executor>`; composition picks the backend
+  (`EngineConfig.executor`, `AgentBuilder::executor`), `SessionMeta.executor` records the id
+  (additive). v1 scope: only Shell-category tools execute remotely; FS tools stay host-side;
+  ssh syncs per-call is too slow so callers own the cadence.
+- **Self-learning skills + local memory are the `learning` plugin**: `SkillSource::Learned`
+  (`~/.config/agentloop/skills/learned`, lowest precedence — project > user > learned),
+  a permission-gated size-capped `SkillSave` tool, a once-per-session Stop-hook continuation
+  asking the model to distill at most one verified procedure, and `MemoryWrite` +
+  always-resident memory notes (`~/.config/agentloop/memory/*.md`, hard prompt budget with an
+  explicit truncation note, loaded by `prompts::load_memory_section`). `Plugin` gained a
+  `hooks()` contribution to make this composable. Enable via `enable_plugin("learning")`
+  (sdk feature `learning`); zero footprint when off.
+- **Per-subagent worktrees ship**: a spawnable role with `isolation != Never` provisions the
+  child its own worktree from the parent cwd; on `EndTurn` the loop integrates it back
+  (emitting `WorkspaceIntegrated`, folding merge/verify-failure notes into the tool result),
+  otherwise discards it. Deeper trees remain a role knob (`RoleSpec.max_depth`, clamp 3).
+- **OpenAI-compatible presets are table-driven** (`COMPAT_PRESETS` in the facade): openrouter,
+  groq, mistral, xai — same env-gated pattern as DeepSeek (`OPENROUTER_API_KEY` etc.), ids
+  deliberately not in `BUILTIN_PROVIDER_IDS` so custom specs win. OpenRouter is the aggregator
+  route to GLM/Kimi/MiniMax without bespoke clients.
+- **Prompt-injection scanning is a hook**: `hooks::InjectionScanHook` (PostToolUse) runs
+  `scan_text` heuristics (override phrases, exfil phrases, invisible unicode) over markdown
+  tool results and wraps hits in a warning fence — content is never dropped. Off by default;
+  `EngineConfig.injection_scan` / `AgentBuilder::injection_scan`. Gateways reuse `scan_text`
+  on inbound platform text. `EngineConfig.network` sets the shell `NetworkPolicy` (containers
+  drop the network; the local backend rejects `Denied`).
+- **`packages/gateway` is the fifth workspace, contract-only for now**: channels are dumb
+  adapters behind a `Channel` trait (normalized `Inbound`/`Outbound`, permission replies as
+  first-class events). Adapters (Telegram long-poll first, then Slack Socket Mode, Discord)
+  and the routing core (`ChatKey -> SessionId` map, event projection, permission relay) are
+  future work on top of this trait; WhatsApp/Signal additionally need bridge daemons.
 
 ## Commit style
 

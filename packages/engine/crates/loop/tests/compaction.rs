@@ -32,7 +32,13 @@ async fn compaction_reduces_messages_sent_to_provider() {
     let store: Arc<dyn SessionStore> = Arc::new(MemoryStore::new());
     let agent = NativeAgentBuilder::new(store.clone())
         .providers(provider_registry(provider.clone()))
-        .tools(agentloop_tools::base_tools().registry)
+        .tools(
+            agentloop_tools::base_tools(
+                std::sync::Arc::new(agentloop_executors::LocalExecutor),
+                agentloop_core::NetworkPolicy::Allowed,
+            )
+            .registry,
+        )
         .system_prompt("test")
         .default_model(default_model())
         .build();
@@ -120,7 +126,13 @@ async fn compaction_boundary_event_is_persisted() {
     let store: Arc<dyn SessionStore> = Arc::new(MemoryStore::new());
     let agent = NativeAgentBuilder::new(store.clone())
         .providers(provider_registry(provider))
-        .tools(agentloop_tools::base_tools().registry)
+        .tools(
+            agentloop_tools::base_tools(
+                std::sync::Arc::new(agentloop_executors::LocalExecutor),
+                agentloop_core::NetworkPolicy::Allowed,
+            )
+            .registry,
+        )
         .system_prompt("test")
         .default_model(default_model())
         .build();

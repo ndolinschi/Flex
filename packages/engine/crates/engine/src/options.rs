@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use agentloop_contracts::IsolationPolicy;
-use agentloop_core::{Plugin, SessionStore, Workspaces};
+use agentloop_core::{Executor, NetworkPolicy, Plugin, SessionStore, Workspaces};
 use agentloop_hooks::{DiagnosticsConfig, FormatterSpec};
 use agentloop_loop::roles::RoleSpec;
 use agentloop_mcp::{McpBridgeConfig, McpManager};
@@ -50,6 +50,18 @@ pub struct EngineConfig {
     /// (currently 500 — a backstop against a runaway loop, not a budget for
     /// normal work).
     pub max_iterations: Option<u32>,
+    /// Command-execution backend for shell tools. `None` = run directly on
+    /// the host (`/bin/sh -lc`, the historical behavior); set a container or
+    /// remote backend to sandbox command execution.
+    pub executor: Option<Arc<dyn Executor>>,
+    /// Network posture for shell commands. `Denied` is enforced best-effort
+    /// by the executor backend (container backends drop the network; the
+    /// local backend rejects the call).
+    pub network: NetworkPolicy,
+    /// Scan tool results with prompt-injection heuristics and fence flagged
+    /// content in an explicit warning before the model reads it. Off by
+    /// default.
+    pub injection_scan: bool,
     /// Isolation backend. When set, root sessions can run in an isolated
     /// workspace; when `None`, isolation requests degrade or fail per policy.
     pub workspace: Option<Arc<dyn Workspaces>>,
@@ -84,6 +96,9 @@ impl Default for EngineConfig {
             mcp_manager: None,
             session_store: None,
             max_iterations: None,
+            executor: None,
+            network: NetworkPolicy::Allowed,
+            injection_scan: false,
             workspace: None,
             isolation_default: IsolationPolicy::Never,
             verify_command: None,

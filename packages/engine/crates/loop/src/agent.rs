@@ -218,6 +218,7 @@ impl Agent for NativeAgent {
             mode: params.mode,
             isolation,
             workspace_id,
+            executor: self.deps.executor_id.clone(),
             base_cwd: base,
             created_at_ms: now,
             updated_at_ms: now,

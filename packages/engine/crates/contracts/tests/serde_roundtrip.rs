@@ -222,6 +222,7 @@ fn legacy_session_meta_loads_without_isolation_fields() {
     let isolated = SessionMeta {
         isolation: Some(IsolationPolicy::Required),
         workspace_id: Some("ws-9".to_owned()),
+        executor: None,
         base_cwd: Some(std::path::PathBuf::from("/repo")),
         ..meta
     };

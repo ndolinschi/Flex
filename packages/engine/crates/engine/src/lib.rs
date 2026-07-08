@@ -128,12 +128,15 @@ impl EngineService {
     ) -> EngineResult<Self> {
         let plugins = PluginRegistry::from_plugins(std::mem::take(&mut config.plugins));
 
+        let executor = config.executor.take();
+        let executor_id = executor.as_ref().map(|backend| backend.id().to_owned());
+        let executor = executor.unwrap_or_else(|| Arc::new(agentloop_executors::LocalExecutor));
         let BaseTools {
             registry: mut tools,
             pending_questions,
             ..
         } = if config.cwd.is_some() {
-            agentloop_tools::base_tools()
+            agentloop_tools::base_tools(executor, config.network)
         } else {
             agentloop_tools::base_tools_read_only()
         };
@@ -152,8 +155,17 @@ impl EngineService {
             .as_deref()
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "headless".to_string());
+        let mut appends = plugins.prompt_fragments();
+        if let Some(memory) =
+            agentloop_prompts::load_memory_section(&agentloop_prompts::MemoryConfig {
+                dir: default_user_memory_dir(),
+                budget_chars: 0,
+            })
+        {
+            appends.push(memory);
+        }
         let system_prompt = SystemPromptAssembler::new(SystemPromptConfig {
-            appends: plugins.prompt_fragments(),
+            appends,
             ..SystemPromptConfig::default()
         })
         .assemble(&Vars {
@@ -175,6 +187,7 @@ impl EngineService {
             .as_ref()
             .map(|cwd| cwd.join(".agent").join("skills"));
         let skills = Arc::new(SkillRegistry::discover(SkillDiscoveryConfig {
+            learned_dir: default_user_skill_dir().map(|dir| dir.join("learned")),
             user_dir: default_user_skill_dir(),
             project_dir: project_skill_dir,
         })?);
@@ -212,6 +225,9 @@ impl EngineService {
         if let Some(model) = default_model {
             builder = builder.default_model(model);
         }
+        if let Some(id) = executor_id {
+            builder = builder.executor_id(id);
+        }
         if let Some(manager) = mcp_manager {
             builder = builder.mcp(manager);
         }
@@ -224,6 +240,10 @@ impl EngineService {
         if diagnostics.is_active() {
             hooks.push(Arc::new(diagnostics));
         }
+        if config.injection_scan {
+            hooks.insert(0, Arc::new(agentloop_hooks::InjectionScanHook::new()));
+        }
+        hooks.extend(plugins.hooks());
         if !hooks.is_empty() {
             builder = builder.hooks(hooks);
         }
@@ -478,6 +498,15 @@ fn default_user_command_dir() -> Option<PathBuf> {
             .join(".config")
             .join("agentloop")
             .join("commands")
+    })
+}
+
+fn default_user_memory_dir() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(|home| {
+        PathBuf::from(home)
+            .join(".config")
+            .join("agentloop")
+            .join("memory")
     })
 }
 

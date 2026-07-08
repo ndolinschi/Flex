@@ -32,6 +32,13 @@
       "maximum": 255,
       "minimum": 0
     },
+    "executor": {
+      "description": "Id of the command-execution backend shell tools run through\n(`\"local\"`, `\"docker\"`, …). `None` = legacy / host execution.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "id": {
       "$ref": "#/$defs/SessionId"
     },

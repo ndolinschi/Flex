@@ -328,6 +328,7 @@ mod tests {
             mode: None,
             isolation: None,
             workspace_id: None,
+            executor: None,
             base_cwd: None,
             created_at_ms: 1,
             updated_at_ms: 1,

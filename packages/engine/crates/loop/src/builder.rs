@@ -52,6 +52,7 @@ pub struct NativeAgentBuilder {
     pending_questions: Arc<PendingMap<QuestionId, Vec<Answer>>>,
     mcp: Option<std::sync::Arc<McpManager>>,
     workspace: Option<Arc<dyn Workspaces>>,
+    executor_id: Option<String>,
 }
 
 impl NativeAgentBuilder {
@@ -70,6 +71,7 @@ impl NativeAgentBuilder {
             pending_questions: Arc::new(PendingMap::new()),
             mcp: None,
             workspace: None,
+            executor_id: None,
         }
     }
 
@@ -140,6 +142,14 @@ impl NativeAgentBuilder {
         self
     }
 
+    /// Record the id of the command-execution backend shell tools run
+    /// through, stamped onto each session's metadata. `None` (default) =
+    /// host execution.
+    pub fn executor_id(mut self, id: impl Into<String>) -> Self {
+        self.executor_id = Some(id.into());
+        self
+    }
+
     pub fn build(self) -> Arc<NativeAgent> {
         let mut tools = self.tools;
         if let Some(manager) = &self.mcp {
@@ -164,6 +174,7 @@ impl NativeAgentBuilder {
                 system_prompt: self.system_prompt,
                 default_model: self.default_model,
                 workspace: self.workspace,
+                executor_id: self.executor_id,
                 pending_permissions: Arc::new(PendingMap::new()),
                 pending_questions: self.pending_questions,
             }),

@@ -49,6 +49,10 @@ pub struct SessionMeta {
     /// `None` when the session runs directly in [`Self::cwd`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace_id: Option<String>,
+    /// Id of the command-execution backend shell tools run through
+    /// (`"local"`, `"docker"`, …). `None` = legacy / host execution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub executor: Option<String>,
     /// The original project directory before isolation redirected [`Self::cwd`]
     /// to a workspace root. Lets resume fall back if the workspace is gone and
     /// tells integration where to merge back. `None` when not isolated.
@@ -149,15 +153,20 @@ pub struct TurnSummary {
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum PlanStatus {
+    /// Not started yet.
     Pending,
+    /// Being worked on right now.
     InProgress,
+    /// Finished.
     Completed,
 }
 
 /// One entry of the agent's working plan (task list).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct PlanEntry {
+    /// Short imperative description of the step, e.g. "add failing test".
     pub content: String,
+    /// Current progress of this step.
     pub status: PlanStatus,
 }
 

@@ -31,6 +31,9 @@ pub(crate) struct TurnDeps {
     /// Optional isolation backend. When set, root sessions whose effective
     /// policy asks for isolation are provisioned an isolated workspace.
     pub(crate) workspace: Option<Arc<dyn Workspaces>>,
+    /// Id of the configured command-execution backend, recorded on session
+    /// metadata. `None` = host execution (legacy).
+    pub(crate) executor_id: Option<String>,
     pub(crate) pending_permissions: Arc<PendingMap<PermissionRequestId, PermissionDecision>>,
     pub(crate) pending_questions: Arc<PendingMap<QuestionId, Vec<Answer>>>,
 }

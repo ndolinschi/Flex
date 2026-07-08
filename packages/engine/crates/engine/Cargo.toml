@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 agentloop-contracts = { workspace = true }
 agentloop-core = { workspace = true }
+agentloop-executors = { workspace = true }
 agentloop-hooks = { workspace = true }
 agentloop-loop = { workspace = true }
 agentloop-mcp = { workspace = true }
