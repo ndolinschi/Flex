@@ -14,12 +14,17 @@ use serde::Deserialize;
 
 use agentloop_contracts::{ToolOutput, ToolResultBlock};
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
+use agentloop_tools::fs::extract_page_links;
 
-/// Default max response bytes to keep.
+/// Default max output bytes/chars.
 const DEFAULT_MAX_BYTES: usize = 200_000;
 
-/// Hard cap on response bytes fetched.
+/// Hard cap on max_bytes input parameter.
 const HARD_MAX_BYTES: usize = 1_000_000;
+
+/// Raw HTML fetch limit — applies before conversion, large enough that we don't
+/// cut HTML mid-tag.
+const RAW_FETCH_LIMIT: usize = 4 * 1024 * 1024;
 
 /// Maximum characters in the output fed back to the model.
 const MAX_OUTPUT_CHARS: usize = 120_000;
@@ -36,6 +41,8 @@ struct ScrapePageInput {
     url: String,
     /// Maximum response bytes to keep. Defaults to 200000, capped at 1000000.
     max_bytes: Option<usize>,
+    /// Whether to include links found on the page in the output. Defaults to true.
+    include_links: Option<bool>,
 }
 
 /// Fetches a web page and returns its text content as markdown.
@@ -72,7 +79,8 @@ impl Tool for ScrapePageTool {
                  types). Use this after `search_web` to read the full content of a result. \
                  Set `max_bytes` to limit large pages. Non-success HTTP statuses are \
                  returned as tool errors so you can decide whether to retry with a \
-                 different URL."
+                 different URL. When `include_links` is true (the default), a numbered list \
+                 of links found on the page is appended."
                 .to_owned(),
             input_schema: schema_of::<ScrapePageInput>(),
             read_only: true,
@@ -111,6 +119,7 @@ impl Tool for ScrapePageTool {
             .max_bytes
             .unwrap_or(DEFAULT_MAX_BYTES)
             .min(HARD_MAX_BYTES);
+        let include_links = parsed.include_links.unwrap_or(true);
 
         let response = tokio::select! {
             _ = ctx.cancel.cancelled() => return Err(ToolError::Cancelled),
@@ -140,12 +149,12 @@ impl Tool for ScrapePageTool {
 
         if response
             .content_length()
-            .is_some_and(|len| len as usize > HARD_MAX_BYTES)
+            .is_some_and(|len| len as usize > RAW_FETCH_LIMIT)
         {
             return Err(ToolError::Execution(format!(
                 "`scrape_page` URL `{}` is too large (content-length exceeds {} bytes). \
                  Use a more specific URL.",
-                final_url, HARD_MAX_BYTES
+                final_url, RAW_FETCH_LIMIT
             )));
         }
 
@@ -158,24 +167,42 @@ impl Tool for ScrapePageTool {
             })?,
         };
 
-        let kept_len = bytes.len().min(max_bytes);
+        let kept_len = bytes.len().min(RAW_FETCH_LIMIT);
+        let raw_truncated = kept_len < bytes.len();
         let is_html = content_type
             .as_deref()
             .is_some_and(|ct| ct.contains("text/html") || ct.contains("application/xhtml"));
 
-        let text = if is_html {
+        let body = if is_html {
             let html_str = String::from_utf8_lossy(&bytes[..kept_len]);
-            htmd::convert(&html_str).unwrap_or_else(|_| html_str.into_owned())
-        } else {
-            String::from_utf8_lossy(&bytes[..kept_len]).into_owned()
-        };
+            let pre_cleaned = strip_html_boilerplate(&html_str);
+            let markdown = htmd::convert(&pre_cleaned).unwrap_or(pre_cleaned);
+            let core = extract_content_core(&markdown);
+            let (mut truncated, _) = truncate_chars(&core, max_bytes);
 
-        // For HTML/markdown content, extract the main content core to reduce
-        // boilerplate (nav, footer, sidebars) in the output.
-        let text = if is_html {
-            extract_content_core(&text)
+            if include_links {
+                let links = extract_page_links(&html_str, final_url.as_str());
+                if !links.is_empty() {
+                    truncated.push_str("\n\n--- Links found on this page ---\n");
+                    for (i, (link_url, link_text)) in links.iter().enumerate() {
+                        truncated.push_str(&format!(
+                            "{}. [{}]({})\n",
+                            i + 1,
+                            link_text,
+                            link_url
+                        ));
+                    }
+                    truncated.push_str(
+                        "\nUse `scrape_page` to explore any of these links.",
+                    );
+                }
+            }
+
+            truncated
         } else {
-            text.to_owned()
+            let raw = String::from_utf8_lossy(&bytes[..kept_len.min(max_bytes)]);
+            let (truncated, _) = truncate_chars(raw.as_ref(), max_bytes);
+            truncated
         };
 
         let mut rendered = String::new();
@@ -188,11 +215,7 @@ impl Tool for ScrapePageTool {
             rendered.push_str(ct);
         }
         rendered.push_str("\n\n");
-        rendered.push_str(&text);
-
-        if kept_len < bytes.len() {
-            rendered.push_str("\n\n[... response truncated by max_bytes ...]");
-        }
+        rendered.push_str(&body);
 
         let (rendered, output_truncated) = truncate_chars(&rendered, MAX_OUTPUT_CHARS);
 
@@ -205,10 +228,106 @@ impl Tool for ScrapePageTool {
                 "content_type": content_type,
                 "bytes": bytes.len(),
                 "kept_bytes": kept_len,
-                "truncated": output_truncated || kept_len < bytes.len(),
+                "truncated": output_truncated || raw_truncated,
             })),
         })
     }
+}
+
+/// Strip boilerplate HTML tags and semantic chrome that are never useful
+/// content for a model.
+///
+/// Removes:
+/// - `<script>`, `<style>`, `<noscript>` (container tags with content)
+/// - `<link>`, `<meta>` (self-closing tags)
+/// - `<nav>`, `<header>`, `<footer>` (semantic chrome — entire element with
+///   all descendants removed)
+fn strip_html_boilerplate(html: &str) -> String {
+    let mut result = strip_container_tag(html, "script");
+    result = strip_container_tag(&result, "style");
+    result = strip_container_tag(&result, "noscript");
+    result = strip_container_tag(&result, "nav");
+    result = strip_container_tag(&result, "header");
+    result = strip_container_tag(&result, "footer");
+    result = strip_self_closing_tag(&result, "link");
+    result = strip_self_closing_tag(&result, "meta");
+    result
+}
+
+/// Remove `<tag ...>content</tag>` pairs (case-insensitive).
+fn strip_container_tag(html: &str, tag_name: &str) -> String {
+    let html_lower = html.to_lowercase();
+    let open_marker = format!("<{}", tag_name);
+    let close_marker = format!("</{}>", tag_name);
+    let mut out = String::with_capacity(html.len());
+    let mut pos = 0;
+    let len = html.len();
+    while pos < len {
+        let remaining = &html_lower[pos..];
+        match remaining.find(&open_marker) {
+            None => {
+                out.push_str(&html[pos..]);
+                break;
+            }
+            Some(rel) => {
+                out.push_str(&html[pos..pos + rel]);
+                let tag_start = pos + rel;
+                // Find the `>` that closes the opening tag.
+                match html[tag_start..].find('>') {
+                    None => {
+                        out.push_str(&html[tag_start..]);
+                        break;
+                    }
+                    Some(gt) => {
+                        let after_open = tag_start + gt + 1;
+                        // Search for the closing tag.
+                        match html_lower[after_open..].find(&close_marker) {
+                            None => {
+                                out.push_str(&html[after_open..]);
+                                break;
+                            }
+                            Some(close_rel) => {
+                                pos = after_open + close_rel + close_marker.len();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Remove `<tag .../>` or `<tag ...>` self-closing elements (case-insensitive).
+fn strip_self_closing_tag(html: &str, tag_name: &str) -> String {
+    let html_lower = html.to_lowercase();
+    let open_marker = format!("<{}", tag_name);
+    let mut out = String::with_capacity(html.len());
+    let mut pos = 0;
+    let len = html.len();
+    while pos < len {
+        let remaining = &html_lower[pos..];
+        match remaining.find(&open_marker) {
+            None => {
+                out.push_str(&html[pos..]);
+                break;
+            }
+            Some(rel) => {
+                out.push_str(&html[pos..pos + rel]);
+                let tag_start = pos + rel;
+                match html[tag_start..].find('>') {
+                    None => {
+                        out.push_str(&html[tag_start..]);
+                        break;
+                    }
+                    Some(gt) => {
+                        pos = tag_start + gt + 1;
+                    }
+                }
+            }
+        }
+    }
+    out
 }
 
 /// Extract the main content from a markdown page by finding the densest

@@ -116,9 +116,11 @@ impl FallbackSearchBackend {
 impl SearchBackend for FallbackSearchBackend {
     async fn search(&self, query: &str) -> Result<Vec<SearchResult>, SearchError> {
         let mut last_err: Option<SearchError> = None;
-        for backend in &self.backends {
+        for backend in self.backends.iter() {
             match backend.search(query).await {
-                Ok(results) if !results.is_empty() => return Ok(results),
+                Ok(results) if !results.is_empty() => {
+                    return Ok(results);
+                }
                 Ok(_) => {
                     last_err = Some(SearchError::NoResults);
                 }

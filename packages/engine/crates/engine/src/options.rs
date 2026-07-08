@@ -15,6 +15,25 @@ use agentloop_hooks::{DiagnosticsConfig, FormatterSpec};
 use agentloop_loop::roles::RoleSpec;
 use agentloop_mcp::{McpBridgeConfig, McpManager};
 
+/// Control the verbosity of NDJSON event output in the stdio transport.
+///
+/// At [`Low`](OutputVerbosity::Low), only materialized turn-level events are
+/// emitted; streaming deltas and intermediate noisy events are suppressed.
+/// At [`Medium`](OutputVerbosity::Medium) (the default), all events are
+/// emitted except for streaming deltas. At [`High`](OutputVerbosity::High),
+/// every event passes through — including per-token streaming deltas.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OutputVerbosity {
+    /// Only materialized turn-level events: no streaming deltas or intermediate
+    /// internal events.
+    Low,
+    /// All events except streaming deltas (default).
+    #[default]
+    Medium,
+    /// All events, including per-token streaming deltas.
+    High,
+}
+
 #[derive(Clone)]
 pub struct EngineConfig {
     pub cwd: Option<PathBuf>,
@@ -50,6 +69,9 @@ pub struct EngineConfig {
     /// composition time. Empty = the base tool set only (byte-identical to the
     /// pre-plugin engine).
     pub plugins: Vec<Arc<dyn Plugin>>,
+    /// NDJSON event verbosity for the stdio transport. Defaults to
+    /// [`OutputVerbosity::Medium`].
+    pub verbosity: OutputVerbosity,
 }
 
 impl Default for EngineConfig {
@@ -68,6 +90,7 @@ impl Default for EngineConfig {
             formatters: Vec::new(),
             diagnostics: DiagnosticsConfig::default(),
             plugins: Vec::new(),
+            verbosity: OutputVerbosity::default(),
         }
     }
 }

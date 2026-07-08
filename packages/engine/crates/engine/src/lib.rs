@@ -36,7 +36,7 @@ mod error;
 mod options;
 
 pub use error::{EngineResult, EngineServiceError};
-pub use options::EngineConfig;
+pub use options::{EngineConfig, OutputVerbosity};
 
 #[derive(Clone)]
 pub struct EngineService {
@@ -51,6 +51,8 @@ pub struct EngineService {
     isolation_default: IsolationPolicy,
     /// Verify command run before integrating a workspace back.
     verify_command: Option<String>,
+    /// NDJSON output verbosity level.
+    verbosity: OutputVerbosity,
 }
 
 /// Map a loop-independent [`PluginRole`] onto the loop's [`RoleSpec`].
@@ -79,6 +81,7 @@ impl EngineService {
             workspace: None,
             isolation_default: IsolationPolicy::Never,
             verify_command: None,
+            verbosity: OutputVerbosity::default(),
         }
     }
 
@@ -95,6 +98,7 @@ impl EngineService {
             workspace: None,
             isolation_default: IsolationPolicy::Never,
             verify_command: None,
+            verbosity: OutputVerbosity::default(),
         }
     }
 
@@ -102,6 +106,11 @@ impl EngineService {
     /// Lets clients enumerate providers and list models for pickers.
     pub fn provider_registry(&self) -> &ProviderRegistry {
         &self.providers
+    }
+
+    /// The configured NDJSON output verbosity level.
+    pub fn verbosity(&self) -> OutputVerbosity {
+        self.verbosity
     }
 
     /// Compose the native loop over a prebuilt [`ProviderRegistry`] and an
@@ -227,6 +236,7 @@ impl EngineService {
         service.workspace = config.workspace;
         service.isolation_default = config.isolation_default;
         service.verify_command = config.verify_command;
+        service.verbosity = config.verbosity;
         Ok(service)
     }
 

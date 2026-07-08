@@ -21,7 +21,9 @@ use std::sync::Arc;
 use agentloop_core::Plugin;
 use agentloop_providers::{ProviderOptions, native, native_all};
 
-pub use agentloop_engine::{EngineConfig, EngineResult, EngineService, EngineServiceError};
+pub use agentloop_engine::{
+    EngineConfig, EngineResult, EngineService, EngineServiceError, OutputVerbosity,
+};
 pub use agentloop_providers::{self as providers, CustomProviderSpec};
 #[cfg(feature = "search")]
 pub use agentloop_search::{self as search, SearchPlugin};
@@ -67,6 +69,12 @@ impl AgentBuilder {
     /// tools. The agent can still use the search plugin if enabled.
     pub fn headless(mut self) -> Self {
         self.config.cwd = None;
+        self
+    }
+
+    /// Set the NDJSON event output verbosity level (default: [`OutputVerbosity::Medium`]).
+    pub fn verbosity(mut self, level: OutputVerbosity) -> Self {
+        self.config.verbosity = level;
         self
     }
 

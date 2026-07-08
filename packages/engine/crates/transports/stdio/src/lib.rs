@@ -13,7 +13,7 @@ use agentloop_contracts::{
     AgentEvent, NewSessionParams, PermissionMode, PromptInput, SessionEvent, TurnOptions,
     TurnSummary,
 };
-use agentloop_engine::{EngineService, EngineServiceError};
+use agentloop_engine::{EngineService, EngineServiceError, OutputVerbosity};
 
 /// Request served by the current headless NDJSON protocol.
 #[derive(Debug, Clone)]
@@ -22,6 +22,7 @@ pub struct OneTurnRequest {
     pub title: Option<String>,
     pub cwd: Option<PathBuf>,
     pub permission_mode: PermissionMode,
+    pub verbosity: OutputVerbosity,
 }
 
 impl OneTurnRequest {
@@ -32,7 +33,37 @@ impl OneTurnRequest {
             prompt,
             cwd,
             permission_mode: PermissionMode::Plan,
+            verbosity: OutputVerbosity::default(),
         }
+    }
+}
+
+/// Whether an [`AgentEvent`] should be emitted at the given verbosity level.
+fn event_visible(event: &AgentEvent, verbosity: OutputVerbosity) -> bool {
+    match verbosity {
+        OutputVerbosity::High => true,
+        OutputVerbosity::Medium => !matches!(
+            event,
+            AgentEvent::MarkdownDelta { .. }
+                | AgentEvent::ThinkingDelta { .. }
+                | AgentEvent::ToolArgsDelta { .. }
+        ),
+        OutputVerbosity::Low => matches!(
+            event,
+            AgentEvent::TurnStarted { .. }
+                | AgentEvent::TurnCompleted { .. }
+                | AgentEvent::AssistantMessage { .. }
+                | AgentEvent::UserMessage { .. }
+                | AgentEvent::ToolCallUpdated { .. }
+                | AgentEvent::PermissionRequested { .. }
+                | AgentEvent::PermissionResolved { .. }
+                | AgentEvent::SessionError { .. }
+                | AgentEvent::ModelFallback { .. }
+                | AgentEvent::SubagentEvent { .. }
+                | AgentEvent::SubagentCompleted { .. }
+                | AgentEvent::CompactionBoundary { .. }
+                | AgentEvent::Gap { .. }
+        ),
     }
 }
 
@@ -100,6 +131,7 @@ where
         permission_mode: Some(request.permission_mode),
         ..TurnOptions::default()
     };
+    let verbosity = service.verbosity();
     let prompt_task = tokio::spawn(async move {
         prompt_service
             .prompt(&prompt_session, prompt_input, turn_opts)
@@ -107,6 +139,9 @@ where
     });
 
     while let Some(event) = events.next().await {
+        if !event_visible(&event.payload, verbosity) {
+            continue;
+        }
         let completed = matches!(event.payload, AgentEvent::TurnCompleted { .. });
         write_event(&mut writer, &event).await?;
         if completed {
@@ -145,5 +180,89 @@ mod tests {
         assert_eq!(parsed.session_id, event.session_id);
         assert_eq!(parsed.seq, 7);
         assert!(matches!(parsed.payload, AgentEvent::Gap { from_seq: 3 }));
+    }
+
+    #[test]
+    fn high_verbosity_shows_all_events() {
+        assert!(event_visible(
+            &AgentEvent::MarkdownDelta {
+                message_id: agentloop_contracts::MessageId::generate(),
+                text: "hi".into(),
+            },
+            OutputVerbosity::High,
+        ));
+        assert!(event_visible(
+            &AgentEvent::Gap { from_seq: 0 },
+            OutputVerbosity::High,
+        ));
+    }
+
+    #[test]
+    fn medium_verbosity_hides_streaming_deltas() {
+        assert!(!event_visible(
+            &AgentEvent::MarkdownDelta {
+                message_id: agentloop_contracts::MessageId::generate(),
+                text: "hi".into(),
+            },
+            OutputVerbosity::Medium,
+        ));
+        assert!(!event_visible(
+            &AgentEvent::ThinkingDelta {
+                message_id: agentloop_contracts::MessageId::generate(),
+                text: "think".into(),
+            },
+            OutputVerbosity::Medium,
+        ));
+        assert!(!event_visible(
+            &AgentEvent::ToolArgsDelta {
+                call_id: agentloop_contracts::ToolCallId::generate(),
+                json_fragment: "{}".into(),
+            },
+            OutputVerbosity::Medium,
+        ));
+    }
+
+    #[test]
+    fn medium_verbosity_shows_materialized_events() {
+        assert!(event_visible(
+            &AgentEvent::TurnStarted {
+                turn_id: agentloop_contracts::TurnId::generate(),
+            },
+            OutputVerbosity::Medium,
+        ));
+        assert!(event_visible(
+            &AgentEvent::Gap { from_seq: 0 },
+            OutputVerbosity::Medium,
+        ));
+    }
+
+    #[test]
+    fn low_verbosity_only_shows_materialized_events() {
+        assert!(event_visible(
+            &AgentEvent::TurnStarted {
+                turn_id: agentloop_contracts::TurnId::generate(),
+            },
+            OutputVerbosity::Low,
+        ));
+        assert!(!event_visible(
+            &AgentEvent::MarkdownDelta {
+                message_id: agentloop_contracts::MessageId::generate(),
+                text: "hi".into(),
+            },
+            OutputVerbosity::Low,
+        ));
+        // Gap is present in Low verbosity (subscriber sync hint).
+        assert!(event_visible(
+            &AgentEvent::Gap { from_seq: 0 },
+            OutputVerbosity::Low,
+        ));
+        // Intermediate events like MessageStarted are hidden.
+        assert!(!event_visible(
+            &AgentEvent::MessageStarted {
+                message_id: agentloop_contracts::MessageId::generate(),
+                role: agentloop_contracts::Role::Assistant,
+            },
+            OutputVerbosity::Low,
+        ));
     }
 }

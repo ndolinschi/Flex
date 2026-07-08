@@ -18,7 +18,7 @@ mod web_fetch;
 pub use ask_question::AskQuestionTool;
 pub use bash::BashTool;
 pub use exit_plan_mode::ExitPlanModeTool;
-pub use fs::{EditTool, FsState, ReadTool, WriteTool};
+pub use fs::{EditTool, FsState, ReadTool, WriteTool, extract_page_links};
 pub use glob::GlobTool;
 pub use grep::GrepTool;
 pub use registry::{BaseTools, base_tools, base_tools_read_only, registry_with_questions};

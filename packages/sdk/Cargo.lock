@@ -353,6 +353,7 @@ version = "0.1.0"
 dependencies = [
  "agentloop-contracts",
  "agentloop-core",
+ "agentloop-tools",
  "async-trait",
  "htmd",
  "reqwest 0.12.28",

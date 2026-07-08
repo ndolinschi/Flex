@@ -8,10 +8,11 @@ use serde::Deserialize;
 use agentloop_contracts::ToolOutput;
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
-use crate::fs::{schema_of, truncate_chars};
+use crate::fs::{clean_html_for_model, extract_page_links, schema_of, truncate_chars};
 
 const DEFAULT_MAX_BYTES: usize = 200_000;
 const HARD_MAX_BYTES: usize = 1_000_000;
+const RAW_FETCH_LIMIT: usize = 4 * 1024 * 1024;
 const MAX_OUTPUT_CHARS: usize = 120_000;
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -21,6 +22,8 @@ struct WebFetchInput {
     url: String,
     /// Maximum response bytes to keep. Defaults to 200000, capped at 1000000.
     max_bytes: Option<usize>,
+    /// Whether to include links found on the page in the output. Defaults to true.
+    include_links: Option<bool>,
 }
 
 /// Fetch HTTP(S) content and return token-efficient text.
@@ -51,7 +54,8 @@ impl Tool for WebFetchTool {
             description: "Fetch an HTTP(S) URL and return its text body with status and content \
                           type metadata. Use `max_bytes` for large pages. Non-success HTTP \
                           statuses are returned as tool errors so the model can decide whether \
-                          to retry with a different URL."
+                          to retry with a different URL. When `include_links` is true (the \
+                          default), a numbered list of links found on the page is appended."
                 .to_owned(),
             input_schema: schema_of::<WebFetchInput>(),
             read_only: true,
@@ -87,6 +91,7 @@ impl Tool for WebFetchTool {
             .max_bytes
             .unwrap_or(DEFAULT_MAX_BYTES)
             .min(HARD_MAX_BYTES);
+        let include_links = input.include_links.unwrap_or(true);
 
         let response = tokio::select! {
             _ = ctx.cancel.cancelled() => return Err(ToolError::Cancelled),
@@ -112,12 +117,12 @@ impl Tool for WebFetchTool {
 
         if response
             .content_length()
-            .is_some_and(|len| len as usize > HARD_MAX_BYTES)
+            .is_some_and(|len| len as usize > RAW_FETCH_LIMIT)
         {
             return Err(ToolError::Execution(format!(
                 "WebFetch `{}` is too large (content-length exceeds {} bytes). Use a more \
                  specific URL.",
-                final_url, HARD_MAX_BYTES
+                final_url, RAW_FETCH_LIMIT
             )));
         }
 
@@ -127,8 +132,43 @@ impl Tool for WebFetchTool {
                 ToolError::Execution(format!("WebFetch could not read `{final_url}`: {err}."))
             })?,
         };
-        let kept_len = bytes.len().min(max_bytes);
-        let text = String::from_utf8_lossy(&bytes[..kept_len]);
+        let kept_len = bytes.len().min(RAW_FETCH_LIMIT);
+        let raw_truncated = kept_len < bytes.len();
+
+        let is_html = content_type
+            .as_deref()
+            .is_some_and(|ct| ct.contains("text/html") || ct.contains("application/xhtml"));
+
+        let body = if is_html {
+            let html_str = String::from_utf8_lossy(&bytes[..kept_len]);
+            let cleaned = clean_html_for_model(&html_str);
+            let (mut truncated, _) = truncate_chars(&cleaned, max_bytes);
+
+            if include_links {
+                let links = extract_page_links(&html_str, final_url.as_str());
+                if !links.is_empty() {
+                    truncated.push_str("\n\n--- Links found on this page ---\n");
+                    for (i, (link_url, link_text)) in links.iter().enumerate() {
+                        truncated.push_str(&format!(
+                            "{}. [{}]({})\n",
+                            i + 1,
+                            link_text,
+                            link_url
+                        ));
+                    }
+                    truncated.push_str(
+                        "\nUse `WebFetch` to explore any of these links.",
+                    );
+                }
+            }
+
+            truncated
+        } else {
+            let raw = String::from_utf8_lossy(&bytes[..kept_len.min(max_bytes)]);
+            let (truncated, _) = truncate_chars(raw.as_ref(), max_bytes);
+            truncated
+        };
+
         let mut rendered = String::new();
         rendered.push_str("url: ");
         rendered.push_str(final_url.as_str());
@@ -139,10 +179,7 @@ impl Tool for WebFetchTool {
             rendered.push_str(content_type);
         }
         rendered.push_str("\n\n");
-        rendered.push_str(text.as_ref());
-        if kept_len < bytes.len() {
-            rendered.push_str("\n\n[... response truncated by max_bytes ...]");
-        }
+        rendered.push_str(&body);
 
         let (rendered, output_truncated) = truncate_chars(&rendered, MAX_OUTPUT_CHARS);
         Ok(ToolOutput {
@@ -154,7 +191,7 @@ impl Tool for WebFetchTool {
                 "content_type": content_type,
                 "bytes": bytes.len(),
                 "kept_bytes": kept_len,
-                "truncated": output_truncated || kept_len < bytes.len(),
+                "truncated": output_truncated || raw_truncated,
             })),
         })
     }
