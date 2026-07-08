@@ -77,8 +77,12 @@ pub struct ProviderOptions {
 /// Native loop over a single provider resolved from `opts.provider` or the
 /// environment.
 pub fn native(opts: ProviderOptions, config: EngineConfig) -> EngineResult<EngineService> {
-    let (mut providers, default_model) =
-        resolve_real_providers(opts.provider.as_deref(), opts.model, &opts.custom)?;
+    let (mut providers, default_model) = resolve_real_providers(
+        opts.provider.as_deref(),
+        opts.model,
+        &opts.custom,
+        &opts.provider_keys,
+    )?;
     connect_bedrock(&mut providers, &opts.provider_keys, &opts.provider_regions);
     EngineService::native(providers, Some(default_model), config)
 }
@@ -88,8 +92,12 @@ pub fn native(opts: ProviderOptions, config: EngineConfig) -> EngineResult<Engin
 ///
 /// Succeeds with an empty registry and no default model when nothing resolves.
 pub fn native_all(opts: ProviderOptions, config: EngineConfig) -> EngineResult<EngineService> {
-    let (mut providers, mut default_model) =
-        resolve_available_providers(opts.provider.as_deref(), opts.model, &opts.custom)?;
+    let (mut providers, mut default_model) = resolve_available_providers(
+        opts.provider.as_deref(),
+        opts.model,
+        &opts.custom,
+        &opts.provider_keys,
+    )?;
     if let Some(bedrock_model) =
         connect_bedrock(&mut providers, &opts.provider_keys, &opts.provider_regions)
     {

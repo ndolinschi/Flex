@@ -106,6 +106,15 @@ impl AgentBuilder {
         self
     }
 
+    /// Set an API key for a built-in provider, bypassing the environment
+    /// variable. For example: `.provider_key("deepseek", "sk-...")`.
+    pub fn provider_key(mut self, id: impl Into<String>, key: impl Into<String>) -> Self {
+        self.provider_opts
+            .provider_keys
+            .insert(id.into(), key.into());
+        self
+    }
+
     /// Replace the engine-scoped configuration wholesale (advanced: isolation,
     /// MCP, hooks, roles, session store, …). Any plugins already added via the
     /// builder are preserved and merged in at [`AgentBuilder::build`].

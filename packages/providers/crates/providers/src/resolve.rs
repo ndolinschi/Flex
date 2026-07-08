@@ -12,12 +12,12 @@ use std::sync::Arc;
 use agentloop_contracts::{ModelRef, ProviderId};
 use agentloop_core::{ProviderError, ProviderRegistry};
 use agentloop_engine::{EngineResult, EngineServiceError};
-use agentloop_provider_anthropic::{ANTHROPIC_PROVIDER_ID, AnthropicProvider};
+use agentloop_provider_anthropic::{ANTHROPIC_PROVIDER_ID, AnthropicConfig, AnthropicProvider};
 use agentloop_provider_bedrock::{
     BEDROCK_PROVIDER_ID, BedrockAuth, BedrockConfig, BedrockProvider,
 };
 use agentloop_provider_copilot::{COPILOT_PROVIDER_ID, CopilotConfig, CopilotProvider};
-use agentloop_provider_gemini::{GEMINI_PROVIDER_ID, GeminiProvider};
+use agentloop_provider_gemini::{GEMINI_PROVIDER_ID, GeminiConfig, GeminiProvider};
 use agentloop_provider_ollama::{OLLAMA_PROVIDER_ID, OllamaProvider};
 use agentloop_provider_openai::{OPENAI_PROVIDER_ID, OpenAiConfig, OpenAiProvider};
 
@@ -173,6 +173,7 @@ pub fn resolve_real_providers(
     provider_arg: Option<&str>,
     model_arg: Option<String>,
     custom: &[CustomProviderSpec],
+    provider_keys: &std::collections::BTreeMap<String, String>,
 ) -> EngineResult<(ProviderRegistry, ModelRef)> {
     let provider_name = match provider_arg {
         Some(provider) => provider,
@@ -201,14 +202,30 @@ pub fn resolve_real_providers(
 
     match provider_name {
         OPENAI_PROVIDER_ID if !custom.iter().any(|spec| spec.id == OPENAI_PROVIDER_ID) => {
-            let provider = OpenAiProvider::from_env()?;
+            let provider = if let Some(key) = provider_keys.get(OPENAI_PROVIDER_ID) {
+                OpenAiProvider::new(OpenAiConfig::from_values(
+                    key.clone(),
+                    std::env::var("OPENAI_BASE_URL").ok(),
+                    std::env::var("OPENAI_MODEL").ok(),
+                )?)
+            } else {
+                OpenAiProvider::from_env()?
+            };
             let model = model_arg.unwrap_or_else(|| provider.default_model().to_owned());
             let mut providers = ProviderRegistry::new();
             providers.register(Arc::new(provider));
             Ok((providers, ModelRef(format!("{OPENAI_PROVIDER_ID}/{model}"))))
         }
         ANTHROPIC_PROVIDER_ID => {
-            let provider = AnthropicProvider::from_env()?;
+            let provider = if let Some(key) = provider_keys.get(ANTHROPIC_PROVIDER_ID) {
+                AnthropicProvider::new(AnthropicConfig::from_values(
+                    key.clone(),
+                    std::env::var("ANTHROPIC_BASE_URL").ok(),
+                    std::env::var("ANTHROPIC_MODEL").ok(),
+                )?)
+            } else {
+                AnthropicProvider::from_env()?
+            };
             let model = model_arg.unwrap_or_else(|| provider.default_model().to_owned());
             let mut providers = ProviderRegistry::new();
             providers.register(Arc::new(provider));
@@ -218,7 +235,15 @@ pub fn resolve_real_providers(
             ))
         }
         GEMINI_PROVIDER_ID => {
-            let provider = GeminiProvider::from_env()?;
+            let provider = if let Some(key) = provider_keys.get(GEMINI_PROVIDER_ID) {
+                GeminiProvider::new(GeminiConfig::from_values(
+                    key.clone(),
+                    std::env::var("GEMINI_BASE_URL").ok(),
+                    std::env::var("GEMINI_MODEL").ok(),
+                )?)
+            } else {
+                GeminiProvider::from_env()?
+            };
             let model = model_arg.unwrap_or_else(|| provider.default_model().to_owned());
             let mut providers = ProviderRegistry::new();
             providers.register(Arc::new(provider));
@@ -270,10 +295,14 @@ pub fn resolve_real_providers(
                 Ok((providers, ModelRef(format!("{other}/{model}"))))
             } else if other == DEEPSEEK_PROVIDER_ID {
                 let (provider, default_model) =
-                    build_deepseek_from_env()?.ok_or_else(|| ProviderError::AuthMissing {
-                        provider: ProviderId::from(DEEPSEEK_PROVIDER_ID),
-                        hint: "set `DEEPSEEK_API_KEY` (optional `DEEPSEEK_MODEL`)".to_owned(),
-                    })?;
+                    if let Some(key) = provider_keys.get(DEEPSEEK_PROVIDER_ID) {
+                        build_deepseek(key.clone(), None)?
+                    } else {
+                        build_deepseek_from_env()?.ok_or_else(|| ProviderError::AuthMissing {
+                            provider: ProviderId::from(DEEPSEEK_PROVIDER_ID),
+                            hint: "set `DEEPSEEK_API_KEY` (optional `DEEPSEEK_MODEL`)".to_owned(),
+                        })?
+                    };
                 let model = model_arg.unwrap_or(default_model);
                 let mut providers = ProviderRegistry::new();
                 providers.register(provider);
@@ -306,9 +335,13 @@ pub fn resolve_available_providers(
     preferred: Option<&str>,
     model_arg: Option<String>,
     custom: &[CustomProviderSpec],
+    provider_keys: &std::collections::BTreeMap<String, String>,
 ) -> EngineResult<(ProviderRegistry, Option<ModelRef>)> {
     /// `(provider, its default model)` for a known name; `None` for unknown.
-    fn build_provider(name: &str) -> Result<Option<ProviderWithDefault>, ProviderError> {
+    fn build_provider(
+        name: &str,
+        provider_keys: &std::collections::BTreeMap<String, String>,
+    ) -> Result<Option<ProviderWithDefault>, ProviderError> {
         fn boxed<P: agentloop_core::Provider + 'static>(
             provider: P,
             default_model: String,
@@ -316,18 +349,42 @@ pub fn resolve_available_providers(
             Some((Arc::new(provider), default_model))
         }
         match name {
-            OPENAI_PROVIDER_ID => OpenAiProvider::from_env().map(|p| {
-                let model = p.default_model().to_owned();
-                boxed(p, model)
-            }),
-            ANTHROPIC_PROVIDER_ID => AnthropicProvider::from_env().map(|p| {
-                let model = p.default_model().to_owned();
-                boxed(p, model)
-            }),
-            GEMINI_PROVIDER_ID => GeminiProvider::from_env().map(|p| {
-                let model = p.default_model().to_owned();
-                boxed(p, model)
-            }),
+            OPENAI_PROVIDER_ID => {
+                if let Some(key) = provider_keys.get(OPENAI_PROVIDER_ID) {
+                    let config = OpenAiConfig::from_values(key.clone(), None, None)?;
+                    let model = config.default_model.clone();
+                    Ok(boxed(OpenAiProvider::new(config), model))
+                } else {
+                    OpenAiProvider::from_env().map(|p| {
+                        let model = p.default_model().to_owned();
+                        boxed(p, model)
+                    })
+                }
+            }
+            ANTHROPIC_PROVIDER_ID => {
+                if let Some(key) = provider_keys.get(ANTHROPIC_PROVIDER_ID) {
+                    let config = AnthropicConfig::from_values(key.clone(), None, None)?;
+                    let model = config.default_model.clone();
+                    Ok(boxed(AnthropicProvider::new(config), model))
+                } else {
+                    AnthropicProvider::from_env().map(|p| {
+                        let model = p.default_model().to_owned();
+                        boxed(p, model)
+                    })
+                }
+            }
+            GEMINI_PROVIDER_ID => {
+                if let Some(key) = provider_keys.get(GEMINI_PROVIDER_ID) {
+                    let config = GeminiConfig::from_values(key.clone(), None, None)?;
+                    let model = config.default_model.clone();
+                    Ok(boxed(GeminiProvider::new(config), model))
+                } else {
+                    GeminiProvider::from_env().map(|p| {
+                        let model = p.default_model().to_owned();
+                        boxed(p, model)
+                    })
+                }
+            }
             COPILOT_PROVIDER_ID => CopilotProvider::from_env().map(|p| {
                 let model = p.default_model().to_owned();
                 boxed(p, model)
@@ -363,7 +420,7 @@ pub fn resolve_available_providers(
         if name == OPENAI_PROVIDER_ID && custom.iter().any(|spec| spec.id == OPENAI_PROVIDER_ID) {
             continue;
         }
-        match build_provider(name) {
+        match build_provider(name, provider_keys) {
             Ok(Some((provider, model))) => register(&mut providers, provider, model),
             Ok(None) => {}
             Err(ProviderError::AuthMissing { .. }) => {
@@ -373,17 +430,22 @@ pub fn resolve_available_providers(
         }
     }
     if env_is_set("OLLAMA_HOST") || env_is_set("OLLAMA_MODEL") {
-        if let Ok(Some((provider, model))) = build_provider(OLLAMA_PROVIDER_ID) {
+        if let Ok(Some((provider, model))) = build_provider(OLLAMA_PROVIDER_ID, provider_keys) {
             register(&mut providers, provider, model);
         }
     }
     if env_is_set("AWS_BEARER_TOKEN_BEDROCK") {
-        if let Ok(Some((provider, model))) = build_provider(BEDROCK_PROVIDER_ID) {
+        if let Ok(Some((provider, model))) = build_provider(BEDROCK_PROVIDER_ID, provider_keys) {
             register(&mut providers, provider, model);
         }
     }
     if custom.iter().all(|spec| spec.id != DEEPSEEK_PROVIDER_ID) {
-        if let Ok(Some((provider, model))) = build_deepseek_from_env() {
+        let deepseek_opt = if let Some(key) = provider_keys.get(DEEPSEEK_PROVIDER_ID) {
+            build_deepseek(key.clone(), None).ok()
+        } else {
+            build_deepseek_from_env().ok().flatten()
+        };
+        if let Some((provider, model)) = deepseek_opt {
             register(&mut providers, provider, model);
         }
     }
@@ -406,7 +468,7 @@ pub fn resolve_available_providers(
     if let Some(name) = preferred {
         let id = ProviderId::from(name);
         if providers.get(&id).is_none() {
-            match build_provider(name).map_err(EngineServiceError::from)? {
+            match build_provider(name, provider_keys).map_err(EngineServiceError::from)? {
                 Some((provider, model)) => register(&mut providers, provider, model),
                 None => return Err(EngineServiceError::UnsupportedProvider(name.to_owned())),
             }
@@ -438,6 +500,10 @@ mod tests {
     use super::*;
     use crate::CustomProviderSpec;
     use agentloop_contracts::{ErrorCode, ModelInfo, ProviderId};
+
+    fn no_keys() -> std::collections::BTreeMap<String, String> {
+        std::collections::BTreeMap::new()
+    }
 
     fn spec(id: &str) -> CustomProviderSpec {
         CustomProviderSpec {
@@ -519,7 +585,7 @@ mod tests {
 
     #[test]
     fn unsupported_provider_is_invalid_request() {
-        let err = match resolve_real_providers(Some("mock"), None, &[]) {
+        let err = match resolve_real_providers(Some("mock"), None, &[], &no_keys()) {
             Ok(_) => panic!("mock provider must not resolve at runtime"),
             Err(err) => err,
         };
@@ -528,7 +594,7 @@ mod tests {
 
     #[test]
     fn unknown_preferred_provider_is_invalid_request_in_multi_resolver() {
-        let err = match resolve_available_providers(Some("mock"), None, &[]) {
+        let err = match resolve_available_providers(Some("mock"), None, &[], &no_keys()) {
             Ok(_) => panic!("mock provider must not resolve at runtime"),
             Err(err) => err,
         };
@@ -537,8 +603,9 @@ mod tests {
 
     #[test]
     fn qualified_model_arg_passes_through_multi_resolver() {
-        let (_, model) = resolve_available_providers(None, Some("ollama/llama3".to_owned()), &[])
-            .expect("qualified model arg never requires a resolvable provider");
+        let (_, model) =
+            resolve_available_providers(None, Some("ollama/llama3".to_owned()), &[], &no_keys())
+                .expect("qualified model arg never requires a resolvable provider");
         assert_eq!(
             model.expect("qualified model arg yields Some").0,
             "ollama/llama3"
@@ -547,7 +614,7 @@ mod tests {
 
     #[test]
     fn no_providers_and_no_custom_specs_never_errors() {
-        let (providers, model) = resolve_available_providers(None, None, &[])
+        let (providers, model) = resolve_available_providers(None, None, &[], &no_keys())
             .expect("no providers configured must not error");
         if providers.ids().is_empty() {
             assert!(model.is_none());
@@ -556,10 +623,11 @@ mod tests {
 
     #[test]
     fn custom_spec_registers_in_multi_resolver() {
-        let (providers, _) = match resolve_available_providers(None, None, &[spec("deepseek")]) {
-            Ok(resolved) => resolved,
-            Err(err) => panic!("custom provider should register: {err}"),
-        };
+        let (providers, _) =
+            match resolve_available_providers(None, None, &[spec("deepseek")], &no_keys()) {
+                Ok(resolved) => resolved,
+                Err(err) => panic!("custom provider should register: {err}"),
+            };
         assert!(
             providers.ids().iter().any(|id| id.as_str() == "deepseek"),
             "registry should contain the custom id: {:?}",
@@ -586,8 +654,9 @@ mod tests {
 
     #[test]
     fn custom_deepseek_does_not_conflict_with_builtin() {
-        let (providers, _) = resolve_available_providers(None, None, &[spec("deepseek")])
-            .expect("custom deepseek must resolve without conflict");
+        let (providers, _) =
+            resolve_available_providers(None, None, &[spec("deepseek")], &no_keys())
+                .expect("custom deepseek must resolve without conflict");
         let deepseek_count = providers
             .ids()
             .iter()
@@ -603,11 +672,15 @@ mod tests {
 
     #[test]
     fn preferred_custom_provider_sets_priority_and_default_model() {
-        let (providers, model) =
-            match resolve_available_providers(Some("deepseek"), None, &[spec("deepseek")]) {
-                Ok(resolved) => resolved,
-                Err(err) => panic!("preferred custom provider should resolve: {err}"),
-            };
+        let (providers, model) = match resolve_available_providers(
+            Some("deepseek"),
+            None,
+            &[spec("deepseek")],
+            &no_keys(),
+        ) {
+            Ok(resolved) => resolved,
+            Err(err) => panic!("preferred custom provider should resolve: {err}"),
+        };
         assert_eq!(
             providers.ids().first().map(|id| id.as_str().to_owned()),
             Some("deepseek".to_owned())
@@ -625,7 +698,8 @@ mod tests {
             models: vec![model_info("glm-4"), model_info("glm-4-air")],
             ..spec("glm")
         };
-        let (_, model) = match resolve_available_providers(Some("glm"), None, &[custom]) {
+        let (_, model) = match resolve_available_providers(Some("glm"), None, &[custom], &no_keys())
+        {
             Ok(resolved) => resolved,
             Err(err) => panic!("custom provider should resolve: {err}"),
         };
@@ -637,7 +711,7 @@ mod tests {
 
     #[test]
     fn custom_spec_shadowing_a_builtin_is_rejected() {
-        let err = match resolve_available_providers(None, None, &[spec("anthropic")]) {
+        let err = match resolve_available_providers(None, None, &[spec("anthropic")], &no_keys()) {
             Ok(_) => panic!("builtin id collision must be rejected"),
             Err(err) => err,
         };
@@ -650,7 +724,7 @@ mod tests {
 
     #[test]
     fn custom_openai_does_not_conflict_with_builtin() {
-        let (providers, _) = resolve_available_providers(None, None, &[spec("openai")])
+        let (providers, _) = resolve_available_providers(None, None, &[spec("openai")], &no_keys())
             .expect("custom openai must resolve without conflict");
         let openai_count = providers
             .ids()
@@ -662,8 +736,9 @@ mod tests {
 
     #[test]
     fn single_provider_resolver_prefers_custom_openai_over_env() {
-        let (providers, model) = resolve_real_providers(Some("openai"), None, &[spec("openai")])
-            .expect("custom openai spec must resolve");
+        let (providers, model) =
+            resolve_real_providers(Some("openai"), None, &[spec("openai")], &no_keys())
+                .expect("custom openai spec must resolve");
         assert_eq!(
             providers
                 .ids()
@@ -678,7 +753,7 @@ mod tests {
     #[test]
     fn malformed_custom_id_is_rejected() {
         for bad in ["Deep-Seek", "deep/seek", "", "-deepseek"] {
-            let err = match resolve_available_providers(None, None, &[spec(bad)]) {
+            let err = match resolve_available_providers(None, None, &[spec(bad)], &no_keys()) {
                 Ok(_) => panic!("id `{bad}` must be rejected"),
                 Err(err) => err,
             };
@@ -695,8 +770,8 @@ mod tests {
             api_key: "  ".to_owned(),
             ..spec("lmstudio")
         };
-        let (registry, _) =
-            resolve_available_providers(None, None, &[no_key]).expect("keyless spec registers");
+        let (registry, _) = resolve_available_providers(None, None, &[no_key], &no_keys())
+            .expect("keyless spec registers");
         assert!(registry.ids().iter().any(|id| id.as_str() == "lmstudio"));
 
         let no_url = CustomProviderSpec {
@@ -704,18 +779,22 @@ mod tests {
             ..spec("deepseek")
         };
         assert!(matches!(
-            resolve_available_providers(None, None, &[no_url]),
+            resolve_available_providers(None, None, &[no_url], &no_keys()),
             Err(EngineServiceError::CustomProviderInvalid { id, .. }) if id == "deepseek"
         ));
     }
 
     #[test]
     fn duplicate_custom_ids_are_rejected() {
-        let err =
-            match resolve_available_providers(None, None, &[spec("deepseek"), spec("deepseek")]) {
-                Ok(_) => panic!("duplicate custom ids must be rejected"),
-                Err(err) => err,
-            };
+        let err = match resolve_available_providers(
+            None,
+            None,
+            &[spec("deepseek"), spec("deepseek")],
+            &no_keys(),
+        ) {
+            Ok(_) => panic!("duplicate custom ids must be rejected"),
+            Err(err) => err,
+        };
         assert!(matches!(
             &err,
             EngineServiceError::CustomProviderInvalid { id, .. } if id == "deepseek"
@@ -725,7 +804,7 @@ mod tests {
     #[test]
     fn single_provider_resolver_builds_a_named_custom_spec() {
         let (providers, model) =
-            match resolve_real_providers(Some("deepseek"), None, &[spec("deepseek")]) {
+            match resolve_real_providers(Some("deepseek"), None, &[spec("deepseek")], &no_keys()) {
                 Ok(resolved) => resolved,
                 Err(err) => panic!("custom provider should resolve: {err}"),
             };
