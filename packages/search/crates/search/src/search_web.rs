@@ -1,8 +1,9 @@
 //! `search_web` tool: query a web search engine and return formatted results.
 //!
 //! Powered by a swappable [`SearchBackend`]; the default implementation
-//! queries DuckDuckGo's HTML endpoint (no API key required). Results are
-//! returned as a token-efficient markdown list with titles, URLs, and snippets.
+//! uses a fallback chain (DuckDuckGo → SearXNG). Results are returned as a
+//! token-efficient markdown list with titles, URLs, and snippets. An optional
+//! [`SearchReranker`] re-orders results by relevance.
 
 use std::sync::Arc;
 
@@ -13,13 +14,17 @@ use serde::Deserialize;
 use agentloop_contracts::{ToolOutput, ToolResultBlock};
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
+use crate::rerank::SearchReranker;
 use crate::search_backend::{SearchBackend, SearchError};
 
 /// Maximum characters in the formatted output passed back to the model.
 const MAX_OUTPUT_CHARS: usize = 60_000;
 
-/// Maximum number of results to include in the output.
-const MAX_RESULTS: usize = 15;
+/// Default maximum number of results to include in the output.
+const DEFAULT_MAX_RESULTS: usize = 15;
+
+/// Absolute cap on the number of results.
+const HARD_MAX_RESULTS: usize = 20;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -27,17 +32,36 @@ struct SearchWebInput {
     /// The search query string. Be specific: include keywords, dates, or
     /// site restrictions (e.g. `site:docs.rs`) for better results.
     query: String,
+    /// How many results to return (1–20, default 15). Fewer results are
+    /// faster but less comprehensive; more results give broader coverage.
+    max_results: Option<usize>,
+    /// Search depth: `"broad"` for overview queries that cast a wide net,
+    /// `"specific"` for targeted searches on a narrow topic. Affects query
+    /// interpretation; the model should use `"broad"` when exploring a
+    /// new domain and `"specific"` when drilling into known topics.
+    #[allow(dead_code)]
+    depth: Option<String>,
 }
 
 /// Searches the web via a pluggable backend and returns results as markdown.
 pub struct SearchWebTool {
     backend: Arc<dyn SearchBackend>,
+    reranker: Option<Arc<dyn SearchReranker>>,
 }
 
 impl SearchWebTool {
     /// Create a tool that uses the given backend.
     pub fn new(backend: Arc<dyn SearchBackend>) -> Self {
-        Self { backend }
+        Self {
+            backend,
+            reranker: None,
+        }
+    }
+
+    /// Attach a result re-ranker that re-orders results by relevance to the query.
+    pub fn with_reranker(mut self, reranker: Arc<dyn SearchReranker>) -> Self {
+        self.reranker = Some(reranker);
+        self
     }
 }
 
@@ -50,8 +74,10 @@ impl Tool for SearchWebTool {
                  Use this to find current information, documentation, news, or any \
                  topic beyond your training data. Be specific with your query: include \
                  relevant keywords, dates, or operators like `site:` for better \
-                 results. Results are limited to the most relevant matches; if you \
-                 need to explore a result further, call `scrape_page` on its URL."
+                 results. Set `max_results` (1–20, default 15) to control how many \
+                 results you get back. Set `depth` to `\"broad\"` for exploratory \
+                 overview searches or `\"specific\"` for narrowly targeted queries. \
+                 If you need to explore a result further, call `scrape_page` on its URL."
                 .to_owned(),
             input_schema: schema_of::<SearchWebInput>(),
             read_only: true,
@@ -77,6 +103,11 @@ impl Tool for SearchWebTool {
                 "`query` must be a non-empty search string for `search_web`.".to_owned(),
             ));
         }
+
+        let max_results = parsed
+            .max_results
+            .unwrap_or(DEFAULT_MAX_RESULTS)
+            .clamp(1, HARD_MAX_RESULTS);
 
         let results = tokio::select! {
             _ = ctx.cancel.cancelled() => return Err(ToolError::Cancelled),
@@ -108,10 +139,22 @@ impl Tool for SearchWebTool {
                         "Search request failed: {err}. Check your network connection and retry."
                     )));
                 }
+                Err(SearchError::ParseError(msg)) => {
+                    return Err(ToolError::Execution(format!(
+                        "Search backend returned unparseable response: {msg}. Try a different query."
+                    )));
+                }
             },
         };
 
-        let truncated: Vec<_> = results.into_iter().take(MAX_RESULTS).collect();
+        // Apply re-ranker if configured.
+        let reranked = if let Some(ref reranker) = self.reranker {
+            reranker.rerank(query, &results)
+        } else {
+            results
+        };
+
+        let truncated: Vec<_> = reranked.into_iter().take(max_results).collect();
         let result_count = truncated.len();
         let rendered = format_search_results(query, &truncated);
 

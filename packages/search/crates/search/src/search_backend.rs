@@ -4,8 +4,11 @@
 //! engines. The default implementation uses DuckDuckGo's HTML endpoint (no API
 //! key required), but consumers can swap in any backend.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use reqwest::Client;
+use serde::Deserialize;
 
 /// A single search result from a backend.
 #[derive(Debug, Clone)]
@@ -25,6 +28,8 @@ pub enum SearchError {
     NoResults,
     #[error("search backend rate-limited; retry later")]
     RateLimited,
+    #[error("search response parse error: {0}")]
+    ParseError(String),
 }
 
 /// A pluggable search backend.
@@ -83,6 +88,127 @@ impl SearchBackend for DuckDuckGoBackend {
 
         let html = response.text().await?;
         let results = parse_duckduckgo_html(&html);
+        if results.is_empty() {
+            return Err(SearchError::NoResults);
+        }
+        Ok(results)
+    }
+}
+
+/// Cascading fallback search backend.
+///
+/// Wraps an ordered list of backends and tries each in sequence until one
+/// returns non-empty results. If all backends fail, the last error is returned.
+pub struct FallbackSearchBackend {
+    backends: Vec<Arc<dyn SearchBackend>>,
+}
+
+impl FallbackSearchBackend {
+    /// Create a fallback chain from the given backends.
+    ///
+    /// Backends are tried in order; the first to return non-empty results wins.
+    pub fn new(backends: Vec<Arc<dyn SearchBackend>>) -> Self {
+        Self { backends }
+    }
+}
+
+#[async_trait]
+impl SearchBackend for FallbackSearchBackend {
+    async fn search(&self, query: &str) -> Result<Vec<SearchResult>, SearchError> {
+        let mut last_err: Option<SearchError> = None;
+        for backend in &self.backends {
+            match backend.search(query).await {
+                Ok(results) if !results.is_empty() => return Ok(results),
+                Ok(_) => {
+                    last_err = Some(SearchError::NoResults);
+                }
+                Err(e) => {
+                    last_err = Some(e);
+                }
+            }
+        }
+        Err(last_err.unwrap_or(SearchError::NoResults))
+    }
+}
+
+/// A SearXNG backend that queries a public or self-hosted instance.
+///
+/// Queries the instance at the configured base URL using the JSON API
+/// (`/search?format=json&q=...`). No API key is required for public instances.
+pub struct SearxNGBackend {
+    client: Client,
+    base_url: String,
+}
+
+impl SearxNGBackend {
+    /// Create a backend that queries the given SearXNG instance.
+    ///
+    /// The `base_url` should be the root of the instance (e.g.
+    /// `https://search.sapti.me`).
+    pub fn new(base_url: String) -> Self {
+        Self {
+            client: Client::new(),
+            base_url,
+        }
+    }
+}
+
+/// Minimal SearXNG JSON response for parsing.
+#[derive(Debug, Deserialize)]
+struct SearxNGResponse {
+    results: Vec<SearxNGResult>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SearxNGResult {
+    title: String,
+    url: String,
+    content: Option<String>,
+}
+
+#[async_trait]
+impl SearchBackend for SearxNGBackend {
+    async fn search(&self, query: &str) -> Result<Vec<SearchResult>, SearchError> {
+        let url = format!(
+            "{}/search?format=json&q={}",
+            self.base_url.trim_end_matches('/'),
+            urlencoding(query)
+        );
+
+        let response = self
+            .client
+            .get(&url)
+            .header(
+                reqwest::header::USER_AGENT,
+                "Mozilla/5.0 (compatible; SearxNGBot/1.0)",
+            )
+            .send()
+            .await?;
+
+        let response = match response.error_for_status() {
+            Ok(r) => r,
+            Err(err) => {
+                if err.status() == Some(reqwest::StatusCode::TOO_MANY_REQUESTS) {
+                    return Err(SearchError::RateLimited);
+                }
+                return Err(SearchError::Request(err));
+            }
+        };
+
+        let body = response.text().await?;
+        let parsed: SearxNGResponse = serde_json::from_str(&body)
+            .map_err(|err| SearchError::ParseError(format!("SearXNG JSON parse error: {err}")))?;
+
+        let results: Vec<SearchResult> = parsed
+            .results
+            .into_iter()
+            .map(|r| SearchResult {
+                title: r.title,
+                url: r.url,
+                snippet: r.content.unwrap_or_default(),
+            })
+            .collect();
+
         if results.is_empty() {
             return Err(SearchError::NoResults);
         }

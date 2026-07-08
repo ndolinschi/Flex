@@ -1,22 +1,26 @@
 //! `SearchPlugin` — the deep-search capability.
 //!
 //! Contributes two web tools (`search_web`, `scrape_page`) and a `researcher`
-//! role that encodes a structured Analyze/Plan → Execute/Evaluate →
-//! Synthesis/Citation workflow.
+//! role that encodes a structured deep-research workflow with iterative
+//! reflection, parallel fan-out, incremental compaction, and layered search.
 
 use std::sync::Arc;
 
 use agentloop_contracts::IsolationPolicy;
 use agentloop_core::{Plugin, PluginRole, PluginRoleTools, Tool};
 
+use crate::rerank::KeywordReranker;
 use crate::scrape_page::ScrapePageTool;
-use crate::search_backend::{DuckDuckGoBackend, SearchBackend};
+use crate::search_backend::{
+    DuckDuckGoBackend, FallbackSearchBackend, SearchBackend, SearxNGBackend,
+};
 use crate::search_web::SearchWebTool;
 
 /// The deep-search plugin.
 ///
 /// Enabled via `AgentBuilder::enable_plugin("search")`. Uses a swappable
-/// [`SearchBackend`]; the default is DuckDuckGo's HTML endpoint.
+/// [`SearchBackend`]; the default is a fallback chain of DuckDuckGo → SearXNG
+/// with keyword-based result re-ranking.
 pub struct SearchPlugin {
     backend: Arc<dyn SearchBackend>,
 }
@@ -29,10 +33,13 @@ impl SearchPlugin {
 }
 
 impl Default for SearchPlugin {
-    /// Defaults to the DuckDuckGo HTML backend.
+    /// Defaults to a fallback chain: DuckDuckGo → SearXNG (public instance).
     fn default() -> Self {
         Self {
-            backend: Arc::new(DuckDuckGoBackend::new()),
+            backend: Arc::new(FallbackSearchBackend::new(vec![
+                Arc::new(DuckDuckGoBackend::new()),
+                Arc::new(SearxNGBackend::new("https://search.sapti.me".to_owned())),
+            ])),
         }
     }
 }
@@ -44,7 +51,10 @@ impl Plugin for SearchPlugin {
 
     fn tools(&self) -> Vec<Arc<dyn Tool>> {
         vec![
-            Arc::new(SearchWebTool::new(Arc::clone(&self.backend))),
+            Arc::new(
+                SearchWebTool::new(Arc::clone(&self.backend))
+                    .with_reranker(Arc::new(KeywordReranker::new())),
+            ),
             Arc::new(ScrapePageTool::new()),
         ]
     }
@@ -71,33 +81,53 @@ impl Plugin for SearchPlugin {
 /// System prompt for the researcher role.
 ///
 /// Encodes a structured deep-research workflow: Analyze & Plan →
-/// Execute & Evaluate (iterative) → Synthesis & Citation.
+/// Execute & Evaluate with mandatory reflection checkpoints →
+/// Synthesis & Citation. Includes instructions for parallel fan-out,
+/// incremental compaction, and layered search patterns.
 const RESEARCHER_PROMPT: &str = r#"You are an Autonomous Deep Search Agent. Your objective is to provide comprehensive, highly accurate, and deeply researched answers to complex user queries. You do not just guess or rely on your internal training data; you actively plan, search, read, and verify information from the internet.
 
 ### YOUR AVAILABLE TOOLS:
-1. `search_web(query: string)`: Returns search engine results (titles, URLs, and short snippets).
-2. `scrape_page(url: string)`: Reads the content of a specific webpage and returns the text.
+1. `search_web(query, max_results?, depth?)`: Search the web. Set `max_results` (1-20, default 15) to control result count. Set `depth` to `"broad"` for exploratory overview searches or `"specific"` for narrowly targeted queries.
+2. `scrape_page(url, max_bytes?)`: Read the full content of a specific webpage.
+3. `Task(role="researcher", prompt="...")`: Spawn a parallel researcher sub-agent to investigate a sub-question independently.
 
 ### YOUR WORKFLOW (THE LOOP):
+
 #### Phase 1: Analyze & Plan
 - What is the core question?
 - What underlying assumptions or sub-questions need to be answered?
+- For complex questions, identify distinct angles that can be researched in parallel.
 - Create a specific plan. Write down 2-4 distinct search queries.
 
 #### Phase 2: Execute & Evaluate (Iterative Loop)
-1. Run `search_web` with planned queries.
-2. Evaluate snippets. Use `scrape_page` to read the full context.
-3. Critically evaluate: Is this credible? Contradictions? Fully answered?
-4. If missing, formulate NEW queries and repeat.
+Use a **layered search pattern**:
+1. **Broad searches** (2-3 rounds): Start with `depth="broad"` queries to map the landscape. Read snippets; scrape only the most promising pages.
+2. **Deep-dive scrapes**: After identifying key sources, scrape them in full. Extract facts, data points, and arguments.
+3. **Verification searches** (2-3 rounds): Use `depth="specific"` queries to verify key claims. Search for counter-arguments and contradictory evidence.
+
+**Parallel fan-out for complex questions**: If the question has multiple independent angles (e.g., "analyze the economic and environmental impact of X"), use `Task(role="researcher", prompt="...")` to spawn parallel researcher sub-agents for each angle. Each sub-agent will return a synthesis of its findings.
+
+**Incremental compaction**: After 3 search rounds, summarize what you have learned concisely before continuing. Discard raw search output that is no longer needed; keep only key facts, sources, and open questions.
+
+#### Reflection Checkpoint (mandatory — after every 2 search+scrape cycles):
+Stop and answer these four questions explicitly:
+1. What is answered fully?
+2. What is partially answered (and what's missing)?
+3. Are there contradictions between sources? (List them)
+4. What new search queries are needed?
+
+If all questions are answered and no contradictions remain, proceed to Synthesis.
 
 #### Phase 3: Synthesis & Citation
 - Direct, clear answer first.
 - Structure with headings and bullet points.
 - Cite sources with inline citations [1], [2].
 - Maintain objective, analytical tone.
+- List sources at the end with URLs.
 
 ### GUARDRAILS:
 - Never hallucinate facts or URLs.
 - If you cannot find verifiable information, state it explicitly.
-- Avoid confirmation bias — search for counter-arguments.
-- Narrow overly broad queries to the most verifiable aspects."#;
+- Avoid confirmation bias — search for counter-arguments and contradictory evidence.
+- Narrow overly broad queries to the most verifiable aspects.
+- Prefer primary sources (official docs, academic papers, .gov/.edu domains) over secondary commentary."#;

@@ -3,6 +3,10 @@
 //! Follows the same pattern as the engine's `WebFetch` tool: reqwest for
 //! HTTP, `htmd` for HTML-to-markdown conversion, and truncation with
 //! explicit markers so the model knows content was cut.
+//!
+//! After markdown conversion, a heuristic extracts the "content core" — the
+//! largest contiguous block of paragraphs — to keep the output token-efficient
+//! by dropping boilerplate (nav, footer, sidebars) from the response.
 
 use async_trait::async_trait;
 use schemars::JsonSchema;
@@ -19,6 +23,11 @@ const HARD_MAX_BYTES: usize = 1_000_000;
 
 /// Maximum characters in the output fed back to the model.
 const MAX_OUTPUT_CHARS: usize = 120_000;
+
+/// Minimum fraction of total content the content core must represent to be used.
+/// If the best contiguous block is less than this fraction of the total, the full
+/// content is returned instead.
+const CORE_MIN_FRACTION: f64 = 0.30;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -161,6 +170,14 @@ impl Tool for ScrapePageTool {
             String::from_utf8_lossy(&bytes[..kept_len]).into_owned()
         };
 
+        // For HTML/markdown content, extract the main content core to reduce
+        // boilerplate (nav, footer, sidebars) in the output.
+        let text = if is_html {
+            extract_content_core(&text)
+        } else {
+            text.to_owned()
+        };
+
         let mut rendered = String::new();
         rendered.push_str("url: ");
         rendered.push_str(final_url.as_str());
@@ -194,6 +211,74 @@ impl Tool for ScrapePageTool {
     }
 }
 
+/// Extract the main content from a markdown page by finding the densest
+/// paragraph region.
+///
+/// Strategy:
+/// 1. Split by double-newline into paragraphs.
+/// 2. Find the longest paragraph as the anchor point.
+/// 3. Expand left and right from the anchor, including neighboring paragraphs
+///    that exceed the minimum length threshold (30 chars).
+/// 4. If the resulting block is at least 30% of total content, return it;
+///    otherwise return the full text.
+///
+/// This drops short boilerplate like nav bars and footers while keeping the
+/// article body.
+fn extract_content_core(markdown: &str) -> String {
+    const MIN_PARAGRAPH_LEN: usize = 30;
+
+    let paragraphs: Vec<&str> = markdown
+        .split("\n\n")
+        .map(|p| p.trim())
+        .filter(|p| !p.is_empty())
+        .collect();
+
+    if paragraphs.len() < 3 {
+        // Too few paragraphs to meaningfully extract a core.
+        return markdown.to_owned();
+    }
+
+    let total_chars: usize = paragraphs.iter().map(|p| p.len()).sum();
+    if total_chars == 0 {
+        return markdown.to_owned();
+    }
+
+    // Find the longest paragraph as the anchor.
+    let anchor = match paragraphs.iter().enumerate().max_by_key(|(_, p)| p.len()) {
+        Some((idx, _)) => idx,
+        None => return markdown.to_owned(),
+    };
+
+    // Expand left from the anchor.
+    let mut core_start = anchor;
+    while core_start > 0 && paragraphs[core_start - 1].len() >= MIN_PARAGRAPH_LEN {
+        core_start -= 1;
+    }
+
+    // Expand right from the anchor.
+    let mut core_end = anchor + 1;
+    while core_end < paragraphs.len() && paragraphs[core_end].len() >= MIN_PARAGRAPH_LEN {
+        core_end += 1;
+    }
+
+    let core: Vec<&str> = paragraphs[core_start..core_end].to_vec();
+    let core_chars: usize = core.iter().map(|p| p.len()).sum();
+    let fraction = core_chars as f64 / total_chars as f64;
+
+    if core.len() >= 2 && fraction >= CORE_MIN_FRACTION {
+        let mut result = core.join("\n\n");
+        if core_start > 0 || core_end < paragraphs.len() {
+            result = format!(
+                "[... {:.0}% of page focused as main content ...]\n\n{result}",
+                fraction * 100.0
+            );
+        }
+        result
+    } else {
+        markdown.to_owned()
+    }
+}
+
 fn schema_of<I: JsonSchema>() -> serde_json::Value {
     serde_json::to_value(schemars::schema_for!(I))
         .unwrap_or_else(|_| serde_json::json!({"type": "object"}))
@@ -206,4 +291,52 @@ fn truncate_chars(text: &str, max_chars: usize) -> (String, bool) {
     let mut out: String = text.chars().take(max_chars).collect();
     out.push_str("\n\n[... output truncated ...]");
     (out, true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_content_core_drops_boilerplate() {
+        let input = "\
+# Nav\nHome | About | Contact\n\n\
+# Footer\nCopyright 2025\n\n\
+# Main Article\n\
+This is the first paragraph of the main article.\n\
+\n\
+This is the second paragraph of the main article.\n\
+\n\
+This is the third paragraph with important details.";
+
+        let core = extract_content_core(input);
+        // The core should contain the "Main Article" section (the largest contiguous block).
+        assert!(core.contains("Main Article"));
+        assert!(core.contains("first paragraph"));
+        assert!(core.contains("third paragraph"));
+        // The small nav/footer blocks should not be in the core.
+        assert!(!core.contains("Copyright 2025"));
+        assert!(!core.contains("Home | About"));
+    }
+
+    #[test]
+    fn extract_content_core_full_when_too_small() {
+        // Only two paragraphs — not enough to extract a core, returns full content.
+        let input = "Single paragraph only.\n\nShort second paragraph.";
+        let core = extract_content_core(input);
+        assert_eq!(core, input);
+    }
+
+    #[test]
+    fn extract_content_core_single_section() {
+        // All paragraphs are part of one large block — should return all.
+        let input = "\
+Introduction paragraph with some context.\n\n\
+Main body paragraph with the bulk of the content here.\n\n\
+Conclusion paragraph wrapping everything up nicely.";
+        let core = extract_content_core(input);
+        assert!(core.contains("Introduction"));
+        assert!(core.contains("Main body"));
+        assert!(core.contains("Conclusion"));
+    }
 }
