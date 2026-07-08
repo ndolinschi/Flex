@@ -18,8 +18,6 @@ use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescri
 
 use crate::fs::schema_of;
 
-// Schema-only: the loop parses Task input itself; this struct exists to
-// generate the JSON schema shown to the model.
 #[allow(dead_code)]
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -49,8 +47,6 @@ impl Tool for TaskTool {
             name: SUBAGENT_TOOL_NAME.to_owned(),
             description: self.description.clone(),
             input_schema: schema_of::<TaskInput>(),
-            // Read-only so consecutive Task calls batch and run concurrently;
-            // children gate their own mutations.
             read_only: true,
             category: ToolCategory::Agent,
             needs_permission: PermissionHint::Never,

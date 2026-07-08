@@ -24,7 +24,6 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn schema_dir() -> PathBuf {
-    // xtask lives at <engine>/xtask; schemas at <engine>/schemas/v1.
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("schemas")

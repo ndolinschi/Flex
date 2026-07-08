@@ -95,7 +95,6 @@ mod tests {
     #[test]
     fn missing_program_is_not_on_path() {
         assert!(!program_on_path("definitely-not-a-real-binary-xyz-123"));
-        // An explicit non-existent path is likewise unavailable.
         assert!(!program_on_path("/no/such/tool"));
     }
 }

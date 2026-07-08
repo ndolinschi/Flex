@@ -3,7 +3,6 @@
 //! The runner composes the native loop with real provider clients and prints
 //! the canonical event stream as NDJSON.
 
-// The runner's job is to print to stdout; libraries must not.
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
 mod cli;

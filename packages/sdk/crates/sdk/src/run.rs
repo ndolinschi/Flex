@@ -23,8 +23,6 @@ pub(crate) async fn run(args: RunArgs) -> anyhow::Result<()> {
         tracing::info!(target: "resolution", "{line}");
     }
 
-    // The headless runner has no permission-response input yet. The transport
-    // defaults to plan mode so read-only tools can run while mutations deny.
     let request = OneTurnRequest::new(args.prompt, args.workdir);
     let _summary = serve_one_turn(resolution.service, request, tokio::io::stdout())
         .await

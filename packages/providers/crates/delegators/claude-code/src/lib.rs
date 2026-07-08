@@ -14,10 +14,9 @@ pub use agent::{
     ClaudeCodeAgent, ClaudeCodeProfile, claude_code_agent, claude_code_agent_with_host,
     ephemeral_claude_code_agent,
 };
+pub use agentloop_delegator_common::{DelegatorHostError, DelegatorProbeStatus};
 pub use config::{ClaudeCodeConfig, PromptTransport};
 pub use host::TokioCommandHost;
 pub use mapper::ClaudeCodeLineMapper;
-// Probe outcomes surface to composition roots (resolver, doctor).
-pub use agentloop_delegator_common::{DelegatorHostError, DelegatorProbeStatus};
 
 pub const CLAUDE_CODE_AGENT_ID: &str = "claude-code";

@@ -155,9 +155,6 @@ impl Provider for OpenAiProvider {
         match self.fetch_models_live().await {
             Ok(models) => Ok(models),
             Err(err) => {
-                // The `/models` endpoint is unreachable (custom endpoint down,
-                // bad key, no listing route). Rather than an empty picker, fall
-                // back to the configured default model so it stays selectable.
                 let default = self.config.default_model.trim();
                 if default.is_empty() {
                     return Err(err);
@@ -470,8 +467,6 @@ mod tests {
 
     #[tokio::test]
     async fn static_models_are_served_without_a_network_call() {
-        // The config points at an unroutable host: a network attempt would
-        // error, so an Ok result proves the static catalog short-circuits.
         let models = vec![model("deepseek-chat"), model("deepseek-reasoner")];
         let provider = OpenAiProvider::with_identity("deepseek", config(), models.clone(), false);
         match provider.list_models().await {

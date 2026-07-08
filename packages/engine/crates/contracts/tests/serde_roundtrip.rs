@@ -159,7 +159,6 @@ fn unknown_kind_is_lenient_not_fatal() {
     let alien = serde_json::json!({"kind": "hologram_projection", "payload": {"x": 1}});
     let event = AgentEvent::from_json_lenient(alien.clone());
     assert_eq!(event, AgentEvent::Unknown { raw: alien });
-    // But a known kind parses normally through the lenient path.
     let known = serde_json::json!({"kind": "gap", "from_seq": 3});
     assert_eq!(
         AgentEvent::from_json_lenient(known),
@@ -193,9 +192,6 @@ fn persistence_classes_are_stable() {
 
 #[test]
 fn legacy_session_meta_loads_without_isolation_fields() {
-    // A SessionMeta persisted before isolation existed has none of the new
-    // fields; it must deserialize with them defaulted to None, and re-serialize
-    // without introducing them (skip_serializing_if keeps old logs byte-stable).
     let legacy = serde_json::json!({
         "id": "sess-1",
         "agent_id": "native",
@@ -223,7 +219,6 @@ fn legacy_session_meta_loads_without_isolation_fields() {
         "must not emit base_cwd when None"
     );
 
-    // And a fully-isolated meta round-trips unchanged.
     let isolated = SessionMeta {
         isolation: Some(IsolationPolicy::Required),
         workspace_id: Some("ws-9".to_owned()),
@@ -255,8 +250,6 @@ fn wire_shape_snapshot() {
 #[test]
 fn hello_snapshot() {
     let hello = Hello::new(AgentCaps::default());
-    // Identity fields are redacted: the snapshot pins the wire shape, and the
-    // brand string must not appear outside branding.rs (CI greps for leaks).
     insta::assert_json_snapshot!("hello_wire_shape", hello, {
         ".engine.name" => "[product]",
         ".engine.version" => "[version]",

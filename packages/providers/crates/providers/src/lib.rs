@@ -18,10 +18,8 @@ mod resolve;
 
 pub use resolve::{connect_bedrock, resolve_available_providers, resolve_real_providers};
 
-// Re-export the engine surface a composition root needs alongside the facade.
 pub use agentloop_engine::{EngineConfig, EngineResult, EngineService, EngineServiceError};
 
-// Re-export the LLM provider client crates (the `Provider` impls).
 pub use agentloop_provider_anthropic as anthropic;
 pub use agentloop_provider_bedrock as bedrock;
 pub use agentloop_provider_copilot as copilot;
@@ -29,9 +27,6 @@ pub use agentloop_provider_gemini as gemini;
 pub use agentloop_provider_ollama as ollama;
 pub use agentloop_provider_openai as openai;
 
-// Re-export the external-agent connector crates (the `Agent` impls, formerly
-// "delegators"). They keep the `Agent` trait: an external agent runs its own
-// loop, which the thin `Provider` trait cannot model.
 pub use agentloop_delegator_acp as delegator_acp;
 pub use agentloop_delegator_claude_code as delegator_claude_code;
 pub use agentloop_delegator_copilot as delegator_copilot;
@@ -95,8 +90,6 @@ pub fn native(opts: ProviderOptions, config: EngineConfig) -> EngineResult<Engin
 pub fn native_all(opts: ProviderOptions, config: EngineConfig) -> EngineResult<EngineService> {
     let (mut providers, mut default_model) =
         resolve_available_providers(opts.provider.as_deref(), opts.model, &opts.custom)?;
-    // A Bedrock API key connected from the client (persisted, not env)
-    // registers/overrides Bedrock here.
     if let Some(bedrock_model) =
         connect_bedrock(&mut providers, &opts.provider_keys, &opts.provider_regions)
     {

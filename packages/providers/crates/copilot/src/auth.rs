@@ -161,7 +161,6 @@ mod tests {
         )
         .expect("parses");
         assert_eq!(session.bearer, "tid=abc;exp=99");
-        // Endpoint from the exchange wins, trailing slash trimmed.
         assert_eq!(session.api_base, "https://api.enterprise.githubcopilot.com");
         assert_eq!(session.expires_at_secs, 1_800_000_000);
     }

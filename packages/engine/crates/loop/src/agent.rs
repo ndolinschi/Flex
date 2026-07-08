@@ -156,18 +156,10 @@ impl Agent for NativeAgent {
         };
         let now = now_ms();
 
-        // Effective isolation for this root session: an explicit request wins,
-        // else the (main) role's declared policy. Subagents never reach here —
-        // they inherit the parent's cwd (top-level isolation).
         let policy = params
             .isolation
             .unwrap_or_else(|| self.deps.roles.isolation(None));
 
-        // Provision an isolated workspace when asked and a backend exists. On
-        // success the session's cwd is redirected into the workspace root and
-        // the original directory is kept as `base_cwd` (for integration and for
-        // resume fallback). Optional isolation degrades to running in place;
-        // Required isolation fails the session if it can't be provisioned.
         let mut cwd = base_cwd.clone();
         let mut isolation = None;
         let mut workspace_id = None;
@@ -253,11 +245,6 @@ impl Agent for NativeAgent {
     }
 
     async fn resume_session(&self, id: &SessionId) -> Result<(), AgentError> {
-        // The log is the ground truth: resuming is just re-attaching a handle
-        // at the right sequence number. One exception: if this session ran in
-        // an isolated workspace that has since been integrated or removed, its
-        // stored cwd points at a directory that no longer exists — repoint it
-        // to the base directory so tools keep working after the resume.
         let meta = self.deps.store.get_meta(id).await?;
         if meta.workspace_id.is_some() {
             if let Some(base) = meta.base_cwd.filter(|_| !meta.cwd.exists()) {
@@ -295,18 +282,15 @@ impl Agent for NativeAgent {
         })?;
         let session_id = session.clone();
         let rx = handle.broadcast.subscribe();
-        let stream = tokio_stream::wrappers::BroadcastStream::new(rx).map(move |item| {
-            match item {
-                Ok(event) => event,
-                // Lagged: tell the subscriber to re-sync from the store.
-                Err(_) => SessionEvent {
-                    session_id: session_id.clone(),
-                    seq: 0,
-                    turn_id: None,
-                    ts_ms: now_ms(),
-                    payload: AgentEvent::Gap { from_seq: 0 },
-                },
-            }
+        let stream = tokio_stream::wrappers::BroadcastStream::new(rx).map(move |item| match item {
+            Ok(event) => event,
+            Err(_) => SessionEvent {
+                session_id: session_id.clone(),
+                seq: 0,
+                turn_id: None,
+                ts_ms: now_ms(),
+                payload: AgentEvent::Gap { from_seq: 0 },
+            },
         });
         Ok(Box::pin(stream))
     }

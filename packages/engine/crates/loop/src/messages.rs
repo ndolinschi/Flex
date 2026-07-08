@@ -69,9 +69,6 @@ pub fn transcript_to_messages(transcript: &Transcript) -> Vec<Message> {
                         name: call.tool_name.clone(),
                         input: call.input.clone(),
                     });
-                    // Every requested call needs a result message or the
-                    // conversation is invalid for tool-use APIs. Unresolved
-                    // calls (cancelled turns) get a synthetic error result.
                     let (blocks, is_error) = output_or_synthetic(
                         call.result.as_ref(),
                         &call.status,
@@ -84,8 +81,6 @@ pub fn transcript_to_messages(transcript: &Transcript) -> Vec<Message> {
                         is_error,
                     });
                 }
-                // Unknown future block kinds cannot be re-encoded for a
-                // provider; skip them rather than corrupt the request.
                 _ => {}
             }
         }

@@ -34,10 +34,6 @@ pub trait SearchBackend: Send + Sync {
     async fn search(&self, query: &str) -> Result<Vec<SearchResult>, SearchError>;
 }
 
-// ---------------------------------------------------------------------------
-// DuckDuckGo HTML backend
-// ---------------------------------------------------------------------------
-
 /// Searches DuckDuckGo's HTML endpoint and parses result blocks.
 ///
 /// Uses `https://html.duckduckgo.com/html/` — no API key is required.
@@ -75,8 +71,6 @@ impl SearchBackend for DuckDuckGoBackend {
             .send()
             .await?;
 
-        // Normalize HTTP errors through reqwest's own error type so we get
-        // a consistent error message that includes the status code and URL.
         let response = match response.error_for_status() {
             Ok(r) => r,
             Err(err) => {
@@ -134,11 +128,8 @@ fn parse_duckduckgo_html(html: &str) -> Vec<SearchResult> {
     while let Some(rel_start) = html[search_pos..].find(marker) {
         let block_start = search_pos + rel_start;
 
-        // Advance past the marker to avoid re-matching.
         let content_start = block_start + marker.len();
 
-        // Find the end of this block: next `class="result "` or end of HTML.
-        // The trailing space avoids matching partial class names like `result__a`.
         let block_end = html[content_start..]
             .find("class=\"result \"")
             .map(|p| content_start + p)
@@ -147,8 +138,6 @@ fn parse_duckduckgo_html(html: &str) -> Vec<SearchResult> {
         let block = &html[block_start..block_end];
 
         if let Some((title, url)) = extract_result_link(block) {
-            // Don't include ad results (they have a different URL pattern
-            // and no search-engine value).
             if !is_ad_result(&url) {
                 let snippet = extract_snippet(block).unwrap_or_default();
                 results.push(SearchResult {
@@ -171,12 +160,10 @@ fn extract_result_link(html: &str) -> Option<(String, String)> {
     let pos = html.find(link_marker)?;
     let after_marker = &html[pos + link_marker.len()..];
 
-    // Extract href="..."
     let href_start = after_marker.find("href=\"")? + 6;
     let href_end = after_marker[href_start..].find('"')?;
     let url = html_entity_decode(&after_marker[href_start..href_start + href_end]);
 
-    // Find the closing `>` after the `<a ...>` tag and extract inner text.
     let tag_close = after_marker[href_start + href_end..].find('>')?;
     let text_start = href_start + href_end + tag_close + 1;
     let text_end = after_marker[text_start..]
@@ -194,11 +181,9 @@ fn extract_result_link(html: &str) -> Option<(String, String)> {
 
 /// Extract the snippet text from a result block.
 fn extract_snippet(html: &str) -> Option<String> {
-    // Try `class="result__snippet"` first (DuckDuckGo HTML endpoint).
     if let Some(snippet) = extract_tag_content(html, "class=\"result__snippet\"") {
         return Some(snippet);
     }
-    // Fall back to the legacy `class="result-snippet"` table-cell format.
     if let Some(snippet) = extract_tag_content(html, "class=\"result-snippet\"") {
         return Some(snippet);
     }

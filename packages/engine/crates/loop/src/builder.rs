@@ -29,10 +29,6 @@ pub struct LoopLimits {
 impl Default for LoopLimits {
     fn default() -> Self {
         Self {
-            // A backstop against a genuinely runaway loop (a stuck tool, a
-            // model repeating the same call forever), not a budget for
-            // normal work — a single turn scaffolding a multi-file project
-            // easily spends 50+ model round trips on legitimate progress.
             max_iterations: 500,
             tool_concurrency: 4,
             tool_timeout: Duration::from_secs(600),

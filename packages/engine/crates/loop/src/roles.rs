@@ -143,7 +143,6 @@ impl RoleRegistry {
                 deny,
             };
         };
-        // Re-allow Task below the depth cap so deeper trees can form.
         if depth < spec.max_depth {
             deny.retain(|name| name != agentloop_core::tool::SUBAGENT_TOOL_NAME);
         }
@@ -316,13 +315,10 @@ mod tests {
                 .map(|(_, text)| text)
                 .unwrap_or_default()
         };
-        // Different roles advertise different models so the orchestrator can
-        // route research → fast model, implementation → strong model.
         assert!(summary("searcher").contains("deepseek/deepseek-v4-flash"));
         let worker = summary("worker");
         assert!(worker.contains("deepseek/deepseek-v4-pro"));
         assert!(worker.contains("full tool access"));
-        // A role with no chain reports that it inherits the session model.
         assert!(summary("reviewer").contains("inherits session model"));
     }
 

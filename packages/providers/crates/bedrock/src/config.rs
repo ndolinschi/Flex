@@ -232,8 +232,6 @@ mod tests {
 
     #[test]
     fn control_and_listing_endpoints_follow_the_region() {
-        // The whole point of the region override: model listing must hit the
-        // chosen region, not always us-east-1.
         let config = BedrockConfig::bearer("eu-west-1", "key", None);
         assert_eq!(config.control_host(), "bedrock.eu-west-1.amazonaws.com");
         assert!(
@@ -261,9 +259,6 @@ mod tests {
     #[test]
     fn inference_profiles_page_url_encodes_continuation_token() {
         let config = BedrockConfig::bearer("us-east-1", "key", None);
-        // A realistic token carries base64 chars (`/`, `+`, `=`) that must be
-        // percent-encoded so the SigV4 canonical query stays valid; params stay
-        // sorted (`maxResults` < `nextToken` < `typeEquals`).
         let url = config.inference_profiles_page_url(Some("a/b+c=="), "SYSTEM_DEFINED");
         assert_eq!(
             url,

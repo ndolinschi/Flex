@@ -54,7 +54,6 @@ impl CopilotConfig {
         }
         spec = spec.args(self.extra_args.clone());
         spec = spec.arg("-p").arg(prompt.into());
-        // Copilot renders ANSI styling for terminals; ask it not to.
         spec = spec.env("NO_COLOR", "1");
         DelegatorRunRequest::new(self.apply_cwd(spec))
     }

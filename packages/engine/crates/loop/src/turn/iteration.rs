@@ -48,10 +48,6 @@ pub(super) async fn run_iteration(
 ) -> Result<IterationOutcome, AgentError> {
     let mut auto_compacted = false;
 
-    // Failover chain: the effective model first, then `fallback_models` in
-    // order (deduped). Each candidate is tried at most once per iteration;
-    // partial output from a failed attempt is discarded before it is ever
-    // materialized, so a retry rebuilds cleanly from the log.
     let primary = opts
         .model
         .clone()
@@ -76,7 +72,6 @@ pub(super) async fn run_iteration(
     let (draft, was_cancelled, llm_started, llm_span) = loop {
         let model_ref = chain[attempt].clone();
         let next_model = chain.get(attempt + 1).cloned();
-        // ── build the request from the log ──────────────────────────────────────
         let events = deps.store.read(&handle.id, 0).await?;
         let transcript =
             agentloop_contracts::reduce(events.iter().map(|(_, event)| event).collect::<Vec<_>>());
@@ -89,18 +84,12 @@ pub(super) async fn run_iteration(
             }
             system.push_str(append);
         }
-        // Effort guidance composes after the role append: the role prompt says
-        // what the job is, this says how hard to work at it. Only when the
-        // caller set an effort — `None` keeps the prompt byte-for-byte as before.
         if let Some(effort) = opts.effort {
             if !system.is_empty() {
                 system.push_str("\n\n");
             }
             system.push_str(effort::guidance(effort));
         }
-        // Plan mode: tell the model it's researching read-only and should hand
-        // off a plan via ExitPlanMode. The permission gate enforces this; the
-        // guidance keeps the model from flailing into denied edits.
         if matches!(
             opts.permission_mode,
             Some(agentloop_contracts::PermissionMode::Plan)
@@ -138,7 +127,6 @@ pub(super) async fn run_iteration(
 
         let mut request = ChatRequest::new(model.clone(), messages);
         request.system = (!system.is_empty()).then_some(system.clone());
-        // Role-scoped tools: subagent sessions see only their role's set.
         let tool_filter = match meta.role.as_deref() {
             Some(role) => deps.roles.tool_filter(role, &deps.tools, meta.depth),
             None => Default::default(),
@@ -167,10 +155,6 @@ pub(super) async fn run_iteration(
             continue;
         }
 
-        // Extended-thinking budget: an explicit `/thinking` budget wins;
-        // otherwise derive one from the effort level, scaled per role. Forward
-        // it only to providers that declare the capability, so strict APIs
-        // never receive an unknown field.
         let budget = opts
             .thinking
             .map(|thinking| thinking.budget_tokens)
@@ -193,7 +177,6 @@ pub(super) async fn run_iteration(
             }
         }
 
-        // ── stream the model response ───────────────────────────────────────
         let llm_started = now_ms();
         let llm_span = info_span!("llm_request", provider = %provider.id(), model = %model);
         let mut stream = {
@@ -240,12 +223,6 @@ pub(super) async fn run_iteration(
         let mut draft = AssistantDraft::new();
         let mut was_cancelled = false;
         let mut stream_err: Option<ProviderError> = None;
-        // A stream that closes without ever delivering a terminal event
-        // (`MessageEnd`/`Usage`) has been cut off mid-response, not
-        // deliberately finished — the wire dropped, it was not the model
-        // saying "done". Track whether we actually saw one so `None => break`
-        // can tell the two cases apart instead of treating a truncated
-        // partial draft as a normal, successful completion.
         let mut saw_terminal_event = false;
         loop {
             tokio::select! {
@@ -283,10 +260,6 @@ pub(super) async fn run_iteration(
         }
 
         if stream_err.is_none() && !was_cancelled && !saw_terminal_event {
-            // The provider connection ended before signalling completion —
-            // surface it like any other stream failure so it goes through
-            // the same compaction/fallback/retry path instead of silently
-            // persisting a truncated partial draft as a successful answer.
             stream_err = Some(ProviderError::Stream {
                 provider: provider.id(),
                 message: "stream ended before a MessageEnd/Usage event was received \
@@ -297,8 +270,6 @@ pub(super) async fn run_iteration(
 
         if let Some(err) = stream_err {
             if is_context_overflow(&err) && !auto_compacted {
-                // The partial draft is dropped; compaction rewrites the log and
-                // the retry rebuilds a smaller request from it.
                 tracing::info!(
                     target: "loop",
                     session_id = %handle.id,
@@ -316,11 +287,6 @@ pub(super) async fn run_iteration(
                 continue;
             }
             if mid_stream_retryable(&err) && stream_retries < MAX_STREAM_RETRIES {
-                // The partial draft is dropped; a fresh request rebuilds
-                // cleanly from the persisted log on the same model. This is
-                // not a fallback (no model switch, nothing persisted about
-                // it) — just absorbing a one-off dropped connection or
-                // corrupted frame before treating the model itself as bad.
                 stream_retries += 1;
                 tracing::info!(
                     target: "loop",
@@ -338,8 +304,6 @@ pub(super) async fn run_iteration(
                 continue;
             }
             if fallback_eligible(&err) {
-                // The partial draft is dropped here, never materialized —
-                // the retry rebuilds its context from the persisted log.
                 emit_fallback(
                     handle,
                     turn_id,
@@ -410,7 +374,6 @@ pub(super) async fn run_iteration(
     }
 
     if tool_requests.is_empty() {
-        // Stop hook may inject a continuation.
         let mut continuation: Option<String> = None;
         let outcome = run_hooks(
             deps,

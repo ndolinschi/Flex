@@ -64,14 +64,8 @@ pub(super) async fn execute_tool_requests(
             .await?;
     }
 
-    // Batch consecutive read-only calls; run them concurrently (bounded).
-    // The manager is shared behind a mutex — no await happens under the lock.
-    // One turn per session (turn gate) makes this per-turn semaphore the
-    // session-level execution bound the pool expects.
     let session_permits = Arc::new(Semaphore::new(deps.limits.tool_concurrency));
     let children_spawned = Arc::new(AtomicUsize::new(0));
-    // Per-role spawn counters for split mode: parallel Task calls of the
-    // same role in this message round-robin across the role's model chain.
     let split_counters = Arc::new(Mutex::new(std::collections::HashMap::<String, usize>::new()));
     let manager_shared = Arc::new(Mutex::new(std::mem::take(manager)));
     let mut index = 0;
@@ -138,7 +132,6 @@ pub(super) async fn execute_tool_requests(
         .into_inner()
         .unwrap_or_else(|p| p.into_inner());
 
-    // Feed results back in request order.
     let result_blocks: Vec<ContentBlock> = tool_requests
         .iter()
         .filter_map(|req| {
@@ -204,7 +197,6 @@ async fn execute_one_call(
             .ok()
     };
 
-    // Subagent spawn: intercepted and run by the loop, not the pool.
     if request.name == SUBAGENT_TOOL_NAME {
         if let Some(call) = transition(ToolCallStatus::Running, None) {
             emit_update(call).await;
@@ -221,8 +213,6 @@ async fn execute_one_call(
         )
         .await;
         let final_call = match result {
-            // Tool-level errors (bad role, child failed) teach the model and
-            // never fail the turn; hard failures mark the call failed.
             Ok(output) => transition(ToolCallStatus::Completed, Some(output)),
             Err(err @ (ToolError::InvalidInput(_) | ToolError::Execution(_))) => transition(
                 ToolCallStatus::Completed,
@@ -242,7 +232,6 @@ async fn execute_one_call(
         return;
     }
 
-    // Unknown tool: a model mistake — feed a teaching error result back.
     let Some(tool) = deps.tools.get(&request.name) else {
         if let Some(call) = transition(ToolCallStatus::Running, None) {
             emit_update(call).await;
@@ -261,7 +250,6 @@ async fn execute_one_call(
     };
     let descriptor = tool.descriptor();
 
-    // ── permission gate ─────────────────────────────────────────────────────
     let verdict = deps.policy.evaluate(
         &descriptor,
         &request.input,
@@ -292,9 +280,6 @@ async fn execute_one_call(
             }
             let detail = serde_json::to_string_pretty(&request.input).ok().map(|s| {
                 if s.len() > 2000 {
-                    // Trim to a char boundary — a raw `&s[..2000]` panics when
-                    // byte 2000 lands inside a multi-byte char (e.g. an em-dash
-                    // in pasted non-ASCII input).
                     let mut end = 2000;
                     while end > 0 && !s.is_char_boundary(end) {
                         end -= 1;
@@ -356,7 +341,6 @@ async fn execute_one_call(
                     ));
                 }
                 PermissionDecision::AllowOnce => {}
-                // Unknown future decision kinds fail closed.
                 _ => {
                     if let Some(call) = transition(
                         ToolCallStatus::Denied {
@@ -373,7 +357,6 @@ async fn execute_one_call(
         Verdict::Allow => {}
     }
 
-    // ── pre-execution hook (may rewrite input or block) ─────────────────────
     let mut input = request.input.clone();
     {
         let call_snapshot = manager
@@ -419,7 +402,6 @@ async fn execute_one_call(
         }
     }
 
-    // ── run on the worker pool: real parallelism + panic isolation ─────────
     let call_token = cancel.child_token();
     let ctx = ToolContext {
         session_id: handle.id.clone(),
@@ -442,7 +424,6 @@ async fn execute_one_call(
     while let Some(event) = results_rx.recv().await {
         match event {
             ToolEvent::Started { call_id } if call_id == request.id => {
-                // Permits acquired; the tool is actually executing now.
                 if let Some(call) = transition(ToolCallStatus::Running, None) {
                     emit_update(call).await;
                 }
@@ -454,14 +435,12 @@ async fn execute_one_call(
                 outcome = Some(done);
                 break;
             }
-            // A report for another call can only mean a wiring bug; ignore.
             ToolEvent::Started { .. } | ToolEvent::Finished { .. } => {}
         }
     }
     let result = match outcome {
         Some(ToolJobOutcome::Output(result)) => result,
         Some(ToolJobOutcome::Panicked { message }) => {
-            // The call fails; the turn (and the session) survive.
             if let Some(call) = transition(
                 ToolCallStatus::Failed {
                     error: format!("tool panicked: {message}"),
@@ -472,13 +451,11 @@ async fn execute_one_call(
             }
             return;
         }
-        // Channel closed without a Finished report: torn down mid-flight.
         None => Err(ToolError::Cancelled),
     };
 
     let final_call = match result {
         Ok(mut output) => {
-            // Post-execution hook may rewrite the output.
             let call_snapshot = manager
                 .lock()
                 .unwrap_or_else(|p| p.into_inner())
@@ -506,7 +483,6 @@ async fn execute_one_call(
             },
             None,
         ),
-        // Tool-level errors teach the model and never fail the loop.
         Err(err @ (ToolError::InvalidInput(_) | ToolError::Execution(_))) => transition(
             ToolCallStatus::Completed,
             Some(ToolOutput::error(err.to_string())),
@@ -535,11 +511,6 @@ async fn run_subagent_call(
     split_counters: &Arc<Mutex<std::collections::HashMap<String, usize>>>,
     request: &DraftToolCall,
 ) -> Result<ToolOutput, ToolError> {
-    // Server-side depth enforcement: the tool spec sent to the model already
-    // omits Task once a role hits its `max_depth`, but a model can still try
-    // to call an undeclared tool — so re-check here rather than trusting the
-    // advertised schema. Only subagent sessions (a `role`) are capped; the
-    // main session is never depth-limited.
     if let Some(role) = meta.role.as_deref() {
         let filter = deps.roles.tool_filter(role, &deps.tools, meta.depth);
         if !filter.permits(SUBAGENT_TOOL_NAME) {
@@ -586,10 +557,6 @@ async fn run_subagent_call(
         ToolError::Execution("the agent is shutting down; cannot spawn subagents".to_owned())
     })?;
 
-    // Split mode: rotate parallel spawns of the same role across its model
-    // chain (deterministic chain-order assignment per batch). The child puts
-    // the assigned model first and keeps the rest of the chain for failover.
-    // Unknown roles get None and hit the teaching path in run_subagent.
     let assigned_model = deps.roles.get(&role).and_then(|spec| {
         if !spec.split || spec.models.len() < 2 {
             return None;

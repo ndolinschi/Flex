@@ -30,19 +30,16 @@ fn default_prompt_substitutes_all_placeholders() {
 #[test]
 fn override_dir_replaces_and_merges_parts() {
     let dir = tempfile::tempdir().unwrap();
-    // Same filename as a built-in: replaces it.
     fs::write(
         dir.path().join("00-identity.md"),
         "# Custom identity\n\nOverride in {{cwd}}.\n",
     )
     .unwrap();
-    // New filename: merged into the sort order between 10- and 20-.
     fs::write(
         dir.path().join("15-extra.md"),
         "# Extra guidance\n\nProject-specific rules.\n",
     )
     .unwrap();
-    // Non-markdown files are ignored.
     fs::write(dir.path().join("notes.txt"), "not a part").unwrap();
 
     let assembler = SystemPromptAssembler::new(SystemPromptConfig {
@@ -51,18 +48,14 @@ fn override_dir_replaces_and_merges_parts() {
     });
     let prompt = assembler.assemble(&fixed_vars()).unwrap();
 
-    // Replacement: custom identity present with substitution, built-in gone.
     assert!(prompt.starts_with("# Custom identity"));
     assert!(prompt.contains("Override in /workspace/project."));
     assert!(!prompt.contains("precise software engineering agent"));
-    // Merge order: 10-conduct < 15-extra < 20-tool-use.
     let conduct = prompt.find("# Conduct").unwrap();
     let extra = prompt.find("# Extra guidance").unwrap();
     let tool_use = prompt.find("# Tool use").unwrap();
     assert!(conduct < extra && extra < tool_use);
-    // Ignored file never leaks in.
     assert!(!prompt.contains("not a part"));
-    // Appends land at the very end.
     assert!(prompt.ends_with("Appended instructions."));
 }
 
@@ -83,7 +76,6 @@ fn assembly_is_deterministic() {
 #[test]
 fn empty_parts_are_dropped_from_the_join() {
     let dir = tempfile::tempdir().unwrap();
-    // Overriding a built-in with whitespace-only content removes it.
     fs::write(dir.path().join("30-verification.md"), "\n  \n").unwrap();
     let assembler = SystemPromptAssembler::new(SystemPromptConfig {
         parts_dir: Some(dir.path().to_path_buf()),

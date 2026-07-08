@@ -201,12 +201,6 @@ async fn connect_server(
                     cmd.current_dir(cwd);
                 }
                 cmd.stderr(Stdio::null());
-                // Own process group so the server — and anything it launches
-                // (e.g. a browser under playwright) — can't send job-control
-                // signals to, or wrestle the controlling terminal away from,
-                // the interactive TUI that spawned us. Without this, a stdio
-                // server started mid-session (a provider switch reloads MCP)
-                // could leave the CLI's terminal in a bad state.
                 #[cfg(unix)]
                 cmd.process_group(0);
             });

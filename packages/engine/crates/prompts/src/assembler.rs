@@ -130,9 +130,6 @@ impl SystemPromptAssembler {
     /// Given identical configuration, directory contents, and [`Vars`], the
     /// output is byte-for-byte identical across calls.
     pub fn assemble(&self, vars: &Vars) -> Result<String, PromptError> {
-        // BTreeMap keys the parts by filename, which both deduplicates
-        // (override replaces built-in) and sorts (deterministic order
-        // regardless of directory iteration order).
         let mut parts: BTreeMap<String, String> = BUILT_IN_PARTS
             .iter()
             .map(|(name, content)| ((*name).to_owned(), (*content).to_owned()))
@@ -152,8 +149,6 @@ impl SystemPromptAssembler {
                 if path.extension().and_then(|ext| ext.to_str()) != Some("md") || !path.is_file() {
                     continue;
                 }
-                // Non-UTF-8 filenames cannot participate in the filename
-                // sort order, so they are skipped rather than guessed at.
                 let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
                     continue;
                 };

@@ -90,7 +90,6 @@ impl Hook for FormatOnEditHook {
         let Some(ext) = util::extension_of(&file) else {
             return Ok(HookOutcome::Continue);
         };
-        // Availability gate: an enabled spec whose binary resolves on $PATH.
         let Some(spec) = self
             .specs
             .iter()
@@ -231,10 +230,8 @@ mod tests {
             env: Vec::new(),
             disabled: false,
         }]);
-        // Wrong extension.
         let (outcome, _) = run(&hook, &write_call("/tmp/a.py")).await;
         assert_eq!(outcome, HookOutcome::Continue);
-        // Non-edit tool.
         let mut read = write_call("/tmp/a.rs");
         read.tool_name = "Read".to_owned();
         let (outcome, _) = run(&hook, &read).await;

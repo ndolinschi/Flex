@@ -43,8 +43,6 @@ pub fn thinking_budget(effort: Effort, role: Option<&str>) -> Option<u32> {
     match role {
         Some(ROLE_SEARCHER) => base_budget(effort).map(|b| (b / 2).max(4_096)),
         Some(ROLE_REVIEWER) => {
-            // Floor a reviewer at the High budget even when the session runs
-            // lower — a careless review is worse than a slow one.
             let floor = base_budget(Effort::High).unwrap_or(16_384);
             Some(base_budget(effort).unwrap_or(0).max(floor))
         }
@@ -105,7 +103,6 @@ mod tests {
 
     #[test]
     fn main_and_worker_budgets_track_the_level() {
-        // main session (no role) and worker both follow the base ladder.
         for role in [None, Some("worker")] {
             assert_eq!(thinking_budget(Effort::Low, role), None);
             assert_eq!(thinking_budget(Effort::Medium, role), Some(8_192));
@@ -148,8 +145,6 @@ mod tests {
     fn guidance_scales_posture_and_top_tiers_mandate_review() {
         assert!(guidance(Effort::Low).contains("favor speed"));
         assert!(guidance(Effort::High).contains("think before acting"));
-        // xhigh and max carry the orchestration posture: parallel fan-out +
-        // a mandatory reviewer pass.
         for e in [Effort::XHigh, Effort::Max] {
             let text = guidance(e).to_lowercase();
             assert!(text.contains("parallel"), "{e:?} should push parallelism");

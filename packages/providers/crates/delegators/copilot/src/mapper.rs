@@ -24,8 +24,6 @@ impl LineMapper for CopilotLineMapper {
         let cleaned = strip_ansi(line);
         let trimmed = cleaned.trim_end();
 
-        // Suppress leading blank lines and the stats footer the CLI appends
-        // after the answer ("Total usage est: ...", "Total duration: ...").
         if is_footer_noise(trimmed) {
             return Ok(Vec::new());
         }
@@ -50,7 +48,6 @@ fn strip_ansi(input: &str) -> String {
             continue;
         }
         match chars.peek() {
-            // CSI: ESC [ ... final byte in @-~
             Some('[') => {
                 chars.next();
                 for c in chars.by_ref() {
@@ -59,7 +56,6 @@ fn strip_ansi(input: &str) -> String {
                     }
                 }
             }
-            // OSC: ESC ] ... BEL or ESC \
             Some(']') => {
                 chars.next();
                 while let Some(c) = chars.next() {
@@ -137,7 +133,6 @@ mod tests {
                 .expect("maps")
                 .is_empty()
         );
-        // Interior blank lines are kept once content started.
         assert_eq!(text_of(mapper.map_line("").expect("maps")), "\n");
     }
 }

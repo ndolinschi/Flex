@@ -134,7 +134,6 @@ impl DeviceFlow {
         let mut interval = auth.interval;
 
         loop {
-            // Wait first: GitHub rejects polls issued before the interval.
             tokio::select! {
                 _ = cancel.cancelled() => {
                     return Err(ProviderError::Cancelled { provider });
@@ -321,8 +320,6 @@ mod tests {
         }
     }
 
-    // --- pure parsing -----------------------------------------------------
-
     #[test]
     fn parses_device_code_response() {
         let auth = parse_device_code_response(
@@ -454,8 +451,6 @@ mod tests {
             .expect_err("must fail");
         assert!(matches!(err, ProviderError::Stream { .. }), "{err}");
     }
-
-    // --- end-to-end against a mock server ----------------------------------
 
     /// Replays a fixed sequence of responses, repeating the last one.
     struct SequenceResponder(Mutex<Vec<ResponseTemplate>>);
@@ -592,7 +587,6 @@ mod tests {
 
     #[tokio::test]
     async fn poll_cancels_during_the_sleep() {
-        // Never contacted: the cancel trips during the initial interval wait.
         let flow = DeviceFlow::with_base_url("http://127.0.0.1:9");
         let cancel = CancellationToken::new();
         let trip = cancel.clone();
@@ -610,7 +604,6 @@ mod tests {
 
     #[tokio::test]
     async fn poll_gives_up_once_the_code_expires() {
-        // expires_in 0: the deadline passes before the first request is sent.
         let flow = DeviceFlow::with_base_url("http://127.0.0.1:9");
         let err = flow
             .poll(&test_auth(0, 0), CancellationToken::new())

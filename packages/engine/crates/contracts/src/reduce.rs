@@ -104,9 +104,6 @@ impl Transcript {
 /// Fold persisted events into a [`Transcript`]. Pure and total: unknown or
 /// out-of-order input degrades gracefully, never panics.
 pub fn reduce<'a>(events: impl IntoIterator<Item = &'a AgentEvent> + Clone) -> Transcript {
-    // Pass 1: latest tool-call record per id, plus session/turn context for
-    // synthesizing records the log doesn't carry (delegated agents that only
-    // reference calls from message blocks).
     let mut calls: HashMap<ToolCallId, ToolCall> = HashMap::new();
     let mut session_id: Option<SessionId> = None;
     for event in events.clone() {
@@ -119,7 +116,6 @@ pub fn reduce<'a>(events: impl IntoIterator<Item = &'a AgentEvent> + Clone) -> T
         }
     }
 
-    // Pass 2: materialize items in order.
     let mut transcript = Transcript::default();
     let mut current_turn: Option<TurnId> = None;
     for event in events {
@@ -131,9 +127,6 @@ pub fn reduce<'a>(events: impl IntoIterator<Item = &'a AgentEvent> + Clone) -> T
             } => {
                 let blocks = map_blocks(content, message_id, &calls, &session_id, &current_turn)
                     .into_iter()
-                    // Tool results are carried by the ToolCall records; a user
-                    // message consisting only of results materializes empty
-                    // and is dropped below.
                     .collect::<Vec<_>>();
                 if !blocks.is_empty() {
                     transcript.items.push(TranscriptItem {
@@ -206,7 +199,6 @@ fn map_blocks(
                 });
                 blocks.push(TranscriptBlock::ToolCall(Box::new(call)));
             }
-            // Results live inside their ToolCall record.
             ContentBlock::ToolResult { .. } => {}
             ContentBlock::Image { media_type, data } => blocks.push(TranscriptBlock::Image {
                 media_type: media_type.clone(),

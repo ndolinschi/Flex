@@ -55,7 +55,6 @@ async fn custom_identity_streams_deepseek_dialect_end_to_end() {
         .collect()
         .await;
 
-    // Normalized event order: start, thinking, text, tool call, end, usage.
     assert!(
         matches!(&events[0], ProviderStreamEvent::MessageStart { model, .. } if model == "deepseek-reasoner"),
         "expected MessageStart first: {events:?}"
@@ -102,7 +101,6 @@ async fn custom_identity_streams_deepseek_dialect_end_to_end() {
     ));
     assert_eq!(events.len(), 10, "no stray events: {events:?}");
 
-    // The outgoing request carried the Bearer key and the thinking config.
     let requests = server.received_requests().await.expect("requests recorded");
     assert_eq!(requests.len(), 1);
     let sent = &requests[0];

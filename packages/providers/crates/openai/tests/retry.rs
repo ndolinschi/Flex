@@ -24,7 +24,7 @@ fn user_message(text: &str) -> Message {
     }
 }
 
-#[allow(clippy::expect_used)] // test helper: a bad config is a test bug, not a runtime path
+#[allow(clippy::expect_used)]
 fn config(server: &MockServer) -> OpenAiConfig {
     OpenAiConfig::from_values(
         "sk-test".to_owned(),

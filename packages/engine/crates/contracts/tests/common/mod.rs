@@ -1,8 +1,6 @@
 //! Shared builders for contract tests. Fixed ids and timestamps keep
 //! snapshots deterministic.
 
-// Each integration-test binary compiles its own copy of this module and not
-// all of them use every builder.
 #![allow(dead_code, unreachable_pub)]
 
 use std::path::PathBuf;

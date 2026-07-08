@@ -115,7 +115,6 @@ impl AgentBuilder {
 
     /// Resolve providers, fold in enabled plugins, and build the service.
     pub fn build(mut self) -> EngineResult<EngineService> {
-        // Builder-added plugins extend any already present on the config.
         self.config.plugins.extend(self.plugins);
         if self.all_providers {
             native_all(self.provider_opts, self.config)

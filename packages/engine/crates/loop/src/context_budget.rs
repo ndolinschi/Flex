@@ -123,7 +123,6 @@ mod tests {
                 ..agentloop_contracts::ProviderCaps::default()
             },
         )) as Arc<dyn Provider>;
-        // MockProvider defaults to mock id; copilot default is tested via provider id string.
         assert_eq!(
             provider_default_limit(&ProviderId::from("copilot")),
             COPILOT_CONTEXT_LIMIT
@@ -158,7 +157,6 @@ mod tests {
             }],
         );
         let tokens = estimate_request_tokens("abcd", &request);
-        // system 4 + message 4 = 8 chars -> 2 tokens
         assert_eq!(tokens, 2);
     }
 

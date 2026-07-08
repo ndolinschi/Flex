@@ -182,8 +182,6 @@ where
                 .code
                 .map(|code| code.to_string())
                 .unwrap_or_else(|| "signal".to_owned());
-            // An exit with no stderr is almost always a missing or
-            // unauthenticated CLI — point the user there instead of "unknown".
             let detail = if stderr.is_empty() {
                 "no error output — check that the CLI is installed and signed in".to_owned()
             } else {

@@ -65,7 +65,6 @@ pub(crate) async fn run_turn(
         handle.set_turn_permission_mode(opts.permission_mode);
         handle.set_turn_effort(opts.effort);
 
-        // ── prompt intake ───────────────────────────────────────────────────
         let outcome = run_hooks(
             deps,
             &handle,
@@ -127,7 +126,6 @@ pub(crate) async fn run_turn(
             }
         }
 
-        // ── side-channel events (tools emit progress/plans/questions) ──────
         let (sink, mut sink_rx) = EventSink::channel();
         let drain = tokio::spawn({
             let handle = handle.clone();
@@ -143,7 +141,6 @@ pub(crate) async fn run_turn(
             }
         });
 
-        // ── the loop ────────────────────────────────────────────────────────
         let mut usage_total = TokenUsage::default();
         let mut num_model_calls = 0u32;
         let mut num_tool_calls = 0u32;
@@ -176,7 +173,6 @@ pub(crate) async fn run_turn(
                     break;
                 }
                 Err(err) => {
-                    // Terminal failure: normalize, record, fail the turn.
                     for call in manager.cancel_in_flight() {
                         let _ = handle
                             .emit_persistent(Some(&turn_id), AgentEvent::ToolCallUpdated { call })
@@ -245,9 +241,6 @@ pub(crate) async fn run_turn(
             )
             .await?;
 
-        // Capture a per-turn snapshot of the working tree for `/undo`. This is
-        // availability-gated (git repo required) and strictly non-fatal — a
-        // snapshot failure must never fail an otherwise-successful turn.
         if let Some(workspace) = &deps.workspace {
             match workspace
                 .snapshot(&meta.cwd, &format!("turn {turn_id}"))
@@ -264,7 +257,7 @@ pub(crate) async fn run_turn(
                         )
                         .await;
                 }
-                Ok(None) => {} // not a git repo → snapshots silently disabled
+                Ok(None) => {}
                 Err(err) => {
                     tracing::debug!(target: "turn", error = %err, "workspace snapshot skipped");
                 }

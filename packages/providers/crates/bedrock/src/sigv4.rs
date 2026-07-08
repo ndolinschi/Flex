@@ -37,9 +37,6 @@ pub(crate) fn signed_headers(
 ) -> Vec<(String, String)> {
     let payload_hash = hex_lower(&sha256(payload));
 
-    // The signed header set. For non-S3 services (IAM, Bedrock, …) the AWS SDKs
-    // sign `host`, `x-amz-date`, and `content-type`, and send
-    // `x-amz-content-sha256` UNSIGNED — so it is appended after signing below.
     let mut headers: Vec<(String, String)> = vec![
         ("host".to_owned(), host.to_owned()),
         ("x-amz-date".to_owned(), amz_datetime.to_owned()),
@@ -76,8 +73,6 @@ pub(crate) fn signed_headers(
         creds.access_key_id
     );
 
-    // Return the concrete headers the caller should set on the request: the
-    // signed set, the unsigned payload-hash header, and the Authorization.
     let mut out = headers;
     out.push(("x-amz-content-sha256".to_owned(), payload_hash));
     out.push(("authorization".to_owned(), authorization));
@@ -183,7 +178,6 @@ mod tests {
 
     #[test]
     fn hmac_rfc_test_vector() {
-        // RFC 4231 test case 2: key "Jefe", data "what do ya want for nothing?".
         let mac = hmac_sha256(b"Jefe", b"what do ya want for nothing?");
         assert_eq!(
             hex_lower(&mac),
@@ -194,14 +188,11 @@ mod tests {
     #[test]
     fn civil_from_days_epoch_and_known_date() {
         assert_eq!(civil_from_days(0), (1970, 1, 1));
-        // 2015-08-30 is 16677 days after the epoch.
         assert_eq!(civil_from_days(16_677), (2015, 8, 30));
     }
 
     #[test]
     fn matches_aws_documented_example() {
-        // AWS "Signature Version 4" canonical example: a GET to the IAM API.
-        // https://docs.aws.amazon.com/.../sigv4-create-canonical-request.html
         let creds = Sigv4Credentials {
             access_key_id: "AKIDEXAMPLE".to_owned(),
             secret_access_key: "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY".to_owned(),

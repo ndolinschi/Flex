@@ -128,11 +128,9 @@ impl EngineService {
             tools.register(tool);
         }
 
-        // Base roles from config, extended by plugin-declared roles.
         let mut roles = config.roles.clone();
         roles.extend(plugins.roles().into_iter().map(plugin_role_to_spec));
 
-        // Advertise the spawnable roles on the Task tool, then register it.
         let role_registry = RoleRegistry::with_defaults(roles.clone())?;
         tools.register(agentloop_tools::subagent_tool(&role_registry.spawnable()));
 
@@ -149,11 +147,6 @@ impl EngineService {
             project_dir: Some(config.cwd.join(".agent").join("commands")),
         })?;
 
-        // Skills: `~/.config/agentloop/skills/*/SKILL.md` and
-        // `<project>/.agent/skills/*/SKILL.md`. Only names + descriptions sit
-        // in the `Skill` tool's own description (progressive disclosure); the
-        // full body loads into context on invocation. No tool is registered
-        // when nothing was discovered.
         let skills = Arc::new(SkillRegistry::discover(SkillDiscoveryConfig {
             user_dir: default_user_skill_dir(),
             project_dir: Some(config.cwd.join(".agent").join("skills")),
@@ -195,9 +188,6 @@ impl EngineService {
         if let Some(manager) = mcp_manager {
             builder = builder.mcp(manager);
         }
-        // Post-edit hooks (format-on-edit, diagnostics feedback). Each is
-        // included only when configured and active; otherwise the loop keeps
-        // its default empty hook set and behaves byte-identically.
         let mut hooks: Vec<Arc<dyn Hook>> = Vec::new();
         let formatter = FormatOnEditHook::new(config.formatters.clone());
         if formatter.is_active() {
@@ -231,8 +221,6 @@ impl EngineService {
     }
 
     pub async fn create_session(&self, mut params: NewSessionParams) -> EngineResult<SessionId> {
-        // Apply the run-level isolation default when the caller didn't request
-        // one (the role's own policy still applies if this default is Never).
         if params.isolation.is_none() && self.isolation_default.wants_isolation() {
             params.isolation = Some(self.isolation_default);
         }
@@ -276,8 +264,6 @@ impl EngineService {
         let outcome = backend
             .integrate(&root, &base, self.verify_command.as_deref())
             .await?;
-        // A merged/empty workspace is gone: repoint the session to the base so
-        // subsequent turns keep working — and so it no longer reads as isolated.
         if matches!(
             outcome,
             IntegrationOutcome::Merged { .. } | IntegrationOutcome::Empty
@@ -414,9 +400,6 @@ impl EngineService {
         session: &SessionId,
         from_seq: u64,
     ) -> EngineResult<Vec<SessionEvent>> {
-        // Stores persist payloads only today. Reconstruct the turn envelope by
-        // replaying from the beginning; timestamps remain synthetic until the
-        // store contract grows persisted envelopes.
         let events = self.store.read(session, 0).await?;
         let mut current_turn: Option<TurnId> = None;
         let mut replay = Vec::new();
@@ -498,8 +481,6 @@ mod tests {
         );
     }
 
-    // ── workspace isolation lifecycle (EngineService orchestration) ───────────
-
     use agentloop_loop::NativeAgentBuilder;
     use agentloop_session::MemoryStore;
     use agentloop_testkit::MockWorkspaces;
@@ -549,7 +530,6 @@ mod tests {
             PathBuf::from("/repo"),
             "cwd repointed to base after merge"
         );
-        // Repointed cwd means the session no longer reads as isolated.
         assert!(!service.is_isolated(&id).await.expect("meta"));
     }
 
@@ -585,7 +565,7 @@ mod tests {
         let store = std::sync::Arc::new(MemoryStore::new());
         let mock = std::sync::Arc::new(MockWorkspaces::new());
         let agent = NativeAgentBuilder::new(store.clone()).build();
-        let service = EngineService::new(agent, store.clone()); // isolation_default = Never
+        let service = EngineService::new(agent, store.clone());
         let id = service
             .create_session(NewSessionParams {
                 cwd: Some(PathBuf::from("/repo")),
@@ -623,7 +603,7 @@ mod tests {
     async fn revert_without_a_workspace_backend_errors() {
         let store = std::sync::Arc::new(MemoryStore::new());
         let agent = NativeAgentBuilder::new(store.clone()).build();
-        let service = EngineService::new(agent, store.clone()); // no workspace backend
+        let service = EngineService::new(agent, store.clone());
         let id = service
             .create_session(NewSessionParams {
                 cwd: Some(PathBuf::from("/repo")),

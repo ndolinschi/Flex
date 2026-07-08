@@ -83,8 +83,6 @@ fn kind(status: &ToolCallStatus) -> &'static str {
         ToolCallStatus::Failed { .. } => "failed",
         ToolCallStatus::Denied { .. } => "denied",
         ToolCallStatus::Cancelled => "cancelled",
-        // ToolCallStatus is #[non_exhaustive]; the test enumerates all
-        // current states above.
         _ => panic!("unhandled status variant added — extend this test"),
     }
 }

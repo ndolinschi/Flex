@@ -23,9 +23,6 @@ use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescri
 
 use crate::fs::schema_of;
 
-// Schema-only: `run` reads `name` straight from the raw JSON so a malformed
-// call still gets IntoInput-quality validation from the model-facing schema
-// without needing a second struct.
 #[allow(dead_code)]
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

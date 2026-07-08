@@ -69,8 +69,6 @@ impl NativeAgent {
             )));
         };
 
-        // Child model chain: assigned first (split), else the role chain,
-        // else inherit the parent session's model at turn time.
         let mut chain: Vec<ModelRef> = Vec::new();
         if let Some(model) = req.assigned_model.clone() {
             chain.push(model);
@@ -89,7 +87,6 @@ impl NativeAgent {
             .map_err(|err| ToolError::Execution(err.to_string()))?;
         let child_model = chain.first().cloned().or_else(|| parent_meta.model.clone());
 
-        // ── create the child session ─────────────────────────────────────────
         let child = SessionId::generate();
         let now = now_ms();
         let meta = agentloop_contracts::SessionMeta {
@@ -100,9 +97,6 @@ impl NativeAgent {
             role: Some(req.role.clone()),
             depth: parent_meta.depth.saturating_add(1),
             provider_session_id: None,
-            // A subagent inherits the parent's working directory — including the
-            // parent's isolated worktree, when the root session is isolated —
-            // but does not own a workspace of its own (top-level isolation).
             cwd: parent_meta.cwd.clone(),
             model: child_model,
             mode: None,
@@ -123,7 +117,6 @@ impl NativeAgent {
             .await
             .map_err(|err| ToolError::Execution(err.to_string()))?;
 
-        // ── announce into the parent stream ──────────────────────────────────
         let parent_handle = self
             .live_handle(parent)
             .ok_or_else(|| ToolError::Execution("parent session is not live".to_owned()))?;
@@ -139,11 +132,9 @@ impl NativeAgent {
             )
             .await;
 
-        // ── relay child events into the parent (persisted classes only) ──────
         let relay_stop = CancellationToken::new();
         let relay = self.spawn_relay(&child_handle, parent_handle.clone(), &child, &relay_stop);
 
-        // ── run the child turn ───────────────────────────────────────────────
         let brief = build_brief(&req, &role.prompt);
         let opts = TurnOptions {
             model: chain.first().cloned(),

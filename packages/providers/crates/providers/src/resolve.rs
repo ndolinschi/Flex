@@ -76,8 +76,6 @@ fn build_custom_provider(
     if spec.base_url.trim().is_empty() {
         return Err(invalid("base_url is empty"));
     }
-    // An empty api_key is deliberate: keyless local endpoints (LM Studio,
-    // llama.cpp) serve OpenAI-compatible APIs without auth.
     let config = OpenAiConfig::from_values(
         spec.api_key.clone(),
         Some(spec.base_url.clone()),
@@ -100,8 +98,6 @@ type ProviderWithDefault = (Arc<dyn agentloop_core::Provider>, String);
 /// a built-in on top of [`OpenAiProvider`] rather than a bespoke crate.
 pub(crate) const DEEPSEEK_PROVIDER_ID: &str = "deepseek";
 const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com/v1";
-// `deepseek-v4-pro` is the current flagship id; the legacy `deepseek-chat` /
-// `deepseek-reasoner` names are deprecated (they now just route to v4-flash).
 pub(crate) const DEEPSEEK_DEFAULT_MODEL: &str = "deepseek-v4-pro";
 
 /// Build the built-in DeepSeek provider from `DEEPSEEK_API_KEY` (optional
@@ -140,8 +136,6 @@ pub(crate) fn build_deepseek(
         Some(DEEPSEEK_BASE_URL.to_owned()),
         Some(model.clone()),
     )?;
-    // DeepSeek accepts the DeepSeek-style `thinking` request field (reasoner),
-    // which is exactly the capability `OpenAiProvider`'s `thinking` flag gates.
     let provider = OpenAiProvider::with_identity(DEEPSEEK_PROVIDER_ID, config, Vec::new(), true);
     Ok((Arc::new(provider), model))
 }
@@ -162,8 +156,6 @@ pub fn connect_bedrock(
     }
     let mut config = BedrockConfig::from_env();
     config.auth = BedrockAuth::Bearer(key.clone());
-    // A client-supplied region overrides the environment/default, so the
-    // control-plane (model listing) and runtime endpoints hit the right region.
     if let Some(region) = provider_regions
         .get(BEDROCK_PROVIDER_ID)
         .map(|r| r.trim())
@@ -208,8 +200,6 @@ pub fn resolve_real_providers(
     };
 
     match provider_name {
-        // A custom `/connect openai …` spec wins over the env built-in: when one
-        // exists this arm is skipped and the `other` branch below uses the spec.
         OPENAI_PROVIDER_ID if !custom.iter().any(|spec| spec.id == OPENAI_PROVIDER_ID) => {
             let provider = OpenAiProvider::from_env()?;
             let model = model_arg.unwrap_or_else(|| provider.default_model().to_owned());
@@ -253,8 +243,6 @@ pub fn resolve_real_providers(
         }
         BEDROCK_PROVIDER_ID => {
             let provider = BedrockProvider::from_env();
-            // Bedrock is unusable without a credential — fail here with an
-            // actionable message rather than deferring to the first turn.
             if !provider.has_credentials() {
                 return Err(ProviderError::AuthMissing {
                     provider: ProviderId::from(BEDROCK_PROVIDER_ID),
@@ -274,8 +262,6 @@ pub fn resolve_real_providers(
             ))
         }
         other => {
-            // A custom spec of the same id wins over a built-in (lets a user's
-            // `/connect deepseek …` override the built-in DeepSeek).
             if let Some(spec) = custom.iter().find(|spec| spec.id == other) {
                 let (provider, default_model) = build_custom_provider(spec)?;
                 let model = model_arg.unwrap_or(default_model);
@@ -374,9 +360,6 @@ pub fn resolve_available_providers(
         GEMINI_PROVIDER_ID,
         COPILOT_PROVIDER_ID,
     ] {
-        // A custom `/connect openai …` spec wins over the env built-in; skip the
-        // env registration here so the id is never registered twice (the custom
-        // loop below registers it). Mirrors the DeepSeek guard.
         if name == OPENAI_PROVIDER_ID && custom.iter().any(|spec| spec.id == OPENAI_PROVIDER_ID) {
             continue;
         }
@@ -389,32 +372,22 @@ pub fn resolve_available_providers(
             Err(err) => return Err(err.into()),
         }
     }
-    // Ollama's `from_env` is infallible; auto-register only when its env vars
-    // opt in, so a dead default endpoint doesn't join the registry unasked.
     if env_is_set("OLLAMA_HOST") || env_is_set("OLLAMA_MODEL") {
         if let Ok(Some((provider, model))) = build_provider(OLLAMA_PROVIDER_ID) {
             register(&mut providers, provider, model);
         }
     }
-    // Bedrock: a real built-in crate, env-gated by its API key so it doesn't
-    // join the registry unless the user opted in.
     if env_is_set("AWS_BEARER_TOKEN_BEDROCK") {
         if let Ok(Some((provider, model))) = build_provider(BEDROCK_PROVIDER_ID) {
             register(&mut providers, provider, model);
         }
     }
-    // DeepSeek: OpenAI-compatible built-in, env-gated by `DEEPSEEK_API_KEY`.
-    // Skip when a custom spec claims the id, so a user's `/connect deepseek …`
-    // wins and we never register the id twice.
     if custom.iter().all(|spec| spec.id != DEEPSEEK_PROVIDER_ID) {
         if let Ok(Some((provider, model))) = build_deepseek_from_env() {
             register(&mut providers, provider, model);
         }
     }
 
-    // Client-configured providers come after the built-ins, in vec order.
-    // Shadowing a built-in id or repeating a custom id is rejected rather
-    // than silently last-wins.
     let mut seen_custom_ids = std::collections::HashSet::new();
     for spec in custom {
         if BUILTIN_PROVIDER_IDS.contains(&spec.id.as_str()) {
@@ -433,8 +406,6 @@ pub fn resolve_available_providers(
     if let Some(name) = preferred {
         let id = ProviderId::from(name);
         if providers.get(&id).is_none() {
-            // Not auto-registered: build it explicitly so the caller gets the
-            // precise error (or a working provider, e.g. ollama without env).
             match build_provider(name).map_err(EngineServiceError::from)? {
                 Some((provider, model)) => register(&mut providers, provider, model),
                 None => return Err(EngineServiceError::UnsupportedProvider(name.to_owned())),
@@ -443,9 +414,6 @@ pub fn resolve_available_providers(
         providers.set_priority(vec![id]);
     }
 
-    // A qualified model ref (`provider/model`) names its own provider and
-    // needs no priority provider to resolve against; the other two branches
-    // do, and simply yield `None` when the registry is empty.
     let default_model = match model_arg {
         Some(model) if model.contains('/') => Some(ModelRef(model)),
         Some(model) => providers

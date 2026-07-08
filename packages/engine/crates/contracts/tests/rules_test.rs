@@ -13,9 +13,7 @@ fn parses_bare_and_specified_rules() {
             "WebFetch(domain:example.com)",
             ("WebFetch", Some("domain:example.com")),
         ),
-        // Nested parens inside the specifier survive.
         ("Bash(echo (hi))", ("Bash", Some("echo (hi)"))),
-        // Whitespace tolerated around the whole rule.
         ("  Glob  ", ("Glob", None)),
     ];
     for (raw, (tool, spec)) in cases {

@@ -335,9 +335,6 @@ fn push_message(out: &mut Vec<OpenAiMessage>, message: Message) {
             ContentBlock::Markdown { text: value } => {
                 text.push(value);
             }
-            // Reasoning must not be echoed back on replay (DeepSeek rejects
-            // it, and switching providers mid-session would leak another
-            // model's thinking); drop it instead of folding into text.
             ContentBlock::Thinking { .. } => {}
             ContentBlock::Image { media_type, data } => {
                 text.push(render_blob("image", &media_type, &data));

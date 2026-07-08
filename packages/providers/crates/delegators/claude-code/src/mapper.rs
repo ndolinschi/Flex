@@ -70,8 +70,6 @@ impl LineMapper for ClaudeCodeLineMapper {
                 total_cost_usd,
             } => {
                 let mut events = Vec::new();
-                // The result frame echoes the final assistant text; only use
-                // it when no assistant message streamed it already.
                 if !self.saw_assistant_text {
                     if let Some(result) = result.filter(|value| !value.is_empty()) {
                         events.push(DelegatorEvent::AssistantDelta { text: result });
@@ -351,7 +349,6 @@ mod tests {
     #[test]
     fn result_echo_is_deduped_and_usage_mapped() {
         let mut mapper = ClaudeCodeLineMapper::new();
-        // The assistant message streams the final text...
         let events = mapper
             .map_line(
                 r#"{"type":"assistant","message":{"content":[{"type":"text","text":"pong"}]}}"#,
@@ -363,8 +360,6 @@ mod tests {
                 text: "pong".to_owned()
             }]
         );
-        // ...and the result frame echoes it. The echo must be suppressed,
-        // while usage and cost are captured.
         let events = mapper
             .map_line(
                 r#"{"type":"result","result":"pong","is_error":false,"usage":{"input_tokens":7,"output_tokens":3,"cache_read_input_tokens":100},"total_cost_usd":0.0125}"#,

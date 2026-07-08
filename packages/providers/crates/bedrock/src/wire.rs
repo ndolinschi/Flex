@@ -9,8 +9,6 @@ use agentloop_contracts::{
 use agentloop_core::{ChatRequest, ProviderStreamEvent, ToolChoice, ToolSpec};
 use serde::Serialize;
 
-// ---- Request wire types ---------------------------------------------------
-
 #[derive(Debug, Serialize)]
 pub(crate) struct ConverseRequest {
     messages: Vec<BedrockMessage>,
@@ -161,9 +159,6 @@ fn build_messages(messages: Vec<Message>) -> Vec<BedrockMessage> {
                         },
                     });
                 }
-                // Thinking/images/files are dropped from the outbound request:
-                // reasoning replay needs signature round-trip (a follow-on) and
-                // vision is not yet wired for Bedrock.
                 _ => {}
             }
         }
@@ -197,7 +192,6 @@ fn tool_result_content(blocks: Vec<ToolResultBlock>) -> Vec<ToolResultContent> {
         }
     }
     if out.is_empty() {
-        // Converse rejects an empty toolResult; emit a placeholder.
         out.push(ToolResultContent::Text {
             text: "(no output)".to_owned(),
         });
@@ -228,8 +222,6 @@ fn build_tool_config(tools: Vec<ToolSpec>, tool_choice: ToolChoice) -> Option<To
     if tools.is_empty() {
         return None;
     }
-    // Only send an explicit choice for forced modes; `auto` is the default and
-    // some models reject an explicit `toolChoice`.
     let choice = match &tool_choice {
         ToolChoice::Required => Some(serde_json::json!({ "any": {} })),
         ToolChoice::Named(name) => Some(serde_json::json!({ "tool": { "name": name } })),
@@ -244,13 +236,9 @@ fn build_tool_config(tools: Vec<ToolSpec>, tool_choice: ToolChoice) -> Option<To
 fn role_name(role: Role) -> &'static str {
     match role {
         Role::Assistant => "assistant",
-        // Converse has no system role in `messages` (system is separate); a
-        // stray system/user block maps to user.
         _ => "user",
     }
 }
-
-// ---- Stream mapping -------------------------------------------------------
 
 /// Maps decoded Converse stream events onto the canonical event stream.
 #[derive(Debug)]

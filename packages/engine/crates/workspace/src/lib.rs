@@ -91,15 +91,13 @@ impl Workspaces for GitWorktrees {
         session: &SessionId,
         policy: IsolationPolicy,
     ) -> Result<Option<Workspace>, WorkspaceError> {
-        // A base that isn't a git repo (or has no commit yet) can't back a
-        // worktree — degrade or fail per policy rather than exploding.
         let toplevel = match git(base, &["rev-parse", "--show-toplevel"]).await {
             Ok(top) => PathBuf::from(top),
             Err(_) => return cannot_isolate(policy, base),
         };
         let base_ref = match git(&toplevel, &["rev-parse", "HEAD"]).await {
             Ok(sha) => sha,
-            Err(_) => return cannot_isolate(policy, base), // unborn HEAD
+            Err(_) => return cannot_isolate(policy, base),
         };
 
         tokio::fs::create_dir_all(&self.root)
@@ -108,8 +106,6 @@ impl Workspaces for GitWorktrees {
         let worktree_root = self.root.join(session.to_string());
         let branch = format!("{PRODUCT_SLUG}/session-{session}");
 
-        // A validated repo that still fails to add a worktree is unexpected —
-        // surface it (the caller degrades under an Optional policy).
         git(
             &toplevel,
             &[
@@ -161,43 +157,30 @@ impl Workspaces for GitWorktrees {
         if !root.exists() {
             return Err(WorkspaceError::NotFound(root.to_path_buf()));
         }
-        // Commit any uncommitted edits so they are captured as one unit. The
-        // agent may also have committed on its own — either way, what matters
-        // for "is there work to integrate" is whether the branch is *ahead of
-        // the base*, NOT merely whether the working tree is dirty. Checking
-        // only the dirty tree would send committed-but-clean work down the
-        // Empty→discard path, which force-deletes the branch and loses it.
         let porcelain = git(root, &["status", "--porcelain"]).await?;
         if !porcelain.is_empty() {
             git(root, &["add", "-A"]).await?;
             git(root, &["commit", "-m", Self::commit_message()]).await?;
         }
 
-        // How far is the branch ahead of the base's current tip?
         let base_head = git(base, &["rev-parse", "HEAD"]).await?;
         let range = format!("{base_head}..HEAD");
         let ahead = git(root, &["rev-list", "--count", &range]).await?;
         if ahead.trim() == "0" {
-            // Genuinely nothing to integrate (no dirty tree, no commits ahead):
-            // safe to remove the empty workspace.
             self.discard(root, base).await?;
             return Ok(IntegrationOutcome::Empty);
         }
         let files_changed = changed_count(&git(root, &["diff", "--name-only", &range]).await?);
 
-        // Verify inside the isolated tree before touching the base.
         if let Some(cmd) = verify {
             if let Some(detail) = run_verify(root, cmd).await? {
                 return Ok(IntegrationOutcome::VerifyFailed { detail });
             }
         }
 
-        // Fast-forward the base branch onto the isolated branch. If the base
-        // has diverged (moved or dirtied), keep the branch for a manual merge.
         let branch = git(root, &["rev-parse", "--abbrev-ref", "HEAD"]).await?;
         match git(base, &["merge", "--ff-only", &branch]).await {
             Ok(_) => {
-                // Clean up: the worktree must go before its branch can be deleted.
                 let _ = git(base, &["worktree", "remove", "--force", path_str(root)?]).await;
                 let _ = git(base, &["branch", "-D", &branch]).await;
                 Ok(IntegrationOutcome::Merged { files_changed })
@@ -207,9 +190,6 @@ impl Workspaces for GitWorktrees {
     }
 
     async fn discard(&self, root: &Path, base: &Path) -> Result<(), WorkspaceError> {
-        // Best-effort and idempotent: recover the branch name while the
-        // worktree still exists, then remove worktree and branch, ignoring
-        // "already gone" failures.
         let branch = git(root, &["rev-parse", "--abbrev-ref", "HEAD"]).await.ok();
         if let Ok(root_str) = path_str(root) {
             let _ = git(base, &["worktree", "remove", "--force", root_str]).await;
@@ -224,8 +204,6 @@ impl Workspaces for GitWorktrees {
         if !root.exists() {
             return Err(WorkspaceError::NotFound(root.to_path_buf()));
         }
-        // Availability gate: snapshots need a git repo with at least one commit.
-        // A non-repo (or unborn HEAD) silently disables the feature.
         if git(root, &["rev-parse", "--verify", "--quiet", "HEAD"])
             .await
             .is_err()
@@ -233,10 +211,6 @@ impl Workspaces for GitWorktrees {
             return Ok(None);
         }
 
-        // `git stash create` builds a commit object for the current working
-        // tree WITHOUT touching HEAD, the index, the working tree, or the stash
-        // list. It prints nothing when the tree is clean — then the snapshot is
-        // simply the current HEAD.
         let created = git(root, &["stash", "create", label]).await?;
         let commit = if created.is_empty() {
             git(root, &["rev-parse", "HEAD"]).await?
@@ -244,8 +218,6 @@ impl Workspaces for GitWorktrees {
             created
         };
 
-        // Pin the (otherwise dangling) commit under a shadow ref so gc can't
-        // reclaim it before an /undo. The opaque id is the commit sha.
         let shadow = format!("refs/{PRODUCT_SLUG}/snapshots/{commit}");
         git(root, &["update-ref", &shadow, &commit]).await?;
 
@@ -262,9 +234,6 @@ impl Workspaces for GitWorktrees {
         if !root.exists() {
             return Err(WorkspaceError::NotFound(root.to_path_buf()));
         }
-        // The snapshot commit must still resolve, or we would reset to the
-        // wrong tree; the shadow ref written at snapshot time is what keeps it
-        // from being gc'd.
         let commitish = format!("{snapshot_id}^{{commit}}");
         if git(root, &["rev-parse", "--verify", "--quiet", &commitish])
             .await
@@ -273,10 +242,6 @@ impl Workspaces for GitWorktrees {
             return Err(WorkspaceError::NotFound(root.join(snapshot_id)));
         }
 
-        // Point the index and working tree at the snapshot's tree WITHOUT moving
-        // HEAD or any branch: tracked files are overwritten and files that
-        // became tracked after the snapshot are removed; untracked files are
-        // left alone. The restored state shows up as pending changes vs HEAD.
         git(root, &["read-tree", "-u", "--reset", snapshot_id]).await?;
 
         tracing::info!(
@@ -377,7 +342,6 @@ mod tests {
             .expect("some workspace");
         assert!(ws.root.exists(), "worktree dir created");
 
-        // Edit only inside the workspace; the base tree stays clean.
         tokio::fs::write(ws.root.join("new.txt"), "hello\n")
             .await
             .expect("write in worktree");
@@ -408,9 +372,6 @@ mod tests {
 
     #[tokio::test]
     async fn committed_but_clean_work_is_merged_not_discarded() {
-        // The agent committed inside the worktree, leaving a clean tree. The
-        // work is ahead of base, so integrate must MERGE it — never take the
-        // Empty→discard path that would force-delete the unmerged branch.
         let base = tempfile::tempdir().expect("tempdir");
         let wt = tempfile::tempdir().expect("tempdir");
         init_repo(base.path()).await;
@@ -424,7 +385,6 @@ mod tests {
         tokio::fs::write(ws.root.join("committed.txt"), "agent work\n")
             .await
             .expect("write");
-        // The agent commits its own work (clean tree afterwards).
         git(&ws.root, &["add", "-A"]).await.expect("add");
         git(&ws.root, &["commit", "-q", "-m", "agent commit"])
             .await
@@ -509,7 +469,6 @@ mod tests {
             .expect("discard");
         assert!(!ws.root.exists(), "worktree removed on discard");
         assert!(!base.path().join("scratch.txt").exists(), "base untouched");
-        // Idempotent: discarding again is not an error.
         backend
             .discard(&ws.root, base.path())
             .await
@@ -520,7 +479,6 @@ mod tests {
     async fn snapshot_is_none_on_a_non_repo() {
         let dir = tempfile::tempdir().expect("tempdir");
         let backend = GitWorktrees::new(dir.path());
-        // A plain (non-git) directory: snapshots are silently unavailable.
         let snap = backend
             .snapshot(dir.path(), "turn-1")
             .await
@@ -535,14 +493,12 @@ mod tests {
         let backend = GitWorktrees::new(base.path());
         let root = base.path();
 
-        // Snapshot the pristine (committed) state.
         let snap = backend
             .snapshot(root, "turn-1")
             .await
             .expect("snapshot ok")
             .expect("git repo → some snapshot");
 
-        // Mutate a tracked file and add a newly-tracked one after the snapshot.
         tokio::fs::write(root.join("seed.txt"), "corrupted\n")
             .await
             .expect("edit seed");
@@ -551,7 +507,6 @@ mod tests {
             .expect("write added");
         git(root, &["add", "-A"]).await.expect("stage");
 
-        // Restore rewinds tracked files to the snapshot without moving HEAD.
         backend.restore(root, &snap).await.expect("restore ok");
 
         let seed = tokio::fs::read_to_string(root.join("seed.txt"))
@@ -562,7 +517,6 @@ mod tests {
             !root.join("added.txt").exists(),
             "file tracked after the snapshot is dropped on restore"
         );
-        // HEAD is untouched — the branch still points at the seed commit.
         let head = git(root, &["rev-parse", "--abbrev-ref", "HEAD"])
             .await
             .expect("head");
@@ -576,7 +530,6 @@ mod tests {
         let backend = GitWorktrees::new(base.path());
         let root = base.path();
 
-        // Dirty the tree, THEN snapshot: the snapshot should hold the dirty state.
         tokio::fs::write(root.join("seed.txt"), "work in progress\n")
             .await
             .expect("edit");
@@ -586,7 +539,6 @@ mod tests {
             .expect("snapshot ok")
             .expect("some");
 
-        // Change again, then restore back to the work-in-progress snapshot.
         tokio::fs::write(root.join("seed.txt"), "later change\n")
             .await
             .expect("edit again");

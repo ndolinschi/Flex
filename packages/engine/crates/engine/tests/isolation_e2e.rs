@@ -11,7 +11,7 @@ use agentloop_core::ProviderRegistry;
 use agentloop_engine::{EngineConfig, EngineService};
 use agentloop_workspace::GitWorktrees;
 
-#[allow(clippy::expect_used)] // test setup: a failing git/fs op is a test bug
+#[allow(clippy::expect_used)]
 fn git(dir: &Path, args: &[&str]) {
     let status = Command::new("git")
         .current_dir(dir)
@@ -21,7 +21,7 @@ fn git(dir: &Path, args: &[&str]) {
     assert!(status.success(), "git {args:?} failed");
 }
 
-#[allow(clippy::expect_used)] // test setup: a failing git/fs op is a test bug
+#[allow(clippy::expect_used)]
 fn init_repo(dir: &Path) {
     git(dir, &["init", "-q"]);
     git(dir, &["config", "user.email", "test@example.com"]);
@@ -58,8 +58,6 @@ async fn engine_provisions_a_real_worktree_and_merges_it_back() {
         .expect("isolated session opens");
     assert!(service.is_isolated(&session).await.expect("meta"));
 
-    // The worktree lives at <root>/<session-id> (GitWorktrees' layout). An edit
-    // there must not appear in the base tree until integration.
     let worktree = worktrees.path().join(session.to_string());
     assert!(worktree.is_dir(), "a real worktree was created");
     std::fs::write(worktree.join("added.txt"), "from the agent\n").expect("write in worktree");
@@ -84,9 +82,6 @@ async fn engine_provisions_a_real_worktree_and_merges_it_back() {
         "from the agent\n"
     );
     assert!(!worktree.exists(), "worktree removed after merge");
-    // After integration the session is repointed to the base and reads as
-    // no longer isolated, so a second integrate is a clean error, not a no-op
-    // against the base tree.
     assert!(!service.is_isolated(&session).await.expect("meta"));
     assert!(
         matches!(

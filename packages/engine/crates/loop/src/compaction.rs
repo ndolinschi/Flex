@@ -56,10 +56,6 @@ pub(crate) async fn compact_session(
         ))
     })?;
 
-    // Cap the summarizer input to the model's window so `/compact` never
-    // overflows on an already-oversized history (previously it sent the whole
-    // transcript and hit the same limit): keep the prior summary plus the
-    // newest tail items, dropping older ones.
     let context_limit = resolve_context_limit(&provider);
     let source = compact_source_text(&transcript, context_limit);
     if source.trim().is_empty() {
@@ -163,8 +159,6 @@ fn compact_source_text(transcript: &Transcript, context_limit: u64) -> String {
     let max_source_chars = context_limit.saturating_mul(2) as usize;
     let budget = max_source_chars.saturating_sub(prefix.as_ref().map_or(0, |p| p.len() + 2));
 
-    // Accumulate newest-first until the budget is hit; always keep at least
-    // one item so a single huge message still gets summarized.
     let mut kept: Vec<TranscriptItem> = Vec::new();
     let mut used = 0usize;
     let mut dropped = false;
@@ -206,7 +200,6 @@ fn render_item(item: &TranscriptItem) -> String {
 }
 
 fn estimate_tokens(text: &str) -> u64 {
-    // Rough heuristic: ~4 characters per token for English prose.
     (text.len() as u64).div_ceil(4)
 }
 
@@ -242,8 +235,6 @@ mod tests {
 
     #[test]
     fn compact_source_drops_oldest_tail_when_over_budget() {
-        // A tiny budget forces truncation; the newest item survives, an
-        // omission marker appears, and the request stays bounded.
         let items: Vec<TranscriptItem> = (0..50)
             .map(|i| TranscriptItem {
                 message_id: agentloop_contracts::MessageId::from(format!("m{i}")),
@@ -260,7 +251,6 @@ mod tests {
             compaction: None,
             boundary_index: None,
         };
-        // context_limit 100 -> ~200 char budget, far smaller than 50 messages.
         let source = compact_source_text(&transcript, 100);
         assert!(source.contains("older messages omitted"));
         assert!(source.contains("message number 49"));

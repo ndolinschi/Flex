@@ -20,10 +20,6 @@ const HARD_MAX_BYTES: usize = 1_000_000;
 /// Maximum characters in the output fed back to the model.
 const MAX_OUTPUT_CHARS: usize = 120_000;
 
-// ---------------------------------------------------------------------------
-// Input
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ScrapePageInput {
@@ -32,10 +28,6 @@ struct ScrapePageInput {
     /// Maximum response bytes to keep. Defaults to 200000, capped at 1000000.
     max_bytes: Option<usize>,
 }
-
-// ---------------------------------------------------------------------------
-// Tool
-// ---------------------------------------------------------------------------
 
 /// Fetches a web page and returns its text content as markdown.
 ///
@@ -163,7 +155,6 @@ impl Tool for ScrapePageTool {
             .is_some_and(|ct| ct.contains("text/html") || ct.contains("application/xhtml"));
 
         let text = if is_html {
-            // Convert HTML to markdown via htmd.
             let html_str = String::from_utf8_lossy(&bytes[..kept_len]);
             htmd::convert(&html_str).unwrap_or_else(|_| html_str.into_owned())
         } else {
@@ -202,10 +193,6 @@ impl Tool for ScrapePageTool {
         })
     }
 }
-
-// ---------------------------------------------------------------------------
-// Local helpers
-// ---------------------------------------------------------------------------
 
 fn schema_of<I: JsonSchema>() -> serde_json::Value {
     serde_json::to_value(schemars::schema_for!(I))

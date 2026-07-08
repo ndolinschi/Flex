@@ -17,7 +17,6 @@ fn tool_use_resolves_to_latest_call_record() {
     let events = common::sample_event_log();
     let transcript = reduce(events.iter());
 
-    // msg-2 is the assistant message containing the ToolUse block.
     let item = transcript
         .items
         .iter()

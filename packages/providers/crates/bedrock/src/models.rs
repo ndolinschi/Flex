@@ -204,7 +204,7 @@ mod tests {
         ];
         let merged = merge_dedup([a, b]);
         assert_eq!(merged.len(), 2);
-        assert_eq!(merged[0].display_name.as_deref(), Some("A")); // first wins
+        assert_eq!(merged[0].display_name.as_deref(), Some("A"));
         assert_eq!(merged[1].id, "y");
     }
 

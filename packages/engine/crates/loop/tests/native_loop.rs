@@ -135,7 +135,6 @@ async fn snapshot_unavailable_emits_no_event_but_completes() {
     use agentloop_testkit::MockWorkspaces;
     let provider = Arc::new(MockProvider::with_turns([MockProvider::text_turn("done")]));
     let store = Arc::new(MemoryStore::new());
-    // Backend present but the tree isn't a git repo → snapshot returns None.
     let mock = Arc::new(MockWorkspaces::new().without_snapshots());
     let agent = NativeAgentBuilder::new(store.clone())
         .providers(provider_registry(provider))
@@ -539,7 +538,6 @@ async fn thinking_option_is_forwarded_to_thinking_capable_providers() {
 
 #[tokio::test]
 async fn thinking_option_is_dropped_for_non_thinking_providers() {
-    // Default mock caps declare `thinking: false`.
     let provider = Arc::new(MockProvider::new());
     let (agent, _store) = create_agent(provider.clone(), Vec::new(), Vec::new()).await;
     let session = agent
@@ -659,14 +657,6 @@ async fn truncated_stream_without_terminal_event_surfaces_as_error_not_phantom_s
     use agentloop_contracts::MessageId;
     use agentloop_core::ProviderStreamEvent;
 
-    // A stream that yields some content then simply closes — no
-    // `MessageEnd`/`Usage` ever arrives. This is a wire cutoff, not the
-    // model deliberately finishing, so it must not be accepted as a normal
-    // successful completion. Truncation is treated as a transient mid-stream
-    // failure and retried on the same model a bounded number of times before
-    // surfacing, so the script must exhaust every one of those attempts
-    // (initial + retries) to still prove truncation is never silently
-    // accepted — see `mid_stream_failure_is_retried_on_same_model`.
     fn truncated_turn() -> agentloop_testkit::ScriptedTurn {
         Ok(vec![
             ProviderStreamEvent::MessageStart {
@@ -696,7 +686,6 @@ async fn truncated_stream_without_terminal_event_surfaces_as_error_not_phantom_s
          not a phantom successful Stop(EndTurn)"
     );
 
-    // The partial draft must never be persisted as a real final answer.
     let events = store.read(&session, 0).await.expect("events replay");
     assert!(
         !events.iter().any(|(_, event)| matches!(
@@ -722,10 +711,6 @@ async fn truncated_stream_without_terminal_event_surfaces_as_error_not_phantom_s
 async fn mid_stream_failure_is_retried_on_same_model_before_falling_back() {
     use agentloop_testkit::ScriptedError;
 
-    // One transient mid-stream drop followed by a healthy turn: the engine
-    // must absorb the first failure by retrying the *same* model rather than
-    // immediately burning through the fallback chain (there is none
-    // configured here) or failing the turn outright.
     let provider = Arc::new(MockProvider::with_turns(vec![
         Err(ScriptedError::Stream(
             "connection reset mid-frame".to_owned(),
@@ -886,7 +871,6 @@ async fn task_call_spawns_child_and_returns_final_text() {
             "prompt": "Find the answer and report it.",
         }),
     )]);
-    // FIFO script: parent iter 1 (Task), child turn, parent iter 2.
     let provider = Arc::new(MockProvider::with_turns(vec![
         turn,
         MockProvider::text_turn("child result: 42"),
@@ -931,7 +915,6 @@ async fn task_call_spawns_child_and_returns_final_text() {
             .any(|(_, event)| matches!(event, AgentEvent::SubagentCompleted { child_session, .. } if *child_session == child)),
         "SubagentCompleted is persisted"
     );
-    // The child owns its own log.
     let child_events = store.read(&child, 0).await.expect("child log");
     assert!(
         child_events
@@ -939,7 +922,6 @@ async fn task_call_spawns_child_and_returns_final_text() {
             .any(|(_, event)| matches!(event, AgentEvent::AssistantMessage { .. })),
         "child materialized its answer"
     );
-    // The parent's Task call completed with the child's final text.
     assert!(
         events.iter().any(|(_, event)| matches!(
             event,
@@ -955,11 +937,6 @@ async fn task_call_spawns_child_and_returns_final_text() {
 
 #[tokio::test]
 async fn max_depth_denies_grandchild_spawn() {
-    // Parent (main, depth 0) spawns a `worker` child (max_depth: 1, so it
-    // becomes depth 1). The child then itself tries to spawn another
-    // `worker` (would be depth 2) via Task. Since the child is already at
-    // its role's max_depth, that grandchild spawn must be denied — Task
-    // must not actually run, regardless of what the model asks for.
     let (parent_turn, parent_ids) = MockProvider::tool_turn(&[(
         "Task",
         serde_json::json!({
@@ -976,9 +953,6 @@ async fn max_depth_denies_grandchild_spawn() {
             "prompt": "This should never actually run.",
         }),
     )]);
-    // FIFO: parent iter 1 (Task) → child iter 1 (attempts Task, denied
-    // server-side, no grandchild session is ever created) → child iter 2
-    // (final answer) → parent iter 2 (final answer).
     let provider = Arc::new(MockProvider::with_turns(vec![
         parent_turn,
         child_turn,
@@ -1014,8 +988,6 @@ async fn max_depth_denies_grandchild_spawn() {
         })
         .expect("the parent's Task call spawned exactly one child");
 
-    // No grandchild session was ever created: the depth cap denied the
-    // child's Task call before a session existed for it.
     assert!(
         !events.iter().any(|(_, event)| matches!(
             event,
@@ -1024,8 +996,6 @@ async fn max_depth_denies_grandchild_spawn() {
         "no grandchild subagent should have been started — max_depth must be enforced"
     );
 
-    // The child's own log shows its Task call was denied as an error, not
-    // silently dropped or (worse) actually run.
     let child_events = store.read(&child, 0).await.expect("child log");
     assert!(
         child_events.iter().any(|(_, event)| matches!(
@@ -1043,10 +1013,6 @@ async fn max_depth_denies_grandchild_spawn() {
         )),
         "the child's grandchild Task attempt must be denied with a max_depth error"
     );
-    // Exactly 4 model calls happened: parent's Task request, the child's
-    // (denied) Task attempt, the child's follow-up final answer, and the
-    // parent's final answer. A 5th call would mean a grandchild turn
-    // actually ran.
     assert_eq!(provider.requests().len(), 4);
 }
 
@@ -1061,7 +1027,6 @@ async fn child_permission_relays_and_routes() {
         }),
     )]);
     let (child_turn, _) = MockProvider::tool_turn(&[("needs_permission", serde_json::json!({}))]);
-    // FIFO: parent iter 1 (Task) → child ask iter → child final → parent iter 2.
     let provider = Arc::new(MockProvider::with_turns(vec![
         turn,
         child_turn,
@@ -1098,8 +1063,6 @@ async fn child_permission_relays_and_routes() {
             .await
     });
 
-    // The child's ask reaches parent subscribers wrapped as SubagentEvent,
-    // and responding on the child session id resolves it.
     let (child, request_id) = loop {
         let event = stream.next().await.expect("relayed ask arrives");
         if let AgentEvent::SubagentEvent {
@@ -1117,7 +1080,6 @@ async fn child_permission_relays_and_routes() {
         .await
         .expect("responding on the child session unblocks it");
 
-    // The resolution relays back so clients can clear the prompt.
     loop {
         let event = stream.next().await.expect("relayed resolution arrives");
         if let AgentEvent::SubagentEvent { event, .. } = event.payload {
@@ -1171,11 +1133,9 @@ async fn split_agent(
     mock_a.push_turn(turn);
     let mock_b = Arc::new(MockProvider::with_id("mock-b"));
     if split {
-        // One child lands on each provider.
         mock_a.push_turn(MockProvider::text_turn("left result"));
         mock_b.push_turn(MockProvider::text_turn("right result"));
     } else {
-        // Both children pin chain[0] = mock-a.
         mock_a.push_turn(MockProvider::text_turn("left result"));
         mock_a.push_turn(MockProvider::text_turn("right result"));
     }

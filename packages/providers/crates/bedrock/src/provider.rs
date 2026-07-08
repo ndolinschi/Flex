@@ -261,20 +261,12 @@ impl Provider for BedrockProvider {
     }
 
     async fn list_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
-        // Without credentials the control plane is unreachable; serve the
-        // curated fallback so the picker still has entries.
         if !self.config.auth.is_present() {
             return Ok(static_models());
         }
         match self.fetch_dynamic_models().await {
             Ok(models) if !models.is_empty() => Ok(models),
-            // Listed nothing but nothing failed — fall back so the picker isn't
-            // empty.
             Ok(_) => Ok(static_models()),
-            // Listing failed with credentials present (commonly a Bedrock API
-            // key lacking control-plane list permission, or a region with no
-            // access): surface it so the client can explain why instead of
-            // showing a misleading static list.
             Err(err) => Err(err),
         }
     }
@@ -294,7 +286,6 @@ impl Provider for BedrockProvider {
 
         let model = request.model.clone();
         let url = self.config.converse_stream_url(&model);
-        // Serialize once so the SigV4 payload hash matches the sent bytes.
         let payload = serde_json::to_vec(&build_request(request)).map_err(|err| {
             ProviderError::InvalidRequest {
                 provider: provider.clone(),
@@ -424,7 +415,6 @@ fn drain_frames(state: &mut StreamState) {
 }
 
 fn process_event(state: &mut StreamState, event: RawEvent) {
-    // Bedrock signals in-band errors as `:message-type: exception`.
     let is_exception =
         event.message_type.as_deref() == Some("exception") || event.exception_type.is_some();
     if is_exception {
@@ -442,7 +432,7 @@ fn process_event(state: &mut StreamState, event: RawEvent) {
         return;
     }
     let Some(event_type) = event.event_type.as_deref() else {
-        return; // non-event frames (e.g. keep-alives) carry no routing type
+        return;
     };
     match state.mapper.map_event(event_type, &event.payload) {
         Ok(events) => {

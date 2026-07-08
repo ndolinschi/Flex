@@ -50,8 +50,6 @@ impl Plugin for SearchPlugin {
     }
 
     fn system_prompt_fragment(&self) -> Option<String> {
-        // The researcher workflow lives in the role prompt; no top-level
-        // fragment is needed.
         None
     }
 

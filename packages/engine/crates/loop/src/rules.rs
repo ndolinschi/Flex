@@ -29,12 +29,11 @@ pub fn rule_matches(rule: &PermissionRule, facts: &CallFacts<'_>) -> bool {
         return false;
     }
     let Some(spec) = rule.specifier.as_deref() else {
-        return true; // bare rule: whole tool
+        return true;
     };
     match facts.tool_name {
         "Bash" => command_prefix_matches(spec, string_field(facts.input, "command")),
         "WebFetch" => domain_matches(spec, string_field(facts.input, "url")),
-        // Path-taking tools: match the primary path argument.
         _ => {
             let path = string_field(facts.input, "file_path")
                 .or_else(|| string_field(facts.input, "path"));
@@ -134,14 +133,12 @@ fn host_of(url: &str) -> Option<&str> {
 fn path_glob_matches(spec: &str, path: Option<&str>, facts: &CallFacts<'_>) -> bool {
     let Some(path) = path else { return false };
 
-    // Resolve the call's path against cwd (no filesystem access).
     let call_path = if Path::new(path).is_absolute() {
         Path::new(path).to_path_buf()
     } else {
         facts.cwd.join(path)
     };
 
-    // Expand ~ in the pattern.
     let pattern = match (spec.strip_prefix("~/"), facts.home) {
         (Some(rest), Some(home)) => home.join(rest).to_string_lossy().into_owned(),
         _ => spec.to_owned(),
@@ -151,7 +148,7 @@ fn path_glob_matches(spec: &str, path: Option<&str>, facts: &CallFacts<'_>) -> b
         .literal_separator(false)
         .build()
     else {
-        return false; // malformed pattern in a rule never grants anything
+        return false;
     };
     glob.compile_matcher().is_match(&call_path)
 }
@@ -187,15 +184,11 @@ mod tests {
             &facts("Bash", &serde_json::json!({"command": "gitk"}))
         ));
         assert!(!rule_matches(&rule("Bash(npm *)"), &facts("Bash", &input)));
-        // Rule for one tool never matches another.
         assert!(!rule_matches(&rule("Bash(git *)"), &facts("Read", &input)));
     }
 
     #[test]
     fn bash_prefix_rejects_compound_commands() {
-        // A prefix rule approved for a plain command must not authorize a
-        // compound command that smuggles extra shell-executed commands in
-        // behind the approved prefix.
         assert!(!command_prefix_matches(
             "git *",
             Some("git status && rm -rf /")
@@ -224,15 +217,12 @@ mod tests {
             "git *",
             Some("git status\nrm -rf /")
         ));
-        // Redirection can also be used to clobber files; also rejected.
         assert!(!command_prefix_matches(
             "git *",
             Some("git status > /etc/passwd")
         ));
-        // A bare `*` rule is likewise not a blank check for compound commands.
         assert!(!command_prefix_matches("*", Some("git status && rm -rf /")));
 
-        // Plain, non-compound commands still match as before.
         assert!(command_prefix_matches("git *", Some("git status")));
         assert!(command_prefix_matches(
             "git *",
@@ -277,7 +267,6 @@ mod tests {
             &rule("WebFetch(domain:example.org)"),
             &facts("WebFetch", &input)
         ));
-        // Suffix trickery must not match.
         let evil = serde_json::json!({"url": "https://notexample.com/"});
         assert!(!rule_matches(
             &rule("WebFetch(domain:example.com)"),

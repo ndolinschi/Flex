@@ -21,10 +21,6 @@ const MAX_OUTPUT_CHARS: usize = 60_000;
 /// Maximum number of results to include in the output.
 const MAX_RESULTS: usize = 15;
 
-// ---------------------------------------------------------------------------
-// Input
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct SearchWebInput {
@@ -32,10 +28,6 @@ struct SearchWebInput {
     /// site restrictions (e.g. `site:docs.rs`) for better results.
     query: String,
 }
-
-// ---------------------------------------------------------------------------
-// Tool
-// ---------------------------------------------------------------------------
 
 /// Searches the web via a pluggable backend and returns results as markdown.
 pub struct SearchWebTool {
@@ -142,10 +134,6 @@ impl Tool for SearchWebTool {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Output formatting
-// ---------------------------------------------------------------------------
-
 fn format_search_results(query: &str, results: &[crate::search_backend::SearchResult]) -> String {
     let mut out = String::new();
     out.push_str("## Search results for \"");
@@ -163,10 +151,6 @@ fn format_search_results(query: &str, results: &[crate::search_backend::SearchRe
     }
     out
 }
-
-// ---------------------------------------------------------------------------
-// Local helpers (avoid path-dep on agentloop-tools for two small functions)
-// ---------------------------------------------------------------------------
 
 fn schema_of<I: JsonSchema>() -> serde_json::Value {
     serde_json::to_value(schemars::schema_for!(I))

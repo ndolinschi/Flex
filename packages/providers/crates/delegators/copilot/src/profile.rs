@@ -43,8 +43,6 @@ impl DelegatorProfile for CopilotProfile {
                 tool_scoping: false,
             },
             reasoning_visible: false,
-            // Plain markdown, one message per turn: the degenerate-but-valid
-            // unified-stream case.
             streaming: StreamingGranularity::SnapshotOnly,
             resume: ResumeSupport::Replay,
             attachments: AttachmentCaps {
@@ -192,14 +190,12 @@ mod tests {
             .expect("turn");
         assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
 
-        // The prompt reached the CLI as `-p <prompt>`.
         {
             let requests = host.requests.lock().unwrap();
             assert_eq!(requests.len(), 1);
             assert_eq!(requests[0].spec.args, vec!["-p", "say pong"]);
         }
 
-        // The transcript holds exactly one clean assistant message.
         let events = store.read(&session, 0).await.expect("events");
         let assistant: Vec<_> = events
             .iter()

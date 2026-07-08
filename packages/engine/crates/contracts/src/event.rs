@@ -42,7 +42,6 @@ pub struct SessionEvent {
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum AgentEvent {
-    // ── lifecycle (persisted) ───────────────────────────────────────────────
     SessionCreated {
         meta: SessionMeta,
     },
@@ -68,7 +67,6 @@ pub enum AgentEvent {
         error: EngineError,
     },
 
-    // ── streaming deltas (ephemeral — broadcast, never persisted) ──────────
     MessageStarted {
         message_id: MessageId,
         role: Role,
@@ -100,7 +98,6 @@ pub enum AgentEvent {
         note: String,
     },
 
-    // ── materialized items (persisted — the durable log) ───────────────────
     UserMessage {
         message_id: MessageId,
         content: Vec<ContentBlock>,
@@ -123,7 +120,6 @@ pub enum AgentEvent {
         entries: Vec<PlanEntry>,
     },
 
-    // ── control plane (persisted) ───────────────────────────────────────────
     PermissionRequested {
         id: PermissionRequestId,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -168,7 +164,6 @@ pub enum AgentEvent {
         outcome: HookOutcomeKind,
     },
 
-    // ── composition ─────────────────────────────────────────────────────────
     SubagentStarted {
         child_session: SessionId,
         task: String,
@@ -190,7 +185,6 @@ pub enum AgentEvent {
         summary: TurnSummary,
     },
 
-    // ── environment isolation (persisted) ─────────────────────────────────────
     /// A session's tools were redirected into an isolated working copy
     /// (e.g. a git worktree) branched from `base_ref`.
     WorkspaceProvisioned {
@@ -223,7 +217,6 @@ pub enum AgentEvent {
         snapshot_id: String,
     },
 
-    // ── transport hygiene ───────────────────────────────────────────────────
     /// A live subscriber lagged and missed events; re-sync from the store
     /// starting at `from_seq`. Never persisted.
     Gap {

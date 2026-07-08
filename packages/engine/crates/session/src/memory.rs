@@ -369,7 +369,6 @@ mod tests {
             "update_meta must bump updated_at_ms"
         );
 
-        // A second patch leaves previously-set fields untouched.
         store
             .update_meta(&id, SessionMetaPatch::default())
             .await
@@ -398,7 +397,6 @@ mod tests {
             events,
             vec![(1, AgentEvent::CompactionBoundary { summary })],
         );
-        // It went through the normal append path: the next seq continues.
         assert_eq!(store.append(&id, &[]).await.unwrap(), 2);
     }
 

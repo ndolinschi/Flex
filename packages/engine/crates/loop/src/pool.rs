@@ -108,7 +108,6 @@ async fn run_job(
     } = job;
     let cancel = ctx.cancel.clone();
 
-    // ── queue for permits (cancellable; never reports Started on cancel) ──
     let _session_permit = tokio::select! {
         biased;
         _ = cancel.cancelled() => {
@@ -117,7 +116,6 @@ async fn run_job(
         }
         permit = session_permits.acquire_owned() => match permit {
             Ok(permit) => permit,
-            // Semaphore closed: the batch is being torn down.
             Err(_) => {
                 finish(&results, call_id, ToolJobOutcome::Output(Err(ToolError::Cancelled)))
                     .await;
@@ -151,7 +149,6 @@ async fn run_job(
         })
         .await;
 
-    // ── run, isolated on its own task so a panic never unwinds the turn ──
     let run_cancel = cancel.clone();
     let inner = tokio::spawn(async move {
         tokio::select! {
@@ -168,7 +165,6 @@ async fn run_job(
         Err(err) if err.is_panic() => ToolJobOutcome::Panicked {
             message: panic_message(err),
         },
-        // Aborted: treated as cancellation, never as an error (hard rule 6).
         Err(_) => ToolJobOutcome::Output(Err(ToolError::Cancelled)),
     };
     finish(&results, call_id, outcome).await;

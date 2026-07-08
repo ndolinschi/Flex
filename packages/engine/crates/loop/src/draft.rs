@@ -147,9 +147,6 @@ impl AssistantDraft {
                     content.push(ContentBlock::Thinking { text, signature });
                 }
                 DraftBlock::Tool { id, name, args } => {
-                    // Empty args = no-argument tool; malformed JSON is kept as
-                    // a raw string so the tool's schema validation produces a
-                    // teaching error instead of the loop crashing.
                     let input = if args.trim().is_empty() {
                         serde_json::json!({})
                     } else {
@@ -221,7 +218,7 @@ mod tests {
         }
         assert_eq!(draft.stop_reason, Some(StopReason::ToolUse));
         let (content, calls) = draft.finish();
-        assert_eq!(content.len(), 3); // thinking, markdown, tool_use
+        assert_eq!(content.len(), 3);
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].name, "echo");
         assert_eq!(calls[0].input, serde_json::json!({"text": "hi"}));
@@ -229,11 +226,6 @@ mod tests {
 
     #[test]
     fn interleaved_parallel_tool_calls_attribute_args_correctly() {
-        // Reproduces: provider announces two parallel tool calls before
-        // streaming either's arguments (ToolCallStart(A), ToolCallStart(B)),
-        // then argument deltas arrive for A even though B is now the most
-        // recently pushed block. Each call's args must land on its own id,
-        // not on whichever Tool block happens to be last.
         let mut draft = AssistantDraft::new();
         draft.apply(ProviderStreamEvent::ToolCallStart {
             call_id: ToolCallId::from("call_a"),

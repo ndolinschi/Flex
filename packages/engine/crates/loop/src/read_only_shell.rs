@@ -52,7 +52,6 @@ const READONLY_GIT_SUBCOMMANDS: &[&str] = &[
 /// backgrounds. Their mere presence forces a deny (we don't try to prove the
 /// nuance safe).
 fn has_side_effect_syntax(command: &str) -> bool {
-    // Command / process substitution and backgrounding — always reject.
     if command.contains("$(")
         || command.contains('`')
         || command.contains("<(")
@@ -60,8 +59,6 @@ fn has_side_effect_syntax(command: &str) -> bool {
     {
         return true;
     }
-    // Output redirection. Strip the harmless "discard" / fd-dup forms first, then
-    // any remaining `>` means a write to a file.
     let mut scrubbed = command.to_owned();
     for safe in [
         "2>&1",
@@ -84,11 +81,7 @@ pub(crate) fn command_is_read_only(command: &str) -> bool {
     if has_side_effect_syntax(trimmed) {
         return false;
     }
-    // Every segment of a pipe/list must independently be read-only.
     for segment in trimmed.split(['|', ';', '\n']).flat_map(|s| s.split("&&")) {
-        // `a || b` splits leave a leading/trailing token when `|` is used above;
-        // re-split on the `||` remnant is unnecessary because `|` already split
-        // it into empty-or-real segments, which we tolerate below.
         if !segment_is_read_only(segment) {
             return false;
         }
@@ -101,19 +94,16 @@ fn segment_is_read_only(segment: &str) -> bool {
         .split_whitespace()
         .skip_while(|t| is_env_assignment(t));
     let Some(bin) = tokens.next() else {
-        // Empty segment (e.g. from splitting `a || b`) — no command to run.
         return true;
     };
     let bin = strip_path(bin);
     if bin == "git" {
-        // First non-flag token after `git` is the subcommand.
         return match tokens.find(|t| !t.starts_with('-')) {
             Some(sub) => READONLY_GIT_SUBCOMMANDS.contains(&sub),
-            None => true, // bare `git` / `git --version`
+            None => true,
         };
     }
     if bin == "find" {
-        // `find` is read-only unless it is told to act on matches.
         let acts = segment.split_whitespace().any(|t| {
             matches!(
                 t,

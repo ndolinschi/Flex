@@ -105,13 +105,10 @@ impl PermissionPolicy {
             return Verdict::Allow;
         }
 
-        // Plan mode: research runs, mutation doesn't — regardless of rules.
         if matches!(mode, PermissionMode::Plan) {
             if descriptor.read_only {
                 return Verdict::Allow;
             }
-            // Read-only shell (e.g. `git log`, `ls`, `rg`) is safe while
-            // planning even though the Bash tool isn't blanket read-only.
             if matches!(descriptor.category, ToolCategory::Shell)
                 && input
                     .get("command")
@@ -129,9 +126,6 @@ impl PermissionPolicy {
             };
         }
 
-        // Explicit rules, last-match-wins. User rules take precedence over the
-        // built-in denies (so a user allow can re-enable a denied path); within
-        // each set the last matching rule decides.
         {
             let rules = self.rules.read().unwrap_or_else(|p| p.into_inner());
             let facts = CallFacts {
@@ -156,7 +150,6 @@ impl PermissionPolicy {
             }
         }
 
-        // Tool-declared hints. Unknown future hints fail closed (ask).
         let would_ask = match descriptor.needs_permission {
             PermissionHint::Never => false,
             PermissionHint::IfMutating => !descriptor.read_only,
@@ -255,7 +248,6 @@ mod tests {
                 Verdict::Deny { .. }
             ));
         }
-        // A non-dotenv file is unaffected (read-only → allowed).
         assert_eq!(
             eval(
                 &policy,
@@ -268,8 +260,6 @@ mod tests {
 
     #[test]
     fn user_allow_rule_overrides_builtin_dotenv_deny() {
-        // User rules are evaluated after the built-in denies, so an explicit
-        // allow wins (last-match-wins).
         let policy = PermissionPolicy::new(PermissionMode::Default)
             .with_rules(vec![PermissionRule::parse("Read(**/.env*)").expect("rule")]);
         let read = descriptor("Read", true, PermissionHint::Never);
@@ -296,7 +286,6 @@ mod tests {
             ),
             Verdict::Deny { .. }
         ));
-        // A command the deny rule does not match still falls through to Ask.
         assert_eq!(
             eval(&policy, &bash, serde_json::json!({ "command": "ls" })),
             Verdict::Ask
@@ -305,8 +294,6 @@ mod tests {
 
     #[test]
     fn last_match_wins_between_allow_and_deny() {
-        // Allow all git, then deny the dangerous subcommand: the later deny wins
-        // for a push, the earlier allow still covers a status.
         let policy = PermissionPolicy::new(PermissionMode::Default).with_rules(vec![
             PermissionRule::parse("Bash(git *)").expect("rule"),
             PermissionRule::parse("!Bash(git push *)").expect("rule"),
@@ -385,10 +372,6 @@ mod tests {
 
     #[test]
     fn allow_always_rule_does_not_authorize_compound_command_injection() {
-        // Simulate what happens after a user allow-always's a single, benign
-        // `git status` invocation: the persisted rule must not then silently
-        // allow a compound command that smuggles a destructive command in
-        // behind the approved prefix.
         let bash = descriptor("Bash", false, PermissionHint::Always);
         let rule =
             PermissionPolicy::rule_for_always(&bash, &serde_json::json!({"command": "git status"}));
@@ -396,8 +379,6 @@ mod tests {
 
         let policy = PermissionPolicy::new(PermissionMode::Default).with_rules(vec![rule]);
 
-        // The originally approved command (and other plain `git` commands)
-        // still short-circuit straight to Allow.
         assert_eq!(
             eval(&policy, &bash, serde_json::json!({"command": "git status"})),
             Verdict::Allow
@@ -407,8 +388,6 @@ mod tests {
             Verdict::Allow
         );
 
-        // A compound command riding on the approved prefix must fall through
-        // to Ask rather than being silently allowed.
         assert_eq!(
             eval(
                 &policy,

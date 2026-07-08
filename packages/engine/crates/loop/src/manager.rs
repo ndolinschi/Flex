@@ -85,7 +85,6 @@ impl ToolCallManager {
         }
 
         let now = now_ms();
-        // Leaving AwaitingPermission: record how long the user took.
         if matches!(call.status, ToolCallStatus::AwaitingPermission { .. }) {
             let waited_since = call
                 .timing

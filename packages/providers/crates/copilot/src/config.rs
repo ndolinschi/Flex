@@ -164,7 +164,6 @@ pub(crate) fn store_github_token_in(dir: &Path, token: &str) -> Result<PathBuf, 
     );
     let body = serde_json::Value::Object(entries).to_string();
 
-    // Write a sibling temp file, then rename: readers never see a torn file.
     let tmp = dir.join(format!("apps.json.tmp-{}", std::process::id()));
     std::fs::write(&tmp, &body).map_err(|err| store_error("write", &tmp, &err))?;
     #[cfg(unix)]
@@ -333,6 +332,6 @@ mod tests {
             discover_github_token(dir.path()).as_deref(),
             Some("gho_new")
         );
-        read_apps_json(dir.path()); // must be valid JSON again
+        read_apps_json(dir.path());
     }
 }

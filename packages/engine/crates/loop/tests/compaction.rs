@@ -81,7 +81,6 @@ async fn compaction_reduces_messages_sent_to_provider() {
     assert_eq!(requests.len(), 4);
 
     let post_compact = &requests[3];
-    // Summary prefix + latest user message — not the full four-message history.
     assert!(
         post_compact.messages.len() <= 2,
         "expected compacted context, got {} messages",

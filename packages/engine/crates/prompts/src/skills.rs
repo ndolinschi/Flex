@@ -248,8 +248,6 @@ fn strip_frontmatter(raw: &str) -> &str {
     let rest = rest.strip_prefix('\n').unwrap_or(rest);
     match rest.find("\n---") {
         Some(end) => {
-            // Skip the "\n---" marker, then skip to the end of that
-            // closing-fence line (tolerating trailing junk like "---  ").
             let after_fence = &rest[end + "\n---".len()..];
             let body_start = after_fence
                 .find('\n')

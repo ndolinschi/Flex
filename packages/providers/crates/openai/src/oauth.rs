@@ -662,9 +662,7 @@ mod tests {
             "XDG_CONFIG_HOME",
             Some(dir.path().parent().unwrap()),
             || {
-                temp_env::with_var("HOME", None::<&str>, || {
-                    // path uses XDG_CONFIG_HOME/agentloop
-                });
+                temp_env::with_var("HOME", None::<&str>, || {});
             },
         );
         let path = dir.path().join("openai-auth.json");

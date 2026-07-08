@@ -38,13 +38,11 @@ impl EventStreamDecoder {
     /// Pull the next complete frame. `Ok(None)` means more bytes are needed;
     /// `Err` means the framing is corrupt (unrecoverable for this stream).
     pub(crate) fn next_message(&mut self) -> Result<Option<RawEvent>, String> {
-        // Prelude is 12 bytes: total len, headers len, prelude CRC.
         if self.buf.len() < 12 {
             return Ok(None);
         }
         let total_len = be_u32(&self.buf[0..4]) as usize;
         let headers_len = be_u32(&self.buf[4..8]) as usize;
-        // 16 = 4 prelude lengths (8) + prelude CRC (4) + message CRC (4).
         if total_len < 16 || headers_len > total_len - 16 {
             return Err(format!(
                 "invalid event-stream frame: total={total_len}, headers={headers_len}"
@@ -64,7 +62,6 @@ impl EventStreamDecoder {
 }
 
 fn be_u32(bytes: &[u8]) -> u32 {
-    // Callers pass a 4-byte window guaranteed by a prior length check.
     let mut value = 0u32;
     for &byte in bytes.iter().take(4) {
         value = (value << 8) | u32::from(byte);
@@ -93,7 +90,6 @@ fn parse_headers(mut headers: &[u8]) -> RawEvent {
         let value_type = headers[0];
         headers = &headers[1..];
         match value_type {
-            // string (7) and byte-array (6): u16 length prefix + bytes.
             6 | 7 => {
                 if headers.len() < 2 {
                     break;
@@ -107,13 +103,13 @@ fn parse_headers(mut headers: &[u8]) -> RawEvent {
                 headers = &headers[value_len..];
                 assign(&mut event, &name, value);
             }
-            0 | 1 => {}                          // bool true/false
-            2 => headers = skip(headers, 1),     // byte
-            3 => headers = skip(headers, 2),     // short
-            4 => headers = skip(headers, 4),     // int
-            5 | 8 => headers = skip(headers, 8), // long / timestamp
-            9 => headers = skip(headers, 16),    // uuid
-            _ => break,                          // unknown: stop safely
+            0 | 1 => {}
+            2 => headers = skip(headers, 1),
+            3 => headers = skip(headers, 2),
+            4 => headers = skip(headers, 4),
+            5 | 8 => headers = skip(headers, 8),
+            9 => headers = skip(headers, 16),
+            _ => break,
         }
     }
     event
@@ -138,12 +134,11 @@ mod tests {
 
     /// Build one event-stream frame with a single `:event-type` string header.
     fn frame(event_type: &str, payload: &[u8]) -> Vec<u8> {
-        // header: name_len(1) + name + type(1) + u16 len + value
         let name = b":event-type";
         let mut headers = Vec::new();
         headers.push(name.len() as u8);
         headers.extend_from_slice(name);
-        headers.push(7u8); // string
+        headers.push(7u8);
         headers.extend_from_slice(&(event_type.len() as u16).to_be_bytes());
         headers.extend_from_slice(event_type.as_bytes());
 
@@ -151,10 +146,10 @@ mod tests {
         let mut out = Vec::new();
         out.extend_from_slice(&(total as u32).to_be_bytes());
         out.extend_from_slice(&(headers.len() as u32).to_be_bytes());
-        out.extend_from_slice(&0u32.to_be_bytes()); // prelude CRC (unchecked)
+        out.extend_from_slice(&0u32.to_be_bytes());
         out.extend_from_slice(&headers);
         out.extend_from_slice(payload);
-        out.extend_from_slice(&0u32.to_be_bytes()); // message CRC (unchecked)
+        out.extend_from_slice(&0u32.to_be_bytes());
         out
     }
 
@@ -175,7 +170,7 @@ mod tests {
         let (head, tail) = bytes.split_at(10);
         let mut decoder = EventStreamDecoder::new();
         decoder.push(head);
-        assert_eq!(decoder.next_message().expect("ok"), None); // incomplete
+        assert_eq!(decoder.next_message().expect("ok"), None);
         decoder.push(tail);
         let event = decoder.next_message().expect("ok").expect("frame");
         assert_eq!(event.event_type.as_deref(), Some("messageStop"));
@@ -211,7 +206,6 @@ mod tests {
     #[test]
     fn rejects_impossible_lengths() {
         let mut decoder = EventStreamDecoder::new();
-        // total len = 4 (< 16 minimum) but 12+ bytes buffered.
         decoder.push(&[0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0]);
         assert!(decoder.next_message().is_err());
     }

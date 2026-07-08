@@ -78,7 +78,6 @@ async fn optional_isolation_falls_back_when_backend_declines() {
         .expect("optional isolation never fails");
 
     let meta = store.get_meta(&id).await.expect("meta");
-    // Runs in place: cwd unchanged, no workspace, but intent recorded.
     assert_eq!(meta.cwd, PathBuf::from("/repo"));
     assert_eq!(meta.workspace_id, None);
     assert_eq!(meta.base_cwd, None);
@@ -138,8 +137,6 @@ async fn no_policy_means_no_isolation() {
 
 #[tokio::test]
 async fn role_declared_isolation_drives_the_root_session() {
-    // Override the built-in `main` role to require isolation; a session with no
-    // explicit param must pick that up.
     let store = Arc::new(MemoryStore::new());
     let mock = Arc::new(MockWorkspaces::new());
     let main = RoleSpec {
@@ -161,8 +158,6 @@ async fn role_declared_isolation_drives_the_root_session() {
 
 #[tokio::test]
 async fn resume_repoints_cwd_when_the_workspace_is_gone() {
-    // The mock's workspace root never exists on disk, standing in for a
-    // workspace that was integrated/removed. Resume must fall back to base_cwd.
     let store = Arc::new(MemoryStore::new());
     let mock = Arc::new(MockWorkspaces::new());
     let agent = build_agent(store.clone(), Some(mock), Vec::new());

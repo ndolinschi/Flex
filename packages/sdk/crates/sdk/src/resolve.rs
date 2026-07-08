@@ -67,7 +67,6 @@ pub(crate) async fn resolve_service(
         None => {}
     }
 
-    // Auto-detect: provider keys win; otherwise probe installed CLIs.
     match native_service(None, model, workdir) {
         Ok(service) => {
             trace.push("provider API key found in environment".to_owned());
@@ -98,9 +97,6 @@ fn native_service(
     model: Option<String>,
     workdir: &Path,
 ) -> Result<EngineService, EngineServiceError> {
-    // Compose over the SDK builder. The headless runner is one-shot and
-    // environment-only: workspace isolation and connected keys belong to
-    // interactive clients, so the engine-scoped defaults are left off here.
     let mut builder = AgentBuilder::new().cwd(workdir.to_path_buf()).date(today());
     if let Some(provider) = provider {
         builder = builder.provider(provider);
@@ -176,8 +172,6 @@ fn is_auth_missing(err: &EngineServiceError) -> bool {
 }
 
 fn today() -> String {
-    // Coarse ISO date from the epoch — the runner has no chrono dependency
-    // and the prompt only needs day resolution.
     let days = agentloop_contracts::now_ms() / 86_400_000;
     let mut year = 1970u64;
     let mut remaining = days;

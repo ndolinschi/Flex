@@ -106,10 +106,6 @@ impl Provider for CopilotProvider {
                     message: format!("Copilot models response was not JSON: {err}"),
                 })?;
         let models = compat::models_from_json(&provider, value)?;
-        // Codex-family models (e.g. `gpt-5.3-codex`) are served by Copilot's
-        // Responses API, not `/chat/completions`, so selecting one only yields
-        // an "not accessible via the /chat/completions endpoint" error. Drop
-        // them from the list this provider can actually run.
         Ok(models
             .into_iter()
             .filter(|model| !is_codex_model(&model.id))

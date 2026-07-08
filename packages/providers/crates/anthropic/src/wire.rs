@@ -408,9 +408,6 @@ impl AnthropicStreamMapper {
 }
 
 pub(crate) fn build_request(request: ChatRequest) -> AnthropicMessagesRequest {
-    // The API requires max_tokens > thinking.budget_tokens; when the caller
-    // did not set an explicit max, floor the default above the budget so a
-    // large budget is not rejected outright. An explicit value is untouched.
     let default_max_tokens = match &request.thinking {
         Some(thinking) => thinking.budget_tokens.saturating_add(4096),
         None => 4096,
@@ -738,7 +735,6 @@ mod tests {
     fn thinking_floors_default_max_tokens_above_the_budget() {
         use agentloop_core::ThinkingConfig;
 
-        // No explicit max_tokens: the default rises above the budget.
         let mut request = ChatRequest::new("claude-test", Vec::new());
         request.thinking = Some(ThinkingConfig {
             budget_tokens: 8192,
@@ -750,7 +746,6 @@ mod tests {
         assert_eq!(json["max_tokens"], 8192 + 4096);
         assert_eq!(json["thinking"]["budget_tokens"], 8192);
 
-        // An explicit caller value is untouched.
         let mut request = ChatRequest::new("claude-test", Vec::new());
         request.thinking = Some(ThinkingConfig {
             budget_tokens: 8192,
@@ -762,7 +757,6 @@ mod tests {
         };
         assert_eq!(json["max_tokens"], 16000);
 
-        // Without thinking the default stays 4096.
         let json = match serde_json::to_value(build_request(ChatRequest::new(
             "claude-test",
             Vec::new(),
