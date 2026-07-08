@@ -88,6 +88,61 @@ impl NativeAgent {
         let child_model = chain.first().cloned().or_else(|| parent_meta.model.clone());
 
         let child = SessionId::generate();
+
+        // Per-subagent isolation: a role that asks for isolation gets its own
+        // worktree branched from the parent's cwd, merged back (or discarded)
+        // when the child finishes. Failures degrade per policy, mirroring
+        // root-session provisioning in `create_session`.
+        let policy = role.isolation;
+        let mut child_cwd = parent_meta.cwd.clone();
+        let mut isolation = None;
+        let mut workspace_id = None;
+        let mut base_cwd = None;
+        let mut provisioned_event = None;
+        if policy.wants_isolation() {
+            match &self.deps.workspace {
+                Some(backend) => match backend.provision(&parent_meta.cwd, &child, policy).await {
+                    Ok(Some(workspace)) => {
+                        child_cwd = workspace.root.clone();
+                        isolation = Some(policy);
+                        workspace_id = Some(workspace.id.clone());
+                        base_cwd = Some(parent_meta.cwd.clone());
+                        provisioned_event = Some(AgentEvent::WorkspaceProvisioned {
+                            workspace_id: workspace.id,
+                            path: workspace.root,
+                            base_ref: workspace.base_ref,
+                        });
+                    }
+                    Ok(None) => tracing::warn!(
+                        target: "workspace", session = %child,
+                        "subagent isolation optional but base cannot be isolated; sharing parent cwd"
+                    ),
+                    Err(err) if policy.is_required() => {
+                        return Err(ToolError::Execution(format!(
+                            "role `{}` requires an isolated workspace but provisioning failed: {err}",
+                            req.role
+                        )));
+                    }
+                    Err(err) => tracing::warn!(
+                        target: "workspace", session = %child,
+                        "subagent isolation failed; sharing parent cwd: {err}"
+                    ),
+                },
+                None if policy.is_required() => {
+                    return Err(ToolError::Execution(format!(
+                        "role `{}` requires an isolated workspace but no workspace backend \
+                         is configured",
+                        req.role
+                    )));
+                }
+                None => tracing::warn!(
+                    target: "workspace", session = %child,
+                    "subagent isolation requested but no workspace backend configured; \
+                     sharing parent cwd"
+                ),
+            }
+        }
+
         let now = now_ms();
         let meta = agentloop_contracts::SessionMeta {
             id: child.clone(),
@@ -97,12 +152,13 @@ impl NativeAgent {
             role: Some(req.role.clone()),
             depth: parent_meta.depth.saturating_add(1),
             provider_session_id: None,
-            cwd: parent_meta.cwd.clone(),
+            cwd: child_cwd,
             model: child_model,
             mode: None,
-            isolation: None,
-            workspace_id: None,
-            base_cwd: None,
+            isolation,
+            workspace_id,
+            executor: parent_meta.executor.clone(),
+            base_cwd,
             created_at_ms: now,
             updated_at_ms: now,
         };
@@ -111,11 +167,18 @@ impl NativeAgent {
             .create(meta.clone())
             .await
             .map_err(|err| ToolError::Execution(err.to_string()))?;
+        let child_workspace = meta
+            .workspace_id
+            .clone()
+            .map(|id| (id, meta.cwd.clone(), parent_meta.cwd.clone()));
         let child_handle = self.install_child_handle(&child);
         child_handle
             .emit_persistent(None, AgentEvent::SessionCreated { meta })
             .await
             .map_err(|err| ToolError::Execution(err.to_string()))?;
+        if let Some(event) = provisioned_event {
+            let _ = child_handle.emit_persistent(None, event).await;
+        }
 
         let parent_handle = self
             .live_handle(parent)
@@ -158,6 +221,70 @@ impl NativeAgent {
         relay_stop.cancel();
         let _ = relay.await;
 
+        // Tear the child's workspace down: merge completed work back into the
+        // parent's tree, discard on error/cancellation. Integration problems
+        // never fail the tool call — they're folded into the result text so
+        // the parent can react.
+        let mut integration_note = None;
+        if let Some((workspace_id, root, base)) = child_workspace {
+            if let Some(backend) = &self.deps.workspace {
+                let completed = matches!(
+                    &summary,
+                    Ok(s) if s.stop_reason == TurnStopReason::EndTurn
+                );
+                if completed {
+                    match backend.integrate(&root, &base, None).await {
+                        Ok(outcome) => {
+                            let _ = parent_handle
+                                .emit_persistent(
+                                    None,
+                                    AgentEvent::WorkspaceIntegrated {
+                                        workspace_id,
+                                        outcome: outcome.clone(),
+                                    },
+                                )
+                                .await;
+                            integration_note = match outcome {
+                                agentloop_contracts::IntegrationOutcome::Merged {
+                                    files_changed,
+                                } => Some(format!(
+                                    "[workspace: merged {files_changed} changed file(s) back \
+                                     into {}]",
+                                    base.display()
+                                )),
+                                agentloop_contracts::IntegrationOutcome::Empty => None,
+                                agentloop_contracts::IntegrationOutcome::VerifyFailed {
+                                    detail,
+                                } => Some(format!(
+                                    "[workspace: NOT merged, verify failed: {detail}; worktree \
+                                     kept at {}]",
+                                    root.display()
+                                )),
+                                agentloop_contracts::IntegrationOutcome::Diverged { branch } => {
+                                    Some(format!(
+                                        "[workspace: NOT merged, base diverged; work kept on \
+                                         branch `{branch}`]"
+                                    ))
+                                }
+                                _ => None,
+                            };
+                        }
+                        Err(err) => {
+                            integration_note = Some(format!(
+                                "[workspace: integration failed: {err}; worktree kept at {}]",
+                                root.display()
+                            ));
+                        }
+                    }
+                } else if let Err(err) = backend.discard(&root, &base).await {
+                    tracing::warn!(
+                        target: "workspace", session = %child,
+                        "failed to discard subagent workspace: {err}"
+                    );
+                }
+            }
+        }
+
         let summary = summary?;
         let _ = parent_handle
             .emit_persistent(
@@ -178,7 +305,7 @@ impl NativeAgent {
             summary.stop_reason,
             TurnStopReason::Error | TurnStopReason::MaxIterations
         );
-        let text = if final_text.trim().is_empty() {
+        let mut text = if final_text.trim().is_empty() {
             format!(
                 "(subagent finished with no textual output: {:?})",
                 summary.stop_reason
@@ -186,6 +313,10 @@ impl NativeAgent {
         } else {
             final_text
         };
+        if let Some(note) = integration_note {
+            text.push_str("\n\n");
+            text.push_str(&note);
+        }
         Ok(if is_error {
             ToolOutput::error(text)
         } else {
