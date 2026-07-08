@@ -140,7 +140,10 @@ async fn claude_code_service(
     }
 }
 
-async fn copilot_service(workdir: Option<&Path>, trace: &mut Vec<String>) -> anyhow::Result<EngineService> {
+async fn copilot_service(
+    workdir: Option<&Path>,
+    trace: &mut Vec<String>,
+) -> anyhow::Result<EngineService> {
     let config = CopilotConfig {
         cwd: workdir.map(|p| p.to_path_buf()),
         ..CopilotConfig::default()
