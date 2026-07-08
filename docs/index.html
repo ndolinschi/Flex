@@ -107,6 +107,136 @@
       </div>
     </section>
 
+    <!-- SDK API -->
+    <section class="sdk-docs" id="sdk">
+      <div class="container">
+        <h2 class="section-heading scroll-reveal">SDK API</h2>
+        <div class="card scroll-reveal">
+          <p class="arch-description">
+            The <code>AgentBuilder</code> fluent API composes providers, the native
+            engine, and plugins into an <code>EngineService</code>. It ships in the
+            <code>agentloop-sdk</code> crate under <code>packages/sdk</code>.
+          </p>
+          <div class="command-block">
+            <kbd>$</kbd>
+            <code>use agentloop_sdk::AgentBuilder;</code>
+          </div>
+          <div class="command-block">
+            <pre>let service = AgentBuilder::new()
+    .provider("deepseek")
+    .model("deepseek-v4-pro")
+    .provider_key("deepseek", "sk-...")
+    .enable_plugin("search")
+    .build()?;</pre>
+          </div>
+          <div class="api-grid">
+            <div class="api-item">
+              <code class="api-sig">.provider(id)</code>
+              <p>Preferred provider (anthropic, openai, gemini, deepseek, ...).</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.model(ref)</code>
+              <p>Default model, optionally <code>provider/model</code>-qualified.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.provider_key(id, key)</code>
+              <p>API key for a built-in provider, bypassing env vars.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.cwd(path) / .headless()</code>
+              <p>Sandbox to a directory (default: cwd), or run read-only with no project.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.verbosity(level)</code>
+              <p>NDJSON output verbosity: <code>Low</code>, <code>Medium</code>, <code>High</code>.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.enable_plugin(id)</code>
+              <p>Enable a built-in plugin (<code>"search"</code>).</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.plugin(impl Plugin)</code>
+              <p>Register a custom plugin.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.custom_providers(specs)</code>
+              <p>Client-configured OpenAI-compatible providers.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.all_providers(true)</code>
+              <p>Register every provider whose credentials resolve.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.build()</code>
+              <p>Resolve providers, fold in plugins, return <code>EngineService</code>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Provider Status -->
+    <section class="provider-status" id="providers">
+      <div class="container">
+        <h2 class="section-heading scroll-reveal">Provider status</h2>
+        <div class="card scroll-reveal">
+          <p class="arch-description">
+            Built-in providers are detected from environment variables. Use
+            <code>.provider_key(id, key)</code> to supply keys programmatically.
+            OpenAI-compatible endpoints can be added via
+            <code>.custom_providers(vec![CustomProviderSpec { ... }])</code>.
+          </p>
+          <div class="provider-grid">
+            <div class="provider-row provider-row-header">
+              <span class="provider-id">Provider</span>
+              <span class="provider-auth">Auth</span>
+              <span class="provider-status-label">Status</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">anthropic</span>
+              <span class="provider-auth">ANTHROPIC_API_KEY</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">openai</span>
+              <span class="provider-auth">OPENAI_API_KEY</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">deepseek</span>
+              <span class="provider-auth">DEEPSEEK_API_KEY</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">gemini</span>
+              <span class="provider-auth">GEMINI_API_KEY</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">bedrock</span>
+              <span class="provider-auth">AWS credentials + region</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">ollama</span>
+              <span class="provider-auth">localhost:11434</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">copilot</span>
+              <span class="provider-auth">device-flow sign-in</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">custom</span>
+              <span class="provider-auth">CustomProviderSpec</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Architecture Section -->
     <section class="architecture">
       <div class="container">
@@ -158,15 +288,15 @@
           <ul>
             <li><a href="https://github.com/ndolinschi/Flex#what-it-is">Overview</a></li>
             <li><a href="https://github.com/ndolinschi/Flex#quick-start--the-flex-runner">Install</a></li>
-            <li><a href="https://github.com/ndolinschi/Flex#sdks">Configuration</a></li>
+            <li><a href="#sdk">Configuration</a></li>
           </ul>
         </div>
         <div class="footer-col scroll-reveal">
           <h4>Resources</h4>
           <ul>
             <li><a href="https://github.com/ndolinschi/Flex/blob/main/AGENTS.md">AGENTS.md (architecture)</a></li>
-            <li><a href="https://github.com/ndolinschi/Flex#sdks">SDK API docs</a></li>
-            <li><a href="https://github.com/ndolinschi/Flex#what-it-is">Provider status</a></li>
+            <li><a href="#sdk">SDK API docs</a></li>
+            <li><a href="#providers">Provider status</a></li>
           </ul>
         </div>
         <div class="footer-col scroll-reveal">
@@ -315,6 +445,26 @@
     });
     gsap.from('.quickstart .card', {
       scrollTrigger: { trigger: '.quickstart .card', start: 'top 88%', toggleActions: 'play none none none' },
+      opacity: 0, y: 30, duration: 0.6, ease: 'power2.out'
+    });
+
+    // SDK API
+    gsap.from('.sdk-docs .section-heading', {
+      scrollTrigger: { trigger: '.sdk-docs', start: 'top 85%', toggleActions: 'play none none none' },
+      opacity: 0, duration: 0.5
+    });
+    gsap.from('.sdk-docs .card', {
+      scrollTrigger: { trigger: '.sdk-docs .card', start: 'top 88%', toggleActions: 'play none none none' },
+      opacity: 0, y: 30, duration: 0.6, ease: 'power2.out'
+    });
+
+    // Provider status
+    gsap.from('.provider-status .section-heading', {
+      scrollTrigger: { trigger: '.provider-status', start: 'top 85%', toggleActions: 'play none none none' },
+      opacity: 0, duration: 0.5
+    });
+    gsap.from('.provider-status .card', {
+      scrollTrigger: { trigger: '.provider-status .card', start: 'top 88%', toggleActions: 'play none none none' },
       opacity: 0, y: 30, duration: 0.6, ease: 'power2.out'
     });
 
