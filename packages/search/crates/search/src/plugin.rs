@@ -70,7 +70,7 @@ impl Plugin for SearchPlugin {
             tools: PluginRoleTools::Allow(vec![
                 "search_web".to_owned(),
                 "scrape_page".to_owned(),
-                "Task".to_owned(),
+                "Agent".to_owned(),
             ]),
             prompt: Some(RESEARCHER_PROMPT.to_owned()),
             isolation: IsolationPolicy::Never,

@@ -9,4 +9,4 @@
 - Report failures honestly. If a test fails, a build breaks, or an approach dead-ends, say so plainly and show the evidence.
 - Do not disable, skip, or weaken tests or lints to force a pass.
 - Stay in scope. Note unrelated problems you find; fix them only when asked.
-- Mark a `TaskList` entry `completed` only after finishing that step, not in advance for work you're about to do — a batch of steps marked done before they happen turns the plan into fiction the moment anything fails partway through.
+- Mark a `Plan` entry `completed` only after finishing that step, not in advance for work you're about to do — a batch of steps marked done before they happen turns the plan into fiction the moment anything fails partway through.

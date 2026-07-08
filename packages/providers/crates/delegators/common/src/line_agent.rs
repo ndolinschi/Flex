@@ -543,6 +543,7 @@ where
             mode: params.mode,
             isolation: None,
             workspace_id: None,
+            executor: None,
             base_cwd: None,
             created_at_ms: now,
             updated_at_ms: now,
@@ -661,18 +662,27 @@ where
     }
 }
 
-pub(crate) struct DelegatedSessionHandle {
+/// Per-session emit machinery shared by delegator runtimes: append-then-
+/// broadcast persistence, ephemeral streaming, turn gating, cancellation.
+/// Public so protocol delegators (ACP) that cannot ride [`LineDelegatorAgent`]
+/// still reuse the exact same event path.
+pub struct DelegatedSessionHandle {
     id: SessionId,
     agent_id: String,
     store: Arc<dyn SessionStore>,
     broadcast: broadcast::Sender<SessionEvent>,
     next_seq: AtomicU64,
-    turn_gate: tokio::sync::Mutex<()>,
-    current_cancel: Mutex<Option<CancellationToken>>,
+    pub(crate) turn_gate: tokio::sync::Mutex<()>,
+    pub(crate) current_cancel: Mutex<Option<CancellationToken>>,
 }
 
 impl DelegatedSessionHandle {
-    fn new(id: SessionId, agent_id: String, store: Arc<dyn SessionStore>, next_seq: u64) -> Self {
+    pub fn new(
+        id: SessionId,
+        agent_id: String,
+        store: Arc<dyn SessionStore>,
+        next_seq: u64,
+    ) -> Self {
         let (broadcast, _) = broadcast::channel(1024);
         Self {
             id,
@@ -685,7 +695,16 @@ impl DelegatedSessionHandle {
         }
     }
 
-    async fn emit_persistent(
+    pub fn session_id(&self) -> &SessionId {
+        &self.id
+    }
+
+    /// Subscribe to this session's live event stream.
+    pub fn subscribe(&self) -> broadcast::Receiver<SessionEvent> {
+        self.broadcast.subscribe()
+    }
+
+    pub async fn emit_persistent(
         &self,
         turn_id: Option<&TurnId>,
         payload: AgentEvent,
@@ -706,7 +725,7 @@ impl DelegatedSessionHandle {
         Ok(seq)
     }
 
-    fn emit_ephemeral(&self, turn_id: Option<&TurnId>, payload: AgentEvent) {
+    pub fn emit_ephemeral(&self, turn_id: Option<&TurnId>, payload: AgentEvent) {
         let _ = self.broadcast.send(SessionEvent {
             session_id: self.id.clone(),
             seq: self.next_seq.load(Ordering::Relaxed),

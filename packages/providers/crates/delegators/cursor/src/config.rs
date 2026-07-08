@@ -7,7 +7,7 @@ use agentloop_contracts::{
     AgentCaps, AgentInfo, CancelSupport, McpPassthrough, ModelDiscovery, ResumeSupport,
     StreamingGranularity,
 };
-use agentloop_delegator_common::DelegatorProcessSpec;
+use agentloop_delegator_common::{DelegatorProcessSpec, DelegatorRunRequest};
 
 use crate::CURSOR_AGENT_ID;
 
@@ -65,6 +65,61 @@ impl CursorLaunchConfig {
                 hint: "Cursor workspace bridge support is only a profile placeholder in this crate"
                     .to_owned(),
             }),
+        }
+    }
+}
+
+/// Infallible launch config for the `cursor-agent` CLI — the runtime path.
+/// The older [`CursorLaunchConfig`] stays as the schema-facing shape that can
+/// also describe the (unimplemented) workspace bridge.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct CursorCliConfig {
+    pub program: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub base_args: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub probe_args: Vec<String>,
+}
+
+impl Default for CursorCliConfig {
+    fn default() -> Self {
+        Self {
+            program: "cursor-agent".to_owned(),
+            cwd: None,
+            base_args: vec![
+                "--print".to_owned(),
+                "--output-format".to_owned(),
+                "stream-json".to_owned(),
+                "--force".to_owned(),
+            ],
+            probe_args: vec!["--version".to_owned()],
+        }
+    }
+}
+
+impl CursorCliConfig {
+    pub fn process_spec(&self) -> DelegatorProcessSpec {
+        self.apply_cwd(DelegatorProcessSpec::new(self.program.clone()).args(self.base_args.clone()))
+    }
+
+    pub fn probe_spec(&self) -> DelegatorProcessSpec {
+        self.apply_cwd(
+            DelegatorProcessSpec::new(self.program.clone()).args(self.probe_args.clone()),
+        )
+    }
+
+    /// The prompt rides as the final positional argument.
+    pub fn prompt_request(&self, prompt: impl Into<String>) -> DelegatorRunRequest {
+        DelegatorRunRequest::new(self.process_spec().arg(prompt.into()))
+    }
+
+    fn apply_cwd(&self, spec: DelegatorProcessSpec) -> DelegatorProcessSpec {
+        if let Some(cwd) = &self.cwd {
+            spec.cwd(cwd.clone())
+        } else {
+            spec
         }
     }
 }

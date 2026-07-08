@@ -1,0 +1,7 @@
+id = "add-cli-flag"
+prompt = "Add a `--verbose` flag to app.py. When passed, the script must print a line `verbose mode enabled` before the sum line. Without the flag, behavior must stay unchanged."
+fixture = "fixtures/add-cli-flag"
+timeout_secs = 300
+
+[check]
+cmd = "python3 app.py --verbose 3 4 | grep -q 'verbose mode enabled' && python3 app.py 3 4 | grep -qx 'sum: 7'"

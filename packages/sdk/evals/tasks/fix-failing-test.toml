@@ -1,0 +1,7 @@
+id = "fix-failing-test"
+prompt = "The test script tests/math.sh fails. Fix the bug in src/math.sh so the test passes. Do not modify the test."
+fixture = "fixtures/fix-failing-test"
+timeout_secs = 300
+
+[check]
+cmd = "bash tests/math.sh"

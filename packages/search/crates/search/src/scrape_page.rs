@@ -185,16 +185,9 @@ impl Tool for ScrapePageTool {
                 if !links.is_empty() {
                     truncated.push_str("\n\n--- Links found on this page ---\n");
                     for (i, (link_url, link_text)) in links.iter().enumerate() {
-                        truncated.push_str(&format!(
-                            "{}. [{}]({})\n",
-                            i + 1,
-                            link_text,
-                            link_url
-                        ));
+                        truncated.push_str(&format!("{}. [{}]({})\n", i + 1, link_text, link_url));
                     }
-                    truncated.push_str(
-                        "\nUse `scrape_page` to explore any of these links.",
-                    );
+                    truncated.push_str("\nUse `scrape_page` to explore any of these links.");
                 }
             }
 

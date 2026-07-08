@@ -197,6 +197,7 @@ fn strip_html_boilerplate(html: &str) -> String {
 
 /// Strip `<nav>`, `<header>`, and `<footer>` elements from HTML while
 /// preserving the rest. Used before link extraction to exclude chrome links.
+#[allow(clippy::expect_used)] // static regexes are infallible
 fn strip_semantic_chrome(html: &str) -> String {
     static NAV_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?is)<nav[^>]*>.*?</nav>").expect("static regex"));
@@ -250,9 +251,7 @@ fn strip_navigation_blocks(markdown: &str) -> String {
     while i < lines.len() {
         if is_list_item_line(lines[i]) {
             let start = i;
-            while i < lines.len()
-                && (is_list_item_line(lines[i]) || lines[i].trim().is_empty())
-            {
+            while i < lines.len() && (is_list_item_line(lines[i]) || lines[i].trim().is_empty()) {
                 i += 1;
             }
             let consecutive = (start..i).filter(|j| is_list_item_line(lines[*j])).count();
@@ -446,8 +445,7 @@ pub(crate) fn clean_html_for_model(html: &str) -> String {
 /// Regex for extracting `href` and inner text from `<a>` tags.
 #[allow(clippy::expect_used)]
 static A_HREF_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"(?is)<a\s[^>]*?href\s*=\s*"([^"]*)"[^>]*>\s*(.*?)\s*</a>"#)
-        .expect("static regex")
+    Regex::new(r#"(?is)<a\s[^>]*?href\s*=\s*"([^"]*)"[^>]*>\s*(.*?)\s*</a>"#).expect("static regex")
 });
 
 /// Strip HTML tags from a string, keeping the inner text.
@@ -495,10 +493,7 @@ pub fn extract_page_links(html: &str, base_url: &str) -> Vec<(String, String)> {
         }
 
         // Filter out javascript:, mailto:, fragment-only
-        if href.starts_with("javascript:")
-            || href.starts_with("mailto:")
-            || href.starts_with('#')
-        {
+        if href.starts_with("javascript:") || href.starts_with("mailto:") || href.starts_with('#') {
             continue;
         }
 
@@ -617,9 +612,18 @@ This is the main content of the page. It provides a thorough overview of the
 topic and contains enough characters to pass the 200-char safety threshold so
 the cleaned version is returned instead of the original.";
         let cleaned = strip_navigation_blocks(md);
-        assert!(!cleaned.contains("[Home]"), "nav line should be stripped: {cleaned}");
-        assert!(cleaned.contains("## Introduction"), "heading should survive");
-        assert!(cleaned.contains("thorough overview"), "body text should survive");
+        assert!(
+            !cleaned.contains("[Home]"),
+            "nav line should be stripped: {cleaned}"
+        );
+        assert!(
+            cleaned.contains("## Introduction"),
+            "heading should survive"
+        );
+        assert!(
+            cleaned.contains("thorough overview"),
+            "body text should survive"
+        );
     }
 
     #[test]
@@ -639,7 +643,10 @@ that should be preserved by the content extraction pipeline during scraping.";
             "consecutive list should be stripped: {cleaned}"
         );
         assert!(cleaned.contains("## Article"), "heading should survive");
-        assert!(cleaned.contains("actual article"), "body text should survive");
+        assert!(
+            cleaned.contains("actual article"),
+            "body text should survive"
+        );
     }
 
     #[test]
@@ -657,7 +664,10 @@ for proper content extraction to work correctly during web scraping.";
             copyright_count, 1,
             "duplicate line should be collapsed to one: {cleaned}"
         );
-        assert!(cleaned.contains("Unique content"), "unique content should survive");
+        assert!(
+            cleaned.contains("Unique content"),
+            "unique content should survive"
+        );
     }
 
     #[test]

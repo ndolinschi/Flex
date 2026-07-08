@@ -1,6 +1,6 @@
 [package]
 name = "agentloop-delegator-cursor"
-description = "Cursor delegator profile scaffolding"
+description = "Cursor delegator: drives `cursor-agent` stream-json and normalizes its output"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,10 +10,18 @@ publish.workspace = true
 
 [dependencies]
 agentloop-contracts = { workspace = true }
+agentloop-core = { workspace = true }
 agentloop-delegator-common = { workspace = true }
+agentloop-session = { workspace = true }
 schemars = { workspace = true }
+serde_json = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+async-trait = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
 
 [lints]
 workspace = true

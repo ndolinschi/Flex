@@ -6,6 +6,7 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
 mod cli;
+mod eval_cmd;
 mod resolve;
 mod run;
 
@@ -34,6 +35,7 @@ async fn main() -> anyhow::Result<()> {
             resolve::doctor(&cwd).await
         }
         Some("run") => run(parse_run_args(&args[1..])?).await,
+        Some("eval") => eval_cmd::eval(&args[1..]).await,
         Some(other) if other.starts_with('-') => run(parse_run_args(&args)?).await,
         Some(other) => bail!("unknown argument: {other}\n{}", usage()),
         None => {

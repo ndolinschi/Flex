@@ -14,6 +14,7 @@ pub(crate) async fn run(args: RunArgs) -> anyhow::Result<()> {
 
     let resolution = resolve_service(
         args.agent.as_deref(),
+        args.agent_cmd.as_deref(),
         args.provider.as_deref(),
         args.model.clone(),
         args.workdir.as_deref(),

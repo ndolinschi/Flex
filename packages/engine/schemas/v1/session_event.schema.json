@@ -1657,9 +1657,11 @@
       "type": "object",
       "properties": {
         "content": {
+          "description": "Short imperative description of the step, e.g. \"add failing test\".",
           "type": "string"
         },
         "status": {
+          "description": "Current progress of this step.",
           "$ref": "#/$defs/PlanStatus"
         }
       },
@@ -1670,11 +1672,22 @@
     },
     "PlanStatus": {
       "description": "Status of one plan/task entry.",
-      "type": "string",
-      "enum": [
-        "pending",
-        "in_progress",
-        "completed"
+      "oneOf": [
+        {
+          "description": "Not started yet.",
+          "type": "string",
+          "const": "pending"
+        },
+        {
+          "description": "Being worked on right now.",
+          "type": "string",
+          "const": "in_progress"
+        },
+        {
+          "description": "Finished.",
+          "type": "string",
+          "const": "completed"
+        }
       ]
     },
     "Provenance": {
@@ -1868,6 +1881,13 @@
           "default": 0,
           "maximum": 255,
           "minimum": 0
+        },
+        "executor": {
+          "description": "Id of the command-execution backend shell tools run through\n(`\"local\"`, `\"docker\"`, …). `None` = legacy / host execution.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "id": {
           "$ref": "#/$defs/SessionId"

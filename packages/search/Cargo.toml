@@ -7,15 +7,15 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/flex/flex"
-publish = false
+repository = "https://github.com/ndolinschi/Flex"
+publish = true
 
 [workspace.dependencies]
 # Engine path deps
-agentloop-contracts = { path = "../engine/crates/contracts" }
-agentloop-core = { path = "../engine/crates/core" }
-agentloop-engine = { path = "../engine/crates/engine" }
-agentloop-tools = { path = "../engine/crates/tools" }
+agentloop-contracts = { path = "../engine/crates/contracts", version = "0.1.0" }
+agentloop-core = { path = "../engine/crates/core", version = "0.1.0" }
+agentloop-engine = { path = "../engine/crates/engine", version = "0.1.0" }
+agentloop-tools = { path = "../engine/crates/tools", version = "0.1.0" }
 # External
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

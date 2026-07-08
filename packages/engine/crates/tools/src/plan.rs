@@ -1,4 +1,4 @@
-//! `TaskList`: update the agent-visible working plan.
+//! `Plan`: update the agent-visible working plan.
 
 use async_trait::async_trait;
 use schemars::JsonSchema;
@@ -11,27 +11,27 @@ use crate::fs::schema_of;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-struct TaskListInput {
+struct PlanInput {
     /// The full current plan; callers should include every visible item.
     entries: Vec<PlanEntry>,
 }
 
 /// Emits a canonical `PlanUpdated` event.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct TaskListTool;
+pub struct PlanTool;
 
 #[async_trait]
-impl Tool for TaskListTool {
+impl Tool for PlanTool {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
-            name: "TaskList".to_owned(),
-            description: "Update the working task list shown to clients. Pass the complete \
+            name: "Plan".to_owned(),
+            description: "Update the working plan shown to clients. Pass the complete \
                           current `entries` array each time, with each item containing \
                           `content` and `status` (`pending`, `in_progress`, or `completed`). \
                           Use this for multi-step work; do not use it for trivial one-step \
                           answers."
                 .to_owned(),
-            input_schema: schema_of::<TaskListInput>(),
+            input_schema: schema_of::<PlanInput>(),
             read_only: true,
             category: ToolCategory::Agent,
             needs_permission: PermissionHint::Never,
@@ -43,9 +43,9 @@ impl Tool for TaskListTool {
         ctx: ToolContext,
         input: serde_json::Value,
     ) -> Result<ToolOutput, ToolError> {
-        let input: TaskListInput = serde_json::from_value(input).map_err(|err| {
+        let input: PlanInput = serde_json::from_value(input).map_err(|err| {
             ToolError::InvalidInput(format!(
-                "Input for `TaskList` must be {{\"entries\": [{{\"content\": \"...\", \
+                "Input for `Plan` must be {{\"entries\": [{{\"content\": \"...\", \
                  \"status\": \"pending|in_progress|completed\"}}]}}: {err}."
             ))
         })?;
@@ -55,7 +55,7 @@ impl Tool for TaskListTool {
             .any(|entry| entry.content.trim().is_empty())
         {
             return Err(ToolError::InvalidInput(
-                "Every TaskList entry needs non-empty `content`.".to_owned(),
+                "Every Plan entry needs non-empty `content`.".to_owned(),
             ));
         }
 
@@ -64,7 +64,7 @@ impl Tool for TaskListTool {
             entries: input.entries,
         });
         Ok(ToolOutput::text(format!(
-            "Updated task list with {count} entr{}.",
+            "Updated plan with {count} entr{}.",
             if count == 1 { "y" } else { "ies" }
         )))
     }

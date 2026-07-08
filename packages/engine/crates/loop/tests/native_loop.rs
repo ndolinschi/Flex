@@ -864,7 +864,7 @@ impl Tool for TaskStub {
 #[tokio::test]
 async fn task_call_spawns_child_and_returns_final_text() {
     let (turn, ids) = MockProvider::tool_turn(&[(
-        "Task",
+        "Agent",
         serde_json::json!({
             "role": "searcher",
             "description": "map the code",
@@ -938,7 +938,7 @@ async fn task_call_spawns_child_and_returns_final_text() {
 #[tokio::test]
 async fn max_depth_denies_grandchild_spawn() {
     let (parent_turn, parent_ids) = MockProvider::tool_turn(&[(
-        "Task",
+        "Agent",
         serde_json::json!({
             "role": "worker",
             "description": "do some work",
@@ -946,7 +946,7 @@ async fn max_depth_denies_grandchild_spawn() {
         }),
     )]);
     let (child_turn, child_ids) = MockProvider::tool_turn(&[(
-        "Task",
+        "Agent",
         serde_json::json!({
             "role": "worker",
             "description": "grandchild work",
@@ -1019,7 +1019,7 @@ async fn max_depth_denies_grandchild_spawn() {
 #[tokio::test]
 async fn child_permission_relays_and_routes() {
     let (turn, ids) = MockProvider::tool_turn(&[(
-        "Task",
+        "Agent",
         serde_json::json!({
             "role": "worker",
             "description": "do protected work",
@@ -1122,11 +1122,11 @@ async fn split_agent(
     let mock_a = Arc::new(MockProvider::with_id("mock-a"));
     let (turn, _) = MockProvider::tool_turn(&[
         (
-            "Task",
+            "Agent",
             serde_json::json!({"role": "searcher", "description": "left", "prompt": "left half"}),
         ),
         (
-            "Task",
+            "Agent",
             serde_json::json!({"role": "searcher", "description": "right", "prompt": "right half"}),
         ),
     ]);
@@ -1223,7 +1223,7 @@ async fn split_false_pins_first_chain_model() {
 #[tokio::test]
 async fn unknown_role_teaches_and_turn_continues() {
     let (turn, ids) = MockProvider::tool_turn(&[(
-        "Task",
+        "Agent",
         serde_json::json!({
             "role": "nonexistent",
             "description": "x",

@@ -5,9 +5,11 @@
 
 use std::collections::BTreeMap;
 mod line_agent;
+mod stream_host;
 mod tokio_host;
 
-pub use line_agent::{DelegatorProfile, LineDelegatorAgent};
+pub use line_agent::{DelegatedSessionHandle, DelegatorProfile, LineDelegatorAgent};
+pub use stream_host::{DuplexProcess, StreamHost, TokioStreamHost};
 pub use tokio_host::TokioCommandHost;
 
 use std::path::PathBuf;

@@ -1,4 +1,4 @@
-//! `Task`: delegate a scoped job to a subagent.
+//! `Agent`: delegate a scoped job to a subagent.
 //!
 //! This crate ships only the descriptor — execution is intercepted and run by
 //! the engine loop (it needs to spawn a child session, which a pure tool
@@ -21,7 +21,7 @@ use crate::fs::schema_of;
 #[allow(dead_code)]
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-struct TaskInput {
+struct AgentInput {
     /// Which role runs the task (see the tool description for the list).
     role: String,
     /// A 3-7 word label shown to the user, e.g. "map session event flow".
@@ -34,19 +34,19 @@ struct TaskInput {
     expected_output: Option<String>,
 }
 
-/// The `Task` descriptor. `run` is never reached in a correct build — the
+/// The `Agent` descriptor. `run` is never reached in a correct build — the
 /// loop intercepts calls by name and runs a subagent instead.
-struct TaskTool {
+struct AgentTool {
     description: String,
 }
 
 #[async_trait]
-impl Tool for TaskTool {
+impl Tool for AgentTool {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
             name: SUBAGENT_TOOL_NAME.to_owned(),
             description: self.description.clone(),
-            input_schema: schema_of::<TaskInput>(),
+            input_schema: schema_of::<AgentInput>(),
             read_only: true,
             category: ToolCategory::Agent,
             needs_permission: PermissionHint::Never,
@@ -59,14 +59,14 @@ impl Tool for TaskTool {
         _input: serde_json::Value,
     ) -> Result<ToolOutput, ToolError> {
         Err(ToolError::Execution(
-            "the Task tool is executed by the engine loop; this build predates \
+            "the Agent tool is executed by the engine loop; this build predates \
              subagent support"
                 .to_owned(),
         ))
     }
 }
 
-/// Build a `Task` tool whose description advertises the spawnable `roles`
+/// Build an `Agent` tool whose description advertises the spawnable `roles`
 /// as `(name, one-line summary)` pairs.
 pub fn subagent_tool(roles: &[(String, String)]) -> Arc<dyn Tool> {
     let role_lines = if roles.is_empty() {
@@ -94,9 +94,9 @@ pub fn subagent_tool(roles: &[(String, String)]) -> Arc<dyn Tool> {
          searcher(s) in parallel; implementation after the plan is clear → one worker \
          per INDEPENDENT task (tasks touching the same files are not independent). Do \
          not delegate trivial work — the handoff costs more than doing it yourself.\n\n\
-         Parallelism: emit multiple Task calls in ONE message to run them concurrently \
+         Parallelism: emit multiple Agent calls in ONE message to run them concurrently \
          (they may be served by different models). You own integrating the results and \
          the correctness of the final answer."
     );
-    Arc::new(TaskTool { description })
+    Arc::new(AgentTool { description })
 }

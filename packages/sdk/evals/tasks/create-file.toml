@@ -1,0 +1,7 @@
+id = "create-file"
+prompt = "Create a file named hello.txt in the current directory containing exactly the text `hello world` (a single line)."
+timeout_secs = 120
+
+[check]
+cmd = "grep -qx 'hello world' hello.txt"
+expect_files = ["hello.txt"]

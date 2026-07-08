@@ -9,6 +9,7 @@ use agentloop_contracts::branding;
 #[derive(Debug)]
 pub(crate) struct RunArgs {
     pub(crate) agent: Option<String>,
+    pub(crate) agent_cmd: Option<String>,
     pub(crate) provider: Option<String>,
     pub(crate) model: Option<String>,
     pub(crate) prompt: String,
@@ -23,6 +24,7 @@ pub(crate) enum OutputFormat {
 
 pub(crate) fn parse_run_args(args: &[String]) -> anyhow::Result<RunArgs> {
     let mut agent: Option<String> = None;
+    let mut agent_cmd: Option<String> = None;
     let mut provider: Option<String> = None;
     let mut model: Option<String> = None;
     let mut prompt: Option<String> = None;
@@ -34,6 +36,9 @@ pub(crate) fn parse_run_args(args: &[String]) -> anyhow::Result<RunArgs> {
         match args[index].as_str() {
             "--agent" => {
                 agent = Some(take_value(args, &mut index, "--agent")?);
+            }
+            "--agent-cmd" => {
+                agent_cmd = Some(take_value(args, &mut index, "--agent-cmd")?);
             }
             "--provider" => {
                 provider = Some(take_value(args, &mut index, "--provider")?);
@@ -64,6 +69,7 @@ pub(crate) fn parse_run_args(args: &[String]) -> anyhow::Result<RunArgs> {
 
     Ok(RunArgs {
         agent,
+        agent_cmd,
         provider,
         model,
         prompt: prompt.context("missing prompt: pass -p \"...\" or --prompt \"...\"")?,
@@ -81,9 +87,12 @@ fn take_value(args: &[String], index: &mut usize, flag: &str) -> anyhow::Result<
 
 pub(crate) fn usage() -> String {
     format!(
-        "usage:\n  {slug} --version\n  {slug} doctor\n  {slug} run [--agent native|claude-code|copilot] \
+        "usage:\n  {slug} --version\n  {slug} doctor\n  {slug} run [--agent native|claude-code|copilot|opencode|cursor|acp] \
+         [--agent-cmd <program>] \
          [--provider anthropic|openai|gemini|ollama|copilot] [--model <model>] -p <prompt> \
-         [--workdir <path>] [--output-format ndjson]\n\n\
+         [--workdir <path>] [--output-format ndjson]\n  {slug} eval [--task <id>]... \
+         [--tasks-dir <dir>] [--agent <agent>] [--provider <id>] [--model <model>] \
+         [--repeat <n>] [--out <dir>] [--json <path>] [--baseline <report.json>]\n\n\
          With no --agent/--provider, the engine auto-detects: provider API keys in the \
          environment select the native loop; otherwise an installed external agent CLI is \
          probed and delegated to. `doctor` explains the decision.",
