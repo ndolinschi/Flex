@@ -17,8 +17,10 @@ agentloop-core = { path = "../engine/crates/core", version = "0.1.0" }
 agentloop-engine = { path = "../engine/crates/engine", version = "0.1.0" }
 agentloop-executors = { path = "../engine/crates/executors", version = "0.1.0" }
 agentloop-learning = { path = "../engine/crates/learning", version = "0.1.0" }
+agentloop-verifier = { path = "../engine/crates/verifier", version = "0.1.0" }
 agentloop-session = { path = "../engine/crates/session", version = "0.1.0" }
 agentloop-transport-stdio = { path = "../engine/crates/transports/stdio", version = "0.1.0" }
+agentloop-transport-http = { path = "../engine/crates/transports/http", version = "0.1.0" }
 agentloop-testkit = { path = "../engine/crates/testkit", version = "0.1.0" }
 
 # local members

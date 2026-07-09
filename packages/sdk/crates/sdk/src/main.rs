@@ -9,13 +9,15 @@ mod cli;
 mod eval_cmd;
 mod resolve;
 mod run;
+mod serve_cmd;
 
 use anyhow::bail;
 
 use agentloop_contracts::branding;
 
-use crate::cli::{parse_run_args, usage};
+use crate::cli::{parse_run_args, parse_serve_args, usage};
 use crate::run::run;
+use crate::serve_cmd::serve;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -36,6 +38,7 @@ async fn main() -> anyhow::Result<()> {
         }
         Some("run") => run(parse_run_args(&args[1..])?).await,
         Some("eval") => eval_cmd::eval(&args[1..]).await,
+        Some("serve") => serve(parse_serve_args(&args[1..])?).await,
         Some(other) if other.starts_with('-') => run(parse_run_args(&args)?).await,
         Some(other) => bail!("unknown argument: {other}\n{}", usage()),
         None => {

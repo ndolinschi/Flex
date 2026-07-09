@@ -12,8 +12,10 @@ members = [
     "crates/prompts",
     "crates/session",
     "crates/tools",
+    "crates/verifier",
     "crates/workspace",
     "crates/transports/stdio",
+    "crates/transports/http",
     "crates/testkit",
     "xtask",
 ]
@@ -39,8 +41,10 @@ agentloop-mcp = { path = "crates/mcp", version = "0.1.0" }
 agentloop-prompts = { path = "crates/prompts", version = "0.1.0" }
 agentloop-session = { path = "crates/session", version = "0.1.0" }
 agentloop-tools = { path = "crates/tools", version = "0.1.0" }
+agentloop-verifier = { path = "crates/verifier", version = "0.1.0" }
 agentloop-workspace = { path = "crates/workspace", version = "0.1.0" }
 agentloop-transport-stdio = { path = "crates/transports/stdio", version = "0.1.0" }
+agentloop-transport-http = { path = "crates/transports/http", version = "0.1.0" }
 agentloop-testkit = { path = "crates/testkit", version = "0.1.0" }
 # external
 serde = { version = "1", features = ["derive"] }
@@ -65,6 +69,11 @@ htmd = "0.2"
 base64 = "0.22"
 sha2 = "0.10"
 getrandom = "0.2"
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace"] }
+utoipa = { version = "5", features = ["preserve_order"] }
+subtle = "2"
 # dev
 insta = { version = "1", features = ["json", "redactions"] }
 pretty_assertions = "1"

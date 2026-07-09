@@ -104,6 +104,8 @@ packages/engine/              # provider-agnostic engine — the hub workspace
     prompts/                  # system-prompt assembly + slash-command registry/expansion
     session/                  # SessionStore impls (memory, jsonl)
     tools/                    # base tool set (Read/Write/Edit/Glob/Grep/Bash/WebFetch/...)
+    verifier/                 # VerifierPlugin: Verify/SubmitVerdict tools — opt-in independent
+                              # verifier ("maker is never the grader")
     workspace/                # Workspaces impl: git-worktree session isolation (the sole git edge)
     mcp/                      # MCP client (rmcp) -> Tool bridge
     transports/{stdio}        # serve any Agent to external clients
@@ -214,6 +216,14 @@ at the composition root (`AgentBuilder::enable_plugin("search")`).
 - **`packages/search` is the first plugin**: `search_web` (DuckDuckGo HTML, no paid API, swappable
   `SearchBackend`) + `scrape_page` (reqwest + htmd) tools and a `researcher` role whose prompt
   encodes an Analyze/Plan → Execute/Evaluate → Synthesis/Citation workflow. Dispatchable via `Agent`.
+- **The independent verifier is the opt-in `verifier` plugin**: `agentloop-verifier`
+  (`crates/verifier`) ships `Verify` (loop-intercepted by name into a fresh `verifier`-role
+  subagent) and `SubmitVerdict` (structured `VerificationVerdict` result). Zero footprint when
+  disabled — the loop's interception and the `verifier` role stay dormant with no tools
+  registered. Enable via `AgentBuilder::enable_plugin("verifier")` (sdk feature `verifier`).
+  `LearningPlugin::require_verified_memory` only makes sense paired with this plugin enabled —
+  otherwise the gate blocks `SkillSave`/`MemoryWrite` forever since no `Verify` call can ever
+  succeed to satisfy it.
 - **`packages/sdk` is the composition root**: `AgentBuilder` composes the providers facade + native
   `EngineService` + enabled plugins; the `flex` `[[bin]]` (runner, NDJSON/stdio + doctor) lives
   here. The brand-gate exemption moved from the engine's `crates/runner/Cargo.toml` to the SDK's.

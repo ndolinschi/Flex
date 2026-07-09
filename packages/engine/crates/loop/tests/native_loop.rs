@@ -980,9 +980,9 @@ impl Tool for SubmitVerdictStub {
         input: serde_json::Value,
     ) -> Result<ToolOutput, agentloop_core::ToolError> {
         // Real behavior (structured verdict on the output) lives in
-        // `agentloop_tools::submit_verdict_tool`; this stub only needs to be
+        // `agentloop_verifier::submit_verdict_tool`; this stub only needs to be
         // callable so the verifier's tool call round-trips in the test.
-        agentloop_tools::submit_verdict_tool()
+        agentloop_verifier::submit_verdict_tool()
             .run(_ctx, input)
             .await
     }

@@ -19,10 +19,12 @@ agentloop-engine = { workspace = true }
 agentloop-executors = { workspace = true }
 agentloop-session = { workspace = true }
 agentloop-transport-stdio = { workspace = true }
+agentloop-transport-http = { workspace = true }
 agentloop-providers = { workspace = true }
 agentloop-eval = { workspace = true }
 agentloop-search = { workspace = true, optional = true }
 agentloop-learning = { workspace = true, optional = true }
+agentloop-verifier = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -37,6 +39,7 @@ tracing-subscriber = { workspace = true }
 [features]
 search = ["agentloop-search"]
 learning = ["agentloop-learning"]
+verifier = ["agentloop-verifier"]
 
 [lints]
 workspace = true

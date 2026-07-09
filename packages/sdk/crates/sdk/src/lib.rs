@@ -31,6 +31,8 @@ pub use agentloop_learning::{self as learning, LearningPlugin};
 pub use agentloop_providers::{self as providers, CustomProviderSpec};
 #[cfg(feature = "search")]
 pub use agentloop_search::{self as search, SearchPlugin};
+#[cfg(feature = "verifier")]
+pub use agentloop_verifier::{self as verifier, VerifierPlugin};
 pub use loop_agent::{ClawBot, ClawBotBuilder, LoopAgent, PromptSource};
 
 /// Fluent builder that resolves providers, enables plugins, and composes a
@@ -102,9 +104,10 @@ impl AgentBuilder {
         self
     }
 
-    /// Enable a built-in plugin by id. Currently recognizes `"search"` and
-    /// `"learning"` (when the matching feature is enabled); unknown ids are
-    /// ignored. Use [`AgentBuilder::plugin`] for custom plugins.
+    /// Enable a built-in plugin by id. Currently recognizes `"search"`,
+    /// `"learning"`, and `"verifier"` (when the matching feature is
+    /// enabled); unknown ids are ignored. Use [`AgentBuilder::plugin`] for
+    /// custom plugins.
     pub fn enable_plugin(mut self, id: &str) -> Self {
         #[cfg(feature = "search")]
         if id == "search" {
@@ -115,6 +118,10 @@ impl AgentBuilder {
             if let Some(plugin) = LearningPlugin::with_default_dir() {
                 self.plugins.push(Arc::new(plugin));
             }
+        }
+        #[cfg(feature = "verifier")]
+        if id == "verifier" {
+            self.plugins.push(Arc::new(VerifierPlugin));
         }
         self
     }

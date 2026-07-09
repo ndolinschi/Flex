@@ -21,7 +21,11 @@ use agentloop_contracts::{ToolOutput, ToolResultBlock, VerificationVerdict};
 use agentloop_core::tool::{SUBMIT_VERDICT_TOOL_NAME, VERIFIER_TOOL_NAME};
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
-use crate::fs::schema_of;
+/// JSON Schema for `T`, generated via `schemars`.
+fn schema_of<T: JsonSchema>() -> serde_json::Value {
+    let schema = schemars::schema_for!(T);
+    serde_json::to_value(schema).unwrap_or_else(|_| serde_json::json!({}))
+}
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize, JsonSchema)]

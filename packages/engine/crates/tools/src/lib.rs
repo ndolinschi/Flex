@@ -13,7 +13,6 @@ mod grep;
 mod plan;
 mod registry;
 mod skill;
-mod verify;
 mod web_fetch;
 
 pub use agent::subagent_tool;
@@ -26,5 +25,4 @@ pub use grep::GrepTool;
 pub use plan::PlanTool;
 pub use registry::{BaseTools, base_tools, base_tools_read_only, registry_with_questions};
 pub use skill::{SkillLoader, skill_tool};
-pub use verify::{submit_verdict_tool, verify_tool};
 pub use web_fetch::WebFetchTool;

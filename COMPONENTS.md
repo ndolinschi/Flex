@@ -57,6 +57,10 @@ prompt-injection heuristics).
 `memory.rs` (`MemoryWrite`, `~/.config/agentloop/memory/*.md`), `hook.rs` (Stop-point
 reflection).
 
+### verifier (`agentloop-verifier`) — `crates/verifier/src/`
+`VerifierPlugin` (independent verifier — "maker is never the grader"): `tools.rs` (`Verify`,
+`SubmitVerdict`; `Verify` is loop-intercepted by name, same as `Agent`).
+
 ### prompts (`agentloop-prompts`) — `crates/prompts/src/`
 System-prompt assembly + slash commands: `assembler.rs` (`SystemPromptAssembler`),
 `commands.rs` (`CommandRegistry`), `memory.rs` (`load_memory_section`), `skills.rs`
