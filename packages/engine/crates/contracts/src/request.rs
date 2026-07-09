@@ -109,6 +109,11 @@ pub struct TurnOptions {
     /// always sets it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<Effort>,
+    /// Hard wall-clock budget for this turn in milliseconds. When it elapses
+    /// the turn is cancelled (same semantics as a user cancel); `None` = no
+    /// per-turn limit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_timeout_ms: Option<u64>,
     /// Namespaced passthrough for agent-specific options.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub extra: BTreeMap<String, serde_json::Value>,
@@ -133,6 +138,11 @@ pub struct NewSessionParams {
     /// their parent's working directory.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub isolation: Option<IsolationPolicy>,
+    /// Role this root session runs as (e.g. `searcher`). Selects the role's
+    /// tool profile and model chain; `None` = the main role. Unknown role
+    /// names are rejected at session creation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub extra: BTreeMap<String, serde_json::Value>,
 }

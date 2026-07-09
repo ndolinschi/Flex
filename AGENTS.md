@@ -335,6 +335,13 @@ Snapshot tests use `insta`. To (re)generate intentionally:
   `EngineConfig.injection_scan` / `AgentBuilder::injection_scan`. Gateways reuse `scan_text`
   on inbound platform text. `EngineConfig.network` sets the shell `NetworkPolicy` (containers
   drop the network; the local backend rejects `Denied`).
+- **Loop agents are an SDK concern**: the SDK's `LoopAgent` trait + `ClawBot` impl drive a
+  root session turn by turn — pinned cwd, a dedicated role for the tool allowlist (reusing
+  `RoleSpec`/`ToolFilter`), optional persistent memory via `LearningPlugin::with_memory_dir`,
+  and an overall wall-clock budget enforced caller-side (deadline + cancel). The engine only
+  gained two additive wire fields: `NewSessionParams.role` (root sessions may serve a named
+  role; unknown names rejected) and `TurnOptions.turn_timeout_ms` (a watchdog trips the
+  turn's cancel token, so a timed-out turn winds down as a graceful `Cancelled`).
 - **`packages/gateway` is the fifth workspace, contract-only for now**: channels are dumb
   adapters behind a `Channel` trait (normalized `Inbound`/`Outbound`, permission replies as
   first-class events). Adapters (Telegram long-poll first, then Slack Socket Mode, Discord)

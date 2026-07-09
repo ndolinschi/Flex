@@ -15,6 +15,8 @@
 //! # }
 //! ```
 
+mod loop_agent;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -29,6 +31,7 @@ pub use agentloop_learning::{self as learning, LearningPlugin};
 pub use agentloop_providers::{self as providers, CustomProviderSpec};
 #[cfg(feature = "search")]
 pub use agentloop_search::{self as search, SearchPlugin};
+pub use loop_agent::{ClawBot, ClawBotBuilder, LoopAgent, PromptSource};
 
 /// Fluent builder that resolves providers, enables plugins, and composes a
 /// native [`EngineService`].

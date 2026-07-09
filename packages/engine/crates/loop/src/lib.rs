@@ -8,6 +8,7 @@
 //! or the turn is cancelled. Every step lands in the append-only session log;
 //! metrics and tracing derive from the same events.
 
+mod actor;
 mod agent;
 mod attachments;
 mod builder;

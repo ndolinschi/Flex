@@ -15,6 +15,7 @@
 
 pub mod branding;
 pub mod capability;
+pub mod checkpoint;
 pub mod content;
 pub mod error;
 pub mod event;
@@ -36,6 +37,7 @@ pub use capability::{
     McpPassthrough, ModeInfo, ModelDiscovery, ModelInfo, ModelRef, PermissionCaps, ProviderCaps,
     ResumeSupport, StreamingGranularity,
 };
+pub use checkpoint::{CheckpointLabel, CheckpointRef};
 pub use content::{BlobSource, ContentBlock, Message, Role, ToolResultBlock};
 pub use error::{EngineError, ErrorCode, Provenance};
 pub use event::{AgentEvent, SessionEvent};

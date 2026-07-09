@@ -11,13 +11,15 @@ use agentloop_contracts::{
 };
 use agentloop_core::{SessionStore, StoreError};
 
+use crate::actor::{SessionActorHandle, spawn_session_actor};
+
 /// Per-session live state: the broadcast bus, the turn gate, and the current
 /// turn's cancellation token. The handle owns everything event emission needs
 /// so background tasks (sink drains) can emit without borrowing the agent.
 pub(crate) struct SessionHandle {
     pub(crate) id: SessionId,
-    agent_id: String,
-    store: Arc<dyn SessionStore>,
+    /// Single-writer front for `emit_persistent` — see `crate::actor`.
+    actor: SessionActorHandle,
     pub(crate) broadcast: broadcast::Sender<SessionEvent>,
     /// Next persisted seq (mirror of the store's counter, for stamping
     /// ephemeral events between persisted ones).
@@ -41,10 +43,10 @@ impl SessionHandle {
         next_seq: u64,
     ) -> Self {
         let (broadcast, _) = broadcast::channel(1024);
+        let actor = spawn_session_actor(id.clone(), store, agent_id, broadcast.clone());
         Self {
             id,
-            agent_id,
-            store,
+            actor,
             broadcast,
             next_seq: AtomicU64::new(next_seq),
             turn_gate: tokio::sync::Mutex::new(()),
@@ -88,27 +90,18 @@ impl SessionHandle {
         *self.turn_effort.lock().unwrap_or_else(|p| p.into_inner())
     }
 
-    /// Append to the store (assigning seq), record metrics, then broadcast.
-    /// Persistence happens *before* broadcast: subscribers can always re-sync
-    /// from the store.
+    /// Append to the store (assigning seq), record metrics, then broadcast —
+    /// as one ordered step through the session's actor, so concurrent callers
+    /// on the same session can never have their broadcasts land out of seq
+    /// order (see `crate::actor`). Persistence happens *before* broadcast:
+    /// subscribers can always re-sync from the store.
     pub(crate) async fn emit_persistent(
         &self,
         turn_id: Option<&TurnId>,
         payload: AgentEvent,
     ) -> Result<u64, StoreError> {
-        let seq = self
-            .store
-            .append(&self.id, std::slice::from_ref(&payload))
-            .await?;
+        let seq = self.actor.append(turn_id.cloned(), payload).await?;
         self.next_seq.store(seq + 1, Ordering::Relaxed);
-        agentloop_core::observe::record_event_metrics(&self.agent_id, &payload);
-        let _ = self.broadcast.send(SessionEvent {
-            session_id: self.id.clone(),
-            seq,
-            turn_id: turn_id.cloned(),
-            ts_ms: now_ms(),
-            payload,
-        });
         Ok(seq)
     }
 

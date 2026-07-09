@@ -11,10 +11,10 @@ use tokio_util::sync::CancellationToken;
 
 use agentloop_contracts::{
     AgentCaps, AgentEvent, AgentInfo, Answer, AttachmentCaps, CancelSupport, CommandInfo,
-    CompactionSummary, McpPassthrough, ModelDiscovery, NewSessionParams, PermissionCaps,
-    PermissionDecision, PermissionMode, PermissionRequestId, PromptInput, QuestionId,
-    ResumeSupport, SessionEvent, SessionId, SessionMeta, SessionMetaPatch, StreamingGranularity,
-    TurnOptions, TurnSummary, now_ms,
+    CompactionSummary, EngineError, ErrorCode, McpPassthrough, ModelDiscovery, NewSessionParams,
+    PermissionCaps, PermissionDecision, PermissionMode, PermissionRequestId, PromptInput,
+    QuestionId, ResumeSupport, SessionEvent, SessionId, SessionMeta, SessionMetaPatch,
+    StreamingGranularity, TurnOptions, TurnSummary, now_ms,
 };
 use agentloop_core::{Agent, AgentError, EventStream};
 
@@ -156,9 +156,16 @@ impl Agent for NativeAgent {
         };
         let now = now_ms();
 
+        let role = params.role;
+        if let Some(name) = &role {
+            if self.deps.roles.get(name).is_none() {
+                return Err(AgentError::Other(format!("unknown role `{name}`")));
+            }
+        }
+
         let policy = params
             .isolation
-            .unwrap_or_else(|| self.deps.roles.isolation(None));
+            .unwrap_or_else(|| self.deps.roles.isolation(role.as_deref()));
 
         let mut cwd = base_cwd.clone();
         let mut isolation = None;
@@ -210,11 +217,14 @@ impl Agent for NativeAgent {
             title: params.title,
             agent_id: self.deps.agent_id.clone(),
             parent_id: None,
-            role: None,
             depth: 0,
             provider_session_id: None,
             cwd,
-            model: params.model.or_else(|| self.deps.default_model.clone()),
+            model: params
+                .model
+                .or_else(|| self.deps.roles.chain(role.as_deref()).first().cloned())
+                .or_else(|| self.deps.default_model.clone()),
+            role,
             mode: params.mode,
             isolation,
             workspace_id,
@@ -308,12 +318,39 @@ impl Agent for NativeAgent {
             .turn_gate
             .try_lock()
             .map_err(|_| AgentError::TurnInProgress(session.clone()))?;
-        let result = turn::run_turn(&self.deps, handle.clone(), input, opts).await;
+        // Run the turn on its own task: a panic anywhere in the turn body
+        // (hooks, message assembly, compaction — outside the tool worker
+        // pool's own panic isolation) unwinds that task alone. `JoinError`
+        // turns into a recorded `SessionError` instead of propagating the
+        // unwind into whatever called `prompt` (an HTTP handler, the CLI).
+        let deps = self.deps.clone();
+        let turn_handle = handle.clone();
+        let joined =
+            tokio::spawn(async move { turn::run_turn(&deps, turn_handle, input, opts).await })
+                .await;
         *handle
             .current_cancel
             .lock()
             .unwrap_or_else(|p| p.into_inner()) = None;
-        result
+        match joined {
+            Ok(result) => result,
+            Err(join_err) => {
+                let message = if join_err.is_panic() {
+                    format!("turn task panicked: {join_err}")
+                } else {
+                    format!("turn task was aborted: {join_err}")
+                };
+                let _ = handle
+                    .emit_persistent(
+                        None,
+                        AgentEvent::SessionError {
+                            error: EngineError::engine(ErrorCode::Unknown, message.clone()),
+                        },
+                    )
+                    .await;
+                Err(AgentError::Other(message))
+            }
+        }
     }
 
     async fn cancel(&self, session: &SessionId) -> Result<(), AgentError> {

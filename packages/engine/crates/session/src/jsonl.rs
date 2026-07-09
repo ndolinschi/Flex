@@ -14,22 +14,32 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use agentloop_contracts::{
-    AgentEvent, CompactionSummary, SessionId, SessionMeta, SessionMetaPatch, now_ms,
+    AgentEvent, CheckpointRef, CompactionSummary, SessionId, SessionMeta, SessionMetaPatch, now_ms,
 };
 use agentloop_core::{SessionStore, StoreError};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "record", rename_all = "snake_case")]
 enum LineRecord {
-    Meta { meta: SessionMeta },
-    Event { event: AgentEvent },
+    Meta {
+        meta: SessionMeta,
+    },
+    Event {
+        event: AgentEvent,
+    },
     Delete,
+    /// Internal to this file format — not a wire type. A named pointer at a
+    /// `seq` the log already contains.
+    Checkpoint {
+        checkpoint: CheckpointRef,
+    },
 }
 
 #[derive(Debug, Clone)]
 struct Record {
     meta: SessionMeta,
     events: Vec<AgentEvent>,
+    checkpoints: Vec<CheckpointRef>,
 }
 
 /// JSONL-backed append-only session store.
@@ -80,6 +90,7 @@ impl SessionStore for JsonlStore {
             Record {
                 meta,
                 events: Vec::new(),
+                checkpoints: Vec::new(),
             },
         );
         Ok(())
@@ -206,6 +217,33 @@ impl SessionStore for JsonlStore {
         .await
         .map(|_| ())
     }
+
+    async fn record_checkpoint(
+        &self,
+        id: &SessionId,
+        checkpoint: CheckpointRef,
+    ) -> Result<(), StoreError> {
+        let mut sessions = self.lock();
+        let record = sessions
+            .get_mut(id)
+            .ok_or_else(|| StoreError::SessionNotFound(id.clone()))?;
+        self.append_record(
+            id,
+            &LineRecord::Checkpoint {
+                checkpoint: checkpoint.clone(),
+            },
+        )?;
+        record.checkpoints.push(checkpoint);
+        Ok(())
+    }
+
+    async fn list_checkpoints(&self, id: &SessionId) -> Result<Vec<CheckpointRef>, StoreError> {
+        let sessions = self.lock();
+        let record = sessions
+            .get(id)
+            .ok_or_else(|| StoreError::SessionNotFound(id.clone()))?;
+        Ok(record.checkpoints.clone())
+    }
 }
 
 fn load_sessions(root: &Path) -> Result<HashMap<SessionId, Record>, StoreError> {
@@ -247,6 +285,7 @@ fn load_file(path: &Path) -> Result<Option<(SessionId, Record)>, StoreError> {
                     current = Some(Record {
                         meta,
                         events: Vec::new(),
+                        checkpoints: Vec::new(),
                     });
                 }
             },
@@ -255,6 +294,16 @@ fn load_file(path: &Path) -> Result<Option<(SessionId, Record)>, StoreError> {
                 None => {
                     return Err(StoreError::Corrupt(format!(
                         "{}:{} contains an event before session metadata",
+                        path.display(),
+                        line_number + 1
+                    )));
+                }
+            },
+            LineRecord::Checkpoint { checkpoint } => match &mut current {
+                Some(record) => record.checkpoints.push(checkpoint),
+                None => {
+                    return Err(StoreError::Corrupt(format!(
+                        "{}:{} contains a checkpoint before session metadata",
                         path.display(),
                         line_number + 1
                     )));
@@ -391,6 +440,14 @@ mod tests {
         assert_eq!(meta.title.as_deref(), Some("updated"));
         assert_eq!(meta.provider_session_id.as_deref(), Some("remote"));
         assert_eq!(meta.model, Some(ModelRef::from("anthropic/model-x")));
+    }
+
+    #[tokio::test]
+    async fn satisfies_the_session_store_conformance_suite() {
+        let dir = tempdir().unwrap();
+        agentloop_testkit::assert_store_conformance(JsonlStore::open(dir.path()).unwrap())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]

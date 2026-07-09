@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 
 use agentloop_contracts::{
-    AgentEvent, CompactionSummary, SessionId, SessionMeta, SessionMetaPatch,
+    AgentEvent, CheckpointRef, CompactionSummary, SessionId, SessionMeta, SessionMetaPatch,
 };
 
 /// Storage failures.
@@ -55,4 +55,22 @@ pub trait SessionStore: Send + Sync {
         id: &SessionId,
         compaction: CompactionSummary,
     ) -> Result<(), StoreError>;
+
+    /// Record a named pointer at a `seq` the log already contains. Not
+    /// separate storage — restoring one is `reduce()` over `read(0)`
+    /// truncated at `checkpoint.seq`. Default no-op so existing
+    /// implementations keep compiling; real stores override both this and
+    /// [`Self::list_checkpoints`] together.
+    async fn record_checkpoint(
+        &self,
+        _id: &SessionId,
+        _checkpoint: CheckpointRef,
+    ) -> Result<(), StoreError> {
+        Ok(())
+    }
+
+    /// Checkpoints recorded for `id`, oldest first. Default empty.
+    async fn list_checkpoints(&self, _id: &SessionId) -> Result<Vec<CheckpointRef>, StoreError> {
+        Ok(Vec::new())
+    }
 }

@@ -39,6 +39,15 @@ pub(super) enum IterationOutcome {
     Stop(TurnStopReason),
 }
 
+/// Aborts the wrapped task when dropped (turn finished before the deadline).
+struct AbortOnDrop(tokio::task::JoinHandle<()>);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
 pub(crate) async fn run_turn(
     deps: &Arc<TurnDeps>,
     handle: Arc<SessionHandle>,
@@ -53,6 +62,18 @@ pub(crate) async fn run_turn(
         .lock()
         .unwrap_or_else(|p| p.into_inner()) = Some(cancel.clone());
     let started_at = now_ms();
+
+    // Per-turn wall-clock budget: trip the turn's cancel token when it
+    // elapses, so the loop winds down gracefully (in-flight calls marked
+    // cancelled, `TurnCompleted` emitted) instead of being aborted mid-emit.
+    let _watchdog = opts.turn_timeout_ms.map(|ms| {
+        let cancel = cancel.clone();
+        AbortOnDrop(tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+            tracing::info!(target: "turn", timeout_ms = ms, "turn timeout elapsed; cancelling");
+            cancel.cancel();
+        }))
+    });
 
     let span = info_span!(
         "turn",

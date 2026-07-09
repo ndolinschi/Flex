@@ -64,6 +64,15 @@
           "type": "null"
         }
       ]
+    },
+    "turn_timeout_ms": {
+      "description": "Hard wall-clock budget for this turn in milliseconds. When it elapses\nthe turn is cancelled (same semantics as a user cancel); `None` = no\nper-turn limit.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0
     }
   },
   "$defs": {

@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 
 use agentloop_contracts::{
-    AgentEvent, CompactionSummary, SessionId, SessionMeta, SessionMetaPatch, now_ms,
+    AgentEvent, CheckpointRef, CompactionSummary, SessionId, SessionMeta, SessionMetaPatch, now_ms,
 };
 use agentloop_core::{SessionStore, StoreError};
 
@@ -21,6 +21,7 @@ use agentloop_core::{SessionStore, StoreError};
 struct Record {
     meta: SessionMeta,
     events: Vec<AgentEvent>,
+    checkpoints: Vec<CheckpointRef>,
 }
 
 /// In-memory [`SessionStore`].
@@ -62,6 +63,7 @@ impl SessionStore for MemoryStore {
             Record {
                 meta,
                 events: Vec::new(),
+                checkpoints: Vec::new(),
             },
         );
         Ok(())
@@ -169,6 +171,27 @@ impl SessionStore for MemoryStore {
         )
         .await
         .map(|_| ())
+    }
+
+    async fn record_checkpoint(
+        &self,
+        id: &SessionId,
+        checkpoint: CheckpointRef,
+    ) -> Result<(), StoreError> {
+        let mut sessions = self.lock();
+        let record = sessions
+            .get_mut(id)
+            .ok_or_else(|| StoreError::SessionNotFound(id.clone()))?;
+        record.checkpoints.push(checkpoint);
+        Ok(())
+    }
+
+    async fn list_checkpoints(&self, id: &SessionId) -> Result<Vec<CheckpointRef>, StoreError> {
+        let sessions = self.lock();
+        let record = sessions
+            .get(id)
+            .ok_or_else(|| StoreError::SessionNotFound(id.clone()))?;
+        Ok(record.checkpoints.clone())
     }
 }
 
@@ -410,6 +433,13 @@ mod tests {
         store.append(&id, &[event("t0")]).await.unwrap();
         let bumped = store.get_meta(&id).await.unwrap().updated_at_ms;
         assert!(bumped > 1, "append must bump updated_at_ms");
+    }
+
+    #[tokio::test]
+    async fn satisfies_the_session_store_conformance_suite() {
+        agentloop_testkit::assert_store_conformance(MemoryStore::new())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]

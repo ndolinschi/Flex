@@ -52,6 +52,13 @@
         }
       ]
     },
+    "role": {
+      "description": "Role this root session runs as (e.g. `searcher`). Selects the role's\ntool profile and model chain; `None` = the main role. Unknown role\nnames are rejected at session creation.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "title": {
       "type": [
         "string",
