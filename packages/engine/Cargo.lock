@@ -93,6 +93,7 @@ version = "0.1.0"
 dependencies = [
  "agentloop-contracts",
  "agentloop-core",
+ "agentloop-session",
  "async-trait",
  "schemars",
  "serde",

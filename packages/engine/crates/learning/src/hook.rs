@@ -76,6 +76,7 @@ mod tests {
             session_id: session,
             turn_id: None,
             data: HookData::Stop { continuation },
+            store: None,
         }
     }
 

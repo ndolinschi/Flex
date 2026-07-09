@@ -13,11 +13,12 @@ use tokio_util::sync::CancellationToken;
 
 use agentloop_contracts::{
     AgentEvent, ContentBlock, Effort, ModelRef, PermissionMode, PromptInput, SessionId, ToolCallId,
-    ToolOutput, TurnOptions, TurnStopReason, now_ms,
+    ToolCallStatus, ToolOutput, TurnOptions, TurnStopReason, now_ms,
 };
-use agentloop_core::tool::ToolError;
+use agentloop_core::tool::{SUBMIT_VERDICT_TOOL_NAME, ToolError};
 
 use crate::agent::NativeAgent;
+use crate::roles::VERIFIER_ROLE;
 
 /// Cap on a child result folded back into the parent's context.
 const RESULT_MAX_CHARS: usize = 24_000;
@@ -317,10 +318,34 @@ impl NativeAgent {
             text.push_str("\n\n");
             text.push_str(&note);
         }
-        Ok(if is_error {
+        let mut output = if is_error {
             ToolOutput::error(text)
         } else {
             ToolOutput::text(text)
+        };
+        if req.role == VERIFIER_ROLE {
+            output.structured = self.extract_last_verdict(&child).await;
+        }
+        Ok(output)
+    }
+
+    /// Read the child log for its last completed `SubmitVerdict` call and
+    /// return the structured verdict it reported, so a `Verify` call's
+    /// `ToolOutput` carries a machine-readable outcome — not just prose —
+    /// even though the verifier itself only ever produces free text plus
+    /// one tool call.
+    async fn extract_last_verdict(&self, child: &SessionId) -> Option<serde_json::Value> {
+        let events = self.deps.store.read(child, 0).await.ok()?;
+        events.iter().rev().find_map(|(_, event)| match event {
+            AgentEvent::ToolCallUpdated { call }
+                if call.tool_name == SUBMIT_VERDICT_TOOL_NAME
+                    && call.status == ToolCallStatus::Completed =>
+            {
+                call.result
+                    .as_ref()
+                    .and_then(|output| output.structured.clone())
+            }
+            _ => None,
         })
     }
 

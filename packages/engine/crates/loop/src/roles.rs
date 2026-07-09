@@ -12,6 +12,12 @@ use agentloop_core::{ToolFilter, ToolRegistry};
 /// Reserved role driving the interactive session; never spawnable.
 pub const MAIN_ROLE: &str = "main";
 
+/// Built-in independent-verifier role, spawned by the `Verify` tool
+/// (`agentloop_core::tool::VERIFIER_TOOL_NAME`) — "maker is never the
+/// grader". Tighter than `reviewer`: no `Bash`/`Write`/`Edit`, and it cannot
+/// spawn further subagents.
+pub const VERIFIER_ROLE: &str = "verifier";
+
 /// How a role's tool set is derived from the registry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RoleToolProfile {
@@ -131,10 +137,13 @@ impl RoleRegistry {
 
     /// The tool filter for a session serving `role` at spawn `depth`.
     /// Subagents never get `AskUserQuestion` (they have no user) and lose
-    /// the `Task` tool once they reach their role's `max_depth`.
+    /// the `Task`/`Verify` tools once they reach their role's `max_depth` —
+    /// `Verify` also spawns a child (a constrained `verifier` subagent), so
+    /// it is gated by the same depth budget as `Agent`.
     pub fn tool_filter(&self, role: &str, registry: &ToolRegistry, depth: u8) -> ToolFilter {
         let mut deny = vec![
             agentloop_core::tool::SUBAGENT_TOOL_NAME.to_owned(),
+            agentloop_core::tool::VERIFIER_TOOL_NAME.to_owned(),
             "AskUserQuestion".to_owned(),
         ];
         let Some(spec) = self.roles.get(role) else {
@@ -144,7 +153,10 @@ impl RoleRegistry {
             };
         };
         if depth < spec.max_depth {
-            deny.retain(|name| name != agentloop_core::tool::SUBAGENT_TOOL_NAME);
+            deny.retain(|name| {
+                name != agentloop_core::tool::SUBAGENT_TOOL_NAME
+                    && name != agentloop_core::tool::VERIFIER_TOOL_NAME
+            });
         }
         let allow = match &spec.tools {
             RoleToolProfile::Full => Vec::new(),
@@ -241,6 +253,26 @@ fn builtin_roles() -> Vec<RoleSpec> {
             ..RoleSpec::new("reviewer")
         },
         RoleSpec {
+            name: VERIFIER_ROLE.to_owned(),
+            tools: RoleToolProfile::Allow(vec![
+                "Read".to_owned(),
+                "Glob".to_owned(),
+                "Grep".to_owned(),
+                agentloop_core::tool::SUBMIT_VERDICT_TOOL_NAME.to_owned(),
+            ]),
+            max_depth: 0,
+            prompt: Some(
+                "You are an independent verifier. You did not produce this work and have no \
+                 access to how it was produced — assess only whether the listed artifacts \
+                 satisfy the rubric you were given. Read the artifacts, check each rubric \
+                 criterion against what they actually show, and call SubmitVerdict exactly \
+                 once. Do not speculate about intent, process, or anything outside the \
+                 artifacts and the rubric."
+                    .to_owned(),
+            ),
+            ..RoleSpec::new(VERIFIER_ROLE)
+        },
+        RoleSpec {
             name: MAIN_ROLE.to_owned(),
             tools: RoleToolProfile::Full,
             ..RoleSpec::new(MAIN_ROLE)
@@ -264,6 +296,45 @@ mod tests {
                 .iter()
                 .all(|(name, _)| name != MAIN_ROLE)
         );
+    }
+
+    #[test]
+    fn verifier_is_spawnable_but_cannot_spawn_further_or_run_shell() {
+        let registry = RoleRegistry::with_defaults(Vec::new()).expect("defaults build");
+        let verifier = registry.get(VERIFIER_ROLE).expect("verifier role");
+        assert_eq!(
+            verifier.max_depth, 0,
+            "verifiers do not spawn further subagents"
+        );
+        assert!(
+            registry
+                .spawnable()
+                .iter()
+                .any(|(name, _)| name == VERIFIER_ROLE),
+            "verifier must be spawnable via the Verify tool"
+        );
+        match &verifier.tools {
+            RoleToolProfile::Allow(tools) => {
+                assert!(tools.iter().any(|t| t == "SubmitVerdict"));
+                assert!(
+                    !tools
+                        .iter()
+                        .any(|t| t == "Bash" || t == "Write" || t == "Edit")
+                );
+            }
+            other => panic!("expected an explicit allowlist, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn tool_filter_denies_verify_beyond_max_depth() {
+        let registry = RoleRegistry::with_defaults(Vec::new()).expect("defaults build");
+        let tools = ToolRegistry::new();
+        // worker's max_depth is 1 by default: permitted at depth 0, denied at depth 1.
+        let at_root = registry.tool_filter("worker", &tools, 0);
+        assert!(at_root.permits(agentloop_core::tool::VERIFIER_TOOL_NAME));
+        let at_max_depth = registry.tool_filter("worker", &tools, 1);
+        assert!(!at_max_depth.permits(agentloop_core::tool::VERIFIER_TOOL_NAME));
     }
 
     #[test]

@@ -19,10 +19,11 @@ use crate::draft::DraftToolCall;
 use crate::manager::ToolCallManager;
 use crate::permission::{PermissionPolicy, Verdict};
 use crate::pool::{ToolEvent, ToolJob, ToolJobOutcome};
+use crate::roles::VERIFIER_ROLE;
 use crate::session_handle::SessionHandle;
 use crate::subagent::SubagentRequest;
 use crate::tool_results::output_or_synthetic;
-use agentloop_core::tool::SUBAGENT_TOOL_NAME;
+use agentloop_core::tool::{SUBAGENT_TOOL_NAME, VERIFIER_TOOL_NAME};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::hooks::run_hooks;
@@ -202,6 +203,41 @@ async fn execute_one_call(
             emit_update(call).await;
         }
         let result = run_subagent_call(
+            deps,
+            handle,
+            meta,
+            turn_id,
+            cancel,
+            children_spawned,
+            split_counters,
+            &request,
+        )
+        .await;
+        let final_call = match result {
+            Ok(output) => transition(ToolCallStatus::Completed, Some(output)),
+            Err(err @ (ToolError::InvalidInput(_) | ToolError::Execution(_))) => transition(
+                ToolCallStatus::Completed,
+                Some(ToolOutput::error(err.to_string())),
+            ),
+            Err(ToolError::Cancelled) => transition(ToolCallStatus::Cancelled, None),
+            Err(err) => transition(
+                ToolCallStatus::Failed {
+                    error: err.to_string(),
+                },
+                None,
+            ),
+        };
+        if let Some(call) = final_call {
+            emit_update(call).await;
+        }
+        return;
+    }
+
+    if request.name == VERIFIER_TOOL_NAME {
+        if let Some(call) = transition(ToolCallStatus::Running, None) {
+            emit_update(call).await;
+        }
+        let result = run_verify_call(
             deps,
             handle,
             meta,
@@ -574,6 +610,117 @@ async fn run_subagent_call(
         description,
         prompt,
         expected_output,
+        assigned_model,
+        permission_mode: handle.turn_permission_mode(),
+        effort: handle.turn_effort(),
+        cancel: cancel.child_token(),
+    };
+    agent.run_subagent(&handle.id, sub).await
+}
+
+/// Parse a Verify call and run it as a `verifier`-role subagent whose brief
+/// is built programmatically from `rubric` + `artifacts` — never from the
+/// caller's own reasoning, since the input schema has no field for that
+/// ("maker is never the grader").
+#[allow(clippy::too_many_arguments)]
+async fn run_verify_call(
+    deps: &Arc<TurnDeps>,
+    handle: &Arc<SessionHandle>,
+    meta: &SessionMeta,
+    _turn_id: &TurnId,
+    cancel: &CancellationToken,
+    children_spawned: &Arc<AtomicUsize>,
+    split_counters: &Arc<Mutex<std::collections::HashMap<String, usize>>>,
+    request: &DraftToolCall,
+) -> Result<ToolOutput, ToolError> {
+    if let Some(role) = meta.role.as_deref() {
+        let filter = deps.roles.tool_filter(role, &deps.tools, meta.depth);
+        if !filter.permits(VERIFIER_TOOL_NAME) {
+            return Err(ToolError::InvalidInput(format!(
+                "role `{role}` may not run a verifier at depth {} (max_depth reached) — \
+                 finish this work yourself instead of delegating further.",
+                meta.depth
+            )));
+        }
+    }
+
+    let rubric = request
+        .input
+        .get("rubric")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.trim().is_empty())
+        .ok_or_else(|| {
+            ToolError::InvalidInput("Verify requires a non-empty string field `rubric`.".to_owned())
+        })?
+        .to_owned();
+    let artifacts: Vec<String> = request
+        .input
+        .get("artifacts")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| {
+            ToolError::InvalidInput(
+                "Verify requires `artifacts`: an array of paths (relative to the working \
+                 directory) the verifier should read."
+                    .to_owned(),
+            )
+        })?
+        .iter()
+        .filter_map(|v| v.as_str().map(str::to_owned))
+        .collect();
+    if artifacts.is_empty() {
+        return Err(ToolError::InvalidInput(
+            "Verify requires at least one entry in `artifacts` — a verifier with nothing to \
+             read cannot form a verdict."
+                .to_owned(),
+        ));
+    }
+    let model_override = request
+        .input
+        .get("model")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.trim().is_empty())
+        .map(agentloop_contracts::ModelRef::from);
+
+    if children_spawned.fetch_add(1, Ordering::SeqCst) >= MAX_CHILDREN_PER_TURN {
+        return Err(ToolError::Execution(format!(
+            "subagent budget of {MAX_CHILDREN_PER_TURN} per turn reached — consolidate \
+             remaining verification into fewer calls or finish it yourself."
+        )));
+    }
+
+    let agent = deps.agent.upgrade().ok_or_else(|| {
+        ToolError::Execution("the agent is shutting down; cannot spawn a verifier".to_owned())
+    })?;
+
+    let assigned_model = model_override.or_else(|| {
+        deps.roles.get(VERIFIER_ROLE).and_then(|spec| {
+            if !spec.split || spec.models.len() < 2 {
+                return None;
+            }
+            let mut counters = split_counters.lock().unwrap_or_else(|p| p.into_inner());
+            let counter = counters.entry(VERIFIER_ROLE.to_owned()).or_insert(0);
+            let model = spec.models[*counter % spec.models.len()].clone();
+            *counter += 1;
+            Some(model)
+        })
+    });
+
+    let artifact_list = artifacts
+        .iter()
+        .map(|path| format!("- {path}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let brief = format!(
+        "Rubric — what must be true for this to pass:\n{rubric}\n\n\
+         Artifacts to inspect (read-only; this is the only context you have):\n{artifact_list}"
+    );
+
+    let sub = SubagentRequest {
+        call_id: request.id.clone(),
+        role: VERIFIER_ROLE.to_owned(),
+        description: "verify artifacts against a rubric".to_owned(),
+        prompt: brief,
+        expected_output: None,
         assigned_model,
         permission_mode: handle.turn_permission_mode(),
         effort: handle.turn_effort(),

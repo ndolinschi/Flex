@@ -30,6 +30,7 @@ pub mod request;
 pub mod session;
 pub mod time;
 pub mod tool_call;
+pub mod verify;
 pub mod workspace;
 
 pub use capability::{
@@ -60,4 +61,5 @@ pub use session::{
 };
 pub use time::now_ms;
 pub use tool_call::{ToolCall, ToolCallOrigin, ToolCallStatus, ToolCallTiming, ToolOutput};
+pub use verify::{VerdictOutcome, VerificationVerdict};
 pub use workspace::{IntegrationOutcome, IsolationPolicy};

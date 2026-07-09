@@ -178,6 +178,7 @@ mod tests {
                     call,
                     output: &mut output,
                 },
+                store: None,
             };
             hook.on(HookPoint::PostToolUse, &mut ctx)
                 .await

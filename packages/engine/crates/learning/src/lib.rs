@@ -13,6 +13,7 @@
 //! Learned skills have the lowest override precedence: any human-authored
 //! user or project skill of the same name wins at discovery time.
 
+mod gate;
 mod hook;
 mod memory;
 mod save;
@@ -22,6 +23,7 @@ use std::sync::Arc;
 
 use agentloop_core::{Hook, Plugin, Tool};
 
+pub use gate::VerifiedMemoryGateHook;
 pub use hook::SkillLearningHook;
 pub use memory::MemoryWriteTool;
 pub use save::SkillSaveTool;
@@ -52,6 +54,7 @@ pub fn default_memory_dir() -> Option<PathBuf> {
 pub struct LearningPlugin {
     learned_dir: PathBuf,
     memory_dir: Option<PathBuf>,
+    require_verified_memory: bool,
 }
 
 impl LearningPlugin {
@@ -60,12 +63,23 @@ impl LearningPlugin {
         Self {
             learned_dir: learned_dir.into(),
             memory_dir: default_memory_dir(),
+            require_verified_memory: false,
         }
     }
 
     /// Override where `MemoryWrite` persists notes (`None` disables the tool).
     pub fn with_memory_dir(mut self, memory_dir: Option<PathBuf>) -> Self {
         self.memory_dir = memory_dir;
+        self
+    }
+
+    /// Require a passing `Verify` verdict (see `agentloop_core::tool::VERIFIER_TOOL_NAME`)
+    /// in the current session before `SkillSave`/`MemoryWrite` commit. Off by
+    /// default — enabling this adds a `PreToolUse` hook
+    /// ([`VerifiedMemoryGateHook`]) that blocks both tools until the session's
+    /// most recent `Verify` call passed.
+    pub fn require_verified_memory(mut self, on: bool) -> Self {
+        self.require_verified_memory = on;
         self
     }
 
@@ -108,6 +122,10 @@ impl Plugin for LearningPlugin {
     }
 
     fn hooks(&self) -> Vec<Arc<dyn Hook>> {
-        vec![Arc::new(SkillLearningHook::new())]
+        let mut hooks: Vec<Arc<dyn Hook>> = vec![Arc::new(SkillLearningHook::new())];
+        if self.require_verified_memory {
+            hooks.push(Arc::new(VerifiedMemoryGateHook::new()));
+        }
+        hooks
     }
 }

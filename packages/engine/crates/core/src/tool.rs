@@ -78,6 +78,18 @@ impl ToolDescriptor {
 /// The `tools` crate ships only the descriptor; execution is loop-owned.
 pub const SUBAGENT_TOOL_NAME: &str = "Agent";
 
+/// The reserved tool name the engine loop intercepts to spawn an independent
+/// verifier (a `verifier`-role subagent seeded with only a rubric and
+/// artifact paths — never the maker's reasoning). The `tools` crate ships
+/// only the descriptor; execution is loop-owned, same as [`SUBAGENT_TOOL_NAME`].
+pub const VERIFIER_TOOL_NAME: &str = "Verify";
+
+/// The tool a `verifier`-role subagent calls to report its outcome. A normal,
+/// role-restricted tool (not loop-intercepted): its only effect is ending the
+/// verifier's turn with a structured `agentloop_contracts::VerificationVerdict`
+/// carried on the result.
+pub const SUBMIT_VERDICT_TOOL_NAME: &str = "SubmitVerdict";
+
 pub struct ToolContext {
     pub session_id: SessionId,
     pub turn_id: TurnId,

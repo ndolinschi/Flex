@@ -935,6 +935,156 @@ async fn task_call_spawns_child_and_returns_final_text() {
     assert_eq!(provider.requests().len(), 3);
 }
 
+struct VerifyStub;
+
+#[async_trait::async_trait]
+impl Tool for VerifyStub {
+    fn descriptor(&self) -> agentloop_core::ToolDescriptor {
+        agentloop_core::ToolDescriptor {
+            name: agentloop_core::tool::VERIFIER_TOOL_NAME.to_owned(),
+            description: "run an independent verifier".to_owned(),
+            input_schema: serde_json::json!({"type": "object"}),
+            read_only: true,
+            category: agentloop_core::ToolCategory::Agent,
+            needs_permission: agentloop_core::PermissionHint::Never,
+        }
+    }
+
+    async fn run(
+        &self,
+        _ctx: agentloop_core::ToolContext,
+        _input: serde_json::Value,
+    ) -> Result<ToolOutput, agentloop_core::ToolError> {
+        unreachable!("the loop must intercept Verify calls")
+    }
+}
+
+struct SubmitVerdictStub;
+
+#[async_trait::async_trait]
+impl Tool for SubmitVerdictStub {
+    fn descriptor(&self) -> agentloop_core::ToolDescriptor {
+        agentloop_core::ToolDescriptor {
+            name: agentloop_core::tool::SUBMIT_VERDICT_TOOL_NAME.to_owned(),
+            description: "report a verification outcome".to_owned(),
+            input_schema: serde_json::json!({"type": "object"}),
+            read_only: true,
+            category: agentloop_core::ToolCategory::Agent,
+            needs_permission: agentloop_core::PermissionHint::Never,
+        }
+    }
+
+    async fn run(
+        &self,
+        _ctx: agentloop_core::ToolContext,
+        input: serde_json::Value,
+    ) -> Result<ToolOutput, agentloop_core::ToolError> {
+        // Real behavior (structured verdict on the output) lives in
+        // `agentloop_tools::submit_verdict_tool`; this stub only needs to be
+        // callable so the verifier's tool call round-trips in the test.
+        agentloop_tools::submit_verdict_tool()
+            .run(_ctx, input)
+            .await
+    }
+}
+
+#[tokio::test]
+async fn verify_call_spawns_a_verifier_and_carries_the_structured_verdict() {
+    let (root_turn, root_ids) = MockProvider::tool_turn(&[(
+        "Verify",
+        serde_json::json!({
+            "rubric": "The file exists and contains a greeting.",
+            "artifacts": ["hello.txt"],
+        }),
+    )]);
+    let (verifier_turn, verifier_ids) = MockProvider::tool_turn(&[(
+        "SubmitVerdict",
+        serde_json::json!({
+            "outcome": "pass",
+            "findings": ["hello.txt:1 contains a greeting, matching the rubric"],
+            "confidence": 0.95,
+        }),
+    )]);
+    let provider = Arc::new(MockProvider::with_turns(vec![
+        root_turn,
+        verifier_turn,
+        MockProvider::text_turn("verified: pass"),
+        MockProvider::text_turn("done"),
+    ]));
+    let (agent, store) = create_agent(
+        provider.clone(),
+        vec![Arc::new(VerifyStub), Arc::new(SubmitVerdictStub)],
+        Vec::new(),
+    )
+    .await;
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+
+    let summary = agent
+        .prompt(
+            &session,
+            PromptInput::text("finish the task, then verify it"),
+            TurnOptions::default(),
+        )
+        .await
+        .expect("turn succeeds");
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+    assert_eq!(provider.requests().len(), 4);
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    let child = events
+        .iter()
+        .find_map(|(_, event)| match event {
+            AgentEvent::SubagentStarted {
+                child_session,
+                role,
+                ..
+            } => {
+                assert_eq!(role.as_deref(), Some("verifier"));
+                Some(child_session.clone())
+            }
+            _ => None,
+        })
+        .expect("SubagentStarted with role=verifier is persisted in the parent log");
+
+    let child_events = store.read(&child, 0).await.expect("child log");
+    assert!(
+        child_events.iter().any(|(_, event)| matches!(
+            event,
+            AgentEvent::ToolCallUpdated { call }
+                if call.tool_name == agentloop_core::tool::SUBMIT_VERDICT_TOOL_NAME
+                    && matches!(call.status, ToolCallStatus::Completed)
+        )),
+        "the verifier's SubmitVerdict call completed in its own log"
+    );
+
+    let verify_call = events
+        .iter()
+        .rev()
+        .find_map(|(_, event)| match event {
+            AgentEvent::ToolCallUpdated { call } if call.id == root_ids[0] => Some(call.clone()),
+            _ => None,
+        })
+        .expect("the Verify call is recorded in the parent log");
+    assert!(matches!(verify_call.status, ToolCallStatus::Completed));
+    let structured = verify_call
+        .result
+        .as_ref()
+        .and_then(|output| output.structured.clone())
+        .expect("Verify's ToolOutput carries the extracted structured verdict");
+    assert_eq!(structured["outcome"], "pass");
+    assert_eq!(
+        structured["findings"][0],
+        "hello.txt:1 contains a greeting, matching the rubric"
+    );
+
+    // Sanity: the verifier's own SubmitVerdict call id is distinct from the
+    // parent's Verify call id — they live in different sessions.
+    assert_ne!(root_ids[0], verifier_ids[0]);
+}
+
 #[tokio::test]
 async fn max_depth_denies_grandchild_spawn() {
     let (parent_turn, parent_ids) = MockProvider::tool_turn(&[(

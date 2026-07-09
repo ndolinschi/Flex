@@ -7,7 +7,7 @@ use agentloop_core::{Executor, NetworkPolicy, PendingMap, ToolRegistry};
 
 use crate::{
     AskQuestionTool, BashTool, EditTool, ExitPlanModeTool, FsState, GlobTool, GrepTool, PlanTool,
-    ReadTool, WebFetchTool, WriteTool,
+    ReadTool, WebFetchTool, WriteTool, submit_verdict_tool, verify_tool,
 };
 
 /// The full M1 tool bundle plus shared state needed by the native loop.
@@ -31,6 +31,8 @@ pub fn base_tools_read_only() -> BaseTools {
     registry.register(Arc::new(PlanTool));
     registry.register(Arc::new(ExitPlanModeTool));
     registry.register(Arc::new(AskQuestionTool::new(pending_questions.clone())));
+    registry.register(verify_tool());
+    registry.register(submit_verdict_tool());
     BaseTools {
         registry,
         fs_state,
@@ -75,5 +77,7 @@ pub fn registry_with_questions(
     registry.register(Arc::new(PlanTool));
     registry.register(Arc::new(ExitPlanModeTool));
     registry.register(Arc::new(AskQuestionTool::new(pending_questions)));
+    registry.register(verify_tool());
+    registry.register(submit_verdict_tool());
     registry
 }

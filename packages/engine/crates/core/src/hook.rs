@@ -2,9 +2,13 @@
 //! One mechanism covers gating (block a tool), rewriting (mutate arguments or
 //! results), and continuation (inject a follow-up on stop).
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 
 use agentloop_contracts::{HookPoint, PromptInput, SessionId, ToolCall, ToolOutput, TurnId};
+
+use crate::store::SessionStore;
 
 /// Hook failures abort the current operation with an explanation.
 #[derive(Debug, thiserror::Error)]
@@ -58,6 +62,12 @@ pub struct HookContext<'a> {
     pub session_id: &'a SessionId,
     pub turn_id: Option<&'a TurnId>,
     pub data: HookData<'a>,
+    /// Read access to the current session's own log (e.g. to check for a
+    /// prior tool call's recorded outcome), when the caller has one to give.
+    /// `None` in contexts with no store (most unit tests); hooks that need it
+    /// degrade gracefully. Hooks never write through this — mutation goes
+    /// through `data`.
+    pub store: Option<Arc<dyn SessionStore>>,
 }
 
 /// An ordered interceptor. Hooks run in registration order; the first

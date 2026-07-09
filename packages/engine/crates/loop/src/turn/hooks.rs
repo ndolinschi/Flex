@@ -27,6 +27,7 @@ pub(super) async fn run_hooks(
             session_id: &handle.id,
             turn_id: Some(turn_id),
             data: std::mem::replace(&mut data, HookData::Session),
+            store: Some(deps.store.clone()),
         };
         let outcome = hook
             .on(point, &mut ctx)
