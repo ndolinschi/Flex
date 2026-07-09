@@ -82,6 +82,18 @@
             <h3>Embeddable SDK</h3>
             <p>AgentBuilder fluent API composes providers + engine + plugins. The flex headless runner streams NDJSON over stdio.</p>
           </article>
+          <article class="feature-item scroll-reveal">
+            <h3>Independent verification</h3>
+            <p>Verify/SubmitVerdict spawn a fresh-context subagent that never sees the maker's reasoning — only artifacts and a rubric. Optional plugin, zero footprint when disabled.</p>
+          </article>
+          <article class="feature-item scroll-reveal">
+            <h3>Goal-loops &amp; Routines</h3>
+            <p>run_goal drives repeated turns to a stated outcome under explicit stop-rules. flex serve --enable-routines runs the same goals unattended, on a cron schedule or a webhook.</p>
+          </article>
+          <article class="feature-item scroll-reveal">
+            <h3>Headless HTTP API</h3>
+            <p>flex serve: bearer-auth HTTP/SSE with an OpenAPI spec. Binds loopback-only unless given an explicit token — no CORS layer, no unauthenticated routes.</p>
+          </article>
         </div>
       </div>
     </section>
@@ -152,7 +164,7 @@
             </div>
             <div class="api-item">
               <code class="api-sig">.enable_plugin(id)</code>
-              <p>Enable a built-in plugin (<code>"search"</code>).</p>
+              <p>Enable a built-in plugin (<code>"search"</code>, <code>"learning"</code>, <code>"verifier"</code>).</p>
             </div>
             <div class="api-item">
               <code class="api-sig">.plugin(impl Plugin)</code>
@@ -165,6 +177,14 @@
             <div class="api-item">
               <code class="api-sig">.all_providers(true)</code>
               <p>Register every provider whose credentials resolve.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.fallback_models(models)</code>
+              <p>Engine-wide failover chain for sessions that don't set their own.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.enable_workflow_tool(true)</code>
+              <p>Register RunWorkflow: declarative multi-step subagent pipelines.</p>
             </div>
             <div class="api-item">
               <code class="api-sig">.build()</code>
@@ -257,9 +277,13 @@
               <span class="arch-layer-label">providers</span>
               <span class="arch-layer-detail">anthropic · openai · gemini · ollama · bedrock · copilot · deepseek · delegators</span>
             </div>
+            <div class="arch-layer arch-layer-gateway">
+              <span class="arch-layer-label">gateway</span>
+              <span class="arch-layer-detail">Channel trait · Routine{Spec,Trigger,Store} — contract-only, no EngineService dep</span>
+            </div>
             <div class="arch-layer arch-layer-engine">
               <span class="arch-layer-label">engine</span>
-              <span class="arch-layer-detail">loop · prompts · session · tools · mcp · workspace · transports</span>
+              <span class="arch-layer-detail">loop · prompts · session · tools · mcp · workspace · transports/{stdio,http} · learning · verifier</span>
             </div>
             <div class="arch-layer arch-layer-search">
               <span class="arch-layer-label">search</span>

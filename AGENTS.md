@@ -52,7 +52,8 @@ that anatomy, and it helps to name where each lives:
 - **Model adapter** — `core::Provider` + `providers/*`; provider quirks die at
   the normalization boundary.
 - **Guardrails / permissions** — `loop::permission` + rules; every tool call is
-  a tracked `ToolCall` with a persisted verdict.
+  a tracked `ToolCall` with a persisted verdict. Plugins can force specific
+  tools to always ask a human, independent of the session's permission mode.
 - **Observability** — persisted `AgentEvent`s (append-then-broadcast) with
   tracing/metrics derived at the choke point.
 - **Environment / isolation** — `core::Workspaces` + `workspace` (git worktrees):
@@ -108,7 +109,8 @@ packages/engine/              # provider-agnostic engine — the hub workspace
                               # verifier ("maker is never the grader")
     workspace/                # Workspaces impl: git-worktree session isolation (the sole git edge)
     mcp/                      # MCP client (rmcp) -> Tool bridge
-    transports/{stdio}        # serve any Agent to external clients
+    transports/{stdio,http}   # serve any Agent to external clients: NDJSON/stdio, and headless
+                              # HTTP/SSE (`flex serve`) with OpenAPI, bearer-token auth
     testkit/                  # MockProvider, conformance suites, scripted-stdio (dev-dep only)
 packages/providers/           # connector umbrella — its own workspace
   crates/
@@ -224,12 +226,49 @@ at the composition root (`AgentBuilder::enable_plugin("search")`).
   `LearningPlugin::require_verified_memory` only makes sense paired with this plugin enabled —
   otherwise the gate blocks `SkillSave`/`MemoryWrite` forever since no `Verify` call can ever
   succeed to satisfy it.
+- **Goal-loops drive repeated turns toward a stated outcome**: `EngineService::run_goal(session,
+  GoalSpec)` loops `prompt()` until a stop-rule fires — `max_iterations`, `max_identical_failures`
+  (per `TurnStopReason` category), `token_budget`, or `Achieved` (no-tool-calls "weak signal", or
+  a `Verify` call reporting `Pass` when `GoalSpec.require_verification` is set — provider-agnostic,
+  since it goes through the normal prompt-and-scan-log path rather than native-loop internals).
+  `GoalStopReason::{Escalate,Parked}` are reserved/unimplemented: a naive post-hoc scan for
+  `QuestionRequested` can't distinguish "needs escalation" from "asked and answered normally",
+  since `AskUserQuestion` already blocks synchronously inside the turn that calls it.
 - **`packages/sdk` is the composition root**: `AgentBuilder` composes the providers facade + native
   `EngineService` + enabled plugins; the `flex` `[[bin]]` (runner, NDJSON/stdio + doctor) lives
   here. The brand-gate exemption moved from the engine's `crates/runner/Cargo.toml` to the SDK's.
+- **`flex serve` is a headless HTTP/SSE transport** (`agentloop-transport-http`): binds
+  `127.0.0.1` unless given an explicit `--token`/`{ENV_PREFIX}_SERVE_TOKEN` (never for an
+  auto-generated one); every route but `/health` needs a bearer token (`subtle::ConstantTimeEq`).
+  Routes cover session CRUD, prompting (`202`, watch `/sessions/{id}/events` for SSE progress),
+  permission resolution, and `/openapi.json` (`utoipa`). `build_router_with_extra`/
+  `serve_http_with_extra` let a caller merge in unrelated routes (already `.with_state()`-applied)
+  without this crate needing to know what they are — the routine webhook (below) is the first user.
 - **Model failover is loop-owned**: `TurnOptions.fallback_models` + the persisted
   `ModelFallback` event; eligible provider failures advance the chain mid-turn with
-  partial drafts discarded pre-materialization. Role chains (v3) feed the same field.
+  partial drafts discarded pre-materialization. Role chains (v3) feed the same field. Two more
+  precedence tiers sit below it, mirroring `model`: `NewSessionParams.fallback_models` (a
+  session-level default consulted when a turn's own chain is empty) and
+  `EngineConfig.default_fallback_models` / `AgentBuilder::fallback_models()` (an engine-wide
+  default, so `flex serve --fallback-model` has an effect even though HTTP clients create
+  sessions independently of server startup). CLI: repeatable `--fallback-model` on `run`/`serve`;
+  a `provider/model` entry naming a different provider than `--provider` auto-enables
+  `all_providers(true)` so the other provider is actually registered.
+- **A force-ask permission override backs HITL governance checkpoints**: `Plugin::force_ask_tools()`
+  (default-provided, additive) names tools that always resolve to `Verdict::Ask` in
+  `PermissionPolicy`, overriding both `BypassPermissions` (would auto-allow) and `DontAsk` (would
+  auto-deny) — an explicit user permission rule still wins. `LearningPlugin::require_human_approval`
+  uses it to force a human's yes on `SkillSave`/`MemoryWrite` even in a fully autonomous session
+  (composes with `require_verified_memory`: verify, then ask). Without a plugin opting in, the
+  override has zero effect.
+- **`RunWorkflow` is an opt-in declarative subagent pipeline**: an ordered list of steps (a
+  `task` or a barrier `parallel` fan-out), each run through the existing `run_subagent()` — no
+  executable script, no sandbox, just data (unlike Claude Code's `agent()`/`parallel()`/
+  `pipeline()` harness, which Flex deliberately doesn't hand the model, in keeping with "loop
+  stays free of process code"). Each step's combined result threads into the next step's brief
+  automatically. Gated by role `max_depth` exactly like `Agent`/`Verify`, and by
+  `EngineConfig.enable_workflow_tool` (default off — the role graph is the default orchestration
+  path; this is an escape hatch for plans whose full shape is already known).
 - **Tools run on a bounded worker pool; subagents are loop-intercepted**: tool jobs
   are spawned tasks behind a semaphore (real parallelism, panic isolation via
   `JoinError::is_panic`); `Agent` calls bypass the pool entirely — control plane ≠
@@ -254,9 +293,11 @@ at the composition root (`AgentBuilder::enable_plugin("search")`).
   `SessionMeta.{isolation,workspace_id,base_cwd}`) are additive.
 - **Engine roadmap** (north star: true parallelism and fault isolation via actors,
   distribution by default, swarms/metaswarms of any models, no bloat):
-  - **Session actor** — the tool worker pool ships; remaining: a single-writer
-    SessionActor mailbox (fixes the latent append→broadcast ordering race),
-    turn-panic supervision, and a testkit conformance suite.
+  - **Session actor** — shipped: the tool worker pool, a single-writer `SessionActor` mailbox
+    (`loop/src/actor.rs`, fixes the append→broadcast ordering race by making `Subscribe` an
+    atomic step in the same mailbox as `Append`), turn-panic supervision
+    (`tokio::spawn`+`JoinError::is_panic` around `run_turn`), and a testkit conformance suite
+    (`agentloop_testkit::store_conformance`) all ship.
   - **Distributed nodes** — node capability tags on `ToolContext`; policy enforced in the
     permission layer (secret/sandboxed execution) — e.g. only some cluster nodes may
     read secret code.
@@ -366,7 +407,19 @@ Snapshot tests use `insta`. To (re)generate intentionally:
   adapters behind a `Channel` trait (normalized `Inbound`/`Outbound`, permission replies as
   first-class events). Adapters (Telegram long-poll first, then Slack Socket Mode, Discord)
   and the routing core (`ChatKey -> SessionId` map, event projection, permission relay) are
-  future work on top of this trait; WhatsApp/Signal additionally need bridge daemons.
+  future work on top of this trait; WhatsApp/Signal additionally need bridge daemons. It also
+  carries the `Routines` contracts (`RoutineSpec`/`RoutineTrigger`/`RoutineStore`) for the same
+  reason — pure data + a trait, no `EngineService` dependency.
+- **Routines run a `GoalSpec` unattended, on a cron schedule or a webhook** (Anthropic Routines,
+  14 Apr 2026 research preview): `RoutineRunner`/`FileRoutineStore`
+  (`~/.config/agentloop/routines/<id>.toml` + an append-only `.history.jsonl`) live in `sdk`, not
+  `engine`, for the same reason `LoopAgent`/`ClawBot` do — they need `EngineService`, which the
+  engine-agnostic `gateway` workspace deliberately doesn't depend on. `flex serve
+  --enable-routines` polls every 30s for due cron routines (`croner` — the one new dependency this
+  cut adds) and mounts `POST /routines/{id}/trigger` for webhook ones, behind the same bearer
+  token via `build_router_with_extra`. `flex routines list|run|remove` round out the CLI; there's
+  no `add` — a `RoutineSpec` is meant to be written directly as TOML. Unattended execution is
+  exactly the scenario the force-ask override above exists for.
 
 ## Commit style
 

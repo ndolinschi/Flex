@@ -6,7 +6,9 @@
 
 Рынок агентных систем в середине 2026 года разделился на четыре лагеря. **Продукты-агенты для разработчиков** (OpenCode, ~184k звёзд; Devin от Cognition, оценка $25B pre-money) конкурируют за рабочий процесс инженера: OpenCode выигрывает открытостью и client/server-архитектурой с OpenAPI-сервером, Devin — глубиной оркестрации («Devin Manages Devins», изолированные VM на сессию, стек организационной памяти Knowledge/Playbooks/Skills). **Персональные агенты-демоны** (OpenClaw, ~380k звёзд — самый быстрорастущий репозиторий GitHub; Hermes Agent от Nous Research, ~185–211k звёзд) показали взрывной спрос на always-on ассистентов в мессенджерах — и одновременно катастрофические провалы безопасности: 512 уязвимостей в аудите OpenClaw, 36,8% skills в ClawHub с проблемами безопасности (исследование Snyk ToxicSkills), неаутентифицированный RCE в OpenCode (CVE-2026-22812). **Фреймворки-инфраструктура** (LangChain ~141k звёзд, LangGraph ~36,8k) закрепились в enterprise через durable execution, checkpointing и open-core-модель LangSmith. Наконец, **паттерны self-improving систем** вокруг Claude Fable 5 (запуск 9 июня 2026) оформились в воспроизводимую дисциплину: независимые верификаторы со свежим контекстом ловят ~73% подсаженных дефектов против 7–33% у самокритики, память компаундируется в файлах (STATE.md, Skills), а не в весах модели.
 
-Ключевые выводы для Flex. (1) Ниша Flex — «полиглотная» оркестрация: ни один из шести конкурентов не позволяет использовать чужие агенты (Claude Code, Cursor, opencode, Copilot, ACP) как взаимозаменяемые сабагенты через единый трейт — это реальная, незанятая дифференциация. (2) Худшее слабое место всего рынка — безопасность и изоляция: worktree-изоляция + executor-бэкенды с network policy + injection-scan hooks у Flex уже сейчас сильнее, чем у OpenClaw, Hermes и OpenCode. (3) Главные пробелы Flex: нет durable checkpointing уровня LangGraph, нет client/server-разделения уровня OpenCode, нет продуктовой зрелости, экосистемы и дистрибуции. (4) Приоритетные заимствования: verifier-сабагенты «maker ≠ grader», checkpointer-абстракция для session actor, headless-сервер с OpenAPI, каналы мессенджеров для packages/gateway — с уроками безопасности OpenClaw, выученными заранее.
+Ключевые выводы для Flex. (1) Ниша Flex — «полиглотная» оркестрация: ни один из шести конкурентов не позволяет использовать чужие агенты (Claude Code, Cursor, opencode, Copilot, ACP) как взаимозаменяемые сабагенты через единый трейт — это реальная, незанятая дифференциация. (2) Худшее слабое место всего рынка — безопасность и изоляция: worktree-изоляция + executor-бэкенды с network policy + injection-scan hooks у Flex уже сейчас сильнее, чем у OpenClaw, Hermes и OpenCode. (3) Главные пробелы Flex на момент написания отчёта: нет durable checkpointing уровня LangGraph, нет client/server-разделения уровня OpenCode, нет продуктовой зрелости, экосистемы и дистрибуции. (4) Приоритетные заимствования: verifier-сабагенты «maker ≠ grader», checkpointer-абстракция для session actor, headless-сервер с OpenAPI, каналы мессенджеров для packages/gateway — с уроками безопасности OpenClaw, выученными заранее.
+>
+> **Обновление 2026-07-09**: пункты (3)–(4) закрыты, кроме каналов мессенджеров и eval-harness — см. «Статус» под каждой рекомендацией в разделе «Что позаимствовать» ниже. Checkpointing, client/server-сервер, независимый верификатор, goal-loops, HITL-гейт на память, декларативные workflow-пайплайны и cron/webhook-раутины реализованы; экосистема/дистрибуция остаются открытым пробелом, как и были.
 
 ---
 
@@ -220,13 +222,15 @@
 
 ### Честные пробелы
 
-- **Зрелость и дистрибуция.** Pre-alpha против 184k–380k звёзд у конкурентов. Нет комьюнити, нет маркетплейса skills, нет истории релизов. Это самый большой разрыв, и он не закрывается архитектурой.
-- **Нет durable checkpointing.** Per-turn snapshots — это файловый time-travel, но не персистентность состояния сессии уровня LangGraph (resume по thread_id, HITL-interrupts, time travel по состоянию). Roadmap-пункт «session actor» этот разрыв признаёт, но пока он не закрыт — Flex проигрывает LangGraph по главной enterprise-оси.
-- **Нет client/server-разделения.** OpenCode показал, что headless-сервер с OpenAPI и генерируемым SDK — то, что превращает CLI в платформу. У Flex есть SDK (AgentBuilder + flex CLI), но нет сетевого API-слоя.
-- **Gateway — задел, а не продукт.** Channel trait и каналы Telegram/Slack/Discord заявлены, но против 20+ каналов OpenClaw и Hermes это прототип.
-- **Self-learning plugin не обкатан.** Механика (SkillSave/MemoryWrite + stop-hook reflection) концептуально на уровне лидеров (Hermes, OpenClaw), но без эксплуатации в бою нет ответа на главный риск, отмеченный и для Fable-паттернов: компаундирование устаревших/ошибочных «выученных» фактов. Нет и независимого верификатора.
-- **Нет observability/evals-стека.** LangSmith — то, за что платят пользователи LangChain; у Devin — Session Insights и analytics. У Flex есть eval в packages/sdk, но нет tracing-продукта.
-- **Нет hosted-исполнения.** Devin (VM), Anthropic Routines, LangGraph Platform показывают спрос на laptop-off исполнение. Serverless stub у Flex — заглушка.
+*(обновлено 2026-07-09 — статусы отражают реализацию из раздела «Что позаимствовать» ниже)*
+
+- **Зрелость и дистрибуция.** Pre-alpha против 184k–380k звёзд у конкурентов. Нет комьюнити, нет маркетплейса skills, нет истории релизов. Это самый большой разрыв, и он не закрывается архитектурой — и не закрылся: чисто продуктовый/маркетинговый пробел, вне зоны того, что можно решить кодом.
+- ~~Нет durable checkpointing.~~ **Закрыто.** `SessionActor` (единственный writer на mailbox) + чекпоинты как индексированные указатели на `seq` в append-only логе. Resume по `session_id` есть; HITL-interrupt-как-состояние в духе LangGraph — нет (Flex решает эквивалентную задачу иначе, через синхронный `PermissionRequested`/`respond_permission` внутри самого турна, а не через checkpoint-based resume).
+- ~~Нет client/server-разделения.~~ **Закрыто.** `flex serve` — headless HTTP/SSE с OpenAPI, bearer-auth, non-loopback-guard. Генерируемого клиентского SDK, как у OpenCode, всё ещё нет — только сама спека.
+- **Gateway — задел, а не продукт.** Channel trait и каналы Telegram/Slack/Discord заявлены, но против 20+ каналов OpenClaw и Hermes это прототип. Не изменилось — P2.1 остаётся неначатым.
+- **Self-learning plugin частично обкатан.** ~~Нет и независимого верификатора.~~ Независимый верификатор (`Verify`/`SubmitVerdict`, maker≠grader) и HITL-подтверждение (`require_human_approval`) есть; риск компаундирования устаревших фактов теперь имеет два независимых заслона. Не хватает главного — эксплуатации в бою (реальных сессий, статистики срабатывания гейтов).
+- **Нет observability/evals-стека.** LangSmith — то, за что платят пользователи LangChain; у Devin — Session Insights и analytics. У Flex есть eval в packages/sdk, но нет tracing-продукта. Не изменилось — P2.2 остаётся неначатым.
+- **Нет hosted-исполнения.** Devin (VM), Anthropic Routines, LangGraph Platform показывают спрос на laptop-off исполнение. **Частично закрыто**: Routines (`flex serve --enable-routines`, cron/webhook) дают laptop-off *исполнение*, но не laptop-off *хостинг* — раутин всё ещё нужен постоянно работающий `flex serve`-процесс где-то, serverless-исполнитель остаётся заглушкой.
 
 ---
 
@@ -234,32 +238,55 @@
 
 Приоритет 1 — критично для дифференциации; привязка к пакетам Flex указана для каждой рекомендации.
 
+> **Статус на 2026-07-09**: все семь пунктов ниже (P1.1–P1.4, P2.3, P3.1, P3.2) реализованы.
+> Только P2.1 (channel-интеграции) и P2.2 (eval-harness) остаются нетронутыми — см. отметки
+> под каждым пунктом. Реализация местами разошлась с первоначальным эскизом; расхождения
+> отмечены явно, без ретуши.
+
 ### P1.1. Независимый верификатор «maker ≠ grader» → packages/engine (roles + loop)
 Самый подкреплённый данными паттерн исследования: fresh-context верификаторы ловят ~73% подсаженных дефектов против 7–33% у самокритики (Parameter Golf; единичный эксперимент, но направление подтверждают и дочерние Devin'ы, самостоятельно гоняющие тесты, и sandboxed-валидация Devin Security Swarm). У Flex уже есть встроенная роль reviewer в RoleSpec — усилить её контрактом: верификатор получает **только артефакты + рубрику**, никогда — рассуждения исполнителя; свежий контекст; результат верификации пишется в event stream как первоклассное событие. Это же закрывает риск компаундирования мусора в learned memory (P1.3).
+
+**✅ Реализовано** (`996a38c`, дальнейший рефакторинг в `c07091b`): опциональный плагин `agentloop-verifier` — `Verify`-тул (loop-intercepted, спавнит `verifier`-роль с `max_depth: 0`) + `SubmitVerdict`. Вердикт (`VerificationVerdict`) идёт через уже существующий `ToolOutput.structured` — без нового wire-события. `LearningPlugin::require_verified_memory` гейтит `SkillSave`/`MemoryWrite` через `VerifiedMemoryGateHook`.
 
 ### P1.2. Checkpointer-абстракция из LangGraph → packages/engine/session (roadmap «session actor»)
 Перенять именно **абстракцию**: трейт Checkpointer с реализациями in-memory/SQLite/Postgres, персистенция состояния сессии по session_id, resume повторным вызовом, HITL-interrupt как состояние сессии. JSONL ground truth Flex — уже готовый журнал для реплея; чекпоинты — это индексированные снапшоты поверх него. Учесть критику Diagrid: checkpoints ≠ durable execution — для настоящей надёжности заложить в контракт session actor'а детекцию сбоев и координацию resume (то, чего в OSS LangGraph нет и что уводит клиентов в платный Platform — для Flex это шанс).
 
+**✅ Реализовано** (`c66481b`): `SessionActorHandle` — единственный writer на mailbox (mpsc), делающий `Subscribe` атомарным шагом относительно `Append` (закрывает документированный в AGENTS.md append→broadcast race). Чекпоинт — не отдельное хранилище, а именованный указатель на `seq` в уже существующем append-only логе (`CheckpointRef`/`CheckpointLabel`, default-provided методы на `SessionStore`). Turn-panic supervision через `tokio::spawn`+`JoinError::is_panic`. SQLite/Postgres-реализации не делались — не потребовались при JSONL-как-ground-truth дизайне.
+
 ### P1.3. Goal-loops и stop-правила из Fable-паттернов → packages/engine/loop + packages/engine/learning
 Шестичастный цикл (trigger → rules load → executor → verifier → memory write → stop check) ложится на существующие hooks и learning-плагин Flex почти один в один. Конкретно: (а) условие остановки как первоклассный параметр loop (аналог /goal: done/escalate/park/go-again, потолок «3 одинаковых провала», бюджет токенов); (б) пятиступенчатая прогрессия памяти (провал → причина → проверенный факт → общее правило → консультация) как схема для MemoryWrite; (в) запись в learned memory **только через верификатор** из P1.1 — этого нет ни у Hermes, ни у OpenClaw, и это ответ на их главную слабость.
+
+**✅ Реализовано** (`034476e`): `EngineService::run_goal(session, GoalSpec)` — `max_iterations`, `max_identical_failures` (по категории `TurnStopReason`), `token_budget`, `Achieved` (weak signal без tool-calls, либо `Verify: Pass` когда `require_verification`). **Расхождение**: `escalate`/`park` — не реализованы, оставлены зарезервированными вариантами `GoalStopReason`; наивный пост-хок скан `QuestionRequested` не отличает «нужна эскалация» от «спросили и ответили в штатном режиме», поскольку `AskUserQuestion` уже блокируется синхронно внутри самого турна.
 
 ### P1.4. Client/server split из OpenCode → packages/sdk + новый сетевой слой
 Headless-сервер с OpenAPI-спецификацией и генерируемым SDK — то, что сделало OpenCode платформой, а не CLI. Для Flex: `flex serve` поверх существующего engine — event-стрим уже нормализован — осталось выставить его по HTTP/SSE. Уроки безопасности обязательны с первого дня: bind на 127.0.0.1, аутентификация по умолчанию (CVE-2026-22812 у OpenCode, ~1 000 открытых инстансов OpenClaw в Shodan, неаутентифицированный API Hermes — три одинаковых провала подряд у трёх проектов).
 
+**✅ Реализовано** (`c07091b`): `agentloop-transport-http` — bind `127.0.0.1` по умолчанию, жёсткий отказ на non-loopback без явного токена, bearer-auth (`subtle::ConstantTimeEq`) на каждом роуте кроме `/health`, `/openapi.json` через `utoipa`. **Расхождение**: генерируемого клиентского SDK нет — только сама OpenAPI-спека; клиенты пока пишутся вручную поверх неё.
+
 ### P2.1. Channel-интеграции OpenClaw → packages/gateway
 Спрос доказан (~380k звёзд OpenClaw, 20+ каналов; сервисы Tencent/Z.ai). У Flex уже есть Channel trait и задел Telegram/Slack/Discord — довести до конца именно эти три (покрывают dev-команды), скопировав из OpenClaw модель маршрутизации: входящий канал/аккаунт/пир → изолированный агент со своим workspace (у Flex — своим worktree). Дифференциация от OpenClaw — безопасность: каждый канал-агент за executor-бэкендом с network policy, injection-scan hooks на входящих сообщениях (у Flex уже есть — у OpenClaw именно этого не хватило против prompt-injection-эксфильтрации).
+
+**⏳ Не начато.** `Channel` trait и нормализованные `Inbound`/`Outbound` остаются contract-only; Telegram/Slack/Discord-адаптеры и `ChatKey → SessionId` роутинг — следующий естественный пункт.
 
 ### P2.2. Eval-harness по мотивам Hermes/Atropos и LangSmith → packages/sdk/eval
 Два образца: (а) Atropos — окружения как микросервисы, эпизодические награды за multi-turn tool-calling/code-exec (сам Atropos заархивирован 04.07.2026 — идеи свободны, конкуренция мертва); (б) LangSmith — production-трейсы становятся eval-датасетами. Для Flex естественный путь — (б): JSONL-сессии уже являются идеальными eval-фикстурами; добавить в packages/sdk/eval конвертацию «сессия → регрессионный тест» и рубрики для verifier-грейдинга (Haiku-класс моделей как дешёвые грейдеры, по образцу маршрутизации из Fable-паттернов).
 
+**⏳ Не начато.** `packages/sdk/crates/eval` уже существует (task discovery, `MockProvider`-раннер, markdown/JSON-отчёты, baseline-гейтинг) — конвертации «сессия → регрессионная фикстура» и verifier-грейдинга в нём пока нет.
+
 ### P2.3. Организационная память Devin (Knowledge с одобрением) → packages/engine/learning
 Точечный паттерн: агент **предлагает** запись в память после наблюдения повторяющегося паттерна, человек одобряет («I noticed you use React and Redux — add to Knowledge?»). Это HITL-мостик между полностью автономным self-learning Flex и enterprise-требованиями к контролю; аналог — Skill Workshop OpenClaw. Реализация: режим `learned_memory_approval: ask` в существующем precedence project>user>learned.
+
+**✅ Реализовано, иначе, чем в эскизе** (`685b8bf`): вместо режима `ask` в precedence-конфиге — `Plugin::force_ask_tools()` (новый extension point на `core::Plugin`) + `PermissionPolicy.force_ask`, переопределяющий и `BypassPermissions`, и `DontAsk` для именованных тулов. `LearningPlugin::require_human_approval(bool)` — независимый от `require_verified_memory` булев флаг (не enum-режим, как планировалось изначально: обнаружилось, что verify-гейт и ask-гейт должны компоноваться, а не быть взаимоисключающими состояниями). Причина отхода от исходного дизайна: обычный permission-prompt на `SkillSave`/`MemoryWrite` уже существовал (`PermissionHint::Always`), но `DontAsk` тихо его отклонял, а `BypassPermissions` — тихо пропускал; именно в автономных прогонах (Routines, P3.2) человеческий чек-пойнт нужнее всего и должен быть независим от общего permission-режима сессии.
 
 ### P3.1. Dynamic Workflows → packages/engine (после стабилизации ядра)
 Модель пишет собственный orchestration-harness (agent/parallel/pipeline) вместо фиксированного RoleSpec. Для Flex это дальний прицел: RoleSpec покрывает 90% случаев дешевле и предсказуемее; но выставить программируемый API оркестрации (те же примитивы, что использует RoleSpec) через SDK — низкая цена, высокая опциональность.
 
+**✅ Реализовано, иначе, чем в эскизе** (`d6b4e5b`): `RunWorkflow` — декларативный список шагов (`task`/barrier `parallel`), не исполняемый JS-harness. Flex сознательно не даёт модели sandbox для произвольного кода — это противоречило бы принципу «loop free of process code» и было бы избыточной поверхностью атаки без явного выигрыша над существующим RoleSpec-графом. Каждый шаг выполняется через уже существующий `run_subagent()`; результат каждого шага автоматически подставляется в бриф следующего. Опционален (`EngineConfig.enable_workflow_tool`, off по умолчанию).
+
 ### P3.2. Routines / scheduled triggers → packages/engine/loop + packages/gateway
 Cron/webhook/CI-триггеры как источник событий для loop (у Hermes — cron-задачи в свежих сессиях, у Anthropic — Routines, у Devin — automations с event-триггерами). Ложится на event model Flex естественно; hosted-вариант отложить до появления реального serverless-executor'а.
+
+**✅ Реализовано** (`772c911`): `RoutineSpec`/`RoutineTrigger`/`RoutineStore` — contract-only в `packages/gateway/crates/channel` (без зависимости на `EngineService`, как и `Channel`); `RoutineRunner`/`FileRoutineStore` — в `packages/sdk` (та же причина, что у `LoopAgent`/`ClawBot`: нужен `EngineService`, которого у `gateway` умышленно нет). `flex serve --enable-routines` — 30-секундный пул для cron-триггеров (`croner` — единственная новая внешняя зависимость всего этого цикла работ) + `POST /routines/{id}/trigger` за тем же bearer-токеном. Hosted/serverless-вариант, как и предполагалось, отложен.
 
 ### Анти-рекомендации (что НЕ заимствовать)
 - **Автономную публикацию/установку skills без ревью** (ClawHub): 36,8% skills с проблемами безопасности и 76 вредоносных payload'ов — прямое следствие отсутствия гейта. Precedence + подписи + HITL-одобрение обязательны для любого будущего skills-обмена.

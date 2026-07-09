@@ -842,6 +842,7 @@ kbd {
 /* Layer accent borders */
 .arch-layer-sdk { border-left: 2px solid var(--color-accent); }
 .arch-layer-providers { border-left: 2px solid var(--color-syntax-key); }
+.arch-layer-gateway { border-left: 2px solid var(--color-syntax-red); }
 .arch-layer-engine { border-left: 2px solid var(--color-syntax-teal); }
 .arch-layer-search { border-left: 2px solid var(--color-syntax-number); }
 .arch-layer-core { border-left: 2px solid var(--color-green); }
