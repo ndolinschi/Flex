@@ -5,7 +5,10 @@
 use std::sync::Arc;
 
 use agentloop_contracts::branding;
-use agentloop_transport_http::{AuthToken, HttpServeOptions, serve_http};
+use agentloop_sdk::routines::{FileRoutineStore, RoutineRunner, routine_webhook_router};
+use agentloop_transport_http::{AuthToken, HttpServeOptions, serve_http_with_extra};
+use axum::Router;
+use tokio_util::sync::CancellationToken;
 
 use crate::cli::ServeArgs;
 use crate::resolve::resolve_service;
@@ -36,14 +39,29 @@ pub(crate) async fn serve(args: ServeArgs) -> anyhow::Result<()> {
         }
     };
 
+    let engine = Arc::new(resolution.service);
+    let mut extra = Router::new();
+    if args.enable_routines {
+        let Some(store) = FileRoutineStore::with_default_dir() else {
+            return Err(anyhow::anyhow!(
+                "--enable-routines needs a resolvable home directory for the routines store"
+            ));
+        };
+        let runner = Arc::new(RoutineRunner::new(engine.clone(), Arc::new(store)));
+        tokio::spawn(runner.clone().spawn_cron_loop(CancellationToken::new()));
+        extra = extra.merge(routine_webhook_router(runner, token.clone()));
+        eprintln!("routines enabled: cron polling started, POST /routines/{{id}}/trigger mounted");
+    }
+
     eprintln!("listening on http://{}", args.bind);
-    serve_http(
-        Arc::new(resolution.service),
+    serve_http_with_extra(
+        engine,
         HttpServeOptions {
             bind: args.bind,
             token,
             token_was_explicit,
         },
+        extra,
     )
     .await
     .map_err(|err| anyhow::anyhow!("{err}"))

@@ -16,6 +16,7 @@
 //! ```
 
 mod loop_agent;
+pub mod routines;
 
 use std::path::PathBuf;
 use std::sync::Arc;

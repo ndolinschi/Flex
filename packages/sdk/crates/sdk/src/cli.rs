@@ -34,6 +34,7 @@ pub(crate) struct ServeArgs {
     pub(crate) workdir: Option<PathBuf>,
     pub(crate) bind: SocketAddr,
     pub(crate) token: Option<String>,
+    pub(crate) enable_routines: bool,
 }
 
 const DEFAULT_SERVE_BIND: &str = "127.0.0.1:4517";
@@ -47,6 +48,7 @@ pub(crate) fn parse_serve_args(args: &[String]) -> anyhow::Result<ServeArgs> {
     let mut workdir: Option<PathBuf> = None;
     let mut bind: Option<String> = None;
     let mut token: Option<String> = None;
+    let mut enable_routines = false;
     let mut index = 0;
 
     while index < args.len() {
@@ -71,6 +73,7 @@ pub(crate) fn parse_serve_args(args: &[String]) -> anyhow::Result<ServeArgs> {
                 bind = Some(format!("{host}:{port}"));
             }
             "--token" => token = Some(take_value(args, &mut index, "--token")?),
+            "--enable-routines" => enable_routines = true,
             "--help" | "-h" => {
                 println!("{}", usage());
                 std::process::exit(0);
@@ -93,6 +96,7 @@ pub(crate) fn parse_serve_args(args: &[String]) -> anyhow::Result<ServeArgs> {
         fallback_models,
         workdir,
         bind,
+        enable_routines,
         token,
     })
 }
@@ -175,8 +179,9 @@ pub(crate) fn usage() -> String {
          [--tasks-dir <dir>] [--agent <agent>] [--provider <id>] [--model <model>] \
          [--repeat <n>] [--out <dir>] [--json <path>] [--baseline <report.json>]\n  \
          {slug} serve [--agent ...] [--agent-cmd <program>] [--provider ...] [--model <model>] \
-         [--fallback-model <model>]... \
-         [--workdir <path>] [--bind <host:port>] [--port <port>] [--token <token>]\n\n\
+         [--fallback-model <model>]... [--enable-routines] \
+         [--workdir <path>] [--bind <host:port>] [--port <port>] [--token <token>]\n  \
+         {slug} routines <list|run|remove> [id]\n\n\
          With no --agent/--provider, the engine auto-detects: provider API keys in the \
          environment select the native loop; otherwise an installed external agent CLI is \
          probed and delegated to. `doctor` explains the decision.\n\n\
@@ -188,7 +193,12 @@ pub(crate) fn usage() -> String {
          but /health. With no --token, one is generated and printed once to stderr; binding \
          beyond loopback requires an explicit --token or {env_prefix}_SERVE_TOKEN. On `serve`, \
          --fallback-model sets the server-wide default chain for sessions that don't specify \
-         their own via the HTTP API.",
+         their own via the HTTP API.\n\n\
+         --enable-routines polls ~/.config/agentloop/routines/*.toml for due cron-triggered \
+         routines and mounts POST /routines/{{id}}/trigger (behind the same bearer token) for \
+         webhook-triggered ones. A routine pairs a GoalSpec with a NewSessionParams seed and \
+         runs unattended — pair it with a memory-approval plugin mode so learned facts still \
+         get a human's yes even though nobody is watching the session.",
         slug = branding::PRODUCT_SLUG,
         env_prefix = branding::ENV_PREFIX,
     )

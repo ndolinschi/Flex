@@ -14,8 +14,8 @@ use agentloop_contracts::{
     AgentEvent, Answer, CompactionSummary, GoalOutcome, GoalSpec, GoalStopReason, Hello,
     IntegrationOutcome, IsolationPolicy, ModelRef, NewSessionParams, PermissionDecision,
     PermissionMode, PermissionRequestId, PromptInput, QuestionId, SessionEvent, SessionId,
-    SessionMeta, TokenUsage, ToolCallStatus, Transcript, TurnId, TurnOptions, TurnStopReason,
-    TurnSummary, VerdictOutcome, VerificationVerdict, now_ms, reduce,
+    SessionMeta, SessionMetaPatch, TokenUsage, ToolCallStatus, Transcript, TurnId, TurnOptions,
+    TurnStopReason, TurnSummary, VerdictOutcome, VerificationVerdict, now_ms, reduce,
 };
 use agentloop_core::{
     Agent, EventStream, Hook, PluginRegistry, PluginRole, PluginRoleTools, ProviderRegistry,
@@ -401,6 +401,24 @@ impl EngineService {
 
     pub async fn list_sessions(&self) -> EngineResult<Vec<SessionMeta>> {
         Ok(self.agent.list_sessions().await?)
+    }
+
+    /// Apply a partial update to a session's persisted metadata (e.g. rename
+    /// via `title`, or patch the default `model`).
+    pub async fn update_session(
+        &self,
+        session: &SessionId,
+        patch: SessionMetaPatch,
+    ) -> EngineResult<SessionMeta> {
+        self.store.update_meta(session, patch).await?;
+        Ok(self.store.get_meta(session).await?)
+    }
+
+    /// Cancel any in-flight turn, then delete the session's event log and
+    /// metadata from the store.
+    pub async fn delete_session(&self, session: &SessionId) -> EngineResult<()> {
+        let _ = self.agent.cancel(session).await;
+        Ok(self.store.delete(session).await?)
     }
 
     pub fn subscribe(&self, session: &SessionId) -> EngineResult<EventStream> {
@@ -881,6 +899,57 @@ mod tests {
             })
             .await
             .expect("isolated session opens")
+    }
+
+    #[tokio::test]
+    async fn update_session_renames_title() {
+        let store = std::sync::Arc::new(MemoryStore::new());
+        let agent = NativeAgentBuilder::new(store.clone()).build();
+        let service = EngineService::new(agent, store);
+        let id = service
+            .create_session(NewSessionParams {
+                title: Some("old".to_owned()),
+                ..NewSessionParams::default()
+            })
+            .await
+            .expect("session");
+
+        let meta = service
+            .update_session(
+                &id,
+                SessionMetaPatch {
+                    title: Some("renamed".to_owned()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("update");
+        assert_eq!(meta.title.as_deref(), Some("renamed"));
+        assert_eq!(
+            service
+                .session_meta(&id)
+                .await
+                .expect("meta")
+                .title
+                .as_deref(),
+            Some("renamed")
+        );
+    }
+
+    #[tokio::test]
+    async fn delete_session_removes_from_store() {
+        let store = std::sync::Arc::new(MemoryStore::new());
+        let agent = NativeAgentBuilder::new(store.clone()).build();
+        let service = EngineService::new(agent, store.clone());
+        let id = service
+            .create_session(NewSessionParams::default())
+            .await
+            .expect("session");
+        assert_eq!(service.list_sessions().await.expect("list").len(), 1);
+
+        service.delete_session(&id).await.expect("delete");
+        assert!(service.list_sessions().await.expect("list").is_empty());
+        assert!(store.get_meta(&id).await.is_err());
     }
 
     #[tokio::test]

@@ -13,6 +13,10 @@ use tokio::sync::mpsc;
 
 use agentloop_contracts::{PermissionDecisionKind, PermissionRequestId};
 
+mod routine;
+
+pub use routine::{RoutineError, RoutineRunRecord, RoutineSpec, RoutineStore, RoutineTrigger};
+
 /// Stable identity of one conversation on one platform. The gateway maps each
 /// key to a persistent session id.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

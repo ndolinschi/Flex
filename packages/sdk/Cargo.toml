@@ -30,6 +30,9 @@ agentloop-eval = { path = "crates/eval", version = "0.1.0" }
 agentloop-providers = { path = "../providers/crates/providers", version = "0.1.0" }
 agentloop-search = { path = "../search/crates/search", version = "0.1.0" }
 
+# gateway (sibling workspace) — Routines' trigger/store contracts
+agentloop-channel = { path = "../gateway/crates/channel", version = "0.1.0" }
+
 # external
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -43,6 +46,16 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"
 tokio-util = { version = "0.7", features = ["rt"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+axum = "0.8"
+# Cron-expression parsing for Routines scheduling (crates/sdk/src/routines.rs)
+# — the only third-party crate this workspace phase adds; everything else
+# reuses what was already in the dependency tree. chrono comes along
+# transitively as croner's own DateTime type, used directly for the poll loop.
+croner = "3"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# Dev-only: the routine-webhook HTTP integration test (mirrors the one in
+# transports/http's own test suite, which uses reqwest the same way).
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "stream"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -72,8 +72,10 @@ fn is_loopback(ip: IpAddr) -> bool {
 
 /// Axum middleware: every request must carry `Authorization: Bearer <token>`
 /// matching the configured token, or gets `401`. Applied to every route
-/// except `/health` (mounted outside this layer).
-pub(crate) async fn require_bearer_token(
+/// except `/health` (mounted outside this layer). Exported so a caller
+/// mounting extra routes via `build_router_with_extra` can protect them with
+/// the same check (e.g. the SDK's routine webhook) instead of duplicating it.
+pub async fn require_bearer_token(
     State(token): State<AuthToken>,
     request: Request<axum::body::Body>,
     next: Next,
