@@ -87,6 +87,17 @@ pub trait Plugin: Send + Sync {
     fn hooks(&self) -> Vec<Arc<dyn Hook>> {
         Vec::new()
     }
+
+    /// Tool names that must always resolve to `Ask` in the permission
+    /// policy, regardless of `PermissionMode` — even `BypassPermissions` and
+    /// `DontAsk`, which would otherwise auto-allow or auto-deny them. An
+    /// explicit user permission rule for the tool still takes precedence.
+    /// For governance checkpoints (e.g. requiring a human to approve a
+    /// learned-memory write) that must survive an otherwise fully autonomous
+    /// session.
+    fn force_ask_tools(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// An ordered set of enabled plugins, consulted during engine composition.
@@ -151,5 +162,17 @@ impl PluginRegistry {
             .iter()
             .flat_map(|plugin| plugin.roles())
             .collect()
+    }
+
+    /// All force-ask tool names contributed by every plugin, deduplicated.
+    pub fn force_ask_tools(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .plugins
+            .iter()
+            .flat_map(|plugin| plugin.force_ask_tools())
+            .collect();
+        names.sort();
+        names.dedup();
+        names
     }
 }

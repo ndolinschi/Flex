@@ -55,6 +55,7 @@ pub struct LearningPlugin {
     learned_dir: PathBuf,
     memory_dir: Option<PathBuf>,
     require_verified_memory: bool,
+    require_human_approval: bool,
 }
 
 impl LearningPlugin {
@@ -64,6 +65,7 @@ impl LearningPlugin {
             learned_dir: learned_dir.into(),
             memory_dir: default_memory_dir(),
             require_verified_memory: false,
+            require_human_approval: false,
         }
     }
 
@@ -80,6 +82,20 @@ impl LearningPlugin {
     /// most recent `Verify` call passed.
     pub fn require_verified_memory(mut self, on: bool) -> Self {
         self.require_verified_memory = on;
+        self
+    }
+
+    /// Require a human to approve each `SkillSave`/`MemoryWrite` call before
+    /// it commits (`learned_memory_approval: ask`) — the agent proposes a
+    /// memory, a human confirms, mirroring Devin's Knowledge-with-approval
+    /// and OpenClaw's Skill Workshop. Off by default. Unlike a plain
+    /// permission prompt, this survives `PermissionMode::DontAsk` (which
+    /// would otherwise silently deny the write) and `BypassPermissions`
+    /// (which would otherwise silently allow it) — composes with
+    /// [`Self::require_verified_memory`]: enabling both means a human only
+    /// sees the approval prompt once verification already passed.
+    pub fn require_human_approval(mut self, on: bool) -> Self {
+        self.require_human_approval = on;
         self
     }
 
@@ -127,5 +143,52 @@ impl Plugin for LearningPlugin {
             hooks.push(Arc::new(VerifiedMemoryGateHook::new()));
         }
         hooks
+    }
+
+    fn force_ask_tools(&self) -> Vec<String> {
+        if self.require_human_approval {
+            vec!["SkillSave".to_owned(), "MemoryWrite".to_owned()]
+        } else {
+            Vec::new()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn force_ask_tools_is_empty_by_default() {
+        let plugin = LearningPlugin::new("/tmp/learned");
+        assert!(plugin.force_ask_tools().is_empty());
+    }
+
+    #[test]
+    fn require_human_approval_force_asks_both_memory_tools() {
+        let plugin = LearningPlugin::new("/tmp/learned").require_human_approval(true);
+        assert_eq!(
+            plugin.force_ask_tools(),
+            vec!["SkillSave".to_owned(), "MemoryWrite".to_owned()]
+        );
+    }
+
+    #[test]
+    fn verified_memory_alone_does_not_force_ask() {
+        let plugin = LearningPlugin::new("/tmp/learned").require_verified_memory(true);
+        assert!(plugin.force_ask_tools().is_empty());
+        assert_eq!(plugin.hooks().len(), 2, "verify gate hook is still added");
+    }
+
+    #[test]
+    fn verify_and_ask_compose() {
+        let plugin = LearningPlugin::new("/tmp/learned")
+            .require_verified_memory(true)
+            .require_human_approval(true);
+        assert_eq!(plugin.hooks().len(), 2, "verify gate hook is still added");
+        assert_eq!(
+            plugin.force_ask_tools(),
+            vec!["SkillSave".to_owned(), "MemoryWrite".to_owned()]
+        );
     }
 }

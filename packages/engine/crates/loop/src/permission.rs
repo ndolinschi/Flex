@@ -1,5 +1,6 @@
 //! The permission policy: modes + allow rules decide Allow / Deny / Ask.
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::RwLock;
 use std::time::Duration;
@@ -43,6 +44,9 @@ pub struct PermissionPolicy {
     /// Called when an `AllowAlways` decision adds a rule (for persistence).
     rule_sink: Option<RuleSink>,
     home: Option<PathBuf>,
+    /// Tool names that always resolve to `Ask`, regardless of mode (see
+    /// [`Self::with_force_ask`]).
+    force_ask: HashSet<String>,
 }
 
 impl PermissionPolicy {
@@ -54,6 +58,7 @@ impl PermissionPolicy {
             ask_timeout: Duration::from_secs(300),
             rule_sink: None,
             home: None,
+            force_ask: HashSet::new(),
         }
     }
 
@@ -80,6 +85,17 @@ impl PermissionPolicy {
         self
     }
 
+    /// Tool names that always resolve to `Ask`, overriding `BypassPermissions`
+    /// (would otherwise auto-allow) and `DontAsk` (would otherwise
+    /// auto-deny) — a governance checkpoint independent of the session's
+    /// general permission mode. An explicit user permission rule for the
+    /// tool still wins (evaluated first); `Plan` mode's mutation-deny is
+    /// also unaffected (planning has no side effects to approve).
+    pub fn with_force_ask(mut self, tools: impl IntoIterator<Item = String>) -> Self {
+        self.force_ask = tools.into_iter().collect();
+        self
+    }
+
     /// Add an allow rule at runtime (`AllowAlways`).
     pub fn add_rule(&self, rule: PermissionRule) {
         if let Some(sink) = &self.rule_sink {
@@ -100,6 +116,18 @@ impl PermissionPolicy {
         mode_override: Option<PermissionMode>,
     ) -> Verdict {
         let mode = mode_override.unwrap_or(self.default_mode);
+
+        // A force-ask tool always asks — even under BypassPermissions
+        // (would otherwise auto-allow below) and DontAsk (would otherwise
+        // auto-deny below) — unless an explicit rule already decided it.
+        // Plan mode is excluded: its mutation-deny already has no side
+        // effects to approve, and force-ask has nothing useful to add there.
+        if !matches!(mode, PermissionMode::Plan) && self.force_ask.contains(&descriptor.name) {
+            if let Some(verdict) = self.resolve_rule_verdict(descriptor, input, cwd) {
+                return verdict;
+            }
+            return Verdict::Ask;
+        }
 
         if matches!(mode, PermissionMode::BypassPermissions) {
             return Verdict::Allow;
@@ -126,28 +154,8 @@ impl PermissionPolicy {
             };
         }
 
-        {
-            let rules = self.rules.read().unwrap_or_else(|p| p.into_inner());
-            let facts = CallFacts {
-                tool_name: &descriptor.name,
-                input,
-                cwd,
-                home: self.home.as_deref(),
-            };
-            if let Some(rule) =
-                resolve(&rules, &facts).or_else(|| resolve(&self.builtin_denies, &facts))
-            {
-                return match rule.effect {
-                    RuleEffect::Allow => Verdict::Allow,
-                    RuleEffect::Deny => Verdict::Deny {
-                        reason: format!(
-                            "`{}` is denied by permission rule `{rule}`",
-                            descriptor.name
-                        ),
-                    },
-                    _ => Verdict::Ask,
-                };
-            }
+        if let Some(verdict) = self.resolve_rule_verdict(descriptor, input, cwd) {
+            return verdict;
         }
 
         let would_ask = match descriptor.needs_permission {
@@ -175,6 +183,34 @@ impl PermissionPolicy {
             },
             _ => Verdict::Ask,
         }
+    }
+
+    /// User rules (checked before builtin denies) resolved against one call,
+    /// if any matched.
+    fn resolve_rule_verdict(
+        &self,
+        descriptor: &ToolDescriptor,
+        input: &serde_json::Value,
+        cwd: &std::path::Path,
+    ) -> Option<Verdict> {
+        let rules = self.rules.read().unwrap_or_else(|p| p.into_inner());
+        let facts = CallFacts {
+            tool_name: &descriptor.name,
+            input,
+            cwd,
+            home: self.home.as_deref(),
+        };
+        let rule = resolve(&rules, &facts).or_else(|| resolve(&self.builtin_denies, &facts))?;
+        Some(match rule.effect {
+            RuleEffect::Allow => Verdict::Allow,
+            RuleEffect::Deny => Verdict::Deny {
+                reason: format!(
+                    "`{}` is denied by permission rule `{rule}`",
+                    descriptor.name
+                ),
+            },
+            _ => Verdict::Ask,
+        })
     }
 
     /// Build the rule an `AllowAlways` decision should persist for a call.
@@ -455,5 +491,59 @@ mod tests {
             eval(&policy, &bash, serde_json::json!({"command": "git st"})),
             Verdict::Allow
         );
+    }
+
+    #[test]
+    fn force_ask_tool_asks_even_under_bypass_permissions() {
+        let policy = PermissionPolicy::new(PermissionMode::BypassPermissions)
+            .with_force_ask(["SkillSave".to_owned()]);
+        let skill_save = descriptor("SkillSave", false, PermissionHint::Always);
+        assert_eq!(
+            eval(&policy, &skill_save, serde_json::json!({})),
+            Verdict::Ask
+        );
+        // An unrelated tool is unaffected — bypass still auto-allows it.
+        let bash = descriptor("Bash", false, PermissionHint::Always);
+        assert_eq!(eval(&policy, &bash, serde_json::json!({})), Verdict::Allow);
+    }
+
+    #[test]
+    fn force_ask_tool_asks_even_under_dont_ask() {
+        let policy =
+            PermissionPolicy::new(PermissionMode::DontAsk).with_force_ask(["SkillSave".to_owned()]);
+        let skill_save = descriptor("SkillSave", false, PermissionHint::Always);
+        assert_eq!(
+            eval(&policy, &skill_save, serde_json::json!({})),
+            Verdict::Ask
+        );
+        // An unrelated tool is unaffected — dont-ask still auto-denies it.
+        let bash = descriptor("Bash", false, PermissionHint::Always);
+        assert!(matches!(
+            eval(&policy, &bash, serde_json::json!({})),
+            Verdict::Deny { .. }
+        ));
+    }
+
+    #[test]
+    fn explicit_deny_rule_still_wins_over_force_ask() {
+        let policy = PermissionPolicy::new(PermissionMode::BypassPermissions)
+            .with_force_ask(["SkillSave".to_owned()])
+            .with_rules(vec![PermissionRule::parse("!SkillSave").expect("rule")]);
+        let skill_save = descriptor("SkillSave", false, PermissionHint::Always);
+        assert!(matches!(
+            eval(&policy, &skill_save, serde_json::json!({})),
+            Verdict::Deny { .. }
+        ));
+    }
+
+    #[test]
+    fn force_ask_does_not_override_plan_mode_mutation_deny() {
+        let policy =
+            PermissionPolicy::new(PermissionMode::Plan).with_force_ask(["SkillSave".to_owned()]);
+        let skill_save = descriptor("SkillSave", false, PermissionHint::Always);
+        assert!(matches!(
+            eval(&policy, &skill_save, serde_json::json!({})),
+            Verdict::Deny { .. }
+        ));
     }
 }

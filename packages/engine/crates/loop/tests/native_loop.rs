@@ -326,6 +326,65 @@ async fn bypass_permissions_skips_ask() {
 }
 
 #[tokio::test]
+async fn force_ask_tool_still_asks_under_bypass_permissions() {
+    // A governance checkpoint (e.g. the learning plugin's
+    // require_human_approval) must survive --bypass-permissions, which would
+    // otherwise auto-allow this tool with no prompt at all.
+    let (turn, _ids) = MockProvider::tool_turn(&[("needs_permission", serde_json::json!({}))]);
+    let provider = Arc::new(MockProvider::with_turns([
+        turn,
+        MockProvider::text_turn("approved after all"),
+    ]));
+    let store = Arc::new(MemoryStore::new());
+    let agent = NativeAgentBuilder::new(store.clone())
+        .providers(provider_registry(provider))
+        .tools(registry_with(vec![Arc::new(PermissionTool)]))
+        .system_prompt("You are a test agent.")
+        .default_model(default_model())
+        .policy(
+            agentloop_loop::PermissionPolicy::new(PermissionMode::Default)
+                .with_force_ask(["needs_permission".to_owned()]),
+        )
+        .build();
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+    let mut stream = agent.events(&session).expect("subscribe succeeds");
+    let prompt_agent = agent.clone();
+    let prompt_session = session.clone();
+    let prompt_task = tokio::spawn(async move {
+        prompt_agent
+            .prompt(
+                &prompt_session,
+                PromptInput::text("run protected tool"),
+                TurnOptions {
+                    permission_mode: Some(PermissionMode::BypassPermissions),
+                    ..TurnOptions::default()
+                },
+            )
+            .await
+    });
+
+    let request_id = loop {
+        let event = stream.next().await.expect("permission event arrives");
+        if let AgentEvent::PermissionRequested { id, .. } = event.payload {
+            break id;
+        }
+    };
+    agent
+        .respond_permission(&session, request_id, PermissionDecision::AllowOnce)
+        .await
+        .expect("permission response succeeds");
+
+    let summary = prompt_task
+        .await
+        .expect("prompt task joins")
+        .expect("turn succeeds");
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+}
+
+#[tokio::test]
 async fn set_turn_permission_mode_applies_to_later_tools_in_same_turn() {
     let (turn, _ids) = MockProvider::tool_turn(&[
         ("needs_permission", serde_json::json!({})),

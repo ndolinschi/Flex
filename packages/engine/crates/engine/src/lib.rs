@@ -229,6 +229,13 @@ impl EngineService {
         if !config.default_fallback_models.is_empty() {
             builder = builder.default_fallback_models(config.default_fallback_models.clone());
         }
+        let force_ask_tools = plugins.force_ask_tools();
+        if !force_ask_tools.is_empty() {
+            builder = builder.policy(
+                agentloop_loop::PermissionPolicy::new(PermissionMode::Default)
+                    .with_force_ask(force_ask_tools),
+            );
+        }
         if let Some(id) = executor_id {
             builder = builder.executor_id(id);
         }
