@@ -159,6 +159,7 @@ mod tests {
                 provider_session_id: None,
                 cwd: std::path::PathBuf::from("."),
                 model: None,
+                fallback_models: Vec::new(),
                 mode: None,
                 isolation: None,
                 workspace_id: None,

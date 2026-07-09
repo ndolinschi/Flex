@@ -224,6 +224,11 @@ impl Agent for NativeAgent {
                 .model
                 .or_else(|| self.deps.roles.chain(role.as_deref()).first().cloned())
                 .or_else(|| self.deps.default_model.clone()),
+            fallback_models: if params.fallback_models.is_empty() {
+                self.deps.default_fallback_models.clone()
+            } else {
+                params.fallback_models
+            },
             role,
             mode: params.mode,
             isolation,

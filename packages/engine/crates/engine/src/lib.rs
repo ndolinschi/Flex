@@ -226,6 +226,9 @@ impl EngineService {
         if let Some(model) = default_model {
             builder = builder.default_model(model);
         }
+        if !config.default_fallback_models.is_empty() {
+            builder = builder.default_fallback_models(config.default_fallback_models.clone());
+        }
         if let Some(id) = executor_id {
             builder = builder.executor_id(id);
         }

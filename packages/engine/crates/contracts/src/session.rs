@@ -39,6 +39,11 @@ pub struct SessionMeta {
     pub cwd: PathBuf,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<ModelRef>,
+    /// Session-level default fallback chain; a turn with an empty
+    /// `TurnOptions.fallback_models` falls back through these models in
+    /// order. Empty = no session-level default.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fallback_models: Vec<ModelRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<String>,
     /// Isolation posture this session was created with. `None` = legacy /

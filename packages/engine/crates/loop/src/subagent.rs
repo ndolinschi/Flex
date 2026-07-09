@@ -155,6 +155,7 @@ impl NativeAgent {
             provider_session_id: None,
             cwd: child_cwd,
             model: child_model,
+            fallback_models: chain.iter().skip(1).cloned().collect(),
             mode: None,
             isolation,
             workspace_id,

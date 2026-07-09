@@ -132,3 +132,40 @@ async fn full_session_lifecycle_over_http() {
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0]["id"], session_id);
 }
+
+#[tokio::test]
+async fn create_session_persists_model_and_fallback_chain() {
+    let token = AuthToken::new("test-token");
+    let (base, _server) = spawn_test_server(token.clone()).await;
+    let client = reqwest::Client::new();
+
+    let created: serde_json::Value = client
+        .post(format!("{base}/sessions"))
+        .bearer_auth(token.as_str())
+        .json(&serde_json::json!({
+            "model": "anthropic/claude-sonnet-4-5",
+            "fallback_models": ["openai/gpt-5", "ollama/llama3"],
+        }))
+        .send()
+        .await
+        .expect("create session")
+        .json()
+        .await
+        .expect("create session body");
+    let session_id = created["session_id"].as_str().expect("session_id");
+
+    let fetched: serde_json::Value = client
+        .get(format!("{base}/sessions/{session_id}"))
+        .bearer_auth(token.as_str())
+        .send()
+        .await
+        .expect("get session")
+        .json()
+        .await
+        .expect("get session body");
+    assert_eq!(fetched["model"], "anthropic/claude-sonnet-4-5");
+    assert_eq!(
+        fetched["fallback_models"],
+        serde_json::json!(["openai/gpt-5", "ollama/llama3"])
+    );
+}

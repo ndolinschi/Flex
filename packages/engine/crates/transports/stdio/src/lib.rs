@@ -10,7 +10,7 @@ use futures::StreamExt;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use agentloop_contracts::{
-    AgentEvent, NewSessionParams, PermissionMode, PromptInput, SessionEvent, TurnOptions,
+    AgentEvent, ModelRef, NewSessionParams, PermissionMode, PromptInput, SessionEvent, TurnOptions,
     TurnSummary,
 };
 use agentloop_engine::{EngineService, EngineServiceError, OutputVerbosity};
@@ -23,6 +23,9 @@ pub struct OneTurnRequest {
     pub cwd: Option<PathBuf>,
     pub permission_mode: PermissionMode,
     pub verbosity: OutputVerbosity,
+    /// This session's fallback chain; empty defers to the engine's own
+    /// default (see `EngineConfig.default_fallback_models`).
+    pub fallback_models: Vec<ModelRef>,
 }
 
 impl OneTurnRequest {
@@ -34,6 +37,7 @@ impl OneTurnRequest {
             cwd,
             permission_mode: PermissionMode::Plan,
             verbosity: OutputVerbosity::default(),
+            fallback_models: Vec::new(),
         }
     }
 }
@@ -112,6 +116,7 @@ where
             title: request.title,
             cwd: request.cwd,
             model: None,
+            fallback_models: request.fallback_models,
             mode: None,
             permission_mode: None,
             isolation: None,

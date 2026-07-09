@@ -41,6 +41,7 @@ pub(crate) async fn resolve_service(
     agent_cmd: Option<&str>,
     provider: Option<&str>,
     model: Option<String>,
+    fallback_models: &[String],
     workdir: Option<&Path>,
 ) -> anyhow::Result<Resolution> {
     let mut trace = Vec::new();
@@ -82,13 +83,13 @@ pub(crate) async fn resolve_service(
                 "explicit --provider {}",
                 provider.unwrap_or_default()
             ));
-            let service = native_service(provider, model, workdir)?;
+            let service = native_service(provider, model, fallback_models, workdir)?;
             trace.push("selected native loop".to_owned());
             return Ok(Resolution { service, trace });
         }
         Some("native") => {
             trace.push("explicit --agent native".to_owned());
-            let service = native_service(provider, model, workdir)?;
+            let service = native_service(provider, model, fallback_models, workdir)?;
             trace.push("selected native loop (provider from environment)".to_owned());
             return Ok(Resolution { service, trace });
         }
@@ -99,7 +100,7 @@ pub(crate) async fn resolve_service(
         None => {}
     }
 
-    match native_service(None, model, workdir) {
+    match native_service(None, model, fallback_models, workdir) {
         Ok(service) => {
             trace.push("provider API key found in environment".to_owned());
             trace.push("selected native loop".to_owned());
@@ -133,6 +134,7 @@ pub(crate) async fn resolve_service(
 fn native_service(
     provider: Option<&str>,
     model: Option<String>,
+    fallback_models: &[String],
     workdir: Option<&Path>,
 ) -> Result<EngineService, EngineServiceError> {
     let mut builder = AgentBuilder::new().date(today());
@@ -145,7 +147,33 @@ fn native_service(
     if let Some(model) = model {
         builder = builder.model(model);
     }
+    if !fallback_models.is_empty() {
+        // A fallback entry naming a provider other than --provider needs
+        // that provider registered too, or resolution just fails with "no
+        // provider registered" the first time the chain advances to it.
+        if fallback_models
+            .iter()
+            .any(|candidate| crosses_provider(provider, candidate))
+        {
+            builder = builder.all_providers(true);
+        }
+        builder = builder.fallback_models(fallback_models.to_vec());
+    }
     builder.build()
+}
+
+/// Whether a `provider/model`-qualified fallback entry names a different
+/// provider than the one explicitly selected (or the auto-detected default
+/// when none was). An unqualified entry inherits whatever provider resolves
+/// the primary model, so it never crosses.
+fn crosses_provider(selected_provider: Option<&str>, candidate: &str) -> bool {
+    let Some((candidate_provider, _)) = candidate.split_once('/') else {
+        return false;
+    };
+    match selected_provider {
+        Some(selected) => candidate_provider != selected,
+        None => true,
+    }
 }
 
 async fn claude_code_service(
@@ -438,7 +466,7 @@ pub(crate) async fn doctor(workdir: &Path) -> anyhow::Result<()> {
     }
 
     println!("resolution:");
-    match resolve_service(None, None, None, None, workdir).await {
+    match resolve_service(None, None, None, None, &[], workdir).await {
         Ok(resolution) => {
             for line in &resolution.trace {
                 println!("  - {line}");
@@ -449,4 +477,35 @@ pub(crate) async fn doctor(workdir: &Path) -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn same_provider_qualified_fallback_does_not_cross() {
+        assert!(!crosses_provider(
+            Some("anthropic"),
+            "anthropic/claude-haiku"
+        ));
+    }
+
+    #[test]
+    fn different_provider_qualified_fallback_crosses() {
+        assert!(crosses_provider(Some("anthropic"), "openai/gpt-5"));
+    }
+
+    #[test]
+    fn unqualified_fallback_never_crosses() {
+        assert!(!crosses_provider(Some("anthropic"), "claude-haiku"));
+        assert!(!crosses_provider(None, "claude-haiku"));
+    }
+
+    #[test]
+    fn qualified_fallback_with_no_explicit_provider_crosses() {
+        // We don't know what auto-detect will pick, so err on the side of
+        // registering every available provider.
+        assert!(crosses_provider(None, "openai/gpt-5"));
+    }
 }

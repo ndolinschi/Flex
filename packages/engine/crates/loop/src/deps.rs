@@ -28,6 +28,9 @@ pub(crate) struct TurnDeps {
     pub(crate) limits: LoopLimits,
     pub(crate) system_prompt: String,
     pub(crate) default_model: Option<ModelRef>,
+    /// Engine-wide default fallback chain; a session created with an empty
+    /// `NewSessionParams.fallback_models` uses this.
+    pub(crate) default_fallback_models: Vec<ModelRef>,
     /// Optional isolation backend. When set, root sessions whose effective
     /// policy asks for isolation are provisioned an isolated workspace.
     pub(crate) workspace: Option<Arc<dyn Workspaces>>,

@@ -9,7 +9,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use agentloop_contracts::IsolationPolicy;
+use agentloop_contracts::{IsolationPolicy, ModelRef};
 use agentloop_core::{Executor, NetworkPolicy, Plugin, SessionStore, Workspaces};
 use agentloop_hooks::{DiagnosticsConfig, FormatterSpec};
 use agentloop_loop::roles::RoleSpec;
@@ -84,6 +84,9 @@ pub struct EngineConfig {
     /// NDJSON event verbosity for the stdio transport. Defaults to
     /// [`OutputVerbosity::Medium`].
     pub verbosity: OutputVerbosity,
+    /// Engine-wide default fallback chain; a session created with an empty
+    /// `NewSessionParams.fallback_models` uses this. Empty = no default.
+    pub default_fallback_models: Vec<ModelRef>,
 }
 
 impl Default for EngineConfig {
@@ -106,6 +109,7 @@ impl Default for EngineConfig {
             diagnostics: DiagnosticsConfig::default(),
             plugins: Vec::new(),
             verbosity: OutputVerbosity::default(),
+            default_fallback_models: Vec::new(),
         }
     }
 }

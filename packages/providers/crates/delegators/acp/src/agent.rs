@@ -351,6 +351,7 @@ impl<H: StreamHost + 'static> Agent for AcpAgent<H> {
             provider_session_id: None,
             cwd: cwd.clone(),
             model: params.model,
+            fallback_models: params.fallback_models,
             mode: params.mode,
             isolation: None,
             workspace_id: None,

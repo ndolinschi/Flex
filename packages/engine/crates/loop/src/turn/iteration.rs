@@ -60,8 +60,13 @@ pub(super) async fn run_iteration(
                     .to_owned(),
             )
         })?;
+    let fallback_source = if !opts.fallback_models.is_empty() {
+        &opts.fallback_models
+    } else {
+        &meta.fallback_models
+    };
     let mut chain = vec![primary];
-    for candidate in &opts.fallback_models {
+    for candidate in fallback_source {
         if !chain.contains(candidate) {
             chain.push(candidate.clone());
         }

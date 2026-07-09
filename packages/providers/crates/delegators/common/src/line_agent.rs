@@ -540,6 +540,7 @@ where
             provider_session_id: None,
             cwd,
             model: params.model,
+            fallback_models: params.fallback_models,
             mode: params.mode,
             isolation: None,
             workspace_id: None,

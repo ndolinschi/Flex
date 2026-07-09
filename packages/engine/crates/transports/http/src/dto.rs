@@ -14,6 +14,16 @@ pub(crate) struct CreateSessionRequest {
     pub title: Option<String>,
     /// Role this root session runs as (e.g. `searcher`); `None` = main.
     pub role: Option<String>,
+    /// Model for this session, optionally `provider/`-qualified; `None`
+    /// defers to the role's model chain, then the server's `--model` default.
+    #[serde(default)]
+    pub model: Option<String>,
+    /// This session's fallback chain, in order; empty defers to the server's
+    /// `--fallback-model` default (if any). A `provider/`-qualified entry
+    /// naming a provider the server didn't register fails when the chain
+    /// reaches it, not at session creation.
+    #[serde(default)]
+    pub fallback_models: Vec<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -27,6 +37,8 @@ pub(crate) struct SessionSummary {
     pub title: Option<String>,
     pub cwd: String,
     pub role: Option<String>,
+    pub model: Option<String>,
+    pub fallback_models: Vec<String>,
     pub created_at_ms: u64,
     pub updated_at_ms: u64,
 }
@@ -38,6 +50,8 @@ impl From<SessionMeta> for SessionSummary {
             title: meta.title,
             cwd: meta.cwd.display().to_string(),
             role: meta.role,
+            model: meta.model.map(|m| m.0),
+            fallback_models: meta.fallback_models.into_iter().map(|m| m.0).collect(),
             created_at_ms: meta.created_at_ms,
             updated_at_ms: meta.updated_at_ms,
         }

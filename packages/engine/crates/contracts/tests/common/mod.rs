@@ -18,6 +18,7 @@ pub fn sample_meta() -> SessionMeta {
         provider_session_id: None,
         cwd: PathBuf::from("/tmp/demo"),
         model: Some(ModelRef::from("anthropic/claude-sonnet-4-5")),
+        fallback_models: Vec::new(),
         mode: None,
         isolation: None,
         workspace_id: None,

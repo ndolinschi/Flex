@@ -94,6 +94,12 @@ pub(crate) async fn create_session(
         title: body.title,
         cwd: body.cwd.map(PathBuf::from),
         role: body.role,
+        model: body.model.map(agentloop_contracts::ModelRef),
+        fallback_models: body
+            .fallback_models
+            .into_iter()
+            .map(agentloop_contracts::ModelRef)
+            .collect(),
         ..NewSessionParams::default()
     };
     let session_id = service.create_session(params).await?;

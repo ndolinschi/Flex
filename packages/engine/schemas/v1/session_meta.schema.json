@@ -39,6 +39,13 @@
         "null"
       ]
     },
+    "fallback_models": {
+      "description": "Session-level default fallback chain; a turn with an empty\n`TurnOptions.fallback_models` falls back through these models in\norder. Empty = no session-level default.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ModelRef"
+      }
+    },
     "id": {
       "$ref": "#/$defs/SessionId"
     },

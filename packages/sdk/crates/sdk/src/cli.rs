@@ -13,6 +13,7 @@ pub(crate) struct RunArgs {
     pub(crate) agent_cmd: Option<String>,
     pub(crate) provider: Option<String>,
     pub(crate) model: Option<String>,
+    pub(crate) fallback_models: Vec<String>,
     pub(crate) prompt: String,
     pub(crate) workdir: Option<PathBuf>,
     pub(crate) output_format: OutputFormat,
@@ -29,6 +30,7 @@ pub(crate) struct ServeArgs {
     pub(crate) agent_cmd: Option<String>,
     pub(crate) provider: Option<String>,
     pub(crate) model: Option<String>,
+    pub(crate) fallback_models: Vec<String>,
     pub(crate) workdir: Option<PathBuf>,
     pub(crate) bind: SocketAddr,
     pub(crate) token: Option<String>,
@@ -41,6 +43,7 @@ pub(crate) fn parse_serve_args(args: &[String]) -> anyhow::Result<ServeArgs> {
     let mut agent_cmd: Option<String> = None;
     let mut provider: Option<String> = None;
     let mut model: Option<String> = None;
+    let mut fallback_models: Vec<String> = Vec::new();
     let mut workdir: Option<PathBuf> = None;
     let mut bind: Option<String> = None;
     let mut token: Option<String> = None;
@@ -52,6 +55,9 @@ pub(crate) fn parse_serve_args(args: &[String]) -> anyhow::Result<ServeArgs> {
             "--agent-cmd" => agent_cmd = Some(take_value(args, &mut index, "--agent-cmd")?),
             "--provider" => provider = Some(take_value(args, &mut index, "--provider")?),
             "--model" => model = Some(take_value(args, &mut index, "--model")?),
+            "--fallback-model" => {
+                fallback_models.push(take_value(args, &mut index, "--fallback-model")?)
+            }
             "--workdir" => {
                 workdir = Some(PathBuf::from(take_value(args, &mut index, "--workdir")?))
             }
@@ -84,6 +90,7 @@ pub(crate) fn parse_serve_args(args: &[String]) -> anyhow::Result<ServeArgs> {
         agent_cmd,
         provider,
         model,
+        fallback_models,
         workdir,
         bind,
         token,
@@ -95,6 +102,7 @@ pub(crate) fn parse_run_args(args: &[String]) -> anyhow::Result<RunArgs> {
     let mut agent_cmd: Option<String> = None;
     let mut provider: Option<String> = None;
     let mut model: Option<String> = None;
+    let mut fallback_models: Vec<String> = Vec::new();
     let mut prompt: Option<String> = None;
     let mut workdir: Option<PathBuf> = None;
     let output_format = OutputFormat::Ndjson;
@@ -113,6 +121,9 @@ pub(crate) fn parse_run_args(args: &[String]) -> anyhow::Result<RunArgs> {
             }
             "--model" => {
                 model = Some(take_value(args, &mut index, "--model")?);
+            }
+            "--fallback-model" => {
+                fallback_models.push(take_value(args, &mut index, "--fallback-model")?);
             }
             "-p" | "--prompt" => {
                 prompt = Some(take_value(args, &mut index, "-p/--prompt")?);
@@ -140,6 +151,7 @@ pub(crate) fn parse_run_args(args: &[String]) -> anyhow::Result<RunArgs> {
         agent_cmd,
         provider,
         model,
+        fallback_models,
         prompt: prompt.context("missing prompt: pass -p \"...\" or --prompt \"...\"")?,
         workdir,
         output_format,
@@ -157,19 +169,73 @@ pub(crate) fn usage() -> String {
     format!(
         "usage:\n  {slug} --version\n  {slug} doctor\n  {slug} run [--agent native|claude-code|copilot|opencode|cursor|acp] \
          [--agent-cmd <program>] \
-         [--provider anthropic|openai|gemini|ollama|copilot] [--model <model>] -p <prompt> \
+         [--provider anthropic|openai|gemini|ollama|copilot] [--model <model>] \
+         [--fallback-model <model>]... -p <prompt> \
          [--workdir <path>] [--output-format ndjson]\n  {slug} eval [--task <id>]... \
          [--tasks-dir <dir>] [--agent <agent>] [--provider <id>] [--model <model>] \
          [--repeat <n>] [--out <dir>] [--json <path>] [--baseline <report.json>]\n  \
          {slug} serve [--agent ...] [--agent-cmd <program>] [--provider ...] [--model <model>] \
+         [--fallback-model <model>]... \
          [--workdir <path>] [--bind <host:port>] [--port <port>] [--token <token>]\n\n\
          With no --agent/--provider, the engine auto-detects: provider API keys in the \
          environment select the native loop; otherwise an installed external agent CLI is \
          probed and delegated to. `doctor` explains the decision.\n\n\
+         --fallback-model may repeat to build an ordered failover chain (rate limit, outage, \
+         auth rejection on the current model advance to the next). A `provider/model` entry \
+         naming a different provider than --provider automatically enables multi-provider \
+         resolution (each provider's credentials must still be present in the environment).\n\n\
          `serve` binds 127.0.0.1:4517 by default and requires a bearer token on every route \
          but /health. With no --token, one is generated and printed once to stderr; binding \
-         beyond loopback requires an explicit --token or {env_prefix}_SERVE_TOKEN.",
+         beyond loopback requires an explicit --token or {env_prefix}_SERVE_TOKEN. On `serve`, \
+         --fallback-model sets the server-wide default chain for sessions that don't specify \
+         their own via the HTTP API.",
         slug = branding::PRODUCT_SLUG,
         env_prefix = branding::ENV_PREFIX,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn run_args_collect_repeated_fallback_model_in_order() {
+        let args = parse_run_args(&[
+            "--model".to_owned(),
+            "anthropic/claude-sonnet-4-5".to_owned(),
+            "--fallback-model".to_owned(),
+            "openai/gpt-5".to_owned(),
+            "--fallback-model".to_owned(),
+            "ollama/llama3".to_owned(),
+            "-p".to_owned(),
+            "hi".to_owned(),
+        ])
+        .expect("parses");
+        assert_eq!(
+            args.fallback_models,
+            vec!["openai/gpt-5".to_owned(), "ollama/llama3".to_owned()]
+        );
+    }
+
+    #[test]
+    fn run_args_default_to_no_fallback_models() {
+        let args =
+            parse_run_args(&["-p".to_owned(), "hi".to_owned()]).expect("parses without flags");
+        assert!(args.fallback_models.is_empty());
+    }
+
+    #[test]
+    fn serve_args_collect_repeated_fallback_model_in_order() {
+        let args = parse_serve_args(&[
+            "--fallback-model".to_owned(),
+            "openai/gpt-5".to_owned(),
+            "--fallback-model".to_owned(),
+            "ollama/llama3".to_owned(),
+        ])
+        .expect("parses");
+        assert_eq!(
+            args.fallback_models,
+            vec!["openai/gpt-5".to_owned(), "ollama/llama3".to_owned()]
+        );
+    }
 }

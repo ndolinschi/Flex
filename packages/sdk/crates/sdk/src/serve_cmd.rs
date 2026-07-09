@@ -16,6 +16,7 @@ pub(crate) async fn serve(args: ServeArgs) -> anyhow::Result<()> {
         args.agent_cmd.as_deref(),
         args.provider.as_deref(),
         args.model.clone(),
+        &args.fallback_models,
         args.workdir.as_deref(),
     )
     .await?;

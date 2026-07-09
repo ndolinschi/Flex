@@ -143,6 +143,11 @@ pub struct NewSessionParams {
     /// names are rejected at session creation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
+    /// Session-level default fallback chain (see
+    /// [`TurnOptions::fallback_models`]); used by every turn on this session
+    /// that doesn't set its own `TurnOptions.fallback_models`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fallback_models: Vec<ModelRef>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub extra: BTreeMap<String, serde_json::Value>,
 }

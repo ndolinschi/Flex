@@ -15,6 +15,13 @@
       "type": "object",
       "additionalProperties": true
     },
+    "fallback_models": {
+      "description": "Session-level default fallback chain (see\n[`TurnOptions::fallback_models`]); used by every turn on this session\nthat doesn't set its own `TurnOptions.fallback_models`.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ModelRef"
+      }
+    },
     "isolation": {
       "description": "Requested isolation posture for this session. `None` defers to the\nengine/role default. Only honored for root sessions; subagents inherit\ntheir parent's working directory.",
       "anyOf": [

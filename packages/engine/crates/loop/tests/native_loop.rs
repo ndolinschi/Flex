@@ -618,6 +618,60 @@ async fn provider_failure_falls_back_to_next_chain_model() {
 }
 
 #[tokio::test]
+async fn session_level_fallback_chain_is_used_when_turn_options_specify_none() {
+    use agentloop_testkit::ScriptedError;
+
+    let failing = Arc::new(MockProvider::with_id("mock-a"));
+    failing.push_turn(Err(ScriptedError::RateLimited {
+        retry_after_ms: Some(1_000),
+    }));
+    let healthy = Arc::new(MockProvider::with_id("mock-b"));
+    healthy.push_turn(MockProvider::text_turn("rescued via session default"));
+
+    let store = Arc::new(MemoryStore::new());
+    let mut providers = ProviderRegistry::new();
+    providers.register(failing.clone());
+    providers.register(healthy.clone());
+    let agent = NativeAgentBuilder::new(store.clone())
+        .providers(providers)
+        .system_prompt("You are a test agent.")
+        .default_model(ModelRef::from("mock-a/model-one"))
+        .build();
+
+    // The fallback chain comes from NewSessionParams, not TurnOptions —
+    // the session-level default lets a client set it once instead of on
+    // every prompt.
+    let session = agent
+        .create_session(NewSessionParams {
+            fallback_models: vec![ModelRef::from("mock-b/model-two")],
+            ..NewSessionParams::default()
+        })
+        .await
+        .expect("session is created");
+    let summary = agent
+        .prompt(&session, PromptInput::text("hello"), TurnOptions::default())
+        .await
+        .expect("turn survives the failing provider");
+
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+    assert_eq!(
+        healthy.requests().len(),
+        1,
+        "fallback model served from the session's own chain"
+    );
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    assert!(
+        events.iter().any(|(_, event)| matches!(
+            event,
+            AgentEvent::ModelFallback { from, to: Some(to), .. }
+                if from.0 == "mock-a/model-one" && to.0 == "mock-b/model-two"
+        )),
+        "fallback event is persisted"
+    );
+}
+
+#[tokio::test]
 async fn exhausted_chain_surfaces_the_error() {
     use agentloop_testkit::ScriptedError;
 

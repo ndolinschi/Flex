@@ -122,6 +122,7 @@ pub(crate) async fn eval(args: &[String]) -> anyhow::Result<()> {
                 None,
                 target.provider.as_deref(),
                 target.model.clone(),
+                &[],
                 Some(&cwd),
             )
             .await

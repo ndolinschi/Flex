@@ -17,6 +17,7 @@ pub(crate) async fn run(args: RunArgs) -> anyhow::Result<()> {
         args.agent_cmd.as_deref(),
         args.provider.as_deref(),
         args.model.clone(),
+        &args.fallback_models,
         args.workdir.as_deref(),
     )
     .await?;
@@ -24,7 +25,12 @@ pub(crate) async fn run(args: RunArgs) -> anyhow::Result<()> {
         tracing::info!(target: "resolution", "{line}");
     }
 
-    let request = OneTurnRequest::new(args.prompt, args.workdir);
+    let mut request = OneTurnRequest::new(args.prompt, args.workdir);
+    request.fallback_models = args
+        .fallback_models
+        .into_iter()
+        .map(agentloop_contracts::ModelRef)
+        .collect();
     let _summary = serve_one_turn(resolution.service, request, tokio::io::stdout())
         .await
         .map_err(|err| anyhow::anyhow!("{err}"))?;

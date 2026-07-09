@@ -215,6 +215,7 @@ mod tests {
             provider_session_id: None,
             cwd: PathBuf::from("/workspace"),
             model: None,
+            fallback_models: Vec::new(),
             mode: None,
             isolation: None,
             workspace_id: None,

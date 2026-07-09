@@ -47,6 +47,7 @@ pub struct NativeAgentBuilder {
     limits: LoopLimits,
     system_prompt: String,
     default_model: Option<ModelRef>,
+    default_fallback_models: Vec<ModelRef>,
     command_infos: Vec<CommandInfo>,
     roles: Vec<crate::roles::RoleSpec>,
     pending_questions: Arc<PendingMap<QuestionId, Vec<Answer>>>,
@@ -66,6 +67,7 @@ impl NativeAgentBuilder {
             limits: LoopLimits::default(),
             system_prompt: String::new(),
             default_model: None,
+            default_fallback_models: Vec::new(),
             command_infos: Vec::new(),
             roles: Vec::new(),
             pending_questions: Arc::new(PendingMap::new()),
@@ -107,6 +109,13 @@ impl NativeAgentBuilder {
 
     pub fn default_model(mut self, model: ModelRef) -> Self {
         self.default_model = Some(model);
+        self
+    }
+
+    /// Engine-wide default fallback chain, used by a session created with an
+    /// empty `NewSessionParams.fallback_models`.
+    pub fn default_fallback_models(mut self, models: Vec<ModelRef>) -> Self {
+        self.default_fallback_models = models;
         self
     }
 
@@ -173,6 +182,7 @@ impl NativeAgentBuilder {
                 limits: self.limits,
                 system_prompt: self.system_prompt,
                 default_model: self.default_model,
+                default_fallback_models: self.default_fallback_models,
                 workspace: self.workspace,
                 executor_id: self.executor_id,
                 pending_permissions: Arc::new(PendingMap::new()),

@@ -66,6 +66,18 @@ impl AgentBuilder {
         self
     }
 
+    /// Engine-wide default fallback chain (optionally `provider/`-qualified
+    /// entries), used by a session created without its own
+    /// `NewSessionParams.fallback_models`. Cross-provider entries need
+    /// [`AgentBuilder::all_providers`] so the other provider is registered.
+    pub fn fallback_models(mut self, models: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        self.config.default_fallback_models = models
+            .into_iter()
+            .map(|m| agentloop_contracts::ModelRef(m.into()))
+            .collect();
+        self
+    }
+
     /// Working directory the session (and its tools) are sandboxed to.
     pub fn cwd(mut self, cwd: impl Into<PathBuf>) -> Self {
         self.config.cwd = Some(cwd.into());
