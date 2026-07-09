@@ -14,6 +14,7 @@ mod plan;
 mod registry;
 mod skill;
 mod web_fetch;
+mod workflow;
 
 pub use agent::subagent_tool;
 pub use ask_question::AskQuestionTool;
@@ -26,3 +27,4 @@ pub use plan::PlanTool;
 pub use registry::{BaseTools, base_tools, base_tools_read_only, registry_with_questions};
 pub use skill::{SkillLoader, skill_tool};
 pub use web_fetch::WebFetchTool;
+pub use workflow::{RunWorkflowInput, WorkflowStepInput, WorkflowStepKind, workflow_tool};

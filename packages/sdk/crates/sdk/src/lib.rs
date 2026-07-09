@@ -158,6 +158,13 @@ impl AgentBuilder {
         self
     }
 
+    /// Register the `RunWorkflow` tool (a declarative multi-step subagent
+    /// pipeline the model can run in one call). Off by default.
+    pub fn enable_workflow_tool(mut self, on: bool) -> Self {
+        self.config.enable_workflow_tool = on;
+        self
+    }
+
     /// Network posture for shell commands (`Denied` requires a backend with
     /// network isolation, e.g. docker).
     pub fn network(mut self, network: agentloop_core::NetworkPolicy) -> Self {

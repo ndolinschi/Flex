@@ -137,13 +137,15 @@ impl RoleRegistry {
 
     /// The tool filter for a session serving `role` at spawn `depth`.
     /// Subagents never get `AskUserQuestion` (they have no user) and lose
-    /// the `Task`/`Verify` tools once they reach their role's `max_depth` —
-    /// `Verify` also spawns a child (a constrained `verifier` subagent), so
-    /// it is gated by the same depth budget as `Agent`.
+    /// the `Task`/`Verify`/`RunWorkflow` tools once they reach their role's
+    /// `max_depth` — `Verify` and `RunWorkflow` also spawn children (a
+    /// constrained `verifier` subagent, and each workflow step
+    /// respectively), so both are gated by the same depth budget as `Agent`.
     pub fn tool_filter(&self, role: &str, registry: &ToolRegistry, depth: u8) -> ToolFilter {
         let mut deny = vec![
             agentloop_core::tool::SUBAGENT_TOOL_NAME.to_owned(),
             agentloop_core::tool::VERIFIER_TOOL_NAME.to_owned(),
+            agentloop_core::tool::WORKFLOW_TOOL_NAME.to_owned(),
             "AskUserQuestion".to_owned(),
         ];
         let Some(spec) = self.roles.get(role) else {
@@ -156,6 +158,7 @@ impl RoleRegistry {
             deny.retain(|name| {
                 name != agentloop_core::tool::SUBAGENT_TOOL_NAME
                     && name != agentloop_core::tool::VERIFIER_TOOL_NAME
+                    && name != agentloop_core::tool::WORKFLOW_TOOL_NAME
             });
         }
         let allow = match &spec.tools {

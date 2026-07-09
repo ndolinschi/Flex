@@ -87,6 +87,12 @@ pub struct EngineConfig {
     /// Engine-wide default fallback chain; a session created with an empty
     /// `NewSessionParams.fallback_models` uses this. Empty = no default.
     pub default_fallback_models: Vec<ModelRef>,
+    /// Register the `RunWorkflow` tool: a declarative pipeline of subagent
+    /// steps the model can run in one call instead of one `Agent` call per
+    /// turn. Off by default — the built-in role graph covers most
+    /// orchestration needs more cheaply and predictably; this is an escape
+    /// hatch for plans whose full multi-step shape is already known.
+    pub enable_workflow_tool: bool,
 }
 
 impl Default for EngineConfig {
@@ -110,6 +116,7 @@ impl Default for EngineConfig {
             plugins: Vec::new(),
             verbosity: OutputVerbosity::default(),
             default_fallback_models: Vec::new(),
+            enable_workflow_tool: false,
         }
     }
 }

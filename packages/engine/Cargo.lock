@@ -124,6 +124,7 @@ dependencies = [
  "globset",
  "insta",
  "pretty_assertions",
+ "serde",
  "serde_json",
  "tempfile",
  "thiserror",

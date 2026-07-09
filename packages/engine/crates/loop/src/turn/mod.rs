@@ -11,7 +11,7 @@
 
 mod hooks;
 mod iteration;
-mod tool_exec;
+pub(crate) mod tool_exec;
 
 use std::sync::Arc;
 

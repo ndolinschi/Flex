@@ -1199,6 +1199,239 @@ async fn verify_call_spawns_a_verifier_and_carries_the_structured_verdict() {
 }
 
 #[tokio::test]
+async fn run_workflow_pipeline_orders_steps_and_threads_context() {
+    let (root_turn, root_ids) = MockProvider::tool_turn(&[(
+        "RunWorkflow",
+        serde_json::json!({
+            "steps": [
+                {"kind": "task", "role": "worker", "prompt": "do research", "label": "research"},
+                {"kind": "task", "role": "worker", "prompt": "write summary", "label": "summary"},
+                {"kind": "parallel", "tasks": [
+                    {"role": "worker", "prompt": "task A", "label": "task-a"},
+                    {"role": "worker", "prompt": "task B", "label": "task-b"},
+                ]},
+            ]
+        }),
+    )]);
+    let provider = Arc::new(MockProvider::with_turns(vec![
+        root_turn,
+        MockProvider::text_turn("research done: found X"),
+        MockProvider::text_turn("summary done: wrote Y"),
+        MockProvider::text_turn("parallel A done"),
+        MockProvider::text_turn("parallel B done"),
+        MockProvider::text_turn("workflow finished"),
+    ]));
+    let (agent, store) = create_agent(provider.clone(), Vec::new(), Vec::new()).await;
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+
+    let summary = agent
+        .prompt(
+            &session,
+            PromptInput::text("run the workflow"),
+            TurnOptions::default(),
+        )
+        .await
+        .expect("turn succeeds");
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+    assert_eq!(
+        provider.requests().len(),
+        6,
+        "1 root call + 4 spawned children + 1 root continuation"
+    );
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    let children: Vec<_> = events
+        .iter()
+        .filter_map(|(_, event)| match event {
+            AgentEvent::SubagentStarted {
+                child_session,
+                call_id,
+                ..
+            } if call_id.as_ref() == Some(&root_ids[0]) => Some(child_session.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(children.len(), 4, "2 Task steps + 2 parallel tasks");
+
+    let result_text = events
+        .iter()
+        .rev()
+        .find_map(|(_, event)| match event {
+            AgentEvent::ToolCallUpdated { call }
+                if call.id == root_ids[0] && matches!(call.status, ToolCallStatus::Completed) =>
+            {
+                Some(call.result.as_ref().map(ToolOutput::render_text))
+            }
+            _ => None,
+        })
+        .flatten()
+        .expect("RunWorkflow call completed with a result");
+
+    for expected in [
+        "Step 1: research",
+        "found X",
+        "Step 2: summary",
+        "wrote Y",
+        "Step 3 (parallel)",
+        "task-a",
+        "parallel A done",
+        "task-b",
+        "parallel B done",
+    ] {
+        assert!(
+            result_text.contains(expected),
+            "expected `{expected}` in workflow result:\n{result_text}"
+        );
+    }
+    // Step order in the summary: research's section appears before summary's.
+    assert!(
+        result_text.find("Step 1").unwrap() < result_text.find("Step 2").unwrap()
+            && result_text.find("Step 2").unwrap() < result_text.find("Step 3").unwrap()
+    );
+}
+
+#[tokio::test]
+async fn run_workflow_denies_nested_workflow_past_max_depth() {
+    let (root_turn, root_ids) = MockProvider::tool_turn(&[(
+        "RunWorkflow",
+        serde_json::json!({
+            "steps": [
+                {"kind": "task", "role": "worker", "prompt": "spawn another workflow"},
+            ]
+        }),
+    )]);
+    let (child_turn, child_ids) = MockProvider::tool_turn(&[(
+        "RunWorkflow",
+        serde_json::json!({
+            "steps": [
+                {"kind": "task", "role": "worker", "prompt": "this should never run"},
+            ]
+        }),
+    )]);
+    let provider = Arc::new(MockProvider::with_turns(vec![
+        root_turn,
+        child_turn,
+        MockProvider::text_turn("child done, no grandchild workflow spawned"),
+        MockProvider::text_turn("root done"),
+    ]));
+    let (agent, store) = create_agent(provider.clone(), Vec::new(), Vec::new()).await;
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+
+    let summary = agent
+        .prompt(
+            &session,
+            PromptInput::text("delegate this"),
+            TurnOptions::default(),
+        )
+        .await
+        .expect("turn succeeds");
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    let child = events
+        .iter()
+        .find_map(|(_, event)| match event {
+            AgentEvent::SubagentStarted {
+                child_session,
+                call_id,
+                ..
+            } if call_id.as_ref() == Some(&root_ids[0]) => Some(child_session.clone()),
+            _ => None,
+        })
+        .expect("the root's RunWorkflow call spawned exactly one child");
+    assert!(
+        !events.iter().any(|(_, event)| matches!(
+            event,
+            AgentEvent::SubagentStarted { child_session, .. } if *child_session != child
+        )),
+        "no grandchild subagent should have been started — max_depth must be enforced"
+    );
+
+    let child_events = store.read(&child, 0).await.expect("child log");
+    assert!(
+        child_events.iter().any(|(_, event)| matches!(
+            event,
+            AgentEvent::ToolCallUpdated { call }
+                if call.id == child_ids[0]
+                    && matches!(call.status, ToolCallStatus::Completed)
+                    && call
+                        .result
+                        .as_ref()
+                        .map(ToolOutput::render_text)
+                        .unwrap_or_default()
+                        .to_lowercase()
+                        .contains("max_depth")
+        )),
+        "the child's nested RunWorkflow attempt must be denied with a max_depth error"
+    );
+}
+
+#[tokio::test]
+async fn run_workflow_clamps_oversized_parallel_step_and_reports_dropped_count() {
+    let tasks: Vec<serde_json::Value> = (0..9)
+        .map(|i| serde_json::json!({"role": "worker", "prompt": format!("task {i}")}))
+        .collect();
+    let (root_turn, root_ids) = MockProvider::tool_turn(&[(
+        "RunWorkflow",
+        serde_json::json!({
+            "steps": [{"kind": "parallel", "tasks": tasks}]
+        }),
+    )]);
+    let mut turns = vec![root_turn];
+    for _ in 0..8 {
+        turns.push(MockProvider::text_turn("done"));
+    }
+    turns.push(MockProvider::text_turn("workflow finished"));
+    let provider = Arc::new(MockProvider::with_turns(turns));
+    let (agent, store) = create_agent(provider.clone(), Vec::new(), Vec::new()).await;
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+
+    let summary = agent
+        .prompt(
+            &session,
+            PromptInput::text("run the oversized workflow"),
+            TurnOptions::default(),
+        )
+        .await
+        .expect("turn succeeds");
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    let children = events
+        .iter()
+        .filter(|(_, event)| matches!(event, AgentEvent::SubagentStarted { .. }))
+        .count();
+    assert_eq!(children, 8, "only the first 8 tasks in the step ran");
+
+    let result_text = events
+        .iter()
+        .rev()
+        .find_map(|(_, event)| match event {
+            AgentEvent::ToolCallUpdated { call }
+                if call.id == root_ids[0] && matches!(call.status, ToolCallStatus::Completed) =>
+            {
+                Some(call.result.as_ref().map(ToolOutput::render_text))
+            }
+            _ => None,
+        })
+        .flatten()
+        .expect("RunWorkflow call completed with a result");
+    assert!(
+        result_text.contains("1 task(s)") && result_text.contains("dropped"),
+        "expected a dropped-task note in:\n{result_text}"
+    );
+}
+
+#[tokio::test]
 async fn max_depth_denies_grandchild_spawn() {
     let (parent_turn, parent_ids) = MockProvider::tool_turn(&[(
         "Agent",

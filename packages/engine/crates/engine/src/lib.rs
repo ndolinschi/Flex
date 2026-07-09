@@ -150,6 +150,9 @@ impl EngineService {
 
         let role_registry = RoleRegistry::with_defaults(roles.clone())?;
         tools.register(agentloop_tools::subagent_tool(&role_registry.spawnable()));
+        if config.enable_workflow_tool {
+            tools.register(agentloop_tools::workflow_tool(&role_registry.spawnable()));
+        }
 
         let cwd_display = config
             .cwd

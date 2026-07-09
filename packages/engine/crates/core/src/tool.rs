@@ -90,6 +90,14 @@ pub const VERIFIER_TOOL_NAME: &str = "Verify";
 /// carried on the result.
 pub const SUBMIT_VERDICT_TOOL_NAME: &str = "SubmitVerdict";
 
+/// The reserved tool name the engine loop intercepts to run a declarative
+/// pipeline of subagent steps (sequential `Task` steps and barrier
+/// `Parallel` steps) — the model describes the plan as data rather than
+/// calling `Agent` once per turn. The `tools` crate ships only the
+/// descriptor; execution is loop-owned, same as [`SUBAGENT_TOOL_NAME`]. Not
+/// registered unless `EngineConfig.enable_workflow_tool` is set.
+pub const WORKFLOW_TOOL_NAME: &str = "RunWorkflow";
+
 pub struct ToolContext {
     pub session_id: SessionId,
     pub turn_id: TurnId,

@@ -23,13 +23,13 @@ use crate::roles::VERIFIER_ROLE;
 use crate::session_handle::SessionHandle;
 use crate::subagent::SubagentRequest;
 use crate::tool_results::output_or_synthetic;
-use agentloop_core::tool::{SUBAGENT_TOOL_NAME, VERIFIER_TOOL_NAME};
+use agentloop_core::tool::{SUBAGENT_TOOL_NAME, VERIFIER_TOOL_NAME, WORKFLOW_TOOL_NAME};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::hooks::run_hooks;
 
 /// Hard cap on subagents spawned in one turn — a runaway-spawn backstop.
-const MAX_CHILDREN_PER_TURN: usize = 8;
+pub(crate) const MAX_CHILDREN_PER_TURN: usize = 8;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn execute_tool_requests(
@@ -246,6 +246,41 @@ async fn execute_one_call(
             children_spawned,
             split_counters,
             &request,
+        )
+        .await;
+        let final_call = match result {
+            Ok(output) => transition(ToolCallStatus::Completed, Some(output)),
+            Err(err @ (ToolError::InvalidInput(_) | ToolError::Execution(_))) => transition(
+                ToolCallStatus::Completed,
+                Some(ToolOutput::error(err.to_string())),
+            ),
+            Err(ToolError::Cancelled) => transition(ToolCallStatus::Cancelled, None),
+            Err(err) => transition(
+                ToolCallStatus::Failed {
+                    error: err.to_string(),
+                },
+                None,
+            ),
+        };
+        if let Some(call) = final_call {
+            emit_update(call).await;
+        }
+        return;
+    }
+
+    if request.name == WORKFLOW_TOOL_NAME {
+        if let Some(call) = transition(ToolCallStatus::Running, None) {
+            emit_update(call).await;
+        }
+        let result = crate::workflow::run_workflow_call(
+            deps,
+            handle,
+            meta,
+            cancel,
+            children_spawned,
+            split_counters,
+            &request.id,
+            &request.input,
         )
         .await;
         let final_call = match result {

@@ -29,6 +29,7 @@ mod session_handle;
 mod subagent;
 mod tool_results;
 mod turn;
+mod workflow;
 
 pub use agent::NativeAgent;
 pub use builder::{LoopLimits, NativeAgentBuilder};
