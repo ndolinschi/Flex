@@ -3,6 +3,10 @@
 Read **AGENTS.md** — the single source of truth for architecture, layer contracts,
 dependency rules, hard rules, and commit style. Do not add guidance here.
 
+When looking for information about the solution, always start with **ARCHITECTURE.md**,
+**TECHSTACK.md**, and **COMPONENTS.md** (system map, tooling, per-crate catalog) before
+grepping; AGENTS.md holds the rules.
+
 Most-used commands:
 
 ```bash

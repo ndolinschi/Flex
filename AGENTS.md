@@ -6,6 +6,12 @@ code. `CLAUDE.md` is a thin pointer to this file (nothing else goes there), and
 `.claude/` holds harness config (permissions, skills) — never prose guidance. Keep it
 that way.
 
+**When looking for information about the solution, always start with
+[ARCHITECTURE.md](ARCHITECTURE.md), [TECHSTACK.md](TECHSTACK.md), and
+[COMPONENTS.md](COMPONENTS.md)** before grepping — they map the system, the crates, and
+the tooling with file paths. They are derived docs; this file stays authoritative for
+rules and decisions.
+
 ## What this project is
 
 An agent-loop engine in Rust, split into five sibling `packages/*` cargo workspaces:
@@ -91,6 +97,8 @@ packages/engine/              # provider-agnostic engine — the hub workspace
                               # ProviderRegistry + default ModelRef + EngineConfig, folds in plugins)
     executors/                # Executor impls: local /bin/sh, docker, ssh(+rsync), apptainer,
                               # serverless stub — command execution behind core::Executor
+    hooks/                    # built-in lifecycle hooks: diagnostics, format-on-edit,
+                              # prompt-injection scanning (InjectionScanHook)
     learning/                 # LearningPlugin: SkillSave/MemoryWrite tools + Stop-point
                               # reflection hook (self-learning skills, local memory)
     prompts/                  # system-prompt assembly + slash-command registry/expansion
@@ -158,7 +166,9 @@ at the composition root (`AgentBuilder::enable_plugin("search")`).
    names, event discriminators, wire fields, error messages, or test names. CI greps for leaks.
 2. **Generic names.** Files, modules, traits, and types use domain terms only:
    `Engine`, `Agent`, `Tool`, `ToolCall`, `Provider`, `Session`, `Event`, `Transcript`, `Command`.
-3. **Markdown policy.** The only .md files in this repo: `README.md`, this file, and
+3. **Markdown policy.** The only .md files in this repo: `README.md`, this file,
+   `ARCHITECTURE.md` / `TECHSTACK.md` / `COMPONENTS.md` (agent navigation docs — keep
+   them in sync when architecture, crates, or tooling change), and
    `packages/engine/prompts/**/*.md` (data). Do not add others.
 4. **No `unwrap`/`expect` in library crates.** thiserror enums per crate, `#[non_exhaustive]`
    on public enums. `anyhow` only in `runner` and tests.
