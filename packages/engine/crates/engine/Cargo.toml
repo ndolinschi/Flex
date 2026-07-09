@@ -18,6 +18,7 @@ agentloop-mcp = { workspace = true }
 agentloop-prompts = { workspace = true }
 agentloop-session = { workspace = true }
 agentloop-tools = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 

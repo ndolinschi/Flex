@@ -11,10 +11,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use agentloop_contracts::{
-    AgentEvent, Answer, CompactionSummary, Hello, IntegrationOutcome, IsolationPolicy, ModelRef,
-    NewSessionParams, PermissionDecision, PermissionMode, PermissionRequestId, PromptInput,
-    QuestionId, SessionEvent, SessionId, SessionMeta, Transcript, TurnId, TurnOptions, TurnSummary,
-    now_ms, reduce,
+    AgentEvent, Answer, CompactionSummary, GoalOutcome, GoalSpec, GoalStopReason, Hello,
+    IntegrationOutcome, IsolationPolicy, ModelRef, NewSessionParams, PermissionDecision,
+    PermissionMode, PermissionRequestId, PromptInput, QuestionId, SessionEvent, SessionId,
+    SessionMeta, TokenUsage, ToolCallStatus, Transcript, TurnId, TurnOptions, TurnStopReason,
+    TurnSummary, VerdictOutcome, VerificationVerdict, now_ms, reduce,
 };
 use agentloop_core::{
     Agent, EventStream, Hook, PluginRegistry, PluginRole, PluginRoleTools, ProviderRegistry,
@@ -416,6 +417,148 @@ impl EngineService {
         Ok(self.agent.cancel(session).await?)
     }
 
+    /// Drive repeated turns on `session` toward `goal`, stopping at the
+    /// first applicable rule (see `agentloop_contracts::goal` for the
+    /// stop-reason vocabulary — `Parked` is reserved and never returned
+    /// here). Each iteration after the first re-states the goal rather than
+    /// repeating the original prompt verbatim, since a single-turn "continue"
+    /// nudge is what actually drives repeated turns forward.
+    pub async fn run_goal(&self, session: &SessionId, goal: GoalSpec) -> EngineResult<GoalOutcome> {
+        let mut turns = Vec::new();
+        let mut total_usage = TokenUsage::default();
+        let mut failures = FailureCounts::default();
+        let mut next_prompt = goal.prompt.clone();
+        let mut iterations = 0u32;
+
+        loop {
+            if iterations >= goal.max_iterations {
+                return Ok(GoalOutcome {
+                    stop_reason: GoalStopReason::MaxIterations,
+                    iterations,
+                    total_usage,
+                    turns,
+                });
+            }
+            if let Some(budget) = goal.token_budget {
+                if total_usage.input + total_usage.output >= budget {
+                    return Ok(GoalOutcome {
+                        stop_reason: GoalStopReason::TokenBudgetExceeded,
+                        iterations,
+                        total_usage,
+                        turns,
+                    });
+                }
+            }
+
+            let summary = self
+                .prompt(
+                    session,
+                    PromptInput::text(next_prompt.clone()),
+                    TurnOptions::default(),
+                )
+                .await?;
+            iterations += 1;
+            total_usage.add(&summary.usage);
+            turns.push(summary.clone());
+
+            if summary.stop_reason == TurnStopReason::Cancelled {
+                return Ok(GoalOutcome {
+                    stop_reason: GoalStopReason::Cancelled,
+                    iterations,
+                    total_usage,
+                    turns,
+                });
+            }
+
+            if failures.record(summary.stop_reason) >= goal.max_identical_failures {
+                return Ok(GoalOutcome {
+                    stop_reason: GoalStopReason::IdenticalFailureCeiling,
+                    iterations,
+                    total_usage,
+                    turns,
+                });
+            }
+
+            if goal.require_verification {
+                match self.verify_goal_progress(session, &goal.prompt).await? {
+                    Some(verdict) if verdict.outcome == VerdictOutcome::Pass => {
+                        return Ok(GoalOutcome {
+                            stop_reason: GoalStopReason::Achieved,
+                            iterations,
+                            total_usage,
+                            turns,
+                        });
+                    }
+                    Some(verdict) => {
+                        next_prompt = format!(
+                            "An independent verifier checked this against the goal and found \
+                             issues:\n{}\n\nAddress them, then continue.",
+                            verdict.findings.join("\n")
+                        );
+                        continue;
+                    }
+                    // The verifier plugin is disabled, or the model didn't
+                    // call Verify — fall through to the weaker signal below
+                    // rather than loop forever on a check that can't run.
+                    None => {}
+                }
+            } else if summary.stop_reason == TurnStopReason::EndTurn && summary.num_tool_calls == 0
+            {
+                return Ok(GoalOutcome {
+                    stop_reason: GoalStopReason::Achieved,
+                    iterations,
+                    total_usage,
+                    turns,
+                });
+            }
+
+            next_prompt = format!(
+                "Continue working toward this goal:\n{}\n\nIf you believe it's fully \
+                 complete, say so explicitly and stop calling tools.",
+                goal.prompt
+            );
+        }
+    }
+
+    /// Prompt the model to call `Verify` against `goal_prompt`, then read the
+    /// resulting structured verdict back out of the session's own log (same
+    /// extraction the `verifier` plugin's `Verify` tool already performs for
+    /// the caller that spawned it — see `agentloop_loop::subagent`). Returns
+    /// `None` when no completed `Verify` call is found (tool unavailable, or
+    /// the model didn't call it).
+    async fn verify_goal_progress(
+        &self,
+        session: &SessionId,
+        goal_prompt: &str,
+    ) -> EngineResult<Option<VerificationVerdict>> {
+        let verify_prompt = format!(
+            "Call the Verify tool now — rubric: \"{goal_prompt}\" is fully and correctly \
+             done. List the files you changed (or the relevant output) as artifacts. Call \
+             Verify exactly once; do no other work this turn."
+        );
+        self.prompt(
+            session,
+            PromptInput::text(verify_prompt),
+            TurnOptions::default(),
+        )
+        .await?;
+        let events = self.store.read(session, 0).await?;
+        Ok(events.iter().rev().find_map(|(_, event)| {
+            let AgentEvent::ToolCallUpdated { call } = event else {
+                return None;
+            };
+            if call.tool_name != agentloop_core::tool::VERIFIER_TOOL_NAME
+                || call.status != ToolCallStatus::Completed
+            {
+                return None;
+            }
+            call.result
+                .as_ref()
+                .and_then(|output| output.structured.clone())
+                .and_then(|value| serde_json::from_value::<VerificationVerdict>(value).ok())
+        }))
+    }
+
     /// Push a permission-mode change into an in-flight native turn.
     pub fn set_turn_permission_mode(
         &self,
@@ -478,6 +621,40 @@ impl EngineService {
     }
 }
 
+/// Per-category failure tally for [`EngineService::run_goal`]. Deliberately
+/// coarse — grouped by [`TurnStopReason`], not by error message — since a
+/// `TurnSummary` carries no error text (that lives in a separate
+/// `SessionError` event); this is the signal actually available without
+/// scanning the log for prose to fuzzy-match.
+#[derive(Debug, Default)]
+struct FailureCounts {
+    error: u32,
+    max_iterations: u32,
+    refusal: u32,
+}
+
+impl FailureCounts {
+    /// Record `stop_reason` if it is failure-like, returning the updated
+    /// count for its category (`0` for a non-failure stop reason).
+    fn record(&mut self, stop_reason: TurnStopReason) -> u32 {
+        match stop_reason {
+            TurnStopReason::Error => {
+                self.error += 1;
+                self.error
+            }
+            TurnStopReason::MaxIterations => {
+                self.max_iterations += 1;
+                self.max_iterations
+            }
+            TurnStopReason::Refusal => {
+                self.refusal += 1;
+                self.refusal
+            }
+            _ => 0,
+        }
+    }
+}
+
 /// A session's *active* isolated workspace: `Some((workspace_id, base, root))`
 /// only while its cwd still points at the worktree. Once integrate/discard
 /// repoints cwd back to `base_cwd`, this returns `None` — so a session reads as
@@ -536,6 +713,132 @@ mod tests {
             resolve_max_iterations(None),
             LoopLimits::default().max_iterations
         );
+    }
+
+    mod run_goal {
+        use agentloop_testkit::{EchoTool, MOCK_MODEL, MOCK_PROVIDER_ID, MockProvider};
+
+        use super::*;
+
+        fn default_model() -> ModelRef {
+            ModelRef(format!("{MOCK_PROVIDER_ID}/{MOCK_MODEL}"))
+        }
+
+        fn goal_service(
+            provider: Arc<MockProvider>,
+            limits: LoopLimits,
+        ) -> (EngineService, Arc<MemoryStore>) {
+            let store = Arc::new(MemoryStore::new());
+            let mut providers = ProviderRegistry::new();
+            providers.register(provider);
+            let mut tools = agentloop_core::ToolRegistry::new();
+            tools.register(Arc::new(EchoTool));
+            let agent = NativeAgentBuilder::new(store.clone())
+                .providers(providers)
+                .tools(tools)
+                .limits(limits)
+                .system_prompt("test agent")
+                .default_model(default_model())
+                .build();
+            (EngineService::new(agent, store.clone()), store)
+        }
+
+        fn spec(prompt: &str, max_iterations: u32, max_identical_failures: u32) -> GoalSpec {
+            GoalSpec {
+                prompt: prompt.to_owned(),
+                max_iterations,
+                max_identical_failures,
+                token_budget: None,
+                require_verification: false,
+            }
+        }
+
+        #[tokio::test]
+        async fn achieves_when_the_model_stops_calling_tools() {
+            let provider = Arc::new(MockProvider::with_turns([MockProvider::text_turn(
+                "all done, nothing left to do",
+            )]));
+            let (service, _store) = goal_service(provider, LoopLimits::default());
+            let session = service
+                .create_session(NewSessionParams::default())
+                .await
+                .expect("session");
+
+            let outcome = service
+                .run_goal(&session, spec("say hello", 5, 3))
+                .await
+                .expect("goal runs");
+
+            assert_eq!(outcome.stop_reason, GoalStopReason::Achieved);
+            assert_eq!(outcome.iterations, 1);
+            assert_eq!(outcome.turns.len(), 1);
+        }
+
+        #[tokio::test]
+        async fn stops_at_max_iterations_when_the_model_keeps_working() {
+            // Each run_goal iteration is one full turn: a tool call, then a
+            // text reply that ends it — scripted so the loop never sees the
+            // weak "no tool calls" achieved signal.
+            let mut turns = Vec::new();
+            for _ in 0..2 {
+                let (tool_turn, _ids) =
+                    MockProvider::tool_turn(&[("echo", serde_json::json!({"text": "x"}))]);
+                turns.push(tool_turn);
+                turns.push(MockProvider::text_turn("still working"));
+            }
+            let provider = Arc::new(MockProvider::with_turns(turns));
+            let (service, _store) = goal_service(provider, LoopLimits::default());
+            let session = service
+                .create_session(NewSessionParams::default())
+                .await
+                .expect("session");
+
+            let outcome = service
+                .run_goal(&session, spec("keep working", 2, 10))
+                .await
+                .expect("goal runs");
+
+            assert_eq!(outcome.stop_reason, GoalStopReason::MaxIterations);
+            assert_eq!(outcome.iterations, 2);
+        }
+
+        #[tokio::test]
+        async fn stops_at_identical_failure_ceiling() {
+            // A turn-level max_iterations of 1 means any turn whose first
+            // model call produces a tool call (needing a second round to
+            // close out) is truncated as `TurnStopReason::MaxIterations` —
+            // a controllable, repeatable "failure" for this test.
+            let (turn_a, _) =
+                MockProvider::tool_turn(&[("echo", serde_json::json!({"text": "x"}))]);
+            let (turn_b, _) =
+                MockProvider::tool_turn(&[("echo", serde_json::json!({"text": "y"}))]);
+            let provider = Arc::new(MockProvider::with_turns([turn_a, turn_b]));
+            let (service, _store) = goal_service(
+                provider,
+                LoopLimits {
+                    max_iterations: 1,
+                    ..LoopLimits::default()
+                },
+            );
+            let session = service
+                .create_session(NewSessionParams::default())
+                .await
+                .expect("session");
+
+            let outcome = service
+                .run_goal(&session, spec("do the thing", 10, 2))
+                .await
+                .expect("goal runs");
+
+            assert_eq!(outcome.stop_reason, GoalStopReason::IdenticalFailureCeiling);
+            assert_eq!(outcome.iterations, 2);
+            assert!(
+                outcome
+                    .turns
+                    .iter()
+                    .all(|turn| turn.stop_reason == TurnStopReason::MaxIterations)
+            );
+        }
     }
 
     use agentloop_loop::NativeAgentBuilder;

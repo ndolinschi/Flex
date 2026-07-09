@@ -54,6 +54,7 @@ dependencies = [
  "agentloop-testkit",
  "agentloop-tools",
  "agentloop-workspace",
+ "serde_json",
  "tempfile",
  "thiserror",
  "tokio",

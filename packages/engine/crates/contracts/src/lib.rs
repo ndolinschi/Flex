@@ -19,6 +19,7 @@ pub mod checkpoint;
 pub mod content;
 pub mod error;
 pub mod event;
+pub mod goal;
 pub mod hello;
 pub mod hook;
 pub mod ids;
@@ -42,6 +43,7 @@ pub use checkpoint::{CheckpointLabel, CheckpointRef};
 pub use content::{BlobSource, ContentBlock, Message, Role, ToolResultBlock};
 pub use error::{EngineError, ErrorCode, Provenance};
 pub use event::{AgentEvent, SessionEvent};
+pub use goal::{GoalOutcome, GoalSpec, GoalStopReason};
 pub use hello::{EngineIdentity, Hello, PROTOCOL_VERSION};
 pub use hook::{HookOutcomeKind, HookPoint};
 pub use ids::{

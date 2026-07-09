@@ -52,14 +52,15 @@ pub struct BindTarget {
 }
 
 /// Validate a requested bind address against the token's provenance.
-/// `token_was_explicit` is `true` when the caller passed `--token` or set
-/// `FLEX_SERVE_TOKEN`; `false` when the token was auto-generated.
+/// `token_was_explicit` is `true` when the caller passed an explicit token
+/// (a CLI flag or an environment variable); `false` when it was
+/// auto-generated.
 pub fn validate_bind(addr: SocketAddr, token_was_explicit: bool) -> Result<BindTarget, String> {
     if !is_loopback(addr.ip()) && !token_was_explicit {
         return Err(format!(
             "refusing to bind {addr} (non-loopback) without an explicit auth token — \
-             auto-generated tokens are for local-only use. Pass --token or set \
-             FLEX_SERVE_TOKEN if you really want this reachable off this host."
+             auto-generated tokens are for local-only use. Pass an explicit token if you \
+             really want this reachable off this host."
         ));
     }
     Ok(BindTarget { addr })

@@ -149,6 +149,7 @@ dependencies = [
  "agentloop-prompts",
  "agentloop-session",
  "agentloop-tools",
+ "serde_json",
  "thiserror",
  "tracing",
 ]

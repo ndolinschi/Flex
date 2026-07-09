@@ -68,10 +68,12 @@ impl Tool for MemoryWriteTool {
                           context (user preferences, project facts, environment quirks). \
                           Use ONLY for facts the user stated or confirmed and that stay \
                           true across sessions — never for session-specific state, \
-                          guesses, or anything the repository already records. Notes are \
-                          tiny and always resident: keep each under a few hundred words, \
-                          one topic per `name`. `mode: append` adds to an existing note; \
-                          the default replaces it."
+                          guesses, or anything the repository already records. If this \
+                          note comes from resolving a failure, write the general rule you \
+                          verified, not a log of the incident — the rule is what a future \
+                          session can act on. Notes are tiny and always resident: keep \
+                          each under a few hundred words, one topic per `name`. \
+                          `mode: append` adds to an existing note; the default replaces it."
                 .to_owned(),
             input_schema: crate::save::schema_of::<MemoryWriteInput>(),
             read_only: false,
