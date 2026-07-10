@@ -7,6 +7,8 @@ Companions: [ARCHITECTURE.md](ARCHITECTURE.md), [COMPONENTS.md](COMPONENTS.md).
 
 - Rust, `edition = "2024"`, `rust-version = "1.85"`, `resolver = "3"`.
 - Five independent cargo workspaces (`packages/{engine,providers,search,sdk,gateway}`),
+  plus `packages/desktop` (Tauri 2 + Vite/React/TypeScript UI; not a cargo workspace
+  member of the others — its `src-tauri` path-depends on `agentloop-sdk`),
   each with its own `Cargo.toml` root and `Cargo.lock`. Member crates use
   `{ workspace = true }` deps only — no version numbers in member Cargo.tomls.
 - License: dual `MIT OR Apache-2.0`; transitive licenses enforced by cargo-deny in CI.
@@ -53,6 +55,9 @@ Companions: [ARCHITECTURE.md](ARCHITECTURE.md), [COMPONENTS.md](COMPONENTS.md).
   (licenses/advisories), the schema drift gate, and the **brand-leak gate** —
   `git grep -iIl` for the product name over `packages/*/crates/` must print nothing
   (sole exemptions: `contracts/src/branding.rs` and the SDK bin's `Cargo.toml`).
+- **Desktop UI**: `packages/desktop` — Tauri 2, React 19, Tailwind v4, Zustand,
+  TanStack Query; Rust shell composes via `agentloop-sdk::AgentBuilder` and stores
+  API keys in the OS keychain (`keyring`). Run: `cd packages/desktop && npm run tauri dev`.
 - **Install**: `./install.sh` (repo root) builds the release runner from `packages/sdk`
   and installs the binary to `~/.local/bin` (override with the `*_BIN_DIR` env var noted
   in the script).

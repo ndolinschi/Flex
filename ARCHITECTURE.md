@@ -18,6 +18,7 @@ packages/providers  # LLM provider clients + external-agent connectors (delegato
 packages/search     # optional deep-search plugin (core::Plugin)
 packages/sdk        # AgentBuilder composition root + the headless runner bin
 packages/gateway    # chat-channel contract (Channel trait) — adapters not built yet
+packages/desktop    # Tauri 2 + React UI — second composition root via AgentBuilder
 ```
 
 One `Agent` trait (`packages/engine/crates/core/src/agent.rs`) with two implementation
@@ -30,13 +31,15 @@ families:
   behind the same `Agent` interface.
 
 All output is normalized into one canonical event stream (`AgentEvent`). The engine has
-no UI; transports (NDJSON stdio) let clients attach.
+no UI of its own; clients attach via transports (NDJSON stdio, HTTP/SSE) or embed
+`AgentBuilder` in-process (the `flex` CLI and `packages/desktop` Tauri shell).
 
 Dependency shape is hub-and-spoke: `contracts` (pure data, no I/O) ← `core` (traits) ←
 every other engine crate; engine crates never depend on siblings. The `engine` crate is
 provider-agnostic — provider selection lives in the `providers` facade
-(`packages/providers/crates/providers/src/resolve.rs`). The SDK's runner is the sole
-composition root; nothing depends on it.
+(`packages/providers/crates/providers/src/resolve.rs`). Composition roots are
+`packages/sdk` (`AgentBuilder` + `flex` bin) and `packages/desktop` (Tauri commands that
+call the same builder); nothing depends on those roots.
 
 ## Turn lifecycle (event/data flow)
 

@@ -1,0 +1,46 @@
+[package]
+name = "desktop"
+version = "0.1.0"
+description = "Desktop UI for the agent-loop engine"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["unstable"] }
+tauri-plugin-opener = "2"
+tauri-plugin-store = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+futures = "0.3"
+keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
+tracing = "0.1"
+dirs = "6"
+# Gitignore-aware file walk backing the composer @-mention file search.
+ignore = "0.4"
+# CancellationToken for the routines cron-loop lifecycle.
+tokio-util = "0.7"
+# Cross-platform PTY spawning backing the terminal panel.
+portable-pty = "0.9"
+
+# Composition root — never call EngineService::native or providers::resolve_* here.
+agentloop-sdk = { path = "../../sdk/crates/sdk", features = ["search", "learning", "verifier"] }
+# Wire DTOs for command payloads (not re-exported by the SDK).
+agentloop-contracts = { path = "../../engine/crates/contracts" }
+# Persistent session log across app restarts / provider rebuilds.
+agentloop-session = { path = "../../engine/crates/session" }
+# Git worktree isolation backend.
+agentloop-workspace = { path = "../../engine/crates/workspace" }
+# WorkspaceStatus DTO for workspace_status command.
+agentloop-core = { path = "../../engine/crates/core" }
+# RoutineSpec/RoutineTrigger/RoutineStore/RoutineRunRecord — not re-exported by the SDK.
+agentloop-channel = { path = "../../gateway/crates/channel" }

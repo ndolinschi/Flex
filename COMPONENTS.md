@@ -139,6 +139,14 @@ on this crate.
 TOML task benchmark harness: `task.rs` (`CheckSpec`), `runner.rs`, `metrics.rs`,
 `report.rs`. Task definitions + fixtures in `packages/sdk/evals/tasks/`.
 
+## packages/desktop
+
+Tauri 2 + React desktop shell. Atomic Design UI catalog:
+[`packages/desktop/COMPONENTS.md`](packages/desktop/COMPONENTS.md). Rust side
+(`src-tauri`) is a thin command layer over `agentloop-sdk::AgentBuilder` (native
+providers only; no delegators). Sessions persist via `JsonlStore`; secrets via OS
+keychain.
+
 ## packages/gateway
 
 ### channel (`agentloop-channel`) — `crates/channel/src/lib.rs`

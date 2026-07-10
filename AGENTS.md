@@ -14,7 +14,8 @@ rules and decisions.
 
 ## What this project is
 
-An agent-loop engine in Rust, split into five sibling `packages/*` cargo workspaces:
+An agent-loop engine in Rust, split into five sibling `packages/*` cargo workspaces
+plus a Tauri desktop UI:
 
 - **`packages/engine`** — the provider-agnostic native loop and `EngineService`. Knows nothing
   about concrete providers; it composes over a prebuilt `ProviderRegistry` and a config-gated
@@ -31,6 +32,8 @@ An agent-loop engine in Rust, split into five sibling `packages/*` cargo workspa
   `ChatKey`/`Inbound`/`Outbound` wire types (`channel` crate). Adapters (Telegram, Slack,
   Discord) and the session router are deliberately not implemented yet — they build on this
   trait later.
+- **`packages/desktop`** — Tauri 2 + React UI; second composition root via `AgentBuilder`
+  (native providers only). Atomic Design catalog in `packages/desktop/COMPONENTS.md`.
 
 One `Agent` interface with two families of implementations: a **native loop** that calls LLM
 provider APIs directly, and **connectors** that drive external coding agents behind the same
@@ -172,8 +175,9 @@ at the composition root (`AgentBuilder::enable_plugin("search")`).
    `Engine`, `Agent`, `Tool`, `ToolCall`, `Provider`, `Session`, `Event`, `Transcript`, `Command`.
 3. **Markdown policy.** The only .md files in this repo: `README.md`, this file,
    `ARCHITECTURE.md` / `TECHSTACK.md` / `COMPONENTS.md` (agent navigation docs — keep
-   them in sync when architecture, crates, or tooling change), and
-   `packages/engine/prompts/**/*.md` (data). Do not add others.
+   them in sync when architecture, crates, or tooling change),
+   `packages/engine/prompts/**/*.md` (data), and
+   `packages/desktop/{README,COMPONENTS}.md` (desktop UI). Do not add others.
 4. **No `unwrap`/`expect` in library crates.** thiserror enums per crate, `#[non_exhaustive]`
    on public enums. `anyhow` only in `runner` and tests.
 5. **tracing, not println.** Libraries never install subscribers; `runner` does.
