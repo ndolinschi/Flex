@@ -19,10 +19,11 @@
   --color-icon-3: rgb(226 233 244 / 0.42);
   --color-icon-4: rgb(226 233 244 / 0.3);
 
+  /* Whisper fills — hover ≈6–7%, selected ≈7–8% (Feel: Whisper fills). */
   --color-fill-1: rgb(255 255 255 / 0.1);
-  --color-fill-2: rgb(255 255 255 / 0.07);
+  --color-fill-2: rgb(255 255 255 / 0.08); /* selected / active */
   --color-fill-3: rgb(255 255 255 / 0.05);
-  --color-fill-4: rgb(255 255 255 / 0.04);
+  --color-fill-4: rgb(255 255 255 / 0.065); /* list hover */
   --color-fill-5: rgb(255 255 255 / 0.03);
 
   --color-stroke-1: rgb(255 255 255 / 0.16);
@@ -80,10 +81,11 @@
   --color-icon-3: rgb(20 20 20 / 0.52);
   --color-icon-4: rgb(20 20 20 / 0.28);
 
+  /* Whisper fills — hover ≈6–8%, selected slightly stronger (Feel: Whisper fills). */
   --color-fill-1: rgb(20 20 20 / 0.12);
-  --color-fill-2: rgb(20 20 20 / 0.08);
+  --color-fill-2: rgb(20 20 20 / 0.08); /* selected / active */
   --color-fill-3: rgb(20 20 20 / 0.05);
-  --color-fill-4: rgb(20 20 20 / 0.035);
+  --color-fill-4: rgb(20 20 20 / 0.06); /* list hover */
   --color-fill-5: rgb(20 20 20 / 0.02);
 
   --color-stroke-1: rgb(20 20 20 / 0.16);
@@ -127,6 +129,7 @@
   --color-surface-raised: var(--color-fill-4);
   --color-surface-muted: var(--color-fill-3);
   --color-select-hover: var(--color-fill-4);
+  --color-select-active: var(--color-fill-2);
   --color-ink: var(--color-text-1);
   --color-ink-secondary: var(--color-text-2);
   --color-ink-muted: var(--color-text-3);
@@ -166,6 +169,10 @@
   --leading-tight: 1.25;
   --leading-normal: 1.4;
   --leading-relaxed: 1.5;
+
+  /* Micro tracking — captions 11–12px / body 13–14px (Feel: Semibold is 590). */
+  --tracking-caption: 0.07px;
+  --tracking-body: -0.078px;
 
   /* Spacing — 4px grid */
   --space-1: 0.25rem;

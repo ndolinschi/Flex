@@ -490,6 +490,36 @@ export const summarizeToolCalls = (calls: ToolCall[]): ToolStepSummary => {
   return { kind, title, running, failed, details }
 }
 
+/**
+ * Collapsed WorkGroup resume line — aggregate settled tool calls by kind
+ * across the whole group (not just consecutive clusters), Cursor-style:
+ * "Edited 3 files · Explored 2 files · Ran 1 command".
+ */
+export const buildWorkResumeLine = (calls: ToolCall[]): string | null => {
+  if (calls.length === 0) return null
+
+  const buckets: Record<ToolKind, ToolCall[]> = {
+    edit: [],
+    explore: [],
+    shell: [],
+    generic: [],
+  }
+  for (const call of calls) {
+    buckets[classifyTool(call.tool_name)].push(call)
+  }
+
+  // Order matches the plan / Cursor resume: edits → explores → commands → other.
+  const order: ToolKind[] = ["edit", "explore", "shell", "generic"]
+  const parts: string[] = []
+  for (const kind of order) {
+    const group = buckets[kind]
+    if (group.length === 0) continue
+    parts.push(summarizeToolCalls(group).title)
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : null
+}
+
 const KindIcon = ({
   kind,
   running,
@@ -557,7 +587,7 @@ const ExecTail = ({ callId, muted }: { callId: string; muted?: boolean }) => {
   return (
     <div
       className={cn(
-        "ml-3.5 mt-0.5 max-h-[6.5em] overflow-hidden rounded-sm border-l-2 border-stroke-3 pl-2",
+        "ml-3.5 mt-0.5 max-h-[6.5em] overflow-hidden pl-2",
         muted && "opacity-60",
       )}
     >
@@ -1004,10 +1034,14 @@ export const ToolStepList = ({
   rows,
   renderOther,
   progress,
+  forceOpenDetails = false,
 }: {
   rows: TimelineToolRowLike[]
   renderOther: (row: TimelineToolRowLike) => ReactNode
   progress?: Record<string, string>
+  /** Keep every tool-step cluster expanded (live turn) — not only while a
+   * call inside that cluster is still running. */
+  forceOpenDetails?: boolean
 }) => {
   const clusters = clusterToolRows(rows)
   return (
@@ -1022,7 +1056,7 @@ export const ToolStepList = ({
             // DOM subtree replaced) instead of an in-place update.
             key={`tools:${cluster.calls[0].id}`}
             calls={cluster.calls}
-            forceOpen={cluster.calls.some(isRunning)}
+            forceOpen={forceOpenDetails || cluster.calls.some(isRunning)}
             progress={progress}
           />
         ) : (

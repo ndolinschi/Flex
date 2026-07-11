@@ -122,7 +122,7 @@ const BehaviorContent = () => {
       <SettingRow
         rowId="behavior-permissions"
         title="Permissions"
-        description="Applies to Agent mode. Plan and Ask modes keep their own safeguards."
+        description="Bypass applies in Agent mode; AskUserQuestion still appears. Plan, Ask, and Flex keep their own safeguards."
         first
       >
         <select

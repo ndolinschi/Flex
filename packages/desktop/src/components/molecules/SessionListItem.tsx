@@ -199,7 +199,8 @@ export const SessionListItem = ({
       className={cn(
         "group relative flex min-h-7 items-center gap-3 rounded-sm px-2 py-1.5",
         "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-        isActive ? "bg-fill-5" : "hover:bg-fill-4",
+        // Selected must read stronger than hover (Feel: Whisper fills) — fill-2 ≈8%, fill-4 ≈6%.
+        isActive ? "bg-fill-2" : "hover:bg-fill-4",
         archived && "opacity-60",
       )}
     >
@@ -283,7 +284,7 @@ export const SessionListItem = ({
           {showSubtitle ? null : (
             <span
               className={cn(
-                "shrink-0 text-xs tracking-[0.07px] [font-variant-numeric:tabular-nums]",
+                "shrink-0 text-xs tracking-[var(--tracking-caption)] [font-variant-numeric:tabular-nums]",
                 "group-hover:hidden group-focus-within:hidden",
                 isActive ? "text-ink-secondary" : "text-ink-muted",
               )}
@@ -305,7 +306,8 @@ export const SessionListItem = ({
             <Tooltip label={pinned ? "Unpin" : "Pin"}>
               <IconButton
                 label={pinned ? "Unpin session" : "Pin session"}
-                className="!h-6 !w-6"
+                quiet
+                className="!h-5 !w-5"
                 disabled={!onTogglePin}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -322,7 +324,8 @@ export const SessionListItem = ({
               <Tooltip label="Restore">
                 <IconButton
                   label="Restore session"
-                  className="!h-6 !w-6"
+                  quiet
+                  className="!h-5 !w-5"
                   disabled={!onSetArchived}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -336,7 +339,8 @@ export const SessionListItem = ({
               <Tooltip label="Archive">
                 <IconButton
                   label="Archive session"
-                  className="!h-6 !w-6"
+                  quiet
+                  className="!h-5 !w-5"
                   disabled={!onSetArchived}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -349,7 +353,8 @@ export const SessionListItem = ({
             )}
             <IconButton
               label="More actions"
-              className="!h-6 !w-6"
+              quiet
+              className="!h-5 !w-5"
               onClick={(e) => {
                 e.stopPropagation()
                 const rect = e.currentTarget.getBoundingClientRect()

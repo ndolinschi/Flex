@@ -260,8 +260,8 @@ export const ModelPicker = ({
         aria-expanded={open}
         className={cn(
           "inline-flex h-6 max-w-[16rem] items-center gap-1 rounded-full px-1.5",
-          "text-base text-ink-secondary opacity-80",
-          "transition-[color,opacity] duration-[var(--duration-fast)]",
+          "text-sm tracking-[var(--tracking-caption)] text-ink-secondary opacity-80",
+          "transition-[color,opacity] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
           "hover:text-ink hover:opacity-100 disabled:opacity-50",
           open && "opacity-100",
         )}

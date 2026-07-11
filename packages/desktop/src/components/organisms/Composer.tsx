@@ -14,6 +14,8 @@ import {
   useQueryClient,
 } from "@tanstack/react-query"
 import { open } from "@tauri-apps/plugin-dialog"
+import { Shield } from "lucide-react"
+import { Tooltip } from "../atoms"
 import {
   AttachmentChip,
   ErrorBanner,
@@ -102,6 +104,10 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
   const setComposerDraft = useAppStore((s) => s.setComposerDraft)
   const composerMode = useAppStore((s) => s.composerMode)
   const setComposerMode = useAppStore((s) => s.setComposerMode)
+  const sessionBypass = useAppStore((s) =>
+    activeSessionId ? !!s.sessionBypassBySession[activeSessionId] : false,
+  )
+  const setSessionBypass = useAppStore((s) => s.setSessionBypass)
   const selectedModelId = useAppStore((s) => s.selectedModelId)
   const setSelectedModelId = useAppStore((s) => s.setSelectedModelId)
   const effortByModel = useAppStore((s) => s.effortByModel)
@@ -499,12 +505,18 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
         }
       }
 
+      const store = useAppStore.getState()
+      const mode = store.composerMode
+      const bypass =
+        mode === "agent" && !!store.sessionBypassBySession[activeSessionId]
       await prompt({
         sessionId: activeSessionId,
         text,
         model: selectedModelId ?? undefined,
-        permissionMode: modeToPermission(composerMode),
-        composerMode,
+        permissionMode: bypass
+          ? "bypass_permissions"
+          : modeToPermission(mode),
+        composerMode: mode,
         effort: selectedEffort ?? undefined,
         attachments: pending.map((a) => ({
           path: a.path,
@@ -731,6 +743,13 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
     void handleSend(text)
   }
 
+  const shieldLabel =
+    composerMode !== "agent"
+      ? "Bypass applies in Agent mode"
+      : sessionBypass
+        ? "agent won't ask"
+        : "Bypass permissions for this session"
+
   return (
     <div className="px-4 pt-2">
       {error ? (
@@ -786,7 +805,9 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
           "relative mx-auto flex w-full max-w-[var(--content-rail)] flex-col gap-1.5",
           "rounded-[var(--radius-composer)] bg-user-bubble shadow-[var(--shadow-composer)]",
           "transition-[box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+          "hover:bg-[color-mix(in_srgb,var(--color-user-bubble)_97%,white)]",
           "focus-within:shadow-[var(--shadow-composer-focus)]",
+          "focus-within:hover:bg-user-bubble",
         )}
       >
         <PopoverTray
@@ -926,6 +947,37 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
               value={composerMode}
               onChange={setComposerMode}
             />
+            <Tooltip label={shieldLabel}>
+              <button
+                type="button"
+                disabled={composerMode !== "agent" || !activeSessionId}
+                aria-label={shieldLabel}
+                aria-pressed={sessionBypass}
+                onClick={() => {
+                  if (!activeSessionId || composerMode !== "agent") return
+                  const next = !sessionBypass
+                  setSessionBypass(activeSessionId, next)
+                  if (next) {
+                    useAppStore
+                      .getState()
+                      .addSessionLogRow(
+                        activeSessionId,
+                        "Bypass permissions on for this session",
+                      )
+                  }
+                }}
+                className={cn(
+                  "inline-flex h-6 w-6 items-center justify-center rounded-full",
+                  "transition-[opacity,background-color,color] duration-[var(--duration-fast)]",
+                  "disabled:opacity-30",
+                  sessionBypass && composerMode === "agent"
+                    ? "bg-orange/15 text-orange opacity-100 hover:bg-orange/25"
+                    : "text-icon-2 opacity-50 hover:bg-fill-3 hover:opacity-80",
+                )}
+              >
+                <Shield className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            </Tooltip>
             <ModelPicker
               models={models}
               value={selectedModelId}

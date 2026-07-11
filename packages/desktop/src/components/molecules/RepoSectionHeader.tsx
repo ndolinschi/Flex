@@ -27,22 +27,24 @@ export const RepoSectionHeader = ({
       }}
       className={cn(
         "group flex h-6 w-full cursor-default items-center gap-1.5 rounded-sm px-1.5",
-        "text-xs text-ink-secondary transition-colors hover:bg-fill-4 hover:text-ink",
+        "text-xs tracking-[var(--tracking-caption)] text-ink-muted",
+        "transition-colors hover:bg-fill-4 hover:text-ink-secondary",
       )}
     >
       <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
         <ChevronDown
           className={cn(
-            "h-3.5 w-3.5 text-icon-2 opacity-70 transition-[opacity,transform] group-hover:opacity-100",
+            "h-3 w-3 text-icon-3 opacity-70 transition-[opacity,transform] group-hover:opacity-100",
             collapsed && "-rotate-90",
           )}
           aria-hidden
         />
       </span>
-      <Folder className="h-3.5 w-3.5 shrink-0 text-ink-muted" aria-hidden />
+      <Folder className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <IconButton
         label="New agent in this repository"
+        quiet
         className="!h-5 !w-5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
         onClick={(e) => {
           e.stopPropagation()

@@ -167,6 +167,10 @@ type AppState = {
    * user override the "ask every time" default; Plan/Ask/Flex modes keep
    * their own fixed mapping regardless of this setting. */
   defaultPermissionMode: PermissionMode
+  /** Per-session Composer Shield bypass — when true, Agent-mode turns send
+   * `permissionMode: "bypass_permissions"` (overrides Settings default).
+   * In-memory only; not persisted across reloads. */
+  sessionBypassBySession: Record<SessionId, boolean>
   selectedModelId: string | null
   /** Composer preference for the NEXT session's isolation, set via the
    * ContextBar's isolation picker on a draft session. `null` means unset —
@@ -313,6 +317,8 @@ type AppState = {
   getComposerDraft: () => string
   setComposerMode: (mode: ComposerMode) => void
   setDefaultPermissionMode: (mode: PermissionMode) => void
+  /** Toggle per-session Shield bypass (Composer footer). Not persisted. */
+  setSessionBypass: (sessionId: SessionId, enabled: boolean) => void
   setSelectedModelId: (id: string | null) => void
   setSelectedIsolation: (isolation: IsolationPolicy | null) => void
   setSelectedEffort: (effort: string | null) => void
@@ -437,6 +443,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   orphanDraft: "",
   composerMode: "agent",
   defaultPermissionMode: "default",
+  sessionBypassBySession: {},
   selectedModelId: null,
   selectedIsolation: null,
   selectedEffort: null,
@@ -572,6 +579,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ defaultPermissionMode: mode })
     void persistUiState({ defaultPermissionMode: mode })
   },
+
+  setSessionBypass: (sessionId, enabled) =>
+    set((state) => {
+      const next = { ...state.sessionBypassBySession }
+      if (enabled) {
+        next[sessionId] = true
+      } else {
+        delete next[sessionId]
+      }
+      return { sessionBypassBySession: next }
+    }),
 
   setSelectedModelId: (id) => {
     set({ selectedModelId: id })

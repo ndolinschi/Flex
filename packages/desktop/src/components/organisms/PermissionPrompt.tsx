@@ -95,7 +95,7 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
     <div
       role="dialog"
       aria-labelledby="permission-title"
-      className="w-full max-w-[640px] animate-tray-in"
+      className="w-full max-w-[640px] animate-modal-in"
     >
       <div className="relative rounded-xl border border-stroke-3 bg-panel p-3 shadow-lg">
         <IconButton

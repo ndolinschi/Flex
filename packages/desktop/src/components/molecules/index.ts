@@ -48,6 +48,7 @@ export {
   clusterToolRows,
   classifyTool,
   summarizeToolCalls,
+  buildWorkResumeLine,
 } from "./ToolStepGroup"
 export { WorkGroup } from "./WorkGroup"
 export { WorkflowGroup } from "./WorkflowGroup"

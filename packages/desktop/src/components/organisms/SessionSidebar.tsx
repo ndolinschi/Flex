@@ -553,6 +553,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
 
       <div className="flex items-center justify-end gap-0.5 border-t border-stroke-3 px-2 py-1.5">
         <IconButton
+          quiet
           label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
           onClick={toggleTheme}
         >
@@ -563,6 +564,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
           )}
         </IconButton>
         <IconButton
+          quiet
           label="Settings"
           onClick={() => {
             setRoute("settings")

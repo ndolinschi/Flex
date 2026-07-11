@@ -926,7 +926,8 @@ export const RightPanel = () => {
           className={cn(
             "sash-line-transition absolute inset-y-0 -left-[5px] z-10 w-2.5 cursor-col-resize",
             "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent",
-            "hover:after:bg-stroke-2",
+            // Sash hover = white-alpha focusBorder, never accent (Feel: Quiet chrome).
+            "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_15%,transparent)]",
             dragging && "after:bg-stroke-1",
           )}
         />
@@ -941,9 +942,10 @@ export const RightPanel = () => {
               role="tab"
               className={cn(
                 "flex items-center gap-1.5 rounded-[4px] px-1.5 py-[2px] text-sm",
-                "transition-colors duration-[var(--duration-fast)]",
+                "tracking-[var(--tracking-caption)]",
+                "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                 tab === t.id
-                  ? "bg-fill-3 text-ink"
+                  ? "bg-fill-2 text-ink"
                   : "text-ink-muted hover:bg-fill-4 hover:text-ink-secondary",
               )}
             >

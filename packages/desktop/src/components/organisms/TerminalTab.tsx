@@ -93,7 +93,7 @@ const TerminalRow = ({
       }}
       className={cn(
         "group mx-1 flex cursor-pointer items-center gap-1.5 rounded-sm px-2 py-1 text-sm",
-        selected ? "bg-fill-5 text-ink" : "hover:bg-fill-4",
+        selected ? "bg-fill-2 text-ink" : "hover:bg-fill-4",
       )}
     >
       <TerminalIcon className="h-3.5 w-3.5 shrink-0 text-ink-muted" aria-hidden />
@@ -142,7 +142,7 @@ const AgentTerminalRow = ({
       }}
       className={cn(
         "group mx-1 flex cursor-pointer items-center gap-1.5 rounded-sm px-2 py-1 text-sm",
-        selected ? "bg-fill-5 text-ink" : "hover:bg-fill-4",
+        selected ? "bg-fill-2 text-ink" : "hover:bg-fill-4",
       )}
     >
       <InfinityIcon className="h-3.5 w-3.5 shrink-0 text-yellow" aria-hidden />

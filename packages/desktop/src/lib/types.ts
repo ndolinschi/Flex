@@ -705,12 +705,10 @@ export type BrowserStateEvent = {
   loading: boolean
   canGoBack: boolean
   canGoForward: boolean
-  /** Navigation/load failure, when detected. Preview mock is the only source
-   * today (a deterministic failing URL) — native detection isn't reachable
-   * with the page-load hooks Tauri/wry currently expose (`PageLoadEvent` is
-   * Started/Finished only, no Failed variant), so the real `browser_open`/
-   * `browser_navigate` commands never populate this. See browser.rs's module
-   * doc comment. */
+  /** Navigation/load failure, when detected. Native emits this after
+   * `PageLoadEvent::Finished` when the document looks like a chrome-error /
+   * about:neterror / connection-refused page (eval probe). Preview mock
+   * also sets it for `FAILING_MOCK_HOST`. */
   error?: { host: string; message: string } | null
 }
 

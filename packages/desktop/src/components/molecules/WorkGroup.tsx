@@ -28,6 +28,9 @@ type WorkGroupProps = {
   /** Latest `Verify` call's verdict among this group's rows, if any — shown
    * as a small glyph next to the duration so it's visible even collapsed. */
   verdict?: VerificationVerdict
+  /** Cursor-style resume when collapsed, e.g. "Edited 3 files · Explored 2
+   * files · Ran 1 command". Falls back to "Worked for Xs" when absent. */
+  resumeLine?: string | null
   children: ReactNode
   /** Fired when expansion changes so the timeline can re-stick to bottom. */
   onLayoutChange?: () => void
@@ -35,13 +38,15 @@ type WorkGroupProps = {
   className?: string
 }
 
-/** "Worked for Xs" collapsible wrapper around a turn's work rows. */
+/** Collapsible wrapper around a turn's work rows — "Working" while live,
+ * resume line + duration when settled. */
 export const WorkGroup = ({
   isOpen,
   durationMs,
   costUsd,
   totalTokens,
   verdict,
+  resumeLine,
   children,
   onLayoutChange,
   className,
@@ -64,6 +69,17 @@ export const WorkGroup = ({
     onLayoutChange?.()
   }
 
+  const durationLabel =
+    typeof durationMs === "number" ? formatDuration(durationMs) : null
+
+  const collapsedPrimary = (() => {
+    if (resumeLine) {
+      return durationLabel ? `${resumeLine} · ${durationLabel}` : resumeLine
+    }
+    if (durationLabel) return `Worked for ${durationLabel}`
+    return "Worked"
+  })()
+
   return (
     <div className={cn("flex flex-col", className)}>
       <button
@@ -71,7 +87,7 @@ export const WorkGroup = ({
         onClick={handleToggle}
         aria-expanded={expanded}
         className={cn(
-          "group flex min-h-6 w-full items-center gap-1.5 text-left text-base",
+          "group flex min-h-[var(--end-of-turn-reserved-height)] w-full items-center gap-1.5 text-left text-base",
           !isOpen && "cursor-pointer animate-end-turn-in",
         )}
       >
@@ -82,18 +98,16 @@ export const WorkGroup = ({
           </>
         ) : (
           <>
-            <span className="text-ink-secondary [font-variant-numeric:tabular-nums]">
-              {typeof durationMs === "number"
-                ? `Worked for ${formatDuration(durationMs)}`
-                : "Worked"}
+            <span className="min-w-0 truncate text-ink-secondary [font-variant-numeric:tabular-nums]">
+              {collapsedPrimary}
             </span>
             {typeof totalTokens === "number" && totalTokens > 0 ? (
-              <span className="text-ink-faint [font-variant-numeric:tabular-nums]">
+              <span className="shrink-0 text-ink-faint [font-variant-numeric:tabular-nums]">
                 · {formatTokens(totalTokens)} tokens
               </span>
             ) : null}
             {typeof costUsd === "number" && costUsd > 0 ? (
-              <span className="text-ink-faint [font-variant-numeric:tabular-nums]">
+              <span className="shrink-0 text-ink-faint [font-variant-numeric:tabular-nums]">
                 · {formatCost(costUsd)}
               </span>
             ) : null}
@@ -108,7 +122,7 @@ export const WorkGroup = ({
             ) : null}
             <ChevronRight
               className={cn(
-                "h-2.5 w-2.5 text-icon-3 opacity-0 transition-[transform,opacity] duration-[var(--duration-fast)]",
+                "h-2.5 w-2.5 shrink-0 text-icon-3 opacity-0 transition-[transform,opacity] duration-[var(--duration-fast)]",
                 "group-hover:opacity-100 group-focus-visible:opacity-100",
                 expanded && "rotate-90 opacity-100",
               )}

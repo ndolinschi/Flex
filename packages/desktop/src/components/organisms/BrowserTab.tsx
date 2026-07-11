@@ -122,7 +122,10 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
   const setComposerDraft = useAppStore((s) => s.setComposerDraft)
   const pushToast = useAppStore((s) => s.pushToast)
 
-  const containerRef = useRef<HTMLDivElement>(null)
+  /** Content area only — never the toolbar. Native webview bounds are taken
+   * from this rect so the OS child layer cannot cover React chrome. */
+  const contentRef = useRef<HTMLDivElement>(null)
+  const toolbarRef = useRef<HTMLDivElement>(null)
   const loadingTimeoutRef = useRef<number | null>(null)
   const menuRootRef = useRef<HTMLDivElement>(null)
   const [editing, setEditing] = useState(false)
@@ -145,7 +148,11 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
       const trimmed = raw.trim()
       setEditing(false)
       if (!trimmed) return
-      setBrowserSessionState(sessionKey, { loading: true, url: trimmed })
+      setBrowserSessionState(sessionKey, {
+        loading: true,
+        url: trimmed,
+        loadError: null,
+      })
       setBrowserOwnerSessionId(sessionKey)
       clearLoadingSoon()
       if (browserStarted) {
@@ -165,7 +172,7 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
 
   const handleReclaim = useCallback(() => {
     setBrowserOwnerSessionId(sessionKey)
-    setBrowserSessionState(sessionKey, { loading: true })
+    setBrowserSessionState(sessionKey, { loading: true, loadError: null })
     clearLoadingSoon()
     if (browserUrl) {
       void browserNavigate(browserUrl).catch(() => {})
@@ -285,13 +292,30 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
       unlisten = await listenBrowserState((e) => {
         const ownerKey = useAppStore.getState().browserOwnerSessionId
         if (!ownerKey) return
-        useAppStore.getState().setBrowserSessionState(ownerKey, {
+        // Clear loadError on loading pulses; set it when native emits error.
+        // Title-only pulses may omit `error` — don't clobber an existing one
+        // unless loading started or Finished reported success/failure.
+        const patch: {
+          url: string
+          title: string | null
+          loading: boolean
+          started: true
+          loadError?: { host: string; message: string } | null
+        } = {
           url: e.url,
           title: e.title,
           loading: e.loading,
           started: true,
-          loadError: e.error ?? null,
-        })
+        }
+        if (e.loading) {
+          patch.loadError = null
+        } else if (e.error) {
+          patch.loadError = e.error
+        } else if (e.title == null) {
+          // Page-load Finished emits title: null — clear prior error on success.
+          patch.loadError = null
+        }
+        useAppStore.getState().setBrowserSessionState(ownerKey, patch)
         if (!e.loading && loadingTimeoutRef.current !== null) {
           window.clearTimeout(loadingTimeoutRef.current)
           loadingTimeoutRef.current = null
@@ -354,8 +378,14 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
   // Owns reveal too: the webview must never be shown before its first real
   // (non-degenerate) rect has been applied, otherwise it paints at whatever
   // stale position it last had (e.g. (0,0) from creation), which sits on top
-  // of the toolbar. Effect 3 previously toggled visibility independently and
-  // could win the race against this effect's rAF-deferred first measurement.
+  // of the toolbar.
+  //
+  // Visibility is NOT gated on `browserLoading`. Hiding for the entire load
+  // left a permanent black void when Finished/probe races never cleared
+  // loading, while the page had already painted under the OS webview.
+  // Hide only when the tab is inactive, this session doesn't own the
+  // webview, the browser hasn't started, or a confirmed loadError (so the
+  // React error page isn't covered by Chromium's sheet).
   useEffect(() => {
     if (isBrowserPreview()) return
     const shouldShow = active && isOwner && browserStarted && !loadError
@@ -363,39 +393,58 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
       void browserSetVisible(false)
       return
     }
-    const container = containerRef.current
-    if (!container) return
+    const content = contentRef.current
+    const toolbar = toolbarRef.current
+    if (!content || !toolbar) return
 
+    let cancelled = false
     let rafId: number | null = null
     const measure = () => {
       rafId = null
-      const rect = container.getBoundingClientRect()
-      if (rect.width < 2 || rect.height < 2) return
-      // Viewport preset: clamp the reported rect to the preset width (never
-      // wider than the panel) and center it horizontally, letterboxing the
-      // remainder — the panel background shows through on both sides. Pure
-      // frontend constraint: the existing bounds-reporting call just gets a
-      // narrower/centered rect, no Rust changes needed.
+      if (cancelled) return
+      const contentRect = content.getBoundingClientRect()
+      const toolbarRect = toolbar.getBoundingClientRect()
+      // Authoritative top = toolbar bottom (border box includes padding).
+      // Never trust contentRect.top alone — after display:none → flex, the
+      // content area can briefly report the panel-tabs bottom (y≈69) and the
+      // native layer paints over the h-9 chrome row.
+      const top = Math.max(contentRect.top, toolbarRect.bottom)
+      const height = contentRect.bottom - top
+      if (contentRect.width < 2 || height < 2 || toolbarRect.height < 1) {
+        void browserSetVisible(false)
+        return
+      }
+      // Viewport preset: clamp width (never wider than the content area) and
+      // center horizontally; panel bg letterboxes the sides.
       const presetWidth = VIEWPORT_PRESETS.find(
         (p) => p.id === viewportPreset,
       )?.width
-      const width = presetWidth ? Math.min(presetWidth, rect.width) : rect.width
-      const x = rect.left + (rect.width - width) / 2
-      void browserSetBounds(x, rect.top, width, rect.height).then(() => {
+      const width = presetWidth
+        ? Math.min(presetWidth, contentRect.width)
+        : contentRect.width
+      const x = contentRect.left + (contentRect.width - width) / 2
+      void browserSetBounds(x, top, width, height).then(() => {
+        if (cancelled) return
         void browserSetVisible(true)
       })
     }
     const schedule = () => {
       if (rafId !== null) return
-      rafId = requestAnimationFrame(measure)
+      // Double-rAF so flex chrome has a committed layout before we read
+      // tops — a single rAF can still see pre-toolbar geometry.
+      rafId = requestAnimationFrame(() => {
+        rafId = requestAnimationFrame(measure)
+      })
     }
 
     const resizeObserver = new ResizeObserver(schedule)
-    resizeObserver.observe(container)
+    resizeObserver.observe(content)
+    resizeObserver.observe(toolbar)
     window.addEventListener("resize", schedule)
     schedule()
 
     return () => {
+      cancelled = true
       resizeObserver.disconnect()
       window.removeEventListener("resize", schedule)
       if (rafId !== null) cancelAnimationFrame(rafId)
@@ -409,9 +458,13 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
   const presetWidth = VIEWPORT_PRESETS.find((p) => p.id === viewportPreset)?.width
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      {/* Toolbar */}
-      <div className="flex h-9 shrink-0 items-center gap-1 border-b border-stroke-3 px-1.5">
+    <div className="flex h-full min-h-0 flex-col bg-bg">
+      {/* Toolbar — solid bg + z-index so React chrome stays above any race
+          where the native child webview briefly overlaps this row. */}
+      <div
+        ref={toolbarRef}
+        className="relative z-20 flex h-9 min-h-9 shrink-0 items-center gap-1 overflow-hidden border-b border-stroke-3 bg-bg px-1.5"
+      >
         <div className="flex items-center gap-px">
           <IconButton
             label="Back"
@@ -590,10 +643,10 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
         </div>
       </div>
 
-      {/* Content */}
-      <div ref={containerRef} className="relative min-h-0 flex-1">
+      {/* Content — dedicated bounds target for the native child webview */}
+      <div ref={contentRef} className="relative z-0 min-h-0 flex-1 bg-bg">
         {!browserStarted ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2">
+          <div className="flex h-full flex-col items-center justify-center gap-2 bg-bg">
             <Globe className="h-8 w-8 text-ink-faint opacity-60" aria-hidden />
             <p className="text-[14px] font-medium text-ink">Browser</p>
             <p className="max-w-[300px] text-center text-sm text-ink-muted">
@@ -602,7 +655,7 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
             </p>
           </div>
         ) : showElsewhere ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3">
+          <div className="flex h-full flex-col items-center justify-center gap-3 bg-bg">
             <p className="max-w-[280px] text-center text-sm text-ink-muted">
               Page is open in another chat
             </p>
@@ -611,7 +664,7 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
             </Button>
           </div>
         ) : showLiveContent && loadError ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 px-6">
+          <div className="flex h-full flex-col items-center justify-center gap-3 bg-bg px-6">
             <AlertTriangle className="h-8 w-8 text-danger opacity-80" aria-hidden />
             <p className="text-[14px] font-medium text-ink">
               Can't connect to server
@@ -651,7 +704,14 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
             />
           </div>
         ) : (
-          <div className="h-full w-full bg-black/20" />
+          <div className="flex h-full w-full items-center justify-center bg-bg">
+            {browserLoading ? (
+              <Loader2
+                className="h-5 w-5 animate-spin text-ink-muted"
+                aria-label="Loading page"
+              />
+            ) : null}
+          </div>
         )}
       </div>
     </div>

@@ -118,6 +118,11 @@
   --leading-tight: var(--leading-tight);
   --leading-normal: var(--leading-normal);
   --leading-relaxed: var(--leading-relaxed);
+
+  --tracking-caption: var(--tracking-caption);
+  --tracking-body: var(--tracking-body);
+
+  --color-select-active: var(--color-select-active);
 }
 
 *,
@@ -145,9 +150,10 @@ body {
     color var(--duration-normal) var(--easing-default);
 }
 
+/* Keyboard-first focus — thin neutral ring, never accent glow (Feel: Keyboard-first focus). */
 :focus-visible:not(input):not(textarea):not(select) {
-  outline: 1px solid var(--color-border-strong);
-  outline-offset: 1px;
+  outline: 1px solid var(--color-stroke-2);
+  outline-offset: 2px;
 }
 
 /* Composer textarea owns its own chrome — suppress the global ring. */
@@ -218,7 +224,7 @@ mark[data-plan-find-mark].plan-find-mark-active {
   contain-intrinsic-size: auto 32px;
 }
 
-/* Glass scrollbar — thin, translucent, theme-aware. */
+/* Thin translucent scrollbars — track invisible, thumb ≈ fill hover (Feel: Thin scrollbars). */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -229,20 +235,12 @@ mark[data-plan-find-mark].plan-find-mark-active {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgb(255 255 255 / 0.11);
+  background: var(--color-fill-2);
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(255 255 255 / 0.22);
-}
-
-[data-theme="light"] ::-webkit-scrollbar-thumb {
-  background: rgb(20 20 20 / 0.12);
-}
-
-[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
-  background: rgb(20 20 20 / 0.24);
+  background: var(--color-fill-1);
 }
 
 /* Running indicator */

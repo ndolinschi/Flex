@@ -74,15 +74,15 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
         aria-label={`Mode: ${selected.label}`}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "flex items-center gap-1 rounded-full border border-stroke-3 bg-fill-3 px-2 py-[2px]",
-          "text-sm text-ink-secondary",
+          "flex items-center gap-1 rounded-full border border-stroke-3 bg-fill-4 px-2 py-[2px]",
+          "text-sm tracking-[var(--tracking-caption)] text-ink-secondary",
           "transition-[background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
           "hover:border-stroke-2 hover:bg-fill-2 disabled:opacity-50",
           open && "border-stroke-2 bg-fill-2",
         )}
       >
         <Icon className={cn("h-3 w-3", selected.accent)} aria-hidden />
-        <span>{selected.label}</span>
+        <span className="font-semibold">{selected.label}</span>
         <ChevronDown className="h-2.5 w-2.5 opacity-60" aria-hidden />
       </button>
 

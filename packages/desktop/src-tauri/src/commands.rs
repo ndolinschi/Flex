@@ -778,6 +778,10 @@ pub struct PromptCommandInput {
     pub text: String,
     pub model: Option<String>,
     /// Maps composer mode → engine `PermissionMode` (`plan` / `default` / …).
+    /// `#[serde(default)]` so a missing / omitted field becomes `None` (engine
+    /// Default) rather than failing the whole invoke — matches `effort` /
+    /// `composer_mode` below.
+    #[serde(default)]
     pub permission_mode: Option<String>,
     #[serde(default)]
     pub attachments: Vec<PromptAttachment>,

@@ -68,7 +68,7 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     section: "behavior",
     rowId: "behavior-permissions",
     title: "Permissions",
-    description: "Default permission mode for Agent-mode turns (Ask, Accept edits, Don't ask, Bypass all)",
+    description: "Default permission mode for Agent-mode turns (Ask, Accept edits, Don't ask, Bypass all). Bypass applies in Agent mode; AskUserQuestion still appears",
   },
   {
     section: "behavior",

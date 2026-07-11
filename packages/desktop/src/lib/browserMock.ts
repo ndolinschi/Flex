@@ -1804,7 +1804,14 @@ export const browserInvoke = async <T>(
           permissionMode: input.permissionMode,
         })
       }
-      const wantsPermission = /\b(permission|allow|approve)\b/i.test(input.text)
+      // Mirror engine BypassPermissions: Settings "Bypass all" /
+      // Composer Shield resolve to `permissionMode: "bypass_permissions"`
+      // and skip tool PermissionPrompt. AskUserQuestion
+      // (`wantsQuestion` → `question_requested`) still fires by design.
+      const bypassPermissions = input.permissionMode === "bypass_permissions"
+      const wantsPermission =
+        !bypassPermissions &&
+        /\b(permission|allow|approve)\b/i.test(input.text)
       const wantsQuestion = /\bquestion\b/i.test(input.text)
       const wantsWorkflow = /\bworkflow\b/i.test(input.text)
       const wantsVerify = /\bverif(y|ied|ication)\b/i.test(input.text)
@@ -2887,8 +2894,8 @@ const emitBrowserState = (e: BrowserStateEvent) => {
 
 /** Deterministic "load failure" URL for previewing the load-error page —
  * a real request to this host/port refuses to connect, so it stands in for
- * native load-failure detection (which isn't reachable via Tauri/wry's
- * current page-load hooks; see `BrowserStateEvent.error`'s doc comment). */
+ * native load-failure detection (chrome-error / connection-refused probe
+ * after `PageLoadEvent::Finished` in `browser.rs`). */
 const FAILING_MOCK_HOST = "localhost:1"
 
 const emitBrowserLoadPulse = (url: string) => {

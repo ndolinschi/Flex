@@ -88,6 +88,9 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
     queryFn: () => gitStatusSinceBaseline(sessionId!),
     enabled: !!cwd && !!sessionId && isRepo !== false,
     staleTime: 30_000,
+    // Card mounts when streaming ends — always re-check so a mid-turn
+    // cached empty result doesn't hide real post-turn changes.
+    refetchOnMount: "always",
   })
 
   if (!isRepo || files.length === 0) return null

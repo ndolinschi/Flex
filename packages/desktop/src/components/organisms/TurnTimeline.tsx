@@ -24,6 +24,7 @@ import {
   VerdictBadge,
   WorkGroup,
   WorkflowGroup,
+  buildWorkResumeLine,
   summarizeToolCalls,
 } from "../molecules"
 import { useSessionEvents } from "../../hooks/useSessionEvents"
@@ -233,26 +234,20 @@ const buildDisplayItems = (
   return items
 }
 
-/**
- * True when the trailing display item already carries its own animated
- * affordance while streaming (WorkGroup's "Working" + RunningDot header, a
- * live assistant answer's caret, a live "Thinking…" shimmer, or a running
- * tool-step row's spinner) — so the bottom-of-feed working indicator only
- * appears for the gap cases where nothing else is moving (e.g. right after
- * sending a message before `turn_started` arrives, or between turns) and the
- * feed would otherwise look frozen ("агент кажется мёртвым").
- */
-const lastItemIsAnimating = (item: DisplayItem | undefined): boolean => {
-  if (!item) return false
-  if (item.kind === "group") return item.isOpen
-  const row = item.row
-  if (row.type === "assistant") return row.id.startsWith("live-assistant:")
-  if (row.type === "thinking") return row.id.startsWith("live-thinking:")
-  if (row.type === "tool") {
-    const s = row.call.status.state
-    return s === "running" || s === "pending" || s === "awaiting_permission"
-  }
-  return false
+/** True when the trailing display item is an open (live) WorkGroup — its
+ * header already shows RunningDot + "Working", so the bottom backstop would
+ * be a duplicate. Any other trailing item (assistant answer, gap before
+ * turn_started, subagent, etc.) keeps the backstop so the feed never looks
+ * dead while `isStreaming`. */
+const lastItemIsOpenWorkGroup = (item: DisplayItem | undefined): boolean =>
+  !!item && item.kind === "group" && item.isOpen
+
+/** Aggregate tool calls in a work group into a Cursor-style resume line. */
+const resumeLineForRows = (rows: TimelineRow[]): string | null => {
+  const calls = rows
+    .filter((r): r is Extract<TimelineRow, { type: "tool" }> => r.type === "tool")
+    .map((r) => r.call)
+  return buildWorkResumeLine(calls)
 }
 
 /**
@@ -625,7 +620,7 @@ const TimelineRowView = memo(({
         <div className="group/row ml-auto flex w-fit max-w-full min-w-[150px] flex-col items-stretch">
           <div
             className={cn(
-              "rounded-[var(--radius-bubble)] border border-stroke-3 bg-user-bubble px-2.5 py-2",
+              "rounded-[var(--radius-bubble)] border border-stroke-2 bg-user-bubble px-2.5 py-2",
               "transition-[opacity,background-color,border-color] duration-[var(--duration-fast)]",
               "hover:border-stroke-1 hover:bg-[color-mix(in_srgb,var(--color-user-bubble)_96%,white)]",
               dimmed ? "opacity-50 hover:opacity-100" : "opacity-100",
@@ -651,6 +646,9 @@ const TimelineRowView = memo(({
         </div>
       )
     case "thinking":
+      // Show even without a measurable duration ("Thought") — deltas aren't
+      // persisted on replay, and some providers emit a thinking block with
+      // no span. Only skip empty shells.
       if (!row.text.trim()) return null
       return (
         <ThinkingBlock
@@ -767,19 +765,36 @@ export const TurnTimeline = ({
   )
   const { sessions } = useSessions()
   const activeCwd = sessions.find((s) => s.id === sessionId)?.cwd
+  const queryClient = useQueryClient()
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
   const scrollRafRef = useRef<number | null>(null)
+  const prevStreamingRef = useRef(isStreaming)
   const [showScrollDown, setShowScrollDown] = useState(false)
+
+  // When a turn settles, refresh the session-scoped git baseline diff so
+  // FilesChangedCard (and the Changes tab) pick up edits without waiting
+  // for staleTime — mirrors RightPanel's streaming→idle invalidate.
+  useEffect(() => {
+    if (prevStreamingRef.current && !isStreaming && sessionId) {
+      void queryClient.invalidateQueries({ queryKey: ["git-status"] })
+    }
+    prevStreamingRef.current = isStreaming
+  }, [isStreaming, sessionId, queryClient])
 
   const liveRows = useMemo(() => {
     const extra: TimelineRow[] = []
 
     for (const [messageId, text] of Object.entries(streaming.thinking)) {
       if (!text) continue
+      // Skip once either a materialized thinking row OR the assistant
+      // message for this id exists — otherwise a thinking-only
+      // assistant_message (no markdown) would duplicate the live row.
       const materialized = rows.some(
-        (r) => r.type === "assistant" && r.messageId === messageId,
+        (r) =>
+          (r.type === "thinking" || r.type === "assistant") &&
+          r.messageId === messageId,
       )
       if (materialized) continue
       extra.push({
@@ -839,15 +854,15 @@ export const TurnTimeline = ({
     [liveRows, isStreaming],
   )
 
-  // Backstop "Working…" row: only when streaming AND nothing already on
-  // screen is animating (see `lastItemIsAnimating`) — covers the gap between
-  // sending a message and the first `turn_started`/token, long-running tool
-  // calls without a live cluster spinner in view, and subagent execution, so
-  // the feed never sits fully still while the engine is working.
+  // Always-visible Working backstop while streaming: skip only when the
+  // last display item is already an open WorkGroup (its header has Working
+  // + RunningDot) or the reconnect banner replaces this slot. Otherwise
+  // keep the bottom shimmer so gaps / trailing answers / scroll-away cases
+  // never look dead.
   const showWorkingIndicator =
     isStreaming &&
     !reconnectStatus &&
-    !lastItemIsAnimating(displayItems[displayItems.length - 1])
+    !lastItemIsOpenWorkGroup(displayItems[displayItems.length - 1])
 
   // The reconnect banner REPLACES the plain "Working" row while active —
   // never both. Only shown while the session is actually streaming (a
@@ -989,11 +1004,15 @@ export const TurnTimeline = ({
                       : undefined
                   }
                   verdict={latestVerdictInRows(item.rows)}
+                  resumeLine={
+                    item.isOpen ? null : resumeLineForRows(item.rows)
+                  }
                   onLayoutChange={handleLayoutChange}
                 >
                   <ToolStepList
                     rows={item.rows}
                     progress={streaming.toolProgress}
+                    forceOpenDetails={item.isOpen}
                     renderOther={(row) => (
                       <TimelineRowView
                         row={row as TimelineRow}
@@ -1053,11 +1072,13 @@ export const TurnTimeline = ({
               <span className="animate-shimmer-text">Working</span>
             </div>
           ) : null}
-          {!isStreaming ? (
-            <div className="mt-2">
+          {/* Reserved end-of-turn slot — holds height during streaming so the
+           * FilesChangedCard / summary enter doesn't jump the feed. */}
+          <div className="mt-2 min-h-[var(--end-of-turn-reserved-height)]">
+            {!isStreaming ? (
               <FilesChangedCard cwd={activeCwd} sessionId={sessionId} />
-            </div>
-          ) : null}
+            ) : null}
+          </div>
           <div ref={bottomRef} aria-hidden className="h-px w-full shrink-0" />
         </div>
       </div>

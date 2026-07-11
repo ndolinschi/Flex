@@ -8,7 +8,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | Component | Purpose | Key props | Used by |
 |---|---|---|---|
 | `Button` | Primary action control | `variant`, `size`, `disabled`, `onClick`, `children` | Composer, ProviderSettingsForm, PermissionPrompt, QuestionPrompt, WelcomePage, ConfirmDialog |
-| `IconButton` | Compact icon-only action | `label`, `onClick`, `children` | SessionListItem, SessionSidebar, PlusMenu, ErrorBanner, SettingsShell, SessionMenu |
+| `IconButton` | Compact icon-only action; optional `quiet` opacity .5→.8 | `label`, `quiet?`, `onClick`, `children` | SessionListItem, SessionSidebar, PlusMenu, ErrorBanner, SettingsShell, SessionMenu |
 | `TextInput` | Single-line text field (forwardRef) | standard input props | FormField, SessionListItem, SessionSidebar search, QuestionPrompt, ConfirmDialog |
 | `TextArea` | Multi-line text field | standard textarea props | Composer |
 | `Label` | Accessible form label | `htmlFor`, `children` | FormField, ModelSelect |
@@ -89,11 +89,14 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 ## Theme & motion
 
 - Themes: `data-theme="dark"|"light"` on `<html>` (Cursor Glass palettes).
-- Motion: hover 100ms; trays `animate-tray-in`; pane swaps `animate-pane-fade`; timeline rows `animate-row-fade`; end-of-turn `animate-end-turn-in` (160ms); overlays `animate-backdrop-in`.
-- Composer: `--radius-composer` 12px, soft elevation only (no stroke ring), auto-grow 36–200px; quiet toolbar opacity (0.5→0.8).
+- Feel principles (local `design-map/README.md`): compact density, quiet chrome, whisper fills, opacity hover, micro-motion, alpha hierarchy, keyboard focus, weight 590 + micro tracking, alpha borders, radius-by-role, neutral interactive chrome, thin scrollbars.
+- Motion: hover 100ms ease; trays `animate-tray-in`; pane swaps `animate-pane-fade`; timeline rows `animate-row-fade`; end-of-turn `animate-end-turn-in` (160ms); HITL cards `animate-modal-in` (scale .97→1); overlays `animate-backdrop-in`.
+- Composer: `--radius-composer` 14px, soft elevation + stroke focus (no accent glow), auto-grow 36–200px; quiet toolbar opacity (0.5→0.8); mode/model pills neutral fill + stroke.
 - Content rail: `--content-rail` 840px (`52.5rem`).
-- ContextBar sits above the composer (project / branch / context %).
-- Prior user bubbles dim to 50% (hover restores); message actions reveal on row hover.
+- ContextBar sits above the composer (project / branch / context %) — Flex Canon.
+- Sidebar footer = theme + settings (Flex Canon); rows use fill-4 hover / fill-2 selected.
+- Right panel tabs = Plan / Changes / Terminal / Browser (Flex Canon); pill tabs; sash hover white-alpha.
+- Prior user bubbles dim to 50% (hover restores); hairline stroke-2; message actions reveal on row hover.
 - Sessions: default title `New Agent`; one draft per project; first prompt renames the session.
 - Engine settings: plugin toggles (search/learning/verifier), fallback models, default isolation.
 - Composer `/` opens slash-command tray; SessionMenu supports undo/redo files + integrate/discard when isolated.

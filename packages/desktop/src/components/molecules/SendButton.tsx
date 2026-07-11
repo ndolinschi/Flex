@@ -20,9 +20,9 @@ export const SendButton = ({
 }: SendButtonProps) => {
   const circleClass = cn(
     "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
-    "bg-send text-send-fg",
-    "transition-[filter] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-    "hover:brightness-110",
+    "bg-send text-send-fg opacity-80",
+    "transition-opacity duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+    "hover:opacity-100",
   )
 
   if (isStreaming && canQueue) {

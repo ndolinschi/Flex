@@ -33,11 +33,15 @@ export const usePlanBuild = () => {
     store.setSessionStreaming(sessionId, true)
 
     try {
+      const sessionBypass = !!store.sessionBypassBySession[sessionId]
       await prompt({
         sessionId,
         text: BUILD_PROMPT,
         model: buildModel,
-        permissionMode: modeToPermission("agent"),
+        permissionMode: sessionBypass
+          ? "bypass_permissions"
+          : modeToPermission("agent"),
+        composerMode: "agent",
         effort: buildModel ? (store.getEffortForModel(buildModel) ?? undefined) : undefined,
       })
       store.setPlanBuilt(sessionId, true)
