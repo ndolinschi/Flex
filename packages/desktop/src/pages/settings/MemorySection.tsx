@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Brain, ChevronDown, Clock, FileText, MoreHorizontal, Trash2 } from "lucide-react"
-import { IconButton, Spinner, Tooltip } from "../components/atoms"
+import { IconButton, Spinner, Tooltip } from "../../components/atoms"
 import {
   Collapsible,
   ConfirmDialog,
@@ -10,8 +10,8 @@ import {
   EmptyState,
   ErrorBanner,
   MarkdownBody,
-} from "../components/molecules"
-import { useSessions } from "../hooks/useSessions"
+} from "../../components/molecules"
+import { useSessions } from "../../hooks/useSessions"
 import {
   memoryGet,
   memoryList,
@@ -22,10 +22,10 @@ import {
   projectMemoryRemove,
   projectMemorySetExpiry,
   toInvokeError,
-} from "../lib/tauri"
-import type { MemoryEntryDto, MemoryTtlPreset } from "../lib/types"
-import { memoryExpiryFromPreset } from "../lib/types"
-import { basename, cn, formatCountdown, formatRelativeTime } from "../lib/utils"
+} from "../../lib/tauri"
+import type { MemoryEntryDto, MemoryTtlPreset } from "../../lib/types"
+import { memoryExpiryFromPreset } from "../../lib/types"
+import { basename, cn, formatCountdown, formatRelativeTime } from "../../lib/utils"
 
 const MEMORY_KEY = ["memory"] as const
 const projectMemoryKey = (cwd: string) => ["project-memory", cwd] as const

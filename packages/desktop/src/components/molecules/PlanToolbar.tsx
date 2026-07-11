@@ -14,7 +14,7 @@ import { cn } from "../../lib/utils"
 import { Button, IconButton, RunningDot } from "../atoms"
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu"
 import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
-import { useGroupedModels } from "./useGroupedModels"
+import { useGroupedModels } from "../../hooks/useGroupedModels"
 
 export type PlanBuildStatus = "draft" | "ready" | "building" | "built"
 

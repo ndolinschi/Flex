@@ -5,7 +5,7 @@ import { EFFORT_LEVELS, effortLabel } from "../../lib/types"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
-import { useGroupedModels } from "./useGroupedModels"
+import { useGroupedModels } from "../../hooks/useGroupedModels"
 
 type ModelPickerProps = {
   models: ModelInfoDto[]

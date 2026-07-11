@@ -37,14 +37,11 @@ import { isSessionNotFoundError } from "../../lib/sessions"
 import type { SessionMeta } from "../../lib/types"
 import { basename, cn } from "../../lib/utils"
 import { persistUiState, useAppStore } from "../../stores/appStore"
+import { SIDEBAR_DEFAULT_WIDTH } from "../../stores/layoutConstants"
 
 const isMac =
   typeof navigator !== "undefined" &&
   /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
-
-// Mirrors SIDEBAR_DEFAULT_WIDTH in stores/appStore.ts (not exported there;
-// setSidebarWidth clamps internally so this only needs to match the default).
-const SIDEBAR_DEFAULT_WIDTH = 260
 
 type RepoGroup = {
   cwd: string

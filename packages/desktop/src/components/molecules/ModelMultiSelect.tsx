@@ -4,7 +4,7 @@ import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Label } from "../atoms"
 import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
-import { useGroupedModels } from "./useGroupedModels"
+import { useGroupedModels } from "../../hooks/useGroupedModels"
 
 type ModelMultiSelectProps = {
   id: string

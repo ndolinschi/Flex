@@ -383,8 +383,6 @@ export type PromptAttachment = {
   mediaType?: string
 }
 
-export type ComposerMode = "agent" | "plan" | "ask" | "flex"
-
 export type PermissionMode =
   | "default"
   | "accept_edits"
@@ -422,27 +420,12 @@ export const effortLabel = (effort: string): string => {
   return effort.charAt(0).toUpperCase() + effort.slice(1)
 }
 
-export type ComposerAttachment = {
-  id: string
-  path: string
-  kind: "image" | "file"
-  name: string
-}
-
 export type RespondPermissionInput = {
   sessionId: string
   requestId: string
   decision: string
   reason?: string
 }
-
-export type AppRoute =
-  | "chat"
-  | "settings"
-  | "customize"
-  | "automations"
-  | "memory"
-  | "welcome"
 
 export type RoutineTriggerDto = {
   kind: "cron" | "webhook"
@@ -501,194 +484,10 @@ export type MemoryEntryDto = {
   expiresAtMs?: number
 }
 
-/** Preset TTLs offered by the memory expiry menu, mapped to absolute
- * `expiresAtMs` at selection time. `"forever"` clears any expiry. */
-export type MemoryTtlPreset = "forever" | "1d" | "1w" | "30d"
-
-const MEMORY_TTL_MS: Record<Exclude<MemoryTtlPreset, "forever">, number> = {
-  "1d": 24 * 60 * 60 * 1000,
-  "1w": 7 * 24 * 60 * 60 * 1000,
-  "30d": 30 * 24 * 60 * 60 * 1000,
-}
-
-/** Absolute expiry timestamp for a TTL preset selected "now", or `undefined`
- * for `"forever"` (never expires). */
-export const memoryExpiryFromPreset = (
-  preset: MemoryTtlPreset,
-  now: number = Date.now(),
-): number | undefined => {
-  if (preset === "forever") return undefined
-  return now + MEMORY_TTL_MS[preset]
-}
-
-export type StreamingBuffers = {
-  markdown: Record<MessageId, string>
-  thinking: Record<MessageId, string>
-  toolCalls: Record<ToolCallId, ToolCall>
-  /** Latest progress note per running tool call (from `tool_progress`). */
-  toolProgress: Record<ToolCallId, string>
-  /** Accumulated partial input JSON per running tool call (from `tool_args_delta`). */
-  toolArgs: Record<ToolCallId, string>
-}
-
-export type PendingPermission = {
-  sessionId: SessionId
-  requestId: PermissionRequestId
-  title: string
-  detail?: string
-  options: PermissionDecisionKind[]
-  callId?: ToolCallId
-}
-
-export type PendingQuestion = {
-  sessionId: SessionId
-  requestId: string
-  questions: Question[]
-}
-
 export type RespondQuestionInput = {
   sessionId: string
   requestId: string
   answers: Answer[]
-}
-
-/** One subagent task parsed from a `RunWorkflow` call's raw input JSON. */
-export type WorkflowStepTaskInput = {
-  role: string
-  prompt: string
-  label?: string
-}
-
-/** One step of a `RunWorkflow` plan, parsed from `ToolCall.input.steps`. */
-export type WorkflowStepInput =
-  | { kind: "task"; task: WorkflowStepTaskInput }
-  | { kind: "parallel"; tasks: WorkflowStepTaskInput[] }
-
-/** Lifecycle of one subagent slot consumed by a workflow step, tracked in
- * arrival order (engine emits no step index — see WorkflowGroup.tsx). */
-export type WorkflowSubagentSlot = {
-  childSession: SessionId
-  task: string
-  role?: string
-  phase: "started" | "completed"
-  summary?: TurnSummary
-  children: TimelineRow[]
-}
-
-export type TimelineRow =
-  | { type: "user"; id: string; messageId: MessageId; text: string; tsMs: number }
-  | { type: "assistant"; id: string; messageId: MessageId; text: string; model?: string; tsMs: number }
-  | { type: "thinking"; id: string; messageId: MessageId; text: string; tsMs: number }
-  | { type: "tool"; id: string; call: ToolCall; tsMs: number }
-  | { type: "plan"; id: string; entries: PlanEntry[]; tsMs: number }
-  | { type: "turn"; id: string; turnId: TurnId; phase: "started" | "completed"; summary?: TurnSummary; tsMs: number }
-  | { type: "error"; id: string; error: EngineError; tsMs: number }
-  | { type: "fallback"; id: string; from: string; to?: string; reason: string; tsMs: number }
-  | { type: "command"; id: string; name: string; args: string; tsMs: number }
-  | { type: "meta"; id: string; text: string; tsMs: number }
-  | {
-      type: "subagent"
-      id: string
-      childSession: SessionId
-      task: string
-      role?: string
-      /** The parent tool call that spawned this subagent, when tool-driven
-       * (e.g. `Task`). Used to route it into a `workflow` row instead of
-       * rendering it as a top-level subagent block. */
-      callId?: ToolCallId
-      phase: "started" | "completed"
-      summary?: TurnSummary
-      children: TimelineRow[]
-      tsMs: number
-    }
-  | {
-      type: "workflow"
-      id: string
-      callId: ToolCallId
-      toolName: string
-      steps: WorkflowStepInput[]
-      status: ToolCallStatus
-      /** Subagent slots observed so far, in arrival order — consumed
-       * front-to-back to infer each step's progress (no step index/total
-       * exists on the wire; see WorkflowGroup.tsx). */
-      subagents: WorkflowSubagentSlot[]
-      tsMs: number
-    }
-  | {
-      type: "verdict"
-      id: string
-      callId: ToolCallId
-      /** Pending/running while the `Verify` call is in flight; a settled
-       * verdict only exists once `status.state === "completed"` and the
-       * call's `result.structured` parsed as a `VerificationVerdict`. */
-      status: ToolCallStatus
-      verdict?: VerificationVerdict
-      tsMs: number
-    }
-  | {
-      type: "checkpoint"
-      id: string
-      snapshotId: string
-      turnId?: TurnId
-      tsMs: number
-    }
-
-export const extractMarkdownText = (blocks: ContentBlock[]): string => {
-  const parts: string[] = []
-  for (const block of blocks) {
-    if (block.type === "markdown") {
-      parts.push(block.text)
-    }
-  }
-  return parts.join("\n\n")
-}
-
-export const extractThinkingText = (blocks: ContentBlock[]): string => {
-  const parts: string[] = []
-  for (const block of blocks) {
-    if (block.type === "thinking") {
-      parts.push(block.text)
-    }
-  }
-  return parts.join("\n\n")
-}
-
-/** True when a user_message should render as a chat bubble (not tool-result feedback). */
-export const hasVisibleUserContent = (blocks: ContentBlock[]): boolean => {
-  for (const block of blocks) {
-    if (block.type === "markdown" && block.text.trim()) return true
-    if (block.type === "image" || block.type === "file") return true
-  }
-  return false
-}
-
-export const DEFAULT_SESSION_TITLE = "New Agent"
-
-export const truncateId = (id: string, len = 8): string => {
-  if (id.length <= len) return id
-  return `${id.slice(0, len)}…`
-}
-
-/** True when the session still has the placeholder title (or none). */
-export const isDefaultSessionTitle = (title?: string | null): boolean => {
-  const t = title?.trim()
-  return !t || t === DEFAULT_SESSION_TITLE
-}
-
-/** Title derived from the first user prompt . */
-export const titleFromPrompt = (text: string, maxLen = 48): string => {
-  const cleaned = text.replace(/\s+/g, " ").trim()
-  if (!cleaned) return DEFAULT_SESSION_TITLE
-  if (cleaned.length <= maxLen) return cleaned
-  const slice = cleaned.slice(0, maxLen)
-  const lastSpace = slice.lastIndexOf(" ")
-  const base = lastSpace > 16 ? slice.slice(0, lastSpace) : slice
-  return `${base.trimEnd()}…`
-}
-
-export const sessionLabel = (meta: SessionMeta): string => {
-  if (meta.title?.trim()) return meta.title.trim()
-  return DEFAULT_SESSION_TITLE
 }
 
 // Right-panel Terminal + Browser features (desktop-only, camelCase serde)

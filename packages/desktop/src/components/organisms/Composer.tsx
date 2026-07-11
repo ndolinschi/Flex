@@ -22,8 +22,6 @@ import {
   ModePicker,
   ModelPicker,
   PlusMenu,
-  PopoverItem,
-  PopoverTray,
   SendButton,
   modePlaceholder,
   modeToPermission,
@@ -48,51 +46,22 @@ import type { FileHit } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
 import { ContextBar } from "./ContextBar"
+import { ComposerQueue } from "./composer/ComposerQueue"
+import { SlashCommandTray } from "./composer/SlashCommandTray"
+import { AtMentionTray } from "./composer/AtMentionTray"
+import { attachImageBlob } from "./composer/composerAttachments"
+import {
+  EMPTY_QUEUE,
+  STREAMING_SAFETY_TIMEOUT_MS,
+  TURN_IN_PROGRESS_MARKER,
+  waitForSubscription,
+} from "../../hooks/useComposerSend"
 
 type ComposerProps = {
   isHero?: boolean
 }
 
 /** Stable empty queue — inline `?? []` in a Zustand selector re-renders forever. */
-const EMPTY_QUEUE: string[] = []
-
-/** Exact message from `agentloop_core::agent::AgentError` when a turn is
- * already running for a session — the desktop layer's `prompt` command
- * bubbles it up verbatim (see `commands::prompt` → `service.prompt`), so
- * matching this substring is the only way to tell "rejected because a turn
- * is live" apart from any other prompt failure. */
-const TURN_IN_PROGRESS_MARKER = "a turn is already in progress for session"
-
-/** How long to wait for `subscribe_session` to resolve before sending anyway.
- * The backend broadcast channel has no replay buffer (see appStore's
- * `subscribedSessions` doc comment), so firing `prompt()` before the
- * subscription is live can silently drop `turn_started` and leave the UI
- * with no streaming indication even though the engine turn is running. A
- * brand-new session's subscribe IPC round-trip is normally sub-50ms; this
- * is a generous ceiling so a slow IPC never blocks sending indefinitely. */
-const SUBSCRIBE_READY_TIMEOUT_MS = 2_000
-const SUBSCRIBE_POLL_INTERVAL_MS = 25
-
-/** Safety timeout: if optimistic streaming is set but no engine event moves
- * the session out of it within this window, something ate the turn_started
- * (or the prompt call genuinely died silently) — force one resync, then give
- * up and clear the flag so the UI never gets stuck "streaming" forever. */
-const STREAMING_SAFETY_TIMEOUT_MS = 5_000
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-/** Poll `subscribedSessions[sessionId]` until true or the timeout elapses.
- * Not event-driven (zustand has no natural "await this becomes true"
- * primitive without extra plumbing) — a short poll is simplest and the
- * window is small enough that busy-waiting cost is negligible. */
-const waitForSubscription = async (sessionId: string): Promise<void> => {
-  const deadline = Date.now() + SUBSCRIBE_READY_TIMEOUT_MS
-  while (Date.now() < deadline) {
-    if (useAppStore.getState().subscribedSessions[sessionId]) return
-    await sleep(SUBSCRIBE_POLL_INTERVAL_MS)
-  }
-}
-
 /** reference glass expanded prompt — fill surface, soft elevation, no harsh outline. */
 export const Composer = ({ isHero = false }: ComposerProps) => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
@@ -336,39 +305,6 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
     }
   }
 
-  // Image paste (and same-path drag/drop): the reference design lets users
-  // paste a screenshot straight into the composer. In MOCK/preview there's no
-  // filesystem, so we hand the engine an object URL as the attachment "path"
-  // (the mock backend never dereferences it — good enough for a preview).
-  // Native mode has no equivalent: the only file-producing command is
-  // `browser_screenshot` (a fixed, browser-panel-specific capture); there is
-  // no generic "write these bytes to a temp file" command, and the fs plugin
-  // isn't enabled in src-tauri/capabilities (read-only for this change). So a
-  // pasted/dropped image on native cannot currently be turned into a
-  // `path`-based attachment the engine can read — see report.
-  const extForMimeType = (mimeType: string): string => {
-    if (mimeType === "image/png") return "png"
-    if (mimeType === "image/gif") return "gif"
-    if (mimeType === "image/webp") return "webp"
-    return "jpg"
-  }
-
-  const attachImageBlob = async (blob: File | Blob, suggestedName?: string) => {
-    const name = suggestedName ?? `pasted-${Date.now()}.${extForMimeType(blob.type)}`
-    if (isBrowserPreview()) {
-      const url = URL.createObjectURL(blob)
-      addAttachment({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        path: url,
-        kind: "image",
-        name,
-      })
-      return true
-    }
-    // No native path to persist the blob to disk — see comment above.
-    return false
-  }
-
   const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items
     if (!items) return
@@ -378,7 +314,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
     for (const item of imageItems) {
       const blob = item.getAsFile()
       if (!blob) continue
-      void attachImageBlob(blob).then((attached) => {
+      void attachImageBlob(blob, addAttachment).then((attached) => {
         if (!attached) {
           setError(
             "Pasting images isn't supported yet outside preview mode (no way to save the clipboard image to disk).",
@@ -395,7 +331,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
     if (images.length === 0) return
     e.preventDefault()
     for (const file of images) {
-      void attachImageBlob(file, file.name).then((attached) => {
+      void attachImageBlob(file, addAttachment, file.name).then((attached) => {
         if (!attached) {
           setError(
             "Dropping images isn't supported yet outside preview mode (no way to save the file to disk).",
@@ -767,34 +703,12 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
         />
       </div>
 
-      {messageQueue.length > 0 ? (
-        <div className="mx-auto mb-1.5 flex w-full max-w-[var(--content-rail)] flex-col gap-1">
-          {messageQueue.map((item, index) => (
-            <div
-              key={`${index}-${item.slice(0, 24)}`}
-              className="animate-tray-in flex items-center gap-2 rounded-md bg-fill-4 px-2.5 py-1.5 text-sm text-ink-secondary"
-            >
-              <span className="shrink-0 text-xs text-ink-faint">Queued</span>
-              <span className="min-w-0 flex-1 truncate">{item}</span>
-              <button
-                type="button"
-                onClick={() => handleSendQueuedNow(index)}
-                className="shrink-0 text-xs text-accent transition-colors hover:text-accent-hover"
-              >
-                Send now
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRemoveQueued(index)}
-                aria-label="Remove queued message"
-                className="shrink-0 text-ink-faint transition-colors hover:text-ink"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : null}
+      <ComposerQueue
+        items={messageQueue}
+        onSendNow={handleSendQueuedNow}
+        onRemove={handleRemoveQueued}
+      />
+
 
       <div
         ref={slashRootRef}
@@ -810,60 +724,23 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
           "focus-within:hover:bg-user-bubble",
         )}
       >
-        <PopoverTray
+        <SlashCommandTray
           open={slashOpen}
-          onClose={() => {
-            /* keep draft; Esc handled in textarea keydown */
-          }}
           anchorRef={slashRootRef}
-          placement="above"
-          role="listbox"
-          aria-label="Slash commands"
-          className="left-0 right-0 w-full"
-        >
-          <ul className="max-h-48 overflow-y-auto py-0.5">
-            {slashMatches.map((cmd, i) => (
-              <li key={cmd.name}>
-                <PopoverItem
-                  active={i === slashHighlight}
-                  onClick={() => handleInsertCommand(cmd.name)}
-                >
-                  <span className="font-mono text-ink">/{cmd.name}</span>
-                  <span className="min-w-0 flex-1 truncate text-ink-muted">
-                    {cmd.description}
-                  </span>
-                </PopoverItem>
-              </li>
-            ))}
-          </ul>
-        </PopoverTray>
+          matches={slashMatches}
+          highlight={slashHighlight}
+          onSelect={handleInsertCommand}
+        />
 
-        <PopoverTray
+        <AtMentionTray
           open={atOpen}
-          autoFocus={false}
-          onClose={() => setAtDismissed(true)}
           anchorRef={slashRootRef}
-          placement="above"
-          role="listbox"
-          aria-label="Mention a file"
-          className="left-0 right-0 w-full"
-        >
-          <ul className="max-h-56 overflow-y-auto py-0.5">
-            {fileHits.map((hit, i) => (
-              <li key={hit.path}>
-                <PopoverItem
-                  active={i === atHighlight}
-                  onClick={() => handleInsertFile(hit)}
-                >
-                  <span className="shrink-0 font-mono text-ink">{hit.name}</span>
-                  <span className="min-w-0 flex-1 truncate text-right text-ink-faint">
-                    {hit.path}
-                  </span>
-                </PopoverItem>
-              </li>
-            ))}
-          </ul>
-        </PopoverTray>
+          hits={fileHits}
+          highlight={atHighlight}
+          onClose={() => setAtDismissed(true)}
+          onSelect={handleInsertFile}
+        />
+
 
         {attachments.length > 0 ? (
           <div className="flex flex-wrap gap-1.5 px-3 pt-3">

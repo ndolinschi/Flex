@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Clock, Play, Plus, Trash2, Webhook } from "lucide-react"
-import { Badge, Button, Spinner, TextArea, TextInput } from "../components/atoms"
+import { Badge, Button, Spinner, TextArea, TextInput } from "../../components/atoms"
 import {
   Collapsible,
   ConfirmDialog,
@@ -9,9 +9,9 @@ import {
   FieldRow,
   ModelSelect,
   SettingsSection,
-} from "../components/molecules"
-import { useModels } from "../hooks/useModels"
-import { humanizeCron } from "../lib/cron"
+} from "../../components/molecules"
+import { useModels } from "../../hooks/useModels"
+import { humanizeCron } from "../../lib/cron"
 import {
   routinesHistory,
   routinesList,
@@ -19,9 +19,9 @@ import {
   routinesRun,
   routinesUpsert,
   toInvokeError,
-} from "../lib/tauri"
-import type { RoutineDto, RoutineRunRecordDto, RoutineTriggerDto } from "../lib/types"
-import { cn, formatRelativeTime } from "../lib/utils"
+} from "../../lib/tauri"
+import type { RoutineDto, RoutineRunRecordDto, RoutineTriggerDto } from "../../lib/types"
+import { cn, formatRelativeTime } from "../../lib/utils"
 
 const ROUTINES_KEY = ["routines"] as const
 

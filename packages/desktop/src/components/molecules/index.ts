@@ -44,11 +44,15 @@ export { ToolCallChip } from "./ToolCallChip"
 export { VerdictBadge } from "./VerdictBadge"
 export {
   ToolStepGroup,
-  ToolStepList,
+} from "./ToolStepGroup"
+export { ToolStepList } from "./ToolStepList"
+export { DetailRow } from "./DetailRow"
+export { BackgroundBashRow } from "./BackgroundBashRow"
+export {
   clusterToolRows,
   classifyTool,
   summarizeToolCalls,
   buildWorkResumeLine,
-} from "./ToolStepGroup"
+} from "../../lib/toolPresentation"
 export { WorkGroup } from "./WorkGroup"
 export { WorkflowGroup } from "./WorkflowGroup"

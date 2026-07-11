@@ -42,6 +42,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `ErrorBanner` | Inline error | `message`, `onDismiss?` | Composer, Settings |
 | `ToolCallChip` | Single tool as Cursor-style step | `call` | TurnTimeline |
 | `ToolStepGroup` | Aggregated explore/edit/shell summary + card expand | `calls` | TurnTimeline (via ToolStepList) |
+| `ToolStepList` | Clusters consecutive same-kind tool rows | `rows`, `renderOther` | TurnTimeline |
+| `DetailRow` / `BackgroundBashRow` / `ExecTail` | Tool-step detail / background bash / exec tail | — | ToolStepGroup |
 | `StreamingCaret` | Streaming caret | — | TurnTimeline |
 | `SubagentGroup` | Nested subagent work block | `task`, `role?`, `phase` | TurnTimeline |
 | `WorkGroup` | "Worked for Xs" / "Working" | `isOpen`, `durationMs?` | TurnTimeline |
@@ -54,13 +56,23 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|---|---|
 | `SessionSidebar` | New Agent + Search + Agents list + theme/settings footer | (hooks) | App shell |
 | `ProviderSettingsForm` | Provider / key / model | — | SettingsPage, WelcomePage |
-| `Composer` | Prompt + ContextBar (project/branch/env) | `isHero?` | ChatShell |
+| `Composer` | Prompt + ContextBar; trays/queue under `organisms/composer/` | `isHero?` | ChatShell |
 | `ContextBar` | Project · branch · context % | `cwd`, `sessionId` | Composer |
-| `TurnTimeline` | Turns + tools + plans + streaming | `sessionId` | ChatShell |
+| `TurnTimeline` | Turns + tools + plans + streaming; pieces under `organisms/timeline/` | `sessionId` | ChatShell |
 | `PermissionPrompt` | Tool permission HITL | `permission` | ChatPage |
 | `QuestionPrompt` | AskUserQuestion HITL | `question` | ChatPage |
-| `RightPanel` | Plan / Changes / Terminal / Browser | — | App shell |
+| `RightPanel` | Plan / Changes / Terminal / Browser; tabs under `organisms/right-panel/` | — | App shell |
 | `AppHeader` | Title + session menu | — | ChatShell |
+| `BrowserTab` | Embedded browser panel | `active` | RightPanel |
+| `TerminalTab` | PTY / agent terminal | — | RightPanel |
+
+### Organism subfolders
+
+| Path | Contents |
+|---|---|
+| `organisms/timeline/` | `buildDisplayItems`, `TimelineRowView`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
+| `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
+| `organisms/right-panel/` | `PlanTab`, `ChangesTab`, `FileRow` |
 
 ## Templates / Pages
 
@@ -68,8 +80,10 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|
 | `ChatShell` | Header + timeline + composer (`hideSidebar` when App owns sidebar) |
 | `SettingsShell` | Back header + form (`embedded` when App owns sidebar) |
+| `ErrorBoundary` | Top-level render-error fence (`templates/`) |
 | `ChatPage` | Conversation (`embedded`) |
-| `SettingsPage` | Provider config (`embedded`) |
+| `SettingsPage` | Settings shell; sections from `pages/settings/` |
+| `CustomizeSection` / `MemorySection` / `AutomationsSection` | Settings nav sections (`pages/settings/`) |
 | `WelcomePage` | First-run setup |
 
 ## Data layer
@@ -77,12 +91,21 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | Module | Role |
 |---|---|
 | `src/lib/tauri.ts` | Typed IPC |
-| `src/lib/types.ts` | Wire + DTO types |
+| `src/lib/types/` | Wire + timeline + UI types (`wire.ts`, `timeline.ts`, `ui.ts`, barrel `index.ts`) |
+| `src/lib/timeline/` | Pure timeline fold: `applyEvent`, `applyStreaming`, `parseWorkflow`, `thinkingSpans`, `rowIds` |
+| `src/lib/toolPresentation.ts` | Pure tool classify/summarize/cluster helpers |
+| `src/lib/sessionSideEffects/` | Global-event side effects (`applyGlobalEvent`, `agentTerminal`, `devServerToast`) |
 | `src/lib/browserMock.ts` | Vite preview only — never used under Tauri |
-| `src/stores/appStore.ts` | Route, theme, drafts, mode, streaming, questions, recentCwds |
+| `src/stores/appStore.ts` | Composes Zustand slices; public `useAppStore` API |
+| `src/stores/slices/` | `session` / `composer` / `layout` / `ui` / `panelExtras` slices |
+| `src/stores/persist.ts` | `persistUiState` / `restoreUiState` |
+| `src/stores/layoutConstants.ts` | Sidebar / right-panel / chat width clamps |
 | `src/hooks/useSessions.ts` | Session CRUD |
-| `src/hooks/useSessionEvents.ts` | Active-session replay + timeline rows |
-| `src/hooks/useGlobalSessionEvents.ts` | App-level `session-event` fan-out + subscribe for streaming sessions |
+| `src/hooks/useSessionEvents.ts` | Active-session replay + timeline rows (thin over `lib/timeline`) |
+| `src/hooks/useGlobalSessionEvents.ts` | App-level `session-event` fan-out + subscribe |
+| `src/hooks/useComposerSend.ts` | Subscribe-wait + send/queue constants |
+| `src/hooks/useStickToBottom.ts` | Timeline stick-to-bottom scroll |
+| `src/hooks/useGroupedModels.ts` | Model picker grouping |
 | `src/hooks/useKeyboardShortcuts.ts` | Enter / ⌘N / ⌘K / ⌘L / Esc |
 | `src/hooks/useProviderConfig.ts` | Provider + plugin + fallback prefs |
 

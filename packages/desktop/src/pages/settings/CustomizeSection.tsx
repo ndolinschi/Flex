@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { BookOpen, Check, Globe, Plug, Plus, ShieldCheck, Trash2 } from "lucide-react"
-import { Badge, Button, Spinner, TextArea, TextInput } from "../components/atoms"
+import { Badge, Button, Spinner, TextArea, TextInput } from "../../components/atoms"
 import {
   ConfirmDialog,
   ErrorBanner,
@@ -9,13 +9,13 @@ import {
   McpCatalogCard,
   McpInstallDialog,
   SettingsSection,
-} from "../components/molecules"
-import { useProviderConfig } from "../hooks/useProviderConfig"
-import { useAppStore } from "../stores/appStore"
-import { MCP_CATALOG, type McpCatalogEntry } from "../lib/mcpCatalog"
-import { mcpList, mcpRemove, mcpTest, mcpUpsert, toInvokeError } from "../lib/tauri"
-import type { McpServerDto, PluginPrefs } from "../lib/types"
-import { cn } from "../lib/utils"
+} from "../../components/molecules"
+import { useProviderConfig } from "../../hooks/useProviderConfig"
+import { useAppStore } from "../../stores/appStore"
+import { MCP_CATALOG, type McpCatalogEntry } from "../../lib/mcpCatalog"
+import { mcpList, mcpRemove, mcpTest, mcpUpsert, toInvokeError } from "../../lib/tauri"
+import type { McpServerDto, PluginPrefs } from "../../lib/types"
+import { cn } from "../../lib/utils"
 
 type PluginKey = keyof PluginPrefs
 
