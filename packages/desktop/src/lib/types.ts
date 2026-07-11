@@ -155,6 +155,18 @@ export type PlanEntry = {
   status: PlanStatus
 }
 
+/** `agentloop_contracts::VerdictOutcome` — the `Verify` tool's graded result. */
+export type VerdictOutcome = "pass" | "fail" | "inconclusive"
+
+/** `agentloop_contracts::VerificationVerdict`, read out of a completed `Verify`
+ * call's `ToolOutput.structured` (see `agentloop_core::tool::VERIFIER_TOOL_NAME`
+ * and `EngineService::verify_goal_progress` in `packages/engine/crates/engine/src/lib.rs`). */
+export type VerificationVerdict = {
+  outcome: VerdictOutcome
+  findings: string[]
+  confidence?: number
+}
+
 export type QuestionOption = {
   label: string
   description?: string
@@ -173,6 +185,8 @@ export type Answer = {
   selected: string[]
 }
 
+export type ExecStream = "stdout" | "stderr"
+
 export type AgentEvent =
   | { kind: "session_created"; meta: SessionMeta }
   | { kind: "engine_info"; agent_id: string; capabilities: unknown; provider_session_id?: string; resolution_trace?: string[] }
@@ -185,6 +199,7 @@ export type AgentEvent =
   | { kind: "text_snapshot"; message_id: MessageId; text: string }
   | { kind: "tool_args_delta"; call_id: ToolCallId; json_fragment: string }
   | { kind: "tool_progress"; call_id: ToolCallId; note: string }
+  | { kind: "exec_chunk"; call_id: ToolCallId; stream: ExecStream; text: string }
   | { kind: "user_message"; message_id: MessageId; content: ContentBlock[] }
   | { kind: "assistant_message"; message_id: MessageId; content: ContentBlock[]; model?: string; usage?: TokenUsage }
   | { kind: "tool_call_updated"; call: ToolCall }
@@ -196,6 +211,11 @@ export type AgentEvent =
   | { kind: "command_expanded"; name: string; args: string }
   | { kind: "compaction_boundary"; summary: unknown }
   | { kind: "model_fallback"; from: string; to?: string; reason: EngineError }
+  /** Ephemeral, live-broadcast only — never persisted to replay/JSONL. Fires
+   * once per retry attempt right before the engine sleeps that attempt's
+   * backoff. Success = normal stream events resume; exhaustion is signaled
+   * separately via `model_fallback` or a terminal turn error. */
+  | { kind: "retry_scheduled"; attempt: number; max_attempts: number; delay_ms: number; error: string }
   | { kind: "hook_fired"; point: string; outcome: string }
   | { kind: "subagent_started"; child_session: SessionId; task: string; call_id?: ToolCallId; role?: string }
   | { kind: "subagent_event"; child_session: SessionId; event: AgentEvent }
@@ -224,9 +244,16 @@ export type PluginPrefs = {
   verifier: boolean
 }
 
+/** Secret storage backend: `"file"` stores the encryption key in a local
+ * file (no OS prompts, ever); `"keychain"` stores it in the OS Keychain
+ * (protected by the OS, but may prompt). See
+ * `src-tauri/src/secrets.rs::SecretStorageMode`. */
+export type SecretStorageMode = "file" | "keychain"
+
 export type ProviderConfigView = {
   preferredProvider?: string
   baseUrl?: string
+  region?: string
   defaultModel?: string
   cwd?: string
   configuredProviders: string[]
@@ -234,12 +261,14 @@ export type ProviderConfigView = {
   plugins: PluginPrefs
   fallbackModels: string[]
   defaultIsolation?: IsolationPolicy | string
+  secretStorage: SecretStorageMode
 }
 
 export type SaveProviderConfigInput = {
   preferredProvider: string
   apiKey?: string
   baseUrl?: string
+  region?: string
   defaultModel?: string
   cwd?: string
   plugins?: PluginPrefs
@@ -251,6 +280,39 @@ export type BuiltinProvider = {
   id: string
   label: string
   requiresApiKey: boolean
+}
+
+/** A named provider connection ("profile") — e.g. "AWS work" (Bedrock, key A,
+ * us-east-1) vs. "AWS personal" (Bedrock, key B, eu-west-1). The API key
+ * itself is never returned; `hasKey` reports whether one is stored. See
+ * `src-tauri/src/config.rs::ProviderProfile`. */
+export type ProviderProfileView = {
+  id: string
+  label: string
+  provider: string
+  baseUrl?: string
+  region?: string
+  defaultModel?: string
+  fallbackModels?: string
+  defaultIsolation?: IsolationPolicy | string
+  hasKey: boolean
+  isActive: boolean
+}
+
+/** Create/update input for one profile (`profile_upsert`). `id` empty/omitted
+ * creates a new profile; `apiKey` empty/omitted keeps the existing stored key
+ * on update. Also the shape `validate_profile` takes, so Validate always
+ * checks the exact values currently in the form. */
+export type ProviderProfileInput = {
+  id?: string
+  label: string
+  provider: string
+  apiKey?: string
+  baseUrl?: string
+  region?: string
+  defaultModel?: string
+  fallbackModels?: string
+  defaultIsolation?: IsolationPolicy | string
 }
 
 export type ModelInfoDto = {
@@ -324,6 +386,22 @@ export type PromptCommandInput = {
   model?: string
   permissionMode?: PermissionMode
   attachments?: PromptAttachment[]
+  /** Wire values of contracts::request::Effort (`#[serde(rename_all =
+   * "lowercase")]`): "low" | "medium" | "high" | "xhigh" | "max". Omitted =
+   * engine default. */
+  effort?: string
+}
+
+/** Mirrors contracts::request::Effort's serde wire values (lowercase),
+ * ordered low → high. "Default" (unset) is represented as `null` in state,
+ * not a member of this list. */
+export const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const
+export type EffortLevel = (typeof EFFORT_LEVELS)[number]
+
+/** Display label for an effort wire value ("xhigh" -> "X-High"). */
+export const effortLabel = (effort: string): string => {
+  if (effort === "xhigh") return "X-High"
+  return effort.charAt(0).toUpperCase() + effort.slice(1)
 }
 
 export type ComposerAttachment = {
@@ -340,7 +418,13 @@ export type RespondPermissionInput = {
   reason?: string
 }
 
-export type AppRoute = "chat" | "settings" | "customize" | "automations" | "welcome"
+export type AppRoute =
+  | "chat"
+  | "settings"
+  | "customize"
+  | "automations"
+  | "memory"
+  | "welcome"
 
 export type RoutineTriggerDto = {
   kind: "cron" | "webhook"
@@ -366,6 +450,57 @@ export type RoutineRunRecordDto = {
   startedMs: number
   stopReason: string
   iterations: number
+}
+
+/** A user-configured MCP (Model Context Protocol) server (stdio transport
+ * only — see `agentloop_mcp::McpServerConfig` / `commands::McpServerDto`).
+ * Its tools are bridged into the native tool registry as `<id>__<tool>` at
+ * the next engine service rebuild (saving/removing rebuilds it; there is no
+ * hot-reload of already-open sessions). */
+export type McpServerDto = {
+  id: string
+  command: string
+  args: string[]
+  env: Record<string, string>
+  enabled: boolean
+}
+
+/** A durable note the `learning` plugin's `MemoryWrite` tool persisted —
+ *  loads into every future session's system prompt. */
+export type MemoryEntryDto = {
+  /** The note's name (file stem), e.g. `user-preferences`. */
+  id: string
+  /** First non-empty line of the note, used as a title in the list view. */
+  title: string
+  /** Full markdown body. `undefined` in the list view — call `memoryGet`. */
+  content?: string
+  /** Milliseconds since epoch, from the file's last-modified time. */
+  updatedAtMs?: number
+  /** Milliseconds since epoch when this entry expires and is purged.
+   * `undefined` = long-term (never expires). Sourced from a sidecar
+   * `expiry.json` file next to the `.md` notes — never from the note body
+   * itself, since the engine's prompt loader reads `.md` files raw. */
+  expiresAtMs?: number
+}
+
+/** Preset TTLs offered by the memory expiry menu, mapped to absolute
+ * `expiresAtMs` at selection time. `"forever"` clears any expiry. */
+export type MemoryTtlPreset = "forever" | "1d" | "1w" | "30d"
+
+const MEMORY_TTL_MS: Record<Exclude<MemoryTtlPreset, "forever">, number> = {
+  "1d": 24 * 60 * 60 * 1000,
+  "1w": 7 * 24 * 60 * 60 * 1000,
+  "30d": 30 * 24 * 60 * 60 * 1000,
+}
+
+/** Absolute expiry timestamp for a TTL preset selected "now", or `undefined`
+ * for `"forever"` (never expires). */
+export const memoryExpiryFromPreset = (
+  preset: MemoryTtlPreset,
+  now: number = Date.now(),
+): number | undefined => {
+  if (preset === "forever") return undefined
+  return now + MEMORY_TTL_MS[preset]
 }
 
 export type StreamingBuffers = {
@@ -399,6 +534,29 @@ export type RespondQuestionInput = {
   answers: Answer[]
 }
 
+/** One subagent task parsed from a `RunWorkflow` call's raw input JSON. */
+export type WorkflowStepTaskInput = {
+  role: string
+  prompt: string
+  label?: string
+}
+
+/** One step of a `RunWorkflow` plan, parsed from `ToolCall.input.steps`. */
+export type WorkflowStepInput =
+  | { kind: "task"; task: WorkflowStepTaskInput }
+  | { kind: "parallel"; tasks: WorkflowStepTaskInput[] }
+
+/** Lifecycle of one subagent slot consumed by a workflow step, tracked in
+ * arrival order (engine emits no step index — see WorkflowGroup.tsx). */
+export type WorkflowSubagentSlot = {
+  childSession: SessionId
+  task: string
+  role?: string
+  phase: "started" | "completed"
+  summary?: TurnSummary
+  children: TimelineRow[]
+}
+
 export type TimelineRow =
   | { type: "user"; id: string; messageId: MessageId; text: string; tsMs: number }
   | { type: "assistant"; id: string; messageId: MessageId; text: string; model?: string; tsMs: number }
@@ -416,9 +574,44 @@ export type TimelineRow =
       childSession: SessionId
       task: string
       role?: string
+      /** The parent tool call that spawned this subagent, when tool-driven
+       * (e.g. `Task`). Used to route it into a `workflow` row instead of
+       * rendering it as a top-level subagent block. */
+      callId?: ToolCallId
       phase: "started" | "completed"
       summary?: TurnSummary
       children: TimelineRow[]
+      tsMs: number
+    }
+  | {
+      type: "workflow"
+      id: string
+      callId: ToolCallId
+      toolName: string
+      steps: WorkflowStepInput[]
+      status: ToolCallStatus
+      /** Subagent slots observed so far, in arrival order — consumed
+       * front-to-back to infer each step's progress (no step index/total
+       * exists on the wire; see WorkflowGroup.tsx). */
+      subagents: WorkflowSubagentSlot[]
+      tsMs: number
+    }
+  | {
+      type: "verdict"
+      id: string
+      callId: ToolCallId
+      /** Pending/running while the `Verify` call is in flight; a settled
+       * verdict only exists once `status.state === "completed"` and the
+       * call's `result.structured` parsed as a `VerificationVerdict`. */
+      status: ToolCallStatus
+      verdict?: VerificationVerdict
+      tsMs: number
+    }
+  | {
+      type: "checkpoint"
+      id: string
+      snapshotId: string
+      turnId?: TurnId
       tsMs: number
     }
 
@@ -464,7 +657,7 @@ export const isDefaultSessionTitle = (title?: string | null): boolean => {
   return !t || t === DEFAULT_SESSION_TITLE
 }
 
-/** Title derived from the first user prompt (Cursor-style). */
+/** Title derived from the first user prompt . */
 export const titleFromPrompt = (text: string, maxLen = 48): string => {
   const cleaned = text.replace(/\s+/g, " ").trim()
   if (!cleaned) return DEFAULT_SESSION_TITLE
@@ -494,4 +687,18 @@ export type BrowserStateEvent = {
   loading: boolean
   canGoBack: boolean
   canGoForward: boolean
+  /** Navigation/load failure, when detected. Preview mock is the only source
+   * today (a deterministic failing URL) — native detection isn't reachable
+   * with the page-load hooks Tauri/wry currently expose (`PageLoadEvent` is
+   * Started/Finished only, no Failed variant), so the real `browser_open`/
+   * `browser_navigate` commands never populate this. See browser.rs's module
+   * doc comment. */
+  error?: { host: string; message: string } | null
 }
+
+// Per-file / per-hunk review actions (Changes tab Keep/Undo — the reference design pattern).
+
+/** Where a `review_apply_patch` call applies its patch: the session's
+ * working dir (worktree root if isolated, else the repo itself), or the
+ * isolated session's base repo (errors if the session isn't isolated). */
+export type ReviewPatchTarget = "worktree" | "base"

@@ -29,7 +29,7 @@ type PopoverTrayProps = {
 const ITEM_SELECTOR =
   '[role="option"]:not([disabled]), [role="menuitem"]:not([disabled])'
 
-/** Shared Cursor Glass tray — Esc + click-outside + arrow keys, tray-in motion. */
+/** Shared reference glass tray — Esc + click-outside + arrow keys, tray-in motion. */
 export const PopoverTray = ({
   open,
   onClose,

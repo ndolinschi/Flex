@@ -13,7 +13,7 @@ it's what powers them.
 - **One `Agent` interface, many implementations.** The native loop calls LLM
   APIs directly (Anthropic, OpenAI, Gemini, Ollama, Bedrock, Copilot,
   DeepSeek). Delegator implementations drive external coding agents — Claude
-  Code, ACP agents (Gemini CLI, Goose), opencode, Cursor, Copilot — behind the
+  Code, ACP agents (Gemini CLI, Goose), opencode, Copilot — behind the
   exact same interface. Any of them can run as a subagent of any other.
 - **One stream format.** Every provider and external agent's output is
   normalized into a single typed, markdown-flavored event stream (text,
@@ -42,6 +42,7 @@ it's what powers them.
 ├── README.md                  # this file
 ├── install.sh                 # build + install the `flex` runner globally
 ├── packages/
+│   ├── desktop/               # Tauri 2 + React desktop app — second composition root
 │   ├── engine/                # cargo workspace — provider-agnostic native engine
 │   │   ├── crates/
 │   │   │   ├── contracts/     # pure data: events, content blocks, ToolCall, branding
@@ -69,7 +70,7 @@ it's what powers them.
 │   │       ├── bedrock/       # AWS Bedrock client
 │   │       ├── copilot/       # GitHub Copilot device-flow auth + API client
 │   │       └── delegators/    # external-agent connectors (acp, claude-code, copilot,
-│   │                          #   cursor, opencode) + shared common
+│   │                          #   opencode) + shared common
 │   ├── search/                # cargo workspace — deep-search plugin
 │   │   └── crates/search/     # SearchPlugin: search_web + scrape_page + researcher role
 │   └── sdk/                   # cargo workspace — builder API + headless runner
@@ -110,6 +111,30 @@ Set an API key inline (bypasses environment variables):
 ```bash
 flex run --provider deepseek -p "..." --key sk-...
 ```
+
+## Desktop app
+
+`packages/desktop` is a native desktop app (Tauri 2 + React) — a second
+composition root over `AgentBuilder`, alongside the `flex` CLI. It's an
+agents-first chat UI, not an IDE:
+
+- Multi-provider sessions with named connection profiles, including AWS
+  Bedrock bearer auth.
+- Per-session git-worktree isolation with a review flow — per-file/hunk
+  keep/undo, checkpoints.
+- Embedded browser, a real PTY terminal, and a read-only terminal for
+  watching the agent work.
+- Plan mode with approval, a live subagent viewer, per-project and global
+  memory, MCP servers, an effort picker, and session-scoped change tracking.
+
+```bash
+cd packages/desktop
+npm install
+npm run tauri dev
+```
+
+See [packages/desktop/README.md](packages/desktop/README.md) for prerequisites,
+provider setup, and keyboard shortcuts.
 
 ## SDK — embed in your own Rust project
 

@@ -13,6 +13,10 @@ dist-ssr
 *.local
 .preview-shots
 
+# Research / extraction notes (not for public commit)
+design-map/
+DESIGN-NOTES.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

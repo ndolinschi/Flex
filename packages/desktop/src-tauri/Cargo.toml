@@ -13,17 +13,26 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["unstable"] }
+tauri = { version = "2", features = ["unstable", "devtools"] }
 tauri-plugin-opener = "2"
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-window-state = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Reads MCP server configs (~/.config/agentloop/mcp/*.toml) synchronously at
+# service-composition time; agentloop-sdk's FileMcpStore covers the async CRUD path.
+toml = "0.8"
 thiserror = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
 futures = "0.3"
 keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
+# Local encrypted secrets store (safeStorage-style pattern) — see src/secrets.rs.
+aes-gcm = "0.11"
+rand = "0.10"
 tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dirs = "6"
 # Gitignore-aware file walk backing the composer @-mention file search.
 ignore = "0.4"
@@ -42,5 +51,9 @@ agentloop-session = { path = "../../engine/crates/session" }
 agentloop-workspace = { path = "../../engine/crates/workspace" }
 # WorkspaceStatus DTO for workspace_status command.
 agentloop-core = { path = "../../engine/crates/core" }
+# RoleSpec/RoleToolProfile for composing Flex composer-mode roles — not re-exported by the SDK.
+agentloop-engine = { path = "../../engine/crates/engine" }
 # RoutineSpec/RoutineTrigger/RoutineStore/RoutineRunRecord — not re-exported by the SDK.
 agentloop-channel = { path = "../../gateway/crates/channel" }
+# load_memory_section/MemoryConfig for per-project memory prompt injection — not re-exported by the SDK.
+agentloop-prompts = { path = "../../engine/crates/prompts" }

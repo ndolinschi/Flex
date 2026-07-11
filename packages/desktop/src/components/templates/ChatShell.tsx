@@ -1,6 +1,13 @@
-import { useEffect, useRef, type ReactNode } from "react"
+import type { CSSProperties, ReactNode } from "react"
 import { AppHeader } from "../organisms"
 import { cn } from "../../lib/utils"
+import { useAppStore } from "../../stores/appStore"
+
+const QUICKSTART_SUGGESTIONS = [
+  "Fix a bug in this repo",
+  "Explain the architecture",
+  "Add tests for recent changes",
+]
 
 type ChatShellProps = {
   sidebar?: ReactNode
@@ -23,41 +30,27 @@ export const ChatShell = ({
   heroTitle = "Agent",
   heroHint = "Describe a task to start the native agent loop.",
 }: ChatShellProps) => {
-  const backdropRef = useRef<HTMLDivElement>(null)
+  const setComposerDraft = useAppStore((s) => s.setComposerDraft)
+  // "tight" viewport (~<680px, see hooks/useViewportWidth): tighten the chat
+  // gutters. TurnTimeline/Composer both size their content rail off the
+  // --content-rail custom property (`max-w-[var(--content-rail)]`), and
+  // custom properties cascade to descendants, so overriding it here narrows
+  // both without editing either (TurnTimeline is out of scope for this pass).
+  const tight = useAppStore((s) => s.viewport === "tight")
 
-  // #region agent log
-  useEffect(() => {
-    if (!overlay) return
-    const backdrop = backdropRef.current
-    if (!backdrop) return
-    const br = backdrop.getBoundingClientRect()
-    fetch("http://127.0.0.1:7399/ingest/4642b0a4-a520-4891-a625-7f347f2070b9", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "34bae6",
-      },
-      body: JSON.stringify({
-        sessionId: "34bae6",
-        runId: "post-fix",
-        hypothesisId: "H2",
-        location: "ChatShell.tsx:backdrop",
-        message: "full-main backdrop geometry",
-        data: {
-          backdropTop: Math.round(br.top),
-          backdropHeight: Math.round(br.height),
-          viewportH: window.innerHeight,
-          coversFullMain: br.top <= 80 && br.height >= window.innerHeight * 0.7,
-          strategy: "absolute-inset-0-on-main",
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-  }, [overlay, composerHero])
-  // #endregion
+  const handleQuickstart = (text: string) => {
+    setComposerDraft(text)
+    window.requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLTextAreaElement>("[data-composer]")
+      el?.focus()
+    })
+  }
 
   const pane = (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+    <div
+      className="flex h-full min-h-0 min-w-0 flex-1 flex-col"
+      style={tight ? ({ "--content-rail": "100%" } as CSSProperties) : undefined}
+    >
       <AppHeader />
       <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div
@@ -71,11 +64,28 @@ export const ChatShell = ({
 
         {composerHero ? (
           <div className="flex min-h-0 flex-1 flex-col justify-center overflow-y-auto">
-            <div className="mx-auto mb-5 w-full max-w-[var(--content-rail)] px-4 text-center">
+            <div
+              className={cn(
+                "mx-auto mb-5 w-full max-w-[var(--content-rail)] text-center",
+                tight ? "px-3" : "px-4",
+              )}
+            >
               <h2 className="mb-4 truncate text-[28px] font-semibold leading-none tracking-[-0.04em] text-ink">
                 {heroTitle}
               </h2>
               <p className="text-base text-ink-muted">{heroHint}</p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {QUICKSTART_SUGGESTIONS.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => handleQuickstart(suggestion)}
+                    className="rounded-full border border-stroke-3 px-3 py-1 text-sm text-ink-secondary transition-colors hover:border-stroke-2 hover:bg-fill-4"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
             </div>
             {composer}
             <div className="pb-3" />
@@ -83,7 +93,12 @@ export const ChatShell = ({
         ) : (
           <div className="relative z-50 shrink-0 pb-3">
             {overlay ? (
-              <div className="absolute inset-x-0 bottom-full z-50 mb-3 flex justify-center px-4">
+              <div
+                className={cn(
+                  "absolute inset-x-0 bottom-full z-50 mb-3 flex justify-center",
+                  tight ? "px-3" : "px-4",
+                )}
+              >
                 {overlay}
               </div>
             ) : null}
@@ -93,14 +108,18 @@ export const ChatShell = ({
 
         {overlay ? (
           <div
-            ref={backdropRef}
-            className="absolute inset-0 z-40 bg-black/15 animate-backdrop-in"
+            className="pointer-events-none absolute inset-0 z-40 bg-black/15 animate-backdrop-in"
             aria-hidden
           />
         ) : null}
 
         {composerHero && overlay ? (
-          <div className="absolute inset-x-0 bottom-6 z-50 flex justify-center px-4">
+          <div
+            className={cn(
+              "absolute inset-x-0 bottom-6 z-50 flex justify-center",
+              tight ? "px-3" : "px-4",
+            )}
+          >
             {overlay}
           </div>
         ) : null}

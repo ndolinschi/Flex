@@ -12,8 +12,9 @@ export const WelcomePage = () => {
           Configure a provider to get started
         </h1>
         <p className="mb-6 text-sm text-ink-muted">
-          Choose a native provider, set host and API key (stored in the OS
-          keychain), then create sessions and stream turns.
+          Choose a native provider, set host and API key (encrypted locally
+          by default — no system prompts; the OS Keychain is available under
+          Security below), then create sessions and stream turns.
         </p>
 
         <ProviderSettingsForm />

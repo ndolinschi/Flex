@@ -7,7 +7,7 @@ type AttachmentChipProps = {
   onRemove: (id: string) => void
 }
 
-/** Cursor-style context pill: file icon + name + inline remove. */
+/** context pill: file icon + name + inline remove. */
 export const AttachmentChip = ({ attachment, onRemove }: AttachmentChipProps) => {
   const Icon = attachment.kind === "image" ? ImageIcon : FileIcon
 

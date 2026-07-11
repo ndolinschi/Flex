@@ -20,7 +20,7 @@ export const formatRelativeTime = (tsMs: number): string => {
   return `${days}d ago`
 }
 
-/** Cursor-style turn duration: "12s", "1m 9s", "1h 2m". */
+/** turn duration: "12s", "1m 9s", "1h 2m". */
 export const formatDuration = (ms: number): string => {
   const totalSeconds = Math.max(1, Math.round(ms / 1000))
   if (totalSeconds < 60) return `${totalSeconds}s`
@@ -58,7 +58,7 @@ export const basename = (path: string): string => {
   return segment || trimmed || path
 }
 
-/** Compact Cursor-style relative time for sidebar rows. */
+/** Compact relative time for sidebar rows. */
 export const formatCompactTime = (tsMs: number): string => {
   const diff = Date.now() - tsMs
   const minutes = Math.floor(diff / 60_000)
@@ -69,6 +69,20 @@ export const formatCompactTime = (tsMs: number): string => {
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d`
   return `${Math.floor(days / 7)}w`
+}
+
+/** Countdown label for a memory expiry pill: "expires in 6d" / "expires in
+ * 3h" / "expires in 12m", or "expired" once past. Deliberately coarse (one
+ * unit, no combining) to stay compact at 11px in a list row. */
+export const formatCountdown = (expiresAtMs: number, now: number = Date.now()): string => {
+  const diff = expiresAtMs - now
+  if (diff <= 0) return "expired"
+  const minutes = Math.ceil(diff / 60_000)
+  if (minutes < 60) return `expires in ${minutes}m`
+  const hours = Math.ceil(minutes / 60)
+  if (hours < 24) return `expires in ${hours}h`
+  const days = Math.ceil(hours / 24)
+  return `expires in ${days}d`
 }
 
 /** Lucide icon for a file path by extension (Changes panel). */

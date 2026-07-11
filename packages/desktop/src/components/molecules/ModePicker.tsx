@@ -48,7 +48,7 @@ type ModePickerProps = {
   disabled?: boolean
 }
 
-/** Cursor-style Agent / Plan / Ask mode pill for the composer footer. */
+/** Agent / Plan / Ask mode pill for the composer footer. */
 export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -92,7 +92,6 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
           return (
             <PopoverItem
               key={mode.id}
-              active={isActive}
               onClick={() => {
                 onChange(mode.id)
                 setOpen(false)

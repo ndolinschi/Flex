@@ -50,8 +50,8 @@ export const SessionMenu = ({
   const snapshots = useAppStore(
     (s) => s.snapshotsBySession[sessionId] ?? EMPTY_SNAPSHOTS,
   )
-  const cursor = useAppStore((s) => s.snapshotCursorBySession[sessionId] ?? -1)
-  const setSnapshotCursor = useAppStore((s) => s.setSnapshotCursor)
+  const cursor = useAppStore((s) => s.snapshotIndexBySession[sessionId] ?? -1)
+  const setSnapshotIndex = useAppStore((s) => s.setSnapshotIndex)
 
   const { data: isolated = false, refetch: refetchIsolated } = useQuery({
     queryKey: ["is-isolated", sessionId],
@@ -143,7 +143,7 @@ export const SessionMenu = ({
     setError(null)
     try {
       await revertSnapshot(sessionId, target)
-      setSnapshotCursor(sessionId, Math.max(effectiveIndex - 1, -1))
+      setSnapshotIndex(sessionId, Math.max(effectiveIndex - 1, -1))
     } catch (err) {
       setError(toInvokeError(err))
     } finally {
@@ -160,7 +160,7 @@ export const SessionMenu = ({
     setError(null)
     try {
       await revertSnapshot(sessionId, target)
-      setSnapshotCursor(sessionId, next === tipIndex ? -1 : next)
+      setSnapshotIndex(sessionId, next === tipIndex ? -1 : next)
     } catch (err) {
       setError(toInvokeError(err))
     } finally {

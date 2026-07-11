@@ -3,6 +3,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -13,15 +14,42 @@ import {
   Globe,
   RefreshCw,
   Terminal as TerminalIcon,
+  Undo2,
+  X,
   XCircle,
 } from "lucide-react"
 import { Button, IconButton, RunningDot, ScrollArea, Spinner } from "../atoms"
-import { Collapsible, DiffView, MarkdownBody, PlanStatusIcon } from "../molecules"
+import {
+  Collapsible,
+  ConfirmDialog,
+  DiffView,
+  MarkdownBody,
+  PlanBuildBar,
+  PlanStatusIcon,
+  VerdictBadge,
+} from "../molecules"
+import { usePlanBuild } from "../../hooks/usePlanBuild"
+import { useSessionEvents } from "../../hooks/useSessionEvents"
 import { useSessions } from "../../hooks/useSessions"
-import { useWorkspaceActions } from "../../hooks/useWorkspaceActions"
-import { gitBranch, gitDiff, gitStatus, isIsolated } from "../../lib/tauri"
+import {
+  invalidateReviewQueries,
+  useWorkspaceActions,
+} from "../../hooks/useWorkspaceActions"
+import { buildPatch, type Hunk, type ParsedDiffFile } from "../../lib/diff"
+import {
+  gitBranch,
+  gitIsRepo,
+  gitStatusSinceBaseline,
+  isIsolated,
+  reviewApplyPatch,
+  reviewFileDiff,
+  reviewKeepFile,
+  reviewUndoFile,
+  toInvokeError,
+} from "../../lib/tauri"
 import type { GitFileStatus, PlanEntry, SessionMeta } from "../../lib/types"
 import { sessionLabel } from "../../lib/types"
+import { formatRelativeTime } from "../../lib/utils"
 import { useAppStore, type RightPanelTab } from "../../stores/appStore"
 import { basename, cn, fileIconForPath, formatTokens } from "../../lib/utils"
 import { BrowserTab } from "./BrowserTab"
@@ -41,6 +69,10 @@ const TABS: Array<{
 /** Stable empty list — inline `?? []` in a Zustand selector re-renders forever. */
 const EMPTY_ENTRIES: PlanEntry[] = []
 
+// Mirrors RIGHT_PANEL_DEFAULT_WIDTH in stores/appStore.ts (not exported there;
+// setRightPanelWidth clamps internally so this only needs to match the default).
+const RIGHT_PANEL_DEFAULT_WIDTH = 380
+
 /* ── Plan tab ─────────────────────────────────────────────────────────── */
 
 const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
@@ -54,6 +86,22 @@ const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
   const setPendingPlanApproval = useAppStore((s) => s.setPendingPlanApproval)
   const setComposerMode = useAppStore((s) => s.setComposerMode)
   const setComposerDraft = useAppStore((s) => s.setComposerDraft)
+  const composerMode = useAppStore((s) => s.composerMode)
+  const isStreaming = useAppStore((s) =>
+    active ? !!s.streamingSessions[active.id] || s.isStreaming : false,
+  )
+  const { buildPlan, isBuilding } = usePlanBuild()
+  // Latest `Verify` call's verdict for this session, if any — verification
+  // only ever appears in `run_goal`/routine runs (GoalSpec.require_verification),
+  // never plain interactive prompts, so this is usually empty in normal chat.
+  const { rows } = useSessionEvents(active?.id ?? null)
+  const latestVerdictRow = useMemo(() => {
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const row = rows[i]
+      if (row.type === "verdict") return row
+    }
+    return undefined
+  }, [rows])
 
   const awaitingApproval =
     !!active &&
@@ -64,6 +112,14 @@ const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     setPendingPlanApproval(null)
   }
 
+  const handleBuild = () => {
+    if (!active) return
+    void buildPlan(active.id)
+  }
+
+  // Reuses the exact behavior of the old PlanApprovalCard overlay: leave plan
+  // mode, seed the draft, then dispatch a synthetic Cmd+Enter at the composer
+  // so the existing send path (not a second code path) fires the turn.
   const handleApprove = () => {
     setPendingPlanApproval(null)
     setComposerMode("agent")
@@ -89,6 +145,13 @@ const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
   const done = entries.filter((e) => e.status === "completed").length
   const running = entries.some((e) => e.status === "in_progress")
   const built = entries.length > 0 && done === entries.length
+  // design: Build once a plan exists and work hasn't started yet.
+  const canBuild =
+    !!planDoc &&
+    !built &&
+    !running &&
+    !isStreaming &&
+    (awaitingApproval || composerMode === "plan")
 
   return (
     <>
@@ -103,7 +166,7 @@ const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
           {sessionLabel(active)}
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-1">
-          {awaitingApproval ? (
+          {awaitingApproval || canBuild ? (
             <span className="text-ink-secondary">Ready for review</span>
           ) : built ? (
             <span className="flex items-center gap-1 text-yellow">
@@ -121,6 +184,16 @@ const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto w-full max-w-[800px] px-6 pb-16 pt-8">
+          {awaitingApproval ? (
+            <div className="mb-4 flex items-center justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={handleKeepPlanning}>
+                Keep planning
+              </Button>
+              <Button variant="primary" size="sm" onClick={handleApprove}>
+                Approve &amp; build
+              </Button>
+            </div>
+          ) : null}
           <h1 className="text-[22px] font-semibold leading-7 text-ink">
             {sessionLabel(active)}
           </h1>
@@ -133,6 +206,24 @@ const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
           {planDoc ? (
             <div className="mt-5">
               <MarkdownBody content={planDoc} />
+            </div>
+          ) : null}
+
+          {latestVerdictRow ? (
+            <div className="mt-6">
+              <h2 className="mb-1 text-sm font-medium text-ink-secondary">
+                Verification
+              </h2>
+              <div className="flex items-center gap-2 border-b border-stroke-4 py-2">
+                <VerdictBadge
+                  verdict={latestVerdictRow.verdict}
+                  running={latestVerdictRow.status.state !== "completed"}
+                  className="flex-1"
+                />
+                <span className="shrink-0 text-sm text-ink-faint">
+                  {formatRelativeTime(latestVerdictRow.tsMs)}
+                </span>
+              </div>
             </div>
           ) : null}
 
@@ -170,15 +261,8 @@ const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
         </div>
       </ScrollArea>
 
-      {awaitingApproval ? (
-        <div className="flex shrink-0 items-center justify-end gap-1.5 border-t border-stroke-3 px-3 py-2.5">
-          <Button variant="ghost" size="sm" onClick={handleKeepPlanning}>
-            Keep planning
-          </Button>
-          <Button variant="primary" size="sm" onClick={handleApprove}>
-            Approve &amp; build
-          </Button>
-        </div>
+      {canBuild && !awaitingApproval ? (
+        <PlanBuildBar onBuild={handleBuild} isBuilding={isBuilding} />
       ) : null}
     </>
   )
@@ -194,49 +278,165 @@ const STATUS_COLOR: Record<string, string> = {
   R: "text-blue",
 }
 
+/** Dir prefix of a file row's path, truncated from the LEFT when it doesn't
+ * fit — the reference trick: the outer span is `direction: rtl` so ellipsis lands
+ * on the left, but the text itself must stay logically LTR (a path, not
+ * Arabic), so it's wrapped in an inner `direction: ltr` span. */
+const PathPrefix = ({ dir }: { dir: string }) => {
+  if (!dir) return null
+  return (
+    <span
+      className="min-w-0 shrink overflow-hidden text-ellipsis whitespace-nowrap text-xs opacity-40"
+      style={{ direction: "rtl" }}
+    >
+      <span style={{ direction: "ltr", unicodeBidi: "embed" }}>{dir}</span>
+    </span>
+  )
+}
+
 const FileRow = ({
   file,
-  cwd,
+  sessionId,
+  isolated,
   expanded,
   onToggle,
+  onError,
 }: {
   file: GitFileStatus
-  cwd: string
+  sessionId: string | null
+  isolated: boolean
   expanded: boolean
   onToggle: () => void
+  onError: (message: string) => void
 }) => {
-  const dir = file.path.includes("/")
+  // A trailing-slash path is an untracked-directory porcelain entry (e.g.
+  // "public/"), not a file — render it as just "public/" instead of
+  // splitting it into a "public/" prefix + "public" basename, which would
+  // duplicate the name (see `capture_session_baseline`'s "dir" sentinel).
+  const isDir = file.path.endsWith("/")
+  const dir = !isDir && file.path.includes("/")
     ? file.path.slice(0, file.path.lastIndexOf("/") + 1)
     : ""
-  const name = basename(file.path)
+  const name = isDir ? file.path : basename(file.path)
   const FileGlyph = fileIconForPath(file.path)
+  const queryClient = useQueryClient()
+  const [busyAction, setBusyAction] = useState<"keep" | "undo" | null>(null)
+  const [confirmUndo, setConfirmUndo] = useState(false)
 
-  const { data: diff, isLoading } = useQuery({
-    queryKey: ["git-diff", cwd, file.path],
-    queryFn: () => gitDiff(cwd, file.path),
-    enabled: expanded,
+  const {
+    data: diff,
+    isLoading,
+    refetch: refetchDiff,
+  } = useQuery({
+    queryKey: ["review-file-diff", file.path, sessionId],
+    queryFn: () => reviewFileDiff(sessionId!, file.path),
+    enabled: expanded && !!sessionId,
     staleTime: 5_000,
   })
 
+  const pushToast = useAppStore((s) => s.pushToast)
+
+  const handleKeepFile = async (e: ReactMouseEvent) => {
+    e.stopPropagation()
+    if (!sessionId || busyAction) return
+    setBusyAction("keep")
+    try {
+      await reviewKeepFile(sessionId, file.path)
+      invalidateReviewQueries(queryClient, file.path)
+      pushToast(`Kept ${name}`, "success")
+    } catch (err) {
+      const message = toInvokeError(err)
+      pushToast(`Keep failed: ${message}`, "error")
+      onError(message)
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const runUndoFile = async () => {
+    if (!sessionId || busyAction) return
+    setBusyAction("undo")
+    try {
+      await reviewUndoFile(sessionId, file.path)
+      invalidateReviewQueries(queryClient, file.path)
+      pushToast(`Undid ${name}`, "success")
+    } catch (err) {
+      const message = toInvokeError(err)
+      pushToast(`Undo failed: ${message}`, "error")
+      onError(message)
+    } finally {
+      setBusyAction(null)
+      setConfirmUndo(false)
+    }
+  }
+
+  const handleKeepHunk = async (hunk: Hunk, diffFile: ParsedDiffFile) => {
+    if (!sessionId || !isolated) return
+    try {
+      await reviewApplyPatch(
+        sessionId,
+        buildPatch(diffFile, [hunk]),
+        "base",
+        false,
+      )
+      invalidateReviewQueries(queryClient, file.path)
+      void refetchDiff()
+      pushToast(`Kept hunk in ${name}`, "success")
+    } catch (err) {
+      const message = toInvokeError(err)
+      pushToast(`Keep failed: ${message}`, "error")
+      onError(message)
+    }
+  }
+
+  const handleUndoHunk = async (hunk: Hunk, diffFile: ParsedDiffFile) => {
+    if (!sessionId) return
+    try {
+      // Reverse-apply in the working dir — for non-isolated sessions
+      // "worktree" still resolves to the repo cwd (review_apply_patch /
+      // review_dirs in commands.rs: target "worktree" is always meta.cwd,
+      // isolated or not), so this hunk-undo works the same either way.
+      await reviewApplyPatch(
+        sessionId,
+        buildPatch(diffFile, [hunk]),
+        "worktree",
+        true,
+      )
+      invalidateReviewQueries(queryClient, file.path)
+      void refetchDiff()
+      pushToast(`Undid hunk in ${name}`, "success")
+    } catch (err) {
+      const message = toInvokeError(err)
+      pushToast(`Undo failed: ${message}`, "error")
+      onError(message)
+    }
+  }
+
   return (
     <li>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={expanded}
+      <div
         className={cn(
-          "group flex h-7 w-full items-center gap-2 px-3 text-left",
+          "group flex h-7 w-full items-center gap-1.5 rounded-[4px] px-3",
           "transition-colors duration-[var(--duration-fast)] hover:bg-fill-4",
         )}
       >
-        <FileGlyph
-          className="h-3.5 w-3.5 shrink-0 text-ink-muted"
-          aria-hidden
-        />
-        <span className="min-w-0 flex-1 truncate text-base">
-          <span className="text-ink-faint">{dir}</span>
-          <span className="text-ink-secondary">{name}</span>
-        </span>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        >
+          <FileGlyph
+            className="h-3.5 w-3.5 shrink-0 text-ink-muted"
+            aria-hidden
+          />
+          <span className="flex min-w-0 flex-1 items-center gap-0">
+            <PathPrefix dir={dir} />
+            <span className="shrink-0 truncate text-sm text-ink-secondary">
+              {name}
+            </span>
+          </span>
+        </button>
         <span className="flex shrink-0 items-center gap-1 text-sm [font-variant-numeric:tabular-nums]">
           {typeof file.added === "number" ? (
             <span className="text-green">+{file.added}</span>
@@ -266,6 +466,40 @@ const FileRow = ({
             {file.status === "?" ? "U" : file.status}
           </span>
         </span>
+        {/* Per-file quick actions — hidden until row hover, gap 4px per spec.
+            Keep is meaningless without a base repo (non-isolated sessions
+            have nowhere to "keep" into), so it's isolated-only. */}
+        <span className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-[var(--duration-fast)] group-hover:opacity-100">
+          {isolated ? (
+            <IconButton
+              label="Keep"
+              onClick={handleKeepFile}
+              disabled={busyAction !== null}
+              className="h-6 w-6"
+            >
+              {busyAction === "keep" ? (
+                <Spinner size="sm" />
+              ) : (
+                <Check className="h-3.5 w-3.5" aria-hidden />
+              )}
+            </IconButton>
+          ) : null}
+          <IconButton
+            label="Undo"
+            onClick={(e) => {
+              e.stopPropagation()
+              setConfirmUndo(true)
+            }}
+            disabled={busyAction !== null}
+            className="h-6 w-6"
+          >
+            {busyAction === "undo" ? (
+              <Spinner size="sm" />
+            ) : (
+              <Undo2 className="h-3.5 w-3.5" aria-hidden />
+            )}
+          </IconButton>
+        </span>
         <ChevronRight
           className={cn(
             "h-2.5 w-2.5 shrink-0 text-icon-3",
@@ -275,8 +509,9 @@ const FileRow = ({
               : "opacity-0 group-hover:opacity-100",
           )}
           aria-hidden
+          onClick={onToggle}
         />
-      </button>
+      </div>
       <Collapsible open={expanded}>
         <div className="border-y border-stroke-4 bg-fill-5 py-1">
           {isLoading ? (
@@ -284,10 +519,25 @@ const FileRow = ({
               <Spinner size="sm" /> Loading diff…
             </div>
           ) : (
-            <DiffView diff={diff ?? ""} />
+            <DiffView
+              diff={diff ?? ""}
+              onKeepHunk={isolated ? handleKeepHunk : undefined}
+              onUndoHunk={handleUndoHunk}
+            />
           )}
         </div>
       </Collapsible>
+
+      <ConfirmDialog
+        open={confirmUndo}
+        title={`Undo changes to ${name}?`}
+        description="This reverts the file to its base state."
+        confirmLabel="Undo"
+        danger
+        isLoading={busyAction === "undo"}
+        onConfirm={() => void runUndoFile()}
+        onCancel={() => setConfirmUndo(false)}
+      />
     </li>
   )
 }
@@ -297,50 +547,32 @@ const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
   const sessionId = active?.id ?? null
   const [expandedPath, setExpandedPath] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   const queryClient = useQueryClient()
 
-  const { data: files = [], refetch, isFetching } = useQuery({
-    queryKey: ["git-status", cwd],
-    queryFn: () => gitStatus(cwd),
+  // Gate session-scoped git queries/actions on the cwd actually being a git
+  // repo — defaults to `true` while loading/no cwd so this never flashes the
+  // "not a git repository" empty state for an instant on a real repo before
+  // the query resolves (mirrors ContextBar's `isRepo` gating).
+  const { data: isRepo = true } = useQuery({
+    queryKey: ["git-is-repo", cwd],
+    queryFn: () => gitIsRepo(cwd),
     enabled: !!cwd,
+    staleTime: 15_000,
+  })
+
+  const { data: files = [], refetch, isFetching } = useQuery({
+    queryKey: ["git-status", cwd, sessionId],
+    queryFn: () => gitStatusSinceBaseline(sessionId!),
+    enabled: !!cwd && !!sessionId && isRepo,
     refetchInterval: 5_000,
     refetchOnWindowFocus: true,
   })
 
-  // #region agent log
-  useEffect(() => {
-    if (files.length === 0) return
-    const statuses = files.map((f) => f.status)
-    const questionCount = statuses.filter((s) => s === "?").length
-    fetch("http://127.0.0.1:7399/ingest/4642b0a4-a520-4891-a625-7f347f2070b9", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "34bae6",
-      },
-      body: JSON.stringify({
-        sessionId: "34bae6",
-        runId: "post-fix",
-        hypothesisId: "H5",
-        location: "RightPanel.tsx:ChangesTab",
-        message: "changes uses file icons + status letter on right",
-        data: {
-          fileCount: files.length,
-          statuses,
-          questionMarkCount: questionCount,
-          rendersFileIcons: true,
-          statusLetterAsQuestionMark: false,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-  }, [files])
-  // #endregion
-
   const { data: branch } = useQuery({
     queryKey: ["git-branch", cwd],
     queryFn: () => gitBranch(cwd),
-    enabled: !!cwd,
+    enabled: !!cwd && isRepo,
     staleTime: 10_000,
   })
 
@@ -377,10 +609,26 @@ const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     [files],
   )
 
+  // design: the aggregate bar's buttons read "Keep All"/"Undo All" when
+  // multiple files are pending, singular "Keep"/"Undo" for exactly one — one
+  // bar, label swaps, not separate components.
+  const aggregateSuffix = files.length === 1 ? "" : " All"
+
   if (!active) {
     return (
       <div className="flex flex-1 items-center justify-center px-6 text-center">
         <p className="text-sm text-ink-muted">No active session.</p>
+      </div>
+    )
+  }
+
+  // No git repo in this cwd at all — calm empty state, not an error. A repo
+  // with an unborn HEAD (no commits yet) is still `isRepo === true` and
+  // keeps the regular UI below (see `git_is_repo`'s doc comment).
+  if (!isRepo) {
+    return (
+      <div className="flex flex-1 items-center justify-center px-6 text-center">
+        <p className="text-sm text-ink-muted">Not a git repository.</p>
       </div>
     )
   }
@@ -430,20 +678,22 @@ const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
               <FileRow
                 key={file.path}
                 file={file}
-                cwd={cwd}
+                sessionId={sessionId}
+                isolated={isolated}
                 expanded={expandedPath === file.path}
                 onToggle={() =>
                   setExpandedPath((prev) =>
                     prev === file.path ? null : file.path,
                   )
                 }
+                onError={setError}
               />
             ))}
           </ul>
         )}
       </ScrollArea>
 
-      {isolated ? (
+      {isolated && files.length > 0 ? (
         <div className="flex shrink-0 items-center gap-1.5 border-t border-stroke-3 px-3 py-2">
           <Button
             variant="secondary"
@@ -451,40 +701,102 @@ const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             isLoading={workspace.busy}
             onClick={() => void workspace.integrate()}
           >
-            <GitMerge className="h-3 w-3" aria-hidden /> Integrate
+            <GitMerge className="h-3 w-3" aria-hidden /> Keep{aggregateSuffix}
           </Button>
           <Button
             variant="ghost"
             size="sm"
             disabled={workspace.busy}
-            onClick={() => void workspace.discard()}
+            onClick={() => setConfirmDiscard(true)}
           >
-            <XCircle className="h-3 w-3" aria-hidden /> Discard
+            <XCircle className="h-3 w-3" aria-hidden /> Undo{aggregateSuffix}
           </Button>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmDiscard}
+        title={`Undo${aggregateSuffix === "" ? "" : " all"} changes?`}
+        description={
+          files.length === 1
+            ? "This discards the isolated workspace's change and reverts the file to its base state."
+            : "This discards the isolated workspace and reverts every changed file to its base state."
+        }
+        confirmLabel={`Undo${aggregateSuffix}`}
+        danger
+        isLoading={workspace.busy}
+        onConfirm={() => {
+          void workspace.discard()
+          setConfirmDiscard(false)
+        }}
+        onCancel={() => setConfirmDiscard(false)}
+      />
     </>
   )
 }
 
 /* ── Panel shell ──────────────────────────────────────────────────────── */
 
-/** Cursor-style right panel: Plan / Changes tabs, resizable via a left sash. */
+/** right panel: Plan / Changes tabs, resizable via a left sash.
+ *
+ * Below the "narrow" viewport breakpoint (~940px, see hooks/useViewportWidth)
+ * the panel switches from a side-by-side flex column to an absolutely
+ * positioned overlay anchored to the right edge of the chat area, with a
+ * dim backdrop that closes it on click — same width clamp, same open/close
+ * state (`rightPanelOpen` semantics are unchanged, this is presentational
+ * only). At "wide" it renders exactly as before. */
 export const RightPanel = () => {
-  const open = useAppStore((s) => s.rightPanelOpen)
+  const rightPanelOpen = useAppStore((s) => s.rightPanelOpen)
+  const route = useAppStore((s) => s.route)
+  const viewport = useAppStore((s) => s.viewport)
+  const narrow = viewport !== "wide"
+  // Overlay routes (settings/automations/memory/customize) render as absolute
+  // panes over ChatPage (see App.tsx) — the right panel belongs to chat only,
+  // so it must hide there. Compute an *effective* open instead of unmounting:
+  // terminals/webview must survive the route swap (PTYs / the native browser
+  // webview are expensive to recreate), so this reuses the exact same
+  // width-0/hidden mechanics as the user manually closing the panel.
+  const open = rightPanelOpen && route === "chat"
   const tab = useAppStore((s) => s.rightPanelTab)
   const setTab = useAppStore((s) => s.setRightPanelTab)
+  const setRightPanelOpen = useAppStore((s) => s.setRightPanelOpen)
   const width = useAppStore((s) => s.rightPanelWidth)
   const setWidth = useAppStore((s) => s.setRightPanelWidth)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
+  const pendingPlanApproval = useAppStore((s) => s.pendingPlanApproval)
   const { sessions } = useSessions()
   const active = sessions.find((s) => s.id === activeSessionId)
   const [dragging, setDragging] = useState(false)
 
+  // auto-reveal: the moment a plan awaits approval for the
+  // active session, surface it — open the panel and switch to Plan — instead
+  // of leaving it to a background tab the user might not be looking at.
+  const awaitingApprovalForActive =
+    !!activeSessionId &&
+    !!pendingPlanApproval &&
+    pendingPlanApproval.sessionId === activeSessionId
+  const prevAwaitingRef = useRef(false)
+  useEffect(() => {
+    if (awaitingApprovalForActive && !prevAwaitingRef.current) {
+      setRightPanelOpen(true)
+      setTab("plan")
+    }
+    prevAwaitingRef.current = awaitingApprovalForActive
+  }, [awaitingApprovalForActive, setRightPanelOpen, setTab])
+
+  // Gate the tab's changes-count badge on the cwd being a git repo — see
+  // ChangesTab's own `isRepo` gating for the full rationale.
+  const isRepoForBadge = useQuery({
+    queryKey: ["git-is-repo", active?.cwd ?? ""],
+    queryFn: () => gitIsRepo(active!.cwd),
+    enabled: !!active?.cwd,
+    staleTime: 15_000,
+  }).data
+
   const changesCount = useQuery({
-    queryKey: ["git-status", active?.cwd ?? ""],
-    queryFn: () => gitStatus(active?.cwd ?? ""),
-    enabled: !!active?.cwd && open,
+    queryKey: ["git-status", active?.cwd ?? "", active?.id ?? null],
+    queryFn: () => gitStatusSinceBaseline(active!.id),
+    enabled: !!active?.cwd && !!active?.id && open && isRepoForBadge !== false,
     refetchInterval: 10_000,
   }).data?.length
 
@@ -508,79 +820,114 @@ export const RightPanel = () => {
     window.addEventListener("pointerup", onUp)
   }
 
+  const handleSashDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setWidth(RIGHT_PANEL_DEFAULT_WIDTH, true)
+  }
+
   return (
-    <aside
-      style={open ? { width } : undefined}
-      className={cn(
-        "relative flex h-full shrink-0 flex-col overflow-hidden bg-bg",
-        !dragging &&
-          "transition-[width,opacity] duration-[var(--duration-normal)] ease-[var(--easing-default)]",
-        open
-          ? "border-l border-stroke-3 opacity-100"
-          : "w-0 border-l-0 opacity-0 pointer-events-none",
-      )}
-      aria-hidden={!open}
-      aria-label="Details panel"
-    >
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        onPointerDown={handleSashDown}
-        className={cn(
-          "absolute inset-y-0 left-0 z-10 w-1 cursor-ew-resize",
-          "transition-colors duration-[var(--duration-fast)] hover:bg-stroke-2",
-          dragging && "bg-stroke-1",
-        )}
-      />
-
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-3 border-b border-stroke-3 px-1">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            aria-selected={tab === t.id}
-            role="tab"
-            className={cn(
-              "flex items-center gap-1.5 rounded-[4px] px-1.5 py-[2px] text-sm",
-              "transition-colors duration-[var(--duration-fast)]",
-              tab === t.id
-                ? "bg-fill-3 text-ink"
-                : "text-ink-muted hover:bg-fill-4 hover:text-ink-secondary",
-            )}
-          >
-            {t.icon ? <t.icon className="h-3.5 w-3.5" aria-hidden /> : null}
-            {t.label}
-            {t.id === "changes" && changesCount ? (
-              <span className="text-ink-faint [font-variant-numeric:tabular-nums]">
-                {changesCount}
-              </span>
-            ) : null}
-          </button>
-        ))}
-      </div>
-
-      {tab === "plan" ? (
-        <PlanTab active={active} />
-      ) : tab === "changes" ? (
-        <ChangesTab active={active} />
+    <>
+      {narrow && open ? (
+        <div
+          className="absolute inset-0 z-20 bg-black/30 animate-backdrop-in"
+          aria-hidden
+          onClick={() => setRightPanelOpen(false)}
+        />
       ) : null}
-      <div
+      <aside
+        style={open ? { width } : undefined}
         className={cn(
-          "min-h-0 flex-1 flex-col",
-          tab === "terminal" ? "flex" : "hidden",
+          "relative flex h-full shrink-0 flex-col overflow-hidden bg-bg",
+          !dragging &&
+            "transition-[width,opacity] duration-[var(--duration-normal)] ease-[var(--easing-default)]",
+          open
+            ? "border-l border-stroke-3 opacity-100"
+            : "w-0 border-l-0 opacity-0 pointer-events-none",
+          // Narrow: overlay anchored to the right edge instead of a side-by-side
+          // column — same width clamp, now floating above the chat with a shadow.
+          narrow && open ? "absolute inset-y-0 right-0 z-30 shadow-popover" : null,
         )}
+        aria-hidden={!open}
+        aria-label="Details panel"
       >
-        <TerminalTab active={open && tab === "terminal"} />
-      </div>
-      <div
-        className={cn(
-          "min-h-0 flex-1 flex-col",
-          tab === "browser" ? "flex" : "hidden",
-        )}
-      >
-        <BrowserTab active={open && tab === "browser"} />
-      </div>
-    </aside>
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize details panel"
+          aria-valuenow={width}
+          tabIndex={0}
+          onPointerDown={handleSashDown}
+          onDoubleClick={handleSashDoubleClick}
+          className={cn(
+            "sash-line-transition absolute inset-y-0 -left-[5px] z-10 w-2.5 cursor-col-resize",
+            "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent",
+            "hover:after:bg-stroke-2",
+            dragging && "after:bg-stroke-1",
+          )}
+        />
+
+        <div className="flex h-[var(--header-height)] shrink-0 items-center gap-3 border-b border-stroke-3 px-1">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              aria-selected={tab === t.id}
+              role="tab"
+              className={cn(
+                "flex items-center gap-1.5 rounded-[4px] px-1.5 py-[2px] text-sm",
+                "transition-colors duration-[var(--duration-fast)]",
+                tab === t.id
+                  ? "bg-fill-3 text-ink"
+                  : "text-ink-muted hover:bg-fill-4 hover:text-ink-secondary",
+              )}
+            >
+              {t.icon ? <t.icon className="h-3.5 w-3.5" aria-hidden /> : null}
+              {t.label}
+              {t.id === "changes" && changesCount ? (
+                <span className="text-ink-faint [font-variant-numeric:tabular-nums]">
+                  {changesCount}
+                </span>
+              ) : null}
+            </button>
+          ))}
+          {narrow ? (
+            // Full-width overlay only — wide mode has no header close button
+            // (AppHeader's ⌘J toggle covers it there) and must stay
+            // byte-identical; at narrow the panel fills the chat area so a
+            // backdrop click alone is undiscoverable.
+            <IconButton
+              label="Close panel"
+              onClick={() => setRightPanelOpen(false)}
+              className="ml-auto"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden />
+            </IconButton>
+          ) : null}
+        </div>
+
+        {tab === "plan" ? (
+          <PlanTab active={active} />
+        ) : tab === "changes" ? (
+          <ChangesTab active={active} />
+        ) : null}
+        <div
+          className={cn(
+            "min-h-0 flex-1 flex-col",
+            tab === "terminal" ? "flex" : "hidden",
+          )}
+        >
+          <TerminalTab active={open && tab === "terminal"} />
+        </div>
+        <div
+          className={cn(
+            "min-h-0 flex-1 flex-col",
+            tab === "browser" ? "flex" : "hidden",
+          )}
+        >
+          <BrowserTab active={open && tab === "browser"} />
+        </div>
+      </aside>
+    </>
   )
 }

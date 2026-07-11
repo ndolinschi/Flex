@@ -11,7 +11,7 @@ type RunningDotProps = {
   className?: string
 }
 
-/** Cursor-style animated 3×3 dot grid inside a 20px status slot. */
+/** animated 3×3 dot grid inside a 20px status slot. */
 export const RunningDot = ({ className }: RunningDotProps) => {
   return (
     <span

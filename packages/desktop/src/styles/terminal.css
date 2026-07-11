@@ -1,4 +1,4 @@
-/* Cursor-glass terminal chrome: wrapper padding + scrollbar + stripped decorations. */
+/* glass terminal chrome: wrapper padding + scrollbar + stripped decorations. */
 .glass-terminal-wrapper {
   padding: 8px 4px 8px 8px;
 }

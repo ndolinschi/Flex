@@ -28,7 +28,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `ModelSelect` | Simple model `<select>` | `models`, `value`, `onChange` | ProviderSettingsForm |
 | `ModelPicker` | Searchable model tray (PopoverTray) | `models`, `value`, `onChange` | Composer |
 | `ModePicker` | Agent / Plan / Ask pill switcher | `value`, `onChange` | Composer |
-| `PlanCard` | Checklist from `plan_updated` | `entries` | TurnTimeline |
+| `PlanBuildBar` | Cursor-style Build CTA after ExitPlanMode | `onBuild`, `onKeepPlanning?`, `variant` | RightPanel Plan tab, ChatPage |
+| `PlanCard` | Checklist from `plan_updated` (right Plan tab; not inlined in timeline) | `entries` | RightPanel |
 | `PlusMenu` | Attach + mode shortcuts (Plan/Ask) | `onAttachFile`, `onAttachImage`, `onSetMode?` | Composer |
 | `ProjectPicker` | Recent cwds + Open Folder | `sessionId`, `cwd`, `onError?` | ContextBar |
 | `BranchPicker` | List/checkout local git branches | `cwd`, `onError?` | ContextBar |
@@ -58,7 +59,6 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `TurnTimeline` | Turns + tools + plans + streaming | `sessionId` | ChatShell |
 | `PermissionPrompt` | Tool permission HITL | `permission` | ChatPage |
 | `QuestionPrompt` | AskUserQuestion HITL | `question` | ChatPage |
-| `PlanApprovalCard` | Plan approve actions (legacy overlay; Plan tab hosts approval now) | `approval` | RightPanel Plan tab (inline) |
 | `RightPanel` | Plan / Changes / Terminal / Browser | — | App shell |
 | `AppHeader` | Title + session menu | — | ChatShell |
 

@@ -1,13 +1,13 @@
 :root,
 [data-theme="dark"] {
-  /* ── Cursor 2.0 "glass" dark — authentic values from workbench.glass.main.css.
+  /* ── reference design dark — authentic values from the reference stylesheet.
      Cool, blue-tinted near-black surfaces; text is a cool off-white at low alpha;
      fills/strokes are white-alpha overlays (hover = white 7%). ─────────────── */
   --color-base: #eef2fa;
-  --color-chrome: #0c0e11; /* chat pane / main surface (cursor-bg-primary) */
-  --color-panel: #14171d; /* sidebar + popovers (cursor-bg-secondary) */
+  --color-chrome: #0c0e11; /* chat pane / main surface */
+  --color-panel: #14171d; /* sidebar + popovers */
   --color-editor: #14171d;
-  --color-elevated: #1b1f27; /* chat bubbles / raised tiles (cursor-bg-elevated) */
+  --color-elevated: #1b1f27; /* chat bubbles / raised tiles */
 
   --color-text-1: rgb(236 241 250 / 0.85);
   --color-text-2: rgb(226 233 244 / 0.62);
@@ -30,9 +30,9 @@
   --color-stroke-3: rgb(255 255 255 / 0.09);
   --color-stroke-4: rgb(255 255 255 / 0.05);
 
-  --color-accent: #5b9df2;
-  --color-accent-hover: #6fabf5;
-  --color-accent-subtle: color-mix(in srgb, #5b9df2 18%, transparent);
+  --color-accent: #81a1c1;
+  --color-accent-hover: #92aecb;
+  --color-accent-subtle: color-mix(in srgb, #81a1c1 18%, transparent);
   --color-accent-text: #0c0e11;
   --color-red: #e34671;
   --color-yellow: #f1b467;
@@ -56,7 +56,7 @@
 }
 
 [data-theme="light"] {
-  /* ── Cursor Glass light (nWn) ────────────────────────────────────────── */
+  /* ── reference glass light (nWn) ────────────────────────────────────────── */
   --color-base: #141414;
   --color-chrome: #fcfcfc;
   --color-panel: #f3f3f3;
@@ -136,6 +136,14 @@
     sans-serif;
   --font-mono: Menlo, Monaco, ui-monospace, "SF Mono", "Courier New", monospace;
 
+  /* reference canon (design-map/00-foundations.md: "Semibold canonical weight
+     = 590; 600 only in 3 minor, apparently-stale spots"). Needs the matching
+     `--font-weight-semibold: var(--font-weight-semibold);` line added to the
+     `@theme` block in src/index.css for Tailwind's `font-semibold` utility to
+     actually emit 590 (out of scope here — see report). 600 kept as a
+     documented fallback in case the 590 reading is ever contested. */
+  --font-weight-semibold: 590; /* fallback 600 */
+
   --text-xs: 0.6875rem;
   --text-sm: 0.75rem;
   --text-base: 0.8125rem;
@@ -158,7 +166,7 @@
   --space-10: 2.5rem;
   --space-12: 3rem;
 
-  /* Radius — Cursor 2.0 glass scale (sm6 / base8 / lg10 / xl14 / 2xl16). */
+  /* Radius — reference glass scale (sm6 / base8 / lg10 / xl14 / 2xl16). */
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -170,7 +178,7 @@
   --radius-full: 9999px;
   --radius-composer: 14px;
 
-  /* Shadows — Cursor Glass: stroke ring + theme-aware elevation.
+  /* Shadows — reference glass: stroke ring + theme-aware elevation.
      Colors come from per-theme --shadow-color / --shadow-ambient so they read
      correctly on both near-black (dark) and light surfaces. */
   --shadow-sm: 0 0 0 1px var(--color-stroke-3), 0 2px 8px var(--shadow-ambient);
@@ -187,19 +195,19 @@
     0 0 0 1px var(--color-stroke-3),
     0 1px 2px var(--shadow-ambient),
     0 8px 24px -6px var(--shadow-color);
-  /* Cursor has no accent glow on composer focus — neutral ring only. */
+  /* the reference design has no accent glow on composer focus — neutral ring only. */
   --shadow-composer-focus:
     0 0 0 1px var(--color-stroke-2),
     0 1px 2px var(--shadow-ambient),
     0 10px 28px -6px var(--shadow-color);
-  /* Popover chrome — Cursor's --cursor-box-shadow-xl (borderless, 4-layer). */
+  /* Popover chrome — the reference design's box-shadow-xl (borderless, 4-layer). */
   --shadow-popover:
     0 0 0 1px var(--color-stroke-3),
     0 0 4px 0 var(--shadow-ambient),
     0 12px 24px 0 var(--shadow-ambient),
     0 24px 36px 0 var(--shadow-ambient);
 
-  /* Motion — Cursor Glass (subtle) */
+  /* Motion — reference glass (subtle) */
   --duration-instant: 50ms;
   --duration-fast: 100ms;
   --duration-normal: 150ms;
@@ -207,7 +215,7 @@
   --duration-slower: 300ms;
   --duration-content: 220ms;
   --duration-end-turn: 160ms;
-  /* Cursor accordion: max-height .25s + opacity .2s ease-in-out. */
+  /* reference accordion: max-height .25s + opacity .2s ease-in-out. */
   --duration-expand: 250ms;
   --duration-expand-fade: 200ms;
   --easing-default: ease;
@@ -223,10 +231,10 @@
   --header-height: 34px;
   --composer-min-height: 2.25rem;
   --composer-max-height: 12.5rem;
-  --timeline-row-min-height: 1.75rem;
+  --timeline-row-min-height: 1.25rem;
   --status-bar-height: 1.75rem;
   --content-rail: 52.5rem;
   --form-rail: 32rem;
   --welcome-rail: 28rem;
-  --end-of-turn-reserved-height: 1.75rem;
+  --end-of-turn-reserved-height: 1.25rem;
 }

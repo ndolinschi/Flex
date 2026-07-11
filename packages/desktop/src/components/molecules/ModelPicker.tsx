@@ -1,8 +1,10 @@
-import { useMemo, useRef, useState } from "react"
-import { Check, ChevronDown } from "lucide-react"
-import type { ModelInfoDto } from "../../lib/types"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
+import { Check, ChevronDown, ChevronRight, Gauge } from "lucide-react"
+import { EFFORT_LEVELS, effortLabel } from "../../lib/types"
+import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
-import { PopoverItem, PopoverSearch, PopoverTray } from "./PopoverTray"
+import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
 
 type ModelPickerProps = {
   models: ModelInfoDto[]
@@ -10,7 +12,131 @@ type ModelPickerProps = {
   onChange: (id: string) => void
   isLoading?: boolean
   disabled?: boolean
+  /** Effort for a given model id (contracts Effort wire value, or `null` for
+   * "Default"). Reference design: effort is picked FOR a specific model,
+   * inside its dropdown row — not a global setting. */
+  effortFor?: (modelId: string) => string | null
+  onEffortChange?: (modelId: string, effort: string | null) => void
+  /** Provider id -> friendly label (from `list_builtin_providers`), used for
+   * the dropdown's section headers. Falls back to a capitalized providerId
+   * when a model's provider isn't in this list (e.g. a custom profile). */
+  builtinProviders?: BuiltinProvider[]
 }
+
+const SUBMENU_WIDTH = 144
+
+/** Effort submenu — a chevron/"Edit" affordance on EVERY model row expands
+ * Default + the 5 contract effort levels (reference design lets you set
+ * effort for any model, not just the active one). Portal-mounted (the model
+ * tray clips overflow) and viewport-clamped like ContextMenu, anchored to the
+ * trigger row's rect. */
+const EffortSubmenu = ({
+  anchorRect,
+  value,
+  onChange,
+  onClose,
+}: {
+  anchorRect: DOMRect
+  value: string | null
+  onChange: (effort: string | null) => void
+  onClose: () => void
+}) => {
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [coords, setCoords] = useState<{ x: number; y: number } | null>(null)
+
+  useLayoutEffect(() => {
+    const el = menuRef.current
+    const margin = 8
+    const height = el?.getBoundingClientRect().height ?? 0
+    let x = anchorRect.right + 4
+    let y = anchorRect.top
+    if (x + SUBMENU_WIDTH + margin > window.innerWidth) {
+      x = Math.max(margin, anchorRect.left - SUBMENU_WIDTH - 4)
+    }
+    if (y + height + margin > window.innerHeight) {
+      y = Math.max(margin, window.innerHeight - height - margin)
+    }
+    setCoords({ x, y })
+  }, [anchorRect])
+
+  useEffect(() => {
+    const handlePointer = (e: MouseEvent) => {
+      if (menuRef.current?.contains(e.target as Node)) return
+      onClose()
+    }
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        e.stopPropagation()
+        onClose()
+      }
+    }
+    document.addEventListener("mousedown", handlePointer, true)
+    document.addEventListener("keydown", handleKey, true)
+    return () => {
+      document.removeEventListener("mousedown", handlePointer, true)
+      document.removeEventListener("keydown", handleKey, true)
+    }
+  }, [onClose])
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      role="menu"
+      aria-label="Effort"
+      style={{
+        position: "fixed",
+        left: coords?.x ?? anchorRect.right,
+        top: coords?.y ?? anchorRect.top,
+        width: SUBMENU_WIDTH,
+        visibility: coords ? "visible" : "hidden",
+      }}
+      className={cn(
+        "z-[200] overflow-hidden rounded-md py-0.5",
+        "bg-panel shadow-[var(--shadow-popover)] animate-tray-in",
+      )}
+    >
+      <PopoverItem
+        role="menuitem"
+        active={value === null}
+        onClick={() => {
+          onChange(null)
+          onClose()
+        }}
+      >
+        <span className="min-w-0 flex-1 truncate text-ink">Default</span>
+        {value === null ? (
+          <Check className="h-3 w-3 shrink-0 text-accent" aria-hidden />
+        ) : null}
+      </PopoverItem>
+      {EFFORT_LEVELS.map((level) => {
+        const active = level === value
+        return (
+          <PopoverItem
+            key={level}
+            role="menuitem"
+            active={active}
+            onClick={() => {
+              onChange(level)
+              onClose()
+            }}
+          >
+            <span className="min-w-0 flex-1 truncate text-ink">
+              {effortLabel(level)}
+            </span>
+            {active ? (
+              <Check className="h-3 w-3 shrink-0 text-accent" aria-hidden />
+            ) : null}
+          </PopoverItem>
+        )
+      })}
+    </div>,
+    document.body,
+  )
+}
+
+const capitalize = (s: string): string =>
+  s.length === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1)
 
 export const ModelPicker = ({
   models,
@@ -18,13 +144,26 @@ export const ModelPicker = ({
   onChange,
   isLoading = false,
   disabled = false,
+  effortFor,
+  onEffortChange,
+  builtinProviders = [],
 }: ModelPickerProps) => {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
+  const [effortMenuFor, setEffortMenuFor] = useState<{
+    modelId: string
+    rect: DOMRect
+  } | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
 
   const selected = models.find((m) => m.id === value)
+  const selectedEffort = value && effortFor ? effortFor(value) : null
   const label = selected?.displayName ?? selected?.id ?? "Select model"
+
+  const providerLabel = useMemo(() => {
+    const byId = new Map(builtinProviders.map((p) => [p.id, p.label]))
+    return (providerId: string) => byId.get(providerId) ?? capitalize(providerId)
+  }, [builtinProviders])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -33,13 +172,119 @@ export const ModelPicker = ({
       (m) =>
         m.id.toLowerCase().includes(q) ||
         (m.displayName?.toLowerCase().includes(q) ?? false) ||
-        m.providerId.toLowerCase().includes(q),
+        m.providerId.toLowerCase().includes(q) ||
+        providerLabel(m.providerId).toLowerCase().includes(q),
     )
-  }, [models, query])
+  }, [models, query, providerLabel])
+
+  /** Group filtered models by provider, preserving each group's first-seen
+   * order (the models list's own ordering) rather than sorting — matches
+   * the reference design's provider clusters without re-ranking providers. */
+  const groups = useMemo(() => {
+    const order: string[] = []
+    const byProvider = new Map<string, ModelInfoDto[]>()
+    for (const m of filtered) {
+      if (!byProvider.has(m.providerId)) {
+        byProvider.set(m.providerId, [])
+        order.push(m.providerId)
+      }
+      byProvider.get(m.providerId)?.push(m)
+    }
+    return order.map((providerId) => ({
+      providerId,
+      label: providerLabel(providerId),
+      items: byProvider.get(providerId) ?? [],
+    }))
+  }, [filtered, providerLabel])
 
   const handleClose = () => {
     setOpen(false)
     setQuery("")
+    setEffortMenuFor(null)
+  }
+
+  const renderRow = (m: ModelInfoDto) => {
+    const active = m.id === value
+    const modelEffort = effortFor ? effortFor(m.id) : null
+    return (
+      <li key={m.id} className="relative">
+        <PopoverItem
+          active={active}
+          onClick={() => {
+            onChange(m.id)
+            handleClose()
+          }}
+        >
+          {/* name truncates first — provider/effort/check keep their own
+              shrink-0 slots so they never get eaten by a long model name,
+              and each has an explicit gap so the effort badge and the check
+              never visually collide. */}
+          <span className="min-w-0 flex-1 truncate">
+            {m.displayName ?? m.id}
+          </span>
+          {modelEffort ? (
+            <span className="shrink-0 truncate text-xs text-ink-muted">
+              {effortLabel(modelEffort)}
+            </span>
+          ) : null}
+          {onEffortChange ? (
+            // Not a nested <button> — PopoverItem's row is itself a
+            // <button>, and HTML forbids button-in-button. A role="button"
+            // span keeps the same a11y/interaction contract without the
+            // invalid nesting. Available on every row (not just the active
+            // model) — reference design lets you set effort for any model.
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label={`Effort for ${m.displayName ?? m.id}`}
+              aria-haspopup="menu"
+              aria-expanded={effortMenuFor?.modelId === m.id}
+              onClick={(e) => {
+                e.stopPropagation()
+                const rect = e.currentTarget.getBoundingClientRect()
+                setEffortMenuFor((cur) =>
+                  cur?.modelId === m.id ? null : { modelId: m.id, rect },
+                )
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" && e.key !== " ") return
+                e.preventDefault()
+                e.stopPropagation()
+                const rect = e.currentTarget.getBoundingClientRect()
+                setEffortMenuFor((cur) =>
+                  cur?.modelId === m.id ? null : { modelId: m.id, rect },
+                )
+              }}
+              className={cn(
+                "flex shrink-0 cursor-pointer items-center gap-0.5 rounded px-1 py-0.5",
+                "text-xs text-ink-faint transition-colors hover:bg-fill-2 hover:text-ink",
+              )}
+            >
+              <Gauge className="h-3 w-3" aria-hidden />
+              <ChevronRight className="h-2.5 w-2.5" aria-hidden />
+            </span>
+          ) : null}
+          {active ? (
+            <Check className="ml-2 h-3 w-3 shrink-0 text-accent" aria-hidden />
+          ) : (
+            <span className="ml-2 w-3 shrink-0" />
+          )}
+        </PopoverItem>
+        {effortMenuFor?.modelId === m.id && onEffortChange ? (
+          <EffortSubmenu
+            anchorRect={effortMenuFor.rect}
+            value={modelEffort}
+            onChange={(effort) => {
+              // One gesture: picking an effort on any row also selects that
+              // model at that effort (reference design).
+              onEffortChange(m.id, effort)
+              onChange(m.id)
+            }}
+            onClose={() => setEffortMenuFor(null)}
+          />
+        ) : null}
+      </li>
+    )
   }
 
   return (
@@ -51,14 +296,19 @@ export const ModelPicker = ({
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          "inline-flex h-6 max-w-[14rem] items-center gap-1 rounded-full px-1.5",
+          "inline-flex h-6 max-w-[16rem] items-center gap-1 rounded-full px-1.5",
           "text-base text-ink-secondary opacity-80",
           "transition-[color,opacity] duration-[var(--duration-fast)]",
           "hover:text-ink hover:opacity-100 disabled:opacity-50",
           open && "opacity-100",
         )}
       >
-        <span className="truncate">{label}</span>
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {selectedEffort ? (
+          <span className="shrink-0 truncate text-ink-muted">
+            {effortLabel(selectedEffort)}
+          </span>
+        ) : null}
         <ChevronDown
           className="h-2.5 w-2.5 shrink-0 text-icon-3"
           strokeWidth={2.5}
@@ -80,40 +330,19 @@ export const ModelPicker = ({
           onChange={setQuery}
           placeholder="Search models"
         />
-        <ul className="max-h-56 overflow-y-auto py-0.5">
-          {filtered.length === 0 ? (
-            <li className="px-2.5 py-3 text-center text-xs text-ink-faint">
+        <div className="max-h-56 overflow-y-auto py-0.5">
+          {groups.length === 0 ? (
+            <p className="px-2.5 py-3 text-center text-xs text-ink-faint">
               No models found
-            </li>
+            </p>
           ) : (
-            filtered.map((m) => {
-              const active = m.id === value
-              return (
-                <li key={m.id}>
-                  <PopoverItem
-                    active={active}
-                    onClick={() => {
-                      onChange(m.id)
-                      handleClose()
-                    }}
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {m.displayName ?? m.id}
-                    </span>
-                    <span className="shrink-0 text-xs text-ink-faint">
-                      {m.providerId}
-                    </span>
-                    {active ? (
-                      <Check className="h-3 w-3 shrink-0 text-accent" aria-hidden />
-                    ) : (
-                      <span className="w-3" />
-                    )}
-                  </PopoverItem>
-                </li>
-              )
-            })
+            groups.map((group) => (
+              <PopoverSection key={group.providerId} label={group.label}>
+                <ul>{group.items.map(renderRow)}</ul>
+              </PopoverSection>
+            ))
           )}
-        </ul>
+        </div>
       </PopoverTray>
     </div>
   )

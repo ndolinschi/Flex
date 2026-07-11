@@ -8,6 +8,8 @@
     "core:event:default",
     "opener:default",
     "store:default",
-    "dialog:default"
+    "dialog:default",
+    "notification:default",
+    "window-state:default"
   ]
 }

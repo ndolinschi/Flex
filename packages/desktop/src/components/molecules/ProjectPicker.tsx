@@ -44,8 +44,11 @@ export const ProjectPicker = ({
 
   const recents = useMemo(() => {
     const sessions =
-      queryClient.getQueryData<{ cwd: string }[]>(["sessions"]) ?? []
-    const fromSessions = sessions.map((s) => s.cwd)
+      queryClient.getQueryData<{ cwd: string; parent_id?: string }[]>([
+        "sessions",
+      ]) ?? []
+    // Skip subagent children — their worktree paths aren't user projects.
+    const fromSessions = sessions.filter((s) => !s.parent_id).map((s) => s.cwd)
     const merged = [...recentCwds, ...fromSessions, cwd].filter(
       (p): p is string => !!p && p.trim().length > 0,
     )

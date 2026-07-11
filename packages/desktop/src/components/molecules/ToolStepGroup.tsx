@@ -1,4 +1,10 @@
-import { useState, type KeyboardEvent, type ReactNode } from "react"
+import {
+  memo,
+  useState,
+  useSyncExternalStore,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react"
 import {
   ChevronRight,
   FilePenLine,
@@ -7,9 +13,13 @@ import {
   Terminal,
   Wrench,
 } from "lucide-react"
+import { reviewFileDiff } from "../../lib/tauri"
 import type { ToolCall } from "../../lib/types"
 import { basename, cn } from "../../lib/utils"
+import { useAppStore } from "../../stores/appStore"
+import { getExecTail, subscribeExecTail } from "../../lib/execTailBus"
 import { Collapsible } from "./Collapsible"
+import { DiffView } from "./DiffView"
 
 export type ToolKind = "explore" | "edit" | "shell" | "generic"
 
@@ -164,6 +174,12 @@ export type ToolStepDetail = {
   removed?: number
   running: boolean
   failed: boolean
+  /** Repo-relative file path for edit/write rows — lets the row offer an
+   * inline diff (lazy-fetched via `reviewFileDiff` on first expand). */
+  diffPath?: string
+  /** Shell/bash calls get a live mini-log tail rendered under the row while
+   * running (see `execTailBus`). */
+  isShell?: boolean
 }
 
 export type ToolStepSummary = {
@@ -235,6 +251,7 @@ const editDetail = (call: ToolCall): ToolStepDetail => {
     removed: diff?.removed,
     running: isRunning(call),
     failed: isFailed(call),
+    diffPath: path ?? undefined,
   }
 }
 
@@ -245,6 +262,7 @@ const shellDetail = (call: ToolCall): ToolStepDetail => {
     label: cmd ? cmd : call.tool_name,
     running: isRunning(call),
     failed: isFailed(call),
+    isShell: true,
   }
 }
 
@@ -409,6 +427,148 @@ const DiffBadge = ({
   )
 }
 
+/** Live mini-log: last ~5 lines of a command's buffered stdout/stderr,
+ * rendered directly under its detail row (reference design: liveness feedback
+ * for long-running commands, not just a spinner). Subscribes to execTailBus
+ * via useSyncExternalStore so it updates as chunks stream in. Tails are no
+ * longer cleared when the call completes (see execTailBus module doc), so
+ * this keeps rendering after `running` flips to false — `muted` dims it
+ * slightly further to read as "history" rather than a live feed. */
+const ExecTail = ({ callId, muted }: { callId: string; muted?: boolean }) => {
+  const tail = useSyncExternalStore(
+    (onChange) => subscribeExecTail(callId, onChange),
+    () => getExecTail(callId),
+  )
+  if (!tail.trim()) return null
+  const lines = tail.split("\n").filter((_, i, arr) => !(i === arr.length - 1 && arr[i] === ""))
+  const lastLines = lines.slice(-5)
+  return (
+    <div
+      className={cn(
+        "ml-3.5 mt-0.5 max-h-[6.5em] overflow-hidden rounded-sm border-l-2 border-stroke-3 pl-2",
+        muted && "opacity-60",
+      )}
+    >
+      <pre className="whitespace-pre-wrap break-all font-mono text-[11px] leading-[1.4] text-ink-faint">
+        {lastLines.join("\n")}
+      </pre>
+    </div>
+  )
+}
+
+type DetailRowProps = {
+  detail: ToolStepDetail
+  note?: string
+}
+
+/** Single detail line under a tool-step group. Edit/write rows that carry a
+ * resolvable `diffPath` become expandable: first expand lazy-fetches the
+ * file's diff against its pre-agent base state and renders it inline
+ * (display-only — no hunk actions, this is a timeline row, not the Changes
+ * tab). Rows without a path behave exactly as before. */
+const DetailRow = ({ detail, note }: DetailRowProps) => {
+  const sessionId = useAppStore((s) => s.activeSessionId)
+  const [expanded, setExpanded] = useState(false)
+  const [diff, setDiff] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false)
+
+  const canExpand = !!detail.diffPath && !!sessionId
+
+  const handleToggle = () => {
+    if (!canExpand) return
+    const next = !expanded
+    setExpanded(next)
+    if (next && diff === null && !loading) {
+      setLoading(true)
+      setError(false)
+      reviewFileDiff(sessionId!, detail.diffPath!)
+        .then((text) => setDiff(text))
+        .catch(() => setError(true))
+        .finally(() => setLoading(false))
+    }
+  }
+
+  return (
+    <li
+      className={cn(
+        "flex flex-col",
+        detail.failed && "text-danger",
+        detail.running && "text-ink-faint",
+      )}
+    >
+      <div
+        role={canExpand ? "button" : undefined}
+        tabIndex={canExpand ? 0 : undefined}
+        aria-expanded={canExpand ? expanded : undefined}
+        onClick={canExpand ? handleToggle : undefined}
+        onKeyDown={
+          canExpand
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  handleToggle()
+                }
+              }
+            : undefined
+        }
+        className={cn(
+          "flex min-h-6 items-center gap-1 text-[13px] leading-[1.5] text-ink-muted",
+          canExpand && "cursor-pointer",
+        )}
+      >
+        {/* Fixed-size leading slot — running→done swaps the spinner for a
+         * chevron (or nothing, when not expandable) in place, so the box
+         * itself never changes size and the row never shifts. */}
+        <span className="flex h-3 w-3 shrink-0 items-center justify-center">
+          {detail.running ? (
+            <LoaderCircle className="h-3 w-3 animate-spin" aria-hidden />
+          ) : canExpand ? (
+            <ChevronRight
+              className={cn(
+                "h-2.5 w-2.5 text-icon-3 transition-transform duration-[var(--duration-fast)]",
+                expanded && "rotate-90",
+              )}
+              aria-hidden
+            />
+          ) : null}
+        </span>
+        <span className="min-w-0 shrink truncate text-[12px] [font-variant-numeric:tabular-nums] text-ink-secondary">
+          {detail.label}
+        </span>
+        {note ? (
+          <span className="min-w-0 shrink truncate text-ink-faint">
+            {note}
+          </span>
+        ) : detail.sublabel ? (
+          <span className="shrink-0 text-ink-faint">{detail.sublabel}</span>
+        ) : null}
+        <DiffBadge added={detail.added} removed={detail.removed} />
+      </div>
+      {detail.isShell ? (
+        <ExecTail callId={detail.id} muted={!detail.running} />
+      ) : null}
+      {canExpand ? (
+        <Collapsible open={expanded}>
+          <div className="ml-3.5 max-h-[300px] overflow-auto rounded-md border border-stroke-3 bg-panel py-1">
+            {loading ? (
+              <div className="px-3 py-1 text-[12px] text-ink-faint">
+                Loading diff…
+              </div>
+            ) : error ? (
+              <div className="px-3 py-1 text-[12px] text-ink-faint">
+                Diff unavailable — file may be outside this session's workspace
+              </div>
+            ) : diff ? (
+              <DiffView diff={diff} />
+            ) : null}
+          </div>
+        </Collapsible>
+      ) : null}
+    </li>
+  )
+}
+
 type ToolStepGroupProps = {
   calls: ToolCall[]
   className?: string
@@ -418,13 +578,13 @@ type ToolStepGroupProps = {
   progress?: Record<string, string>
 }
 
-/** Cursor-style aggregated tool step: one summary line, expandable details. */
-export const ToolStepGroup = ({
+/** aggregated tool step: one summary line, expandable details. */
+export const ToolStepGroup = memo(function ToolStepGroup({
   calls,
   className,
   forceOpen = false,
   progress,
-}: ToolStepGroupProps) => {
+}: ToolStepGroupProps) {
   const summary = summarizeToolCalls(calls)
   const [expanded, setExpanded] = useState(forceOpen || summary.running)
   const open = forceOpen || expanded
@@ -460,7 +620,7 @@ export const ToolStepGroup = ({
         onClick={handleToggle}
         onKeyDown={handleKeyDown}
         className={cn(
-          "flex w-full items-center gap-1.5 rounded-md py-0.5 text-left text-base",
+          "flex w-full items-center gap-1 rounded-md py-px text-left text-base",
           "text-ink-muted transition-colors duration-[var(--duration-fast)]",
           "hover:text-ink-secondary focus-visible:outline-none",
           summary.failed && "text-danger",
@@ -492,46 +652,20 @@ export const ToolStepGroup = ({
 
       <Collapsible open={open}>
         <ul className="mt-0.5 ml-1.5 flex flex-col gap-0.5 py-0.5 pl-3">
-          {summary.details.map((detail) => {
-            const note = detail.running ? progress?.[detail.id] : undefined
-            return (
-              <li
-                key={detail.id}
-                className={cn(
-                  "flex min-h-6 items-center gap-1 text-[13px] leading-[1.5] text-ink-muted",
-                  detail.failed && "text-danger",
-                  detail.running && "text-ink-faint",
-                )}
-              >
-                {detail.running ? (
-                  <LoaderCircle
-                    className="h-3 w-3 shrink-0 animate-spin"
-                    aria-hidden
-                  />
-                ) : null}
-                <span className="min-w-0 shrink truncate font-mono text-[12px] text-ink-secondary">
-                  {detail.label}
-                </span>
-                {note ? (
-                  <span className="min-w-0 shrink truncate text-ink-faint">
-                    {note}
-                  </span>
-                ) : detail.sublabel ? (
-                  <span className="shrink-0 text-ink-faint">
-                    {detail.sublabel}
-                  </span>
-                ) : null}
-                <DiffBadge added={detail.added} removed={detail.removed} />
-              </li>
-            )
-          })}
+          {summary.details.map((detail) => (
+            <DetailRow
+              key={detail.id}
+              detail={detail}
+              note={detail.running ? progress?.[detail.id] : undefined}
+            />
+          ))}
         </ul>
       </Collapsible>
     </div>
   )
-}
+})
 
-/** Cluster consecutive same-kind tool rows for Cursor-style summaries. */
+/** Cluster consecutive same-kind tool rows for summaries. */
 export const clusterToolRows = (
   rows: TimelineToolRowLike[],
 ): Array<
@@ -585,7 +719,12 @@ export const ToolStepList = ({
       {clusters.map((cluster, i) =>
         cluster.kind === "tools" ? (
           <ToolStepGroup
-            key={`tools:${cluster.calls.map((c) => c.id).join(",")}`}
+            // Stable across the cluster's lifetime: keyed on the FIRST call's
+            // id only, not the full (growing) id list. Keying on the joined
+            // list meant every new call appended to a running cluster changed
+            // the key, forcing a full unmount/remount (expanded state reset,
+            // DOM subtree replaced) instead of an in-place update.
+            key={`tools:${cluster.calls[0].id}`}
             calls={cluster.calls}
             forceOpen={cluster.calls.some(isRunning)}
             progress={progress}

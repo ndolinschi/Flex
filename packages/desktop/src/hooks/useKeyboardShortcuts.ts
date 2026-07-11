@@ -6,9 +6,12 @@ type ShortcutHandlers = {
   onFocusComposer?: () => void
   /** Return true if the shortcut was handled (caller may preventDefault). */
   onCancel?: () => boolean
+  /** ⌘K — opens the SearchModal ( agent search). */
   onSearch?: () => void
   onToggleSidebar?: () => void
   onToggleRightPanel?: () => void
+  /** ⌘⇧P — command palette (distinct from ⌘K agent search). */
+  onToggleCommandPalette?: () => void
 }
 
 const isEditableTarget = (target: EventTarget | null): boolean => {
@@ -49,6 +52,12 @@ export const useKeyboardShortcuts = (
       if (e.key === "k" && handlers.onSearch) {
         e.preventDefault()
         handlers.onSearch()
+        return
+      }
+
+      if (e.shiftKey && (e.key === "p" || e.key === "P") && handlers.onToggleCommandPalette) {
+        e.preventDefault()
+        handlers.onToggleCommandPalette()
         return
       }
 

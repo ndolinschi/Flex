@@ -2,10 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   getProviderConfig,
   saveProviderConfig,
+  setSecretStorage,
   toInvokeError,
   validateProvider,
 } from "../lib/tauri"
-import type { ProviderConfigView, SaveProviderConfigInput } from "../lib/types"
+import type {
+  ProviderConfigView,
+  SaveProviderConfigInput,
+  SecretStorageMode,
+} from "../lib/types"
 
 const CONFIG_KEY = ["provider-config"] as const
 
@@ -32,6 +37,13 @@ export const useProviderConfig = () => {
     mutationFn: (input: SaveProviderConfigInput) => validateProvider(input),
   })
 
+  const secretStorageMutation = useMutation({
+    mutationFn: (mode: SecretStorageMode) => setSecretStorage(mode),
+    onSuccess: (view: ProviderConfigView) => {
+      queryClient.setQueryData(CONFIG_KEY, view)
+    },
+  })
+
   const handleSave = async (input: SaveProviderConfigInput) => {
     try {
       return await saveMutation.mutateAsync(input)
@@ -48,6 +60,14 @@ export const useProviderConfig = () => {
     }
   }
 
+  const handleSetSecretStorage = async (mode: SecretStorageMode) => {
+    try {
+      return await secretStorageMutation.mutateAsync(mode)
+    } catch (err) {
+      throw new Error(toInvokeError(err))
+    }
+  }
+
   return {
     config: query.data,
     isLoading: query.isLoading,
@@ -55,11 +75,16 @@ export const useProviderConfig = () => {
     error: query.error ? toInvokeError(query.error) : null,
     save: handleSave,
     validate: handleValidate,
+    setSecretStorage: handleSetSecretStorage,
     isSaving: saveMutation.isPending,
     isValidating: validateMutation.isPending,
+    isSettingSecretStorage: secretStorageMutation.isPending,
     saveError: saveMutation.error ? toInvokeError(saveMutation.error) : null,
     validateError: validateMutation.error
       ? toInvokeError(validateMutation.error)
+      : null,
+    secretStorageError: secretStorageMutation.error
+      ? toInvokeError(secretStorageMutation.error)
       : null,
   }
 }

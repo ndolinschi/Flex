@@ -1,37 +1,49 @@
 import {
   useMemo,
-  useRef,
-  useEffect,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react"
+import { useQuery } from "@tanstack/react-query"
 import {
+  Archive,
+  ArrowUpRight,
   Bot,
+  Brain,
+  ChevronDown,
   Moon,
+  RotateCw,
   Search,
   Settings,
   SlidersHorizontal,
   SquarePen,
   Sun,
+  X,
 } from "lucide-react"
-import { IconButton, ScrollArea, Skeleton, Spinner, TextInput } from "../atoms"
+import { Button, IconButton, ScrollArea, Skeleton, Spinner } from "../atoms"
 import {
+  ContextMenu,
   EmptyState,
   ErrorBanner,
   RepoSectionHeader,
   SessionListItem,
   SidebarActionRow,
+  type ContextMenuItem,
 } from "../molecules"
 import { useSessions } from "../../hooks/useSessions"
-import { resumeSession, toInvokeError } from "../../lib/tauri"
+import { useWorkspaceStatuses } from "../../hooks/useWorkspaceStatuses"
+import { resumeSession, toInvokeError, userIdentity } from "../../lib/tauri"
 import type { SessionMeta } from "../../lib/types"
-import { sessionLabel } from "../../lib/types"
 import { basename, cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
 
 const isMac =
   typeof navigator !== "undefined" &&
   /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
+
+// Mirrors SIDEBAR_DEFAULT_WIDTH in stores/appStore.ts (not exported there;
+// setSidebarWidth clamps internally so this only needs to match the default).
+const SIDEBAR_DEFAULT_WIDTH = 260
 
 type RepoGroup = {
   cwd: string
@@ -59,27 +71,40 @@ const groupByRepo = (sessions: SessionMeta[]): RepoGroup[] => {
   return sorted
 }
 
-export const SessionSidebar = () => {
+type SessionSidebarProps = {
+  onOpenSearch: () => void
+}
+
+export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const setActiveSessionId = useAppStore((s) => s.setActiveSessionId)
   const setRoute = useAppStore((s) => s.setRoute)
   const streamingSessions = useAppStore((s) => s.streamingSessions)
-  const searchOpen = useAppStore((s) => s.sidebarSearchOpen)
-  const searchQuery = useAppStore((s) => s.sidebarSearchQuery)
-  const setSidebarSearchQuery = useAppStore((s) => s.setSidebarSearchQuery)
-  const toggleSidebarSearch = useAppStore((s) => s.toggleSidebarSearch)
-  const setSidebarSearchOpen = useAppStore((s) => s.setSidebarSearchOpen)
+  const unreadBySession = useAppStore((s) => s.unreadBySession)
   const theme = useAppStore((s) => s.theme)
   const toggleTheme = useAppStore((s) => s.toggleTheme)
   const collapsed = useAppStore((s) => s.sidebarCollapsed)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
+  const setSidebarCollapsed = useAppStore((s) => s.setSidebarCollapsed)
+  const viewport = useAppStore((s) => s.viewport)
+  const narrow = viewport !== "wide"
+  const pinnedSessionIds = useAppStore((s) => s.pinnedSessionIds)
+  const archivedSessionIds = useAppStore((s) => s.archivedSessionIds)
+  const toggleSessionPinned = useAppStore((s) => s.toggleSessionPinned)
+  const setSessionArchived = useAppStore((s) => s.setSessionArchived)
   const [selectError, setSelectError] = useState<string | null>(null)
+  const [selectErrorId, setSelectErrorId] = useState<string | null>(null)
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
   const [collapsedRepos, setCollapsedRepos] = useState<Record<string, boolean>>({})
+  const [archivedCollapsed, setArchivedCollapsed] = useState(true)
   const [dragging, setDragging] = useState(false)
-  const searchInputRef = useRef<HTMLInputElement>(null)
+  const [repoMenu, setRepoMenu] = useState<{
+    cwd: string
+    position: { x: number; y: number }
+  } | null>(null)
   const {
-    sessions,
+    sessions: allSessions,
     isLoading,
     error,
     newAgent,
@@ -87,41 +112,109 @@ export const SessionSidebar = () => {
     deleteSession,
     isCreating,
   } = useSessions()
-
-  useEffect(() => {
-    if (searchOpen) searchInputRef.current?.focus()
-  }, [searchOpen])
+  // Subagent child sessions render inside their parent's feed — the sidebar
+  // lists only top-level agents.
+  const sessions = useMemo(
+    () => allSessions.filter((s) => !s.parent_id),
+    [allSessions],
+  )
+  const { data: identity } = useQuery({
+    queryKey: ["user-identity"],
+    queryFn: userIdentity,
+    staleTime: Infinity,
+  })
+  const displayName = identity?.name || "User"
 
   const handleCreate = async (cwd?: string) => {
     await newAgent(cwd)
   }
 
   const handleSelect = async (id: string) => {
-    setSelectError(null)
+    // Clear only this row's stale error banner/state — leave other rows alone.
+    if (selectErrorId === id) {
+      setSelectError(null)
+      setSelectErrorId(null)
+    }
     try {
       await resumeSession(id)
+      setRowErrors((prev) => {
+        if (!(id in prev)) return prev
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
       setActiveSessionId(id)
       setRoute("chat")
     } catch (err) {
-      setSelectError(toInvokeError(err))
+      console.error("resume_session failed", id, err)
+      const message = toInvokeError(err)
+      setSelectError(message)
+      setSelectErrorId(id)
+      setRowErrors((prev) => ({ ...prev, [id]: message }))
     }
   }
 
-  const filteredSessions = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    if (!q) return sessions
-    return sessions.filter((s) =>
-      sessionLabel(s).toLowerCase().includes(q),
-    )
-  }, [sessions, searchQuery])
+  const handleDismissSelectError = () => {
+    setSelectError(null)
+    setSelectErrorId(null)
+  }
 
-  const repoGroups = useMemo(
-    () => groupByRepo(filteredSessions),
-    [filteredSessions],
+  const handleRetrySelect = () => {
+    if (selectErrorId) void handleSelect(selectErrorId)
+  }
+
+  const pinnedIdSet = useMemo(() => new Set(pinnedSessionIds), [pinnedSessionIds])
+  const archivedIdSet = useMemo(
+    () => new Set(archivedSessionIds),
+    [archivedSessionIds],
   )
+
+  const pinnedSessions = useMemo(
+    () => sessions.filter((s) => pinnedIdSet.has(s.id)),
+    [sessions, pinnedIdSet],
+  )
+
+  const archivedSessions = useMemo(
+    () => sessions.filter((s) => archivedIdSet.has(s.id)),
+    [sessions, archivedIdSet],
+  )
+
+  const groupableSessions = useMemo(
+    () => sessions.filter((s) => !pinnedIdSet.has(s.id) && !archivedIdSet.has(s.id)),
+    [sessions, pinnedIdSet, archivedIdSet],
+  )
+
+  const repoGroups = useMemo(() => groupByRepo(groupableSessions), [groupableSessions])
+
+  const sessionIds = useMemo(() => sessions.map((s) => s.id), [sessions])
+  const workspaceStatuses = useWorkspaceStatuses(sessionIds)
 
   const toggleRepo = (cwd: string) =>
     setCollapsedRepos((prev) => ({ ...prev, [cwd]: !prev[cwd] }))
+
+  const handleRepoContextMenu = (
+    e: ReactMouseEvent<HTMLDivElement>,
+    cwd: string,
+  ) => {
+    e.preventDefault()
+    setRepoMenu({ cwd, position: { x: e.clientX, y: e.clientY } })
+  }
+
+  const repoMenuItems: ContextMenuItem[] = repoMenu
+    ? [
+        {
+          type: "item",
+          label: "New Agent here",
+          icon: SquarePen,
+          onSelect: () => void handleCreate(repoMenu.cwd),
+        },
+        {
+          type: "item",
+          label: collapsedRepos[repoMenu.cwd] ? "Expand" : "Collapse",
+          onSelect: () => toggleRepo(repoMenu.cwd),
+        },
+      ]
+    : []
 
   const handleSashDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -143,32 +236,71 @@ export const SessionSidebar = () => {
     window.addEventListener("pointerup", onUp)
   }
 
+  const handleSashDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setSidebarWidth(SIDEBAR_DEFAULT_WIDTH, true)
+  }
+
+  const expanded = !collapsed
   return (
-    <aside
-      style={collapsed ? undefined : { width: sidebarWidth }}
-      className={cn(
-        "relative flex h-full shrink-0 flex-col overflow-hidden bg-surface",
-        !dragging &&
-          "transition-[width,opacity] duration-[var(--duration-normal)] ease-[var(--easing-default)]",
-        collapsed
-          ? "w-0 border-r-0 opacity-0 pointer-events-none"
-          : "border-r border-stroke-3 opacity-100",
-      )}
-      aria-hidden={collapsed}
-      aria-label="Sessions sidebar"
-    >
-      {collapsed ? null : (
+    <>
+      {narrow && expanded ? (
         <div
-          role="separator"
-          aria-orientation="vertical"
-          onPointerDown={handleSashDown}
-          className={cn(
-            "absolute inset-y-0 right-0 z-10 w-1 cursor-ew-resize",
-            "transition-colors duration-[var(--duration-fast)] hover:bg-stroke-2",
-            dragging && "bg-stroke-2",
-          )}
+          className="absolute inset-0 z-20 bg-black/30 animate-backdrop-in"
+          aria-hidden
+          onClick={() => setSidebarCollapsed(true)}
         />
-      )}
+      ) : null}
+      <aside
+        style={!collapsed && !narrow ? { width: sidebarWidth } : undefined}
+        className={cn(
+          "relative flex h-full shrink-0 flex-col overflow-hidden bg-surface",
+          !dragging &&
+            "transition-[width,opacity] duration-[var(--duration-normal)] ease-[var(--easing-default)]",
+          collapsed
+            ? "w-0 border-r-0 opacity-0 pointer-events-none"
+            : "border-r border-stroke-3 opacity-100",
+          // Mobile (narrow/tight): full-width overlay anchored to the app's
+          // left edge instead of a side-by-side column — same open/close
+          // state, now floating above the chat with a shadow (mirrors
+          // RightPanel.tsx's narrow handling).
+          narrow && expanded
+            ? "absolute inset-y-0 left-0 z-30 w-full shadow-popover"
+            : null,
+        )}
+        aria-hidden={collapsed}
+        aria-label="Sessions sidebar"
+      >
+        {expanded && !narrow ? (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize sessions sidebar"
+            aria-valuenow={sidebarWidth}
+            tabIndex={0}
+            onPointerDown={handleSashDown}
+            onDoubleClick={handleSashDoubleClick}
+            className={cn(
+              "absolute -right-[5px] inset-y-0 z-10 w-2.5 cursor-col-resize",
+              "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent",
+              "after:transition-colors after:duration-[var(--duration-fast)] hover:after:bg-stroke-2",
+              dragging && "after:bg-stroke-1",
+            )}
+          />
+        ) : null}
+
+      {narrow && expanded ? (
+        // Full-width overlay only — wide mode keeps the existing header
+        // (backdrop click is enough at side-by-side width; discoverability
+        // requires an explicit close control once the sidebar fills the
+        // chat area).
+        <div className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b border-stroke-3 px-3">
+          <span className="text-sm text-ink-secondary">Sessions</span>
+          <IconButton label="Close sidebar" onClick={() => setSidebarCollapsed(true)}>
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </IconButton>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-px px-2 pt-2 pb-3">
         <SidebarActionRow
@@ -181,12 +313,19 @@ export const SessionSidebar = () => {
           icon={Search}
           label="Search"
           kbd={isMac ? "⌘K" : "Ctrl+K"}
-          onClick={() => toggleSidebarSearch()}
+          onClick={onOpenSearch}
         />
         <SidebarActionRow
           icon={Bot}
           label="Automations"
+          trailingIcon={ArrowUpRight}
           onClick={() => setRoute("automations")}
+        />
+        <SidebarActionRow
+          icon={Brain}
+          label="Memory"
+          trailingIcon={ArrowUpRight}
+          onClick={() => setRoute("memory")}
         />
         <SidebarActionRow
           icon={SlidersHorizontal}
@@ -195,25 +334,9 @@ export const SessionSidebar = () => {
         />
       </div>
 
-      {searchOpen ? (
-        <div className="px-2 pb-2">
-          <TextInput
-            ref={searchInputRef}
-            value={searchQuery}
-            onChange={(e) => setSidebarSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setSidebarSearchOpen(false)
-            }}
-            placeholder="Search agents"
-            aria-label="Search agents"
-            className="h-7 text-base"
-          />
-        </div>
-      ) : null}
-
       <div className="group/label flex items-center gap-1 px-2 pb-1">
         <span className="min-w-0 flex-1 truncate px-2 text-sm text-ink-muted">
-          Agents
+          Repositories
         </span>
         <IconButton
           label="Search agents"
@@ -221,15 +344,15 @@ export const SessionSidebar = () => {
             "h-6 w-6 opacity-0 transition-opacity duration-[var(--duration-fast)]",
             "group-hover/label:opacity-100",
           )}
-          onClick={() => toggleSidebarSearch()}
+          onClick={onOpenSearch}
         >
           <Search className="h-3 w-3" aria-hidden />
         </IconButton>
       </div>
 
-      {error || selectError ? (
+      {error ? (
         <div className="px-2 pb-2">
-          <ErrorBanner message={error ?? selectError ?? ""} />
+          <ErrorBanner message={error} />
         </div>
       ) : null}
 
@@ -240,29 +363,53 @@ export const SessionSidebar = () => {
               <Skeleton key={i} className="h-7 w-full rounded-sm" />
             ))}
           </div>
-        ) : repoGroups.length === 0 ? (
-          searchQuery ? (
-            <p className="px-2 py-3 text-center text-sm text-ink-faint">
-              No matching agents
-            </p>
-          ) : (
-            <EmptyState
-              title="No agents yet"
-              description="Create an agent to start working on tasks."
-              actionLabel="New Agent"
-              onAction={() => void handleCreate()}
-            />
-          )
+        ) : sessions.length === 0 ? (
+          <EmptyState
+            title="No agents yet"
+            description="Create an agent to start working on tasks."
+            actionLabel="New Agent"
+            onAction={() => void handleCreate()}
+          />
         ) : (
           <div className="flex flex-col gap-2">
+            {pinnedSessions.length > 0 ? (
+              <section className="flex flex-col gap-px">
+                <div className="flex h-6 w-full items-center gap-1.5 px-1.5 text-xs text-ink-secondary">
+                  <span className="min-w-0 flex-1 truncate">Pinned</span>
+                </div>
+                {pinnedSessions.map((session) => (
+                  <SessionListItem
+                    key={session.id}
+                    session={session}
+                    isActive={session.id === activeSessionId}
+                    isRunning={!!streamingSessions[session.id]}
+                    errorMessage={rowErrors[session.id]}
+                    unread={unreadBySession[session.id]}
+                    workspaceStatus={workspaceStatuses[session.id]}
+                    pinned
+                    onSelect={(id) => void handleSelect(id)}
+                    onRename={renameSession}
+                    onDelete={deleteSession}
+                    onNewAgentInRepo={(cwd) => void handleCreate(cwd)}
+                    onTogglePin={toggleSessionPinned}
+                    onSetArchived={setSessionArchived}
+                  />
+                ))}
+              </section>
+            ) : null}
+
             {repoGroups.map((group) => (
               <section key={group.cwd} className="flex flex-col gap-px">
-                <RepoSectionHeader
-                  label={group.label}
-                  collapsed={!!collapsedRepos[group.cwd]}
-                  onToggle={() => toggleRepo(group.cwd)}
-                  onNewSession={() => void handleCreate(group.cwd)}
-                />
+                <div
+                  onContextMenu={(e) => handleRepoContextMenu(e, group.cwd)}
+                >
+                  <RepoSectionHeader
+                    label={group.label}
+                    collapsed={!!collapsedRepos[group.cwd]}
+                    onToggle={() => toggleRepo(group.cwd)}
+                    onNewSession={() => void handleCreate(group.cwd)}
+                  />
+                </div>
                 {!collapsedRepos[group.cwd]
                   ? group.sessions.map((session) => (
                       <SessionListItem
@@ -270,32 +417,122 @@ export const SessionSidebar = () => {
                         session={session}
                         isActive={session.id === activeSessionId}
                         isRunning={!!streamingSessions[session.id]}
+                        errorMessage={rowErrors[session.id]}
+                        unread={unreadBySession[session.id]}
+                        workspaceStatus={workspaceStatuses[session.id]}
                         onSelect={(id) => void handleSelect(id)}
                         onRename={renameSession}
                         onDelete={deleteSession}
+                        onNewAgentInRepo={(cwd) => void handleCreate(cwd)}
+                        onTogglePin={toggleSessionPinned}
+                        onSetArchived={setSessionArchived}
                       />
                     ))
                   : null}
               </section>
             ))}
+
+            {archivedSessions.length > 0 ? (
+              <section className="flex flex-col gap-px">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={!archivedCollapsed}
+                  onClick={() => setArchivedCollapsed((prev) => !prev)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") setArchivedCollapsed((prev) => !prev)
+                  }}
+                  className={cn(
+                    "group flex h-6 w-full cursor-default items-center gap-1.5 rounded-sm px-1.5",
+                    "text-xs text-ink-secondary transition-colors hover:bg-fill-4 hover:text-ink",
+                  )}
+                >
+                  <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 text-icon-2 opacity-70 transition-[opacity,transform] group-hover:opacity-100",
+                        archivedCollapsed && "-rotate-90",
+                      )}
+                      aria-hidden
+                    />
+                  </span>
+                  <Archive className="h-3.5 w-3.5 shrink-0 text-ink-muted" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">
+                    Archived ({archivedSessions.length})
+                  </span>
+                </div>
+                {!archivedCollapsed
+                  ? archivedSessions.map((session) => (
+                      <SessionListItem
+                        key={session.id}
+                        session={session}
+                        isActive={session.id === activeSessionId}
+                        isRunning={!!streamingSessions[session.id]}
+                        errorMessage={rowErrors[session.id]}
+                        unread={unreadBySession[session.id]}
+                        workspaceStatus={workspaceStatuses[session.id]}
+                        archived
+                        onSelect={(id) => void handleSelect(id)}
+                        onRename={renameSession}
+                        onDelete={deleteSession}
+                        onNewAgentInRepo={(cwd) => void handleCreate(cwd)}
+                        onTogglePin={toggleSessionPinned}
+                        onSetArchived={setSessionArchived}
+                      />
+                    ))
+                  : null}
+              </section>
+            ) : null}
           </div>
         )}
       </ScrollArea>
 
-      <div className="flex items-center justify-end gap-0.5 border-t border-stroke-3 px-2 py-1.5">
-        <IconButton
-          label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-          onClick={toggleTheme}
-        >
-          {theme === "dark" ? (
-            <Sun className="h-3.5 w-3.5" aria-hidden />
-          ) : (
-            <Moon className="h-3.5 w-3.5" aria-hidden />
+      {selectError ? (
+        <div
+          role="alert"
+          className={cn(
+            "flex items-start gap-2 border-t border-stroke-3 bg-danger-subtle px-3 py-2",
           )}
-        </IconButton>
-        <IconButton label="Settings" onClick={() => setRoute("settings")}>
-          <Settings className="h-3.5 w-3.5" aria-hidden />
-        </IconButton>
+        >
+          <p className="flex-1 text-xs text-danger">{selectError}</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-1.5 text-danger"
+            onClick={handleRetrySelect}
+          >
+            <RotateCw className="h-3 w-3" aria-hidden />
+            Retry
+          </Button>
+          <IconButton label="Dismiss error" onClick={handleDismissSelectError}>
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </IconButton>
+        </div>
+      ) : null}
+
+      <div className="flex items-center gap-2 border-t border-stroke-3 px-2 py-1.5">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-fill-2 text-xs text-ink-secondary">
+          {displayName.charAt(0).toUpperCase()}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm text-ink">{displayName}</span>
+          <span className="truncate text-xs text-ink-muted">Local</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-0.5">
+          <IconButton
+            label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            onClick={toggleTheme}
+          >
+            {theme === "dark" ? (
+              <Sun className="h-3.5 w-3.5" aria-hidden />
+            ) : (
+              <Moon className="h-3.5 w-3.5" aria-hidden />
+            )}
+          </IconButton>
+          <IconButton label="Settings" onClick={() => setRoute("settings")}>
+            <Settings className="h-3.5 w-3.5" aria-hidden />
+          </IconButton>
+        </span>
       </div>
 
       {isCreating ? (
@@ -304,6 +541,13 @@ export const SessionSidebar = () => {
           Creating…
         </div>
       ) : null}
-    </aside>
+
+      <ContextMenu
+        position={repoMenu?.position ?? null}
+        items={repoMenuItems}
+        onClose={() => setRepoMenu(null)}
+      />
+      </aside>
+    </>
   )
 }

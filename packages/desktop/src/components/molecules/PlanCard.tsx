@@ -21,7 +21,7 @@ export const PlanStatusIcon = ({ status }: { status: PlanEntry["status"] }) => {
   return <Circle className="h-3 w-3 text-icon-3" aria-hidden />
 }
 
-/** Cursor-style plan checklist rendered from `plan_updated` events. */
+/** plan checklist rendered from `plan_updated` events. */
 export const PlanCard = ({ entries }: PlanCardProps) => {
   if (entries.length === 0) return null
 

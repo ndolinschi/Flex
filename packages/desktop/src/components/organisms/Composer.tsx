@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type DragEvent,
+  type KeyboardEvent,
+} from "react"
 import {
   keepPreviousData,
   useQuery,
@@ -29,6 +38,7 @@ import {
 } from "../../lib/tauri"
 import { isBrowserPreview } from "../../lib/browserMock"
 import {
+  effortLabel,
   isDefaultSessionTitle,
   titleFromPrompt,
 } from "../../lib/types"
@@ -44,7 +54,7 @@ type ComposerProps = {
 /** Stable empty queue — inline `?? []` in a Zustand selector re-renders forever. */
 const EMPTY_QUEUE: string[] = []
 
-/** Cursor Glass expanded prompt — fill surface, soft elevation, no harsh outline. */
+/** reference glass expanded prompt — fill surface, soft elevation, no harsh outline. */
 export const Composer = ({ isHero = false }: ComposerProps) => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const draftsBySession = useAppStore((s) => s.draftsBySession)
@@ -57,6 +67,11 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
   const setComposerMode = useAppStore((s) => s.setComposerMode)
   const selectedModelId = useAppStore((s) => s.selectedModelId)
   const setSelectedModelId = useAppStore((s) => s.setSelectedModelId)
+  const effortByModel = useAppStore((s) => s.effortByModel)
+  const setEffortForModel = useAppStore((s) => s.setEffortForModel)
+  const selectedEffort = selectedModelId
+    ? (effortByModel[selectedModelId] ?? null)
+    : null
   const attachments = useAppStore((s) => s.attachments)
   const addAttachment = useAppStore((s) => s.addAttachment)
   const removeAttachment = useAppStore((s) => s.removeAttachment)
@@ -72,33 +87,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
   const pushRecentCwd = useAppStore((s) => s.pushRecentCwd)
   const isBootstrapped = useAppStore((s) => s.isBootstrapped)
   const route = useAppStore((s) => s.route)
-
-  // #region agent log
-  useEffect(() => {
-    fetch("http://127.0.0.1:7399/ingest/4642b0a4-a520-4891-a625-7f347f2070b9", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "34bae6",
-      },
-      body: JSON.stringify({
-        sessionId: "34bae6",
-        runId: "post-fix",
-        hypothesisId: "H4",
-        location: "Composer.tsx:isStreaming",
-        message: "composer queue-enabled state",
-        data: {
-          isStreaming,
-          textareaDisabled: false,
-          hasQueue: true,
-          queueLen: messageQueue.length,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-  }, [isStreaming, messageQueue.length])
-  // #endregion
-  const { models, isLoading: modelsLoading } = useModels(
+  const { models, builtinProviders, isLoading: modelsLoading } = useModels(
     isBootstrapped && route !== "welcome",
   )
   const { sessions } = useSessions()
@@ -140,6 +129,16 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
   }, [commands, slashQuery])
 
   const slashOpen = slashQuery !== null && slashMatches.length > 0
+
+  // Browser tab's load-error page "Ask Agent" button prefills the draft (via
+  // `setComposerDraft`) then asks for focus through this event, since the
+  // textarea ref lives here, not in the store.
+  useEffect(() => {
+    const handleFocusRequest = () => textareaRef.current?.focus()
+    window.addEventListener("flex:focus-composer", handleFocusRequest)
+    return () =>
+      window.removeEventListener("flex:focus-composer", handleFocusRequest)
+  }, [])
 
   useEffect(() => {
     setSlashHighlight(0)
@@ -221,24 +220,43 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
     if (active.cwd) pushRecentCwd(active.cwd)
   }, [activeSessionId, active, setSelectedModelId, pushRecentCwd])
 
-  // Auto-grow textarea up to max height (Cursor: 36–200px). Measured in a rAF so
+  // Auto-grow textarea up to max height (design: 36–200px). Measured in a rAF so
   // the flex width has resolved (an early measure sees a collapsed width, wraps the
   // content, and locks the box at max). Transitions are off during the measure so
   // `scrollHeight` reflects content, not a mid-animation height.
+  const measureComposerHeight = useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
+    const prevTransition = el.style.transition
+    el.style.transition = "none"
+    el.style.height = "auto"
+    const next = Math.min(el.scrollHeight, 200)
+    el.style.height = `${Math.max(next, 36)}px`
+    void el.offsetHeight
+    el.style.transition = prevTransition
+  }, [])
+
+  useEffect(() => {
+    const raf = window.requestAnimationFrame(measureComposerHeight)
+    return () => window.cancelAnimationFrame(raf)
+  }, [composerDraft, measureComposerHeight])
+
+  // The inline height persists across layout moves (hero ↔ chat, sidebar/panel
+  // resizes, route swaps). A measure taken at a stale width wraps differently
+  // and locks the box tall — re-measure whenever the textarea's width changes.
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
-    const raf = window.requestAnimationFrame(() => {
-      const prevTransition = el.style.transition
-      el.style.transition = "none"
-      el.style.height = "auto"
-      const next = Math.min(el.scrollHeight, 200)
-      el.style.height = `${Math.max(next, 36)}px`
-      void el.offsetHeight
-      el.style.transition = prevTransition
+    let lastWidth = el.clientWidth
+    const ro = new ResizeObserver(() => {
+      const width = el.clientWidth
+      if (width === lastWidth) return
+      lastWidth = width
+      measureComposerHeight()
     })
-    return () => window.cancelAnimationFrame(raf)
-  }, [composerDraft])
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [measureComposerHeight])
 
   const handlePick = async (kind: "file" | "image") => {
     try {
@@ -275,9 +293,87 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
     }
   }
 
+  // Image paste (and same-path drag/drop): the reference design lets users
+  // paste a screenshot straight into the composer. In MOCK/preview there's no
+  // filesystem, so we hand the engine an object URL as the attachment "path"
+  // (the mock backend never dereferences it — good enough for a preview).
+  // Native mode has no equivalent: the only file-producing command is
+  // `browser_screenshot` (a fixed, browser-panel-specific capture); there is
+  // no generic "write these bytes to a temp file" command, and the fs plugin
+  // isn't enabled in src-tauri/capabilities (read-only for this change). So a
+  // pasted/dropped image on native cannot currently be turned into a
+  // `path`-based attachment the engine can read — see report.
+  const extForMimeType = (mimeType: string): string => {
+    if (mimeType === "image/png") return "png"
+    if (mimeType === "image/gif") return "gif"
+    if (mimeType === "image/webp") return "webp"
+    return "jpg"
+  }
+
+  const attachImageBlob = async (blob: File | Blob, suggestedName?: string) => {
+    const name = suggestedName ?? `pasted-${Date.now()}.${extForMimeType(blob.type)}`
+    if (isBrowserPreview()) {
+      const url = URL.createObjectURL(blob)
+      addAttachment({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        path: url,
+        kind: "image",
+        name,
+      })
+      return true
+    }
+    // No native path to persist the blob to disk — see comment above.
+    return false
+  }
+
+  const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    const imageItems = Array.from(items).filter((i) => i.type.startsWith("image/"))
+    if (imageItems.length === 0) return
+    e.preventDefault()
+    for (const item of imageItems) {
+      const blob = item.getAsFile()
+      if (!blob) continue
+      void attachImageBlob(blob).then((attached) => {
+        if (!attached) {
+          setError(
+            "Pasting images isn't supported yet outside preview mode (no way to save the clipboard image to disk).",
+          )
+        }
+      })
+    }
+  }
+
+  const handleDrop = (e: DragEvent<HTMLTextAreaElement>) => {
+    const files = e.dataTransfer?.files
+    if (!files || files.length === 0) return
+    const images = Array.from(files).filter((f) => f.type.startsWith("image/"))
+    if (images.length === 0) return
+    e.preventDefault()
+    for (const file of images) {
+      void attachImageBlob(file, file.name).then((attached) => {
+        if (!attached) {
+          setError(
+            "Dropping images isn't supported yet outside preview mode (no way to save the file to disk).",
+          )
+        }
+      })
+    }
+  }
+
   const handleModelChange = async (id: string) => {
+    const changed = id !== selectedModelId
     setSelectedModelId(id)
     if (!activeSessionId) return
+    if (changed && isBootstrapped) {
+      const display = models.find((m) => m.id === id)?.displayName ?? id
+      const effort = useAppStore.getState().effortByModel[id] ?? null
+      const effortSuffix = effort ? ` ${effortLabel(effort)}` : ""
+      useAppStore
+        .getState()
+        .addSessionLogRow(activeSessionId, `Model changed to ${display}${effortSuffix}`)
+    }
     try {
       await updateSession(activeSessionId, { model: id })
     } catch (err) {
@@ -292,28 +388,6 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
 
     // Queue follow-ups while a turn is in flight.
     if (isStreaming && overrideText === undefined) {
-      // #region agent log
-      fetch("http://127.0.0.1:7399/ingest/4642b0a4-a520-4891-a625-7f347f2070b9", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "34bae6",
-        },
-        body: JSON.stringify({
-          sessionId: "34bae6",
-          runId: "post-fix",
-          hypothesisId: "H4",
-          location: "Composer.tsx:handleSend",
-          message: "queued follow-up while streaming",
-          data: {
-            isStreaming,
-            draftLen: text.length,
-            queueLenBefore: messageQueue.length,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
       enqueueMessage(activeSessionId, text)
       setComposerDraft("")
       return
@@ -332,7 +406,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
     setSessionStreaming(activeSessionId, true)
 
     try {
-      // Rename draft "New Agent" from the first prompt (Cursor-style).
+      // Rename draft "New Agent" from the first prompt .
       if (text && isDefaultSessionTitle(active?.title)) {
         try {
           await updateSession(activeSessionId, {
@@ -349,6 +423,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
         text,
         model: selectedModelId ?? undefined,
         permissionMode: modeToPermission(composerMode),
+        effort: selectedEffort ?? undefined,
         attachments: pending.map((a) => ({
           path: a.path,
           kind: a.kind,
@@ -390,6 +465,10 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
     setIsStreaming(false)
     setSessionStreaming(activeSessionId, false)
     useAppStore.getState().clearStreamingForSession(activeSessionId)
+    // Force-close any rows still marked running (spinner backstop) — the
+    // engine may never emit a matching turn_completed/session_error. See
+    // useSessionEvents' sweepRequests.
+    useAppStore.getState().requestSweep(activeSessionId)
     try {
       await cancel(activeSessionId)
     } catch (err) {
@@ -540,6 +619,16 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
     removeQueuedMessage(activeSessionId, index)
   }
 
+  // "Send now" dequeues one item and drains it through the same send path the
+  // turn-complete effect uses, without waiting for the current turn to end.
+  const handleSendQueuedNow = (index: number) => {
+    if (!activeSessionId) return
+    const text = messageQueue[index]
+    if (text === undefined) return
+    removeQueuedMessage(activeSessionId, index)
+    void handleSend(text)
+  }
+
   return (
     <div className="px-4 pt-2">
       {error ? (
@@ -562,10 +651,17 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
           {messageQueue.map((item, index) => (
             <div
               key={`${index}-${item.slice(0, 24)}`}
-              className="flex items-center gap-2 rounded-md border border-stroke-3 bg-fill-5 px-2.5 py-1.5 text-sm text-ink-secondary"
+              className="animate-tray-in flex items-center gap-2 rounded-md bg-fill-4 px-2.5 py-1.5 text-sm text-ink-secondary"
             >
-              <span className="shrink-0 text-ink-faint">Queued</span>
+              <span className="shrink-0 text-xs text-ink-faint">Queued</span>
               <span className="min-w-0 flex-1 truncate">{item}</span>
+              <button
+                type="button"
+                onClick={() => handleSendQueuedNow(index)}
+                className="shrink-0 text-xs text-accent transition-colors hover:text-accent-hover"
+              >
+                Send now
+              </button>
               <button
                 type="button"
                 onClick={() => handleRemoveQueued(index)}
@@ -698,6 +794,9 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
             }}
             onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
             onScroll={syncBackdropScroll}
             placeholder={placeholder}
             rows={1}
@@ -720,7 +819,6 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
             <PlusMenu
               onAttachFile={() => void handlePick("file")}
               onAttachImage={() => void handlePick("image")}
-              onSetMode={setComposerMode}
             />
             <ModePicker
               value={composerMode}
@@ -731,6 +829,9 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
               value={selectedModelId}
               onChange={(id) => void handleModelChange(id)}
               isLoading={modelsLoading}
+              effortFor={(modelId) => effortByModel[modelId] ?? null}
+              onEffortChange={setEffortForModel}
+              builtinProviders={builtinProviders}
             />
           </div>
           <div className="flex shrink-0 items-center gap-1">

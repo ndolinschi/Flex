@@ -25,6 +25,20 @@ pub struct TerminalHandle {
     pub created_at_ms: u64,
 }
 
+/// Snapshot of a non-isolated session's repo state at the moment the session
+/// started (or was first resumed post-restart), used to scope the Changes
+/// panel to files this session actually touched rather than the whole
+/// repo's pre-existing dirty state.
+pub struct SessionBaseline {
+    /// `git rev-parse HEAD` in the session's `cwd` at capture time; empty
+    /// string if the repo has no HEAD yet (e.g. freshly initialized).
+    pub head_sha: String,
+    /// Dirty paths (from `git status --porcelain`) at capture time, mapped
+    /// to a `git hash-object` content hash. Deleted paths are recorded with
+    /// the sentinel `"deleted"` since they have no blob to hash.
+    pub files: HashMap<String, String>,
+}
+
 pub struct AppState {
     pub service: Mutex<Option<EngineService>>,
     pub config: Mutex<ProviderConfig>,
@@ -45,6 +59,9 @@ pub struct AppState {
     pub next_terminal_seq: SyncMutex<u64>,
     /// The single browser-panel webview, if the user has opened it.
     pub browser_webview: Mutex<Option<tauri::Webview>>,
+    /// Per-session repo baselines for non-isolated sessions, keyed by
+    /// session id string. See [`SessionBaseline`].
+    pub session_baselines: Mutex<HashMap<String, SessionBaseline>>,
 }
 
 impl AppState {
@@ -62,6 +79,7 @@ impl AppState {
             terminals: SyncMutex::new(HashMap::new()),
             next_terminal_seq: SyncMutex::new(0),
             browser_webview: Mutex::new(None),
+            session_baselines: Mutex::new(HashMap::new()),
         }
     }
 }

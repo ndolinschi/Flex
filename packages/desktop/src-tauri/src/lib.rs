@@ -3,6 +3,7 @@ mod commands;
 mod compose;
 mod config;
 mod error;
+mod secrets;
 mod state;
 mod terminal;
 
@@ -12,12 +13,34 @@ use crate::compose::{build_service, open_session_store};
 use crate::config::load_config;
 use crate::state::AppState;
 
+/// Trace/log to stdout so engine and provider errors are visible in the
+/// `tauri dev` console. `RUST_LOG` wins if set (standard `EnvFilter` syntax,
+/// e.g. `RUST_LOG=debug`); otherwise falls back to a useful default that
+/// surfaces provider-level detail (Bedrock request/stream failures) without
+/// drowning in framework noise. Init once, before building the engine
+/// service, so failures during `build_service` on launch are also captured.
+fn init_tracing() {
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        tracing_subscriber::EnvFilter::new(
+            "info,agentloop_loop=debug,agentloop_engine=debug,\
+             agentloop_providers=debug,agentloop_provider_bedrock=debug",
+        )
+    });
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_writer(std::io::stdout)
+        .try_init();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    init_tracing();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
             let store = open_session_store().map_err(|e| e.to_string())?;
             let config = load_config().unwrap_or_default();
@@ -45,9 +68,15 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::hello,
             commands::get_provider_config,
+            commands::set_secret_storage,
             commands::list_builtin_providers,
             commands::validate_provider,
             commands::save_provider_config,
+            commands::profiles_list,
+            commands::profile_upsert,
+            commands::profile_remove,
+            commands::profile_activate,
+            commands::validate_profile,
             commands::list_models,
             commands::list_providers,
             commands::create_session,
@@ -64,11 +93,20 @@ pub fn run() {
             commands::respond_permission,
             commands::respond_question,
             commands::is_configured,
+            commands::git_is_repo,
             commands::git_branch,
             commands::git_list_branches,
             commands::git_checkout,
             commands::git_status,
+            commands::git_status_since_baseline,
             commands::git_diff,
+            commands::git_commit,
+            commands::git_push,
+            // Review flow: per-file keep/undo + hunk-patch apply.
+            commands::review_undo_file,
+            commands::review_keep_file,
+            commands::review_apply_patch,
+            commands::review_file_diff,
             commands::list_files,
             commands::list_commands,
             commands::is_isolated,
@@ -81,6 +119,19 @@ pub fn run() {
             commands::routines_remove,
             commands::routines_run,
             commands::routines_history,
+            commands::mcp_list,
+            commands::mcp_upsert,
+            commands::mcp_remove,
+            commands::mcp_test,
+            commands::memory_list,
+            commands::memory_get,
+            commands::memory_remove,
+            commands::memory_set_expiry,
+            commands::project_memory_list,
+            commands::project_memory_get,
+            commands::project_memory_remove,
+            commands::project_memory_set_expiry,
+            commands::user_identity,
             terminal::terminal_create,
             terminal::terminal_write,
             terminal::terminal_resize,
@@ -94,6 +145,10 @@ pub fn run() {
             browser::browser_set_bounds,
             browser::browser_set_visible,
             browser::browser_close,
+            browser::browser_open_devtools,
+            browser::browser_hard_reload,
+            browser::browser_clear_data,
+            browser::browser_screenshot,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

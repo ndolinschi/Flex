@@ -1,14 +1,18 @@
 @import "tailwindcss";
 @import "./styles/tokens.css";
 @import "./styles/terminal.css";
+@import "./styles/highlight.css";
 
 @theme {
+  /* reference canon: semibold = 590 (see design-map/00-foundations.md) */
+  --font-weight-semibold: 590;
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 
   --color-base: var(--color-base);
   --color-chrome: var(--color-chrome);
   --color-panel: var(--color-panel);
+  --color-elevated: var(--color-elevated);
   --color-editor: var(--color-editor);
 
   --color-text-1: var(--color-text-1);
@@ -155,14 +159,50 @@ textarea[data-composer]:focus-visible {
   color: var(--color-ink);
 }
 
-.hljs {
-  background: transparent;
+/*
+ * Timeline row containment (long-session perf): off-screen rows skip layout
+ * / paint / style work entirely via `content-visibility: auto`. The browser
+ * still needs a size estimate for scrollbar math before a row is ever
+ * measured, hence per-kind `contain-intrinsic-size` hints below — rough is
+ * fine, they only matter until the row's first real layout, after which the
+ * browser remembers the measured size. Do NOT apply to any row that must
+ * always stay live/measured off-screen (e.g. xterm-backed panes) — the
+ * timeline has none of those (xterm only lives in the right-panel Terminal
+ * tab), so no row kind is excluded here.
+ */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 80px;
+}
+
+/* User bubbles are short one-liners most of the time. */
+.cv-auto-user {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 80px;
+}
+
+/* Assistant markdown answers run longer on average than a user bubble. */
+.cv-auto-assistant {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+
+/* Collapsed "Worked for Ns" groups — short header row when collapsed. */
+.cv-auto-group {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+
+/* Meta/fallback/command/error rows are single lines. */
+.cv-auto-meta {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 32px;
 }
 
 /* Glass scrollbar — thin, translucent, theme-aware. */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -197,7 +237,7 @@ textarea[data-composer]:focus-visible {
   }
 }
 
-/* Tray / popover — Cursor closed-transform: -4px Y + 0.99 scale */
+/* Tray / popover — closed-transform: -4px Y + 0.99 scale */
 @keyframes tray-in {
   from {
     opacity: 0;
@@ -239,7 +279,7 @@ textarea[data-composer]:focus-visible {
   }
 }
 
-/* Content reveal — Cursor "fadeInSlideUp": opacity + a short lift. */
+/* Content reveal — "fadeInSlideUp": opacity + a short lift. */
 @keyframes content-in {
   from {
     opacity: 0;
@@ -261,7 +301,7 @@ textarea[data-composer]:focus-visible {
   }
 }
 
-/* Modal entrance — Cursor react-modal scale-in. */
+/* Modal entrance — reference modal scale-in. */
 @keyframes modal-in {
   from {
     opacity: 0;
@@ -273,8 +313,61 @@ textarea[data-composer]:focus-visible {
   }
 }
 
+/* Toast entrance — reference notifications: slide up from below + fade in. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 .animate-tray-in {
   animation: tray-in var(--duration-fast) var(--easing-out-strong) both;
+}
+
+/* Subagent viewer panel — bottom-anchored overlay open/close (150ms
+ * ease-out both, translateY(4px)+scale(.99)+opacity), reusing the same
+ * closed-transform shape as tray-in but on --duration-normal/--easing-out
+ * per the reference design's tray primitive timing (not the fast/strong pair
+ * `tray-in` uses elsewhere). */
+@keyframes subagent-viewer-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes subagent-viewer-out {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0) scale(0.99);
+  }
+}
+
+.animate-subagent-viewer-in {
+  animation: subagent-viewer-in var(--duration-normal) var(--easing-out) both;
+}
+
+.animate-subagent-viewer-out {
+  animation: subagent-viewer-out var(--duration-normal) var(--easing-out) both;
+}
+
+/* Feed dim mask behind the open subagent viewer — independent, hardcoded
+ * .16s timing (not tied to --duration-normal), matching the reference design. */
+.subagent-viewer-mask {
+  transition: opacity 0.16s ease-out;
 }
 
 .animate-pane-fade {
@@ -317,6 +410,19 @@ textarea[data-composer]:focus-visible {
   animation: modal-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+.animate-toast-in {
+  animation: toast-in 300ms var(--easing-out) both;
+}
+
+/* sash hover-highlight transition — shared utility so RightPanel's
+ * (and, as a follow-up, SessionSidebar's) drag-sash hover-line can pick up
+ * the same timing without duplicating the value. Targets the sash's own
+ * `::after` highlight line, since Tailwind's `after:` variant can't apply an
+ * arbitrary custom class. */
+.sash-line-transition::after {
+  transition: background-color 0.1s ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-tray-in,
   .animate-pane-fade,
@@ -324,8 +430,15 @@ textarea[data-composer]:focus-visible {
   .animate-content-in,
   .animate-backdrop-in,
   .animate-end-turn-in,
-  .animate-modal-in {
+  .animate-modal-in,
+  .animate-toast-in,
+  .animate-subagent-viewer-in,
+  .animate-subagent-viewer-out {
     animation: none;
+  }
+
+  .subagent-viewer-mask {
+    transition: none;
   }
 
   /* Keep the shimmer text readable (not transparent) without the sweep. */

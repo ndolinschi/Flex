@@ -1,4 +1,4 @@
-import { ChevronDown, Plus } from "lucide-react"
+import { ChevronDown, Folder, Plus } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { IconButton } from "../atoms"
 
@@ -39,6 +39,7 @@ export const RepoSectionHeader = ({
           aria-hidden
         />
       </span>
+      <Folder className="h-3.5 w-3.5 shrink-0 text-ink-muted" aria-hidden />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       <IconButton
         label="New agent in this repository"

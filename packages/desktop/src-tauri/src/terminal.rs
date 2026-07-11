@@ -6,7 +6,7 @@
 //! guard before returning — no `.await` ever happens while the guard is
 //! held, so blocking this mutex briefly is safe inside an async fn.
 
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -173,6 +173,10 @@ pub async fn terminal_write(
         .writer
         .write_all(data.as_bytes())
         .map_err(|e| DesktopError::Message(format!("failed to write to terminal: {e}")))?;
+    handle
+        .writer
+        .flush()
+        .map_err(|e| DesktopError::Message(format!("failed to flush terminal: {e}")))?;
     Ok(())
 }
 

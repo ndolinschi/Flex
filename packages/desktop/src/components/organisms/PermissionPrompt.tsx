@@ -1,9 +1,16 @@
 import { useState } from "react"
-import { Button } from "../atoms"
+import { X } from "lucide-react"
+import { Button, IconButton } from "../atoms"
 import { ErrorBanner } from "../molecules"
 import { respondPermission, toInvokeError } from "../../lib/tauri"
 import type { PendingPermission } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
+
+/** Backend error when the engine no longer has this request in memory
+ * (engine restarted / session gone) — the request itself, if it still
+ * exists, will simply time out; there is nothing left to respond to. */
+const isStalePermissionError = (message: string): boolean =>
+  message.toLowerCase().includes("no pending permission request")
 
 type PermissionPromptProps = {
   permission: PendingPermission
@@ -34,6 +41,7 @@ const formatDetail = (detail?: string): string | null => {
 
 export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
   const setPendingPermission = useAppStore((s) => s.setPendingPermission)
+  const pushToast = useAppStore((s) => s.pushToast)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const detail = formatDetail(permission.detail)
@@ -49,10 +57,25 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
       })
       setPendingPermission(null)
     } catch (err) {
-      setError(toInvokeError(err))
+      const message = toInvokeError(err)
+      if (isStalePermissionError(message)) {
+        // The engine-side request is gone (restart / session ended) — dismiss
+        // instead of hard-blocking on an error that can never be resolved.
+        setPendingPermission(null)
+        pushToast("Permission request expired", "error")
+      } else {
+        setError(message)
+      }
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleDismiss = () => {
+    // Local dismiss only — does not respond. If the engine-side request still
+    // exists it will simply time out / stay unanswered; this just guarantees
+    // the user is never hard-blocked by a modal they can't get rid of.
+    setPendingPermission(null)
   }
 
   return (
@@ -61,8 +84,15 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
       aria-labelledby="permission-title"
       className="w-full max-w-lg animate-modal-in"
     >
-      <div className="rounded-xl bg-panel p-3 shadow-lg">
-        <h3 id="permission-title" className="text-sm font-semibold text-ink">
+      <div className="relative rounded-xl bg-panel p-3 shadow-lg">
+        <IconButton
+          label="Dismiss"
+          onClick={handleDismiss}
+          className="absolute right-2 top-2 h-6 w-6"
+        >
+          <X className="h-3.5 w-3.5" aria-hidden />
+        </IconButton>
+        <h3 id="permission-title" className="pr-6 text-sm font-semibold text-ink">
           {permission.title}
         </h3>
         {detail ? (

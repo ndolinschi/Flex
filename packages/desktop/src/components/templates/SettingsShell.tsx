@@ -7,6 +7,8 @@ type SettingsShellProps = {
   children: ReactNode
   /** Header title; back always returns to chat. */
   title?: string
+  /** Optional supporting copy rendered under the title. */
+  description?: string
   /** Rail width for the content column. */
   wide?: boolean
   /** When true, omit the outer full-window chrome (used inside AppShell). */
@@ -16,6 +18,7 @@ type SettingsShellProps = {
 export const SettingsShell = ({
   children,
   title = "Provider settings",
+  description,
   wide = false,
   embedded = false,
 }: SettingsShellProps) => {
@@ -23,18 +26,25 @@ export const SettingsShell = ({
 
   const body = (
     <>
-      <header className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-3">
+      <header className="flex min-h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-8 py-6">
         <IconButton label="Back to chat" onClick={() => setRoute("chat")}>
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
         </IconButton>
-        <h1 className="truncate text-sm font-medium text-ink">{title}</h1>
+        <div className="min-w-0">
+          <h1 className="truncate text-[15px] font-medium text-ink">{title}</h1>
+          {description ? (
+            <p className="mt-0.5 truncate text-xs text-ink-muted">
+              {description}
+            </p>
+          ) : null}
+        </div>
       </header>
-      <main className="flex-1 overflow-y-auto p-4">
+      <main className="flex-1 overflow-y-auto px-8 py-6">
         <div
           className={
             wide
               ? "mx-auto max-w-[var(--content-rail)]"
-              : "mx-auto max-w-[var(--form-rail)]"
+              : "mx-auto max-w-[720px]"
           }
         >
           {children}

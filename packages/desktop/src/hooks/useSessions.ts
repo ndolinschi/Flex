@@ -49,9 +49,17 @@ export const useSessions = () => {
     mutationFn: (id: string) => deleteSession(id),
     onSuccess: (_data, deletedId) => {
       void queryClient.invalidateQueries({ queryKey: SESSIONS_KEY })
-      const activeId = useAppStore.getState().activeSessionId
-      if (activeId === deletedId) {
+      const state = useAppStore.getState()
+      if (state.activeSessionId === deletedId) {
         setActiveSessionId(null)
+      }
+      // A deleted session can never resolve its pending permission —
+      // clear it so a stale modal can't outlive the session it belongs to.
+      if (state.pendingPermission?.sessionId === deletedId) {
+        state.setPendingPermission(null)
+      }
+      if (state.pendingQuestion?.sessionId === deletedId) {
+        state.setPendingQuestion(null)
       }
     },
   })
@@ -67,7 +75,7 @@ export const useSessions = () => {
   }
 
   /**
-   * Cursor-style New Agent: reuse an empty "New Agent" draft for the same
+   * New Agent: reuse an empty "New Agent" draft for the same
    * project instead of spawning another UUID-titled row.
    */
   const handleNewAgent = async (

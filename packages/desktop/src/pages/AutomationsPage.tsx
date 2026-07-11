@@ -1,15 +1,18 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ChevronDown, Play, Plus, Trash2 } from "lucide-react"
+import { Clock, Play, Plus, Trash2, Webhook } from "lucide-react"
 import { Badge, Button, Spinner, TextArea, TextInput } from "../components/atoms"
 import {
   Collapsible,
   ConfirmDialog,
   ErrorBanner,
+  FieldRow,
   ModelSelect,
+  SettingsSection,
 } from "../components/molecules"
 import { SettingsShell } from "../components/templates"
 import { useModels } from "../hooks/useModels"
+import { humanizeCron } from "../lib/cron"
 import {
   routinesHistory,
   routinesList,
@@ -33,8 +36,23 @@ const selectClasses = cn(
 
 const KEBAB_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
-const triggerLabel = (trigger: RoutineTriggerDto): string =>
-  trigger.kind === "cron" ? (trigger.expr ?? "") : (trigger.path ?? "")
+/** Trigger summary shown under the routine name: icon + human text. */
+const TriggerSummary = ({ trigger }: { trigger: RoutineTriggerDto }) => {
+  if (trigger.kind === "cron") {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <Clock className="h-3 w-3" aria-hidden />
+        {humanizeCron(trigger.expr ?? "")}
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Webhook className="h-3 w-3" aria-hidden />
+      POST {trigger.path ?? ""}
+    </span>
+  )
+}
 
 type AutomationsPageProps = {
   embedded?: boolean
@@ -138,24 +156,17 @@ const CreateRoutineForm = ({
   }
 
   return (
-    <div className="mb-4 flex flex-col gap-3 rounded-lg border border-stroke-3 bg-panel p-3">
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="routine-id" className="text-sm font-medium text-ink-secondary">
-          Id
-        </label>
+    <SettingsSection title="New automation">
+      <FieldRow label="Id" htmlFor="routine-id" hint='Kebab-case, e.g. "nightly-review"'>
         <TextInput
           id="routine-id"
           value={form.id}
           onChange={(e) => patch({ id: e.target.value })}
           placeholder="nightly-review"
         />
-        <p className="text-xs text-ink-faint">Kebab-case, e.g. "nightly-review"</p>
-      </div>
+      </FieldRow>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="routine-prompt" className="text-sm font-medium text-ink-secondary">
-          Prompt
-        </label>
+      <FieldRow label="Prompt" htmlFor="routine-prompt">
         <TextArea
           id="routine-prompt"
           value={form.prompt}
@@ -163,13 +174,10 @@ const CreateRoutineForm = ({
           placeholder="Review overnight PRs opened against main…"
           rows={3}
         />
-      </div>
+      </FieldRow>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="routine-trigger-kind" className="text-sm font-medium text-ink-secondary">
-            Trigger
-          </label>
+      <FieldRow label="Trigger" htmlFor="routine-trigger-kind">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <select
             id="routine-trigger-kind"
             value={form.triggerKind}
@@ -179,12 +187,7 @@ const CreateRoutineForm = ({
             <option value="cron">Cron</option>
             <option value="webhook">Webhook</option>
           </select>
-        </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="routine-trigger-value" className="text-sm font-medium text-ink-secondary">
-            {form.triggerKind === "cron" ? "Cron expression" : "Webhook path"}
-          </label>
           <TextInput
             id="routine-trigger-value"
             value={form.triggerKind === "cron" ? form.expr : form.path}
@@ -196,72 +199,66 @@ const CreateRoutineForm = ({
             placeholder={form.triggerKind === "cron" ? "0 9 * * *" : "/deploy"}
           />
         </div>
-      </div>
+      </FieldRow>
 
-      <ModelSelect
-        id="routine-model"
-        label="Model (optional)"
-        models={models}
-        value={form.model}
-        onChange={(value) => patch({ model: value })}
-        isLoading={modelsLoading}
-        placeholder="Use default model"
-      />
+      <FieldRow label="Model (optional)" htmlFor="routine-model">
+        <ModelSelect
+          id="routine-model"
+          models={models}
+          value={form.model}
+          onChange={(value) => patch({ model: value })}
+          isLoading={modelsLoading}
+          placeholder="Use default model"
+        />
+      </FieldRow>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="routine-cwd" className="text-sm font-medium text-ink-secondary">
-          Working directory (optional)
-        </label>
+      <FieldRow label="Working directory (optional)" htmlFor="routine-cwd">
         <TextInput
           id="routine-cwd"
           value={form.cwd}
           onChange={(e) => patch({ cwd: e.target.value })}
           placeholder="/Users/you/project"
         />
-      </div>
+      </FieldRow>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="routine-max-iterations" className="text-sm font-medium text-ink-secondary">
-            Max iterations
-          </label>
-          <TextInput
-            id="routine-max-iterations"
-            type="number"
-            min={1}
-            value={form.maxIterations}
-            onChange={(e) => patch({ maxIterations: e.target.value })}
-          />
-        </div>
+      <FieldRow label="Max iterations" htmlFor="routine-max-iterations">
+        <TextInput
+          id="routine-max-iterations"
+          type="number"
+          min={1}
+          value={form.maxIterations}
+          onChange={(e) => patch({ maxIterations: e.target.value })}
+        />
+      </FieldRow>
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="routine-token-budget" className="text-sm font-medium text-ink-secondary">
-            Token budget (optional)
-          </label>
-          <TextInput
-            id="routine-token-budget"
-            type="number"
-            min={0}
-            value={form.tokenBudget}
-            onChange={(e) => patch({ tokenBudget: e.target.value })}
-            placeholder="No limit"
-          />
-        </div>
-      </div>
+      <FieldRow label="Token budget (optional)" htmlFor="routine-token-budget">
+        <TextInput
+          id="routine-token-budget"
+          type="number"
+          min={0}
+          value={form.tokenBudget}
+          onChange={(e) => patch({ tokenBudget: e.target.value })}
+          placeholder="No limit"
+        />
+      </FieldRow>
 
-      <label className="flex items-center gap-2 text-sm text-ink-secondary">
+      <FieldRow label="Require verification" htmlFor="routine-require-verification">
         <input
+          id="routine-require-verification"
           type="checkbox"
           checked={form.requireVerification}
           onChange={(e) => patch({ requireVerification: e.target.checked })}
           className="h-3.5 w-3.5 rounded border-border accent-accent"
         />
-        Require verification
-      </label>
+      </FieldRow>
 
-      {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}
+      {error ? (
+        <div className="px-4 py-3">
+          <ErrorBanner message={error} onDismiss={() => setError(null)} />
+        </div>
+      ) : null}
 
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 px-4 py-3">
         <Button variant="secondary" size="sm" onClick={onCancel}>
           Cancel
         </Button>
@@ -269,7 +266,7 @@ const CreateRoutineForm = ({
           Save automation
         </Button>
       </div>
-    </div>
+    </SettingsSection>
   )
 }
 
@@ -304,46 +301,39 @@ const RoutineRow = ({ routine }: { routine: RoutineDto }) => {
   })
 
   const history = historyQuery.data ?? EMPTY_HISTORY
+  const lastRun = history.length > 0 ? history.slice().sort((a, b) => b.startedMs - a.startedMs)[0] : null
 
   return (
-    <div className="rounded-lg border border-stroke-3 bg-panel">
+    <div className="flex flex-col">
       <div className="flex items-start gap-3 p-3">
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-0.5 shrink-0 rounded p-0.5 text-ink-muted transition-colors hover:text-ink"
+          className="min-w-0 flex-1 text-left"
           aria-label={expanded ? "Collapse run history" : "Expand run history"}
           aria-expanded={expanded}
         >
-          <ChevronDown
-            className={cn(
-              "h-4 w-4 transition-transform duration-[var(--duration-fast)]",
-              expanded && "rotate-180",
-            )}
-            aria-hidden
-          />
-        </button>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-base text-ink">{routine.title ?? routine.id}</p>
-            {routine.trigger.kind === "cron" ? (
-              <Badge variant="muted">{triggerLabel(routine.trigger)}</Badge>
-            ) : (
-              <Badge variant="default">{triggerLabel(routine.trigger)}</Badge>
-            )}
-          </div>
-          <p className="mt-0.5 truncate text-sm text-ink-muted">{routine.prompt}</p>
+          <p className="truncate text-[13px] text-ink">{routine.title ?? routine.id}</p>
+          <p className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-ink-muted">
+            <TriggerSummary trigger={routine.trigger} />
+            <span aria-hidden>·</span>
+            <span className="truncate">{routine.prompt}</span>
+          </p>
           {ranNote ? (
             <p className="mt-1 text-xs text-accent">
               Started — a new session will appear in the sidebar.
             </p>
           ) : null}
-        </div>
+        </button>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {historyQuery.isSuccess && lastRun ? (
+            <Badge variant={lastRun.stopReason === "completed" ? "success" : "muted"}>
+              {lastRun.stopReason}
+            </Badge>
+          ) : null}
           <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
             isLoading={runMutation.isPending}
             onClick={() => void runMutation.mutateAsync()}
@@ -377,7 +367,7 @@ const RoutineRow = ({ routine }: { routine: RoutineDto }) => {
                 .map((record) => (
                   <div
                     key={`${record.sessionId}-${record.startedMs}`}
-                    className="flex items-center gap-2 text-sm"
+                    className="flex items-center gap-2 text-xs"
                   >
                     <span className="text-ink-muted">
                       {formatRelativeTime(record.startedMs)}
@@ -423,49 +413,51 @@ export const AutomationsPage = ({ embedded = false }: AutomationsPageProps) => {
 
   const routines = routinesQuery.data ?? EMPTY_ROUTINES
 
+  const newAutomationButton = (
+    <Button size="sm" onClick={() => setCreating(true)}>
+      <Plus className="h-3.5 w-3.5" aria-hidden /> New automation
+    </Button>
+  )
+
   return (
     <SettingsShell title="Automations" wide embedded={embedded}>
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-ink-muted">
-          Routines run on a schedule or webhook and start a new session automatically.
-        </p>
-        {!creating ? (
-          <Button size="sm" onClick={() => setCreating(true)}>
-            <Plus className="h-3.5 w-3.5" aria-hidden /> New automation
-          </Button>
+      <div className="flex flex-col gap-4">
+        <SettingsSection
+          title="Routines"
+          description="Run on a schedule or webhook and start a new session automatically"
+          actions={!creating ? newAutomationButton : undefined}
+        >
+          {routinesQuery.isLoading ? (
+            <div className="flex items-center gap-2 p-3 text-sm text-ink-muted">
+              <Spinner size="sm" /> Loading automations…
+            </div>
+          ) : routinesQuery.isError ? (
+            <div className="p-3">
+              <ErrorBanner message={toInvokeError(routinesQuery.error)} />
+            </div>
+          ) : routines.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+              <p className="text-[13px] text-ink-secondary">No automations yet</p>
+              <p className="text-xs text-ink-faint">
+                Create an automation to run a prompt on a schedule or webhook.
+              </p>
+              {newAutomationButton}
+            </div>
+          ) : (
+            routines.map((routine) => <RoutineRow key={routine.id} routine={routine} />)
+          )}
+        </SettingsSection>
+
+        {creating ? (
+          <CreateRoutineForm
+            onCancel={() => setCreating(false)}
+            onSaved={() => {
+              setCreating(false)
+              void queryClient.invalidateQueries({ queryKey: ROUTINES_KEY })
+            }}
+          />
         ) : null}
       </div>
-
-      {creating ? (
-        <CreateRoutineForm
-          onCancel={() => setCreating(false)}
-          onSaved={() => {
-            setCreating(false)
-            void queryClient.invalidateQueries({ queryKey: ROUTINES_KEY })
-          }}
-        />
-      ) : null}
-
-      {routinesQuery.isLoading ? (
-        <div className="flex items-center gap-2 py-8 text-sm text-ink-muted">
-          <Spinner size="sm" /> Loading automations…
-        </div>
-      ) : routinesQuery.isError ? (
-        <ErrorBanner message={toInvokeError(routinesQuery.error)} />
-      ) : routines.length === 0 && !creating ? (
-        <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-          <p className="text-sm text-ink-muted">No automations yet.</p>
-          <Button size="sm" onClick={() => setCreating(true)}>
-            <Plus className="h-3.5 w-3.5" aria-hidden /> New automation
-          </Button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {routines.map((routine) => (
-            <RoutineRow key={routine.id} routine={routine} />
-          ))}
-        </div>
-      )}
     </SettingsShell>
   )
 }

@@ -1,8 +1,9 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { useGlobalSessionEvents } from "./hooks/useGlobalSessionEvents"
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts"
 import { useSessions } from "./hooks/useSessions"
+import { useViewportWidth } from "./hooks/useViewportWidth"
 import { isBrowserPreview } from "./lib/browserMock"
 import {
   cancel,
@@ -10,10 +11,17 @@ import {
   listSessions,
   resumeSession,
 } from "./lib/tauri"
-import { RightPanel, SessionSidebar } from "./components/organisms"
+import {
+  CommandPalette,
+  RightPanel,
+  SearchModal,
+  SessionSidebar,
+} from "./components/organisms"
+import { ToastHost } from "./components/molecules"
 import { AutomationsPage } from "./pages/AutomationsPage"
 import { ChatPage } from "./pages/ChatPage"
 import { CustomizePage } from "./pages/CustomizePage"
+import { MemoryPage } from "./pages/MemoryPage"
 import { SettingsPage } from "./pages/SettingsPage"
 import { WelcomePage } from "./pages/WelcomePage"
 import { restoreUiState, useAppStore } from "./stores/appStore"
@@ -32,12 +40,18 @@ const AppRoutes = () => {
   const route = useAppStore((s) => s.route)
   const isBootstrapped = useAppStore((s) => s.isBootstrapped)
   const setRoute = useAppStore((s) => s.setRoute)
-  const toggleSidebarSearch = useAppStore((s) => s.toggleSidebarSearch)
   const toggleSidebarCollapsed = useAppStore((s) => s.toggleSidebarCollapsed)
   const toggleRightPanel = useAppStore((s) => s.toggleRightPanel)
   const setTheme = useAppStore((s) => s.setTheme)
   const { newAgent } = useSessions()
   useGlobalSessionEvents()
+  // Gated on isBootstrapped so the first classification runs after
+  // restoreUiState applies the persisted sidebarCollapsed value — otherwise
+  // an early narrow classification could force-collapse before the user's
+  // saved preference is even loaded (BEHAVIOR SPEC #5).
+  useViewportWidth(isBootstrapped)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const [searchModalOpen, setSearchModalOpen] = useState(false)
 
   // Stable handlers — avoid rebinding the window listener every render.
   const handlersRef = useRef({
@@ -48,6 +62,7 @@ const AppRoutes = () => {
     onCancel: (): boolean => false,
     onToggleSidebar: () => {},
     onToggleRightPanel: () => {},
+    onToggleCommandPalette: () => {},
   })
   handlersRef.current = {
     onSend: () => {
@@ -62,8 +77,7 @@ const AppRoutes = () => {
     },
     onSearch: () => {
       if (useAppStore.getState().route === "welcome") return
-      setRoute("chat")
-      toggleSidebarSearch()
+      setSearchModalOpen((v) => !v)
     },
     onFocusComposer: () => {
       document.querySelector<HTMLTextAreaElement>("[data-composer]")?.focus()
@@ -74,17 +88,40 @@ const AppRoutes = () => {
     onToggleRightPanel: () => {
       toggleRightPanel()
     },
+    onToggleCommandPalette: () => {
+      setCommandPaletteOpen((v) => !v)
+    },
     onCancel: () => {
       const state = useAppStore.getState()
-      if (state.sidebarSearchOpen) {
-        state.setSidebarSearchOpen(false)
+      if (commandPaletteOpen) {
+        setCommandPaletteOpen(false)
         return true
+      }
+      if (searchModalOpen) {
+        setSearchModalOpen(false)
+        return true
+      }
+      // Narrow/tight: an open sidebar or right-panel overlay covers the
+      // chat area — Esc closes it before falling through to turn-cancel.
+      if (state.viewport !== "wide") {
+        if (!state.sidebarCollapsed) {
+          state.setSidebarCollapsed(true)
+          return true
+        }
+        if (state.rightPanelOpen) {
+          state.setRightPanelOpen(false)
+          return true
+        }
       }
       if (!state.isStreaming || !state.activeSessionId) return false
       const sessionId = state.activeSessionId
       state.setIsStreaming(false)
       state.setSessionStreaming(sessionId, false)
       state.clearStreamingForSession(sessionId)
+      // Force-close any rows still marked running (spinner backstop) — the
+      // engine may never emit a matching turn_completed/session_error, e.g.
+      // if the process already died. See useSessionEvents' sweepRequests.
+      state.requestSweep(sessionId)
       void cancel(sessionId)
       return true
     },
@@ -133,12 +170,37 @@ const AppRoutes = () => {
           useAppStore.getState().setSelectedModelId("anthropic/claude-sonnet-4")
         }
 
+        // Effort moved from a single global setting to per-model (reference
+        // design: effort is picked FOR a specific model, in its dropdown row).
+        // Migration: if a legacy `selectedEffort` exists and we haven't
+        // captured any per-model efforts yet, apply it once to the current
+        // model and drop the legacy value so this only runs the first launch
+        // after upgrading.
+        if (ui.effortByModel) {
+          for (const [modelId, effort] of Object.entries(ui.effortByModel)) {
+            useAppStore.getState().setEffortForModel(modelId, effort)
+          }
+        } else if (ui.selectedEffort) {
+          const currentModel = useAppStore.getState().selectedModelId
+          if (currentModel) {
+            useAppStore.getState().setEffortForModel(currentModel, ui.selectedEffort)
+          }
+          useAppStore.getState().setSelectedEffort(null)
+        }
+
         if (ui.composerMode) {
           useAppStore.getState().setComposerMode(ui.composerMode)
         }
 
         if (ui.recentCwds?.length) {
           useAppStore.getState().setRecentCwds(ui.recentCwds)
+        }
+
+        if (ui.pinnedSessionIds) {
+          useAppStore.getState().setPinnedSessionIds(ui.pinnedSessionIds)
+        }
+        if (ui.archivedSessionIds) {
+          useAppStore.getState().setArchivedSessionIds(ui.archivedSessionIds)
         }
 
         if (ui.sidebarCollapsed) {
@@ -180,38 +242,62 @@ const AppRoutes = () => {
   if (route === "welcome") return <WelcomePage />
 
   // Persistent sidebar + keep Chat mounted so timeline/subscriptions survive
-  // settings round-trips (Cursor Glass: content swap, not full remount).
+  // settings round-trips (reference glass: content swap, not full remount).
   return (
-    <div className="flex h-full bg-bg">
-      <SessionSidebar />
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-        <div
-          className={cn(
-            "flex h-full min-h-0 flex-1 flex-col",
-            "transition-opacity duration-[var(--duration-normal)] ease-[var(--easing-default)]",
-            route !== "chat" && "pointer-events-none opacity-0",
-          )}
-          aria-hidden={route !== "chat"}
-        >
-          <ChatPage embedded />
+    <div className="relative flex h-full bg-bg">
+      {/* Root is `relative` so SessionSidebar's mobile overlay (absolute,
+       * anchored to this container's left edge — see SessionSidebar.tsx's
+       * `narrow` handling) spans the full app width, not just the chat area. */}
+      <SessionSidebar onOpenSearch={() => setSearchModalOpen(true)} />
+      {/* Relative + flex-row: at "wide" the right panel lays out as a normal
+       * side-by-side column (unchanged from before); at "narrow"/"tight" it
+       * switches to an absolute overlay anchored to this container's right
+       * edge, so the overlay + backdrop cover only the chat area, not the
+       * sidebar (see RightPanel.tsx's `narrow` handling). */}
+      <div className="relative flex min-h-0 min-w-0 flex-1">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+          <div
+            className={cn(
+              "flex h-full min-h-0 flex-1 flex-col",
+              "transition-opacity duration-[var(--duration-normal)] ease-[var(--easing-default)]",
+              route !== "chat" && "pointer-events-none opacity-0",
+            )}
+            aria-hidden={route !== "chat"}
+          >
+            <ChatPage embedded />
+          </div>
+          {route === "settings" ? (
+            <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
+              <SettingsPage embedded />
+            </div>
+          ) : null}
+          {route === "customize" ? (
+            <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
+              <CustomizePage embedded />
+            </div>
+          ) : null}
+          {route === "automations" ? (
+            <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
+              <AutomationsPage embedded />
+            </div>
+          ) : null}
+          {route === "memory" ? (
+            <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
+              <MemoryPage embedded />
+            </div>
+          ) : null}
         </div>
-        {route === "settings" ? (
-          <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
-            <SettingsPage embedded />
-          </div>
-        ) : null}
-        {route === "customize" ? (
-          <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
-            <CustomizePage embedded />
-          </div>
-        ) : null}
-        {route === "automations" ? (
-          <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
-            <AutomationsPage embedded />
-          </div>
-        ) : null}
+        <RightPanel />
       </div>
-      <RightPanel />
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+      />
+      <SearchModal
+        open={searchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+      />
+      <ToastHost />
     </div>
   )
 }

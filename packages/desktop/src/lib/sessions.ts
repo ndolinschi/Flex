@@ -1,7 +1,7 @@
 import type { CreateSessionInput, SessionMeta } from "./types"
 import { DEFAULT_SESSION_TITLE, isDefaultSessionTitle } from "./types"
 
-/** Find an unused "New Agent" session for this project (Cursor: one draft per cwd). */
+/** Find an unused "New Agent" session for this project (design: one draft per cwd). */
 export const findDraftSession = (
   sessions: SessionMeta[],
   cwd?: string | null,

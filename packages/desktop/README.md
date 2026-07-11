@@ -48,8 +48,9 @@ plugins, set comma-separated **fallback models**, and choose default workspace
 
 ## UI notes
 
-- Cursor Agents Window chrome: recessed sidebar, content canvas, light/dark themes
-  (toggle in sidebar footer), flat expanded composer (12px radius, quiet toolbar).
+- Reference-design Agents Window chrome: recessed sidebar, content canvas,
+  light/dark themes (toggle in sidebar footer), flat expanded composer
+  (12px radius, quiet toolbar).
 - Sidebar: **New Agent**, **Search** (⌘K); agents grouped by repository with
   running dots. Settings + theme live in the footer. New Agent prefers the latest
   project from the picker when available.
@@ -57,7 +58,7 @@ plugins, set comma-separated **fallback models**, and choose default workspace
 - Composer modes: **Agent** / **Plan** / **Ask** → engine `PermissionMode`.
 - Per-session drafts; Enter sends (Shift+Enter newline).
 - Timeline: `plan_updated` (`PlanCard`), `question_requested` (`QuestionPrompt`),
-  Cursor-style work groups and clustered tool steps.
+  reference-style work groups and clustered tool steps.
 - Motion: 100–160ms hover/tray/end-of-turn; `prefers-reduced-motion` respected.
 
 ## Architecture (short)

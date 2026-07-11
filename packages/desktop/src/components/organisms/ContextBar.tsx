@@ -1,16 +1,26 @@
 import { useEffect, useRef, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { GitMerge, XCircle } from "lucide-react"
-import { isIsolated, workspaceStatus } from "../../lib/tauri"
+import {
+  gitCommit,
+  gitIsRepo,
+  gitPush,
+  gitStatusSinceBaseline,
+  isIsolated,
+  toInvokeError,
+  workspaceStatus,
+} from "../../lib/tauri"
 import { useAppStore } from "../../stores/appStore"
 import { useWorkspaceActions } from "../../hooks/useWorkspaceActions"
 import { useModels } from "../../hooks/useModels"
 import { cn, formatCost, formatTokens } from "../../lib/utils"
 import { BranchPicker } from "../molecules/BranchPicker"
+import { PopoverTray } from "../molecules/PopoverTray"
 import { ProjectPicker } from "../molecules/ProjectPicker"
+import { Button, TextInput } from "../atoms"
 
 /** Fallback context budget used for the usage ring when the selected
- * model's own context window isn't known (Cursor shows a similar %). */
+ * model's own context window isn't known (the reference design shows a similar %). */
 const CONTEXT_BUDGET_TOKENS = 200_000
 
 const ContextRing = ({ fraction }: { fraction: number }) => {
@@ -243,6 +253,157 @@ const IsolationBadge = ({
   )
 }
 
+/** Right-aligned "N changes" pill + "Commit & Push" button, shown above the
+ * composer for non-isolated sessions with a dirty working tree (design:
+ * "Changes +9745 -737" pill + button). Clicking the pill jumps to the
+ * Changes tab; the button opens an inline popover to compose the message. */
+const CommitBar = ({
+  sessionId,
+  cwd,
+  onError,
+}: {
+  sessionId: string
+  cwd?: string
+  onError?: (message: string) => void
+}) => {
+  const [open, setOpen] = useState(false)
+  const [message, setMessage] = useState("Update from agent session")
+  const [busy, setBusy] = useState<"commit" | "push" | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const queryClient = useQueryClient()
+  const pushToast = useAppStore((s) => s.pushToast)
+  const setRightPanelOpen = useAppStore((s) => s.setRightPanelOpen)
+  const setRightPanelTab = useAppStore((s) => s.setRightPanelTab)
+
+  const { data: files = [] } = useQuery({
+    queryKey: ["git-status", cwd ?? "", sessionId ?? null],
+    queryFn: () => gitStatusSinceBaseline(sessionId),
+    enabled: !!cwd && !!sessionId,
+    staleTime: 5_000,
+  })
+
+  const totals = files.reduce(
+    (acc, f) => ({
+      added: acc.added + (f.added ?? 0),
+      removed: acc.removed + (f.removed ?? 0),
+    }),
+    { added: 0, removed: 0 },
+  )
+
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ["git-status"] })
+  }
+
+  const handleCommit = async (andPush: boolean) => {
+    if (busy) return
+    setBusy("commit")
+    try {
+      // TODO: gitCommit stages the whole repo (`git add -A` in the Rust
+      // `git_commit` command) even though the count/list above is
+      // session-scoped (gitStatusSinceBaseline). A session with 0 tracked
+      // changes can still commit unrelated pre-existing dirty files repo-wide.
+      const sha = await gitCommit(sessionId, message.trim())
+      invalidate()
+      pushToast(`Committed ${sha}`, "success")
+      if (andPush) {
+        setBusy("push")
+        try {
+          await gitPush(sessionId)
+          pushToast("Pushed", "success")
+        } catch (err) {
+          const msg = toInvokeError(err)
+          pushToast(`Push failed: ${msg}`, "error")
+          onError?.(msg)
+        }
+      }
+      setOpen(false)
+    } catch (err) {
+      const msg = toInvokeError(err)
+      pushToast(`Commit failed: ${msg}`, "error")
+      onError?.(msg)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  if (files.length === 0) return null
+
+  return (
+    <div ref={rootRef} className="relative flex shrink-0 items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => {
+          setRightPanelOpen(true)
+          setRightPanelTab("changes")
+        }}
+        className={cn(
+          "flex h-6 items-center gap-1 rounded-full bg-fill-3 px-2 text-xs text-ink-muted",
+          "transition-colors hover:bg-fill-2 hover:text-ink-secondary",
+        )}
+      >
+        {files.length} change{files.length === 1 ? "" : "s"}
+        {totals.added > 0 ? (
+          <span className="text-green">+{formatTokens(totals.added)}</span>
+        ) : null}
+        {totals.removed > 0 ? (
+          <span className="text-red">-{formatTokens(totals.removed)}</span>
+        ) : null}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={cn(
+          "flex h-6 items-center gap-1 rounded-md bg-accent px-2 text-xs text-accent-text",
+          "transition-colors hover:bg-accent-hover",
+        )}
+      >
+        <GitMerge className="h-3 w-3" aria-hidden />
+        Commit & Push
+      </button>
+
+      <PopoverTray
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={rootRef}
+        placement="above"
+        role="dialog"
+        aria-label="Commit changes"
+        className="right-0 w-72 p-2.5"
+      >
+        <TextInput
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Commit message"
+          aria-label="Commit message"
+          autoFocus
+        />
+        <div className="mt-2 flex items-center justify-end gap-1.5">
+          <Button
+            variant="secondary"
+            size="sm"
+            isLoading={busy === "commit"}
+            disabled={busy !== null || !message.trim()}
+            onClick={() => void handleCommit(false)}
+          >
+            Commit
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            isLoading={busy === "push"}
+            disabled={busy !== null || !message.trim()}
+            onClick={() => void handleCommit(true)}
+          >
+            Commit & Push
+          </Button>
+        </div>
+      </PopoverTray>
+    </div>
+  )
+}
+
 type ContextBarProps = {
   cwd?: string
   sessionId?: string | null
@@ -264,6 +425,19 @@ export const ContextBar = ({
     staleTime: 5_000,
   })
 
+  // Gate the entire git cluster (branch pill + commit bar) on the cwd
+  // actually being a git repo — a non-git folder should show none of it
+  // rather than a misleading "No branch" pill. `isRepo` defaults to `true`
+  // while the query is loading (or has no cwd yet) so the chrome doesn't
+  // flash away/in on every session switch; it only ever hides once we
+  // positively know there's no repo.
+  const { data: isRepo = true } = useQuery({
+    queryKey: ["git-is-repo", cwd],
+    queryFn: () => gitIsRepo(cwd!),
+    enabled: !!cwd,
+    staleTime: 15_000,
+  })
+
   return (
     <div className="flex min-h-[var(--status-bar-height)] items-center justify-between gap-2 px-1">
       <div className="flex min-w-0 items-center gap-0.5">
@@ -273,13 +447,20 @@ export const ContextBar = ({
           disabled={disabled}
           onError={onError}
         />
-        <BranchPicker cwd={cwd} disabled={disabled} onError={onError} />
+        {isRepo ? (
+          <BranchPicker cwd={cwd} disabled={disabled} onError={onError} />
+        ) : null}
         {isolated && sessionId ? (
           <IsolationBadge sessionId={sessionId} onError={onError} />
         ) : null}
       </div>
 
-      <UsageRing sessionId={sessionId} />
+      <div className="flex shrink-0 items-center gap-2">
+        {isRepo && !isolated && sessionId ? (
+          <CommitBar sessionId={sessionId} cwd={cwd} onError={onError} />
+        ) : null}
+        <UsageRing sessionId={sessionId} />
+      </div>
     </div>
   )
 }

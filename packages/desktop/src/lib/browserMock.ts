@@ -3,11 +3,17 @@ import type {
   BrowserStateEvent,
   BuiltinProvider,
   CreateSessionInput,
+  GitFileStatus,
+  McpServerDto,
+  MemoryEntryDto,
   ModelInfoDto,
   PromptCommandInput,
   ProviderConfigView,
+  ProviderProfileInput,
+  ProviderProfileView,
   RoutineDto,
   RoutineRunRecordDto,
+  SecretStorageMode,
   SessionEvent,
   SessionMeta,
   TerminalExitEvent,
@@ -22,7 +28,7 @@ const now = () => Date.now()
 
 const demoSession = (overrides: Partial<SessionMeta> = {}): SessionMeta => ({
   id: "preview-session-1",
-  title: "Cursor chat redesign",
+  title: "Chat shell redesign",
   agent_id: "native",
   depth: 0,
   cwd: "/Users/preview/flex-app",
@@ -32,6 +38,11 @@ const demoSession = (overrides: Partial<SessionMeta> = {}): SessionMeta => ({
   updated_at_ms: now() - 120_000,
   ...overrides,
 })
+
+/** Cwd for the one demo session deliberately mocked as NOT a git repo (see
+ * `git_is_repo` mock below) — lets the preview demonstrate the "hide the
+ * entire git cluster" behavior without a real non-git folder on disk. */
+const NON_GIT_DEMO_CWD = "/Users/preview/scratch-notes"
 
 let sessions: SessionMeta[] = [
   demoSession(),
@@ -47,10 +58,77 @@ let sessions: SessionMeta[] = [
     created_at_ms: now() - 10_000_000,
     updated_at_ms: now() - 7_200_000,
   }),
+  demoSession({
+    id: "preview-session-4",
+    title: "Scratch notes (no git)",
+    cwd: NON_GIT_DEMO_CWD,
+    created_at_ms: now() - 5_000_000,
+    updated_at_ms: now() - 4_800_000,
+  }),
 ]
 
 let configured = true
 const eventHandlers = new Set<(event: SessionEvent) => void>()
+
+/** Mutable so `review_undo_file`/`review_keep_file` can plausibly affect the
+ * Changes tab in preview — undo removes a file from the list (mirroring the
+ * real command reverting it to its base state, i.e. no more diff), keep is a
+ * no-op on the list (the file stays "changed" relative to the *worktree*,
+ * only the base repo's copy is updated). Kept as a mutable module-level
+ * array (not sessionStorage) since it's only meant to demo one preview
+ * session's flow, not survive a reload. */
+let mockGitStatus: GitFileStatus[] = [
+  { path: "src/App.tsx", status: "M", added: 24, removed: 3 },
+  { path: "src/styles/tokens.css", status: "M", added: 58, removed: 12 },
+  { path: "src/pages/CustomizePage.tsx", status: "?" },
+]
+
+/** Per-path mock diff bodies — `src/App.tsx` gets two hunks so the preview
+ * demonstrates independent per-hunk Keep/Undo, not just per-file. */
+const mockDiffFor = (p: string): string => {
+  if (p === "src/App.tsx") {
+    return [
+      `diff --git a/${p} b/${p}`,
+      `index 3f9c2a1..8b1d4e7 100644`,
+      `--- a/${p}`,
+      `+++ b/${p}`,
+      "@@ -12,7 +12,9 @@ export const AppRoutes = () => {",
+      "   const route = useAppStore((s) => s.route)",
+      "   const isBootstrapped = useAppStore((s) => s.isBootstrapped)",
+      "-  const setRoute = useAppStore((s) => s.setRoute)",
+      "+  const setRoute = useAppStore((s) => s.setRoute)",
+      "+  const toggleRightPanel = useAppStore((s) => s.toggleRightPanel)",
+      "+  const rightPanelOpen = useAppStore((s) => s.rightPanelOpen)",
+      "   const { newAgent } = useSessions()",
+      "   useGlobalSessionEvents()",
+      "@@ -40,6 +42,8 @@ export const AppRoutes = () => {",
+      "   return (",
+      "     <ChatShell>",
+      "-      <LegacyHeader />",
+      "+      <Header />",
+      "+      <StatusBar />",
+      "     </ChatShell>",
+      "   )",
+      " }",
+      "",
+    ].join("\n")
+  }
+  return [
+    `diff --git a/${p} b/${p}`,
+    `index 3f9c2a1..8b1d4e7 100644`,
+    `--- a/${p}`,
+    `+++ b/${p}`,
+    "@@ -1,4 +1,6 @@",
+    " :root {",
+    "-  --accent: #444;",
+    "+  --accent: #3366ff;",
+    "+  --accent-hover: #2952cc;",
+    "   --bg: #0b0b0c;",
+    " }",
+    "",
+  ].join("\n")
+}
+
 let mockBranchByCwd: Record<string, string> = {
   "/Users/preview/flex-app": "main",
   "/Users/preview/docs-site": "main",
@@ -101,7 +179,10 @@ const loadMockPlugins = (): { search: boolean; learning: boolean; verifier: bool
   } catch {
     // Fall through to defaults.
   }
-  return { search: true, learning: false, verifier: false }
+  // Desktop enables [search, learning, verifier] by default in preview so the
+  // Verify tool call / verdict demo (see timelineEvents + the `verify` prompt
+  // keyword below) is visible without opening Customize first.
+  return { search: true, learning: true, verifier: true }
 }
 
 let mockPlugins = loadMockPlugins()
@@ -172,6 +253,244 @@ const saveMockRoutineHistory = () => {
   }
 }
 
+/** Seed demo MCP servers — kept in sessionStorage so upsert/remove round-trip
+    across a page reload, mirroring the mockRoutines pattern above. */
+const defaultMockMcpServers = (): McpServerDto[] => [
+  {
+    id: "filesystem",
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "/Users/preview/flex-app"],
+    env: {},
+    enabled: true,
+  },
+  {
+    id: "github",
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-github"],
+    env: { GITHUB_PERSONAL_ACCESS_TOKEN: "" },
+    enabled: false,
+  },
+]
+
+const loadMockMcpServers = (): McpServerDto[] => {
+  try {
+    const raw = window.sessionStorage.getItem("mockMcpServers")
+    if (raw) return JSON.parse(raw) as McpServerDto[]
+  } catch {
+    // Fall through to defaults.
+  }
+  return defaultMockMcpServers()
+}
+
+let mockMcpServers = loadMockMcpServers()
+
+const saveMockMcpServers = () => {
+  try {
+    window.sessionStorage.setItem("mockMcpServers", JSON.stringify(mockMcpServers))
+  } catch {
+    // Non-fatal in preview.
+  }
+}
+
+/** Seed demo memories — kept in sessionStorage so remove round-trips across a
+    page reload, mirroring the mockRoutines pattern above. */
+const defaultMockMemories = (): MemoryEntryDto[] => [
+  {
+    id: "user-preferences",
+    title: "User preferences",
+    content:
+      "- Prefers concise commit messages in the imperative mood.\n" +
+      "- Likes vim keybindings in the terminal panel.\n" +
+      "- Answers should default to TypeScript over JavaScript for new files.",
+    updatedAtMs: now() - 3_600_000,
+  },
+  {
+    id: "project-facts",
+    title: "Project facts",
+    content:
+      "- This repo is a Tauri + React desktop app talking to a Rust engine over IPC.\n" +
+      "- The mock IPC layer lives in `src/lib/browserMock.ts` for browser preview.\n" +
+      "- Verify changes with `npx tsc --noEmit` before considering a task done.",
+    updatedAtMs: now() - 26 * 3_600_000,
+  },
+  {
+    id: "deploy-quirks",
+    title: "Deploy quirks",
+    content:
+      "- Staging deploys require a manual cache bust after asset changes.\n" +
+      "- The release checklist lives in the automations page, not in this repo.",
+    updatedAtMs: now() - 4 * 24 * 3_600_000,
+  },
+]
+
+const loadMockMemories = (): MemoryEntryDto[] => {
+  try {
+    const raw = window.sessionStorage.getItem("mockMemories")
+    if (raw) return JSON.parse(raw) as MemoryEntryDto[]
+  } catch {
+    // Fall through to defaults.
+  }
+  return defaultMockMemories()
+}
+
+let mockMemories = loadMockMemories()
+
+const saveMockMemories = () => {
+  try {
+    window.sessionStorage.setItem("mockMemories", JSON.stringify(mockMemories))
+  } catch {
+    // Non-fatal in preview.
+  }
+}
+
+/** Mock sidecar `expiry.json` for global memory — `<id, expiresAtMs>`,
+ * mirroring the real `expiry.json` file the desktop backend keeps next to
+ * the `.md` notes (see `src-tauri/src/commands.rs`'s "Memory expiry"
+ * section). Kept in sessionStorage so a set TTL / purge round-trips across
+ * a page reload, same as the mockMemories pattern above. */
+const loadMockMemoryExpiry = (): Record<string, number> => {
+  try {
+    const raw = window.sessionStorage.getItem("mockMemoryExpiry")
+    if (raw) return JSON.parse(raw) as Record<string, number>
+  } catch {
+    // Fall through to defaults.
+  }
+  return {}
+}
+
+let mockMemoryExpiry = loadMockMemoryExpiry()
+
+const saveMockMemoryExpiry = () => {
+  try {
+    window.sessionStorage.setItem("mockMemoryExpiry", JSON.stringify(mockMemoryExpiry))
+  } catch {
+    // Non-fatal in preview.
+  }
+}
+
+/** Delete any global memory entries whose mock expiry has passed, mirroring
+ * `purge_expired_memories` on the desktop backend. Called at the top of the
+ * `memory_list` mock so listing is self-cleaning, same as the real command. */
+const purgeMockMemories = () => {
+  const nowMs = now()
+  const expiredIds = Object.entries(mockMemoryExpiry)
+    .filter(([, ts]) => ts <= nowMs)
+    .map(([id]) => id)
+  if (expiredIds.length === 0) return
+  mockMemories = mockMemories.filter((m) => !expiredIds.includes(m.id))
+  for (const id of expiredIds) delete mockMemoryExpiry[id]
+  saveMockMemories()
+  saveMockMemoryExpiry()
+}
+
+/** Seed per-project memory — keyed by session cwd so the Memory page's
+    project sections have something to show in preview. Only the demo
+    sessions' cwds get entries here; other projects legitimately render no
+    section (mirroring an empty `<cwd>/.agent/memory` dir on disk). */
+const defaultMockProjectMemories = (): Record<string, MemoryEntryDto[]> => ({
+  "/Users/preview/flex-app": [
+    {
+      id: "chat-shell-notes",
+      title: "Chat shell notes",
+      content:
+        "- The redesign keeps the composer pinned to the bottom on all viewport widths.\n" +
+        "- Tool call cards collapse by default; expand state isn't persisted yet.",
+      updatedAtMs: now() - 2 * 3_600_000,
+    },
+    {
+      id: "test-fixtures",
+      title: "Test fixtures",
+      content:
+        "- Golden snapshots for this repo live under `packages/desktop/src/**/__snapshots__`.\n" +
+        "- Re-run `npx tsc --noEmit` after touching shared types.",
+      updatedAtMs: now() - 3 * 24 * 3_600_000,
+    },
+  ],
+})
+
+const loadMockProjectMemories = (): Record<string, MemoryEntryDto[]> => {
+  try {
+    const raw = window.sessionStorage.getItem("mockProjectMemories")
+    if (raw) return JSON.parse(raw) as Record<string, MemoryEntryDto[]>
+  } catch {
+    // Fall through to defaults.
+  }
+  return defaultMockProjectMemories()
+}
+
+let mockProjectMemories = loadMockProjectMemories()
+
+const saveMockProjectMemories = () => {
+  try {
+    window.sessionStorage.setItem(
+      "mockProjectMemories",
+      JSON.stringify(mockProjectMemories),
+    )
+  } catch {
+    // Non-fatal in preview.
+  }
+}
+
+/** Mock sidecar expiry map for project memory, keyed by `cwd` then `id` —
+ * same rationale as `mockMemoryExpiry` above. */
+const loadMockProjectMemoryExpiry = (): Record<string, Record<string, number>> => {
+  try {
+    const raw = window.sessionStorage.getItem("mockProjectMemoryExpiry")
+    if (raw) return JSON.parse(raw) as Record<string, Record<string, number>>
+  } catch {
+    // Fall through to defaults.
+  }
+  return {}
+}
+
+let mockProjectMemoryExpiry = loadMockProjectMemoryExpiry()
+
+const saveMockProjectMemoryExpiry = () => {
+  try {
+    window.sessionStorage.setItem(
+      "mockProjectMemoryExpiry",
+      JSON.stringify(mockProjectMemoryExpiry),
+    )
+  } catch {
+    // Non-fatal in preview.
+  }
+}
+
+/** Delete any expired entries from one project's mock memory, mirroring
+ * `purgeMockMemories` above. */
+const purgeMockProjectMemories = (cwd: string) => {
+  const expiry = mockProjectMemoryExpiry[cwd] ?? {}
+  const nowMs = now()
+  const expiredIds = Object.entries(expiry)
+    .filter(([, ts]) => ts <= nowMs)
+    .map(([id]) => id)
+  if (expiredIds.length === 0) return
+  mockProjectMemories = {
+    ...mockProjectMemories,
+    [cwd]: (mockProjectMemories[cwd] ?? []).filter((m) => !expiredIds.includes(m.id)),
+  }
+  const nextExpiry = { ...expiry }
+  for (const id of expiredIds) delete nextExpiry[id]
+  mockProjectMemoryExpiry = { ...mockProjectMemoryExpiry, [cwd]: nextExpiry }
+  saveMockProjectMemories()
+  saveMockProjectMemoryExpiry()
+}
+
+/** Mutable so `set_secret_storage` round-trips in preview; kept in
+ * sessionStorage so the choice survives a page reload, mirroring the
+ * mockPlugins pattern above. Defaults to `"file"` — the new default. */
+const loadMockSecretStorage = (): SecretStorageMode => {
+  try {
+    const raw = window.sessionStorage.getItem("mock-secret-storage")
+    if (raw === "file" || raw === "keychain") return raw
+  } catch {
+    // Fall through to default.
+  }
+  return "file"
+}
+
+let mockSecretStorage: SecretStorageMode = loadMockSecretStorage()
+
 const providerConfig = (): ProviderConfigView => ({
   preferredProvider: "anthropic",
   baseUrl: "https://api.anthropic.com",
@@ -182,7 +501,88 @@ const providerConfig = (): ProviderConfigView => ({
   plugins: { ...mockPlugins },
   fallbackModels: [],
   defaultIsolation: "never",
+  secretStorage: mockSecretStorage,
 })
+
+/** Seed one "Anthropic" connection — mirrors the mockRoutines pattern.
+ * `hasKey`/`isActive` are derived at read time (see `mockProfilesView`), not
+ * stored, since "active" is a separate id pointer that can move. */
+type MockProfile = {
+  id: string
+  label: string
+  provider: string
+  baseUrl?: string
+  region?: string
+  defaultModel?: string
+  fallbackModels?: string
+  defaultIsolation?: string
+  hasKey: boolean
+}
+
+const defaultMockProfiles = (): MockProfile[] => [
+  {
+    id: "default",
+    label: "Anthropic",
+    provider: "anthropic",
+    baseUrl: "https://api.anthropic.com",
+    defaultModel: "anthropic/claude-sonnet-4",
+    defaultIsolation: "never",
+    hasKey: true,
+  },
+]
+
+const loadMockProfiles = (): MockProfile[] => {
+  try {
+    const raw = window.sessionStorage.getItem("mockProfiles")
+    if (raw) return JSON.parse(raw) as MockProfile[]
+  } catch {
+    // Fall through to defaults.
+  }
+  return defaultMockProfiles()
+}
+
+let mockProfiles = loadMockProfiles()
+
+const saveMockProfiles = () => {
+  try {
+    window.sessionStorage.setItem("mockProfiles", JSON.stringify(mockProfiles))
+  } catch {
+    // Non-fatal in preview.
+  }
+}
+
+const loadMockActiveProfileId = (): string => {
+  try {
+    return window.sessionStorage.getItem("mockActiveProfileId") ?? "default"
+  } catch {
+    return "default"
+  }
+}
+
+let mockActiveProfileId = loadMockActiveProfileId()
+
+const saveMockActiveProfileId = () => {
+  try {
+    window.sessionStorage.setItem("mockActiveProfileId", mockActiveProfileId)
+  } catch {
+    // Non-fatal in preview.
+  }
+}
+
+const mockProfileView = (p: MockProfile): ProviderProfileView => ({
+  id: p.id,
+  label: p.label,
+  provider: p.provider,
+  baseUrl: p.baseUrl,
+  region: p.region,
+  defaultModel: p.defaultModel,
+  fallbackModels: p.fallbackModels,
+  defaultIsolation: p.defaultIsolation,
+  hasKey: p.hasKey,
+  isActive: p.id === mockActiveProfileId,
+})
+
+let mockProfileSeq = 0
 
 /** In-flight mock turns — cancel clears timers and emits turn_completed. */
 const pendingTurns = new Map<
@@ -329,9 +729,133 @@ const demoExploreCall = (sessionId: string): ToolCall => ({
   },
 })
 
+/** A completed `Verify` call — the wire shape a real engine emits from
+ * `EngineService::verify_goal_progress` (packages/engine/crates/engine/src/lib.rs)
+ * during a `run_goal` iteration with `GoalSpec.require_verification: true`.
+ * `result.structured` is the load-bearing field: a `VerificationVerdict`
+ * (`{ outcome, findings, confidence? }`) — see `agentloop_contracts::verify`. */
+const demoVerifyCall = (
+  sessionId: string,
+  overrides: Partial<ToolCall> = {},
+): ToolCall => ({
+  id: "tool-verify-1",
+  session_id: sessionId,
+  turn_id: "turn-1",
+  message_id: "m-asst-1",
+  tool_name: "Verify",
+  input: {
+    rubric: "The chat shell spacing matches the reference agents window design.",
+    artifacts: [
+      "packages/desktop/src/components/organisms/TurnTimeline.tsx",
+      "packages/desktop/src/components/molecules/WorkGroup.tsx",
+    ],
+  },
+  read_only: true,
+  origin: { origin: "model" },
+  status: { state: "completed" },
+  timing: {
+    queued_at_ms: now() - 62_000,
+    started_at_ms: now() - 61_000,
+    finished_at_ms: now() - 58_000,
+  },
+  result: {
+    content: [
+      {
+        type: "markdown",
+        text: "Verdict: pass — spacing and hierarchy match the target design.",
+      },
+    ],
+    is_error: false,
+    structured: {
+      outcome: "pass",
+      findings: [
+        "Composer rail and timeline share the same --content-rail width.",
+        "Work groups collapse to a single summary line matching the reference density.",
+      ],
+      confidence: 0.92,
+    },
+  },
+  ...overrides,
+})
+
 const timelineEvents = (sessionId: string): SessionEvent[] => {
   if (sessionId === "preview-session-2") return []
   const ts = now() - 90_000
+
+  // The demo subagent child session — replayed by the subagent viewer tray.
+  if (sessionId === "preview-sub-1") {
+    return [
+      {
+        session_id: sessionId,
+        seq: 1,
+        ts_ms: ts,
+        payload: {
+          kind: "user_message",
+          message_id: "m-sub-user",
+          content: [
+            {
+              type: "markdown",
+              text: "Map how the timeline renders subagent events.",
+            },
+          ],
+        },
+      },
+      {
+        session_id: sessionId,
+        seq: 2,
+        ts_ms: ts + 400,
+        payload: { kind: "turn_started", turn_id: "t-sub-1" },
+      },
+      {
+        session_id: sessionId,
+        seq: 3,
+        ts_ms: ts + 900,
+        payload: {
+          kind: "tool_call_updated",
+          call: {
+            ...demoExploreCall(sessionId),
+            id: "sub-call-1",
+            status: { state: "completed" },
+          },
+        },
+      },
+      {
+        session_id: sessionId,
+        seq: 4,
+        ts_ms: ts + 1_600,
+        payload: {
+          kind: "assistant_message",
+          message_id: "m-sub-answer",
+          content: [
+            {
+              type: "markdown",
+              text:
+                "The timeline nests subagent events under a collapsible " +
+                "group; each child row reuses the same tool-step components " +
+                "as the parent feed.",
+            },
+          ],
+        },
+      },
+      {
+        session_id: sessionId,
+        seq: 5,
+        ts_ms: ts + 1_700,
+        payload: {
+          kind: "turn_completed",
+          turn_id: "t-sub-1",
+          summary: {
+            turn_id: "t-sub-1",
+            stop_reason: "end_turn",
+            usage: { input: 4_200, output: 310 },
+            num_model_calls: 1,
+            num_tool_calls: 1,
+            duration_ms: 1_300,
+          },
+        },
+      },
+    ]
+  }
 
   // Cancelled-turn coverage: turn without a completion event.
   if (sessionId === "preview-session-3") {
@@ -377,7 +901,7 @@ const timelineEvents = (sessionId: string): SessionEvent[] => {
         content: [
           {
             type: "markdown",
-            text: "Tighten the chat shell spacing and hierarchy, then align it with the Cursor agents window design.",
+            text: "Tighten the chat shell spacing and hierarchy, then align it with the reference agents window design.",
           },
         ],
       },
@@ -561,6 +1085,20 @@ const timelineEvents = (sessionId: string): SessionEvent[] => {
         },
       },
     },
+    // Verifier verdict: an independent `Verify` call the goal loop ran to
+    // grade the work above against a rubric (see EngineService::verify_goal_progress).
+    // Renders as a distinct "verdict" row inside the work group's timeline
+    // (useSessionEvents special-cases tool_name === "Verify") plus a small
+    // glyph on the group's collapsed summary line.
+    {
+      session_id: sessionId,
+      seq: 9.9,
+      ts_ms: ts + 58_000,
+      payload: {
+        kind: "tool_call_updated",
+        call: demoVerifyCall(sessionId),
+      },
+    },
     {
       session_id: sessionId,
       seq: 10,
@@ -655,36 +1193,63 @@ export const browserInvoke = async <T>(
   switch (cmd) {
     case "hello":
       return { ok: true } as T
+    case "user_identity":
+      return { name: "Preview User" } as T
+    case "git_is_repo": {
+      const cwd = String(args?.cwd ?? "")
+      return (cwd !== NON_GIT_DEMO_CWD) as T
+    }
     case "git_branch": {
       const cwd = String(args?.cwd ?? "")
       return (mockBranchByCwd[cwd] ?? "main") as T
     }
     case "git_list_branches":
       return mockBranches as T
-    case "git_status":
-      return [
-        { path: "src/App.tsx", status: "M", added: 24, removed: 3 },
-        { path: "src/styles/tokens.css", status: "M", added: 58, removed: 12 },
-        { path: "src/pages/CustomizePage.tsx", status: "?" },
-      ] as T
-    case "git_diff": {
+    case "git_status": {
+      const cwd = String(args?.cwd ?? "")
+      return (cwd === NON_GIT_DEMO_CWD ? [] : mockGitStatus) as T
+    }
+    // Session-scoped: files changed since the session's baseline. Mocked as
+    // a subset of `mockGitStatus` (drops the untracked file) so the preview
+    // visibly demonstrates the scoping vs. the full-repo `git_status` mock.
+    case "git_status_since_baseline": {
+      const sessionId = String(args?.sessionId ?? "")
+      const session = sessions.find((s) => s.id === sessionId)
+      if (session?.cwd === NON_GIT_DEMO_CWD) return [] as T
+      return mockGitStatus.filter((f) => f.status !== "?") as T
+    }
+    // Commit bar (non-isolated sessions): mock a successful commit that
+    // clears the changed-files list (mirrors a real `git add -A && git
+    // commit` against the mocked working tree) and a no-op push.
+    case "git_commit":
+      mockGitStatus = []
+      return "abc1234" as T
+    case "git_push":
+      return undefined as T
+    case "git_diff":
+    case "review_file_diff": {
       const p = String(args?.path ?? "file")
-      return [
-        `diff --git a/${p} b/${p}`,
-        `index 3f9c2a1..8b1d4e7 100644`,
-        `--- a/${p}`,
-        `+++ b/${p}`,
-        "@@ -12,7 +12,9 @@ export const AppRoutes = () => {",
-        "   const route = useAppStore((s) => s.route)",
-        "   const isBootstrapped = useAppStore((s) => s.isBootstrapped)",
-        "-  const setRoute = useAppStore((s) => s.setRoute)",
-        "+  const setRoute = useAppStore((s) => s.setRoute)",
-        "+  const toggleRightPanel = useAppStore((s) => s.toggleRightPanel)",
-        "+  const rightPanelOpen = useAppStore((s) => s.rightPanelOpen)",
-        "   const { newAgent } = useSessions()",
-        "   useGlobalSessionEvents()",
-        "",
-      ].join("\n") as T
+      return mockDiffFor(p) as T
+    }
+    // Per-file / per-hunk review actions (Changes tab Keep/Undo). Mutates
+    // `mockGitStatus` plausibly so the preview flow is demonstrable:
+    // undo removes the file from the changed-files list (mirrors the real
+    // command reverting it to its base state); keep no-ops on the list
+    // (only the isolated session's base repo copy changes — the worktree,
+    // which the Changes tab always reflects, is untouched).
+    case "review_undo_file": {
+      const p = String(args?.path ?? "")
+      mockGitStatus = mockGitStatus.filter((f) => f.path !== p)
+      return undefined as T
+    }
+    case "review_keep_file":
+      return undefined as T
+    case "review_apply_patch": {
+      // Best-effort mock: a hunk-level Keep/Undo doesn't change whether the
+      // file as a whole still differs from HEAD in this simplified mock (no
+      // real hunk-splitting of `mockDiffFor`'s content), so this is a no-op
+      // beyond acknowledging the call succeeded.
+      return undefined as T
     }
     case "git_checkout": {
       const cwd = String(args?.cwd ?? "")
@@ -757,6 +1322,78 @@ export const browserInvoke = async <T>(
       }
       return providerConfig() as T
     }
+    // No-op mock for the Security section's storage-mode switch — native
+    // Keychain migration can't be exercised in browser preview, so this
+    // just round-trips the choice (see `secrets::SecretsStore::switch_mode`
+    // for the real migration this stands in for).
+    case "set_secret_storage": {
+      const mode = String(args?.mode ?? "file")
+      if (mode === "file" || mode === "keychain") {
+        mockSecretStorage = mode as SecretStorageMode
+        try {
+          window.sessionStorage.setItem("mock-secret-storage", mockSecretStorage)
+        } catch {
+          // Non-fatal in preview.
+        }
+      }
+      return providerConfig() as T
+    }
+    case "profiles_list":
+      return mockProfiles.map(mockProfileView) as T
+    case "profile_upsert": {
+      const input = (args?.profile ?? {}) as ProviderProfileInput
+      const id = input.id?.trim() || `profile-${++mockProfileSeq}`
+      const existing = mockProfiles.find((p) => p.id === id)
+      const hasKey = input.apiKey?.trim() ? true : (existing?.hasKey ?? false)
+      const updated: MockProfile = {
+        id,
+        label: input.label,
+        provider: input.provider,
+        baseUrl: input.baseUrl,
+        region: input.region,
+        defaultModel: input.defaultModel,
+        fallbackModels: input.fallbackModels,
+        defaultIsolation: input.defaultIsolation as string | undefined,
+        hasKey,
+      }
+      mockProfiles = [...mockProfiles.filter((p) => p.id !== id), updated]
+      if (!mockActiveProfileId) {
+        mockActiveProfileId = id
+        saveMockActiveProfileId()
+      }
+      saveMockProfiles()
+      return mockProfileView(updated) as T
+    }
+    case "profile_remove": {
+      const id = String(args?.id ?? "")
+      if (id === mockActiveProfileId) {
+        throw new Error(
+          "cannot remove the active connection — activate another one first",
+        )
+      }
+      mockProfiles = mockProfiles.filter((p) => p.id !== id)
+      saveMockProfiles()
+      return undefined as T
+    }
+    case "profile_activate": {
+      const id = String(args?.id ?? "")
+      if (!mockProfiles.some((p) => p.id === id)) {
+        throw new Error(`connection not found: ${id}`)
+      }
+      mockActiveProfileId = id
+      saveMockActiveProfileId()
+      const active = mockProfiles.find((p) => p.id === id)
+      return {
+        ...providerConfig(),
+        preferredProvider: active?.provider,
+        baseUrl: active?.baseUrl,
+        region: active?.region,
+        defaultModel: active?.defaultModel,
+        defaultIsolation: active?.defaultIsolation ?? "never",
+      } as T
+    }
+    case "validate_profile":
+      return models as T
     case "list_commands":
       return [
         {
@@ -783,7 +1420,7 @@ export const browserInvoke = async <T>(
       return (String(args?.sessionId) === "preview-session-1") as T
     case "workspace_status":
       return (String(args?.sessionId) === "preview-session-1"
-        ? { filesChanged: 3, summary: "src/app.ts, src/index.css, +1 more" }
+        ? { filesChanged: 3, summary: "+82 -15" }
         : null) as T
     case "integrate_session":
       return { status: "empty" } as T
@@ -915,6 +1552,8 @@ export const browserInvoke = async <T>(
       const messageId = `m-asst-${ts}`
       const isPlan = input.permissionMode === "plan"
       const wantsPermission = /\b(permission|allow|approve)\b/i.test(input.text)
+      const wantsWorkflow = /\bworkflow\b/i.test(input.text)
+      const wantsVerify = /\bverif(y|ied|ication)\b/i.test(input.text)
       clearPendingTurn(sessionId)
 
       emit({
@@ -945,6 +1584,268 @@ export const browserInvoke = async <T>(
       }
 
       const timers: number[] = []
+
+      // RunWorkflow demo: a 3-step pipeline (2 sequential tasks, then a
+      // parallel fan-out of 2) staggered over ~6s so the preview shows the
+      // WorkflowGroup block progress step-by-step, exactly like a real
+      // engine run would stream it (tool_call_updated for the call itself,
+      // subagent_started/subagent_event/subagent_completed per step — see
+      // packages/engine/crates/loop/src/workflow.rs).
+      if (wantsWorkflow) {
+        const workflowCallId = `tool-workflow-${ts}`
+        const workflowInput = {
+          steps: [
+            {
+              kind: "task",
+              role: "explorer",
+              prompt: "Map how the timeline renders subagent events.",
+              label: "map event flow",
+            },
+            {
+              kind: "task",
+              role: "explorer",
+              prompt: "Find the WorkGroup/ToolStepGroup styling conventions.",
+              label: "survey styling conventions",
+            },
+            {
+              kind: "parallel",
+              tasks: [
+                {
+                  role: "worker",
+                  prompt: "Draft the WorkflowGroup component.",
+                  label: "draft WorkflowGroup",
+                },
+                {
+                  role: "worker",
+                  prompt: "Wire workflow rows into useSessionEvents.",
+                  label: "wire timeline hook",
+                },
+              ],
+            },
+          ],
+        }
+        const workflowCall = (
+          status: ToolCall["status"],
+          result?: ToolCall["result"],
+        ): ToolCall => ({
+          id: workflowCallId,
+          session_id: sessionId,
+          turn_id: turnId,
+          message_id: messageId,
+          tool_name: "RunWorkflow",
+          input: workflowInput,
+          read_only: true,
+          origin: { origin: "model" },
+          status,
+          timing: { queued_at_ms: now() },
+          result,
+        })
+
+        timers.push(
+          window.setTimeout(() => {
+            emit({
+              session_id: sessionId,
+              seq: 102.05,
+              ts_ms: now(),
+              payload: { kind: "tool_call_updated", call: workflowCall({ state: "running" }) },
+            })
+          }, 200),
+        )
+
+        const subagentStep = (
+          seqBase: number,
+          delayMs: number,
+          childSession: string,
+          task: string,
+          role: string,
+          replyText: string,
+        ) => {
+          timers.push(
+            window.setTimeout(() => {
+              emit({
+                session_id: sessionId,
+                seq: seqBase,
+                ts_ms: now(),
+                payload: {
+                  kind: "subagent_started",
+                  child_session: childSession,
+                  task,
+                  role,
+                  call_id: workflowCallId,
+                },
+              })
+            }, delayMs),
+          )
+          timers.push(
+            window.setTimeout(() => {
+              emit({
+                session_id: sessionId,
+                seq: seqBase + 0.3,
+                ts_ms: now(),
+                payload: {
+                  kind: "subagent_event",
+                  child_session: childSession,
+                  event: {
+                    kind: "assistant_message",
+                    message_id: `${childSession}-m`,
+                    model: "anthropic/claude-sonnet-4",
+                    content: [{ type: "markdown", text: replyText }],
+                  },
+                },
+              })
+            }, delayMs + 700),
+          )
+          timers.push(
+            window.setTimeout(() => {
+              emit({
+                session_id: sessionId,
+                seq: seqBase + 0.6,
+                ts_ms: now(),
+                payload: {
+                  kind: "subagent_completed",
+                  child_session: childSession,
+                  summary: {
+                    turn_id: `${childSession}-turn`,
+                    stop_reason: "end_turn",
+                    usage: { input: 6_200, output: 240 },
+                    num_model_calls: 1,
+                    num_tool_calls: 1,
+                    duration_ms: 1_100,
+                  },
+                },
+              })
+            }, delayMs + 1_100),
+          )
+        }
+
+        // Step 1 (task) — starts ~0.5s in, completes ~1.6s in.
+        subagentStep(
+          102.1,
+          500,
+          "preview-wf-1",
+          "map event flow",
+          "explorer",
+          "Nested subagent events relay through `subagent_event`, matched to their parent by `child_session`.",
+        )
+        // Step 2 (task) — starts after step 1 completes, ~1.8s in.
+        subagentStep(
+          102.2,
+          1_800,
+          "preview-wf-2",
+          "survey styling conventions",
+          "explorer",
+          "WorkGroup/ToolStepGroup use 13px rows, Collapsible, and padding-only indents — no border rails.",
+        )
+        // Step 3 (parallel) — both tasks start together after step 2, ~3.1s in.
+        subagentStep(
+          102.3,
+          3_100,
+          "preview-wf-3a",
+          "draft WorkflowGroup",
+          "worker",
+          "Drafted the collapsible step list with inferred status icons.",
+        )
+        subagentStep(
+          102.31,
+          3_100,
+          "preview-wf-3b",
+          "wire timeline hook",
+          "worker",
+          "Routed subagent_started/_event/_completed into the workflow row when call_id matches.",
+        )
+
+        timers.push(
+          window.setTimeout(() => {
+            emit({
+              session_id: sessionId,
+              seq: 102.9,
+              ts_ms: now(),
+              payload: {
+                kind: "tool_call_updated",
+                call: workflowCall(
+                  { state: "completed" },
+                  {
+                    content: [
+                      { type: "markdown", text: "Workflow finished: 3/3 steps." },
+                    ],
+                    is_error: false,
+                  },
+                ),
+              },
+            })
+          }, 4_400),
+        )
+      }
+
+      // Verify demo: emits a running `Verify` call, then settles it to a
+      // completed verdict ~1.8s later — same wire shape as a real
+      // `EngineService::verify_goal_progress` run (tool_call_updated with
+      // tool_name "Verify", verdict in result.structured). Shows the
+      // "Verifying…" state (VerdictBadge) transition to the pass/fail badge,
+      // both in the timeline's verdict row and the Plan tab's Verification
+      // section.
+      if (wantsVerify) {
+        const verifyCallId = `tool-verify-${ts}`
+        const wantsFail = /\bfail\b/i.test(input.text)
+        timers.push(
+          window.setTimeout(() => {
+            emit({
+              session_id: sessionId,
+              seq: 102.5,
+              ts_ms: now(),
+              payload: {
+                kind: "tool_call_updated",
+                call: {
+                  ...demoVerifyCall(sessionId, {
+                    id: verifyCallId,
+                    turn_id: turnId,
+                    message_id: messageId,
+                    status: { state: "running" },
+                    result: undefined,
+                  }),
+                },
+              },
+            })
+          }, 400),
+        )
+        timers.push(
+          window.setTimeout(() => {
+            emit({
+              session_id: sessionId,
+              seq: 102.6,
+              ts_ms: now(),
+              payload: {
+                kind: "tool_call_updated",
+                call: demoVerifyCall(sessionId, {
+                  id: verifyCallId,
+                  turn_id: turnId,
+                  message_id: messageId,
+                  status: { state: "completed" },
+                  result: wantsFail
+                    ? {
+                        content: [
+                          {
+                            type: "markdown",
+                            text: "Verdict: fail — rubric not met.",
+                          },
+                        ],
+                        is_error: false,
+                        structured: {
+                          outcome: "fail",
+                          findings: [
+                            "tsc --noEmit still reports 2 errors in TurnTimeline.tsx.",
+                            "WorkGroup summary line doesn't show the verdict glyph yet.",
+                          ],
+                          confidence: 0.81,
+                        },
+                      }
+                    : undefined,
+                }),
+              },
+            })
+          }, 2_200),
+        )
+      }
 
       if (isPlan) {
         timers.push(
@@ -1097,15 +1998,110 @@ export const browserInvoke = async <T>(
         }, 1_400),
       )
 
+      // Agent terminal demo — simulate a Bash tool call streaming `exec_chunk`
+      // events, so the preview shows the read-only agent terminal live (the reference design
+      // parity: routing lives in useGlobalSessionEvents, this only emits the
+      // wire events a real engine run would produce).
+      const shellCallId = `tool-shell-${ts}`
+      const shellCall: ToolCall = {
+        ...demoShellCall(sessionId, "cargo build", shellCallId),
+        status: { state: "running" },
+        result: undefined,
+      }
+      timers.push(
+        window.setTimeout(() => {
+          emit({
+            session_id: sessionId,
+            seq: 102.15,
+            ts_ms: now(),
+            payload: { kind: "tool_call_updated", call: shellCall },
+          })
+        }, 1_500),
+      )
+      const execLines: { stream: "stdout" | "stderr"; text: string }[] = [
+        { stream: "stdout", text: "$ cargo build\n" },
+        { stream: "stdout", text: "   Compiling desktop v0.1.0\n" },
+        { stream: "stdout", text: "   Compiling engine v0.1.0\n" },
+        { stream: "stderr", text: "warning: unused import: `foo`\n" },
+        { stream: "stdout", text: "    Finished dev [unoptimized] target(s)\n" },
+        { stream: "stdout", text: "  ➜  Local:   http://localhost:5173/\n" },
+      ]
+      execLines.forEach((line, i) => {
+        timers.push(
+          window.setTimeout(() => {
+            emit({
+              session_id: sessionId,
+              seq: 102.2 + i * 0.01,
+              ts_ms: now(),
+              payload: {
+                kind: "exec_chunk",
+                call_id: shellCallId,
+                stream: line.stream,
+                text: line.text,
+              },
+            })
+          }, 1_650 + i * 150),
+        )
+      })
+      timers.push(
+        window.setTimeout(
+          () => {
+            emit({
+              session_id: sessionId,
+              seq: 102.3,
+              ts_ms: now(),
+              payload: {
+                kind: "tool_call_updated",
+                call: {
+                  ...shellCall,
+                  status: { state: "completed" },
+                  result: {
+                    content: [{ type: "markdown", text: "exit_code: 0" }],
+                    is_error: false,
+                    structured: { exit_code: 0, success: true, truncated: false },
+                  },
+                },
+              },
+            })
+          },
+          1_650 + execLines.length * 150,
+        ),
+      )
+
+      // Retry-events demo: simulate the engine hitting a dropped connection
+      // right after the shell tool settles, so the preview shows the
+      // "Reconnecting" banner (TurnTimeline) replace the plain Working
+      // indicator for a bit before streaming resumes. `retry_scheduled` is
+      // ephemeral (live broadcast only) — never appended to JSONL/replay by
+      // a real engine, so this mock only ever emits it, never persists it.
+      const retryAt = 1_650 + execLines.length * 150 + 200
+      timers.push(
+        window.setTimeout(() => {
+          emit({
+            session_id: sessionId,
+            seq: 102.9,
+            ts_ms: now(),
+            payload: {
+              kind: "retry_scheduled",
+              attempt: 1,
+              max_attempts: 10,
+              delay_ms: 3_000,
+              error: "connection reset while streaming (network loss)",
+            },
+          })
+        }, retryAt),
+      )
+
       const reply = "Preview mock reply — layout changes look good."
       const chunks = [
         "Preview mock reply",
         " — layout changes",
         " look good.",
       ]
+      const replyStart = retryAt + 1_500
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i]
-        const delay = 1_600 + i * 180
+        const delay = replyStart + i * 180
         timers.push(
           window.setTimeout(() => {
             emit({
@@ -1160,7 +2156,7 @@ export const browserInvoke = async <T>(
             },
           })
           pendingTurns.delete(sessionId)
-        }, 2_300),
+        }, replyStart + chunks.length * 180),
       )
 
       pendingTurns.set(sessionId, { timers, turnId, startedAt: ts })
@@ -1216,6 +2212,119 @@ export const browserInvoke = async <T>(
     case "routines_history": {
       const id = String(args?.id ?? "")
       return (mockRoutineHistory[id] ?? []) as T
+    }
+    case "mcp_list":
+      return [...mockMcpServers].sort((a, b) => a.id.localeCompare(b.id)) as T
+    case "mcp_upsert": {
+      const server = (args?.server ?? {}) as McpServerDto
+      mockMcpServers = [
+        ...mockMcpServers.filter((s) => s.id !== server.id),
+        server,
+      ].sort((a, b) => a.id.localeCompare(b.id))
+      saveMockMcpServers()
+      return undefined as T
+    }
+    case "mcp_remove": {
+      const id = String(args?.id ?? "")
+      mockMcpServers = mockMcpServers.filter((s) => s.id !== id)
+      saveMockMcpServers()
+      return undefined as T
+    }
+    case "mcp_test": {
+      const id = String(args?.id ?? "")
+      const server = mockMcpServers.find((s) => s.id === id)
+      if (!server) throw new Error(`server \`${id}\` not found`)
+      // Preview stub: pretend every configured server connects fine and
+      // exposes a couple of demo tools, keyed off the command name.
+      return [`${server.command}_ping`, `${server.command}_status`] as T
+    }
+    case "memory_list": {
+      purgeMockMemories()
+      const sorted = [...mockMemories].sort(
+        (a, b) => (b.updatedAtMs ?? 0) - (a.updatedAtMs ?? 0),
+      )
+      return sorted.map((m) => ({
+        ...m,
+        content: undefined,
+        expiresAtMs: mockMemoryExpiry[m.id],
+      })) as T
+    }
+    case "memory_get": {
+      const id = String(args?.id ?? "")
+      const memory = mockMemories.find((m) => m.id === id)
+      if (!memory) throw new Error(`memory \`${id}\` not found`)
+      return { ...memory, expiresAtMs: mockMemoryExpiry[id] } as T
+    }
+    case "memory_remove": {
+      const id = String(args?.id ?? "")
+      mockMemories = mockMemories.filter((m) => m.id !== id)
+      delete mockMemoryExpiry[id]
+      saveMockMemories()
+      saveMockMemoryExpiry()
+      return undefined as T
+    }
+    case "memory_set_expiry": {
+      const id = String(args?.id ?? "")
+      const expiresAtMs = args?.expiresAtMs as number | undefined
+      if (expiresAtMs == null) {
+        delete mockMemoryExpiry[id]
+      } else {
+        mockMemoryExpiry[id] = expiresAtMs
+      }
+      saveMockMemoryExpiry()
+      return undefined as T
+    }
+    case "project_memory_list": {
+      const cwd = String(args?.cwd ?? "")
+      purgeMockProjectMemories(cwd)
+      const list = mockProjectMemories[cwd] ?? []
+      const expiry = mockProjectMemoryExpiry[cwd] ?? {}
+      const sorted = [...list].sort(
+        (a, b) => (b.updatedAtMs ?? 0) - (a.updatedAtMs ?? 0),
+      )
+      return sorted.map((m) => ({
+        ...m,
+        content: undefined,
+        expiresAtMs: expiry[m.id],
+      })) as T
+    }
+    case "project_memory_get": {
+      const cwd = String(args?.cwd ?? "")
+      const id = String(args?.id ?? "")
+      const memory = (mockProjectMemories[cwd] ?? []).find((m) => m.id === id)
+      if (!memory) throw new Error(`memory \`${id}\` not found`)
+      return {
+        ...memory,
+        expiresAtMs: mockProjectMemoryExpiry[cwd]?.[id],
+      } as T
+    }
+    case "project_memory_remove": {
+      const cwd = String(args?.cwd ?? "")
+      const id = String(args?.id ?? "")
+      mockProjectMemories = {
+        ...mockProjectMemories,
+        [cwd]: (mockProjectMemories[cwd] ?? []).filter((m) => m.id !== id),
+      }
+      const nextExpiry = { ...(mockProjectMemoryExpiry[cwd] ?? {}) }
+      delete nextExpiry[id]
+      mockProjectMemoryExpiry = { ...mockProjectMemoryExpiry, [cwd]: nextExpiry }
+      saveMockProjectMemories()
+      saveMockProjectMemoryExpiry()
+      return undefined as T
+    }
+    case "project_memory_set_expiry": {
+      const cwd = String(args?.cwd ?? "")
+      const id = String(args?.id ?? "")
+      const expiresAtMs = args?.expiresAtMs as number | undefined
+      const nextExpiry = { ...(mockProjectMemoryExpiry[cwd] ?? {}) }
+      if (expiresAtMs == null) {
+        delete nextExpiry[id]
+      } else {
+        nextExpiry[id] = expiresAtMs
+      }
+      mockProjectMemoryExpiry = { ...mockProjectMemoryExpiry, [cwd]: nextExpiry }
+      saveMockProjectMemoryExpiry()
+      return undefined as T
     }
     case "terminal_create": {
       const id = `term-${++mockTerminalSeq}`
@@ -1276,7 +2385,8 @@ export const browserInvoke = async <T>(
     case "browser_back":
     case "browser_forward":
       return undefined as T
-    case "browser_reload": {
+    case "browser_reload":
+    case "browser_hard_reload": {
       emitBrowserLoadPulse(mockBrowserUrl)
       return undefined as T
     }
@@ -1284,6 +2394,20 @@ export const browserInvoke = async <T>(
     case "browser_set_visible":
     case "browser_close":
       return undefined as T
+    // Native-only: opening a real DevTools window has no preview equivalent.
+    // BrowserTab.tsx checks `isBrowserPreview()` and shows a toast instead of
+    // calling this, but resolve cleanly here too in case it's ever invoked.
+    case "browser_open_devtools":
+      return undefined as T
+    // Native-only: `clear_all_browsing_data` has no meaningful preview
+    // equivalent (no real cookies/cache exist for the mock iframe) — no-op.
+    case "browser_clear_data":
+      return undefined as T
+    // Native-only: `screencapture` has no preview equivalent. BrowserTab.tsx
+    // checks `isBrowserPreview()` and shows a degradation toast instead of
+    // calling this, but throw here too in case it's ever invoked directly.
+    case "browser_screenshot":
+      throw new Error("Screenshot unavailable in preview")
     default:
       throw new Error(`Browser preview mock: unhandled command "${cmd}"`)
   }
@@ -1375,6 +2499,12 @@ const emitBrowserState = (e: BrowserStateEvent) => {
   for (const handler of browserStateHandlers) handler(e)
 }
 
+/** Deterministic "load failure" URL for previewing the load-error page —
+ * a real request to this host/port refuses to connect, so it stands in for
+ * native load-failure detection (which isn't reachable via Tauri/wry's
+ * current page-load hooks; see `BrowserStateEvent.error`'s doc comment). */
+const FAILING_MOCK_HOST = "localhost:1"
+
 const emitBrowserLoadPulse = (url: string) => {
   emitBrowserState({
     url,
@@ -1384,12 +2514,22 @@ const emitBrowserLoadPulse = (url: string) => {
     canGoForward: true,
   })
   window.setTimeout(() => {
+    let host = url
+    try {
+      host = new URL(url).host
+    } catch {
+      // Keep the raw url as the host fallback.
+    }
+    const failed = host === FAILING_MOCK_HOST
     emitBrowserState({
       url,
       title: null,
       loading: false,
       canGoBack: true,
       canGoForward: true,
+      error: failed
+        ? { host, message: `${host} refused to connect` }
+        : null,
     })
   }, 300)
 }

@@ -1,26 +1,17 @@
 import { useRef, useState } from "react"
-import {
-  FileIcon,
-  ImageIcon,
-  ListTodo,
-  MessageCircle,
-  Plus,
-} from "lucide-react"
-import type { ComposerMode } from "../../lib/types"
+import { FileIcon, ImageIcon, Plus } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { PopoverItem, PopoverTray } from "./PopoverTray"
 
 type PlusMenuProps = {
   onAttachFile: () => void
   onAttachImage: () => void
-  onSetMode?: (mode: ComposerMode) => void
   disabled?: boolean
 }
 
 export const PlusMenu = ({
   onAttachFile,
   onAttachImage,
-  onSetMode,
   disabled = false,
 }: PlusMenuProps) => {
   const [open, setOpen] = useState(false)
@@ -58,31 +49,6 @@ export const PlusMenu = ({
         <p className="border-b border-stroke-3 px-2.5 py-1.5 text-xs text-ink-faint">
           Add agents, context, tools…
         </p>
-        {onSetMode ? (
-          <>
-            <PopoverItem
-              role="menuitem"
-              onClick={() => {
-                handleClose()
-                onSetMode("plan")
-              }}
-            >
-              <ListTodo className="h-3.5 w-3.5 text-yellow" aria-hidden />
-              Plan
-            </PopoverItem>
-            <PopoverItem
-              role="menuitem"
-              onClick={() => {
-                handleClose()
-                onSetMode("ask")
-              }}
-            >
-              <MessageCircle className="h-3.5 w-3.5 text-cyan" aria-hidden />
-              Ask
-            </PopoverItem>
-            <div className="mx-2 my-0.5 border-t border-stroke-3" />
-          </>
-        ) : null}
         <PopoverItem
           role="menuitem"
           onClick={() => {
