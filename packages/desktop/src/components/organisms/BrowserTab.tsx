@@ -148,75 +148,13 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
       setBrowserSessionState(sessionKey, { loading: true, url: trimmed })
       setBrowserOwnerSessionId(sessionKey)
       clearLoadingSoon()
-      // #region agent log
-      fetch("http://127.0.0.1:7399/ingest/4642b0a4-a520-4891-a625-7f347f2070b9", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "34bae6",
-        },
-        body: JSON.stringify({
-          sessionId: "34bae6",
-          runId: "pre-fix",
-          hypothesisId: "H5",
-          location: "BrowserTab.tsx:commitNavigate",
-          message: "navigate requested",
-          data: {
-            url: trimmed,
-            browserStarted,
-            preview: isBrowserPreview(),
-            active,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
       if (browserStarted) {
-        void browserNavigate(trimmed).catch((err) => {
-          // #region agent log
-          fetch("http://127.0.0.1:7399/ingest/4642b0a4-a520-4891-a625-7f347f2070b9", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Debug-Session-Id": "34bae6",
-            },
-            body: JSON.stringify({
-              sessionId: "34bae6",
-              runId: "pre-fix",
-              hypothesisId: "H5",
-              location: "BrowserTab.tsx:browserNavigate",
-              message: "navigate failed",
-              data: { error: String(err) },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {})
-          // #endregion
-        })
+        void browserNavigate(trimmed).catch(() => {})
       } else {
-        void browserOpen(trimmed).catch((err) => {
-          // #region agent log
-          fetch("http://127.0.0.1:7399/ingest/4642b0a4-a520-4891-a625-7f347f2070b9", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Debug-Session-Id": "34bae6",
-            },
-            body: JSON.stringify({
-              sessionId: "34bae6",
-              runId: "pre-fix",
-              hypothesisId: "H5",
-              location: "BrowserTab.tsx:browserOpen",
-              message: "open failed",
-              data: { error: String(err) },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {})
-          // #endregion
-        })
+        void browserOpen(trimmed).catch(() => {})
       }
     },
     [
-      active,
       browserStarted,
       clearLoadingSoon,
       sessionKey,
@@ -413,9 +351,18 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
   }, [loadError])
 
   // Effect 2: bounds sync (native only) — re-run when webview starts or tab activates.
+  // Owns reveal too: the webview must never be shown before its first real
+  // (non-degenerate) rect has been applied, otherwise it paints at whatever
+  // stale position it last had (e.g. (0,0) from creation), which sits on top
+  // of the toolbar. Effect 3 previously toggled visibility independently and
+  // could win the race against this effect's rAF-deferred first measurement.
   useEffect(() => {
     if (isBrowserPreview()) return
-    if (!active || !isOwner || !browserStarted) return
+    const shouldShow = active && isOwner && browserStarted && !loadError
+    if (!shouldShow) {
+      void browserSetVisible(false)
+      return
+    }
     const container = containerRef.current
     if (!container) return
 
@@ -423,30 +370,6 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
     const measure = () => {
       rafId = null
       const rect = container.getBoundingClientRect()
-      // #region agent log
-      fetch("http://127.0.0.1:7399/ingest/4642b0a4-a520-4891-a625-7f347f2070b9", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "34bae6",
-        },
-        body: JSON.stringify({
-          sessionId: "34bae6",
-          runId: "pre-fix",
-          hypothesisId: "H6",
-          location: "BrowserTab.tsx:bounds",
-          message: "measuring container",
-          data: {
-            left: rect.left,
-            top: rect.top,
-            width: rect.width,
-            height: rect.height,
-            skipped: rect.width < 2 || rect.height < 2,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
       if (rect.width < 2 || rect.height < 2) return
       // Viewport preset: clamp the reported rect to the preset width (never
       // wider than the panel) and center it horizontally, letterboxing the
@@ -458,7 +381,9 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
       )?.width
       const width = presetWidth ? Math.min(presetWidth, rect.width) : rect.width
       const x = rect.left + (rect.width - width) / 2
-      void browserSetBounds(x, rect.top, width, rect.height)
+      void browserSetBounds(x, rect.top, width, rect.height).then(() => {
+        void browserSetVisible(true)
+      })
     }
     const schedule = () => {
       if (rafId !== null) return
@@ -474,19 +399,9 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
       resizeObserver.disconnect()
       window.removeEventListener("resize", schedule)
       if (rafId !== null) cancelAnimationFrame(rafId)
-    }
-  }, [active, isOwner, browserStarted, viewportPreset])
-
-  // Effect 3: visibility (native only) — only the owning, active session shows
-  // the webview, and only while there's no load-error page covering it (the
-  // in-panel error state replaces the raw webview rather than layering over it).
-  useEffect(() => {
-    if (isBrowserPreview()) return
-    void browserSetVisible(active && isOwner && browserStarted && !loadError)
-    return () => {
       void browserSetVisible(false)
     }
-  }, [active, isOwner, browserStarted, loadError])
+  }, [active, isOwner, browserStarted, loadError, viewportPreset])
 
   const preview = isBrowserPreview()
   const showLiveContent = browserStarted && isOwner

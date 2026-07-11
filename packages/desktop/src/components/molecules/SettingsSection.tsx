@@ -1,12 +1,105 @@
 import type { ReactNode } from "react"
 import { cn } from "../../lib/utils"
 
+/* ── New Settings shell primitives (design-map/07-settings.md §4) ──────────
+ * `SettingsCard` + `SettingRow` implement the reference's group-card/row
+ * anatomy for the new SettingsShell nav+content layout. The legacy
+ * `SettingsSection`/`FieldRow` pair below (bordered card, label+hint layout)
+ * stays as-is — it's still used by list-style sections (MCP servers,
+ * automations, provider connections) that don't fit the toggle-row shape. */
+
+type SettingsCardProps = {
+  /** Group label rendered OUTSIDE the card, above it (12px secondary per
+   * the reference — not a card header). */
+  label?: string
+  description?: string
+  children: ReactNode
+  className?: string
+}
+
+/** Group card — flat panel-tier background, no border, rows separated by
+ * inset dividers (see `SettingRow`). */
+export const SettingsCard = ({
+  label,
+  description,
+  children,
+  className,
+}: SettingsCardProps) => {
+  return (
+    <div className={cn("flex flex-col gap-2", className)}>
+      {label ? (
+        <div className="flex flex-col gap-0.5 pl-2 pr-1">
+          <h3 className="text-[12px] leading-4 text-ink-secondary">{label}</h3>
+          {description ? (
+            <p className="text-[12px] leading-4 text-ink-muted">{description}</p>
+          ) : null}
+        </div>
+      ) : null}
+      <div className="flex flex-col rounded-[12px] bg-settings-card">{children}</div>
+    </div>
+  )
+}
+
+type SettingRowProps = {
+  /** Stable id for search-index navigation + highlight targeting — see
+   * `settingsSearchIndex.ts` and `SettingsShell`'s highlight effect. */
+  rowId?: string
+  title: string
+  description?: string
+  children?: ReactNode
+  /** Suppress the top inset divider — pass for the first row in a card. */
+  first?: boolean
+  className?: string
+}
+
+/** Toggle-row anatomy: title+description (both 13px, differ only by color)
+ * on the left, a right-aligned control slot, and an absolute inset divider
+ * between rows (design-map/07-settings.md §4, `.cursor-settings-cell`). */
+export const SettingRow = ({
+  rowId,
+  title,
+  description,
+  children,
+  first = false,
+  className,
+}: SettingRowProps) => {
+  return (
+    <div
+      data-settings-row={rowId}
+      className={cn(
+        "relative flex items-center gap-5 px-3.5 py-3",
+        !first && "before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-stroke-4 before:content-['']",
+        className,
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] leading-[18px] text-ink">{title}</p>
+        {description ? (
+          <p className="mt-0.5 text-[13px] leading-[18px] text-ink-secondary">
+            {description}
+          </p>
+        ) : null}
+      </div>
+      {children ? (
+        <div className="flex shrink-0 items-center justify-end gap-2">
+          {children}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 type SettingsSectionProps = {
   title: string
   description?: string
   actions?: ReactNode
   children: ReactNode
   className?: string
+  /** Stable id for search-index navigation + highlight targeting — see
+   * `settingsSearchIndex.ts` and `SettingsShell`'s highlight effect. Mirrors
+   * `SettingRow`'s `rowId` for sections that use this older list-card shape
+   * (MCP servers, automations, provider connections) instead of `SettingRow`. */
+  rowId?: string
 }
 
 export const SettingsSection = ({
@@ -15,21 +108,29 @@ export const SettingsSection = ({
   actions,
   children,
   className,
+  rowId,
 }: SettingsSectionProps) => {
   return (
-    <section className={cn("mb-8", className)}>
-      <div className="mb-3 flex items-start justify-between gap-4">
+    <section data-settings-row={rowId} className={cn("mb-8", className)}>
+      <div className="mb-2 flex items-start justify-between gap-4 pl-2 pr-1">
         <div className="min-w-0">
-          <h2 className="text-[13px] font-medium text-ink">{title}</h2>
+          <h2 className="text-[12px] leading-4 text-ink-secondary">{title}</h2>
           {description ? (
-            <p className="mt-0.5 text-xs text-ink-muted">{description}</p>
+            <p className="mt-0.5 text-[12px] leading-4 text-ink-muted">{description}</p>
           ) : null}
         </div>
         {actions ? (
           <div className="flex shrink-0 items-center gap-2">{actions}</div>
         ) : null}
       </div>
-      <div className="@container/settings divide-y divide-stroke-3 rounded-lg border border-stroke-3">
+      <div
+        className={cn(
+          "@container/settings rounded-[12px] bg-settings-card",
+          // Inset dividers between rows (12px inset, absolute — not
+          // full-width borders), per design-map/07-settings.md §4.
+          "[&>*+*]:relative [&>*+*]:before:absolute [&>*+*]:before:inset-x-3 [&>*+*]:before:top-0 [&>*+*]:before:h-px [&>*+*]:before:bg-stroke-4 [&>*+*]:before:content-['']",
+        )}
+      >
         {children}
       </div>
     </section>
@@ -54,7 +155,7 @@ export const FieldRow = ({
   return (
     <div
       className={cn(
-        "grid grid-cols-1 items-start gap-2 px-4 py-3",
+        "grid grid-cols-1 items-start gap-2 px-3.5 py-3",
         "@[640px]/settings:grid-cols-[240px_1fr] @[640px]/settings:gap-6",
         className,
       )}

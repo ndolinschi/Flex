@@ -9,14 +9,21 @@ const BUILD_PROMPT = "Implement the plan as specified."
 /**
  * "Build" — leave plan mode and start implementing.
  * Calls `prompt` directly (no synthetic keyboard events).
+ *
+ * `modelId` (optional) overrides `store.selectedModelId` for this one turn —
+ * the Plan tab toolbar's model pill (`planBuildModelBySession`) picks the
+ * build model independently of the composer's current model. Its per-model
+ * effort (`effortByModel`) rides along automatically.
  */
 export const usePlanBuild = () => {
   const [isBuilding, setIsBuilding] = useState(false)
 
-  const buildPlan = async (sessionId: SessionId) => {
+  const buildPlan = async (sessionId: SessionId, modelId?: string) => {
     if (isBuilding) return
     const store = useAppStore.getState()
     if (store.streamingSessions[sessionId] || store.isStreaming) return
+
+    const buildModel = modelId ?? store.selectedModelId ?? undefined
 
     setIsBuilding(true)
     store.setPendingPlanApproval(null)
@@ -29,9 +36,11 @@ export const usePlanBuild = () => {
       await prompt({
         sessionId,
         text: BUILD_PROMPT,
-        model: store.selectedModelId ?? undefined,
+        model: buildModel,
         permissionMode: modeToPermission("agent"),
+        effort: buildModel ? (store.getEffortForModel(buildModel) ?? undefined) : undefined,
       })
+      store.setPlanBuilt(sessionId, true)
     } catch (err) {
       store.setIsStreaming(false)
       store.setSessionStreaming(sessionId, false)

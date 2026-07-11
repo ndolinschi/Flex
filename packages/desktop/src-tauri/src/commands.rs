@@ -11,7 +11,7 @@ use agentloop_contracts::{
     PermissionRequestId, PromptInput, QuestionId, SessionEvent, SessionId, SessionMeta,
     SessionMetaPatch, TurnOptions, TurnSummary,
 };
-use agentloop_core::WorkspaceStatus;
+use agentloop_core::{BackgroundEntrySummary, WorkspaceStatus};
 use agentloop_sdk::EngineService;
 use agentloop_sdk::mcp::McpToolClient;
 use agentloop_sdk::routines::{FileRoutineStore, RoutineRunner, default_routines_dir};
@@ -786,6 +786,12 @@ pub struct PromptCommandInput {
     /// rather than erroring — see `parse_effort`.
     #[serde(default)]
     pub effort: Option<String>,
+    /// The composer mode picked in the UI ("agent" | "plan" | "ask" | "flex"),
+    /// distinct from `permission_mode` (its derived wire value — see
+    /// `ModePicker.tsx::modeToPermission`). Only `"flex"` currently changes
+    /// backend behavior: it appends the orchestrator system prompt below.
+    #[serde(default)]
+    pub composer_mode: Option<String>,
 }
 
 fn parse_effort(raw: Option<&str>) -> Option<Effort> {
@@ -880,6 +886,46 @@ fn build_prompt_input(input: &PromptCommandInput) -> PromptInput {
 /// rather than `0` (which would mean "use the 8k default").
 const PROJECT_MEMORY_PROMPT_BUDGET_CHARS: usize = 4_000;
 
+/// System prompt appended for the Flex composer mode, instructing the model
+/// to act as an orchestrator over the `planner` / `plan-reviewer` /
+/// `flex-worker` roles registered in `compose.rs::flex_composer_roles`. The
+/// model runs with `PermissionMode::DontAsk` in this mode (see
+/// `ModePicker.tsx::modeToPermission`), so it — and every subagent it
+/// spawns, which inherit the parent's permission mode — must never leave a
+/// permission ask pending.
+const FLEX_ORCHESTRATOR_PROMPT: &str = "\
+You are an orchestrator. First classify the task:
+- SIMPLE (single-file change, question, quick fix): do it yourself directly, no subagents.
+- COMPLEX (multi-file feature, refactor, \"build X\"): orchestrate as below.
+
+PLAN: if you are a top-tier model, draft the plan yourself; otherwise spawn \
+Agent(role=planner, model=<top tier>) with the full task. The planner may \
+spawn its own read-only context gatherers.
+
+REVIEW: send the plan to Verify (or Agent role=plan-reviewer) using a \
+DIFFERENT model than the planner, passing ONLY the task statement plus the \
+plan text — nothing else. If REJECTED: revise with the planner, addressing \
+every numbered objection. Hard limit: 3 revision cycles. After the 3rd \
+rejection, stop and present both the plan and the objections to the user \
+for a decision — do not keep revising past that point.
+
+EXECUTE: once the plan is APPROVED, split it into independent steps and \
+spawn flex-worker agents (each gets an isolated worktree, merged back \
+automatically) with COMPLETE, self-contained prompts — the step, the \
+relevant file paths, and the verification commands to run. Run independent \
+steps in parallel, up to 8 at a time.
+
+MERGE/VERIFY: after workers finish, review the integration results, run the \
+project's verification commands, and summarize what changed.
+
+Model tiers: pick the top-tier planner from the models available to you by \
+name (opus/sol/terra/o1-class names are top tier; sonnet/grok/gpt-class names \
+are middle tier). Always use the full `provider/model` id from your model \
+list when overriding a subagent's model.
+
+You run with DontAsk permissions, and every subagent you spawn inherits \
+that: never leave a permission ask pending, and never block waiting on one.";
+
 #[tauri::command]
 pub async fn prompt(
     state: State<'_, AppState>,
@@ -914,12 +960,18 @@ pub async fn prompt(
             budget_chars: PROJECT_MEMORY_PROMPT_BUDGET_CHARS,
         })
     });
-    let system_append = match (cwd_notice, project_memory) {
+    let mut system_append = match (cwd_notice, project_memory) {
         (Some(a), Some(b)) => Some(format!("{a}\n\n{b}")),
         (Some(a), None) => Some(a),
         (None, Some(b)) => Some(b),
         (None, None) => None,
     };
+    if input.composer_mode.as_deref() == Some("flex") {
+        system_append = Some(match system_append {
+            Some(existing) => format!("{existing}\n\n{FLEX_ORCHESTRATOR_PROMPT}"),
+            None => FLEX_ORCHESTRATOR_PROMPT.to_owned(),
+        });
+    }
     let opts = TurnOptions {
         model: input.model.clone().map(ModelRef),
         permission_mode: parse_permission_mode(input.permission_mode.as_deref()),
@@ -936,6 +988,84 @@ pub async fn cancel(state: State<'_, AppState>, session_id: String) -> DesktopRe
     let service = require_service(&state).await?;
     let id = SessionId::from(session_id);
     Ok(service.cancel(&id).await?)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackgroundProcessDto {
+    pub process_id: String,
+    pub command: Option<String>,
+    pub running: bool,
+    pub started_at_ms: Option<u64>,
+    pub exit_code: Option<i32>,
+}
+
+impl From<BackgroundEntrySummary> for BackgroundProcessDto {
+    fn from(entry: BackgroundEntrySummary) -> Self {
+        Self {
+            process_id: entry.id,
+            command: Some(entry.command),
+            running: entry.running,
+            started_at_ms: Some(entry.started_at_ms),
+            exit_code: entry.exit_code,
+        }
+    }
+}
+
+/// List background processes (started via `Bash`'s `run_in_background`) for
+/// a session, for a "background processes" panel. Thin pass-through to
+/// `EngineService::background_list`, which itself proxies to
+/// `BackgroundProcessRegistry::list` (`packages/engine/crates/core/src/executor.rs`).
+#[tauri::command]
+pub async fn background_list(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> DesktopResult<Vec<BackgroundProcessDto>> {
+    let service = require_service(&state).await?;
+    let id = SessionId::from(session_id);
+    Ok(service
+        .background_list(&id)
+        .into_iter()
+        .map(BackgroundProcessDto::from)
+        .collect())
+}
+
+/// Kill one background process by id, for the Stop button on a running
+/// background-process row. Thin pass-through to
+/// `EngineService::background_kill`; a `false` result (unknown id — already
+/// reaped or never existed) is not an error, so it's swallowed here rather
+/// than surfaced as one.
+#[tauri::command]
+pub async fn background_kill(
+    state: State<'_, AppState>,
+    session_id: String,
+    process_id: String,
+) -> DesktopResult<()> {
+    let service = require_service(&state).await?;
+    let id = SessionId::from(session_id);
+    let _ = service.background_kill(&id, &process_id).await?;
+    Ok(())
+}
+
+/// Ask a still-running **foreground** shell call to move to the background
+/// (see `MOVE-TO-BACKGROUND`): the "Move to background" affordance on a
+/// running shell row in `ToolStepGroup`. Thin pass-through to
+/// `EngineService::background_demote`. Returns `false` — not an error — when
+/// there's nothing to do: the call already finished, the id is unknown, or
+/// the session's execution backend doesn't support demote (only the local
+/// backend does; docker/ssh sessions get no visible effect). The caller
+/// should treat `false` the same as `true` from the user's perspective —
+/// silently do nothing rather than show an error, since "the command already
+/// finished" is not exceptional.
+#[tauri::command]
+pub async fn background_demote(
+    state: State<'_, AppState>,
+    session_id: String,
+    call_id: String,
+) -> DesktopResult<bool> {
+    let service = require_service(&state).await?;
+    let id = SessionId::from(session_id);
+    Ok(service.background_demote(&id, &call_id))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2869,6 +2999,94 @@ pub async fn user_identity(_state: State<'_, AppState>) -> DesktopResult<UserIde
         .unwrap_or_else(|| "User".to_string());
 
     Ok(UserIdentityDto { name })
+}
+
+// ---------------------------------------------------------------------------
+// Plan tab: Save to Workspace — writes the rendered plan markdown to a file
+// inside the session's cwd. Traversal-hardened the same way as
+// `project_memory_dir`/`validate_repo_relative_path` above: canonicalize the
+// cwd, join the caller-supplied relative path, then verify the WRITTEN
+// file's parent directory canonicalizes to somewhere still inside the
+// canonical cwd — this catches `..` segments that a components() scan alone
+// could miss once symlinks are involved (a plain "reject any ParentDir
+// component" check, as `validate_repo_relative_path` does for git paths, is
+// enough there because git resolves those paths itself; a raw filesystem
+// write needs the stronger belt-and-suspenders canonicalize-and-prefix-check
+// since we do the join ourselves).
+// ---------------------------------------------------------------------------
+
+/// Rejects absolute paths and any `..` path component before it's ever
+/// joined onto a base directory — first line of defense, mirrors
+/// `validate_repo_relative_path`'s component scan.
+fn validate_relative_write_path(path: &str) -> DesktopResult<&str> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err(DesktopError::Message("path is required".into()));
+    }
+    let as_path = std::path::Path::new(trimmed);
+    if as_path.is_absolute() {
+        return Err(DesktopError::Message(format!(
+            "path must be relative to the session cwd, got absolute path: {trimmed}"
+        )));
+    }
+    if as_path
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err(DesktopError::Message(format!(
+            "path must not contain '..': {trimmed}"
+        )));
+    }
+    Ok(trimmed)
+}
+
+/// Writes `content` to `relative_path` inside `session_id`'s cwd, creating
+/// parent directories as needed (e.g. a not-yet-existing `plans/` folder).
+/// Returns the absolute path written. Used by the Plan tab's "Save to
+/// Workspace" menu item (`PlanToolbar`); the frontend passes
+/// `plans/<slug>-<date>.md`.
+#[tauri::command]
+pub async fn save_text_file(
+    state: State<'_, AppState>,
+    session_id: String,
+    relative_path: String,
+    content: String,
+) -> DesktopResult<String> {
+    let service = require_service(&state).await?;
+    let id = SessionId::from(session_id);
+    let meta = service.session_meta(&id).await?;
+
+    let relative = validate_relative_write_path(&relative_path)?;
+
+    let canonical_cwd = meta
+        .cwd
+        .canonicalize()
+        .map_err(|e| DesktopError::Message(format!("invalid session cwd: {e}")))?;
+
+    let target = canonical_cwd.join(relative);
+    let parent = target
+        .parent()
+        .ok_or_else(|| DesktopError::Message("path has no parent directory".into()))?;
+
+    std::fs::create_dir_all(parent)
+        .map_err(|e| DesktopError::Message(format!("cannot create `{}`: {e}", parent.display())))?;
+
+    // Re-canonicalize the parent now that it's guaranteed to exist, and
+    // verify it's still inside the session cwd — belt-and-suspenders against
+    // `..` traversal via symlinks that the component scan above can't see.
+    let canonical_parent = parent
+        .canonicalize()
+        .map_err(|e| DesktopError::Message(format!("invalid target directory: {e}")))?;
+    if !canonical_parent.starts_with(&canonical_cwd) {
+        return Err(DesktopError::Message(
+            "resolved path escapes the session's working directory".into(),
+        ));
+    }
+
+    std::fs::write(&target, content)
+        .map_err(|e| DesktopError::Message(format!("cannot write `{}`: {e}", target.display())))?;
+
+    Ok(target.display().to_string())
 }
 
 /// (Re)spawn the routines cron-poll loop against the current engine service.

@@ -507,6 +507,14 @@ pub fn set_secret_storage(
     cfg: &mut ProviderConfig,
     target: SecretStorageMode,
 ) -> DesktopResult<()> {
+    // Keychain mode is macOS-only for now (see `secrets::resolve_mode`'s doc
+    // comment) — reject the switch outright on other platforms with a clear
+    // error rather than silently no-op'ing or falling back to File.
+    if target == SecretStorageMode::Keychain && !cfg!(target_os = "macos") {
+        return Err(DesktopError::Message(
+            "Keychain secret storage is only available on macOS".into(),
+        ));
+    }
     let current = resolve_mode(cfg.prefs.secret_storage.as_deref());
     if current == target {
         // Still persist the explicit choice even if it matches the resolved

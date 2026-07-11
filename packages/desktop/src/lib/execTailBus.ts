@@ -11,7 +11,13 @@
  * Buffers are intentionally NOT cleared when a call completes — the mini-log
  * stays visible (muted) under the finished row for the rest of the chat
  * session. See `MAX_TAIL_BUFFERS` for the resulting memory bound.
+ *
+ * `pushExecTail` also feeds `execErrorScan` (see that module) on every chunk —
+ * same call site as the tail buffer append, so error detection stays in sync
+ * with the mini-log without `useGlobalSessionEvents` needing to know about it.
  */
+
+import { scanExecChunk } from "./execErrorScan"
 
 type TailSubscriber = () => void
 
@@ -48,11 +54,14 @@ const evictOldestIfNeeded = () => {
 }
 
 /** Append text to a call's tail buffer, keeping only the trailing slice on
- * overflow (oldest output is dropped first — callers only need recent lines). */
+ * overflow (oldest output is dropped first — callers only need recent lines).
+ * Also feeds the same chunk to `execErrorScan` so error detection tracks the
+ * tail buffer without a second call site in `useGlobalSessionEvents`. */
 export const pushExecTail = (callId: string, text: string): void => {
   const prev = tails.get(callId) ?? ""
   tails.set(callId, (prev + text).slice(-MAX_TAIL_CHARS))
   evictOldestIfNeeded()
+  scanExecChunk(callId, text)
   notify(callId)
 }
 

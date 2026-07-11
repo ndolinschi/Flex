@@ -138,9 +138,9 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
     <div
       role="dialog"
       aria-labelledby="question-title"
-      className="w-full max-w-lg animate-tray-in"
+      className="w-full max-w-[640px] animate-tray-in"
     >
-      <div className="rounded-xl bg-panel p-3 shadow-lg">
+      <div className="rounded-xl border border-stroke-3 bg-panel p-3 shadow-lg">
         <h3 id="question-title" className="text-sm font-semibold text-ink">
           Agent needs your input
         </h3>

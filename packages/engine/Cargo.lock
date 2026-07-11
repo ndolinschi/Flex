@@ -204,6 +204,7 @@ version = "0.1.0"
 dependencies = [
  "agentloop-contracts",
  "agentloop-core",
+ "agentloop-executors",
  "async-trait",
  "base64",
  "futures",

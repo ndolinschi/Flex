@@ -46,9 +46,20 @@ export const ChatShell = ({
     })
   }
 
+  // Hard CSS floor for the chat column — wide viewport only. No live-clamp
+  // math (see stores/appStore.ts's CHAT_MIN_WIDTH) can ever fully hide chat:
+  // this is a backstop against a sash math error, not the primary defense.
+  // Narrow/tight are exempt — sidebar/right-panel are absolute overlays
+  // there (see SessionSidebar.tsx / RightPanel.tsx `narrow` handling), so the
+  // chat pane already renders at full width underneath them.
+  const wide = useAppStore((s) => s.viewport === "wide")
+
   const pane = (
     <div
-      className="flex h-full min-h-0 min-w-0 flex-1 flex-col"
+      className={cn(
+        "flex h-full min-h-0 min-w-0 flex-1 flex-col",
+        wide && "min-w-[380px]",
+      )}
       style={tight ? ({ "--content-rail": "100%" } as CSSProperties) : undefined}
     >
       <AppHeader />
@@ -105,13 +116,6 @@ export const ChatShell = ({
             {composer}
           </div>
         )}
-
-        {overlay ? (
-          <div
-            className="pointer-events-none absolute inset-0 z-40 bg-black/15 animate-backdrop-in"
-            aria-hidden
-          />
-        ) : null}
 
         {composerHero && overlay ? (
           <div

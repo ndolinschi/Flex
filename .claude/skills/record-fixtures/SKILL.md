@@ -37,3 +37,10 @@ To (re)record:
 
 Never invent wire formats from documentation alone — mark unverified fixtures
 with a `// UNVERIFIED: recorded from docs, not a live CLI` comment.
+
+When NOT to use: a snapshot diff you haven't read yet (read it first — a
+surprising diff usually means the code change is wrong, not the snapshot);
+recording a fixture for a wire format you haven't captured from a real CLI run
+(see the "never invent" rule above); routine test failures unrelated to a
+parser/mapper/system-prompt change (that's a bug to fix, not a fixture to
+re-record).

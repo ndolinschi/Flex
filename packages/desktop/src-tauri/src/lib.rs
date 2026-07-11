@@ -7,11 +7,25 @@ mod secrets;
 mod state;
 mod terminal;
 
-use tauri::Manager;
+use tauri::{LogicalSize, Manager};
 
 use crate::compose::{build_service, open_session_store};
 use crate::config::load_config;
 use crate::state::AppState;
+
+/// Must match `app.windows[0].minWidth`/`minHeight` in `tauri.conf.json`.
+///
+/// tauri-plugin-window-state's `on_window_ready` restore hook calls
+/// `set_size` directly from whatever was last persisted to
+/// `.window-state.json` — it does not consult the window's configured
+/// min-size, and a programmatic `set_size` is not clamped by the OS/Tauri
+/// the way an interactive user drag-resize is. So a size saved *before*
+/// this minimum existed (or saved on a platform where the min wasn't
+/// enforced) gets replayed verbatim on every future launch, silently
+/// bypassing the constraint below. Re-assert and clamp here, in `setup`,
+/// which runs after the plugin's window-ready restore.
+const MAIN_WINDOW_MIN_WIDTH: f64 = 900.0;
+const MAIN_WINDOW_MIN_HEIGHT: f64 = 600.0;
 
 /// Trace/log to stdout so engine and provider errors are visible in the
 /// `tauri dev` console. `RUST_LOG` wins if set (standard `EnvFilter` syntax,
@@ -41,7 +55,32 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_os::init())
         .setup(|app| {
+            // Belt-and-suspenders against tauri-plugin-window-state replaying a
+            // stale sub-minimum size from `.window-state.json` (see constants
+            // above). Re-apply the min constraint and, if the size restored by
+            // the plugin already violates it, snap back up to the minimum.
+            if let Some(window) = app.get_webview_window("main") {
+                let min_size = LogicalSize::new(MAIN_WINDOW_MIN_WIDTH, MAIN_WINDOW_MIN_HEIGHT);
+                let _ = window.set_min_size(Some(min_size));
+
+                if let Ok(scale) = window.scale_factor() {
+                    if let Ok(current) = window.inner_size() {
+                        let current_logical = current.to_logical::<f64>(scale);
+                        if current_logical.width < MAIN_WINDOW_MIN_WIDTH
+                            || current_logical.height < MAIN_WINDOW_MIN_HEIGHT
+                        {
+                            let clamped = LogicalSize::new(
+                                current_logical.width.max(MAIN_WINDOW_MIN_WIDTH),
+                                current_logical.height.max(MAIN_WINDOW_MIN_HEIGHT),
+                            );
+                            let _ = window.set_size(clamped);
+                        }
+                    }
+                }
+            }
+
             let store = open_session_store().map_err(|e| e.to_string())?;
             let config = load_config().unwrap_or_default();
             let service = if config.is_ready() {
@@ -90,6 +129,9 @@ pub fn run() {
             commands::unsubscribe_session,
             commands::prompt,
             commands::cancel,
+            commands::background_list,
+            commands::background_kill,
+            commands::background_demote,
             commands::respond_permission,
             commands::respond_question,
             commands::is_configured,
@@ -132,6 +174,7 @@ pub fn run() {
             commands::project_memory_remove,
             commands::project_memory_set_expiry,
             commands::user_identity,
+            commands::save_text_file,
             terminal::terminal_create,
             terminal::terminal_write,
             terminal::terminal_resize,

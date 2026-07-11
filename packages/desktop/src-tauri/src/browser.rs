@@ -261,6 +261,13 @@ pub async fn browser_clear_data(state: State<'_, AppState>) -> DesktopResult<()>
 /// Caveat: if the app window isn't frontmost, this can capture whatever
 /// occludes it — `screencapture -R` has no window-handle-scoped capture mode,
 /// only a screen-region one. Acceptable for v1.
+///
+/// `screencapture` is a macOS-only binary, so the real implementation is
+/// `#[cfg(target_os = "macos")]`-gated; every other platform gets the stub
+/// below, which returns a `DesktopResult` error (surfaced to the frontend as
+/// a toast — see the module's error-path convention) rather than failing to
+/// compile or panicking at runtime.
+#[cfg(target_os = "macos")]
 #[tauri::command]
 pub async fn browser_screenshot(state: State<'_, AppState>) -> DesktopResult<String> {
     let guard = state.browser_webview.lock().await;
@@ -303,4 +310,15 @@ pub async fn browser_screenshot(state: State<'_, AppState>) -> DesktopResult<Str
     }
 
     Ok(out_path.to_string_lossy().into_owned())
+}
+
+/// Non-macOS stub: no equivalent region-capture binary is wired up yet
+/// (Windows would need a Win32/GDI capture, Linux would need portal/X11
+/// grab). Returns a clear, user-visible error instead of silently no-op'ing.
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+pub async fn browser_screenshot(_state: State<'_, AppState>) -> DesktopResult<String> {
+    Err(DesktopError::Message(
+        "Screenshots are not supported on this platform yet".into(),
+    ))
 }

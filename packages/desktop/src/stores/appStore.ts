@@ -4,13 +4,16 @@ import type {
   AppRoute,
   ComposerAttachment,
   ComposerMode,
+  IsolationPolicy,
   PendingPermission,
   PendingQuestion,
+  PermissionMode,
   SessionId,
   StreamingBuffers,
   TokenUsage,
   TurnSummary,
 } from "../lib/types"
+import type { SettingsSectionId } from "../lib/settingsSearchIndex"
 
 const emptyStreaming = (): StreamingBuffers => ({
   markdown: {},
@@ -66,6 +69,21 @@ const emptyBrowserSessionState = (): BrowserSessionState => ({
 export const sessionScopeKey = (sessionId: SessionId | null): string =>
   sessionId ?? "none"
 
+/** Whether `sessionId` has had any prior activity worth gating a "changed to
+ * X" log row on — a fresh session with no turns yet shouldn't get one before
+ * the user has said anything. `lastTurnUsage` is set once a turn completes
+ * (see ContextBar's UsageRing, which reads the same field to know a turn
+ * happened); a non-empty `sessionLogRows` (e.g. an earlier model/provider
+ * change already logged) also counts as prior activity. Shared by
+ * Composer.tsx's `handleModelChange` and ProviderSettingsForm.tsx's provider
+ * label log. */
+export const sessionHasActivity = (
+  state: Pick<AppState, "lastTurnUsage" | "sessionLogRows">,
+  sessionId: SessionId,
+): boolean =>
+  !!state.lastTurnUsage[sessionId] ||
+  (state.sessionLogRows[sessionId]?.length ?? 0) > 0
+
 const RIGHT_PANEL_MIN_WIDTH = 300
 const RIGHT_PANEL_MAX_WIDTH = 960
 const RIGHT_PANEL_DEFAULT_WIDTH = 380
@@ -74,22 +92,89 @@ const SIDEBAR_MIN_WIDTH = 210
 const SIDEBAR_MAX_WIDTH = 400
 const SIDEBAR_DEFAULT_WIDTH = 260
 
-const clampRightPanelWidth = (width: number): number =>
-  Math.min(RIGHT_PANEL_MAX_WIDTH, Math.max(RIGHT_PANEL_MIN_WIDTH, Math.round(width)))
+/** Hard floor for the chat column's width (wide viewport only — narrow/tight
+ * overlays are exempt, panels float over the chat there instead of sharing
+ * row space). Mirrored as a Tailwind arbitrary value on ChatShell's pane
+ * (`min-w-[380px]`) — keep both in sync if this changes. Also the anchor for
+ * the dynamic sash clamps below: neither sash may claim so much width that
+ * less than this remains for chat. */
+export const CHAT_MIN_WIDTH = 380
 
-const clampSidebarWidth = (width: number): number =>
-  Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(width)))
+/** Dynamic clamp for the right panel's sash: outer [MIN, MAX] bounds still
+ * apply, but additionally the panel may never claim so much width that chat
+ * would drop under CHAT_MIN_WIDTH once the sidebar (if visible, wide-mode
+ * side-by-side) is also accounted for. SSR-safe: falls back to the static
+ * MAX when `window` isn't available. */
+const clampRightPanelWidth = (
+  width: number,
+  sidebarWidth = 0,
+  sidebarVisible = false,
+): number => {
+  const rounded = Math.round(width)
+  const staticMax = RIGHT_PANEL_MAX_WIDTH
+  if (typeof window === "undefined") {
+    return Math.min(staticMax, Math.max(RIGHT_PANEL_MIN_WIDTH, rounded))
+  }
+  const otherPane = sidebarVisible ? sidebarWidth : 0
+  const dynamicMax = window.innerWidth - otherPane - CHAT_MIN_WIDTH
+  const effectiveMax = Math.min(staticMax, Math.max(RIGHT_PANEL_MIN_WIDTH, dynamicMax))
+  return Math.min(effectiveMax, Math.max(RIGHT_PANEL_MIN_WIDTH, rounded))
+}
+
+/** Mirrors clampRightPanelWidth for the left sidebar's sash — see its doc
+ * comment for the shared rationale. */
+const clampSidebarWidth = (
+  width: number,
+  rightPanelWidth = 0,
+  rightPanelVisible = false,
+): number => {
+  const rounded = Math.round(width)
+  const staticMax = SIDEBAR_MAX_WIDTH
+  if (typeof window === "undefined") {
+    return Math.min(staticMax, Math.max(SIDEBAR_MIN_WIDTH, rounded))
+  }
+  const otherPane = rightPanelVisible ? rightPanelWidth : 0
+  const dynamicMax = window.innerWidth - otherPane - CHAT_MIN_WIDTH
+  const effectiveMax = Math.min(staticMax, Math.max(SIDEBAR_MIN_WIDTH, dynamicMax))
+  return Math.min(effectiveMax, Math.max(SIDEBAR_MIN_WIDTH, rounded))
+}
 
 type AppState = {
   activeSessionId: SessionId | null
   route: AppRoute
+  /** Active section within the Settings shell's persistent left nav
+   * (design-map/07-settings.md) — additive route state alongside `route`,
+   * since `route` still drives which top-level page mounts (settings /
+   * customize / automations / memory all map onto the same shell, see
+   * App.tsx) while this tracks which nav section is open inside it. */
+  settingsSection: SettingsSectionId
   theme: UiTheme
+  /** Settings → General "System notifications" toggle — gates
+   * `notifyTurnCompleted` entirely (see `useGlobalSessionEvents`'s
+   * background-completion call site). Default ON. */
+  notificationsEnabled: boolean
+  /** Settings → General "Completion sound" toggle — plays a short WebAudio
+   * chime on turn completion (background AND active-session completions)
+   * when enabled. Default OFF. */
+  completionSoundEnabled: boolean
   /** Per-session composer drafts. */
   draftsBySession: Record<SessionId, string>
   /** Draft used when no session is active. */
   orphanDraft: string
   composerMode: ComposerMode
+  /** Default permission mode applied to Agent-mode turns (see
+   * `ModePicker.tsx`'s `modeToPermission`). Settings → Behavior lets the
+   * user override the "ask every time" default; Plan/Ask/Flex modes keep
+   * their own fixed mapping regardless of this setting. */
+  defaultPermissionMode: PermissionMode
   selectedModelId: string | null
+  /** Composer preference for the NEXT session's isolation, set via the
+   * ContextBar's isolation picker on a draft session. `null` means unset —
+   * `create_session` then falls back to the provider profile's
+   * `default_isolation` (see `newAgentCreateInput` / `commands::create_session`).
+   * Only "never" | "required" are offered in the UI ("optional" stays
+   * wire-supported but is skipped in this picker per product decision). */
+  selectedIsolation: IsolationPolicy | null
   /** Turn effort level (contracts::request::Effort wire value: "low" |
    * "medium" | "high" | "xhigh" | "max"), or `null` for "Default" (unset —
    * engine default applies). Legacy global setting — superseded by
@@ -104,6 +189,14 @@ type AppState = {
   isStreaming: boolean
   /** Which sessions currently have a turn in flight (sidebar indicators). */
   streamingSessions: Record<SessionId, boolean>
+  /** Whether `subscribe_session` has resolved for a session — the backend
+   * broadcast channel only fans out events emitted AFTER a subscriber
+   * attaches (see `EngineHandle::events` / `commands::subscribe_session`),
+   * so a `prompt()` fired before this is true can race the engine's
+   * `turn_started` and lose it forever (no replay buffer on that channel).
+   * `useGlobalSessionEvents` sets this once its `subscribeSession` IPC call
+   * resolves; Composer awaits it before sending on a brand-new session. */
+  subscribedSessions: Record<SessionId, boolean>
   /** Token usage of each session's latest completed turn (context ring). */
   lastTurnUsage: Record<SessionId, TokenUsage>
   /** Full summary of each session's latest completed turn (cost / token breakdown). */
@@ -117,6 +210,14 @@ type AppState = {
    * `closeRunningRows`). A local backstop for when the engine never emits a
    * matching `turn_completed`/`session_error` (e.g. the process already died). */
   sweepRequests: Record<SessionId, number>
+  /** Bumped (monotonic counter) when something outside `useSessionEvents`
+   * wants a full replay-based resync — e.g. Composer's optimistic-streaming
+   * safety timeout (see `handleSend`): if `setIsStreaming(true)` fires but no
+   * engine event arrives within ~5s (the `subscribe_session` broadcast race
+   * described on `subscribedSessions`, or any other dropped `turn_started`),
+   * this forces one resync attempt before giving up and clearing the flag.
+   * Mirrors `sweepRequests`' bump-and-observe pattern. */
+  resyncRequests: Record<SessionId, number>
   /** Client-side log rows appended to a session's feed on model/provider
    * changes (e.g. "Model changed to Claude Sonnet 4.6 Medium"). Not
    * persisted — v1, in-memory only; lost on reload. */
@@ -129,6 +230,14 @@ type AppState = {
   plansBySession: Record<SessionId, import("../lib/types").PlanEntry[]>
   /** Latest full plan markdown per session (from ExitPlanMode tool call input). */
   planDocsBySession: Record<SessionId, string>
+  /** Plan-tab toolbar's model override per session (defaults to the
+   * session's current `selectedModelId` the first time the toolbar reads
+   * it — see `PlanToolbar`). Additive, in-memory only (not persisted). */
+  planBuildModelBySession: Record<SessionId, string>
+  /** Whether the Plan tab's Build button has completed a build turn for a
+   * session's CURRENT plan doc (shows "Built" instead of "Build"). Reset
+   * whenever a new plan doc arrives for that session (see `setPlanDoc`). */
+  planBuiltBySession: Record<SessionId, boolean>
   /** Follow-ups queued while a turn is streaming (flushed on turn complete). */
   messageQueueBySession: Record<SessionId, string[]>
   sidebarSearchOpen: boolean
@@ -195,12 +304,17 @@ type AppState = {
   subagentViewer: { sessionId: SessionId; title: string } | null
   setActiveSessionId: (id: SessionId | null) => void
   setRoute: (route: AppRoute) => void
+  setSettingsSection: (section: SettingsSectionId) => void
   setTheme: (theme: UiTheme) => void
   toggleTheme: () => void
+  setNotificationsEnabled: (enabled: boolean) => void
+  setCompletionSoundEnabled: (enabled: boolean) => void
   setComposerDraft: (draft: string) => void
   getComposerDraft: () => string
   setComposerMode: (mode: ComposerMode) => void
+  setDefaultPermissionMode: (mode: PermissionMode) => void
   setSelectedModelId: (id: string | null) => void
+  setSelectedIsolation: (isolation: IsolationPolicy | null) => void
   setSelectedEffort: (effort: string | null) => void
   /** Set (or clear, with `null`) the effort for one model id. */
   setEffortForModel: (modelId: string, effort: string | null) => void
@@ -211,6 +325,9 @@ type AppState = {
   clearAttachments: () => void
   setIsStreaming: (streaming: boolean) => void
   setSessionStreaming: (sessionId: SessionId, streaming: boolean) => void
+  /** Mark a session's `subscribe_session` IPC call as resolved (or, passing
+   * `false`, clear it on unsubscribe/session teardown). See `subscribedSessions`. */
+  setSessionSubscribed: (sessionId: SessionId, subscribed: boolean) => void
   setLastTurnUsage: (sessionId: SessionId, usage: TokenUsage) => void
   setLastTurnSummary: (sessionId: SessionId, summary: TurnSummary) => void
   addTurnToSessionTotals: (sessionId: SessionId, summary: TurnSummary) => void
@@ -223,6 +340,8 @@ type AppState = {
   clearStreamingForSession: (sessionId: SessionId) => void
   /** Bump the sweep counter for a session — see `sweepRequests`. */
   requestSweep: (sessionId: SessionId) => void
+  /** Bump the resync counter for a session — see `resyncRequests`. */
+  requestResync: (sessionId: SessionId) => void
   /** Append a client-side log row (model/provider change) to a session's feed. */
   addSessionLogRow: (sessionId: SessionId, text: string) => void
   setPendingPermission: (permission: PendingPermission | null) => void
@@ -235,6 +354,10 @@ type AppState = {
     entries: import("../lib/types").PlanEntry[],
   ) => void
   setPlanDoc: (sessionId: SessionId, plan: string) => void
+  /** Set (or clear, with `null`) the Plan tab's build-model override for a session. */
+  setPlanBuildModel: (sessionId: SessionId, modelId: string | null) => void
+  /** Mark (or clear) a session's plan as built — see `planBuiltBySession`. */
+  setPlanBuilt: (sessionId: SessionId, built: boolean) => void
   enqueueMessage: (sessionId: SessionId, text: string) => void
   shiftQueuedMessage: (sessionId: SessionId) => string | null
   removeQueuedMessage: (sessionId: SessionId, index: number) => void
@@ -306,27 +429,36 @@ let toastCounter = 0
 export const useAppStore = create<AppState>((set, get) => ({
   activeSessionId: null,
   route: "welcome",
+  settingsSection: "general",
   theme: "dark",
+  notificationsEnabled: true,
+  completionSoundEnabled: false,
   draftsBySession: {},
   orphanDraft: "",
   composerMode: "agent",
+  defaultPermissionMode: "default",
   selectedModelId: null,
+  selectedIsolation: null,
   selectedEffort: null,
   effortByModel: {},
   attachments: [],
   isStreaming: false,
   streamingSessions: {},
+  subscribedSessions: {},
   lastTurnUsage: {},
   lastTurnSummary: {},
   sessionTotals: {},
   streamingBySession: {},
   sweepRequests: {},
+  resyncRequests: {},
   sessionLogRows: {},
   pendingPermission: null,
   pendingQuestion: null,
   pendingPlanApproval: null,
   plansBySession: {},
   planDocsBySession: {},
+  planBuildModelBySession: {},
+  planBuiltBySession: {},
   messageQueueBySession: {},
   sidebarSearchOpen: false,
   sidebarSearchQuery: "",
@@ -375,7 +507,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Navigating away from chat leaves the panel with nothing sensible to
       // anchor to — close it rather than let it linger off-screen.
       subagentViewer: route === "chat" ? state.subagentViewer : null,
+      // Legacy dedicated routes (settings/customize/automations/memory) now
+      // all mount the same SettingsShell — preselect the nav section that
+      // corresponds to whichever shortcut was clicked, so e.g. the sidebar's
+      // "Memory" button still lands the user on the Memory section.
+      settingsSection:
+        route === "memory"
+          ? "memory"
+          : route === "automations"
+            ? "automations"
+            : route === "customize"
+              ? "tools-mcp"
+              : route === "settings"
+                ? state.settingsSection
+                : state.settingsSection,
     })),
+
+  setSettingsSection: (section) => set({ settingsSection: section }),
 
   setTheme: (theme) => {
     applyThemeToDom(theme)
@@ -386,6 +534,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   toggleTheme: () => {
     const next = get().theme === "dark" ? "light" : "dark"
     get().setTheme(next)
+  },
+
+  setNotificationsEnabled: (enabled) => {
+    set({ notificationsEnabled: enabled })
+    void persistUiState({ notificationsEnabled: enabled })
+  },
+
+  setCompletionSoundEnabled: (enabled) => {
+    set({ completionSoundEnabled: enabled })
+    void persistUiState({ completionSoundEnabled: enabled })
   },
 
   getComposerDraft: () => {
@@ -410,9 +568,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     void persistUiState({ composerMode: mode })
   },
 
+  setDefaultPermissionMode: (mode) => {
+    set({ defaultPermissionMode: mode })
+    void persistUiState({ defaultPermissionMode: mode })
+  },
+
   setSelectedModelId: (id) => {
     set({ selectedModelId: id })
     void persistUiState({ selectedModelId: id })
+  },
+
+  setSelectedIsolation: (isolation) => {
+    set({ selectedIsolation: isolation })
+    void persistUiState({ selectedIsolation: isolation })
   },
 
   setSelectedEffort: (effort) => {
@@ -452,6 +620,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSessionStreaming: (sessionId, streaming) =>
     set((state) => ({
       streamingSessions: { ...state.streamingSessions, [sessionId]: streaming },
+    })),
+
+  setSessionSubscribed: (sessionId, subscribed) =>
+    set((state) => ({
+      subscribedSessions: { ...state.subscribedSessions, [sessionId]: subscribed },
     })),
 
   setLastTurnUsage: (sessionId, usage) =>
@@ -519,6 +692,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     })),
 
+  requestResync: (sessionId) =>
+    set((state) => ({
+      resyncRequests: {
+        ...state.resyncRequests,
+        [sessionId]: (state.resyncRequests[sessionId] ?? 0) + 1,
+      },
+    })),
+
   addSessionLogRow: (sessionId, text) =>
     set((state) => {
       const prev = state.sessionLogRows[sessionId] ?? []
@@ -554,8 +735,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
 
   setPlanDoc: (sessionId, plan) =>
+    set((state) => {
+      // A new plan doc invalidates any prior "Built" status for this
+      // session — the Build button should read "Build" again, not "Built".
+      const prevPlan = state.planDocsBySession[sessionId]
+      const builtReset =
+        prevPlan !== plan && state.planBuiltBySession[sessionId]
+          ? { planBuiltBySession: { ...state.planBuiltBySession, [sessionId]: false } }
+          : null
+      return {
+        planDocsBySession: { ...state.planDocsBySession, [sessionId]: plan },
+        ...builtReset,
+      }
+    }),
+
+  setPlanBuildModel: (sessionId, modelId) =>
+    set((state) => {
+      const next = { ...state.planBuildModelBySession }
+      if (modelId) next[sessionId] = modelId
+      else delete next[sessionId]
+      return { planBuildModelBySession: next }
+    }),
+
+  setPlanBuilt: (sessionId, built) =>
     set((state) => ({
-      planDocsBySession: { ...state.planDocsBySession, [sessionId]: plan },
+      planBuiltBySession: { ...state.planBuiltBySession, [sessionId]: built },
     })),
 
   enqueueMessage: (sessionId, text) => {
@@ -633,7 +837,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setSidebarWidth: (width, persist = true) => {
-    const clamped = clampSidebarWidth(width)
+    const state = get()
+    // Only the wide, side-by-side layout needs the cross-pane clamp — at
+    // narrow/tight the right panel is a full-width overlay, not sharing row
+    // space with the sidebar, so it must not shrink the sidebar's ceiling.
+    const rightPanelVisible = state.viewport === "wide" && state.rightPanelOpen
+    const clamped = clampSidebarWidth(width, state.rightPanelWidth, rightPanelVisible)
     set({ sidebarWidth: clamped })
     if (persist) void persistUiState({ sidebarWidth: clamped })
   },
@@ -661,14 +870,30 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setRightPanelWidth: (width, persist = true) => {
-    const clamped = clampRightPanelWidth(width)
+    const state = get()
+    // Only the wide, side-by-side layout needs the cross-pane clamp — at
+    // narrow/tight the sidebar is a full-width overlay, not sharing row
+    // space with the right panel, so it must not shrink the panel's ceiling.
+    const sidebarVisible = state.viewport === "wide" && !state.sidebarCollapsed
+    const clamped = clampRightPanelWidth(width, state.sidebarWidth, sidebarVisible)
     set({ rightPanelWidth: clamped })
     if (persist) void persistUiState({ rightPanelWidth: clamped })
   },
 
   setViewport: (viewport) => {
     const state = get()
-    if (state.viewport === viewport) return
+    if (state.viewport === viewport) {
+      // Same classification, but the window may still have shrunk within it
+      // (e.g. 1280 -> 1000, both "wide") — re-clamp so a previously-valid
+      // side-by-side layout can't crush the chat column below CHAT_MIN_WIDTH.
+      // Re-entrant through the setters themselves (not the raw clamp helper)
+      // so persistence/state stay in sync exactly like a live sash drag.
+      if (viewport === "wide") {
+        get().setSidebarWidth(state.sidebarWidth)
+        get().setRightPanelWidth(state.rightPanelWidth)
+      }
+      return
+    }
 
     const wasNarrow = state.viewport !== "wide"
     const isNarrow = viewport !== "wide"
@@ -708,6 +933,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (restoreRightPanel !== state.rightPanelOpen) {
         void persistUiState({ rightPanelOpen: restoreRightPanel })
       }
+      // Re-clamp now that both panes may be visible side-by-side again at
+      // "wide" — the persisted widths could have been set while narrow (no
+      // cross-pane constraint applied) or the window could have shrunk while
+      // narrow/tight (whose overlay widths aren't clamped against chat).
+      get().setSidebarWidth(get().sidebarWidth)
+      get().setRightPanelWidth(get().rightPanelWidth)
       return
     }
 
@@ -906,10 +1137,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 type UiPersisted = {
   activeSessionId: SessionId | null
   selectedModelId?: string | null
+  selectedIsolation?: IsolationPolicy | null
   selectedEffort?: string | null
   effortByModel?: Record<string, string>
   composerMode?: ComposerMode
+  defaultPermissionMode?: PermissionMode
   theme?: UiTheme
+  notificationsEnabled?: boolean
+  completionSoundEnabled?: boolean
   recentCwds?: string[]
   sidebarCollapsed?: boolean
   sidebarWidth?: number
@@ -936,7 +1171,7 @@ const ensureStore = async () => {
   await storeReady
 }
 
-const persistUiState = async (partial: Partial<UiPersisted>) => {
+export const persistUiState = async (partial: Partial<UiPersisted>) => {
   try {
     await ensureStore()
     if (!cachedStore) return

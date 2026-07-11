@@ -9,6 +9,7 @@ import {
   isBrowserPreview,
 } from "./browserMock"
 import type {
+  BackgroundProcessDto,
   BrowserStateEvent,
   BuiltinProvider,
   CommandInfoDto,
@@ -66,6 +67,17 @@ export const saveProviderConfig = (
 export const setSecretStorage = (
   mode: SecretStorageMode,
 ): Promise<ProviderConfigView> => invoke("set_secret_storage", { mode })
+
+/** OS platform family (`"macos" | "windows" | "linux" | ...`), via
+ * `@tauri-apps/plugin-os`'s `type()` — gates the Security section's "System
+ * Keychain" option to macOS only (the backend rejects it elsewhere; see
+ * `secrets.rs`). In browser preview (no plugin runtime) this always resolves
+ * to `"macos"` so the option is visible for design review. */
+export const platformType = async (): Promise<string> => {
+  if (isBrowserPreview()) return "macos"
+  const { type } = await import("@tauri-apps/plugin-os")
+  return type()
+}
 
 // Named provider connections ("profiles") — see `src-tauri/src/config.rs`'s
 // "Named provider connections" section for the backend contract.
@@ -132,6 +144,30 @@ export const prompt = (input: PromptCommandInput): Promise<TurnSummary> =>
 
 export const cancel = (sessionId: string): Promise<void> =>
   invoke("cancel", { sessionId })
+
+/** List background processes (started via `Bash`'s `run_in_background`) for
+ * a session — see `background_list` in `src-tauri/src/commands.rs`. */
+export const backgroundList = (
+  sessionId: string,
+): Promise<BackgroundProcessDto[]> => invoke("background_list", { sessionId })
+
+/** Kill one background process by id — see `background_kill` in
+ * `src-tauri/src/commands.rs`. */
+export const backgroundKill = (
+  sessionId: string,
+  processId: string,
+): Promise<void> => invoke("background_kill", { sessionId, processId })
+
+/** Ask a still-running foreground shell call to move to the background (see
+ * `MOVE-TO-BACKGROUND`) — see `background_demote` in
+ * `src-tauri/src/commands.rs`. Resolves `false` (not a rejection) when
+ * there's nothing to do: the call already finished, or the session's
+ * execution backend doesn't support demote — callers should treat that the
+ * same as `true` (silently no visible change) rather than surface an error. */
+export const backgroundDemote = (
+  sessionId: string,
+  callId: string,
+): Promise<boolean> => invoke("background_demote", { sessionId, callId })
 
 export const respondPermission = (input: RespondPermissionInput): Promise<void> =>
   invoke("respond_permission", { input })
@@ -426,3 +462,15 @@ export type UserIdentityDto = {
 
 export const userIdentity = (): Promise<UserIdentityDto> =>
   invoke("user_identity")
+
+/** Writes `content` to `relativePath` inside `sessionId`'s cwd (creating
+ * parent dirs as needed) and returns the absolute path written. The backing
+ * command rejects absolute paths and any `..` segment, and re-verifies the
+ * resolved parent directory is still inside the session's cwd. Used by the
+ * Plan tab's "Save to Workspace" menu item (`PlanToolbar`). */
+export const saveTextFile = (
+  sessionId: string,
+  relativePath: string,
+  content: string,
+): Promise<string> =>
+  invoke("save_text_file", { sessionId, relativePath, content })

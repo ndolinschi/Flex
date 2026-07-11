@@ -1,5 +1,6 @@
 import type { UnlistenFn } from "@tauri-apps/api/event"
 import type {
+  BackgroundProcessDto,
   BrowserStateEvent,
   BuiltinProvider,
   CreateSessionInput,
@@ -65,10 +66,27 @@ let sessions: SessionMeta[] = [
     created_at_ms: now() - 5_000_000,
     updated_at_ms: now() - 4_800_000,
   }),
+  demoSession({
+    id: "preview-session-5",
+    title: "Interrupted question",
+    cwd: "/Users/preview/flex-app",
+    created_at_ms: now() - 8_000_000,
+    updated_at_ms: now() - 6_500_000,
+  }),
 ]
 
 let configured = true
 const eventHandlers = new Set<(event: SessionEvent) => void>()
+/** Demo background-process id seeded per session by the timeline fixture
+ * (`bgCallId` below), so `background_list`/`background_kill` have something
+ * consistent to report. */
+const mockBackgroundIdBySession = new Map<string, string>()
+const mockKilledBackgroundIds = new Set<string>()
+/** Call ids that `background_demote` (see the invoke case below) has flipped
+ * into the background presentation — lets the mock's own timers (which would
+ * otherwise complete the demoted call normally) check and skip re-emitting a
+ * plain "completed" result over top of the demote. */
+const mockDemotedCallIds = new Set<string>()
 
 /** Mutable so `review_undo_file`/`review_keep_file` can plausibly affect the
  * Changes tab in preview — undo removes a file from the list (mirroring the
@@ -890,6 +908,90 @@ const timelineEvents = (sessionId: string): SessionEvent[] => {
     ]
   }
 
+  // Restart-during-AskUserQuestion coverage: replay ends on a dangling
+  // `awaiting_permission` AskUserQuestion tool call with a matching
+  // `question_requested` — no `turn_completed`/`session_error` ever follows,
+  // mirroring an app restart that killed the turn mid-HITL-question. Verifies
+  // the boot-time sweep closes this like any other dangling tool row (no
+  // eternal "Working"), and that the client appends an "interrupted by
+  // restart" meta row instead of leaving a stale, unresolvable question.
+  if (sessionId === "preview-session-5") {
+    return [
+      {
+        session_id: sessionId,
+        seq: 1,
+        ts_ms: ts,
+        payload: {
+          kind: "user_message",
+          message_id: "m-user-5",
+          content: [
+            { type: "markdown", text: "Do on your own decision." },
+          ],
+        },
+      },
+      {
+        session_id: sessionId,
+        seq: 2,
+        ts_ms: ts + 1_000,
+        payload: { kind: "turn_started", turn_id: "turn-5" },
+      },
+      {
+        session_id: sessionId,
+        seq: 3,
+        ts_ms: ts + 2_000,
+        payload: {
+          kind: "tool_call_updated",
+          call: {
+            id: "tool-ask-5",
+            session_id: sessionId,
+            turn_id: "turn-5",
+            message_id: "m-asst-5",
+            tool_name: "AskUserQuestion",
+            input: {
+              questions: [
+                {
+                  header: "Approach",
+                  question: "Which layout should the composer use?",
+                  options: [
+                    { label: "Docked card", description: "Compact, above the composer" },
+                    { label: "Modal", description: "Centered, blocks the chat" },
+                  ],
+                  multi_select: false,
+                  allow_custom: true,
+                },
+              ],
+            },
+            read_only: true,
+            origin: { origin: "model" },
+            status: { state: "awaiting_permission", request_id: "question-5" },
+            timing: { queued_at_ms: ts + 2_000, started_at_ms: ts + 2_000 },
+          },
+        },
+      },
+      {
+        session_id: sessionId,
+        seq: 4,
+        ts_ms: ts + 2_050,
+        payload: {
+          kind: "question_requested",
+          id: "question-5",
+          questions: [
+            {
+              header: "Approach",
+              question: "Which layout should the composer use?",
+              options: [
+                { label: "Docked card", description: "Compact, above the composer" },
+                { label: "Modal", description: "Centered, blocks the chat" },
+              ],
+              multi_select: false,
+              allow_custom: true,
+            },
+          ],
+        },
+      },
+    ]
+  }
+
   return [
     {
       session_id: sessionId,
@@ -1195,6 +1297,34 @@ export const browserInvoke = async <T>(
       return { ok: true } as T
     case "user_identity":
       return { name: "Preview User" } as T
+    case "save_text_file": {
+      // No real filesystem in preview — stash into sessionStorage under a
+      // `<sessionId>::<relativePath>` key so a Save-then-reload round-trips
+      // the same way the browserMock's other seeded stores do (see e.g. the
+      // routines/MCP/memory mocks above), and return a fake absolute path
+      // matching the shape the real command returns (`<cwd>/<relativePath>`).
+      const sessionId = String(args?.sessionId ?? "")
+      const relativePath = String(args?.relativePath ?? "")
+      const content = String(args?.content ?? "")
+      if (!relativePath.trim()) {
+        throw new Error("path is required")
+      }
+      if (
+        relativePath.startsWith("/") ||
+        relativePath.split("/").some((seg) => seg === "..")
+      ) {
+        throw new Error(`path must not escape the session cwd: ${relativePath}`)
+      }
+      const session = sessions.find((s) => s.id === sessionId)
+      const cwd = session?.cwd ?? "/preview/workspace"
+      const key = `flex.saveTextFile.${sessionId}::${relativePath}`
+      try {
+        window.sessionStorage.setItem(key, content)
+      } catch {
+        // sessionStorage can throw (quota, privacy mode) — non-fatal for preview.
+      }
+      return `${cwd}/${relativePath}` as T
+    }
     case "git_is_repo": {
       const cwd = String(args?.cwd ?? "")
       return (cwd !== NON_GIT_DEMO_CWD) as T
@@ -1416,12 +1546,22 @@ export const browserInvoke = async <T>(
           argsHint: "bug",
         },
       ] as T
-    case "is_isolated":
-      return (String(args?.sessionId) === "preview-session-1") as T
-    case "workspace_status":
-      return (String(args?.sessionId) === "preview-session-1"
+    case "is_isolated": {
+      const id = String(args?.sessionId ?? "")
+      const found = sessions.find((s) => s.id === id)
+      // Fall back to the original hardcoded demo session so existing preview
+      // scenarios (e.g. IsolationBadge stories) keep working even though it
+      // predates `base_cwd` being set on demoSession.
+      return (!!found?.base_cwd || id === "preview-session-1") as T
+    }
+    case "workspace_status": {
+      const id = String(args?.sessionId ?? "")
+      const found = sessions.find((s) => s.id === id)
+      const isIsolatedSession = !!found?.base_cwd || id === "preview-session-1"
+      return (isIsolatedSession
         ? { filesChanged: 3, summary: "+82 -15" }
         : null) as T
+    }
     case "integrate_session":
       return { status: "empty" } as T
     case "discard_session":
@@ -1431,11 +1571,20 @@ export const browserInvoke = async <T>(
       return sessions as T
     case "create_session": {
       const input = (args?.input ?? {}) as CreateSessionInput
+      const isIsolatedRequest = input.isolation === "required"
+      const cwd = input.cwd ?? "/Users/preview/project"
       const session = demoSession({
         id: `preview-session-${sessions.length + 1}`,
         title: input.title ?? "New Agent",
-        cwd: input.cwd ?? "/Users/preview/project",
+        cwd,
         model: input.model ?? "anthropic/claude-sonnet-4",
+        isolation: input.isolation,
+        // Mirrors the real engine: an isolated session gets a private
+        // worktree cwd, with `base_cwd` pointing back at the origin repo —
+        // that's what `is_isolated`/`IsolationBadge` key off of.
+        ...(isIsolatedRequest
+          ? { base_cwd: cwd, cwd: `${cwd}/.flex-worktrees/session-${sessions.length + 1}` }
+          : {}),
         created_at_ms: now(),
         updated_at_ms: now(),
       })
@@ -1508,6 +1657,83 @@ export const browserInvoke = async <T>(
       })
       return undefined as T
     }
+    case "background_list": {
+      // Mirrors the demo `bgCall` seeded in the timeline fixture below
+      // (`tool-bg-<ts>`, `npm run dev`) — good enough for the "background
+      // processes" panel to have something to render in the preview. Real
+      // data comes from `EngineService::background_list` in production.
+      const sessionId = String(args?.sessionId ?? "")
+      const killed = mockKilledBackgroundIds.has(sessionId)
+      const entries: BackgroundProcessDto[] = []
+      const bgId = mockBackgroundIdBySession.get(sessionId)
+      if (bgId) {
+        entries.push({
+          process_id: bgId,
+          command: "npm run dev",
+          running: !killed,
+          started_at_ms: now() - 59_000,
+          exit_code: killed ? 0 : null,
+        })
+      }
+      return entries as T
+    }
+    case "background_kill": {
+      const sessionId = String(args?.sessionId ?? "")
+      const processId = String(args?.processId ?? "")
+      mockKilledBackgroundIds.add(sessionId)
+      // Flip the mocked background call's `structured.running` to false and
+      // append the engine's exit-marker chunk, so a manual Stop click in the
+      // preview reaches the same "exited" state the marker alone produces.
+      emit({
+        session_id: sessionId,
+        seq: 102.7,
+        ts_ms: now(),
+        payload: {
+          kind: "exec_chunk",
+          call_id: processId,
+          stream: "stdout",
+          text: "[process exited with code 0]\n",
+        },
+      })
+      return undefined as T
+    }
+    case "background_demote": {
+      // Mock for `MOVE-TO-BACKGROUND`: flips the demo running "cargo build"
+      // shell call (see `shellCallId`/`shellCall` in the timeline fixture
+      // below) into the same background presentation `isDemotedBashCall`
+      // detects for a real engine's demote result — same structured
+      // `{"process_id", "running"}` shape a `run_in_background` start uses,
+      // per the unified detection in `ToolStepGroup`.
+      const sessionId = String(args?.sessionId ?? "")
+      const callId = String(args?.callId ?? "")
+      if (!callId || mockDemotedCallIds.has(callId)) {
+        return false as T
+      }
+      mockDemotedCallIds.add(callId)
+      emit({
+        session_id: sessionId,
+        seq: 102.35,
+        ts_ms: now(),
+        payload: {
+          kind: "tool_call_updated",
+          call: {
+            ...demoShellCall(sessionId, "cargo build", callId),
+            status: { state: "completed" },
+            result: {
+              content: [
+                {
+                  type: "markdown",
+                  text: `Moved to background (process ${callId}). Output so far:\n$ cargo build\n   Compiling desktop v0.1.0\n\n[output continues in the agent terminal; use Bash background_action status/kill with process_id ${callId}]`,
+                },
+              ],
+              is_error: false,
+              structured: { process_id: callId, pid: 5150, running: true, truncated: false },
+            },
+          },
+        },
+      })
+      return true as T
+    }
     case "respond_permission": {
       const input = (args?.input ?? args ?? {}) as {
         sessionId: string
@@ -1547,11 +1773,39 @@ export const browserInvoke = async <T>(
     case "prompt": {
       const input = (args?.input ?? args ?? {}) as PromptCommandInput
       const sessionId = input.sessionId
+      // Mirror the real engine's `AgentError::TurnInProgress` rejection (see
+      // `agentloop_core::agent`) — a second `prompt` for a session that
+      // already has one in flight is rejected, not silently restarted. Lets
+      // the desktop layer's queue-on-rejection recovery path (Composer's
+      // handleSend) be exercised in preview/mock mode too.
+      if (pendingTurns.has(sessionId)) {
+        throw new Error(`a turn is already in progress for session ${sessionId}`)
+      }
+      // Observable hook for preview verification — every prompt logs the
+      // resolved `permissionMode` so Settings → Behavior → Permissions
+      // (`defaultPermissionMode` → `modeToPermission`) can be sanity-checked
+      // without instrumenting the store directly.
+      console.debug("[mock] prompt: permissionMode resolved", {
+        composerMode: input.composerMode,
+        permissionMode: input.permissionMode,
+      })
       const ts = now()
       const turnId = `turn-${ts}`
       const messageId = `m-asst-${ts}`
       const isPlan = input.permissionMode === "plan"
+      if (input.composerMode === "flex") {
+        // Observable hook for preview verification — the Flex mode plumbs an
+        // explicit `composerMode` flag through `prompt()` alongside its
+        // derived `permissionMode: "dont_ask"` (see `ModePicker.tsx`'s
+        // `modeToPermission` and `commands.rs::prompt`'s orchestrator system
+        // prompt). No mock behavior otherwise changes for this mode.
+        console.debug("[mock] prompt: composerMode=flex, permissionMode=dont_ask", {
+          sessionId,
+          permissionMode: input.permissionMode,
+        })
+      }
       const wantsPermission = /\b(permission|allow|approve)\b/i.test(input.text)
+      const wantsQuestion = /\bquestion\b/i.test(input.text)
       const wantsWorkflow = /\bworkflow\b/i.test(input.text)
       const wantsVerify = /\bverif(y|ied|ication)\b/i.test(input.text)
       clearPendingTurn(sessionId)
@@ -1917,6 +2171,37 @@ export const browserInvoke = async <T>(
         )
       }
 
+      if (wantsQuestion) {
+        // Scripted `AskUserQuestion` / `question_requested` trigger — lets
+        // preview verification exercise QuestionPrompt's docked-card layout
+        // the same way `wantsPermission` exercises PermissionPrompt's.
+        timers.push(
+          window.setTimeout(() => {
+            emit({
+              session_id: sessionId,
+              seq: 101.5,
+              ts_ms: now(),
+              payload: {
+                kind: "question_requested",
+                id: `question-${ts}`,
+                questions: [
+                  {
+                    header: "Approach",
+                    question: "Which layout should the composer use?",
+                    options: [
+                      { label: "Docked card", description: "Compact, above the composer" },
+                      { label: "Modal", description: "Centered, blocks the chat" },
+                    ],
+                    multi_select: false,
+                    allow_custom: true,
+                  },
+                ],
+              },
+            })
+          }, 200),
+        )
+      }
+
       timers.push(
         window.setTimeout(() => {
           emit({
@@ -2023,6 +2308,13 @@ export const browserInvoke = async <T>(
         { stream: "stdout", text: "   Compiling desktop v0.1.0\n" },
         { stream: "stdout", text: "   Compiling engine v0.1.0\n" },
         { stream: "stderr", text: "warning: unused import: `foo`\n" },
+        // Real error line — verifies the "N errors in output" badge / "Ask
+        // Agent to fix" action on this (foreground, completed) shell row
+        // (see execErrorScan.ts).
+        {
+          stream: "stderr",
+          text: "error[E0425]: cannot find function `foo` in this scope\n",
+        },
         { stream: "stdout", text: "    Finished dev [unoptimized] target(s)\n" },
         { stream: "stdout", text: "  ➜  Local:   http://localhost:5173/\n" },
       ]
@@ -2046,6 +2338,10 @@ export const browserInvoke = async <T>(
       timers.push(
         window.setTimeout(
           () => {
+            // Skip if `background_demote` already flipped this call — don't
+            // stomp the "Moved to background" result with a plain
+            // "completed" one.
+            if (mockDemotedCallIds.has(shellCallId)) return
             emit({
               session_id: sessionId,
               seq: 102.3,
@@ -2066,6 +2362,96 @@ export const browserInvoke = async <T>(
           },
           1_650 + execLines.length * 150,
         ),
+      )
+
+      // Background-process demo — a `Bash` call started with
+      // `run_in_background: true`, rendering as a distinct row in
+      // ToolStepGroup (see `isBackgroundBashCall`/`BackgroundRow`). Emits the
+      // start call's `tool_call_updated` with `structured.running: true`,
+      // streams a couple of `exec_chunk`s, then appends the engine's
+      // `[process exited with code N]` marker chunk — the row should flip to
+      // "exited" from that marker alone, independent of any further
+      // `tool_call_updated`. `background_kill` (see the invoke case below)
+      // flips `bgRunning` so a manual Stop click also reaches an exited
+      // state without waiting for the marker.
+      const bgCallId = `tool-bg-${ts}`
+      mockBackgroundIdBySession.set(sessionId, bgCallId)
+      const bgCall: ToolCall = {
+        id: bgCallId,
+        session_id: sessionId,
+        turn_id: "turn-1",
+        message_id: "m-asst-1",
+        tool_name: "Bash",
+        input: { command: "npm run dev", run_in_background: true },
+        read_only: false,
+        origin: { origin: "model" },
+        status: { state: "completed" },
+        timing: {
+          queued_at_ms: now() - 60_000,
+          started_at_ms: now() - 59_000,
+          finished_at_ms: now() - 59_000,
+        },
+        result: {
+          content: [
+            {
+              type: "markdown",
+              text: "Started background process tool-bg-1 (pid 4242), now running.",
+            },
+          ],
+          is_error: false,
+          structured: { process_id: bgCallId, pid: 4242, running: true, truncated: false },
+        },
+      }
+      timers.push(
+        window.setTimeout(() => {
+          emit({
+            session_id: sessionId,
+            seq: 102.4,
+            ts_ms: now(),
+            payload: { kind: "tool_call_updated", call: bgCall },
+          })
+        }, 1_700),
+      )
+      const bgLines: { stream: "stdout" | "stderr"; text: string }[] = [
+        { stream: "stdout", text: "> flex-desktop@0.1.0 dev\n" },
+        { stream: "stdout", text: "> vite\n" },
+        { stream: "stdout", text: "  VITE ready in 312 ms\n" },
+        { stream: "stdout", text: "  ➜  Local:   http://localhost:1421/\n" },
+      ]
+      bgLines.forEach((line, i) => {
+        timers.push(
+          window.setTimeout(() => {
+            emit({
+              session_id: sessionId,
+              seq: 102.5 + i * 0.01,
+              ts_ms: now(),
+              payload: {
+                kind: "exec_chunk",
+                call_id: bgCallId,
+                stream: line.stream,
+                text: line.text,
+              },
+            })
+          }, 1_900 + i * 150),
+        )
+      })
+      // Exit marker arrives ~6s later, simulating a dev server that's killed
+      // (or crashes) on its own — the row should flip to "exited" purely
+      // from this chunk landing, with no further `tool_call_updated`.
+      timers.push(
+        window.setTimeout(() => {
+          emit({
+            session_id: sessionId,
+            seq: 102.6,
+            ts_ms: now(),
+            payload: {
+              kind: "exec_chunk",
+              call_id: bgCallId,
+              stream: "stdout",
+              text: "[process exited with code 0]\n",
+            },
+          })
+        }, 6_500),
       )
 
       // Retry-events demo: simulate the engine hitting a dropped connection

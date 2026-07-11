@@ -347,7 +347,18 @@ pub fn resolve_real_providers(
             Ok((providers, ModelRef(format!("{OLLAMA_PROVIDER_ID}/{model}"))))
         }
         BEDROCK_PROVIDER_ID => {
-            let provider = BedrockProvider::from_env();
+            let provider = if let Some(key) = provider_keys.get(BEDROCK_PROVIDER_ID) {
+                // Mirror the other arms: a caller-supplied key wins over the
+                // environment. Region still falls back through
+                // `BedrockConfig::from_env`'s precedence (`BEDROCK_REGION` ->
+                // `AWS_REGION` -> `AWS_DEFAULT_REGION` -> default) so a client
+                // key alone doesn't lose region/model env overrides.
+                let mut config = BedrockConfig::from_env();
+                config.auth = BedrockAuth::Bearer(key.clone());
+                BedrockProvider::new(config)
+            } else {
+                BedrockProvider::from_env()
+            };
             if !provider.has_credentials() {
                 return Err(ProviderError::AuthMissing {
                     provider: ProviderId::from(BEDROCK_PROVIDER_ID),
@@ -488,7 +499,13 @@ pub fn resolve_available_providers(
                 Ok(boxed(provider, model))
             }
             BEDROCK_PROVIDER_ID => {
-                let provider = BedrockProvider::from_env();
+                let provider = if let Some(key) = provider_keys.get(BEDROCK_PROVIDER_ID) {
+                    let mut config = BedrockConfig::from_env();
+                    config.auth = BedrockAuth::Bearer(key.clone());
+                    BedrockProvider::new(config)
+                } else {
+                    BedrockProvider::from_env()
+                };
                 let model = provider.default_model().to_owned();
                 Ok(boxed(provider, model))
             }
@@ -677,6 +694,62 @@ mod tests {
             providers
                 .get(&ProviderId::from(BEDROCK_PROVIDER_ID))
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn bedrock_client_key_wins_over_missing_env_in_single_provider_resolver() {
+        // Root-cause regression: a caller-supplied Bedrock key must resolve
+        // even when no Bedrock env vars are set at all — previously this arm
+        // called `BedrockProvider::from_env()` unconditionally and returned
+        // `AuthMissing` before ever looking at `provider_keys`.
+        let keys = std::collections::BTreeMap::from([(
+            BEDROCK_PROVIDER_ID.to_owned(),
+            "bedrock-api-key".to_owned(),
+        )]);
+        let (providers, model) =
+            match resolve_real_providers(Some(BEDROCK_PROVIDER_ID), None, &[], &keys) {
+                Ok(resolved) => resolved,
+                Err(err) => panic!("client-supplied bedrock key must resolve: {err}"),
+            };
+        assert!(model.0.starts_with("bedrock/"));
+        assert!(
+            providers
+                .get(&ProviderId::from(BEDROCK_PROVIDER_ID))
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn bedrock_without_key_or_env_is_auth_missing_in_single_provider_resolver() {
+        let err = match resolve_real_providers(Some(BEDROCK_PROVIDER_ID), None, &[], &no_keys()) {
+            Ok(_) => panic!("bedrock without any credentials must not resolve"),
+            Err(err) => err,
+        };
+        assert_eq!(err.to_engine_error().code, ErrorCode::AuthMissing);
+    }
+
+    #[test]
+    fn bedrock_client_key_wins_over_missing_env_in_multi_resolver() {
+        let keys = std::collections::BTreeMap::from([(
+            BEDROCK_PROVIDER_ID.to_owned(),
+            "bedrock-api-key".to_owned(),
+        )]);
+        let (providers, model) =
+            match resolve_available_providers(Some(BEDROCK_PROVIDER_ID), None, &[], &keys) {
+                Ok(resolved) => resolved,
+                Err(err) => panic!("client-supplied bedrock key must resolve: {err}"),
+            };
+        assert!(
+            providers
+                .get(&ProviderId::from(BEDROCK_PROVIDER_ID))
+                .is_some()
+        );
+        assert!(
+            model
+                .expect("bedrock resolves a model")
+                .0
+                .starts_with("bedrock/")
         );
     }
 

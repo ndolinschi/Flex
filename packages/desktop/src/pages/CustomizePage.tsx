@@ -2,9 +2,17 @@ import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { BookOpen, Check, Globe, Plug, Plus, ShieldCheck, Trash2 } from "lucide-react"
 import { Badge, Button, Spinner, TextArea, TextInput } from "../components/atoms"
-import { ConfirmDialog, ErrorBanner, FieldRow, SettingsSection } from "../components/molecules"
-import { SettingsShell } from "../components/templates"
+import {
+  ConfirmDialog,
+  ErrorBanner,
+  FieldRow,
+  McpCatalogCard,
+  McpInstallDialog,
+  SettingsSection,
+} from "../components/molecules"
 import { useProviderConfig } from "../hooks/useProviderConfig"
+import { useAppStore } from "../stores/appStore"
+import { MCP_CATALOG, type McpCatalogEntry } from "../lib/mcpCatalog"
 import { mcpList, mcpRemove, mcpTest, mcpUpsert, toInvokeError } from "../lib/tauri"
 import type { McpServerDto, PluginPrefs } from "../lib/types"
 import { cn } from "../lib/utils"
@@ -312,6 +320,134 @@ const McpServerRow = ({ server }: { server: McpServerDto }) => {
   )
 }
 
+/** Assembles an `McpServerDto` for a catalog entry from the install
+ * dialog's collected values — positional `argKeys` values are appended
+ * after the entry's literal `args` (e.g. filesystem's path, postgres's
+ * connection string), and `envKeys` values become the `env` map. */
+const buildCatalogServerDto = (
+  entry: McpCatalogEntry,
+  values: { args: Record<string, string>; env: Record<string, string> },
+): McpServerDto => ({
+  id: entry.id,
+  command: entry.command,
+  args: [
+    ...entry.args,
+    ...entry.argKeys.map((a) => values.args[a.key]?.trim() ?? "").filter(Boolean),
+  ],
+  env: Object.fromEntries(
+    entry.envKeys
+      .map((e) => [e.name, values.env[e.name]?.trim() ?? ""] as const)
+      .filter(([, v]) => v.length > 0),
+  ),
+  enabled: true,
+})
+
+/** Curated "Browse catalog" grid of popular MCP servers, additive above the
+ * manual add-server flow below. Cards with no required args/env install
+ * directly; cards that need them (a path, a token, a connection string)
+ * open `McpInstallDialog` first. Installed-state badge is matched against
+ * live `mcp_list` results by id, so re-opening Settings after install shows
+ * "Installed" even without a page refresh (react-query cache). */
+const McpCatalogSection = () => {
+  const queryClient = useQueryClient()
+  const pushToast = useAppStore((s) => s.pushToast)
+  const [query, setQuery] = useState("")
+  const [pendingEntry, setPendingEntry] = useState<McpCatalogEntry | null>(null)
+  const [dialogError, setDialogError] = useState<string | null>(null)
+
+  const serversQuery = useQuery({
+    queryKey: MCP_SERVERS_KEY,
+    queryFn: mcpList,
+  })
+  const installedIds = useMemo(
+    () => new Set((serversQuery.data ?? EMPTY_MCP_SERVERS).map((s) => s.id)),
+    [serversQuery.data],
+  )
+
+  const installMutation = useMutation({
+    mutationFn: (dto: McpServerDto) => mcpUpsert(dto),
+    onSuccess: (_data, dto) => {
+      void queryClient.invalidateQueries({ queryKey: MCP_SERVERS_KEY })
+      pushToast(`${dto.id} installed`, "success")
+      setPendingEntry(null)
+      setDialogError(null)
+    },
+    onError: (err) => {
+      pushToast(toInvokeError(err), "error")
+      setDialogError(toInvokeError(err))
+    },
+  })
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return MCP_CATALOG
+    return MCP_CATALOG.filter(
+      (entry) =>
+        entry.name.toLowerCase().includes(q) ||
+        entry.description.toLowerCase().includes(q) ||
+        entry.id.toLowerCase().includes(q),
+    )
+  }, [query])
+
+  const handleInstall = (entry: McpCatalogEntry) => {
+    if (entry.argKeys.length === 0 && entry.envKeys.length === 0) {
+      installMutation.mutate(buildCatalogServerDto(entry, { args: {}, env: {} }))
+      return
+    }
+    setDialogError(null)
+    setPendingEntry(entry)
+  }
+
+  return (
+    <>
+      <SettingsSection
+        title="Browse catalog"
+        description="One-click install for popular MCP servers."
+        rowId="tools-mcp-catalog"
+        actions={
+          <TextInput
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search catalog…"
+            aria-label="Search MCP catalog"
+            className="w-56"
+          />
+        }
+      >
+        {visible.length === 0 ? (
+          <p className="p-8 text-center text-sm text-ink-muted">
+            No catalog servers match “{query}”.
+          </p>
+        ) : (
+          visible.map((entry) => (
+            <McpCatalogCard
+              key={entry.id}
+              entry={entry}
+              installed={installedIds.has(entry.id)}
+              installing={installMutation.isPending && installMutation.variables?.id === entry.id}
+              onInstall={handleInstall}
+            />
+          ))
+        )}
+      </SettingsSection>
+
+      <McpInstallDialog
+        entry={pendingEntry}
+        isLoading={installMutation.isPending}
+        error={dialogError}
+        onCancel={() => {
+          setPendingEntry(null)
+          setDialogError(null)
+        }}
+        onInstall={(values) => {
+          if (!pendingEntry) return
+          installMutation.mutate(buildCatalogServerDto(pendingEntry, values))
+        }}
+      />
+    </>
+  )
+}
+
 /** MCP (Model Context Protocol) server management — stdio servers whose
  * tools get bridged into the tool registry on the next service rebuild.
  * Structured like AutomationsPage (list + inline add-form + per-row
@@ -333,6 +469,7 @@ const McpServersSection = () => {
       <SettingsSection
         title="MCP servers"
         description="Tools from stdio MCP servers. Restart sessions to pick up new or changed servers."
+        rowId="tools-mcp-servers"
         actions={
           !creating ? (
             <Button size="sm" onClick={() => setCreating(true)}>
@@ -369,12 +506,13 @@ const McpServersSection = () => {
   )
 }
 
-type CustomizePageProps = {
-  embedded?: boolean
-}
-
-/** Customize view: searchable plugin cards with Add / Added. */
-export const CustomizePage = ({ embedded = false }: CustomizePageProps) => {
+/** Customize content: searchable plugin cards with Add / Added, plus the MCP
+ * servers list. Mounted inside the Settings shell's "Tools & MCP" section
+ * (design-map/07-settings.md build brief §3) — the standalone Customize
+ * route/page is gone; `App.tsx` now renders the unified settings shell for
+ * all of settings/customize/automations/memory. No `SettingsShell` wrapper
+ * here anymore since the shell itself owns nav+header. */
+export const CustomizeContent = () => {
   const { config, isLoading, save } = useProviderConfig()
   const [query, setQuery] = useState("")
   const [busyKey, setBusyKey] = useState<PluginKey | null>(null)
@@ -428,13 +566,13 @@ export const CustomizePage = ({ embedded = false }: CustomizePageProps) => {
   )
 
   return (
-    <SettingsShell title="Customize" wide embedded={embedded}>
       <div className="flex flex-col gap-4">
         {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}
 
         <SettingsSection
           title="Engine plugins"
           description="Native tool bundles the engine can load into a session."
+          rowId="tools-plugins"
           actions={searchInput}
         >
           {isLoading || !plugins ? (
@@ -494,8 +632,8 @@ export const CustomizePage = ({ embedded = false }: CustomizePageProps) => {
           )}
         </SettingsSection>
 
+        <McpCatalogSection />
         <McpServersSection />
       </div>
-    </SettingsShell>
   )
 }

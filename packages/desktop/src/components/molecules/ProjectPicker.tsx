@@ -39,6 +39,7 @@ export const ProjectPicker = ({
   const setActiveSessionId = useAppStore((s) => s.setActiveSessionId)
   const setRoute = useAppStore((s) => s.setRoute)
   const selectedModelId = useAppStore((s) => s.selectedModelId)
+  const selectedIsolation = useAppStore((s) => s.selectedIsolation)
 
   const label = cwd ? basename(cwd) : "Project"
 
@@ -92,6 +93,7 @@ export const ProjectPicker = ({
           title: DEFAULT_SESSION_TITLE,
           cwd: nextCwd,
           model: selectedModelId ?? undefined,
+          ...(selectedIsolation ? { isolation: selectedIsolation } : {}),
         })
         await queryClient.invalidateQueries({ queryKey: ["sessions"] })
         setActiveSessionId(meta.id)

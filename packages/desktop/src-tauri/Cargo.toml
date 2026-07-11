@@ -19,6 +19,8 @@ tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-window-state = "2"
+# Platform detection for the Security section's macOS-only Keychain option.
+tauri-plugin-os = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Reads MCP server configs (~/.config/agentloop/mcp/*.toml) synchronously at

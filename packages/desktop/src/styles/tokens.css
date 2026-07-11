@@ -50,6 +50,14 @@
   --color-send: #eef2fa;
   --color-send-fg: #0c0e11;
 
+  /* Settings shell (design-map/07-settings.md) — panel-tier card background
+     (reference `--cursor-bg-quinary`, one step past --color-panel/elevated;
+     we don't have a fifth surface tier, so this adds one scoped to Settings
+     group cards rather than overloading --color-elevated everywhere). */
+  --color-settings-card: rgb(255 255 255 / 0.035);
+  /* Toggle ON track — reference default is GREEN, not accent-blue (§5). */
+  --color-switch-on: #3fa266;
+
   /* Elevation — dark drops onto near-black, so shadows stay dark. */
   --shadow-color: rgb(0 0 0 / 0.45);
   --shadow-ambient: rgb(0 0 0 / 0.22);
@@ -102,6 +110,10 @@
   --color-code-inline: rgb(20 20 20 / 0.06);
   --color-send: #141414;
   --color-send-fg: #f8f8f8;
+
+  /* Settings shell (design-map/07-settings.md) — see dark theme comment. */
+  --color-settings-card: rgb(20 20 20 / 0.03);
+  --color-switch-on: #00854c;
 
   /* Elevation — light surfaces need a soft, low-alpha shadow, not near-black. */
   --shadow-color: rgb(20 20 20 / 0.14);

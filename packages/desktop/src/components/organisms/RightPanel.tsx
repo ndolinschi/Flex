@@ -18,17 +18,20 @@ import {
   X,
   XCircle,
 } from "lucide-react"
-import { Button, IconButton, RunningDot, ScrollArea, Spinner } from "../atoms"
+import { Button, IconButton, ScrollArea, Spinner } from "../atoms"
 import {
   Collapsible,
   ConfirmDialog,
   DiffView,
   MarkdownBody,
-  PlanBuildBar,
   PlanStatusIcon,
+  PlanToolbar,
   VerdictBadge,
+  type PlanBuildStatus,
 } from "../molecules"
 import { usePlanBuild } from "../../hooks/usePlanBuild"
+import { usePlanFind } from "../../hooks/usePlanFind"
+import { useModels } from "../../hooks/useModels"
 import { useSessionEvents } from "../../hooks/useSessionEvents"
 import { useSessions } from "../../hooks/useSessions"
 import {
@@ -45,6 +48,7 @@ import {
   reviewFileDiff,
   reviewKeepFile,
   reviewUndoFile,
+  saveTextFile,
   toInvokeError,
 } from "../../lib/tauri"
 import type { GitFileStatus, PlanEntry, SessionMeta } from "../../lib/types"
@@ -75,6 +79,24 @@ const RIGHT_PANEL_DEFAULT_WIDTH = 380
 
 /* ── Plan tab ─────────────────────────────────────────────────────────── */
 
+/** First Markdown heading (`# `/`## `/…) in the plan doc, sans `#`s — used
+ * as the toolbar breadcrumb's leaf when present, falling back to the
+ * session title. Plain string scan (not a markdown parse) is enough since
+ * we only need the FIRST heading line. */
+const firstHeading = (doc: string | undefined): string | null => {
+  if (!doc) return null
+  const match = /^#{1,6}\s+(.+)$/m.exec(doc)
+  return match ? match[1].trim() : null
+}
+
+/** Slugifies a title for `save_text_file`'s filename (see `handleSaveToWorkspace`). */
+const slugify = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "plan"
+
 const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
   const entries = useAppStore((s) =>
     active ? (s.plansBySession[active.id] ?? EMPTY_ENTRIES) : EMPTY_ENTRIES,
@@ -84,12 +106,20 @@ const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
   )
   const pendingPlanApproval = useAppStore((s) => s.pendingPlanApproval)
   const setPendingPlanApproval = useAppStore((s) => s.setPendingPlanApproval)
-  const setComposerMode = useAppStore((s) => s.setComposerMode)
-  const setComposerDraft = useAppStore((s) => s.setComposerDraft)
   const composerMode = useAppStore((s) => s.composerMode)
   const isStreaming = useAppStore((s) =>
     active ? !!s.streamingSessions[active.id] || s.isStreaming : false,
   )
+  const selectedModelId = useAppStore((s) => s.selectedModelId)
+  const planBuildModel = useAppStore((s) =>
+    active ? s.planBuildModelBySession[active.id] : undefined,
+  )
+  const setPlanBuildModel = useAppStore((s) => s.setPlanBuildModel)
+  const planBuilt = useAppStore((s) =>
+    active ? !!s.planBuiltBySession[active.id] : false,
+  )
+  const pushToast = useAppStore((s) => s.pushToast)
+  const { models, builtinProviders, isLoading: modelsLoading } = useModels()
   const { buildPlan, isBuilding } = usePlanBuild()
   // Latest `Verify` call's verdict for this session, if any — verification
   // only ever appears in `run_goal`/routine runs (GoalSpec.require_verification),
@@ -103,6 +133,30 @@ const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     return undefined
   }, [rows])
 
+  const planBodyRef = useRef<HTMLDivElement>(null)
+  const [findOpen, setFindOpen] = useState(false)
+  const [findQuery, setFindQuery] = useState("")
+  const { matchCount, activeIndex, next, prev } = usePlanFind(
+    planBodyRef,
+    findQuery,
+    findOpen,
+  )
+
+  // ⌘F while the Plan tab is visible opens Find-in-Plan instead of any
+  // browser/global search — scoped via this component's own mount lifetime
+  // (RightPanel only mounts PlanTab while its tab is selected).
+  useEffect(() => {
+    if (!planDoc) return
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault()
+        setFindOpen(true)
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [planDoc])
+
   const awaitingApproval =
     !!active &&
     !!pendingPlanApproval &&
@@ -114,22 +168,31 @@ const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
 
   const handleBuild = () => {
     if (!active) return
-    void buildPlan(active.id)
+    void buildPlan(active.id, planBuildModel ?? selectedModelId ?? undefined)
   }
 
-  // Reuses the exact behavior of the old PlanApprovalCard overlay: leave plan
-  // mode, seed the draft, then dispatch a synthetic Cmd+Enter at the composer
-  // so the existing send path (not a second code path) fires the turn.
-  const handleApprove = () => {
-    setPendingPlanApproval(null)
-    setComposerMode("agent")
-    setComposerDraft("Approved — implement the plan.")
-    requestAnimationFrame(() => {
-      const el = document.querySelector<HTMLTextAreaElement>("[data-composer]")
-      el?.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true }),
-      )
-    })
+  const handleCopyMarkdown = () => {
+    if (!planDoc) return
+    void navigator.clipboard
+      .writeText(planDoc)
+      .then(() => pushToast("Copied plan as Markdown", "success"))
+      .catch(() => pushToast("Couldn't copy plan", "error"))
+  }
+
+  // Writes the plan doc to `plans/<slug>-<date>.md` inside the session's
+  // cwd via the `save_text_file` command (path-inside-cwd validated
+  // server-side — see src-tauri/src/commands.rs).
+  const handleSaveToWorkspace = () => {
+    if (!active || !planDoc) return
+    const date = new Date().toISOString().slice(0, 10)
+    const relativePath = `plans/${slugify(title)}-${date}.md`
+    void saveTextFile(active.id, relativePath, planDoc)
+      .then((absolutePath) => {
+        pushToast(`Saved plan to ${absolutePath}`, "success")
+      })
+      .catch((err) => {
+        pushToast(`Couldn't save plan: ${toInvokeError(err)}`, "error")
+      })
   }
 
   if (!active || (entries.length === 0 && !planDoc)) {
@@ -144,56 +207,62 @@ const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
 
   const done = entries.filter((e) => e.status === "completed").length
   const running = entries.some((e) => e.status === "in_progress")
-  const built = entries.length > 0 && done === entries.length
+  const todosBuilt = entries.length > 0 && done === entries.length
   // design: Build once a plan exists and work hasn't started yet.
   const canBuild =
     !!planDoc &&
-    !built &&
+    !todosBuilt &&
     !running &&
     !isStreaming &&
     (awaitingApproval || composerMode === "plan")
 
+  // "building" is ONLY the Build button's own in-flight turn (`isBuilding`,
+  // from `usePlanBuild`) — the plan checklist's own `running` to-dos (drafting
+  // the plan itself) are a different concept and must not show "Building…".
+  const status: PlanBuildStatus = isBuilding
+    ? "building"
+    : planBuilt || todosBuilt
+      ? "built"
+      : canBuild || awaitingApproval
+        ? "ready"
+        : "draft"
+
+  const title = firstHeading(planDoc) ?? sessionLabel(active)
+
   return (
     <>
-      <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-stroke-3 px-3 text-sm">
-        <span className="min-w-0 truncate text-ink-muted">
-          {basename(active.cwd || "~")}
-        </span>
-        <span className="text-ink-faint">›</span>
-        <span className="text-ink-muted">Plans</span>
-        <span className="text-ink-faint">›</span>
-        <span className="min-w-0 truncate text-ink-secondary">
-          {sessionLabel(active)}
-        </span>
-        <span className="ml-auto flex shrink-0 items-center gap-1">
-          {awaitingApproval || canBuild ? (
-            <span className="text-ink-secondary">Ready for review</span>
-          ) : built ? (
-            <span className="flex items-center gap-1 text-yellow">
-              <Check className="h-3 w-3" aria-hidden /> Built
-            </span>
-          ) : running ? (
-            <span className="flex items-center gap-1 text-ink-secondary">
-              <RunningDot className="h-4 w-4" /> In progress
-            </span>
-          ) : (
-            <span className="text-ink-muted">Draft</span>
-          )}
-        </span>
-      </div>
+      <PlanToolbar
+        repo={basename(active.cwd || "~")}
+        title={title}
+        models={models}
+        builtinProviders={builtinProviders}
+        modelId={planBuildModel ?? selectedModelId}
+        onModelChange={(id) => active && setPlanBuildModel(active.id, id)}
+        modelsLoading={modelsLoading}
+        status={status}
+        onBuild={handleBuild}
+        onKeepPlanning={handleKeepPlanning}
+        showKeepPlanning={awaitingApproval}
+        onCopyMarkdown={handleCopyMarkdown}
+        find={
+          planDoc
+            ? {
+                query: findQuery,
+                onQueryChange: setFindQuery,
+                matchCount,
+                activeIndex,
+                onNext: next,
+                onPrev: prev,
+                open: findOpen,
+                onOpenChange: setFindOpen,
+              }
+            : null
+        }
+        onSaveToWorkspace={handleSaveToWorkspace}
+      />
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto w-full max-w-[800px] px-6 pb-16 pt-8">
-          {awaitingApproval ? (
-            <div className="mb-4 flex items-center justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={handleKeepPlanning}>
-                Keep planning
-              </Button>
-              <Button variant="primary" size="sm" onClick={handleApprove}>
-                Approve &amp; build
-              </Button>
-            </div>
-          ) : null}
           <h1 className="text-[22px] font-semibold leading-7 text-ink">
             {sessionLabel(active)}
           </h1>
@@ -204,7 +273,7 @@ const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
           ) : null}
 
           {planDoc ? (
-            <div className="mt-5">
+            <div ref={planBodyRef} className="mt-5">
               <MarkdownBody content={planDoc} />
             </div>
           ) : null}
@@ -260,10 +329,6 @@ const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
           ) : null}
         </div>
       </ScrollArea>
-
-      {canBuild && !awaitingApproval ? (
-        <PlanBuildBar onBuild={handleBuild} isBuilding={isBuilding} />
-      ) : null}
     </>
   )
 }

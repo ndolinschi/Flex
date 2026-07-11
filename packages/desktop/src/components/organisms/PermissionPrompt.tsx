@@ -16,6 +16,18 @@ type PermissionPromptProps = {
   permission: PendingPermission
 }
 
+/** Engine sends `title` pre-formatted as "Allow `ToolName`?" (see
+ * packages/engine/crates/loop/src/turn/tool_exec.rs). Split out the
+ * backticked tool name so it renders in code style; anything that doesn't
+ * match (e.g. the browser mock's plain "Allow Bash?") just renders as-is. */
+const splitTitle = (
+  title: string,
+): { prefix: string; tool: string; suffix: string } | null => {
+  const match = /^(.*?)`([^`]+)`(.*)$/.exec(title)
+  if (!match) return null
+  return { prefix: match[1], tool: match[2], suffix: match[3] }
+}
+
 /** Prefer a short human line over raw JSON blobs in the detail field. */
 const formatDetail = (detail?: string): string | null => {
   if (!detail?.trim()) return null
@@ -45,6 +57,7 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const detail = formatDetail(permission.detail)
+  const titleParts = splitTitle(permission.title)
 
   const handleDecision = async (decision: string) => {
     setError(null)
@@ -82,9 +95,9 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
     <div
       role="dialog"
       aria-labelledby="permission-title"
-      className="w-full max-w-lg animate-modal-in"
+      className="w-full max-w-[640px] animate-tray-in"
     >
-      <div className="relative rounded-xl bg-panel p-3 shadow-lg">
+      <div className="relative rounded-xl border border-stroke-3 bg-panel p-3 shadow-lg">
         <IconButton
           label="Dismiss"
           onClick={handleDismiss}
@@ -93,12 +106,28 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
           <X className="h-3.5 w-3.5" aria-hidden />
         </IconButton>
         <h3 id="permission-title" className="pr-6 text-sm font-semibold text-ink">
-          {permission.title}
+          {titleParts ? (
+            <>
+              {titleParts.prefix}
+              <code className="rounded bg-fill-4 px-1 py-0.5 font-mono text-sm">
+                {titleParts.tool}
+              </code>
+              {titleParts.suffix}
+            </>
+          ) : (
+            permission.title
+          )}
         </h3>
         {detail ? (
-          <p className="mt-1.5 rounded-md bg-fill-4 px-2.5 py-1.5 font-mono text-sm text-ink-secondary">
-            {detail}
-          </p>
+          <div className="relative mt-1.5 max-h-24 overflow-hidden rounded-md bg-fill-4">
+            <p className="whitespace-pre-wrap break-words px-2.5 py-1.5 font-mono text-sm text-ink-secondary">
+              {detail}
+            </p>
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-fill-4 to-transparent"
+              aria-hidden
+            />
+          </div>
         ) : null}
 
         {error ? (
@@ -107,7 +136,7 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
           </div>
         ) : null}
 
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        <div className="mt-3 flex items-center gap-1.5">
           {permission.options.includes("allow_once") ? (
             <Button
               size="sm"
@@ -130,9 +159,10 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
           {permission.options.includes("deny") ? (
             <Button
               size="sm"
-              variant="danger"
+              variant="ghost"
               isLoading={isSubmitting}
               onClick={() => void handleDecision("deny")}
+              className="ml-auto text-danger hover:bg-danger/10"
             >
               Deny
             </Button>

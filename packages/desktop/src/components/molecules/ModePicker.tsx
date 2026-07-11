@@ -4,10 +4,12 @@ import {
   ChevronDown,
   ListTodo,
   MessageCircle,
+  Network,
   Sparkles,
 } from "lucide-react"
-import type { ComposerMode } from "../../lib/types"
+import type { ComposerMode, PermissionMode } from "../../lib/types"
 import { cn } from "../../lib/utils"
+import { useAppStore } from "../../stores/appStore"
 import { PopoverItem, PopoverTray } from "./PopoverTray"
 
 type ModeOption = {
@@ -39,6 +41,13 @@ const MODES: ModeOption[] = [
     description: "Questions without making changes",
     icon: MessageCircle,
     accent: "text-cyan",
+  },
+  {
+    id: "flex",
+    label: "Flex",
+    description: "Orchestrates planning, review, and isolated workers across models",
+    icon: Network,
+    accent: "text-purple",
   },
 ]
 
@@ -125,17 +134,24 @@ export const modePlaceholder = (mode: ComposerMode, isHero: boolean): string => 
   if (!isHero) {
     if (mode === "plan") return "Refine the plan…"
     if (mode === "ask") return "Ask a follow-up…"
+    if (mode === "flex") return "Direct the orchestrator…"
     return "Send follow-up"
   }
   if (mode === "plan") return "Plan and design before coding…"
   if (mode === "ask") return "Ask questions without making changes…"
+  if (mode === "flex") return "Describe the task — Flex plans, reviews, and executes it…"
   return "Plan, search, build anything"
 }
 
-export const modeToPermission = (
-  mode: ComposerMode,
-): "default" | "plan" | "dont_ask" => {
+/** Agent mode defers to the user's configured default (Settings → Behavior →
+ * Permissions, `appStore.defaultPermissionMode`) — read live via
+ * `getState()` since this is a plain function, not a component/hook, and
+ * callers (Composer.tsx, usePlanBuild.ts) invoke it at turn-submit time, not
+ * render time. Plan/Ask/Flex keep their own fixed safeguards regardless of
+ * that setting. */
+export const modeToPermission = (mode: ComposerMode): PermissionMode => {
   if (mode === "plan") return "plan"
   if (mode === "ask") return "dont_ask"
-  return "default"
+  if (mode === "flex") return "dont_ask"
+  return useAppStore.getState().defaultPermissionMode
 }

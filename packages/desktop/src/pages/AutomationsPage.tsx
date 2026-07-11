@@ -10,7 +10,6 @@ import {
   ModelSelect,
   SettingsSection,
 } from "../components/molecules"
-import { SettingsShell } from "../components/templates"
 import { useModels } from "../hooks/useModels"
 import { humanizeCron } from "../lib/cron"
 import {
@@ -52,10 +51,6 @@ const TriggerSummary = ({ trigger }: { trigger: RoutineTriggerDto }) => {
       POST {trigger.path ?? ""}
     </span>
   )
-}
-
-type AutomationsPageProps = {
-  embedded?: boolean
 }
 
 type FormState = {
@@ -401,8 +396,11 @@ const RoutineRow = ({ routine }: { routine: RoutineDto }) => {
   )
 }
 
-/** Automations list — scheduled/webhook-triggered routines (cron/webhook run_goal). */
-export const AutomationsPage = ({ embedded = false }: AutomationsPageProps) => {
+/** Automations content — scheduled/webhook-triggered routines (cron/webhook
+ * run_goal). Mounted inside the Settings shell's "Automations" section
+ * (design-map/07-settings.md build brief §3); no `SettingsShell` wrapper
+ * here anymore since the shell owns nav+header+page title. */
+export const AutomationsContent = () => {
   const [creating, setCreating] = useState(false)
   const queryClient = useQueryClient()
 
@@ -420,44 +418,44 @@ export const AutomationsPage = ({ embedded = false }: AutomationsPageProps) => {
   )
 
   return (
-    <SettingsShell title="Automations" wide embedded={embedded}>
-      <div className="flex flex-col gap-4">
-        <SettingsSection
-          title="Routines"
-          description="Run on a schedule or webhook and start a new session automatically"
-          actions={!creating ? newAutomationButton : undefined}
-        >
-          {routinesQuery.isLoading ? (
-            <div className="flex items-center gap-2 p-3 text-sm text-ink-muted">
-              <Spinner size="sm" /> Loading automations…
-            </div>
-          ) : routinesQuery.isError ? (
-            <div className="p-3">
-              <ErrorBanner message={toInvokeError(routinesQuery.error)} />
-            </div>
-          ) : routines.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-              <p className="text-[13px] text-ink-secondary">No automations yet</p>
-              <p className="text-xs text-ink-faint">
-                Create an automation to run a prompt on a schedule or webhook.
-              </p>
-              {newAutomationButton}
-            </div>
-          ) : (
-            routines.map((routine) => <RoutineRow key={routine.id} routine={routine} />)
-          )}
-        </SettingsSection>
+    <div className="flex flex-col gap-4">
+      <SettingsSection
+        title="Routines"
+        description="Run on a schedule or webhook and start a new session automatically"
+        actions={!creating ? newAutomationButton : undefined}
+        className="mb-0"
+        rowId="automations-routines"
+      >
+        {routinesQuery.isLoading ? (
+          <div className="flex items-center gap-2 p-3 text-sm text-ink-muted">
+            <Spinner size="sm" /> Loading automations…
+          </div>
+        ) : routinesQuery.isError ? (
+          <div className="p-3">
+            <ErrorBanner message={toInvokeError(routinesQuery.error)} />
+          </div>
+        ) : routines.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+            <p className="text-[13px] text-ink-secondary">No automations yet</p>
+            <p className="text-xs text-ink-faint">
+              Create an automation to run a prompt on a schedule or webhook.
+            </p>
+            {newAutomationButton}
+          </div>
+        ) : (
+          routines.map((routine) => <RoutineRow key={routine.id} routine={routine} />)
+        )}
+      </SettingsSection>
 
-        {creating ? (
-          <CreateRoutineForm
-            onCancel={() => setCreating(false)}
-            onSaved={() => {
-              setCreating(false)
-              void queryClient.invalidateQueries({ queryKey: ROUTINES_KEY })
-            }}
-          />
-        ) : null}
-      </div>
-    </SettingsShell>
+      {creating ? (
+        <CreateRoutineForm
+          onCancel={() => setCreating(false)}
+          onSaved={() => {
+            setCreating(false)
+            void queryClient.invalidateQueries({ queryKey: ROUTINES_KEY })
+          }}
+        />
+      ) : null}
+    </div>
   )
 }

@@ -52,6 +52,29 @@ fn default_cwd() -> String {
         .unwrap_or_else(|| "/".to_owned())
 }
 
+/// Per-OS default shell binary for `terminal_create`, mirroring what each
+/// platform's own terminal apps default to: `$SHELL` (falling back to
+/// `/bin/zsh`, macOS's default login shell since Catalina) on macOS,
+/// `$SHELL` (falling back to `/bin/bash`) on Linux, and `powershell.exe` on
+/// Windows (`$SHELL` isn't a Windows convention). `portable-pty`'s
+/// `CommandBuilder::new_default_prog()` already does something close to this
+/// internally (`$SHELL`/`COMSPEC`), but doesn't expose the exact fallback
+/// chain the product wants here, so it's spelled out explicitly.
+#[cfg(target_os = "macos")]
+fn default_shell() -> String {
+    std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_owned())
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn default_shell() -> String {
+    std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_owned())
+}
+
+#[cfg(windows)]
+fn default_shell() -> String {
+    "powershell.exe".to_owned()
+}
+
 #[tauri::command]
 pub async fn terminal_create(
     app: AppHandle,
@@ -80,7 +103,7 @@ pub async fn terminal_create(
         })
         .map_err(|e| DesktopError::Message(format!("failed to open pty: {e}")))?;
 
-    let mut cmd = CommandBuilder::new_default_prog();
+    let mut cmd = CommandBuilder::new(default_shell());
     cmd.cwd(&cwd_path);
     cmd.env("TERM", "xterm-256color");
 

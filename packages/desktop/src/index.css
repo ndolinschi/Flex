@@ -71,6 +71,8 @@
   --color-danger: var(--color-danger);
   --color-danger-subtle: var(--color-danger-subtle);
   --color-thinking: var(--color-thinking);
+  --color-settings-card: var(--color-settings-card);
+  --color-switch-on: var(--color-switch-on);
 
   --spacing-1: var(--space-1);
   --spacing-2: var(--space-2);
@@ -157,6 +159,23 @@ textarea[data-composer]:focus-visible {
 ::selection {
   background: var(--color-accent-subtle);
   color: var(--color-ink);
+}
+
+/* Plan tab's Find-in-Plan highlight pass (usePlanFind) — plain <mark>s
+ * inserted over the rendered markdown's text nodes, so both themes just
+ * need this one rule rather than per-theme Tailwind classes on generated
+ * DOM nodes. */
+mark[data-plan-find-mark] {
+  background: var(--color-accent-subtle);
+  color: inherit;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px transparent;
+}
+
+mark[data-plan-find-mark].plan-find-mark-active {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 /*
@@ -414,6 +433,23 @@ textarea[data-composer]:focus-visible {
   animation: toast-in 300ms var(--easing-out) both;
 }
 
+/* Settings search "jump to result" pulse (design-map/07-settings.md §9) —
+ * ring grows 2px→4px then fades to transparent, once, over the row the
+ * search result navigated to. */
+@keyframes settings-row-highlight {
+  0% {
+    box-shadow: 0 0 0 2px var(--color-accent);
+  }
+  75%,
+  to {
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
+.animate-settings-row-highlight {
+  animation: settings-row-highlight 1.5s cubic-bezier(0, 0, 0.2, 1) 1;
+}
+
 /* sash hover-highlight transition — shared utility so RightPanel's
  * (and, as a follow-up, SessionSidebar's) drag-sash hover-line can pick up
  * the same timing without duplicating the value. Targets the sash's own
@@ -433,7 +469,8 @@ textarea[data-composer]:focus-visible {
   .animate-modal-in,
   .animate-toast-in,
   .animate-subagent-viewer-in,
-  .animate-subagent-viewer-out {
+  .animate-subagent-viewer-out,
+  .animate-settings-row-highlight {
     animation: none;
   }
 

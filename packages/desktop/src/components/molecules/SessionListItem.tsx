@@ -14,6 +14,7 @@ import type { SessionMeta, WorkspaceStatusDto } from "../../lib/types"
 import { sessionLabel } from "../../lib/types"
 import { formatCompactTime, cn } from "../../lib/utils"
 import { IconButton, RunningDot, TextInput, Tooltip } from "../atoms"
+import { ConfirmDialog } from "./ConfirmDialog"
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu"
 
 type SessionListItemProps = {
@@ -72,6 +73,7 @@ export const SessionListItem = ({
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(session.title ?? "")
   const [isDeleting, setIsDeleting] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(
     null,
   )
@@ -104,12 +106,16 @@ export const SessionListItem = ({
     }
   }
 
-  const handleDelete = async (e?: MouseEvent) => {
+  const requestDelete = (e?: MouseEvent) => {
     e?.stopPropagation()
-    if (!window.confirm(`Delete "${label}"?`)) return
+    setConfirmDeleteOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
     setIsDeleting(true)
     try {
       await onDelete(session.id)
+      setConfirmDeleteOpen(false)
     } finally {
       setIsDeleting(false)
     }
@@ -164,7 +170,7 @@ export const SessionListItem = ({
       icon: Trash2,
       danger: true,
       disabled: isDeleting,
-      onSelect: () => void handleDelete(),
+      onSelect: () => requestDelete(),
     },
   ]
 
@@ -234,6 +240,8 @@ export const SessionListItem = ({
                 className={cn(
                   "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-sm",
                   "[mask-image:linear-gradient(to_right,#000_calc(100%-16px),transparent)]",
+                  "group-hover:[mask-image:linear-gradient(to_right,#000_calc(100%-88px),transparent)]",
+                  "group-focus-within:[mask-image:linear-gradient(to_right,#000_calc(100%-88px),transparent)]",
                   isActive ? "text-ink" : "text-ink-secondary",
                 )}
               >
@@ -358,6 +366,17 @@ export const SessionListItem = ({
         position={menuPosition}
         items={contextMenuItems}
         onClose={() => setMenuPosition(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        title="Delete session"
+        description={`Delete "${label}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        danger
+        isLoading={isDeleting}
+        onConfirm={() => void handleConfirmDelete()}
+        onCancel={() => setConfirmDeleteOpen(false)}
       />
     </div>
   )

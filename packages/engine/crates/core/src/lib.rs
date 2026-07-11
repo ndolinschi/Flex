@@ -24,8 +24,9 @@ pub mod workspace;
 pub use agent::{Agent, AgentError, EventStream};
 pub use event_sink::EventSink;
 pub use executor::{
-    ChunkSink, ExecError, ExecOutcome, ExecSpec, ExecStream, Executor, ExecutorHealth,
-    NetworkPolicy,
+    BackgroundEntry, BackgroundEntrySummary, BackgroundProcess, BackgroundProcessRegistry,
+    BackgroundSpawn, BackgroundStatus, ChunkSink, DemoteRegistry, ExecError, ExecOrDemoted,
+    ExecOutcome, ExecSpec, ExecStream, Executor, ExecutorHealth, NetworkPolicy,
 };
 pub use hook::{Hook, HookContext, HookData, HookError, HookOutcome};
 pub use pending::PendingMap;

@@ -18,10 +18,7 @@ import {
   SessionSidebar,
 } from "./components/organisms"
 import { ToastHost } from "./components/molecules"
-import { AutomationsPage } from "./pages/AutomationsPage"
 import { ChatPage } from "./pages/ChatPage"
-import { CustomizePage } from "./pages/CustomizePage"
-import { MemoryPage } from "./pages/MemoryPage"
 import { SettingsPage } from "./pages/SettingsPage"
 import { WelcomePage } from "./pages/WelcomePage"
 import { restoreUiState, useAppStore } from "./stores/appStore"
@@ -170,6 +167,10 @@ const AppRoutes = () => {
           useAppStore.getState().setSelectedModelId("anthropic/claude-sonnet-4")
         }
 
+        if (ui.selectedIsolation) {
+          useAppStore.getState().setSelectedIsolation(ui.selectedIsolation)
+        }
+
         // Effort moved from a single global setting to per-model (reference
         // design: effort is picked FOR a specific model, in its dropdown row).
         // Migration: if a legacy `selectedEffort` exists and we haven't
@@ -190,6 +191,17 @@ const AppRoutes = () => {
 
         if (ui.composerMode) {
           useAppStore.getState().setComposerMode(ui.composerMode)
+        }
+
+        if (ui.defaultPermissionMode) {
+          useAppStore.getState().setDefaultPermissionMode(ui.defaultPermissionMode)
+        }
+
+        if (typeof ui.notificationsEnabled === "boolean") {
+          useAppStore.getState().setNotificationsEnabled(ui.notificationsEnabled)
+        }
+        if (typeof ui.completionSoundEnabled === "boolean") {
+          useAppStore.getState().setCompletionSoundEnabled(ui.completionSoundEnabled)
         }
 
         if (ui.recentCwds?.length) {
@@ -266,24 +278,12 @@ const AppRoutes = () => {
           >
             <ChatPage embedded />
           </div>
-          {route === "settings" ? (
+          {route === "settings" ||
+          route === "customize" ||
+          route === "automations" ||
+          route === "memory" ? (
             <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
               <SettingsPage embedded />
-            </div>
-          ) : null}
-          {route === "customize" ? (
-            <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
-              <CustomizePage embedded />
-            </div>
-          ) : null}
-          {route === "automations" ? (
-            <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
-              <AutomationsPage embedded />
-            </div>
-          ) : null}
-          {route === "memory" ? (
-            <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
-              <MemoryPage embedded />
             </div>
           ) : null}
         </div>

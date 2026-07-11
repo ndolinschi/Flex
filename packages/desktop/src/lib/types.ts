@@ -148,6 +148,18 @@ export type ToolCall = {
   result?: ToolOutput
 }
 
+/** `commands::BackgroundProcessDto` — one background process started via
+ * `Bash`'s `run_in_background`, tracked by the engine's
+ * `BackgroundProcessRegistry` and reachable via `background_list`/
+ * `background_kill` (`src-tauri/src/commands.rs`). */
+export type BackgroundProcessDto = {
+  process_id: string
+  command?: string | null
+  running: boolean
+  started_at_ms?: number | null
+  exit_code?: number | null
+}
+
 export type PlanStatus = "pending" | "in_progress" | "completed"
 
 export type PlanEntry = {
@@ -371,7 +383,7 @@ export type PromptAttachment = {
   mediaType?: string
 }
 
-export type ComposerMode = "agent" | "plan" | "ask"
+export type ComposerMode = "agent" | "plan" | "ask" | "flex"
 
 export type PermissionMode =
   | "default"
@@ -390,6 +402,12 @@ export type PromptCommandInput = {
    * "lowercase")]`): "low" | "medium" | "high" | "xhigh" | "max". Omitted =
    * engine default. */
   effort?: string
+  /** The composer mode the user picked ("agent" | "plan" | "ask" | "flex"),
+   * separate from `permissionMode` (its derived wire value). Backend uses it
+   * only to decide whether to append the Flex orchestrator system prompt
+   * (see `commands.rs::prompt`); it does not affect permission handling on
+   * its own. */
+  composerMode?: string
 }
 
 /** Mirrors contracts::request::Effort's serde wire values (lowercase),

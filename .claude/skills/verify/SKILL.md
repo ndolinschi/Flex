@@ -28,3 +28,9 @@ Rules:
   `packages/sdk/crates/sdk/Cargo.toml` (CI greps for leaks).
 - If an insta snapshot test fails, review the diff first; accept only intended
   changes (see the record-fixtures skill).
+
+When NOT to use: mid-edit on an unfinished change (run the narrowed check for
+the file you're touching instead, per `20-tool-use.md`/`30-verification.md`);
+a docs-only or comment-only change with no code touched; when you only need
+one package's result, not the full cross-package loop (run that package's
+`cargo fmt`/`clippy`/`test` directly).

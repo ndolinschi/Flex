@@ -1,22 +1,39 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Badge, Button, TextInput } from "../atoms"
 import {
   ConfirmDialog,
   ErrorBanner,
   FieldRow,
+  ModelMultiSelect,
   ModelSelect,
   SettingsSection,
 } from "../molecules"
 import { useProviderProfiles } from "../../hooks/useProviderProfiles"
 import { useProviderConfig } from "../../hooks/useProviderConfig"
 import { useModels } from "../../hooks/useModels"
+import { platformType } from "../../lib/tauri"
 import type {
   ProviderProfileInput,
   ProviderProfileView,
   SecretStorageMode,
 } from "../../lib/types"
-import { useAppStore } from "../../stores/appStore"
+import { sessionHasActivity, useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
+
+/** `"provider/model, other/model"` <-> ordered id array, matching the wire
+ * shape `ProviderProfile::fallback_models` actually stores (a comma-joined
+ * string — see `src-tauri/src/config.rs`). The UI only ever deals in
+ * ordered arrays; this is the one place the string is touched. */
+const parseFallbacks = (raw?: string): string[] =>
+  raw
+    ? raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : []
+
+const serializeFallbacks = (ids: string[]): string | undefined =>
+  ids.length > 0 ? ids.join(", ") : undefined
 
 export const ProviderSettingsForm = () => {
   const {
@@ -60,11 +77,27 @@ export const ProviderSettingsForm = () => {
   const [region, setRegion] = useState("")
   const [apiKey, setApiKey] = useState("")
   const [defaultModel, setDefaultModel] = useState("")
-  const [fallbackModels, setFallbackModels] = useState("")
+  const [fallbackModels, setFallbackModels] = useState<string[]>([])
   const [defaultIsolation, setDefaultIsolation] = useState("never")
   const [formError, setFormError] = useState<string | null>(null)
   const [validateMessage, setValidateMessage] = useState<string | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+
+  // Platform gate for the Security section's "System Keychain" option —
+  // detected once via `@tauri-apps/plugin-os` (mock mode reports "macos" so
+  // preview always shows it). Backend already rejects keychain on non-mac;
+  // this just keeps the option from being offered where it can't work.
+  const [platform, setPlatform] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void platformType().then((p) => {
+      if (!cancelled) setPlatform(p)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  const isMac = platform === "macos"
 
   const hydrateFromProfile = (p: ProviderProfileView) => {
     setEditingId(p.id)
@@ -73,7 +106,7 @@ export const ProviderSettingsForm = () => {
     setBaseUrl(p.baseUrl ?? "")
     setRegion(p.region ?? "")
     setDefaultModel(p.defaultModel ?? "")
-    setFallbackModels(p.fallbackModels ?? "")
+    setFallbackModels(parseFallbacks(p.fallbackModels))
     setDefaultIsolation((p.defaultIsolation as string | undefined) ?? "never")
     setApiKey("")
     setFormError(null)
@@ -88,7 +121,7 @@ export const ProviderSettingsForm = () => {
     setRegion("")
     setApiKey("")
     setDefaultModel("")
-    setFallbackModels("")
+    setFallbackModels([])
     setDefaultIsolation("never")
     setFormError(null)
     setValidateMessage(null)
@@ -100,6 +133,13 @@ export const ProviderSettingsForm = () => {
   const hasStoredKey = editingProfile?.hasKey ?? false
   const isBedrock = provider === "bedrock"
 
+  // Default model is scoped to THIS connection's provider (picking a model
+  // from a different provider than the connection makes no sense); fallbacks
+  // may span any provider (that's the point of a failover chain).
+  const defaultModelOptions = provider
+    ? models.filter((m) => m.providerId === provider)
+    : models
+
   const buildInput = (): ProviderProfileInput => ({
     id: editingId ?? undefined,
     label: label.trim(),
@@ -108,7 +148,7 @@ export const ProviderSettingsForm = () => {
     baseUrl: baseUrl.trim() || undefined,
     region: region.trim() || undefined,
     defaultModel: defaultModel.trim() || undefined,
-    fallbackModels: fallbackModels.trim() || undefined,
+    fallbackModels: serializeFallbacks(fallbackModels),
     defaultIsolation,
   })
 
@@ -165,10 +205,16 @@ export const ProviderSettingsForm = () => {
   }
 
   const logProviderChange = (id: string, fallbackLabel?: string) => {
-    const activeSessionId = useAppStore.getState().activeSessionId
+    const state = useAppStore.getState()
+    const activeSessionId = state.activeSessionId
     if (!activeSessionId) return
+    // Gate on prior activity — same predicate Composer.tsx's
+    // `handleModelChange` uses — so a fresh session with no turns yet
+    // doesn't get a "Provider changed" row before the user has said
+    // anything.
+    if (!sessionHasActivity(state, activeSessionId)) return
     const label = profiles.find((p) => p.id === id)?.label ?? fallbackLabel ?? id
-    useAppStore.getState().addSessionLogRow(activeSessionId, `Provider changed to ${label}`)
+    state.addSessionLogRow(activeSessionId, `Provider changed to ${label}`)
   }
 
   const handleActivate = async (id: string) => {
@@ -211,6 +257,7 @@ export const ProviderSettingsForm = () => {
       <SettingsSection
         title="Connections"
         description="Named provider connections you can switch between (e.g. two AWS accounts)"
+        rowId="models-connections"
         actions={
           <Button size="sm" variant="secondary" onClick={clearToCreateMode}>
             New connection
@@ -287,7 +334,7 @@ export const ProviderSettingsForm = () => {
         }}
       >
         <SettingsSection
-          title={editingId ? "Edit connection" : "New connection"}
+          title={editingId ? `Edit connection — ${editingProfile?.label ?? label}` : "New connection"}
           description="Native provider for the agent loop"
         >
           <FieldRow label="Name" htmlFor="label" hint="e.g. &quot;AWS work&quot;">
@@ -367,47 +414,49 @@ export const ProviderSettingsForm = () => {
           )}
         </SettingsSection>
 
-        <SettingsSection title="Models">
+        <SettingsSection
+          title="Models for this connection"
+          description="This connection's default model and failover chain — used whenever it's active"
+          rowId="models-defaults"
+        >
           <FieldRow
             label="Default model"
             htmlFor="defaultModel"
             hint={
-              models.length > 0
-                ? undefined
-                : "Optional — provider/model id (e.g. anthropic/claude-sonnet-4-5)"
+              provider
+                ? defaultModelOptions.length > 0
+                  ? undefined
+                  : "No models available for this provider yet — validate the connection first"
+                : "Select a provider above first"
             }
           >
-            {models.length > 0 ? (
-              <ModelSelect
-                id="defaultModel"
-                label=""
-                models={models}
-                value={defaultModel}
-                onChange={setDefaultModel}
-                isLoading={modelsLoading}
-                placeholder="Select default model"
-                className="gap-0"
-              />
-            ) : (
-              <TextInput
-                id="defaultModel"
-                value={defaultModel}
-                onChange={(e) => setDefaultModel(e.target.value)}
-                placeholder="provider/model-id"
-              />
-            )}
+            <ModelSelect
+              id="defaultModel"
+              label=""
+              models={defaultModelOptions}
+              value={defaultModel}
+              onChange={setDefaultModel}
+              isLoading={modelsLoading}
+              disabled={!provider}
+              placeholder="Select default model"
+              builtinProviders={builtinProviders}
+              className="gap-0"
+            />
           </FieldRow>
 
           <FieldRow
             label="Fallback models"
             htmlFor="fallbackModels"
-            hint="Comma-separated provider/model ids tried when the primary fails"
+            hint="Ordered failover chain — tried in order when the default fails. Can span any provider."
           >
-            <TextInput
+            <ModelMultiSelect
               id="fallbackModels"
+              label=""
+              models={models}
               value={fallbackModels}
-              onChange={(e) => setFallbackModels(e.target.value)}
-              placeholder="openai/gpt-4.1, anthropic/claude-sonnet-4"
+              onChange={setFallbackModels}
+              isLoading={modelsLoading}
+              builtinProviders={builtinProviders}
             />
           </FieldRow>
         </SettingsSection>
@@ -415,11 +464,11 @@ export const ProviderSettingsForm = () => {
         {/* Plugins moved to the Customize page; `plugins` state is kept hydrated
             from config so buildInput() round-trips the current values on save. */}
 
-        <SettingsSection title="Behavior">
+        <SettingsSection title="Behavior" rowId="behavior-isolation">
           <FieldRow
-            label="Default isolation"
+            label="Default isolation for new sessions"
             htmlFor="defaultIsolation"
-            hint="New sessions can opt into a git worktree sandbox"
+            hint="Sessions can override this when created — this only sets the starting default"
           >
             <select
               id="defaultIsolation"
@@ -460,6 +509,7 @@ export const ProviderSettingsForm = () => {
       <SettingsSection
         title="Security"
         description="Where the encryption key for your stored API keys lives"
+        rowId="behavior-secret-storage"
       >
         <FieldRow
           label="Secret storage"
@@ -467,7 +517,9 @@ export const ProviderSettingsForm = () => {
           hint={
             config?.secretStorage === "keychain"
               ? "System Keychain is OS-protected, but macOS may prompt for access — especially on dev builds that re-sign on every rebuild."
-              : "Local file stores the encryption key on disk, readable by your user account — no system prompts, ever. System Keychain is OS-protected but may prompt."
+              : isMac
+                ? "Local file stores the encryption key on disk, readable by your user account — no system prompts, ever. System Keychain is OS-protected but may prompt."
+                : "Local file stores the encryption key on disk, readable by your user account — no system prompts, ever. System Keychain is only available on macOS."
           }
         >
           <select
@@ -480,7 +532,9 @@ export const ProviderSettingsForm = () => {
             className={selectClassName}
           >
             <option value="file">Local file (no system prompts)</option>
-            <option value="keychain">System Keychain (OS-protected)</option>
+            {isMac ? (
+              <option value="keychain">System Keychain (OS-protected)</option>
+            ) : null}
           </select>
         </FieldRow>
         {secretStorageFormError || secretStorageError ? (

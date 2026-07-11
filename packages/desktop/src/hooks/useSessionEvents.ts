@@ -185,6 +185,38 @@ const RUNNING_TOOL_STATES: ReadonlySet<string> = new Set([
 const closeStatus = (status: ToolCallStatus): ToolCallStatus =>
   RUNNING_TOOL_STATES.has(status.state) ? { state: "cancelled" } : status
 
+/** Engine-side tool name for the HITL question tool (mirrors
+ * `AskUserQuestion` in `agentloop_core::tool`). Used only to recognize a
+ * dangling ask-type call after replay — see `findDanglingAskRow`. */
+const ASK_USER_QUESTION_TOOL_NAME = "AskUserQuestion"
+
+/**
+ * True if `rows` still contains a not-yet-terminal `AskUserQuestion` tool
+ * call — i.e. the replayed JSONL ends mid-question with no resolution ever
+ * coming (the engine's pending-question map was in-memory only and died
+ * with the process that asked). Recurses into subagent/workflow children
+ * the same way `closeRunningRows` does, since a subagent can itself have
+ * asked a question when the app restarted.
+ */
+const findDanglingAskRow = (rows: TimelineRow[]): boolean =>
+  rows.some((row) => {
+    switch (row.type) {
+      case "tool":
+        return (
+          row.call.tool_name === ASK_USER_QUESTION_TOOL_NAME &&
+          RUNNING_TOOL_STATES.has(row.call.status.state)
+        )
+      case "subagent":
+        return row.phase === "started" && findDanglingAskRow(row.children)
+      case "workflow":
+        return row.subagents.some(
+          (slot) => slot.phase === "started" && findDanglingAskRow(slot.children),
+        )
+      default:
+        return false
+    }
+  })
+
 /**
  * Turn-end/error sweep: force-close anything in `rows` still marked running.
  * A cancelled Stop (or any non-`end_turn` stop reason, or a hard
@@ -954,7 +986,23 @@ export const useSessionEvents = (sessionId: string | null) => {
         // right after via the listener below and overwrite these rows with
         // their real status (see applyEventToTimeline's tool/subagent update
         // paths, which replace status wholesale rather than merging).
+        // Check for a dangling AskUserQuestion BEFORE sweeping (the sweep
+        // closes its status to "cancelled", so the check must run against
+        // the pre-sweep rows) so the user sees why the agent went quiet
+        // instead of a silently-abandoned question.
+        const hadDanglingAsk = findDanglingAskRow(accumulated)
         accumulated = closeRunningRows(accumulated)
+        if (hadDanglingAsk) {
+          accumulated = [
+            ...accumulated,
+            {
+              type: "meta",
+              id: `ask-interrupted:${sessionId}`,
+              text: "Question interrupted by restart — the agent can ask again",
+              tsMs: Date.now(),
+            },
+          ]
+        }
 
         rowsRef.current = accumulated
         setRows(accumulated)
@@ -1063,6 +1111,22 @@ export const useSessionEvents = (sessionId: string | null) => {
     // Explicit Stop ends the turn — any reconnect banner is stale.
     setReconnectStatus(null)
   }, [sessionId, sweepRequest, flushPending])
+
+  // External resync trigger (Composer's optimistic-streaming safety timeout —
+  // see appStore's `resyncRequests` doc comment). Mirrors the sweepRequest
+  // effect above but drives the actual replay-based resync path instead of
+  // the local close-running-rows sweep.
+  const resyncRequest = useAppStore((s) =>
+    sessionId ? s.resyncRequests[sessionId] : undefined,
+  )
+  const lastResyncedRef = useRef<number | undefined>(undefined)
+  useEffect(() => {
+    if (!sessionId) return
+    if (resyncRequest === undefined) return
+    if (lastResyncedRef.current === resyncRequest) return
+    lastResyncedRef.current = resyncRequest
+    void resyncRef.current?.()
+  }, [sessionId, resyncRequest])
 
   const streamingBySession = useAppStore((s) => s.streamingBySession)
   const streaming = sessionId

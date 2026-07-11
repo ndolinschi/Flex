@@ -11,7 +11,6 @@ import {
   ErrorBanner,
   MarkdownBody,
 } from "../components/molecules"
-import { SettingsShell } from "../components/templates"
 import { useSessions } from "../hooks/useSessions"
 import {
   memoryGet,
@@ -32,10 +31,6 @@ const MEMORY_KEY = ["memory"] as const
 const projectMemoryKey = (cwd: string) => ["project-memory", cwd] as const
 
 const EMPTY_MEMORIES: MemoryEntryDto[] = []
-
-type MemoryPageProps = {
-  embedded?: boolean
-}
 
 type MemoryScope = {
   getMemory: (id: string) => Promise<MemoryEntryDto>
@@ -338,7 +333,10 @@ const ProjectMemorySection = ({ cwd }: { cwd: string }) => {
     delete and expiry: memories are written by the agent, not authored here —
     and for now the agent only ever writes to the global store, never
     per-project. */
-export const MemoryPage = ({ embedded = false }: MemoryPageProps) => {
+/** Memory content — mounted inside the Settings shell's "Memory" section
+ * (design-map/07-settings.md build brief §3). No `SettingsShell` wrapper
+ * here anymore; the shell owns nav+header+page title. */
+export const MemoryContent = () => {
   const memoryQuery = useQuery({
     queryKey: MEMORY_KEY,
     queryFn: memoryList,
@@ -357,7 +355,7 @@ export const MemoryPage = ({ embedded = false }: MemoryPageProps) => {
   const isEmpty = !memoryQuery.isLoading && !memoryQuery.isError && memories.length === 0
 
   return (
-    <SettingsShell title="Memory" wide embedded={embedded}>
+    <div>
       <div className="mb-4">
         <p className="text-xs text-ink-muted">
           Durable notes the agent saves as it works — user preferences, project facts,
@@ -368,7 +366,7 @@ export const MemoryPage = ({ embedded = false }: MemoryPageProps) => {
         </p>
       </div>
 
-      <section className="mb-6">
+      <section className="mb-6" data-settings-row="memory-global">
         <div className="mb-2 flex items-center gap-2">
           <h2 className="text-[13px] font-medium text-ink">Global</h2>
           <span className="text-[11px] text-ink-faint">{memories.length}</span>
@@ -397,6 +395,6 @@ export const MemoryPage = ({ embedded = false }: MemoryPageProps) => {
       {projectCwds.map((cwd) => (
         <ProjectMemorySection key={cwd} cwd={cwd} />
       ))}
-    </SettingsShell>
+    </div>
   )
 }

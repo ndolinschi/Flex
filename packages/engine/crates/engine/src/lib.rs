@@ -18,8 +18,9 @@ use agentloop_contracts::{
     TurnStopReason, TurnSummary, VerdictOutcome, VerificationVerdict, now_ms, reduce,
 };
 use agentloop_core::{
-    Agent, EventStream, Hook, PluginRegistry, PluginRole, PluginRoleTools, ProviderRegistry,
-    SessionStore, WorkspaceStatus, Workspaces,
+    Agent, BackgroundEntrySummary, BackgroundProcessRegistry, DemoteRegistry, EventStream, Hook,
+    PluginRegistry, PluginRole, PluginRoleTools, ProviderRegistry, SessionStore, WorkspaceStatus,
+    Workspaces,
 };
 pub use agentloop_hooks::{CheckSpec, DiagnosticsConfig, FormatterSpec};
 use agentloop_hooks::{DiagnosticsHook, FormatOnEditHook};
@@ -54,6 +55,21 @@ pub struct EngineService {
     verify_command: Option<String>,
     /// NDJSON output verbosity level.
     verbosity: OutputVerbosity,
+    /// Background processes started via `Bash`'s `run_in_background`, keyed
+    /// by session. `None` for a headless (`cwd`-less) service, which never
+    /// registers `Bash` at all. Killed per-session on `delete_session`, and
+    /// entirely on `EngineService` drop (see the `Drop` impl below) — cancel
+    /// deliberately does *not* touch this: cancelling a turn aborts the
+    /// turn, not servers it started.
+    background_processes: Option<Arc<BackgroundProcessRegistry>>,
+    /// Demote signals for still-running foreground `Bash` calls (see
+    /// `MOVE-TO-BACKGROUND`). `None` for a headless service, same as
+    /// `background_processes` — `Bash` was never registered so there is
+    /// nothing to demote. No teardown concerns here (unlike
+    /// `background_processes`): a demote registration only lives for the
+    /// duration of one in-flight call and self-cleans either way, so there
+    /// is nothing to kill on session delete or service shutdown.
+    demote_processes: Option<Arc<DemoteRegistry>>,
 }
 
 /// Map a loop-independent [`PluginRole`] onto the loop's [`RoleSpec`].
@@ -83,6 +99,8 @@ impl EngineService {
             isolation_default: IsolationPolicy::Never,
             verify_command: None,
             verbosity: OutputVerbosity::default(),
+            background_processes: None,
+            demote_processes: None,
         }
     }
 
@@ -100,6 +118,8 @@ impl EngineService {
             isolation_default: IsolationPolicy::Never,
             verify_command: None,
             verbosity: OutputVerbosity::default(),
+            background_processes: None,
+            demote_processes: None,
         }
     }
 
@@ -135,6 +155,8 @@ impl EngineService {
         let BaseTools {
             registry: mut tools,
             pending_questions,
+            background_processes,
+            demote_processes,
             ..
         } = if config.cwd.is_some() {
             agentloop_tools::base_tools(executor, config.network)
@@ -185,6 +207,18 @@ impl EngineService {
             user_dir: default_user_command_dir(),
             project_dir: project_cmd_dir,
         })?;
+
+        if let Some(user_skill_dir) = default_user_skill_dir() {
+            match agentloop_prompts::install_bundled_skills(&user_skill_dir) {
+                Ok(installed) if !installed.is_empty() => {
+                    tracing::debug!(?installed, "seeded bundled skills into user skill dir");
+                }
+                Ok(_) => {}
+                Err(err) => {
+                    tracing::warn!(%err, "failed to seed bundled skills; continuing without them");
+                }
+            }
+        }
 
         let project_skill_dir = config
             .cwd
@@ -272,6 +306,8 @@ impl EngineService {
         service.isolation_default = config.isolation_default;
         service.verify_command = config.verify_command;
         service.verbosity = config.verbosity;
+        service.background_processes = background_processes;
+        service.demote_processes = demote_processes;
         Ok(service)
     }
 
@@ -415,11 +451,70 @@ impl EngineService {
         Ok(self.store.get_meta(session).await?)
     }
 
-    /// Cancel any in-flight turn, then delete the session's event log and
-    /// metadata from the store.
+    /// Cancel any in-flight turn, kill any background processes the session
+    /// started via `Bash`'s `run_in_background` (a dev server left running
+    /// on a deleted session would otherwise leak forever), then delete the
+    /// session's event log and metadata from the store.
     pub async fn delete_session(&self, session: &SessionId) -> EngineResult<()> {
         let _ = self.agent.cancel(session).await;
+        if let Some(registry) = &self.background_processes {
+            registry.kill_session(session).await;
+        }
         Ok(self.store.delete(session).await?)
+    }
+
+    /// Kill every background process started by any session through
+    /// `Bash`'s `run_in_background`, across the whole service. Call this
+    /// during process shutdown (the runner binary's signal handler, the
+    /// headless HTTP transport's graceful-shutdown path, `EOF` on stdio) —
+    /// a spawned child process is owned by a detached task that outlives
+    /// any `Arc` clone being dropped (background processes must keep
+    /// streaming after their starting tool call returns, by design), so
+    /// there is no `Drop` impl that can kill them for you; this must be
+    /// called explicitly. No-op for a headless service (no `cwd`, so
+    /// `Bash` was never registered).
+    pub async fn shutdown(&self) {
+        if let Some(registry) = &self.background_processes {
+            registry.kill_all().await;
+        }
+    }
+
+    /// List background processes (started via `Bash`'s `run_in_background`)
+    /// tracked for `session`, for a "background processes" panel. Empty for
+    /// a headless service (no registry — `Bash` was never registered) or a
+    /// session with none running.
+    pub fn background_list(&self, session: &SessionId) -> Vec<BackgroundEntrySummary> {
+        match &self.background_processes {
+            Some(registry) => registry.list(session),
+            None => Vec::new(),
+        }
+    }
+
+    /// Kill one background process by id. Returns `false` if `id` is unknown
+    /// for `session` (already reaped or never existed) or if this service
+    /// has no background-process registry at all.
+    pub async fn background_kill(&self, session: &SessionId, id: &str) -> EngineResult<bool> {
+        match &self.background_processes {
+            Some(registry) => Ok(registry.kill(session, id).await?),
+            None => Ok(false),
+        }
+    }
+
+    /// Ask a still-running **foreground** `Bash` call to move to the
+    /// background (see `MOVE-TO-BACKGROUND`): the tool call returns early
+    /// ("moved to background…") and the process keeps running as a tracked
+    /// background entry, reachable afterward through
+    /// [`Self::background_list`]/[`Self::background_kill`] under the same
+    /// `id`. Returns `false` — not an error — when there's nothing to do:
+    /// unknown id, the call already finished naturally, or the session's
+    /// execution backend doesn't support demote at all (docker, ssh, …;
+    /// only the local backend does). Callers (the desktop UI) should treat
+    /// `false` as "no visible effect," not surface it as a failure.
+    pub fn background_demote(&self, session: &SessionId, id: &str) -> bool {
+        match &self.demote_processes {
+            Some(registry) => registry.request_demote(session, id),
+            None => false,
+        }
     }
 
     pub fn subscribe(&self, session: &SessionId) -> EngineResult<EventStream> {

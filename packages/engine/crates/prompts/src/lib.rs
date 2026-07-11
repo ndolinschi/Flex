@@ -20,11 +20,13 @@
 //! ```
 
 pub mod assembler;
+pub mod bundled;
 pub mod commands;
 pub mod memory;
 pub mod skills;
 
 pub use assembler::{PromptError, SystemPromptAssembler, SystemPromptConfig, Vars};
+pub use bundled::{BundledSkillError, install_bundled_skills};
 pub use commands::{CommandDiscoveryConfig, CommandError, CommandExpansion, CommandRegistry};
 pub use memory::{DEFAULT_MEMORY_BUDGET_CHARS, MemoryConfig, load_memory_section};
 pub use skills::{SkillDiscoveryConfig, SkillError, SkillInfo, SkillRegistry, SkillSource};

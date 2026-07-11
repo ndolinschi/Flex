@@ -22,6 +22,17 @@ enum MemoryWriteMode {
     Append,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+enum MemoryScope {
+    /// User-level facts (preferences, identity). Loads into every session
+    /// regardless of which project is open. Default.
+    Global,
+    /// Facts about the current project/codebase. Stored under the session's
+    /// working directory so they only load when that project is open.
+    Project,
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct MemoryWriteInput {
@@ -33,6 +44,11 @@ struct MemoryWriteInput {
     /// `replace` (default) or `append`.
     #[serde(default)]
     mode: Option<MemoryWriteMode>,
+    /// `global` (default) or `project`. Use `project` when the user asks to
+    /// remember something for *this* project/codebase; use `global` (or
+    /// omit) for user-level facts that should follow the user everywhere.
+    #[serde(default)]
+    scope: Option<MemoryScope>,
 }
 
 /// Writes `<name>.md` files under the local memory directory; they load into
@@ -73,7 +89,12 @@ impl Tool for MemoryWriteTool {
                           verified, not a log of the incident — the rule is what a future \
                           session can act on. Notes are tiny and always resident: keep \
                           each under a few hundred words, one topic per `name`. \
-                          `mode: append` adds to an existing note; the default replaces it."
+                          `mode: append` adds to an existing note; the default replaces it. \
+                          `scope: \"project\"` stores the memory in the current project's \
+                          `.agent/memory` (facts about THIS codebase/project the user asked \
+                          to remember); the default `\"global\"` stores user-level facts \
+                          (preferences, identity) that load everywhere. When the user says \
+                          \"remember for this project\", use `scope: \"project\"`."
                 .to_owned(),
             input_schema: crate::save::schema_of::<MemoryWriteInput>(),
             read_only: false,
@@ -84,14 +105,27 @@ impl Tool for MemoryWriteTool {
 
     async fn run(
         &self,
-        _ctx: ToolContext,
+        ctx: ToolContext,
         input: serde_json::Value,
     ) -> Result<ToolOutput, ToolError> {
         let input: MemoryWriteInput = serde_json::from_value(input).map_err(|err| {
             ToolError::InvalidInput(format!(
-                "Input for `MemoryWrite` must be {{\"name\", \"content\", \"mode\"?}}: {err}."
+                "Input for `MemoryWrite` must be {{\"name\", \"content\", \"mode\"?, \"scope\"?}}: {err}."
             ))
         })?;
+        let target_dir = match input.scope {
+            Some(MemoryScope::Project) => {
+                if ctx.cwd.as_os_str().is_empty() {
+                    return Err(ToolError::InvalidInput(
+                        "`scope: \"project\"` requires a project working directory, but this \
+                         session has none (e.g. a headless read-only session)."
+                            .to_owned(),
+                    ));
+                }
+                ctx.cwd.join(".agent").join("memory")
+            }
+            Some(MemoryScope::Global) | None => self.memory_dir.clone(),
+        };
         if !valid_name(&input.name) {
             return Err(ToolError::InvalidInput(format!(
                 "`name` must be kebab-case (lowercase letters, digits, hyphens; max \
@@ -106,7 +140,7 @@ impl Tool for MemoryWriteTool {
             ));
         }
 
-        let path = self.memory_dir.join(format!("{}.md", input.name));
+        let path = target_dir.join(format!("{}.md", input.name));
         let mut content = match input.mode {
             Some(MemoryWriteMode::Append) => {
                 let existing = std::fs::read_to_string(&path).unwrap_or_default();
@@ -133,10 +167,10 @@ impl Tool for MemoryWriteTool {
         }
         content.push('\n');
 
-        std::fs::create_dir_all(&self.memory_dir).map_err(|err| {
+        std::fs::create_dir_all(&target_dir).map_err(|err| {
             ToolError::Execution(format!(
                 "Cannot create memory directory `{}`: {err}.",
-                self.memory_dir.display()
+                target_dir.display()
             ))
         })?;
         std::fs::write(&path, content).map_err(|err| {
@@ -159,12 +193,16 @@ mod tests {
     use tokio_util::sync::CancellationToken;
 
     fn ctx() -> ToolContext {
+        ctx_with_cwd(PathBuf::from("."))
+    }
+
+    fn ctx_with_cwd(cwd: PathBuf) -> ToolContext {
         let (events, _rx) = EventSink::channel();
         ToolContext {
             session_id: SessionId::from("sess-test"),
             turn_id: TurnId::from("turn-test"),
             call_id: ToolCallId::from("call-test"),
-            cwd: PathBuf::from("."),
+            cwd,
             cancel: CancellationToken::new(),
             events,
         }
@@ -198,6 +236,105 @@ mod tests {
             .run(
                 ctx(),
                 serde_json::json!({"name": "big", "content": "x".repeat(5_000)}),
+            )
+            .await
+            .unwrap_err();
+        assert!(matches!(err, ToolError::InvalidInput(_)));
+    }
+
+    #[tokio::test]
+    async fn project_scope_writes_under_cwd_agent_memory() {
+        let global_dir = tempfile::tempdir().expect("tempdir");
+        let project_dir = tempfile::tempdir().expect("tempdir");
+        let tool = MemoryWriteTool::new(global_dir.path());
+        tool.run(
+            ctx_with_cwd(project_dir.path().to_path_buf()),
+            serde_json::json!({"name": "repo-facts", "content": "uses cargo workspaces", "scope": "project"}),
+        )
+        .await
+        .expect("project write");
+
+        let written = std::fs::read_to_string(
+            project_dir
+                .path()
+                .join(".agent")
+                .join("memory")
+                .join("repo-facts.md"),
+        )
+        .expect("read project memory");
+        assert_eq!(written, "uses cargo workspaces\n");
+        assert!(!global_dir.path().join("repo-facts.md").exists());
+    }
+
+    #[tokio::test]
+    async fn global_scope_unchanged_by_default() {
+        let global_dir = tempfile::tempdir().expect("tempdir");
+        let project_dir = tempfile::tempdir().expect("tempdir");
+        let tool = MemoryWriteTool::new(global_dir.path());
+        tool.run(
+            ctx_with_cwd(project_dir.path().to_path_buf()),
+            serde_json::json!({"name": "prefs", "content": "prefers vim"}),
+        )
+        .await
+        .expect("global write (default)");
+
+        let written = std::fs::read_to_string(global_dir.path().join("prefs.md"))
+            .expect("read global memory");
+        assert_eq!(written, "prefers vim\n");
+        assert!(!project_dir.path().join(".agent").exists());
+    }
+
+    #[tokio::test]
+    async fn project_scope_append_mode_works() {
+        let global_dir = tempfile::tempdir().expect("tempdir");
+        let project_dir = tempfile::tempdir().expect("tempdir");
+        let tool = MemoryWriteTool::new(global_dir.path());
+        tool.run(
+            ctx_with_cwd(project_dir.path().to_path_buf()),
+            serde_json::json!({"name": "notes", "content": "line one", "scope": "project"}),
+        )
+        .await
+        .expect("initial project write");
+        tool.run(
+            ctx_with_cwd(project_dir.path().to_path_buf()),
+            serde_json::json!({"name": "notes", "content": "line two", "mode": "append", "scope": "project"}),
+        )
+        .await
+        .expect("append project write");
+
+        let written = std::fs::read_to_string(
+            project_dir
+                .path()
+                .join(".agent")
+                .join("memory")
+                .join("notes.md"),
+        )
+        .expect("read project memory");
+        assert_eq!(written, "line one\nline two\n");
+    }
+
+    #[tokio::test]
+    async fn project_scope_without_cwd_errors() {
+        let global_dir = tempfile::tempdir().expect("tempdir");
+        let tool = MemoryWriteTool::new(global_dir.path());
+        let err = tool
+            .run(
+                ctx_with_cwd(PathBuf::new()),
+                serde_json::json!({"name": "notes", "content": "line one", "scope": "project"}),
+            )
+            .await
+            .unwrap_err();
+        assert!(matches!(err, ToolError::InvalidInput(_)));
+    }
+
+    #[tokio::test]
+    async fn unknown_field_still_rejected() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let tool = MemoryWriteTool::new(dir.path());
+        let err = tool
+            .run(
+                ctx(),
+                serde_json::json!({"name": "prefs", "content": "prefers vim", "bogus": true}),
             )
             .await
             .unwrap_err();

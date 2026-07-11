@@ -9,17 +9,22 @@ import {
   ChevronRight,
   FilePenLine,
   FileSearch,
+  ListEnd,
   LoaderCircle,
+  Square,
   Terminal,
   Wrench,
 } from "lucide-react"
-import { reviewFileDiff } from "../../lib/tauri"
+import { backgroundDemote, backgroundKill, reviewFileDiff } from "../../lib/tauri"
 import type { ToolCall } from "../../lib/types"
 import { basename, cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
 import { getExecTail, subscribeExecTail } from "../../lib/execTailBus"
+import { getExecErrorScan, subscribeExecErrorScan } from "../../lib/execErrorScan"
 import { Collapsible } from "./Collapsible"
 import { DiffView } from "./DiffView"
+import { Badge } from "../atoms/Badge"
+import { IconButton } from "../atoms/IconButton"
 
 export type ToolKind = "explore" | "edit" | "shell" | "generic"
 
@@ -166,6 +171,73 @@ const readRangeLabel = (call: ToolCall): string | null => {
 const shellCommand = (call: ToolCall): string | null =>
   stringField(asRecord(call.input), ["command", "cmd"])
 
+/** Whether `call` is a `Bash` tool call started with `run_in_background:
+ * true` (the engine's detached-process mode — see `BashTool::run_in_background`
+ * in `packages/engine/crates/tools/src/bash.rs`, read-only from here). Such
+ * calls get a distinct feed row (see `backgroundDetail`) instead of the plain
+ * shell row. */
+export const isBackgroundBashCall = (call: ToolCall): boolean => {
+  const input = asRecord(call.input)
+  return input?.run_in_background === true
+}
+
+/** Whether `call` is a **foreground** `Bash` call that was demoted mid-run
+ * (see `MOVE-TO-BACKGROUND`): its `input.run_in_background` is `false`/unset
+ * (it started as a normal blocking call), but the engine's result carries the
+ * same structured `{"process_id", "running"}` shape a `run_in_background`
+ * start does (see `BashTool::run` in `packages/engine/crates/tools/src/bash.rs`
+ * — the demote path deliberately mirrors that structured payload so this
+ * detection doesn't need a third code path). Distinguishing this from
+ * `isBackgroundBashCall` only matters for the label ("Background: <command>"
+ * vs. leaving the original command text) — both route to the same
+ * `BackgroundRow` presentation. */
+export const isDemotedBashCall = (call: ToolCall): boolean => {
+  if (isBackgroundBashCall(call)) return false
+  const structured = asRecord(call.result?.structured)
+  return typeof structured?.process_id === "string"
+}
+
+/** Whether `call` should render as a background-process row at all —
+ * started that way from the outset, or demoted into one mid-run. */
+export const isBackgroundPresentedBashCall = (call: ToolCall): boolean =>
+  isBackgroundBashCall(call) || isDemotedBashCall(call)
+
+/** `process_id` the engine assigned this background process, from the
+ * start call's `structured` result (`{"process_id", "pid", "running",
+ * "truncated"}` — see `BashTool::run_in_background`, or the same shape from
+ * a demote — see `isDemotedBashCall`). `None` until the initial result
+ * lands. */
+const backgroundProcessId = (call: ToolCall): string | null =>
+  stringField(asRecord(call.result?.structured), ["process_id"])
+
+/** Whether the engine has reported this background process as still
+ * running, from the same `structured` payload. Defaults to `true` while the
+ * call itself is still in flight (no structured result yet) — the row should
+ * read as "running" until told otherwise. */
+const backgroundStructuredRunning = (call: ToolCall): boolean => {
+  const structured = asRecord(call.result?.structured)
+  if (!structured) return true
+  const running = structured.running
+  return typeof running === "boolean" ? running : true
+}
+
+/** The engine's own exit marker: a plain-text `ExecChunk` line reading
+ * `[process exited with code N]`, appended to the same `call_id`'s tail after
+ * a background process terminates (see `packages/engine`'s background
+ * executor, read-only from here). This is the authoritative "has it exited"
+ * signal — `structured.running` only reflects the state at the moment the
+ * *start* call returned, not the process's live status. */
+const EXIT_MARKER_RE = /\[process exited(?: with code (-?\d+))?]/
+
+export const parseExitMarker = (
+  tail: string,
+): { exited: true; code: number | null } | { exited: false } => {
+  const m = EXIT_MARKER_RE.exec(tail)
+  if (!m) return { exited: false }
+  const code = m[1] !== undefined ? Number(m[1]) : null
+  return { exited: true, code: Number.isFinite(code) ? code : null }
+}
+
 export type ToolStepDetail = {
   id: string
   label: string
@@ -180,6 +252,27 @@ export type ToolStepDetail = {
   /** Shell/bash calls get a live mini-log tail rendered under the row while
    * running (see `execTailBus`). */
   isShell?: boolean
+  /** Raw shell command (undecorated — no "Background: " prefix), used by the
+   * "Ask Agent to fix" error action so the prefilled prompt quotes the actual
+   * command rather than the display label. */
+  command?: string
+  /** Set for a `Bash` call started with `run_in_background: true` — renders
+   * as a distinct "Background: <command>" row with its own running/exited
+   * state and a Stop control, instead of the plain shell row. */
+  background?: {
+    processId: string | null
+    /** Best-effort "still running" guess from the start call's `structured`
+     * result — superseded by the exit marker once one appears in the tail
+     * (see `ExecTail`/`BackgroundRow`, which parse the live tail directly). */
+    initiallyRunning: boolean
+  }
+  /** Set for a still-running **foreground** shell row (not already a
+   * background row) — offers the "Move to background" affordance (see
+   * `MOVE-TO-BACKGROUND`). Calling `backgroundDemote` for this call id; on
+   * success the row flips to the `background` presentation once the
+   * engine's demoted result lands with its structured `process_id` (see
+   * `isDemotedBashCall`) — no separate client-side state needed. */
+  canDemote?: boolean
 }
 
 export type ToolStepSummary = {
@@ -257,12 +350,31 @@ const editDetail = (call: ToolCall): ToolStepDetail => {
 
 const shellDetail = (call: ToolCall): ToolStepDetail => {
   const cmd = shellCommand(call)
+  const demoted = isDemotedBashCall(call)
+  const background = isBackgroundPresentedBashCall(call)
+    ? {
+        processId: backgroundProcessId(call),
+        initiallyRunning: backgroundStructuredRunning(call),
+      }
+    : undefined
+  // A demoted call's label keeps the plain command text (it started as a
+  // normal foreground row, and the row it flips into already shows
+  // "running"/"exited" state) — only calls that started with
+  // `run_in_background: true` from the outset get the "Background: " prefix.
+  const label = cmd
+    ? background && !demoted
+      ? `Background: ${cmd}`
+      : cmd
+    : call.tool_name
   return {
     id: call.id,
-    label: cmd ? cmd : call.tool_name,
+    label,
     running: isRunning(call),
     failed: isFailed(call),
     isShell: true,
+    command: cmd ?? call.tool_name,
+    background,
+    canDemote: !background && isRunning(call),
   }
 }
 
@@ -456,6 +568,182 @@ const ExecTail = ({ callId, muted }: { callId: string; muted?: boolean }) => {
   )
 }
 
+/** Live error-scan read for a call's exec output (see `execErrorScan`).
+ * Subscribes via `useSyncExternalStore` so the badge/action appears the
+ * instant a matching line streams in, without waiting for the next
+ * `tool_call_updated`. */
+const useExecErrorScan = (callId: string) =>
+  useSyncExternalStore(
+    (onChange) => subscribeExecErrorScan(callId, onChange),
+    () => getExecErrorScan(callId),
+  )
+
+/** "N errors in output" badge + "Ask Agent to fix" action for a COMPLETED
+ * shell row whose exec output tripped the error scanner (see
+ * `execErrorScan`). Deliberately not shown on running rows — the mini-log
+ * tail already gives liveness feedback mid-run, and results aren't final yet
+ * (see the call-site guard in `DetailRow`/`BackgroundRow`).
+ *
+ * "Ask Agent to fix" reuses the exact browser-error-page mechanism
+ * (`setComposerDraft` + `flex:focus-composer` window event — see
+ * `BrowserTab.handleAskAgent`) rather than inventing a second prefill path. */
+const ExecErrorAction = ({
+  callId,
+  command,
+}: {
+  callId: string
+  command: string
+}) => {
+  const scan = useExecErrorScan(callId)
+  const setComposerDraft = useAppStore((s) => s.setComposerDraft)
+
+  if (!scan) return null
+
+  const handleAskAgent = () => {
+    const message = `The command \`${command}\` produced errors:\n\`\`\`\n${scan.lines.join("\n")}\n\`\`\`\nDiagnose and fix these errors.`
+    setComposerDraft(message)
+    window.dispatchEvent(new CustomEvent("flex:focus-composer"))
+  }
+
+  return (
+    <span className="ml-3.5 mt-0.5 flex items-center gap-2">
+      <Badge variant="danger">
+        {scan.count} error{scan.count === 1 ? "" : "s"} in output
+      </Badge>
+      <button
+        type="button"
+        onClick={handleAskAgent}
+        className="text-[12px] text-accent hover:underline focus-visible:outline-none focus-visible:underline"
+      >
+        Ask Agent to fix
+      </button>
+    </span>
+  )
+}
+
+/** Live "has this background process exited" read, derived from the same
+ * exec-tail buffer `ExecTail` renders (see `parseExitMarker`) rather than
+ * from `structured.running`, which only reflects the moment the start call
+ * returned. Subscribes via `useSyncExternalStore` so it flips the instant the
+ * exit-marker chunk lands, independent of any later `tool_call_updated`. */
+const useBackgroundExitState = (
+  callId: string,
+): { exited: true; code: number | null } | { exited: false } => {
+  const tail = useSyncExternalStore(
+    (onChange) => subscribeExecTail(callId, onChange),
+    () => getExecTail(callId),
+  )
+  return parseExitMarker(tail)
+}
+
+/** Distinct feed row for a `Bash` call started with `run_in_background:
+ * true` (see `isBackgroundBashCall`). Renders a subtle pulsing dot + Stop
+ * button while running; once the engine's `[process exited...]` marker
+ * appears in the tail (authoritative — see `parseExitMarker`), swaps to an
+ * exited state showing the code when parseable. The persisted tail keeps
+ * rendering underneath via the same `ExecTail` used for foreground shell
+ * rows. */
+const BackgroundRow = ({ detail }: { detail: ToolStepDetail }) => {
+  const sessionId = useAppStore((s) => s.activeSessionId)
+  const exitState = useBackgroundExitState(detail.id)
+  const [stopping, setStopping] = useState(false)
+  const [stopError, setStopError] = useState<string | null>(null)
+
+  const exited = exitState.exited
+  // Structured `running` from the start call's result is the fallback before
+  // any tail has streamed in (e.g. preview mock with no exec_chunk yet);
+  // the exit marker always wins once seen.
+  const running = !exited && (detail.background?.initiallyRunning ?? detail.running)
+
+  const handleStop = () => {
+    if (!sessionId || !detail.background?.processId || stopping) return
+    setStopping(true)
+    setStopError(null)
+    backgroundKill(sessionId, detail.background.processId)
+      .catch((err) => setStopError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setStopping(false))
+  }
+
+  return (
+    <li className="flex flex-col">
+      <div className="flex min-h-6 items-center gap-1.5 text-[13px] leading-[1.5] text-ink-muted">
+        <span className="flex h-3 w-3 shrink-0 items-center justify-center">
+          <ListEnd className="h-3 w-3 text-ink-faint" aria-hidden />
+        </span>
+        {running ? (
+          <span
+            className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-green"
+            aria-hidden
+          />
+        ) : null}
+        <span className="min-w-0 shrink truncate text-[12px] [font-variant-numeric:tabular-nums] text-ink-secondary">
+          {detail.label}
+        </span>
+        <span className="shrink-0 text-ink-faint">
+          {exited
+            ? exitState.code != null
+              ? `exited (code ${exitState.code})`
+              : "exited"
+            : running
+              ? "running"
+              : null}
+        </span>
+        {running && detail.background?.processId ? (
+          <IconButton
+            label="Stop process"
+            isLoading={stopping}
+            onClick={handleStop}
+            className="ml-auto h-5 w-5"
+          >
+            <Square className="h-3 w-3" aria-hidden />
+          </IconButton>
+        ) : null}
+      </div>
+      {stopError ? (
+        <div className="ml-3.5 mt-0.5 text-[11px] text-danger">{stopError}</div>
+      ) : null}
+      <ExecTail callId={detail.id} muted={!running} />
+      {exited ? (
+        <ExecErrorAction
+          callId={detail.id}
+          command={detail.command ?? detail.label}
+        />
+      ) : null}
+    </li>
+  )
+}
+
+/** "Move to background" affordance for a running foreground shell row (see
+ * `MOVE-TO-BACKGROUND`, `detail.canDemote`): sits next to the running
+ * spinner, mirroring the reference design's inline row action. On click,
+ * calls `backgroundDemote`; a `false` result (nothing to demote — the call
+ * already finished, or the backend doesn't support it) is treated as a
+ * silent no-op, not an error, since it's a benign race rather than a
+ * failure. On success the row flips to the background presentation on its
+ * own once the engine's demoted result lands (see `isDemotedBashCall`) — no
+ * local "demoted" state to track here. */
+const DemoteButton = ({ callId }: { callId: string }) => {
+  const sessionId = useAppStore((s) => s.activeSessionId)
+  const [demoting, setDemoting] = useState(false)
+
+  const handleDemote = () => {
+    if (!sessionId || demoting) return
+    setDemoting(true)
+    backgroundDemote(sessionId, callId).finally(() => setDemoting(false))
+  }
+
+  return (
+    <IconButton
+      label="Move to background"
+      isLoading={demoting}
+      onClick={handleDemote}
+      className="ml-1 h-5 w-5 shrink-0"
+    >
+      <ListEnd className="h-3 w-3" aria-hidden />
+    </IconButton>
+  )
+}
+
 type DetailRowProps = {
   detail: ToolStepDetail
   note?: string
@@ -472,6 +760,10 @@ const DetailRow = ({ detail, note }: DetailRowProps) => {
   const [diff, setDiff] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
+
+  if (detail.background) {
+    return <BackgroundRow detail={detail} />
+  }
 
   const canExpand = !!detail.diffPath && !!sessionId
 
@@ -544,9 +836,13 @@ const DetailRow = ({ detail, note }: DetailRowProps) => {
           <span className="shrink-0 text-ink-faint">{detail.sublabel}</span>
         ) : null}
         <DiffBadge added={detail.added} removed={detail.removed} />
+        {detail.canDemote ? <DemoteButton callId={detail.id} /> : null}
       </div>
       {detail.isShell ? (
         <ExecTail callId={detail.id} muted={!detail.running} />
+      ) : null}
+      {detail.isShell && !detail.running ? (
+        <ExecErrorAction callId={detail.id} command={detail.command ?? detail.label} />
       ) : null}
       {canExpand ? (
         <Collapsible open={expanded}>

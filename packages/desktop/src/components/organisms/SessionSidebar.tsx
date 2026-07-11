@@ -4,7 +4,6 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react"
-import { useQuery } from "@tanstack/react-query"
 import {
   Archive,
   ArrowUpRight,
@@ -30,12 +29,14 @@ import {
   SidebarActionRow,
   type ContextMenuItem,
 } from "../molecules"
-import { useSessions } from "../../hooks/useSessions"
+import { useQueryClient } from "@tanstack/react-query"
+import { SESSIONS_KEY, useSessions } from "../../hooks/useSessions"
 import { useWorkspaceStatuses } from "../../hooks/useWorkspaceStatuses"
-import { resumeSession, toInvokeError, userIdentity } from "../../lib/tauri"
+import { resumeSession, toInvokeError } from "../../lib/tauri"
+import { isSessionNotFoundError } from "../../lib/sessions"
 import type { SessionMeta } from "../../lib/types"
 import { basename, cn } from "../../lib/utils"
-import { useAppStore } from "../../stores/appStore"
+import { persistUiState, useAppStore } from "../../stores/appStore"
 
 const isMac =
   typeof navigator !== "undefined" &&
@@ -112,21 +113,37 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     deleteSession,
     isCreating,
   } = useSessions()
+  const queryClient = useQueryClient()
+  const pushToast = useAppStore((s) => s.pushToast)
   // Subagent child sessions render inside their parent's feed — the sidebar
   // lists only top-level agents.
   const sessions = useMemo(
     () => allSessions.filter((s) => !s.parent_id),
     [allSessions],
   )
-  const { data: identity } = useQuery({
-    queryKey: ["user-identity"],
-    queryFn: userIdentity,
-    staleTime: Infinity,
-  })
-  const displayName = identity?.name || "User"
 
   const handleCreate = async (cwd?: string) => {
     await newAgent(cwd)
+    if (narrow) setSidebarCollapsed(true)
+  }
+
+  /** Everywhere `resume_session` can fail with "not found" (the session's
+   * row/id no longer exists engine-side — e.g. a delete that raced with a
+   * resume, or a persisted id from a previous run): drop it from the
+   * react-query list cache, clear the persisted activeSessionId if it
+   * matches, toast, and — critically — do NOT surface a Retry banner, since
+   * retrying a resume for an id that will never exist again is meaningless. */
+  const healNotFoundSession = (id: string) => {
+    queryClient.setQueryData<SessionMeta[]>(SESSIONS_KEY, (prev) =>
+      prev ? prev.filter((s) => s.id !== id) : prev,
+    )
+    void queryClient.invalidateQueries({ queryKey: SESSIONS_KEY })
+    const state = useAppStore.getState()
+    if (state.activeSessionId === id) {
+      setActiveSessionId(null)
+      void persistUiState({ activeSessionId: null })
+    }
+    pushToast("Session no longer exists", "error")
   }
 
   const handleSelect = async (id: string) => {
@@ -145,9 +162,21 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
       })
       setActiveSessionId(id)
       setRoute("chat")
+      if (narrow) setSidebarCollapsed(true)
     } catch (err) {
       console.error("resume_session failed", id, err)
       const message = toInvokeError(err)
+      const notFound = isSessionNotFoundError(message)
+      if (notFound) {
+        setRowErrors((prev) => {
+          if (!(id in prev)) return prev
+          const next = { ...prev }
+          delete next[id]
+          return next
+        })
+        healNotFoundSession(id)
+        return
+      }
       setSelectError(message)
       setSelectErrorId(id)
       setRowErrors((prev) => ({ ...prev, [id]: message }))
@@ -313,24 +342,36 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
           icon={Search}
           label="Search"
           kbd={isMac ? "⌘K" : "Ctrl+K"}
-          onClick={onOpenSearch}
+          onClick={() => {
+            onOpenSearch()
+            if (narrow) setSidebarCollapsed(true)
+          }}
         />
         <SidebarActionRow
           icon={Bot}
           label="Automations"
           trailingIcon={ArrowUpRight}
-          onClick={() => setRoute("automations")}
+          onClick={() => {
+            setRoute("automations")
+            if (narrow) setSidebarCollapsed(true)
+          }}
         />
         <SidebarActionRow
           icon={Brain}
           label="Memory"
           trailingIcon={ArrowUpRight}
-          onClick={() => setRoute("memory")}
+          onClick={() => {
+            setRoute("memory")
+            if (narrow) setSidebarCollapsed(true)
+          }}
         />
         <SidebarActionRow
           icon={SlidersHorizontal}
           label="Customize"
-          onClick={() => setRoute("customize")}
+          onClick={() => {
+            setRoute("customize")
+            if (narrow) setSidebarCollapsed(true)
+          }}
         />
       </div>
 
@@ -510,29 +551,26 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         </div>
       ) : null}
 
-      <div className="flex items-center gap-2 border-t border-stroke-3 px-2 py-1.5">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-fill-2 text-xs text-ink-secondary">
-          {displayName.charAt(0).toUpperCase()}
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm text-ink">{displayName}</span>
-          <span className="truncate text-xs text-ink-muted">Local</span>
-        </span>
-        <span className="flex shrink-0 items-center gap-0.5">
-          <IconButton
-            label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-            onClick={toggleTheme}
-          >
-            {theme === "dark" ? (
-              <Sun className="h-3.5 w-3.5" aria-hidden />
-            ) : (
-              <Moon className="h-3.5 w-3.5" aria-hidden />
-            )}
-          </IconButton>
-          <IconButton label="Settings" onClick={() => setRoute("settings")}>
-            <Settings className="h-3.5 w-3.5" aria-hidden />
-          </IconButton>
-        </span>
+      <div className="flex items-center justify-end gap-0.5 border-t border-stroke-3 px-2 py-1.5">
+        <IconButton
+          label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+          onClick={toggleTheme}
+        >
+          {theme === "dark" ? (
+            <Sun className="h-3.5 w-3.5" aria-hidden />
+          ) : (
+            <Moon className="h-3.5 w-3.5" aria-hidden />
+          )}
+        </IconButton>
+        <IconButton
+          label="Settings"
+          onClick={() => {
+            setRoute("settings")
+            if (narrow) setSidebarCollapsed(true)
+          }}
+        >
+          <Settings className="h-3.5 w-3.5" aria-hidden />
+        </IconButton>
       </div>
 
       {isCreating ? (

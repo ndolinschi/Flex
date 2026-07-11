@@ -1,7 +1,7 @@
 //! The engine service error type and its mapping to a wire `EngineError`.
 
 use agentloop_contracts::{EngineError, ErrorCode, SessionId};
-use agentloop_core::{AgentError, ProviderError, StoreError, WorkspaceError};
+use agentloop_core::{AgentError, ExecError, ProviderError, StoreError, WorkspaceError};
 use agentloop_loop::roles::RoleError;
 use agentloop_mcp::McpBridgeError;
 use agentloop_prompts::{CommandError, PromptError};
@@ -27,6 +27,8 @@ pub enum EngineServiceError {
     Role(#[from] RoleError),
     #[error(transparent)]
     Workspace(#[from] WorkspaceError),
+    #[error(transparent)]
+    Exec(#[from] ExecError),
     #[error("session {0} is not isolated")]
     NotIsolated(SessionId),
     #[error("no workspace backend is configured")]
@@ -53,6 +55,7 @@ impl EngineServiceError {
             Self::Mcp(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
             Self::Role(err) => EngineError::engine(ErrorCode::InvalidRequest, err.to_string()),
             Self::Workspace(err) => EngineError::engine(ErrorCode::Unknown, err.to_string()),
+            Self::Exec(err) => EngineError::engine(ErrorCode::Unknown, err.to_string()),
             Self::NotIsolated(_) | Self::NoWorkspaceBackend => {
                 EngineError::engine(ErrorCode::InvalidRequest, self.to_string())
             }

@@ -1,5 +1,12 @@
-import type { CreateSessionInput, SessionMeta } from "./types"
+import type { CreateSessionInput, IsolationPolicy, SessionMeta } from "./types"
 import { DEFAULT_SESSION_TITLE, isDefaultSessionTitle } from "./types"
+
+/** True when an engine error means the session id no longer exists (engine's
+ * `StoreError::SessionNotFound` → "session {id} not found", surfaced via
+ * `toInvokeError`). Distinct from other resume/delete failures — retrying a
+ * not-found is meaningless, so callers should self-heal instead. */
+export const isSessionNotFoundError = (message: string): boolean =>
+  /session\s+\S+\s+not found/i.test(message) || /session not found/i.test(message)
 
 /** Find an unused "New Agent" session for this project (design: one draft per cwd). */
 export const findDraftSession = (
@@ -30,8 +37,12 @@ export const resolveCreateCwd = (
 export const newAgentCreateInput = (
   cwd?: string,
   model?: string | null,
+  isolation?: IsolationPolicy | null,
 ): CreateSessionInput => ({
   title: DEFAULT_SESSION_TITLE,
   ...(cwd ? { cwd } : {}),
   ...(model ? { model } : {}),
+  // Omitted when unset — `create_session` then falls back to the provider
+  // profile's `default_isolation` (see commands.rs::create_session).
+  ...(isolation ? { isolation } : {}),
 })

@@ -108,7 +108,8 @@ fn keychain_master_key_exists() -> bool {
 /// Resolve the effective storage mode given an explicit pref (`None` means
 /// "no explicit choice made yet") and honoring existing installs:
 ///
-/// - Explicit pref set -> use it verbatim.
+/// - Explicit pref set -> use it verbatim (but see the non-macOS override
+///   below: `Keychain` can never win off of macOS).
 /// - No explicit pref, but a Keychain master key already exists (i.e. this
 ///   is an *existing* install from before this feature, or one that already
 ///   ran in Keychain mode) -> resolve to `Keychain`, so we don't silently
@@ -117,7 +118,20 @@ fn keychain_master_key_exists() -> bool {
 ///   item now orphaned" migration on next launch).
 /// - No explicit pref, no existing Keychain item -> `File`, the default for
 ///   brand-new setups.
+///
+/// Product decision: the OS-keychain storage *mode* is macOS-only for now
+/// (the `keyring` crate itself is cross-platform — Windows Credential
+/// Manager, Linux secret-service — but we haven't qualified/tested those
+/// backends for this app yet). On non-macOS targets this always resolves to
+/// `File`, regardless of explicit pref or a pre-existing Keychain item, so
+/// there is no path to `Keychain` mode outside macOS. `set_secret_storage`
+/// (the explicit user-facing switch) additionally returns a clear error if
+/// asked for `Keychain` on non-macOS — see `config::set_secret_storage`.
 pub fn resolve_mode(explicit: Option<&str>) -> SecretStorageMode {
+    if !cfg!(target_os = "macos") {
+        // Keychain mode is macOS-only for now — force File on every other platform.
+        return SecretStorageMode::File;
+    }
     if let Some(s) = explicit {
         if let Some(mode) = SecretStorageMode::parse(s) {
             return mode;
@@ -227,11 +241,16 @@ fn load_or_create_file_master_key(config_dir: &Path) -> DesktopResult<[u8; MASTE
 }
 
 /// Write the master key file and restrict its permissions to owner
-/// read/write only (0600) — best-effort on non-Unix targets (this app only
-/// ships for macOS today, but the app doesn't hard-depend on that).
+/// read/write only (0600) on Unix (macOS/Linux). Windows has no POSIX mode
+/// bits; `std::os::unix::fs::PermissionsExt` doesn't exist there, so this is
+/// `#[cfg(unix)]`-gated and Windows instead relies on the default ACLs of the
+/// per-user config directory (`%APPDATA%`), which already restrict access to
+/// the owning user account — documented to the user in Settings alongside
+/// the storage-mode choice.
 fn write_file_master_key(path: &Path, bytes: &[u8; MASTER_KEY_LEN]) -> DesktopResult<()> {
     let encoded = base64_encode(bytes);
     fs::write(path, encoded).map_err(|e| DesktopError::Config(e.to_string()))?;
+    // unix-only: POSIX permission bits don't exist on Windows; Windows relies on default ACLs.
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

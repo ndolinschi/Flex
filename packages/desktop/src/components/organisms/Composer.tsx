@@ -54,6 +54,43 @@ type ComposerProps = {
 /** Stable empty queue — inline `?? []` in a Zustand selector re-renders forever. */
 const EMPTY_QUEUE: string[] = []
 
+/** Exact message from `agentloop_core::agent::AgentError` when a turn is
+ * already running for a session — the desktop layer's `prompt` command
+ * bubbles it up verbatim (see `commands::prompt` → `service.prompt`), so
+ * matching this substring is the only way to tell "rejected because a turn
+ * is live" apart from any other prompt failure. */
+const TURN_IN_PROGRESS_MARKER = "a turn is already in progress for session"
+
+/** How long to wait for `subscribe_session` to resolve before sending anyway.
+ * The backend broadcast channel has no replay buffer (see appStore's
+ * `subscribedSessions` doc comment), so firing `prompt()` before the
+ * subscription is live can silently drop `turn_started` and leave the UI
+ * with no streaming indication even though the engine turn is running. A
+ * brand-new session's subscribe IPC round-trip is normally sub-50ms; this
+ * is a generous ceiling so a slow IPC never blocks sending indefinitely. */
+const SUBSCRIBE_READY_TIMEOUT_MS = 2_000
+const SUBSCRIBE_POLL_INTERVAL_MS = 25
+
+/** Safety timeout: if optimistic streaming is set but no engine event moves
+ * the session out of it within this window, something ate the turn_started
+ * (or the prompt call genuinely died silently) — force one resync, then give
+ * up and clear the flag so the UI never gets stuck "streaming" forever. */
+const STREAMING_SAFETY_TIMEOUT_MS = 5_000
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** Poll `subscribedSessions[sessionId]` until true or the timeout elapses.
+ * Not event-driven (zustand has no natural "await this becomes true"
+ * primitive without extra plumbing) — a short poll is simplest and the
+ * window is small enough that busy-waiting cost is negligible. */
+const waitForSubscription = async (sessionId: string): Promise<void> => {
+  const deadline = Date.now() + SUBSCRIBE_READY_TIMEOUT_MS
+  while (Date.now() < deadline) {
+    if (useAppStore.getState().subscribedSessions[sessionId]) return
+    await sleep(SUBSCRIBE_POLL_INTERVAL_MS)
+  }
+}
+
 /** reference glass expanded prompt — fill surface, soft elevation, no harsh outline. */
 export const Composer = ({ isHero = false }: ComposerProps) => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
@@ -367,12 +404,25 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
     setSelectedModelId(id)
     if (!activeSessionId) return
     if (changed && isBootstrapped) {
-      const display = models.find((m) => m.id === id)?.displayName ?? id
-      const effort = useAppStore.getState().effortByModel[id] ?? null
-      const effortSuffix = effort ? ` ${effortLabel(effort)}` : ""
-      useAppStore
-        .getState()
-        .addSessionLogRow(activeSessionId, `Model changed to ${display}${effortSuffix}`)
+      // Gate on the session having had prior activity — a fresh session with
+      // no turns yet shouldn't get a "Model changed" row before the user has
+      // said anything. `lastTurnUsage` is set once a turn completes (see
+      // ContextBar's UsageRing, which reads the same field to know a turn
+      // happened); a non-empty `sessionLogRows` (e.g. an earlier model/
+      // provider change already logged) also counts as prior activity.
+      const state = useAppStore.getState()
+      const hasPriorActivity =
+        !!state.lastTurnUsage[activeSessionId] ||
+        (state.sessionLogRows[activeSessionId]?.length ?? 0) > 0
+      if (hasPriorActivity) {
+        const display = models.find((m) => m.id === id)?.displayName ?? id
+        const effort = state.effortByModel[id] ?? null
+        const effortSuffix = effort ? ` ${effortLabel(effort)}` : ""
+        state.addSessionLogRow(
+          activeSessionId,
+          `Model changed to ${display}${effortSuffix}`,
+        )
+      }
     }
     try {
       await updateSession(activeSessionId, { model: id })
@@ -405,7 +455,38 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
     setIsStreaming(true)
     setSessionStreaming(activeSessionId, true)
 
+    // Safety timeout: if no engine event nudges us out of streaming within
+    // a few seconds, the turn_started (or any other event) got dropped —
+    // most likely the subscribe/prompt race described on
+    // `waitForSubscription` above, or the engine turn genuinely never
+    // started. Force one resync (replay + re-apply), then clear the
+    // optimistic flag if that still didn't produce a real update, so the UI
+    // never gets stuck "streaming" forever with a dead send button.
+    const safetySessionId = activeSessionId
+    const safetyTimer = window.setTimeout(() => {
+      const store = useAppStore.getState()
+      if (!store.streamingSessions[safetySessionId]) return
+      store.requestResync(safetySessionId)
+      window.setTimeout(() => {
+        const latest = useAppStore.getState()
+        if (!latest.streamingSessions[safetySessionId]) return
+        // Resync didn't turn up a real in-flight turn either — give up.
+        latest.setSessionStreaming(safetySessionId, false)
+        if (latest.activeSessionId === safetySessionId) {
+          latest.setIsStreaming(false)
+        }
+      }, 1_000)
+    }, STREAMING_SAFETY_TIMEOUT_MS)
+
     try {
+      // A brand-new session's event subscription is a fire-and-forget IPC
+      // call (see useGlobalSessionEvents) racing this same tick's prompt()
+      // — the backend's broadcast channel drops anything emitted before a
+      // subscriber attaches, so wait for it (bounded) before sending.
+      if (!useAppStore.getState().subscribedSessions[activeSessionId]) {
+        await waitForSubscription(activeSessionId)
+      }
+
       // Rename draft "New Agent" from the first prompt .
       if (text && isDefaultSessionTitle(active?.title)) {
         try {
@@ -423,6 +504,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
         text,
         model: selectedModelId ?? undefined,
         permissionMode: modeToPermission(composerMode),
+        composerMode,
         effort: selectedEffort ?? undefined,
         attachments: pending.map((a) => ({
           path: a.path,
@@ -431,13 +513,33 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
         })),
       })
     } catch (err) {
-      setError(toInvokeError(err))
-      if (overrideText === undefined) {
-        setComposerDraft(draftSnapshot)
-        for (const att of pending) addAttachment(att)
+      const message = toInvokeError(err)
+      if (message.includes(TURN_IN_PROGRESS_MARKER)) {
+        // The engine just told us a turn IS live for this session — our own
+        // optimistic streaming flag lagging/missing (e.g. the subscribe race
+        // above) is what let this second send through in the first place.
+        // Recover instead of surfacing a raw error: requeue the message and
+        // trust the engine's word that streaming is real.
+        enqueueMessage(activeSessionId, text)
+        if (overrideText === undefined) setComposerDraft("")
+        setSessionStreaming(activeSessionId, true)
+        if (useAppStore.getState().activeSessionId === activeSessionId) {
+          setIsStreaming(true)
+        }
+        useAppStore
+          .getState()
+          .pushToast("Queued — waiting for current turn", "success")
+      } else {
+        setError(message)
+        if (overrideText === undefined) {
+          setComposerDraft(draftSnapshot)
+          for (const att of pending) addAttachment(att)
+        }
+        setIsStreaming(false)
+        setSessionStreaming(activeSessionId, false)
       }
-      setIsStreaming(false)
-      setSessionStreaming(activeSessionId, false)
+    } finally {
+      window.clearTimeout(safetyTimer)
     }
   }
 

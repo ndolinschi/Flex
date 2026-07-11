@@ -6,6 +6,24 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "4173", "--directory", "docs"],
       "port": 4173
+    },
+    {
+      "name": "desktop-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "packages/desktop"],
+      "port": 1420
+    },
+    {
+      "name": "desktop-preview-alt",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "packages/desktop", "--", "--port", "1421"],
+      "port": 1421
+    },
+    {
+      "name": "desktop-preview-1423",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "packages/desktop", "--", "--port", "1423"],
+      "port": 1423
     }
   ]
 }

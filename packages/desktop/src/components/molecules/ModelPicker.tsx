@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { Check, ChevronDown, ChevronRight, Gauge } from "lucide-react"
 import { EFFORT_LEVELS, effortLabel } from "../../lib/types"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
+import { useGroupedModels } from "./useGroupedModels"
 
 type ModelPickerProps = {
   models: ModelInfoDto[]
@@ -135,9 +136,6 @@ const EffortSubmenu = ({
   )
 }
 
-const capitalize = (s: string): string =>
-  s.length === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1)
-
 export const ModelPicker = ({
   models,
   value,
@@ -160,42 +158,7 @@ export const ModelPicker = ({
   const selectedEffort = value && effortFor ? effortFor(value) : null
   const label = selected?.displayName ?? selected?.id ?? "Select model"
 
-  const providerLabel = useMemo(() => {
-    const byId = new Map(builtinProviders.map((p) => [p.id, p.label]))
-    return (providerId: string) => byId.get(providerId) ?? capitalize(providerId)
-  }, [builtinProviders])
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return models
-    return models.filter(
-      (m) =>
-        m.id.toLowerCase().includes(q) ||
-        (m.displayName?.toLowerCase().includes(q) ?? false) ||
-        m.providerId.toLowerCase().includes(q) ||
-        providerLabel(m.providerId).toLowerCase().includes(q),
-    )
-  }, [models, query, providerLabel])
-
-  /** Group filtered models by provider, preserving each group's first-seen
-   * order (the models list's own ordering) rather than sorting — matches
-   * the reference design's provider clusters without re-ranking providers. */
-  const groups = useMemo(() => {
-    const order: string[] = []
-    const byProvider = new Map<string, ModelInfoDto[]>()
-    for (const m of filtered) {
-      if (!byProvider.has(m.providerId)) {
-        byProvider.set(m.providerId, [])
-        order.push(m.providerId)
-      }
-      byProvider.get(m.providerId)?.push(m)
-    }
-    return order.map((providerId) => ({
-      providerId,
-      label: providerLabel(providerId),
-      items: byProvider.get(providerId) ?? [],
-    }))
-  }, [filtered, providerLabel])
+  const { groups } = useGroupedModels(models, query, builtinProviders)
 
   const handleClose = () => {
     setOpen(false)
