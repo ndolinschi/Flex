@@ -12,6 +12,7 @@ use std::sync::Arc;
 use agentloop_contracts::{IsolationPolicy, ModelRef};
 use agentloop_core::{Executor, NetworkPolicy, Plugin, SessionStore, Workspaces};
 use agentloop_hooks::{DiagnosticsConfig, FormatterSpec};
+use agentloop_loop::RetryPolicy;
 use agentloop_loop::roles::RoleSpec;
 use agentloop_mcp::{McpBridgeConfig, McpManager};
 
@@ -93,6 +94,11 @@ pub struct EngineConfig {
     /// orchestration needs more cheaply and predictably; this is an escape
     /// hatch for plans whose full multi-step shape is already known.
     pub enable_workflow_tool: bool,
+    /// Escalating backoff schedule for RETRYABLE provider/network failures
+    /// (dropped connections, timeouts, mid-stream cuts, 5xx, rate limits).
+    /// `None` keeps the engine default (see [`RetryPolicy::default`]) — about
+    /// 10 attempts total, spaced 30s/30s/30s/60s/60s/300s/300s/300s/300s.
+    pub retry_policy: Option<RetryPolicy>,
 }
 
 impl Default for EngineConfig {
@@ -117,6 +123,7 @@ impl Default for EngineConfig {
             verbosity: OutputVerbosity::default(),
             default_fallback_models: Vec::new(),
             enable_workflow_tool: false,
+            retry_policy: None,
         }
     }
 }

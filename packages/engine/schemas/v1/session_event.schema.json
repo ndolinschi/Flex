@@ -336,6 +336,31 @@
           ]
         },
         {
+          "description": "Incremental output from a running exec-style tool (e.g. Bash).\nEphemeral streaming data — the complete output still arrives in the\nfinal `ToolCallUpdated`.",
+          "type": "object",
+          "properties": {
+            "call_id": {
+              "$ref": "#/$defs/ToolCallId"
+            },
+            "kind": {
+              "type": "string",
+              "const": "exec_chunk"
+            },
+            "stream": {
+              "$ref": "#/$defs/ExecStream"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "call_id",
+            "stream",
+            "text"
+          ]
+        },
+        {
           "type": "object",
           "properties": {
             "content": {
@@ -611,6 +636,45 @@
             "kind",
             "from",
             "reason"
+          ]
+        },
+        {
+          "description": "A RETRYABLE provider/network failure (timeout, dropped connection,\nmid-stream cut, 5xx, rate limit) is about to be retried on the *same*\nmodel after a backoff sleep, instead of failing the turn or advancing\nthe fallback chain. Emitted once per scheduled attempt, right before\nthe sleep starts, so a UI can render e.g. \"Reconnecting… attempt 3/10,\nretrying in 30s\". Ephemeral: not persisted, since normal streaming\nresuming afterward is already visible via the next stream events.",
+          "type": "object",
+          "properties": {
+            "attempt": {
+              "description": "1-indexed retry attempt about to be slept for (`1` = first retry\nafter the initial call failed).",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "delay_ms": {
+              "description": "How long this attempt will sleep before retrying, in milliseconds.",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "error": {
+              "description": "Human-readable description of the failure that triggered the retry.",
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "retry_scheduled"
+            },
+            "max_attempts": {
+              "description": "Total attempts allowed by the schedule, counting the initial call.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "kind",
+            "attempt",
+            "max_attempts",
+            "delay_ms",
+            "error"
           ]
         },
         {
@@ -1283,6 +1347,14 @@
           "type": "string",
           "const": "not_installed"
         }
+      ]
+    },
+    "ExecStream": {
+      "description": "Which stream an [`AgentEvent::ExecChunk`] came from.",
+      "type": "string",
+      "enum": [
+        "stdout",
+        "stderr"
       ]
     },
     "HookOutcomeKind": {

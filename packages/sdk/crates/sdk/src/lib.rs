@@ -16,6 +16,7 @@
 //! ```
 
 mod loop_agent;
+pub mod mcp_store;
 pub mod routines;
 
 use std::path::PathBuf;
@@ -29,6 +30,10 @@ pub use agentloop_engine::{
 };
 #[cfg(feature = "learning")]
 pub use agentloop_learning::{self as learning, LearningPlugin};
+pub use agentloop_mcp::{
+    self as mcp, McpBridgeConfig, McpRemoteTool, McpServerConfig, McpServerTransport,
+    StdioServerConfig, StreamableHttpConfig,
+};
 pub use agentloop_providers::{self as providers, CustomProviderSpec};
 #[cfg(feature = "search")]
 pub use agentloop_search::{self as search, SearchPlugin};
@@ -179,6 +184,17 @@ impl AgentBuilder {
         self.provider_opts
             .provider_keys
             .insert(id.into(), key.into());
+        self
+    }
+
+    /// Set a region override for a region-scoped built-in provider, bypassing
+    /// the environment variable. Currently only Bedrock consults this
+    /// (`.provider_region("bedrock", "eu-west-1")`); ignored by providers that
+    /// have no region concept.
+    pub fn provider_region(mut self, id: impl Into<String>, region: impl Into<String>) -> Self {
+        self.provider_opts
+            .provider_regions
+            .insert(id.into(), region.into());
         self
     }
 

@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use futures::{Stream, StreamExt};
@@ -32,9 +32,19 @@ pub struct BedrockProvider {
 
 impl BedrockProvider {
     pub fn new(config: BedrockConfig) -> Self {
+        // A bare `Client::new()` has no timeouts at all: a stalled TCP
+        // handshake or a stream that stops producing bytes hangs the turn
+        // forever with no error to surface. `read_timeout` bounds the gap
+        // between chunks (not total stream duration), so long responses
+        // still work while dead connections fail visibly.
+        let client = Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .read_timeout(Duration::from_secs(120))
+            .build()
+            .unwrap_or_else(|_| Client::new());
         Self {
             config: Arc::new(config),
-            client: Client::new(),
+            client,
         }
     }
 

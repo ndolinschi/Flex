@@ -43,6 +43,16 @@ fn all_variants() -> Vec<AgentEvent> {
             call_id: ToolCallId::from("call-1"),
             note: "read 4kb".to_owned(),
         },
+        AgentEvent::ExecChunk {
+            call_id: ToolCallId::from("call-1"),
+            stream: ExecStream::Stdout,
+            text: "hello\n".to_owned(),
+        },
+        AgentEvent::ExecChunk {
+            call_id: ToolCallId::from("call-1"),
+            stream: ExecStream::Stderr,
+            text: "warning: something\n".to_owned(),
+        },
         AgentEvent::PlanUpdated {
             entries: vec![PlanEntry {
                 content: "write tests".to_owned(),
@@ -178,6 +188,7 @@ fn persistence_classes_are_stable() {
     assert_eq!(
         ephemeral,
         vec![
+            "exec_chunk",
             "gap",
             "markdown_delta",
             "message_started",

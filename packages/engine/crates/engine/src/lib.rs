@@ -216,6 +216,7 @@ impl EngineService {
             .unwrap_or_else(|| Arc::new(MemoryStore::new()));
         let limits = LoopLimits {
             max_iterations: resolve_max_iterations(config.max_iterations),
+            retry: config.retry_policy.clone().unwrap_or_default(),
             ..LoopLimits::default()
         };
         let mut builder = NativeAgentBuilder::new(store.clone())

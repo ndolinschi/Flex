@@ -616,6 +616,12 @@ async fn run_subagent_call(
         .and_then(|v| v.as_str())
         .filter(|s| !s.trim().is_empty())
         .map(str::to_owned);
+    let model_override = request
+        .input
+        .get("model")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.trim().is_empty())
+        .map(agentloop_contracts::ModelRef::from);
 
     if children_spawned.fetch_add(1, Ordering::SeqCst) >= MAX_CHILDREN_PER_TURN {
         return Err(ToolError::Execution(format!(
@@ -628,15 +634,17 @@ async fn run_subagent_call(
         ToolError::Execution("the agent is shutting down; cannot spawn subagents".to_owned())
     })?;
 
-    let assigned_model = deps.roles.get(&role).and_then(|spec| {
-        if !spec.split || spec.models.len() < 2 {
-            return None;
-        }
-        let mut counters = split_counters.lock().unwrap_or_else(|p| p.into_inner());
-        let counter = counters.entry(role.clone()).or_insert(0);
-        let model = spec.models[*counter % spec.models.len()].clone();
-        *counter += 1;
-        Some(model)
+    let assigned_model = model_override.or_else(|| {
+        deps.roles.get(&role).and_then(|spec| {
+            if !spec.split || spec.models.len() < 2 {
+                return None;
+            }
+            let mut counters = split_counters.lock().unwrap_or_else(|p| p.into_inner());
+            let counter = counters.entry(role.clone()).or_insert(0);
+            let model = spec.models[*counter % spec.models.len()].clone();
+            *counter += 1;
+            Some(model)
+        })
     });
 
     let sub = SubagentRequest {

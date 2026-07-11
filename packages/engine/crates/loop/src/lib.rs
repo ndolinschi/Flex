@@ -32,7 +32,7 @@ mod turn;
 mod workflow;
 
 pub use agent::NativeAgent;
-pub use builder::{LoopLimits, NativeAgentBuilder};
+pub use builder::{LoopLimits, NativeAgentBuilder, RetryPolicy};
 pub use manager::{InvalidTransition, ToolCallManager};
 pub use messages::transcript_to_messages;
 pub use permission::{PermissionPolicy, Verdict};

@@ -2,15 +2,16 @@
 //! execution backend.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 
-use agentloop_contracts::ToolOutput;
+use agentloop_contracts::{AgentEvent, ExecStream as WireExecStream, ToolOutput};
 use agentloop_core::{
-    ExecError, ExecSpec, Executor, NetworkPolicy, PermissionHint, Tool, ToolCategory, ToolContext,
-    ToolDescriptor, ToolError,
+    ChunkSink, ExecError, ExecSpec, ExecStream, Executor, NetworkPolicy, PermissionHint, Tool,
+    ToolCategory, ToolContext, ToolDescriptor, ToolError,
 };
 
 use crate::fs::{schema_of, truncate_chars};
@@ -18,6 +19,45 @@ use crate::fs::{schema_of, truncate_chars};
 const DEFAULT_TIMEOUT_MS: u64 = 30_000;
 const MAX_TIMEOUT_MS: u64 = 600_000;
 const MAX_OUTPUT_CHARS: usize = 120_000;
+
+/// Build a [`ChunkSink`] that emits `AgentEvent::ExecChunk` for every
+/// incremental chunk a running command produces, mapping the executor's
+/// wire-format-free `agentloop_core::ExecStream` onto the wire enum
+/// (`agentloop_contracts::ExecStream`) — the only layer that is allowed to
+/// know about both is this one (`tools` depends on `core` and `contracts`;
+/// `executors` depends on `core` alone).
+///
+/// Streaming stops once the running total exceeds `MAX_OUTPUT_CHARS`: the
+/// executor keeps accumulating the full output for the final, still-truncated
+/// `ToolOutput` (unchanged from today), but there is no point flooding live
+/// subscribers past the cap the final render already enforces.
+fn exec_chunk_sink(ctx: &ToolContext) -> ChunkSink {
+    let events = ctx.events.clone();
+    let call_id = ctx.call_id.clone();
+    let emitted = Arc::new(AtomicUsize::new(0));
+    Arc::new(move |stream, text| {
+        if emitted.load(Ordering::Relaxed) > MAX_OUTPUT_CHARS {
+            return;
+        }
+        let previous = emitted.fetch_add(text.chars().count(), Ordering::Relaxed);
+        if previous > MAX_OUTPUT_CHARS {
+            return;
+        }
+        let stream = match stream {
+            ExecStream::Stdout => WireExecStream::Stdout,
+            ExecStream::Stderr => WireExecStream::Stderr,
+            // `ExecStream` is `#[non_exhaustive]`: an unrecognized future
+            // stream kind is treated as stdout rather than dropped or
+            // panicking.
+            _ => WireExecStream::Stdout,
+        };
+        events.emit(AgentEvent::ExecChunk {
+            call_id: call_id.clone(),
+            stream,
+            text: text.to_owned(),
+        });
+    })
+}
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -96,6 +136,7 @@ impl Tool for BashTool {
             env: Vec::new(),
             timeout_ms,
             network: self.network,
+            chunk_sink: Some(exec_chunk_sink(&ctx)),
         };
         let outcome = match self.executor.exec(spec, ctx.cancel.clone()).await {
             Ok(outcome) => outcome,

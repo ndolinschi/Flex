@@ -28,6 +28,7 @@ fn event_visible(event: &AgentEvent) -> bool {
             | AgentEvent::ThinkingDelta { .. }
             | AgentEvent::TextSnapshot { .. }
             | AgentEvent::ToolArgsDelta { .. }
+            | AgentEvent::ExecChunk { .. }
     )
 }
 

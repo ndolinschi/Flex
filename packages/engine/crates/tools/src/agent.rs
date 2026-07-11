@@ -32,6 +32,11 @@ struct AgentInput {
     /// Precisely what the subagent should return.
     #[serde(default)]
     expected_output: Option<String>,
+    /// Optional model override for this subagent (e.g.
+    /// "anthropic/claude-opus-4-8" or a bare model id resolvable by the
+    /// registry). Defaults to the role's models or the parent's model.
+    #[serde(default)]
+    model: Option<String>,
 }
 
 /// The `Agent` descriptor. `run` is never reached in a correct build — the
@@ -96,7 +101,88 @@ pub fn subagent_tool(roles: &[(String, String)]) -> Arc<dyn Tool> {
          not delegate trivial work — the handoff costs more than doing it yourself.\n\n\
          Parallelism: emit multiple Agent calls in ONE message to run them concurrently \
          (they may be served by different models). You own integrating the results and \
-         the correctness of the final answer."
+         the correctness of the final answer.\n\n\
+         Optional `model` override: pin this specific call to a model instead of the \
+         role's own chain (e.g. escalate one subagent to a stronger model for a hard \
+         task). Leave it unset to use the role's configured models."
     );
     Arc::new(AgentTool { description })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn agent_descriptor_advertises_roles_and_model_override() {
+        let descriptor =
+            subagent_tool(&[("searcher".to_owned(), "finds things".to_owned())]).descriptor();
+        assert_eq!(descriptor.name, SUBAGENT_TOOL_NAME);
+        assert!(descriptor.read_only);
+        assert_eq!(descriptor.needs_permission, PermissionHint::Never);
+        assert!(descriptor.description.contains("searcher"));
+        assert!(descriptor.description.contains("model"));
+        let schema = descriptor.input_schema.to_string();
+        assert!(
+            schema.contains("\"model\""),
+            "input schema advertises the optional model override: {schema}"
+        );
+    }
+
+    #[test]
+    fn input_with_model_parses() {
+        let input: AgentInput = serde_json::from_value(serde_json::json!({
+            "role": "searcher",
+            "description": "map event flow",
+            "prompt": "find X",
+            "model": "anthropic/claude-opus-4-8",
+        }))
+        .expect("model field parses");
+        assert_eq!(input.model.as_deref(), Some("anthropic/claude-opus-4-8"));
+    }
+
+    #[test]
+    fn input_without_model_defaults_to_none() {
+        let input: AgentInput = serde_json::from_value(serde_json::json!({
+            "role": "searcher",
+            "description": "map event flow",
+            "prompt": "find X",
+        }))
+        .expect("model is optional");
+        assert_eq!(input.model, None);
+    }
+
+    #[test]
+    fn deny_unknown_fields_still_rejects_typos() {
+        let err = serde_json::from_value::<AgentInput>(serde_json::json!({
+            "role": "searcher",
+            "description": "map event flow",
+            "prompt": "find X",
+            "modle": "typo",
+        }))
+        .unwrap_err();
+        assert!(err.to_string().contains("unknown field"));
+    }
+
+    #[tokio::test]
+    async fn agent_run_is_never_reached_in_a_correct_build() {
+        use agentloop_contracts::{SessionId, ToolCallId, TurnId};
+        use agentloop_core::EventSink;
+        use tokio_util::sync::CancellationToken;
+
+        let (events, _rx) = EventSink::channel();
+        let ctx = ToolContext {
+            session_id: SessionId::from("sess-test"),
+            turn_id: TurnId::from("turn-test"),
+            call_id: ToolCallId::from("call-test"),
+            cwd: std::path::PathBuf::from("."),
+            cancel: CancellationToken::new(),
+            events,
+        };
+        let err = subagent_tool(&[])
+            .run(ctx, serde_json::json!({}))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, ToolError::Execution(_)));
+    }
 }

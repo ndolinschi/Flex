@@ -97,6 +97,14 @@ pub enum AgentEvent {
         call_id: ToolCallId,
         note: String,
     },
+    /// Incremental output from a running exec-style tool (e.g. Bash).
+    /// Ephemeral streaming data — the complete output still arrives in the
+    /// final `ToolCallUpdated`.
+    ExecChunk {
+        call_id: ToolCallId,
+        stream: ExecStream,
+        text: String,
+    },
 
     UserMessage {
         message_id: MessageId,
@@ -158,6 +166,24 @@ pub enum AgentEvent {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         to: Option<crate::capability::ModelRef>,
         reason: EngineError,
+    },
+    /// A RETRYABLE provider/network failure (timeout, dropped connection,
+    /// mid-stream cut, 5xx, rate limit) is about to be retried on the *same*
+    /// model after a backoff sleep, instead of failing the turn or advancing
+    /// the fallback chain. Emitted once per scheduled attempt, right before
+    /// the sleep starts, so a UI can render e.g. "Reconnecting… attempt 3/10,
+    /// retrying in 30s". Ephemeral: not persisted, since normal streaming
+    /// resuming afterward is already visible via the next stream events.
+    RetryScheduled {
+        /// 1-indexed retry attempt about to be slept for (`1` = first retry
+        /// after the initial call failed).
+        attempt: u32,
+        /// Total attempts allowed by the schedule, counting the initial call.
+        max_attempts: u32,
+        /// How long this attempt will sleep before retrying, in milliseconds.
+        delay_ms: u64,
+        /// Human-readable description of the failure that triggered the retry.
+        error: String,
     },
     HookFired {
         point: HookPoint,
@@ -229,6 +255,15 @@ pub enum AgentEvent {
     },
 }
 
+/// Which stream an [`AgentEvent::ExecChunk`] came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum ExecStream {
+    Stdout,
+    Stderr,
+}
+
 impl AgentEvent {
     /// Whether this event belongs in the durable session log.
     pub fn is_persistent(&self) -> bool {
@@ -240,6 +275,7 @@ impl AgentEvent {
                 | Self::TextSnapshot { .. }
                 | Self::ToolArgsDelta { .. }
                 | Self::ToolProgress { .. }
+                | Self::ExecChunk { .. }
                 | Self::SubagentEvent { .. }
                 | Self::Gap { .. }
         )
@@ -259,6 +295,7 @@ impl AgentEvent {
             Self::TextSnapshot { .. } => "text_snapshot",
             Self::ToolArgsDelta { .. } => "tool_args_delta",
             Self::ToolProgress { .. } => "tool_progress",
+            Self::ExecChunk { .. } => "exec_chunk",
             Self::UserMessage { .. } => "user_message",
             Self::AssistantMessage { .. } => "assistant_message",
             Self::ToolCallUpdated { .. } => "tool_call_updated",
@@ -270,6 +307,7 @@ impl AgentEvent {
             Self::CommandExpanded { .. } => "command_expanded",
             Self::CompactionBoundary { .. } => "compaction_boundary",
             Self::ModelFallback { .. } => "model_fallback",
+            Self::RetryScheduled { .. } => "retry_scheduled",
             Self::HookFired { .. } => "hook_fired",
             Self::SubagentStarted { .. } => "subagent_started",
             Self::SubagentEvent { .. } => "subagent_event",

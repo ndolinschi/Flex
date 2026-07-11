@@ -407,6 +407,7 @@ dependencies = [
  "agentloop-eval",
  "agentloop-executors",
  "agentloop-learning",
+ "agentloop-mcp",
  "agentloop-providers",
  "agentloop-search",
  "agentloop-session",

@@ -1,5 +1,6 @@
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use futures::StreamExt;
@@ -14,7 +15,7 @@ use agentloop_core::{
     Agent, Hook, HookContext, HookData, HookError, HookOutcome, PermissionHint, ProviderRegistry,
     SessionStore, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError, ToolRegistry,
 };
-use agentloop_loop::NativeAgentBuilder;
+use agentloop_loop::{LoopLimits, NativeAgentBuilder, RetryPolicy};
 use agentloop_session::MemoryStore;
 use agentloop_testkit::{EchoTool, MOCK_MODEL, MOCK_PROVIDER_ID, MockProvider, SlowTool};
 
@@ -34,6 +35,20 @@ fn provider_registry(provider: Arc<MockProvider>) -> ProviderRegistry {
 
 fn default_model() -> ModelRef {
     ModelRef(format!("{MOCK_PROVIDER_ID}/{MOCK_MODEL}"))
+}
+
+/// `LoopLimits` with an empty retry schedule: the patient same-model retry
+/// added for RETRYABLE failures is exhausted immediately, so a scripted
+/// failure falls through to the fallback-chain/model-exhausted handling on
+/// the first attempt — exactly like before the retry schedule existed. Used
+/// by tests that exercise fallback-chain behavior itself, not retries.
+fn limits_without_retry() -> LoopLimits {
+    LoopLimits {
+        retry: RetryPolicy {
+            schedule: Vec::new(),
+        },
+        ..LoopLimits::default()
+    }
 }
 
 async fn create_agent(
@@ -636,6 +651,7 @@ async fn provider_failure_falls_back_to_next_chain_model() {
         .providers(providers)
         .system_prompt("You are a test agent.")
         .default_model(ModelRef::from("mock-a/model-one"))
+        .limits(limits_without_retry())
         .build();
 
     let session = agent
@@ -695,6 +711,7 @@ async fn session_level_fallback_chain_is_used_when_turn_options_specify_none() {
         .providers(providers)
         .system_prompt("You are a test agent.")
         .default_model(ModelRef::from("mock-a/model-one"))
+        .limits(limits_without_retry())
         .build();
 
     // The fallback chain comes from NewSessionParams, not TurnOptions —
@@ -745,6 +762,7 @@ async fn exhausted_chain_surfaces_the_error() {
         .providers(providers)
         .system_prompt("You are a test agent.")
         .default_model(ModelRef::from("mock-a/model-one"))
+        .limits(limits_without_retry())
         .build();
 
     let session = agent
@@ -784,7 +802,13 @@ async fn truncated_stream_without_terminal_event_surfaces_as_error_not_phantom_s
     let provider = Arc::new(MockProvider::with_turns(
         std::iter::repeat_with(truncated_turn).take(3),
     ));
-    let (agent, store) = create_agent(provider.clone(), Vec::new(), Vec::new()).await;
+    let store = Arc::new(MemoryStore::new());
+    let agent = NativeAgentBuilder::new(store.clone())
+        .providers(provider_registry(provider.clone()))
+        .system_prompt("You are a test agent.")
+        .default_model(default_model())
+        .limits(limits_without_retry())
+        .build();
     let session = agent
         .create_session(NewSessionParams::default())
         .await
@@ -866,6 +890,232 @@ async fn mid_stream_failure_is_retried_on_same_model_before_falling_back() {
         )),
         "the recovered answer materializes once the retry succeeds"
     );
+}
+
+/// A near-zero test schedule: exercises the patient retry layer's control
+/// flow (attempt counting, event emission, cancellation race) without
+/// actually waiting real backoff durations in the test suite.
+fn fast_retry_limits(attempts: usize) -> LoopLimits {
+    LoopLimits {
+        retry: RetryPolicy {
+            schedule: vec![Duration::from_millis(5); attempts],
+        },
+        ..LoopLimits::default()
+    }
+}
+
+#[tokio::test]
+async fn connect_failure_is_retried_on_same_model_and_then_succeeds() {
+    use agentloop_testkit::ScriptedError;
+
+    // `Http` covers timeouts/connection failures classified upstream in
+    // `agentloop_providers_common::http::is_retryable_transport_error`. The
+    // first two failures are absorbed by the existing fast `stream_retries`
+    // micro-retry layer (silent, sub-second, no `RetryScheduled` event —
+    // that layer is unchanged by this feature); once it's exhausted, the
+    // patient schedule takes over for attempts 1-3, then the model finally
+    // succeeds. All six requests land on the same model — no fallback.
+    let provider = Arc::new(MockProvider::with_turns(vec![
+        Err(ScriptedError::Http("connection reset by peer".to_owned())),
+        Err(ScriptedError::Http("connection reset by peer".to_owned())),
+        Err(ScriptedError::Http("connection reset by peer".to_owned())),
+        Err(ScriptedError::Http("connection reset by peer".to_owned())),
+        Err(ScriptedError::Http("connection reset by peer".to_owned())),
+        MockProvider::text_turn("reconnected"),
+    ]));
+    let store = Arc::new(MemoryStore::new());
+    let agent = NativeAgentBuilder::new(store.clone())
+        .providers(provider_registry(provider.clone()))
+        .system_prompt("You are a test agent.")
+        .default_model(default_model())
+        .limits(fast_retry_limits(9))
+        .build();
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+
+    let mut stream = agent.events(&session).expect("subscribe succeeds");
+    let prompt_agent = agent.clone();
+    let prompt_session = session.clone();
+    let prompt_task = tokio::spawn(async move {
+        prompt_agent
+            .prompt(
+                &prompt_session,
+                PromptInput::text("hello"),
+                TurnOptions::default(),
+            )
+            .await
+    });
+
+    let mut retry_attempts = Vec::new();
+    tokio::pin!(prompt_task);
+    let summary = loop {
+        tokio::select! {
+            event = stream.next() => {
+                if let Some(SessionEvent { payload: AgentEvent::RetryScheduled { attempt, max_attempts, .. }, .. }) = event {
+                    retry_attempts.push(attempt);
+                    assert_eq!(max_attempts, 10, "default schedule allows 10 total attempts");
+                }
+            }
+            joined = &mut prompt_task => {
+                break joined.expect("prompt task joins").expect("turn survives repeated connect failures via same-model retry");
+            }
+        }
+    };
+
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+    assert_eq!(
+        provider.requests().len(),
+        6,
+        "five failed attempts (2 fast stream retries + 3 scheduled retries) \
+         plus the successful sixth, all against the same model"
+    );
+    assert_eq!(
+        retry_attempts,
+        vec![1, 2, 3],
+        "RetryScheduled fires once per scheduled attempt, in order, before each backoff sleep"
+    );
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    assert!(
+        !events
+            .iter()
+            .any(|(_, event)| matches!(event, AgentEvent::ModelFallback { .. })),
+        "same-model retries must not be recorded as a fallback"
+    );
+    assert!(
+        events.iter().any(|(_, event)| matches!(
+            event,
+            AgentEvent::AssistantMessage { content, .. }
+                if content.iter().any(|block| matches!(
+                    block,
+                    agentloop_contracts::ContentBlock::Markdown { text } if text == "reconnected"
+                ))
+        )),
+        "the recovered answer materializes once the connection recovers"
+    );
+}
+
+#[tokio::test]
+async fn retry_schedule_exhaustion_falls_back_to_next_model() {
+    use agentloop_testkit::ScriptedError;
+
+    // The first two failures are absorbed by the existing fast
+    // `stream_retries` layer; the schedule here allows exactly one more
+    // scheduled retry, so the fourth failure must advance the fallback chain
+    // instead of retrying forever.
+    let failing = Arc::new(MockProvider::with_id("mock-a"));
+    failing.push_turns([
+        Err(ScriptedError::Http("connection reset".to_owned())),
+        Err(ScriptedError::Http("connection reset".to_owned())),
+        Err(ScriptedError::Http("connection reset".to_owned())),
+        Err(ScriptedError::Http("connection reset".to_owned())),
+    ]);
+    let healthy = Arc::new(MockProvider::with_id("mock-b"));
+    healthy.push_turn(MockProvider::text_turn("served by fallback"));
+
+    let store = Arc::new(MemoryStore::new());
+    let mut providers = ProviderRegistry::new();
+    providers.register(failing.clone());
+    providers.register(healthy.clone());
+    let agent = NativeAgentBuilder::new(store.clone())
+        .providers(providers)
+        .system_prompt("You are a test agent.")
+        .default_model(ModelRef::from("mock-a/model-one"))
+        .limits(fast_retry_limits(1))
+        .build();
+
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+    let opts = TurnOptions {
+        fallback_models: vec![ModelRef::from("mock-b/model-two")],
+        ..TurnOptions::default()
+    };
+    let summary = agent
+        .prompt(&session, PromptInput::text("hello"), opts)
+        .await
+        .expect("the chain rescues the turn once the schedule is exhausted");
+
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+    assert_eq!(
+        failing.requests().len(),
+        4,
+        "2 fast stream retries plus exactly one scheduled retry, then a 4th failure \
+         finds the schedule exhausted and advances the fallback chain"
+    );
+    assert_eq!(healthy.requests().len(), 1, "fallback model served");
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    assert!(
+        events.iter().any(|(_, event)| matches!(
+            event,
+            AgentEvent::ModelFallback { from, to: Some(to), .. }
+                if from.0 == "mock-a/model-one" && to.0 == "mock-b/model-two"
+        )),
+        "fallback fires only after the retry schedule is exhausted"
+    );
+}
+
+#[tokio::test]
+async fn stop_during_backoff_cancels_immediately_without_waiting_out_the_schedule() {
+    use agentloop_testkit::ScriptedError;
+
+    // The first two failures are absorbed by the fast `stream_retries` layer
+    // (sub-second backoff); the third is where the 1-hour scheduled delay
+    // below would kick in. If cancellation didn't race that sleep, this test
+    // would hang for an hour.
+    let provider = Arc::new(MockProvider::with_turns(vec![
+        Err(ScriptedError::Http("connection reset".to_owned())),
+        Err(ScriptedError::Http("connection reset".to_owned())),
+        Err(ScriptedError::Http("connection reset".to_owned())),
+    ]));
+    let store = Arc::new(MemoryStore::new());
+    let agent = NativeAgentBuilder::new(store.clone())
+        .providers(provider_registry(provider.clone()))
+        .system_prompt("You are a test agent.")
+        .default_model(default_model())
+        .limits(LoopLimits {
+            retry: RetryPolicy {
+                schedule: vec![Duration::from_secs(3600)],
+            },
+            ..LoopLimits::default()
+        })
+        .build();
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+
+    let mut stream = agent.events(&session).expect("subscribe succeeds");
+    let prompt_agent = agent.clone();
+    let prompt_session = session.clone();
+    let prompt_task = tokio::spawn(async move {
+        prompt_agent
+            .prompt(
+                &prompt_session,
+                PromptInput::text("hello"),
+                TurnOptions::default(),
+            )
+            .await
+    });
+
+    loop {
+        let SessionEvent { payload, .. } = stream.next().await.expect("retry event arrives");
+        if matches!(payload, AgentEvent::RetryScheduled { .. }) {
+            break;
+        }
+    }
+    agent.cancel(&session).await.expect("cancel succeeds");
+
+    let summary = tokio::time::timeout(Duration::from_secs(5), prompt_task)
+        .await
+        .expect("cancellation interrupts the backoff sleep immediately, not after 3600s")
+        .expect("prompt task joins")
+        .expect("cancelled turn resolves Ok");
+    assert_eq!(summary.stop_reason, TurnStopReason::Cancelled);
 }
 
 #[tokio::test]
@@ -1750,5 +2000,79 @@ async fn unknown_role_teaches_and_turn_continues() {
                     && call.result.as_ref().map(ToolOutput::render_text).unwrap_or_default().contains("Available roles")
         )),
         "bad role produces a teaching error result"
+    );
+}
+
+/// Per-call `model` override (mirrors `Verify`'s `model` field): an Agent
+/// call that sets `model` pins the child to that model, taking precedence
+/// over the role's own `models` chain — same precedence Verify already uses
+/// for its verifier subagents.
+#[tokio::test]
+async fn agent_call_model_override_takes_precedence_over_role_models() {
+    use agentloop_loop::roles::RoleSpec;
+
+    let (turn, _ids) = MockProvider::tool_turn(&[(
+        "Agent",
+        serde_json::json!({
+            "role": "searcher",
+            "description": "escalate",
+            "prompt": "do the hard part",
+            "model": "mock-b/override-model",
+        }),
+    )]);
+    let mock_a = Arc::new(MockProvider::with_id("mock-a"));
+    mock_a.push_turn(turn);
+    mock_a.push_turn(MockProvider::text_turn("done"));
+    let mock_b = Arc::new(MockProvider::with_id("mock-b"));
+    mock_b.push_turn(MockProvider::text_turn("child result"));
+
+    let store = Arc::new(MemoryStore::new());
+    let mut providers = ProviderRegistry::new();
+    providers.register(mock_a.clone());
+    providers.register(mock_b.clone());
+    let agent = NativeAgentBuilder::new(store.clone())
+        .providers(providers)
+        .tools(registry_with(vec![Arc::new(TaskStub)]))
+        .roles(vec![RoleSpec {
+            models: vec![ModelRef::from("mock-a/role-model")],
+            split: false,
+            ..RoleSpec::new("searcher")
+        }])
+        .system_prompt("You are a test agent.")
+        .default_model(ModelRef::from("mock-a/model-parent"))
+        .build();
+
+    let session = agent
+        .create_session(NewSessionParams::default())
+        .await
+        .expect("session is created");
+    let summary = agent
+        .prompt(
+            &session,
+            PromptInput::text("escalate one subagent"),
+            TurnOptions::default(),
+        )
+        .await
+        .expect("turn succeeds");
+    assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+
+    let events = store.read(&session, 0).await.expect("events replay");
+    let child = events
+        .iter()
+        .find_map(|(_, event)| match event {
+            AgentEvent::SubagentStarted { child_session, .. } => Some(child_session.clone()),
+            _ => None,
+        })
+        .expect("Agent call spawned a child");
+    let meta = store.get_meta(&child).await.expect("child meta reads");
+    assert_eq!(
+        meta.model.map(|m| m.0),
+        Some("mock-b/override-model".to_owned()),
+        "explicit per-call model override wins over role.models"
+    );
+    assert_eq!(
+        mock_b.requests().len(),
+        1,
+        "override model actually served the child"
     );
 }

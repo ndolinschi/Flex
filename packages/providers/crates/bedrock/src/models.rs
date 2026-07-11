@@ -70,7 +70,7 @@ pub(crate) fn parse_foundation_models(body: &str) -> Result<Vec<ModelInfo>, serd
         .map(|m| ModelInfo {
             vision: contains_ci(&m.input_modalities, "IMAGE"),
             reasoning: false,
-            context_window: None,
+            context_window: context_window_for(&m.model_id),
             display_name: m.model_name,
             id: m.model_id,
         })
@@ -97,7 +97,7 @@ pub(crate) fn parse_inference_profiles_page(
         .map(|p| ModelInfo {
             vision: false,
             reasoning: false,
-            context_window: None,
+            context_window: context_window_for(&p.inference_profile_id),
             display_name: p.inference_profile_name,
             id: p.inference_profile_id,
         })
@@ -134,6 +134,30 @@ fn contains_ci(haystack: &[String], needle: &str) -> bool {
     haystack
         .iter()
         .any(|item| item.eq_ignore_ascii_case(needle))
+}
+
+/// Known context-window sizes by model-id family. Bedrock's list endpoints
+/// don't report this, so we infer it from the id; unknown families fall back
+/// to `None` (the frontend then assumes a conservative default).
+fn context_window_for(id: &str) -> Option<u32> {
+    let id = id.to_ascii_lowercase();
+    if id.contains("anthropic.claude") {
+        Some(200_000)
+    } else if id.contains("nova-premier") {
+        Some(1_000_000)
+    } else if id.contains("nova-micro") || id.contains("nova-lite") || id.contains("nova-pro") {
+        Some(300_000)
+    } else if id.contains("mistral-7b") || id.contains("mixtral") {
+        Some(32_000)
+    } else if id.contains("meta.llama3")
+        || id.contains("mistral-large")
+        || id.contains("deepseek.r1")
+        || id.contains("gpt-oss")
+    {
+        Some(128_000)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

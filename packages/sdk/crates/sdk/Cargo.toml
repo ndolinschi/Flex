@@ -17,6 +17,7 @@ agentloop-contracts = { workspace = true }
 agentloop-core = { workspace = true }
 agentloop-engine = { workspace = true }
 agentloop-executors = { workspace = true }
+agentloop-mcp = { workspace = true }
 agentloop-session = { workspace = true }
 agentloop-transport-stdio = { workspace = true }
 agentloop-transport-http = { workspace = true }

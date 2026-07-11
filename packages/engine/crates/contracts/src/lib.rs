@@ -42,7 +42,7 @@ pub use capability::{
 pub use checkpoint::{CheckpointLabel, CheckpointRef};
 pub use content::{BlobSource, ContentBlock, Message, Role, ToolResultBlock};
 pub use error::{EngineError, ErrorCode, Provenance};
-pub use event::{AgentEvent, SessionEvent};
+pub use event::{AgentEvent, ExecStream, SessionEvent};
 pub use goal::{GoalOutcome, GoalSpec, GoalStopReason};
 pub use hello::{EngineIdentity, Hello, PROTOCOL_VERSION};
 pub use hook::{HookOutcomeKind, HookPoint};

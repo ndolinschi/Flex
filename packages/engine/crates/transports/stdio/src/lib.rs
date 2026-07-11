@@ -51,6 +51,7 @@ fn event_visible(event: &AgentEvent, verbosity: OutputVerbosity) -> bool {
             AgentEvent::MarkdownDelta { .. }
                 | AgentEvent::ThinkingDelta { .. }
                 | AgentEvent::ToolArgsDelta { .. }
+                | AgentEvent::ExecChunk { .. }
         ),
         OutputVerbosity::Low => matches!(
             event,
@@ -63,6 +64,7 @@ fn event_visible(event: &AgentEvent, verbosity: OutputVerbosity) -> bool {
                 | AgentEvent::PermissionResolved { .. }
                 | AgentEvent::SessionError { .. }
                 | AgentEvent::ModelFallback { .. }
+                | AgentEvent::RetryScheduled { .. }
                 | AgentEvent::SubagentEvent { .. }
                 | AgentEvent::SubagentCompleted { .. }
                 | AgentEvent::CompactionBoundary { .. }

@@ -24,6 +24,10 @@ pub struct LoopLimits {
     /// Optional global cross-session cap on concurrently running tools.
     /// `None` (default) keeps today's per-session bound only.
     pub tool_pool_size: Option<usize>,
+    /// Escalating backoff schedule for provider/network failures that
+    /// survive a dropped connection instead of failing the turn or burning a
+    /// fallback model. See [`RetryPolicy`].
+    pub retry: RetryPolicy,
 }
 
 impl Default for LoopLimits {
@@ -33,6 +37,68 @@ impl Default for LoopLimits {
             tool_concurrency: 4,
             tool_timeout: Duration::from_secs(600),
             tool_pool_size: None,
+            retry: RetryPolicy::default(),
+        }
+    }
+}
+
+/// Escalating same-model retry schedule for RETRYABLE provider/network
+/// failures (timeouts, dropped connections, mid-stream cuts, 5xx, rate
+/// limits) that occur while calling the model.
+///
+/// This is deliberately separate from the mid-stream `stream_retries` bound
+/// in [`crate::turn::iteration`]: that one is a handful of fast, low-backoff
+/// retries for a corrupted frame on an otherwise healthy connection. This
+/// policy is the outer, patient layer — it survives a connection actually
+/// dropping (Wi-Fi hiccup, VPN reset, provider outage) by holding the turn
+/// open across the fallback-chain boundary, sleeping the scheduled delay,
+/// and retrying the *same* model before the existing fallback/model-exhausted
+/// semantics ever see the failure.
+#[derive(Debug, Clone)]
+pub struct RetryPolicy {
+    /// Delay before each successive retry attempt, in order. The default is
+    /// approximately 10 attempts total (initial call + `schedule.len()`
+    /// retries): three 30s spacings, two 60s spacings, then four 300s (5m)
+    /// spacings for a patient tail — enough to ride out a laptop sleep/wake
+    /// or a several-minute network blip without failing the turn.
+    pub schedule: Vec<Duration>,
+}
+
+impl RetryPolicy {
+    /// The default escalating schedule: `[30s, 30s, 30s, 60s, 60s, 300s,
+    /// 300s, 300s, 300s]` — 9 retries plus the initial attempt, ~10 total.
+    pub fn default_schedule() -> Vec<Duration> {
+        vec![
+            Duration::from_secs(30),
+            Duration::from_secs(30),
+            Duration::from_secs(30),
+            Duration::from_secs(60),
+            Duration::from_secs(60),
+            Duration::from_secs(300),
+            Duration::from_secs(300),
+            Duration::from_secs(300),
+            Duration::from_secs(300),
+        ]
+    }
+
+    /// Total attempts the schedule allows, counting the initial call.
+    pub fn max_attempts(&self) -> u32 {
+        self.schedule.len() as u32 + 1
+    }
+
+    /// The delay for the given 1-indexed retry attempt (`1` = first retry,
+    /// after the initial call fails), or `None` once the schedule is
+    /// exhausted.
+    pub fn delay_for(&self, attempt: u32) -> Option<Duration> {
+        let index = attempt.checked_sub(1)? as usize;
+        self.schedule.get(index).copied()
+    }
+}
+
+impl Default for RetryPolicy {
+    fn default() -> Self {
+        Self {
+            schedule: Self::default_schedule(),
         }
     }
 }
@@ -191,5 +257,65 @@ impl NativeAgentBuilder {
             command_infos: self.command_infos,
             sessions: Mutex::new(HashMap::new()),
         })
+    }
+}
+
+#[cfg(test)]
+mod retry_policy_tests {
+    use super::*;
+
+    #[test]
+    fn default_schedule_has_ten_total_attempts() {
+        let policy = RetryPolicy::default();
+        assert_eq!(policy.schedule.len(), 9);
+        assert_eq!(policy.max_attempts(), 10);
+    }
+
+    #[test]
+    fn default_schedule_escalates_as_documented() {
+        let policy = RetryPolicy::default();
+        let expected = [30, 30, 30, 60, 60, 300, 300, 300, 300].map(Duration::from_secs);
+        for (attempt, expected_delay) in (1u32..).zip(expected) {
+            assert_eq!(
+                policy.delay_for(attempt),
+                Some(expected_delay),
+                "attempt {attempt} delay mismatch"
+            );
+        }
+    }
+
+    #[test]
+    fn delay_for_is_none_once_schedule_is_exhausted() {
+        let policy = RetryPolicy::default();
+        assert_eq!(policy.delay_for(10), None);
+        assert_eq!(policy.delay_for(11), None);
+    }
+
+    #[test]
+    fn delay_for_rejects_attempt_zero() {
+        // Attempt numbering is 1-indexed (attempt 1 = first retry); 0 has no
+        // meaning and must not panic via underflow.
+        let policy = RetryPolicy::default();
+        assert_eq!(policy.delay_for(0), None);
+    }
+
+    #[test]
+    fn empty_schedule_is_immediately_exhausted() {
+        let policy = RetryPolicy {
+            schedule: Vec::new(),
+        };
+        assert_eq!(policy.max_attempts(), 1);
+        assert_eq!(policy.delay_for(1), None);
+    }
+
+    #[test]
+    fn custom_schedule_overrides_default() {
+        let policy = RetryPolicy {
+            schedule: vec![Duration::from_millis(10), Duration::from_millis(20)],
+        };
+        assert_eq!(policy.max_attempts(), 3);
+        assert_eq!(policy.delay_for(1), Some(Duration::from_millis(10)));
+        assert_eq!(policy.delay_for(2), Some(Duration::from_millis(20)));
+        assert_eq!(policy.delay_for(3), None);
     }
 }
