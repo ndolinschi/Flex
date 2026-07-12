@@ -2277,7 +2277,22 @@ export const browserInvoke = async <T>(
       return [
         { id: "anthropic", label: "Anthropic", requiresApiKey: true },
         { id: "openai", label: "OpenAI", requiresApiKey: true },
+        { id: "ollama", label: "Ollama", requiresApiKey: false },
+        { id: "copilot", label: "GitHub Copilot", requiresApiKey: false },
       ] as BuiltinProvider[] as T
+    case "copilot_auth_status":
+      return { signedIn: false } as T
+    case "copilot_auth_start":
+      return {
+        sessionId: "mock-copilot-auth",
+        userCode: "ABCD-1234",
+        verificationUri: "https://github.com/login/device",
+        expiresIn: 900,
+      } as T
+    case "copilot_auth_wait":
+      return { signedIn: true } as T
+    case "copilot_auth_cancel":
+      return undefined as T
     case "list_models":
       return models as T
     case "list_providers":

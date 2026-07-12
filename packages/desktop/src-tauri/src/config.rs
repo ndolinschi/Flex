@@ -651,6 +651,13 @@ impl ProviderConfig {
             if profile.provider == "ollama" {
                 return true;
             }
+            // Copilot is ready after a device-flow / editor sign-in
+            // (`apps.json`) or when a GitHub token was pasted into the
+            // profile key map.
+            if profile.provider == "copilot" {
+                return self.profile_keys.contains_key(&profile.id)
+                    || agentloop_sdk::providers::copilot::CopilotConfig::discoverable();
+            }
             return self.profile_keys.contains_key(&profile.id);
         }
         let Some(preferred) = self.prefs.preferred_provider.as_deref() else {
@@ -659,6 +666,10 @@ impl ProviderConfig {
         // Ollama needs a host, not an API key.
         if preferred == "ollama" {
             return true;
+        }
+        if preferred == "copilot" {
+            return self.keys.contains_key(preferred)
+                || agentloop_sdk::providers::copilot::CopilotConfig::discoverable();
         }
         self.keys.contains_key(preferred)
     }

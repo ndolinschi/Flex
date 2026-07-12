@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Button, TextInput } from "../atoms"
 import { ErrorBanner } from "./ErrorBanner"
 import { FieldRow, SettingsSection } from "./SettingsSection"
@@ -21,6 +22,8 @@ type ProviderConnectionFormProps = {
   defaultIsolation: string
   hasStoredKey: boolean
   isBedrock: boolean
+  /** GitHub Copilot: device-flow / editor sign-in is present. */
+  copilotSignedIn?: boolean
   models: ModelInfoDto[]
   defaultModelOptions: ModelInfoDto[]
   builtinProviders: BuiltinProvider[]
@@ -39,6 +42,7 @@ type ProviderConnectionFormProps = {
   onDefaultIsolationChange: (value: string) => void
   onValidate: () => void
   onSave: () => void
+  onCopilotSignIn?: () => void
 }
 
 /** Connection create/edit form (fields + models + isolation + save footer). */
@@ -55,6 +59,7 @@ export const ProviderConnectionForm = ({
   defaultIsolation,
   hasStoredKey,
   isBedrock,
+  copilotSignedIn = false,
   models,
   defaultModelOptions,
   builtinProviders,
@@ -73,7 +78,11 @@ export const ProviderConnectionForm = ({
   onDefaultIsolationChange,
   onValidate,
   onSave,
+  onCopilotSignIn,
 }: ProviderConnectionFormProps) => {
+  const isCopilot = provider === "copilot"
+  const [showTokenPaste, setShowTokenPaste] = useState(false)
+
   return (
     <form
       className="flex flex-col gap-3"
@@ -87,7 +96,7 @@ export const ProviderConnectionForm = ({
         description="Native provider for the agent loop"
         className="mb-0"
       >
-        <FieldRow label="Name" htmlFor="label" hint="e.g. &quot;AWS work&quot;">
+        <FieldRow label="Name" htmlFor="label" hint='e.g. "AWS work"'>
           <TextInput
             id="label"
             value={label}
@@ -112,55 +121,123 @@ export const ProviderConnectionForm = ({
           </select>
         </FieldRow>
 
-        <FieldRow
-          label="API key"
-          htmlFor="apiKey"
-          hint={
-            isBedrock
-              ? hasStoredKey && !apiKey
-                ? "A Bedrock API key is already stored — leave blank to keep it"
-                : "Paste your Bedrock API key (bearer token) — sent as Authorization: Bearer <token>. Stored encrypted locally, never in browser storage; see Security below for the storage backend."
-              : hasStoredKey && !apiKey
-                ? "A key is already stored — leave blank to keep it"
-                : "Stored encrypted locally, never in browser storage; see Security below for the storage backend"
-          }
-        >
-          <TextInput
-            id="apiKey"
-            type="password"
-            value={apiKey}
-            onChange={(e) => onApiKeyChange(e.target.value)}
-            autoComplete="off"
-            placeholder={hasStoredKey ? "••••••••" : isBedrock ? "Bedrock API key" : "sk-…"}
-          />
-        </FieldRow>
-
-        {isBedrock ? (
-          <FieldRow
-            label="Region"
-            htmlFor="region"
-            hint="AWS region for Bedrock, e.g. us-east-1 or eu-west-1 (defaults to us-east-1)"
-          >
-            <TextInput
-              id="region"
-              value={region}
-              onChange={(e) => onRegionChange(e.target.value)}
-              placeholder="us-east-1"
-            />
-          </FieldRow>
+        {isCopilot ? (
+          <>
+            <FieldRow
+              label="GitHub Copilot"
+              htmlFor="copilotSignIn"
+              hint={
+                copilotSignedIn || hasStoredKey
+                  ? "Signed in — validate to list models, then save"
+                  : "Sign in with GitHub device flow, or paste an existing OAuth token"
+              }
+            >
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-ink">
+                  {copilotSignedIn || hasStoredKey ? (
+                    <span className="text-success">Signed in</span>
+                  ) : (
+                    <span className="text-ink-muted">Not signed in</span>
+                  )}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    id="copilotSignIn"
+                    size="sm"
+                    onClick={onCopilotSignIn}
+                  >
+                    {copilotSignedIn || hasStoredKey
+                      ? "Sign in again"
+                      : "Sign in with GitHub"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowTokenPaste((v) => !v)}
+                  >
+                    {showTokenPaste ? "Hide token field" : "Use existing token"}
+                  </Button>
+                </div>
+              </div>
+            </FieldRow>
+            {showTokenPaste ? (
+              <FieldRow
+                label="GitHub token"
+                htmlFor="apiKey"
+                hint={
+                  hasStoredKey && !apiKey
+                    ? "A token is already stored — leave blank to keep it"
+                    : "Paste a gho_/ghu_ token with Copilot access. Stored encrypted locally."
+                }
+              >
+                <TextInput
+                  id="apiKey"
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => onApiKeyChange(e.target.value)}
+                  autoComplete="off"
+                  placeholder={hasStoredKey ? "••••••••" : "gho_…"}
+                />
+              </FieldRow>
+            ) : null}
+          </>
         ) : (
-          <FieldRow
-            label="Base URL"
-            htmlFor="baseUrl"
-            hint="Optional host override (e.g. for Ollama or a proxy)"
-          >
-            <TextInput
-              id="baseUrl"
-              value={baseUrl}
-              onChange={(e) => onBaseUrlChange(e.target.value)}
-              placeholder="https://api.example.com/v1"
-            />
-          </FieldRow>
+          <>
+            <FieldRow
+              label="API key"
+              htmlFor="apiKey"
+              hint={
+                isBedrock
+                  ? hasStoredKey && !apiKey
+                    ? "A Bedrock API key is already stored — leave blank to keep it"
+                    : "Paste your Bedrock API key (bearer token) — sent as Authorization: Bearer <token>. Stored encrypted locally, never in browser storage; see Security below for the storage backend."
+                  : hasStoredKey && !apiKey
+                    ? "A key is already stored — leave blank to keep it"
+                    : "Stored encrypted locally, never in browser storage; see Security below for the storage backend"
+              }
+            >
+              <TextInput
+                id="apiKey"
+                type="password"
+                value={apiKey}
+                onChange={(e) => onApiKeyChange(e.target.value)}
+                autoComplete="off"
+                placeholder={
+                  hasStoredKey ? "••••••••" : isBedrock ? "Bedrock API key" : "sk-…"
+                }
+              />
+            </FieldRow>
+
+            {isBedrock ? (
+              <FieldRow
+                label="Region"
+                htmlFor="region"
+                hint="AWS region for Bedrock, e.g. us-east-1 or eu-west-1 (defaults to us-east-1)"
+              >
+                <TextInput
+                  id="region"
+                  value={region}
+                  onChange={(e) => onRegionChange(e.target.value)}
+                  placeholder="us-east-1"
+                />
+              </FieldRow>
+            ) : (
+              <FieldRow
+                label="Base URL"
+                htmlFor="baseUrl"
+                hint="Optional host override (e.g. for Ollama or a proxy)"
+              >
+                <TextInput
+                  id="baseUrl"
+                  value={baseUrl}
+                  onChange={(e) => onBaseUrlChange(e.target.value)}
+                  placeholder="https://api.example.com/v1"
+                />
+              </FieldRow>
+            )}
+          </>
         )}
       </SettingsSection>
 
@@ -243,12 +320,7 @@ export const ProviderConnectionForm = ({
           </p>
         ) : null}
 
-        <Button
-          type="button"
-          variant="ghost"
-          isLoading={isValidating}
-          onClick={onValidate}
-        >
+        <Button type="button" variant="ghost" isLoading={isValidating} onClick={onValidate}>
           Validate
         </Button>
         <Button type="submit" isLoading={isSaving}>

@@ -8,6 +8,7 @@ use std::sync::Arc;
 // import used everywhere else in this struct.
 use std::sync::Mutex as SyncMutex;
 
+use agentloop_sdk::providers::copilot::DeviceAuthorization;
 use agentloop_sdk::EngineService;
 use agentloop_session::JsonlStore;
 use serde::{Deserialize, Serialize};
@@ -16,6 +17,15 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::config::ProviderConfig;
+
+/// In-flight GitHub Copilot device-code sign-in. The full
+/// [`DeviceAuthorization`] (including the private `device_code`) stays on
+/// this side of the IPC boundary — the frontend only sees the session id
+/// plus the public user code / verification URI.
+pub struct PendingCopilotAuth {
+    pub auth: DeviceAuthorization,
+    pub cancel: CancellationToken,
+}
 
 /// A live PTY-backed terminal session.
 pub struct TerminalHandle {
@@ -131,6 +141,8 @@ pub struct AppState {
     /// the file persisted via [`save_session_baselines`]; loaded from disk
     /// once at startup in [`AppState::new`] so it survives app restart.
     pub session_baselines: Mutex<HashMap<String, SessionBaseline>>,
+    /// Pending Copilot device-flow sessions keyed by opaque session id.
+    pub pending_copilot_auth: Mutex<HashMap<String, PendingCopilotAuth>>,
 }
 
 impl AppState {
@@ -150,6 +162,7 @@ impl AppState {
             browser_webview: Mutex::new(None),
             browser_bounds: SyncMutex::new(None),
             session_baselines: Mutex::new(load_session_baselines()),
+            pending_copilot_auth: Mutex::new(HashMap::new()),
         }
     }
 }
