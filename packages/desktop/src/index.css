@@ -185,15 +185,11 @@ mark[data-plan-find-mark].plan-find-mark-active {
 }
 
 /*
- * Timeline row containment (long-session perf): off-screen rows skip layout
- * / paint / style work entirely via `content-visibility: auto`. The browser
- * still needs a size estimate for scrollbar math before a row is ever
- * measured, hence per-kind `contain-intrinsic-size` hints below — rough is
- * fine, they only matter until the row's first real layout, after which the
- * browser remembers the measured size. Do NOT apply to any row that must
- * always stay live/measured off-screen (e.g. xterm-backed panes) — the
- * timeline has none of those (xterm only lives in the right-panel Terminal
- * tab), so no row kind is excluded here.
+ * Timeline row containment helpers (`.cv-auto*`) — kept for potential
+ * non-virtualized surfaces. The chat timeline itself does NOT apply these:
+ * `@tanstack/react-virtual` already unmounts off-screen rows, and
+ * `content-visibility: auto` on the mounted overscan window races with
+ * ResizeObserver measurement on WebView2 (Windows scroll overlap).
  */
 .cv-auto {
   content-visibility: auto;

@@ -85,13 +85,23 @@ export const estimateSizeForItem = (item: DisplayItem, isFirst: boolean): number
 }
 
 /**
- * Long-session perf: off-screen timeline rows skip layout/paint/style via
- * `content-visibility: auto` (see `.cv-auto*` in index.css). Picks a size
- * hint per row kind so the placeholder height is close before the row is
- * ever measured. No row kind is excluded — the timeline has no xterm or
- * other always-live content (xterm only lives in the right-panel Terminal
- * tab), so every top-level row is a safe candidate for containment.
+ * Growing / live rows must not use `content-visibility: auto`: on some
+ * Chromium/WebView2 builds (notably Windows at fractional DPI) cv reports
+ * stale heights to the virtualizer's ResizeObserver, so absolutely
+ * positioned rows stack on top of each other.
+ *
+ * With `@tanstack/react-virtual`, off-screen rows are already unmounted —
+ * applying cv to the *mounted* overscan window is redundant and harmful
+ * (scroll-in measurement races). Always skip cv on virtualized timeline
+ * rows; the helper remains so call sites stay explicit.
  */
+export const shouldSkipCv = (
+  _item: DisplayItem,
+  _isStreaming: boolean,
+): boolean => true
+
+/** Class names for `.cv-auto*` in `index.css`. Not applied by the
+ * virtualized chat timeline (see [`shouldSkipCv`]). */
 export const cvClassForItem = (item: DisplayItem): string => {
   if (item.kind === "group") return "cv-auto-group"
   switch (item.row.type) {

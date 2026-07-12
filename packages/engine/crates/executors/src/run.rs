@@ -50,6 +50,7 @@ pub(crate) async fn run_command_with_sink(
     label: &str,
     chunk_sink: Option<ChunkSink>,
 ) -> Result<ExecOutcome, ExecError> {
+    crate::win_console::hide_console(&mut command);
     let Some(sink) = chunk_sink else {
         // No sink: keep the original, simplest path untouched.
         let child = command
@@ -203,6 +204,7 @@ pub(crate) async fn run_command_demotable(
     label: &str,
     chunk_sink: Option<ChunkSink>,
 ) -> Result<ExecOrDemoted, ExecError> {
+    crate::win_console::hide_console(&mut command);
     let Some(demote) = demote else {
         // No demote signal wired up: identical to the plain streaming path.
         return run_command_with_sink(command, timeout_ms, cancel, label, chunk_sink)
@@ -498,6 +500,7 @@ pub(crate) async fn spawn_background(
     label: &str,
     chunk_sink: Option<ChunkSink>,
 ) -> Result<BackgroundSpawn, ExecError> {
+    crate::win_console::hide_console(&mut command);
     let mut child: Child = command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -658,7 +661,9 @@ async fn read_and_forward_background<R>(
 
 /// Probe helper: run `binary --version`-style invocation and summarize.
 pub(crate) async fn probe_binary(binary: &str, args: &[&str]) -> Result<String, String> {
-    let output = Command::new(binary)
+    let mut command = Command::new(binary);
+    crate::win_console::hide_console(&mut command);
+    let output = command
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

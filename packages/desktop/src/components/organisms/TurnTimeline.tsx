@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { ArrowDown } from "lucide-react"
@@ -19,7 +19,6 @@ import { cn } from "../../lib/utils"
 import {
   buildDisplayItems,
   collapseConsecutiveCheckpoints,
-  cvClassForItem,
   estimateSizeForItem,
   lastItemIsOpenWorkGroup,
   latestVerdictInRows,
@@ -251,6 +250,37 @@ export const TurnTimeline = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- measure on content growth only
   }, [streamContentKey, isStreaming, displayItems.length])
 
+  // WorkGroup expand/collapse changes row height; remeasure before
+  // re-sticking so virtual offsets stay correct (esp. WebView2).
+  const onLayoutChange = useCallback(() => {
+    virtualizer.measure()
+    handleLayoutChange()
+  }, [virtualizer, handleLayoutChange])
+
+  // WebView2 (Windows) can report stale row heights while content is
+  // scrolling into the overscan window — remeasure after scroll settles.
+  const scrollRemeasureTimer = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  )
+  const handleScrollAndRemeasure = useCallback(() => {
+    handleScroll()
+    if (scrollRemeasureTimer.current !== null) {
+      clearTimeout(scrollRemeasureTimer.current)
+    }
+    scrollRemeasureTimer.current = setTimeout(() => {
+      scrollRemeasureTimer.current = null
+      virtualizer.measure()
+    }, 50)
+  }, [handleScroll, virtualizer])
+
+  useEffect(() => {
+    return () => {
+      if (scrollRemeasureTimer.current !== null) {
+        clearTimeout(scrollRemeasureTimer.current)
+      }
+    }
+  }, [])
+
   if (!sessionId) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -290,7 +320,7 @@ export const TurnTimeline = ({
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <div
         ref={scrollRef}
-        onScroll={handleScroll}
+        onScroll={handleScrollAndRemeasure}
         className={cn(
           "min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3",
           "[scrollbar-width:thin] [scrollbar-color:var(--color-stroke-3)_transparent]",
@@ -312,13 +342,11 @@ export const TurnTimeline = ({
                   className={cn(
                     "absolute top-0 left-0 w-full",
                     marginForItem(item, isFirst),
-                    // Keep content-visibility on overscan/settled rows; the
-                    // live open group stays measured via ResizeObserver.
-                    item.kind === "group" && item.isOpen
-                      ? undefined
-                      : cvClassForItem(item),
                   )}
-                  style={{ transform: `translateY(${vItem.start}px)` }}
+                  // Integer px avoids subpixel stacking on Windows fractional DPI.
+                  style={{
+                    transform: `translateY(${Math.round(vItem.start)}px)`,
+                  }}
                 >
                   {item.kind === "group" ? (
                     <>
@@ -346,7 +374,7 @@ export const TurnTimeline = ({
                         resumeLine={
                           item.isOpen ? null : resumeLineForRows(item.rows)
                         }
-                        onLayoutChange={handleLayoutChange}
+                        onLayoutChange={onLayoutChange}
                       >
                         <WorkGroupBody
                           rows={item.rows}

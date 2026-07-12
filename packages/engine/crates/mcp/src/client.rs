@@ -203,6 +203,8 @@ async fn connect_server(
                 cmd.stderr(Stdio::null());
                 #[cfg(unix)]
                 cmd.process_group(0);
+                #[cfg(windows)]
+                cmd.creation_flags(0x0800_0000);
             });
             let transport =
                 TokioChildProcess::new(command).map_err(|err| McpBridgeError::Transport {

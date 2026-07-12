@@ -7,6 +7,7 @@ mod error;
 mod secrets;
 mod state;
 mod terminal;
+mod win_console;
 
 use tauri::{LogicalSize, Manager};
 use tracing_subscriber::prelude::*;

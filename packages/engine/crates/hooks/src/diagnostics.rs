@@ -161,6 +161,8 @@ async fn run_check(argv: &[String], env: &[(String, String)], file: &str) -> Opt
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000);
     for (key, value) in env {
         cmd.env(key, value);
     }

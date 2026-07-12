@@ -42,9 +42,10 @@ pub(crate) fn kill_group(pid: u32) {
 /// the unix path.
 #[cfg(not(unix))]
 pub(crate) fn kill_group(pid: u32) {
-    let _ = std::process::Command::new("taskkill")
-        .args(["/T", "/F", "/PID", &pid.to_string()])
-        .output();
+    let mut command = std::process::Command::new("taskkill");
+    command.args(["/T", "/F", "/PID", &pid.to_string()]);
+    crate::win_console::hide_console_std(&mut command);
+    let _ = command.output();
 }
 
 #[cfg(all(test, unix))]
