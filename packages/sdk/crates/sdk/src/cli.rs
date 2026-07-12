@@ -272,10 +272,7 @@ mod tests {
             "hi".to_owned(),
         ])
         .expect("parses");
-        assert_eq!(
-            args.plugins,
-            vec!["search".to_owned(), "index".to_owned()]
-        );
+        assert_eq!(args.plugins, vec!["search".to_owned(), "index".to_owned()]);
     }
 
     #[test]
