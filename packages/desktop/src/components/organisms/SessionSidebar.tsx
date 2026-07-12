@@ -34,6 +34,7 @@ import { useGitStatuses } from "../../hooks/useGitStatuses"
 import { useIndexedRepos } from "../../hooks/useIndexedRepos"
 import { useSessionSidebarGroups } from "../../hooks/useSessionSidebarGroups"
 import { resumeSession, toInvokeError } from "../../lib/tauri"
+import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import { isSessionNotFoundError } from "../../lib/sessions"
 import type { SessionMeta } from "../../lib/types"
 import { cn } from "../../lib/utils"
@@ -370,15 +371,17 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
             if (narrow) setSidebarCollapsed(true)
           }}
         />
-        <SidebarActionRow
-          icon={Bot}
-          label="Automations"
-          trailingIcon={ArrowUpRight}
-          onClick={() => {
-            setRoute("automations")
-            if (narrow) setSidebarCollapsed(true)
-          }}
-        />
+        {AUTOMATIONS_UI_ENABLED ? (
+          <SidebarActionRow
+            icon={Bot}
+            label="Automations"
+            trailingIcon={ArrowUpRight}
+            onClick={() => {
+              setRoute("automations")
+              if (narrow) setSidebarCollapsed(true)
+            }}
+          />
+        ) : null}
         <SidebarActionRow
           icon={Brain}
           label="Memory"

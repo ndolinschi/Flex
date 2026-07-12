@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { ArrowRight } from "lucide-react"
 import { ConfirmDialog, ErrorBanner } from "../../molecules"
 import { revertSnapshot } from "../../../lib/tauri"
+import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import { cn } from "../../../lib/utils"
 
 export const CheckpointChip = ({
@@ -24,7 +25,7 @@ export const CheckpointChip = ({
     setError(null)
     try {
       await revertSnapshot(sessionId, snapshotId)
-      void queryClient.invalidateQueries({ queryKey: ["git-status"] })
+      invalidateGitQueries(queryClient)
       void queryClient.invalidateQueries({ queryKey: ["workspace-status"] })
       setOpen(false)
     } catch (err) {

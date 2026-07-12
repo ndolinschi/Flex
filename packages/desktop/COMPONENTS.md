@@ -80,7 +80,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `RightPanel` | Plan / Changes / Terminal / Browser; tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`) | — | App shell |
 | `AppHeader` | Title + session menu | — | ChatShell |
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | RightPanel |
-| `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/` | — | RightPanel |
+| `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/`. Opening the tab with zero workspace PTYs auto-creates one shell. | — | RightPanel |
 | `CommandPalette` | ⌘K-style action palette (nav, theme, new agent); rows via `CommandPaletteRow`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell |
 | `SearchModal` | Fuzzy session search overlay; rows via `FuzzySessionRow` + `HighlightedLabel`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell (via SessionSidebar's `onOpenSearch`) |
 | `SubagentViewer` | Bottom-anchored overlay replaying a subagent's inner session feed | (reads `useAppStore` `subagentViewer`) | App shell; opened from `TimelineRowView` |
@@ -91,7 +91,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|
 | `organisms/timeline/` | `buildDisplayItems` (+ `estimateSizeForItem`), `TimelineRowView`, `WorkGroupBody`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
 | `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
-| `organisms/right-panel/` | `PlanTab`, `ChangesTab`, `FileRow`, `CommitCenter`, `RightPanelTabBar`, `tabs` |
+| `organisms/right-panel/` | `PlanTab`, `ChangesTab`, `FileRow`, `CommitCenter` (remote-aware Commit vs Commit & Push), `RightPanelTabBar`, `tabs` |
+| `organisms/context-bar/` | `CommitBar` (remote-aware Commit vs Commit & Push), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
 | `organisms/browser/` | `BrowserToolbar` (Design Mode toggle), `BrowserOverflowMenu` — composed by `BrowserTab` |
 | `organisms/terminal/` | `TerminalTab`, `TerminalInstance`, `TerminalRow`, `AgentTerminalRow`, `time` helpers |
 
@@ -127,10 +128,14 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/lib/sessionSideEffects/` | Global-event side effects (`applyGlobalEvent`, `agentTerminal`, `devServerToast`) |
 | `src/lib/browserPreview.ts` | Tiny `isBrowserPreview` + `NATIVE_APP_REQUIRED` gate (no mock backend) |
 | `src/lib/browserDesign.ts` | Design Mode DOM payload + markdown serializer for composer chips |
+| `src/lib/nativeWebviewGate.ts` | Detect blocking overlays (`aria-modal` / `data-suppress-native-webview`) so the native browser child webview can be hidden |
 | `e2e/` + `playwright.config.ts` | Asserts Vite preview shows native-app-required (no IPC mock) |
 | `scripts/soak.mjs` | Soak skeleton — exits unless real Tauri is available |
 | `scripts/preview-verify.mjs` | Manual screenshot walk (requires native app) |
-| `src/lib/mcp.ts` | Pure MCP form helpers: `parseArgs`, `parseEnv`, `MCP_ID_RE`, `buildCatalogServerDto` |
+| `src/lib/mcp.ts` | Pure MCP form helpers: `parseArgs`, `parseEnv`, `splitEnvSecrets`, `buildCatalogServerDto`, `prefillCatalogValues` |
+| `src/lib/mcpCatalog.ts` | Curated MCP catalog metadata (`MCP_CATALOG`) + `catalogEntryNeedsConfig` |
+| `McpCatalogCard` | Catalog row with Install / Installed + Configure | `entry`, `installed`, `onInstall`, `onConfigure?` | McpCatalogSection |
+| `McpInstallDialog` | Install/configure modal for catalog args + env (secrets keep-if-blank) | `entry`, `mode`, `onInstall` | McpCatalogSection, McpServerRow |
 | `src/lib/sessionGrouping.ts` | Pure `groupByRepo` — groups/sorts sessions by `cwd` for SessionSidebar |
 | `src/lib/fuzzySearch.ts` | Shared `fuzzyScore` / `fuzzyMatchIndices` for CommandPalette + SearchModal |
 | `src/lib/markdownHighlight.ts` | Lazy-loaded rehype-highlight + core language subset (dynamic import from `MarkdownBody`) |
@@ -169,9 +174,15 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 
 Keep this file in sync when adding or renaming components.
 
+## Feature flags
+
+| Flag | Default | Env | Effect |
+|---|---|---|---|
+| `AUTOMATIONS_UI_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_AUTOMATIONS_UI=true` | Shows Automations in settings nav/search, sidebar, command palette, and the legacy `automations` route |
+
 ## Perf notes (Wave 3)
 
-- **Timeline virtualization:** `TurnTimeline` uses `@tanstack/react-virtual` over `displayItems`. Live tail (Working / reconnect / FilesChangedCard / bottom sentinel) stays outside the virtual window so stick-to-bottom remains correct. Virtualized rows do **not** use `content-visibility: auto` — cv on the mounted overscan window races with WebView2 measurement during scroll (Windows overlap). Off-screen work is already skipped by unmounting. Item spacing uses padding (`pt-*`) so virtual `measureElement` includes gaps; `translateY` offsets are rounded to integer px for fractional DPI.
+- **Timeline virtualization:** `TurnTimeline` uses `@tanstack/react-virtual` over `displayItems`. Live tail (Working / reconnect / FilesChangedCard / bottom sentinel) stays outside the virtual window so stick-to-bottom remains correct. Virtualized rows do **not** use `content-visibility: auto` — cv on the mounted overscan window races with WebView2 measurement during scroll (Windows overlap). Off-screen work is already skipped by unmounting. Item spacing uses padding (`pt-*`) so virtual `measureElement` includes gaps; `translateY` offsets are rounded to integer px for fractional DPI. Never call `virtualizer.measure()` on stream/scroll — it clears `itemSizeCache` and absolute rows overlap on stale `estimateSize`; use `remeasureMountedVirtualItems` (in-place `resizeItem`) instead. `estimateSizeForItem` is content-aware; `anchorTo: "end"` + `followOnAppend` keep growth smooth while pinned to bottom.
 - **Windows consoles:** Release builds are GUI-subsystem. Ordinary children (`git`/`gh`/`cmd`) use `CREATE_NO_WINDOW` via `src-tauri/src/win_console.rs` and the engine `executors` helpers. The Terminal tab's ConPTY PowerShell must **not** use that flag (breaks pipe I/O); instead `ensure_hidden_parent_console` allocates a hidden parent console at startup so ConPTY children do not pop a visible window. Terminal cwd uses `dirs::home_dir` / USERPROFILE (not `$HOME`→`/`) and collapses doubled `\` path escapes.
 - **React Compiler:** Enabled in `vite.config.ts` via `babel-plugin-react-compiler` (React 19 target). Verified with `tsc --noEmit`, `vitest run`, and `vite build`.
 - **Markdown highlight:** Core language pack loads as a separate chunk (`lib/markdownHighlight.ts`); GFM renders immediately, highlight upgrades after the dynamic import.

@@ -8,9 +8,21 @@
   height: 100%;
 }
 
+/* Vertical scrollbar only — `height` here makes WKWebView reserve a
+   horizontal gutter and paint a native ::-webkit-resizer (the diagonal
+   triangle) in the bottom-right of the black terminal surface. */
+.glass-terminal-wrapper .xterm-viewport {
+  resize: none;
+  overflow-x: hidden;
+}
+
 .glass-terminal-wrapper .xterm-viewport::-webkit-scrollbar {
   width: 14px;
-  height: 14px;
+}
+
+.glass-terminal-wrapper .xterm-viewport::-webkit-resizer,
+.glass-terminal-wrapper .xterm-viewport::-webkit-scrollbar-corner {
+  display: none;
 }
 
 .glass-terminal-wrapper .xterm-viewport::-webkit-scrollbar-track {

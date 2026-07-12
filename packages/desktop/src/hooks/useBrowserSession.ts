@@ -17,6 +17,7 @@ import {
   toInvokeError,
 } from "../lib/tauri"
 import { isBrowserPreview, NATIVE_APP_REQUIRED } from "../lib/browserPreview"
+import { isNativeWebviewSuppressed } from "../lib/nativeWebviewGate"
 import {
   useAppStore,
   sessionScopeKey,
@@ -26,6 +27,10 @@ import { log } from "../lib/debug/log"
 import type { BrowserDomElement } from "../lib/browserDesign"
 
 /* ── Viewport presets ─────────────────────────────────────────────────── */
+
+/** Matches BrowserToolbar `h-9` — used when getBoundingClientRect briefly
+ * reports a collapsed chrome row during display:none → flex tab reveals. */
+const BROWSER_TOOLBAR_HEIGHT_PX = 36
 
 export const VIEWPORT_PRESETS: Array<{
   id: BrowserViewportPreset
@@ -419,8 +424,9 @@ export const useBrowserSession = (active: boolean) => {
   // left a permanent black void when Finished/probe races never cleared
   // loading, while the page had already painted under the OS webview.
   // Hide only when the tab is inactive, this session doesn't own the
-  // webview, the browser hasn't started, or a confirmed loadError (so the
-  // React error page isn't covered by Chromium's sheet).
+  // webview, the browser hasn't started, a confirmed loadError (so the
+  // React error page isn't covered by Chromium's sheet), or a blocking
+  // HTML overlay is open (native child webviews always paint above React).
   useEffect(() => {
     if (isBrowserPreview()) return
     const shouldShow = active && isOwner && browserStarted && !loadError
@@ -430,7 +436,11 @@ export const useBrowserSession = (active: boolean) => {
     }
     const content = contentRef.current
     const toolbar = toolbarRef.current
-    if (!content || !toolbar) return
+    if (!content || !toolbar) {
+      // Refs not committed yet — never leave a stale visible webview up.
+      void browserSetVisible(false)
+      return
+    }
 
     let cancelled = false
     let rafId: number | null = null
@@ -439,15 +449,29 @@ export const useBrowserSession = (active: boolean) => {
     let lastSent: { x: number; y: number; w: number; h: number } | null = null
     const measure = (force: boolean) => {
       if (cancelled) return
+      // Native child webviews sit above every HTML stacking context — hide
+      // while modals/palettes claim the screen so they stay visible/clickable.
+      if (isNativeWebviewSuppressed()) {
+        lastSent = null
+        void browserSetVisible(false)
+        return
+      }
       const contentRect = content.getBoundingClientRect()
       const toolbarRect = toolbar.getBoundingClientRect()
-      // Authoritative top = toolbar bottom (border box includes padding).
-      // Never trust contentRect.top alone — after display:none → flex, the
-      // content area can briefly report the panel-tabs bottom (y≈69) and the
-      // native layer paints over the h-9 chrome row.
-      const top = Math.max(contentRect.top, toolbarRect.bottom)
-      const height = contentRect.bottom - top
-      if (contentRect.width < 2 || height < 2 || toolbarRect.height < 1) {
+      // Top must clear the in-flow toolbar. Fall back to h-9 when the chrome
+      // row briefly reports height 0 after display:none → flex (otherwise the
+      // native layer paints over the URL bar).
+      const toolbarBottom =
+        toolbarRect.height >= 1
+          ? toolbarRect.bottom
+          : toolbarRect.top + BROWSER_TOOLBAR_HEIGHT_PX
+      const top = Math.max(contentRect.top, toolbarBottom)
+      // Prefer the content host's own bottom; fall back to its flex parent if
+      // the host hasn't laid out yet after tab reveal.
+      const parentRect = content.parentElement?.getBoundingClientRect()
+      const bottom = Math.max(contentRect.bottom, parentRect?.bottom ?? 0)
+      const height = bottom - top
+      if (contentRect.width < 2 || height < 2) {
         lastSent = null
         void browserSetVisible(false)
         return
@@ -474,6 +498,10 @@ export const useBrowserSession = (active: boolean) => {
       lastSent = { x, y: top, w: width, h: height }
       void browserSetBounds(x, top, width, height).then(() => {
         if (cancelled) return
+        if (isNativeWebviewSuppressed()) {
+          void browserSetVisible(false)
+          return
+        }
         void browserSetVisible(true)
       })
     }
@@ -492,6 +520,7 @@ export const useBrowserSession = (active: boolean) => {
     const resizeObserver = new ResizeObserver(schedule)
     resizeObserver.observe(content)
     resizeObserver.observe(toolbar)
+    if (content.parentElement) resizeObserver.observe(content.parentElement)
     window.addEventListener("resize", schedule)
     schedule()
     // Drift watchdog: ResizeObserver misses position-only moves (sidebar
@@ -500,10 +529,20 @@ export const useBrowserSession = (active: boolean) => {
     // webview over the toolbar. A plain interval keeps firing in those cases;
     // measure(false) only re-sends when the rect actually drifted.
     const watchdog = window.setInterval(() => measure(false), 500)
+    // Overlay open/close doesn't resize the content host — observe DOM so
+    // CommandPalette / ConfirmDialog / etc. immediately hide the webview.
+    const overlayObserver = new MutationObserver(() => measure(true))
+    overlayObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["aria-modal", "data-suppress-native-webview"],
+    })
 
     return () => {
       cancelled = true
       resizeObserver.disconnect()
+      overlayObserver.disconnect()
       window.removeEventListener("resize", schedule)
       window.clearInterval(watchdog)
       if (rafId !== null) cancelAnimationFrame(rafId)

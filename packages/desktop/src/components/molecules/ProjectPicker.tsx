@@ -89,6 +89,12 @@ export const ProjectPicker = ({
         await queryClient.invalidateQueries({
           queryKey: ["git-branches", nextCwd],
         })
+        await queryClient.invalidateQueries({
+          queryKey: ["git-is-repo", nextCwd],
+        })
+        await queryClient.invalidateQueries({
+          queryKey: ["git-has-remote", nextCwd],
+        })
       } else {
         const meta = await createSession({
           title: DEFAULT_SESSION_TITLE,

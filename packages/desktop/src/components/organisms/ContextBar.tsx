@@ -38,7 +38,10 @@ export const ContextBar = ({
     queryKey: ["git-is-repo", cwd],
     queryFn: () => gitIsRepo(cwd!),
     enabled: !!cwd,
-    staleTime: 15_000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 5_000,
   })
 
   return (

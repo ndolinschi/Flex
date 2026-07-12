@@ -16,6 +16,7 @@ import {
 import type { LucideIcon } from "lucide-react"
 import { CommandPaletteRow } from "../molecules"
 import { useSessions } from "../../hooks/useSessions"
+import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import { fuzzyScore } from "../../lib/fuzzySearch"
 import { resumeSession, toInvokeError } from "../../lib/tauri"
 import { sessionLabel } from "../../lib/types"
@@ -144,13 +145,17 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
         group: "Commands",
         run: () => toggleTheme(),
       },
-      {
-        id: "open-automations",
-        label: "Open Automations",
-        icon: Bot,
-        group: "Commands",
-        run: () => setRoute("automations"),
-      },
+      ...(AUTOMATIONS_UI_ENABLED
+        ? ([
+            {
+              id: "open-automations",
+              label: "Open Automations",
+              icon: Bot,
+              group: "Commands",
+              run: () => setRoute("automations"),
+            },
+          ] satisfies CommandEntry[])
+        : []),
       {
         id: "open-memory",
         label: "Open Memory",
@@ -292,6 +297,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
   return createPortal(
     <div
       className="fixed inset-0 z-[300] flex justify-center bg-black/20 animate-backdrop-in"
+      data-suppress-native-webview=""
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
@@ -302,6 +308,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
           "rounded-lg bg-panel shadow-[var(--shadow-popover)] animate-tray-in",
         )}
         role="dialog"
+        aria-modal="true"
         aria-label="Command palette"
       >
         <div className="flex items-center gap-1.5 border-b border-stroke-3 px-3 py-2.5">

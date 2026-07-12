@@ -7,6 +7,7 @@ import { useSessions } from "./hooks/useSessions"
 import { useUpdaterCheck } from "./hooks/useUpdaterCheck"
 import { useViewportWidth } from "./hooks/useViewportWidth"
 import { isBrowserPreview } from "./lib/browserPreview"
+import { AUTOMATIONS_UI_ENABLED } from "./lib/featureFlags"
 import { cancel } from "./lib/tauri"
 import {
   CommandPalette,
@@ -184,7 +185,7 @@ const AppRoutes = () => {
           </div>
           {route === "settings" ||
           route === "customize" ||
-          route === "automations" ||
+          (AUTOMATIONS_UI_ENABLED && route === "automations") ||
           route === "memory" ? (
             <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
               <Suspense

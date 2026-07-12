@@ -130,11 +130,11 @@ pub struct AppState {
     /// The single browser-panel webview, if the user has opened it.
     pub browser_webview: Mutex<Option<tauri::Webview>>,
     /// Last logical bounds (x, y, w, h) requested by the frontend for the
-    /// browser webview. Re-applied natively on window resize: on macOS the
-    /// child NSView is anchored to the window's *bottom-left* (non-flipped
-    /// contentView coords, no autoresizing), so height changes slide it up
-    /// over the React toolbar until bounds are re-asserted. Sync mutex — read
-    /// from the (synchronous) window-event handler.
+    /// browser webview. Used to re-assert position immediately before
+    /// `browser_set_visible(true)` so reveal never flashes at a stale frame.
+    /// Window resize itself is handled by wry's rate-based child autoresize
+    /// (fed by atomic `set_bounds`) — do not re-apply these absolute pixels
+    /// from `WindowEvent::Resized` or the page freezes at the old height.
     pub browser_bounds: SyncMutex<Option<(f64, f64, f64, f64)>>,
     /// Whether Design Mode (element picker) is active in the embedded browser.
     /// Sync mutex so `on_page_load` / `on_navigation` callbacks can read it

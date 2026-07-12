@@ -3,8 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { TextInput } from "../../../components/atoms"
 import { McpCatalogCard, McpInstallDialog, SettingsSection } from "../../../components/molecules"
 import { useAppStore } from "../../../stores/appStore"
-import { MCP_CATALOG, type McpCatalogEntry } from "../../../lib/mcpCatalog"
-import { buildCatalogServerDto } from "../../../lib/mcp"
+import {
+  MCP_CATALOG,
+  catalogEntryNeedsConfig,
+  type McpCatalogEntry,
+} from "../../../lib/mcpCatalog"
+import { buildCatalogServerDto, prefillCatalogValues } from "../../../lib/mcp"
 import { mcpList, mcpUpsert, toInvokeError } from "../../../lib/tauri"
 import type { McpServerDto } from "../../../lib/types"
 import { EMPTY_MCP_SERVERS, MCP_SERVERS_KEY } from "./mcpServersKey"
@@ -12,30 +16,35 @@ import { EMPTY_MCP_SERVERS, MCP_SERVERS_KEY } from "./mcpServersKey"
 /** Curated "Browse catalog" grid of popular MCP servers, additive above the
  * manual add-server flow below. Cards with no required args/env install
  * directly; cards that need them (a path, a token, a connection string)
- * open `McpInstallDialog` first. Installed-state badge is matched against
- * live `mcp_list` results by id, so re-opening Settings after install shows
- * "Installed" even without a page refresh (react-query cache). */
+ * open `McpInstallDialog` first. Installed catalog entries that need config
+ * expose Configure (re-opens the dialog; secrets keep-if-blank). */
 export const McpCatalogSection = () => {
   const queryClient = useQueryClient()
   const pushToast = useAppStore((s) => s.pushToast)
   const [query, setQuery] = useState("")
   const [pendingEntry, setPendingEntry] = useState<McpCatalogEntry | null>(null)
+  const [dialogMode, setDialogMode] = useState<"install" | "configure">("install")
   const [dialogError, setDialogError] = useState<string | null>(null)
 
   const serversQuery = useQuery({
     queryKey: MCP_SERVERS_KEY,
     queryFn: mcpList,
   })
-  const installedIds = useMemo(
-    () => new Set((serversQuery.data ?? EMPTY_MCP_SERVERS).map((s) => s.id)),
-    [serversQuery.data],
-  )
+  const servers = serversQuery.data ?? EMPTY_MCP_SERVERS
+  const installedById = useMemo(() => {
+    const map = new Map<string, McpServerDto>()
+    for (const s of servers) map.set(s.id, s)
+    return map
+  }, [servers])
 
   const installMutation = useMutation({
     mutationFn: (dto: McpServerDto) => mcpUpsert(dto),
     onSuccess: (_data, dto) => {
       void queryClient.invalidateQueries({ queryKey: MCP_SERVERS_KEY })
-      pushToast(`${dto.id} installed`, "success")
+      pushToast(
+        dialogMode === "configure" ? `${dto.id} updated` : `${dto.id} installed`,
+        "success",
+      )
       setPendingEntry(null)
       setDialogError(null)
     },
@@ -57,19 +66,32 @@ export const McpCatalogSection = () => {
   }, [query])
 
   const handleInstall = (entry: McpCatalogEntry) => {
-    if (entry.argKeys.length === 0 && entry.envKeys.length === 0) {
+    if (!catalogEntryNeedsConfig(entry)) {
       installMutation.mutate(buildCatalogServerDto(entry, { args: {}, env: {} }))
       return
     }
+    setDialogMode("install")
     setDialogError(null)
     setPendingEntry(entry)
   }
+
+  const handleConfigure = (entry: McpCatalogEntry) => {
+    setDialogMode("configure")
+    setDialogError(null)
+    setPendingEntry(entry)
+  }
+
+  const existing = pendingEntry ? installedById.get(pendingEntry.id) : undefined
+  const initialValues =
+    pendingEntry && existing && dialogMode === "configure"
+      ? prefillCatalogValues(pendingEntry, existing)
+      : null
 
   return (
     <>
       <SettingsSection
         title="Browse catalog"
-        description="One-click install for popular MCP servers."
+        description="One-click install for popular MCP servers. Tokens and connection strings are stored in the encrypted secrets store."
         rowId="tools-mcp-catalog"
         actions={
           <TextInput
@@ -90,9 +112,10 @@ export const McpCatalogSection = () => {
             <McpCatalogCard
               key={entry.id}
               entry={entry}
-              installed={installedIds.has(entry.id)}
+              installed={installedById.has(entry.id)}
               installing={installMutation.isPending && installMutation.variables?.id === entry.id}
               onInstall={handleInstall}
+              onConfigure={handleConfigure}
             />
           ))
         )}
@@ -100,6 +123,10 @@ export const McpCatalogSection = () => {
 
       <McpInstallDialog
         entry={pendingEntry}
+        mode={dialogMode}
+        initialValues={initialValues}
+        configuredSecretEnv={existing?.configuredSecretEnv ?? []}
+        hasSecretArgs={existing?.hasSecretArgs ?? false}
         isLoading={installMutation.isPending}
         error={dialogError}
         onCancel={() => {
@@ -108,7 +135,24 @@ export const McpCatalogSection = () => {
         }}
         onInstall={(values) => {
           if (!pendingEntry) return
-          installMutation.mutate(buildCatalogServerDto(pendingEntry, values))
+          const dto = buildCatalogServerDto(pendingEntry, values)
+          if (dialogMode === "configure" && existing) {
+            // Preserve enabled flag and only send secret fields that the user
+            // typed (empty = keep existing — handled by Rust upsert).
+            installMutation.mutate({
+              ...dto,
+              enabled: existing.enabled,
+              secretEnv: Object.fromEntries(
+                Object.entries(dto.secretEnv ?? {}).filter(([, v]) => v.trim().length > 0),
+              ),
+              secretArgs:
+                dto.secretArgs && dto.secretArgs.some((v) => v.trim().length > 0)
+                  ? dto.secretArgs
+                  : undefined,
+            })
+            return
+          }
+          installMutation.mutate(dto)
         }}
       />
     </>

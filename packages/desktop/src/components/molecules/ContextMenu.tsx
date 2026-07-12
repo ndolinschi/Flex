@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import type { LucideIcon } from "lucide-react"
+import { isProgrammaticScroll } from "../../lib/programmaticScroll"
 import { cn } from "../../lib/utils"
 
 export type ContextMenuItem =
@@ -106,7 +107,12 @@ export const ContextMenu = ({ position, items, onClose }: ContextMenuProps) => {
     }
 
     const handleBlur = () => onClose()
-    const handleScroll = () => onClose()
+    const handleScroll = () => {
+      // Timeline stick-to-bottom scrolls on every stream tick — ignore those
+      // so open menus don't dismiss while the agent is generating.
+      if (isProgrammaticScroll()) return
+      onClose()
+    }
     const handleResize = () => onClose()
 
     // Capture phase so this fires before the click/contextmenu that opened a
@@ -141,6 +147,7 @@ export const ContextMenu = ({ position, items, onClose }: ContextMenuProps) => {
     <div
       ref={menuRef}
       role="menu"
+      data-suppress-native-webview=""
       style={{
         position: "fixed",
         left: visible.x,

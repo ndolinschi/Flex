@@ -3,6 +3,7 @@ import { SettingsShell } from "../components/templates"
 import { SettingsCard, SettingRow, SETTINGS_NAV_ITEMS } from "../components/molecules"
 import { Toggle } from "../components/atoms"
 import { ProviderSettingsForm } from "../components/organisms"
+import { AUTOMATIONS_UI_ENABLED } from "../lib/featureFlags"
 import { AutomationsContent } from "./settings/AutomationsSection"
 import { CustomizeContent } from "./settings/CustomizeSection"
 import { DiagnosticsContent } from "./settings/DiagnosticsSection"
@@ -197,7 +198,7 @@ export const SettingsPage = ({ embedded = false }: SettingsPageProps) => {
         memory: <MemoryContent />,
         indexing: <IndexingContent />,
         "tools-mcp": <CustomizeContent />,
-        automations: <AutomationsContent />,
+        ...(AUTOMATIONS_UI_ENABLED ? { automations: <AutomationsContent /> } : {}),
         diagnostics: <DiagnosticsContent />,
       }}
     />

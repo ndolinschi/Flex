@@ -238,6 +238,11 @@ export const isConfigured = (): Promise<boolean> => invoke("is_configured")
 export const gitIsRepo = (cwd: string): Promise<boolean> =>
   invoke("git_is_repo", { cwd })
 
+/** Whether the repo at `cwd` has any configured remotes (`git remote`).
+ * Gates Commit vs Commit & Push — no remote means push is unavailable. */
+export const gitHasRemote = (cwd: string): Promise<boolean> =>
+  invoke("git_has_remote", { cwd })
+
 export const gitBranch = (cwd: string): Promise<string | null> =>
   invoke("git_branch", { cwd })
 

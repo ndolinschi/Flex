@@ -7,6 +7,8 @@
  * `rowId` (see `SettingsShell.tsx`'s `data-settings-row` lookup +
  * `.animate-settings-row-highlight`). */
 
+import { AUTOMATIONS_UI_ENABLED } from "./featureFlags"
+
 export type SettingsSectionId =
   | "general"
   | "appearance"
@@ -30,8 +32,9 @@ export type SettingsSearchEntry = {
  * description}"). Sections with dynamic, per-item content (Memory entries,
  * MCP servers, automations) are represented by their static group
  * title/description only; searching *into* dynamic list items is out of
- * scope for this pass. */
-export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
+ * scope for this pass. Automations rows are omitted when
+ * `AUTOMATIONS_UI_ENABLED` is false. */
+const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
   // General
   {
     section: "general",
@@ -180,6 +183,11 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     description: "Poll the GitHub Releases updater channel",
   },
 ]
+
+export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] =
+  ALL_SETTINGS_SEARCH_INDEX.filter(
+    (entry) => entry.section !== "automations" || AUTOMATIONS_UI_ENABLED,
+  )
 
 export const searchSettings = (query: string): SettingsSearchEntry[] => {
   const q = query.trim().toLowerCase()

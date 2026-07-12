@@ -513,7 +513,23 @@ export type McpServerDto = {
   id: string
   command: string
   args: string[]
+  /** Non-secret env vars (persisted in the MCP TOML file). */
   env: Record<string, string>
+  /**
+   * Secret env values to write into the encrypted secrets store.
+   * On upsert: non-empty overwrites; empty string keeps the existing secret.
+   * List responses leave this empty — see `configuredSecretEnv`.
+   */
+  secretEnv?: Record<string, string>
+  /**
+   * Secret positional-arg values appended after `args` at resolve time
+   * (e.g. Postgres connection string). Omitted on list.
+   */
+  secretArgs?: string[]
+  /** Env key names that have a stored secret (values never returned). */
+  configuredSecretEnv?: string[]
+  /** Whether a secret positional-args suffix is stored for this server. */
+  hasSecretArgs?: boolean
   enabled: boolean
 }
 

@@ -59,7 +59,10 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
   }, [loadError])
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-bg">
+    // In-flow chrome: toolbar is shrink-0 in the column so contentRef's
+    // getBoundingClientRect is always the area *below* the URL bar. Absolute
+    // top-9 + overlapping native bounds left a black gap under the page.
+    <div className="relative flex min-h-0 flex-1 flex-col bg-bg">
       <BrowserToolbar
         toolbarRef={toolbarRef}
         browserUrl={browserUrl}
@@ -86,8 +89,12 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
         toggleDesignMode={toggleDesignMode}
       />
 
-      {/* Content — dedicated bounds target for the native child webview */}
-      <div ref={contentRef} className="relative z-0 min-h-0 flex-1 bg-bg">
+      {/* Bounds target for the native child webview — flex-1 fills the
+       * remaining panel height so the OS layer has nowhere left empty. */}
+      <div
+        ref={contentRef}
+        className="relative z-0 min-h-0 flex-1 bg-bg"
+      >
         {preview ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 bg-bg px-6">
             <Globe className="h-8 w-8 text-ink-faint opacity-60" aria-hidden />

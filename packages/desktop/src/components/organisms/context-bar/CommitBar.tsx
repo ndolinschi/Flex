@@ -3,19 +3,24 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { GitMerge } from "lucide-react"
 import {
   gitCommit,
+  gitHasRemote,
   gitPush,
   gitStatusSinceBaseline,
   toInvokeError,
 } from "../../../lib/tauri"
+import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
 import { PopoverTray } from "../../molecules/PopoverTray"
 import { Button, DiffStat, TextInput } from "../../atoms"
 
-/** Right-aligned "N changes" pill + "Commit & Push" button, shown above the
+/** Right-aligned "N changes" pill + Commit button, shown above the
  * composer for non-isolated sessions with a dirty working tree (design:
  * "Changes +9745 -737" pill + button). Clicking the pill jumps to the
- * Changes tab; the button opens an inline popover to compose the message. */
+ * Changes tab; the button opens an inline popover to compose the message.
+ *
+ * Label / actions depend on remotes: no remote → Commit only; with a
+ * remote → Commit and Commit & Push. */
 export const CommitBar = ({
   sessionId,
   cwd,
@@ -41,6 +46,15 @@ export const CommitBar = ({
     staleTime: 5_000,
   })
 
+  const { data: hasRemote = false } = useQuery({
+    queryKey: ["git-has-remote", cwd ?? ""],
+    queryFn: () => gitHasRemote(cwd!),
+    enabled: !!cwd,
+    staleTime: 10_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+  })
+
   // This pill only ever shows a count + aggregate +/- badge (no file rows),
   // so it reads straight from the summary's totals — always accurate even
   // past the server-side row cap.
@@ -50,12 +64,11 @@ export const CommitBar = ({
     removed: summary?.totalRemoved ?? 0,
   }
 
-  const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: ["git-status"] })
-  }
+  const primaryLabel = hasRemote ? "Commit & Push" : "Commit"
 
   const handleCommit = async (andPush: boolean) => {
     if (busy) return
+    if (andPush && !hasRemote) return
     setBusy("commit")
     try {
       // TODO: gitCommit stages the whole repo (`git add -A` in the Rust
@@ -63,7 +76,7 @@ export const CommitBar = ({
       // session-scoped (gitStatusSinceBaseline). A session with 0 tracked
       // changes can still commit unrelated pre-existing dirty files repo-wide.
       const sha = await gitCommit(sessionId, message.trim())
-      invalidate()
+      invalidateGitQueries(queryClient)
       pushToast(`Committed ${sha}`, "success")
       if (andPush) {
         setBusy("push")
@@ -117,7 +130,7 @@ export const CommitBar = ({
         )}
       >
         <GitMerge className="h-3 w-3 shrink-0" aria-hidden />
-        Commit & Push
+        {primaryLabel}
       </button>
 
       <PopoverTray
@@ -137,24 +150,38 @@ export const CommitBar = ({
           autoFocus
         />
         <div className="mt-2 flex items-center justify-end gap-1.5">
-          <Button
-            variant="secondary"
-            size="sm"
-            isLoading={busy === "commit"}
-            disabled={busy !== null || !message.trim()}
-            onClick={() => void handleCommit(false)}
-          >
-            Commit
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            isLoading={busy === "push"}
-            disabled={busy !== null || !message.trim()}
-            onClick={() => void handleCommit(true)}
-          >
-            Commit & Push
-          </Button>
+          {hasRemote ? (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                isLoading={busy === "commit"}
+                disabled={busy !== null || !message.trim()}
+                onClick={() => void handleCommit(false)}
+              >
+                Commit
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                isLoading={busy === "push"}
+                disabled={busy !== null || !message.trim()}
+                onClick={() => void handleCommit(true)}
+              >
+                Commit & Push
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant="primary"
+              size="sm"
+              isLoading={busy === "commit"}
+              disabled={busy !== null || !message.trim()}
+              onClick={() => void handleCommit(false)}
+            >
+              Commit
+            </Button>
+          )}
         </div>
       </PopoverTray>
     </div>

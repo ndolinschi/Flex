@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react"
 import { TextInput } from "../atoms"
+import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import type { SettingsSearchEntry, SettingsSectionId } from "../../lib/settingsSearchIndex"
 import { cn } from "../../lib/utils"
 
@@ -23,7 +24,7 @@ export type SettingsNavItem = {
 /** Nav order + labels for our section set (design-map/07-settings.md §7's
  * `Aml` order / `kci` labels, narrowed to the sections this build actually
  * houses — see report for the full Customize-redistribution mapping). */
-export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
+const ALL_SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { id: "general", label: "General" },
   { id: "appearance", label: "Appearance" },
   { id: "models", label: "Models & Connections" },
@@ -34,6 +35,11 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { id: "automations", label: "Automations" },
   { id: "diagnostics", label: "Diagnostics" },
 ]
+
+/** Visible settings nav — Automations gated by `AUTOMATIONS_UI_ENABLED`. */
+export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = ALL_SETTINGS_NAV_ITEMS.filter(
+  (item) => item.id !== "automations" || AUTOMATIONS_UI_ENABLED,
+)
 
 /** Icon per section — mapped from the reference `Bii` icon dictionary
  * (§7) onto lucide-react equivalents already used elsewhere in this app. */

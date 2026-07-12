@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import { useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ChevronDown, GitBranch, GitMerge, GitPullRequest } from "lucide-react"
 import { Button, TextArea } from "../../atoms"
 import { PopoverItem, PopoverTray } from "../../molecules/PopoverTray"
@@ -8,8 +8,10 @@ import {
   gitCommitPaths,
   gitCreateBranchAndCommit,
   gitCreatePr,
+  gitHasRemote,
   toInvokeError,
 } from "../../../lib/tauri"
+import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
 
@@ -22,20 +24,28 @@ const MODE_LABEL: Record<CommitMode, string> = {
   "commit-pr": "Commit & Create PR",
 }
 
+const PUSH_MODES: ReadonlySet<CommitMode> = new Set(["commit-push", "commit-pr"])
+
 /**
  * Commit center footer for the Changes tab (Cursor parity, spec #48):
  * commit-message textarea + a split button (primary action + dropdown of
  * commit variants). Only rendered for non-isolated sessions with at least
  * one file in the (checkbox-driven) selection — isolated sessions use the
  * Keep/Undo integrate flow instead (see `ChangesTab`).
+ *
+ * Push / PR modes are offered only when the session cwd has a configured
+ * remote — otherwise the primary action is plain Commit (push would fail
+ * with "No configured push destination").
  */
 export const CommitCenter = ({
   sessionId,
+  cwd,
   selectedPaths,
   totalFiles,
   onError,
 }: {
   sessionId: string
+  cwd: string
   selectedPaths: string[]
   totalFiles: number
   onError: (message: string) => void
@@ -43,22 +53,39 @@ export const CommitCenter = ({
   const [message, setMessage] = useState("")
   const [busy, setBusy] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [lastMode, setLastMode] = useState<CommitMode>("commit-push")
+  // null = use the remote-aware default until the user picks a mode.
+  const [lastMode, setLastMode] = useState<CommitMode | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const pushToast = useAppStore((s) => s.pushToast)
+
+  const { data: hasRemote = false } = useQuery({
+    queryKey: ["git-has-remote", cwd],
+    queryFn: () => gitHasRemote(cwd),
+    enabled: !!cwd,
+    staleTime: 10_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+  })
+
+  const defaultMode: CommitMode = hasRemote ? "commit-push" : "commit"
+  const effectivePrimary: CommitMode =
+    lastMode && (hasRemote || !PUSH_MODES.has(lastMode))
+      ? lastMode
+      : defaultMode
 
   const trimmed = message.trim()
   const nothingSelected = selectedPaths.length === 0
   const disabled = busy || nothingSelected || !trimmed
 
   const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: ["git-status"] })
+    invalidateGitQueries(queryClient)
     void queryClient.invalidateQueries({ queryKey: ["git-branch"] })
   }
 
   const run = async (mode: CommitMode) => {
     if (disabled) return
+    if (!hasRemote && PUSH_MODES.has(mode)) return
     setBusy(true)
     setLastMode(mode)
     try {
@@ -134,10 +161,10 @@ export const CommitCenter = ({
           className="rounded-r-none border-r border-r-accent-hover/40"
           isLoading={busy}
           disabled={disabled}
-          onClick={() => void run(lastMode)}
+          onClick={() => void run(effectivePrimary)}
         >
           <GitMerge className="h-3 w-3" aria-hidden />
-          {MODE_LABEL[lastMode]}
+          {MODE_LABEL[effectivePrimary]}
         </Button>
         <Button
           variant="primary"
@@ -149,7 +176,10 @@ export const CommitCenter = ({
           disabled={disabled}
           onClick={() => setMenuOpen((v) => !v)}
         >
-          <ChevronDown className={cn("h-3 w-3", menuOpen && "rotate-180")} aria-hidden />
+          <ChevronDown
+            className={cn("h-3 w-3", menuOpen && "rotate-180")}
+            aria-hidden
+          />
         </Button>
 
         <PopoverTray
@@ -168,29 +198,47 @@ export const CommitCenter = ({
                 Commit
               </PopoverItem>
             </li>
+            {hasRemote ? (
+              <li>
+                <PopoverItem
+                  role="menuitem"
+                  onClick={() => void run("commit-push")}
+                >
+                  <GitMerge className="h-3.5 w-3.5 text-icon-3" aria-hidden />
+                  Commit &amp; Push
+                </PopoverItem>
+              </li>
+            ) : null}
             <li>
-              <PopoverItem role="menuitem" onClick={() => void run("commit-push")}>
-                <GitMerge className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-                Commit &amp; Push
-              </PopoverItem>
-            </li>
-            <li>
-              <PopoverItem role="menuitem" onClick={() => void run("branch-commit")}>
+              <PopoverItem
+                role="menuitem"
+                onClick={() => void run("branch-commit")}
+              >
                 <GitBranch className="h-3.5 w-3.5 text-icon-3" aria-hidden />
                 Create Branch &amp; Commit
               </PopoverItem>
             </li>
-            <li>
-              <PopoverItem role="menuitem" onClick={() => void run("commit-pr")}>
-                <GitPullRequest className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-                Commit &amp; Create PR
-              </PopoverItem>
-            </li>
+            {hasRemote ? (
+              <li>
+                <PopoverItem
+                  role="menuitem"
+                  onClick={() => void run("commit-pr")}
+                >
+                  <GitPullRequest
+                    className="h-3.5 w-3.5 text-icon-3"
+                    aria-hidden
+                  />
+                  Commit &amp; Create PR
+                </PopoverItem>
+              </li>
+            ) : null}
           </ul>
         </PopoverTray>
 
         {nothingSelected ? (
-          <span className="ml-2 text-xs text-ink-faint">Select files to commit</span>
+          <span className="ml-2 text-xs text-ink-faint">
+            Select files to commit
+          </span>
         ) : null}
       </div>
     </div>

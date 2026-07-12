@@ -15,12 +15,13 @@ import { useSessions } from "../../hooks/useSessions"
 import { useStickToBottom } from "../../hooks/useStickToBottom"
 import type { TimelineRow } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
+import { invalidateGitQueries } from "../../lib/invalidateGitQueries"
 import { cn } from "../../lib/utils"
 import {
   buildDisplayItems,
   collapseConsecutiveCheckpoints,
   estimateSizeForItem,
-  lastItemIsOpenWorkGroup,
+  hasOpenWorkGroup,
   latestVerdictInRows,
   marginForItem,
   resumeLineForRows,
@@ -29,6 +30,7 @@ import {
 import { TimelineRowView } from "./timeline/TimelineRowView"
 import { TurnFooter } from "./timeline/TurnFooter"
 import { ReconnectBanner } from "./timeline/ReconnectBanner"
+import { remeasureMountedVirtualItems } from "./timeline/remeasureMountedVirtualItems"
 import { WorkGroupBody } from "./timeline/WorkGroupBody"
 
 type TurnTimelineProps = {
@@ -39,6 +41,11 @@ type TurnTimelineProps = {
 const displayItemKey = (item: DisplayItem): string => {
   if (item.kind === "group") return item.id
   if (item.row.type === "assistant") return `answer:${item.row.messageId}`
+  // Stable across live → materialized so virtual rows (and in-row dialogs)
+  // don't remount when engine IDs replace `live-tool:` / `live-thinking:`.
+  if (item.row.type === "tool") return `tool:${item.row.call.id}`
+  if (item.row.type === "thinking") return `thinking:${item.row.messageId}`
+  if (item.row.type === "checkpoint") return `checkpoint:${item.row.snapshotId}`
   return item.row.id
 }
 
@@ -64,7 +71,7 @@ export const TurnTimeline = ({
   // for staleTime — mirrors RightPanel's streaming→idle invalidate.
   useEffect(() => {
     if (prevStreamingRef.current && !isStreaming && sessionId) {
-      void queryClient.invalidateQueries({ queryKey: ["git-status"] })
+      invalidateGitQueries(queryClient)
     }
     prevStreamingRef.current = isStreaming
   }, [isStreaming, sessionId, queryClient])
@@ -172,16 +179,22 @@ export const TurnTimeline = ({
     [liveRows, isStreaming],
   )
 
-  // Always-visible Working backstop while streaming: skip only when the
-  // last display item is already an open WorkGroup — it renders its own
-  // pulsing "Working" row as the last child of its body (see WorkGroup),
-  // so the bottom backstop here would double it — or the reconnect banner
-  // replaces this slot. Otherwise keep the bottom shimmer so gaps / trailing
-  // answers / scroll-away cases never look dead.
+  // Bottom Working backstop while streaming — skip whenever ANY open
+  // WorkGroup already owns the Thinking/Working cue (header RunningDot),
+  // or the trailing item is a live thinking row (its own shimmer).
+  // Gating only on lastItemIsOpenWorkGroup let a second "Working" appear
+  // under an open group's "Thinking".
+  const last = displayItems[displayItems.length - 1]
+  const lastIsLiveThinking =
+    !!last &&
+    last.kind === "row" &&
+    last.row.type === "thinking" &&
+    last.row.id.startsWith("live-thinking:")
   const showWorkingIndicator =
     isStreaming &&
     !reconnectStatus &&
-    !lastItemIsOpenWorkGroup(displayItems)
+    !hasOpenWorkGroup(displayItems) &&
+    !lastIsLiveThinking
 
   // The reconnect banner REPLACES the plain "Working" row while active —
   // never both. Only shown while the session is actually streaming (a
@@ -241,24 +254,44 @@ export const TurnTimeline = ({
       estimateSizeForItem(displayItems[index], index === 0),
     overscan: 10,
     getItemKey: (index) => displayItemKey(displayItems[index]),
+    // Always read the live DOM height. TanStack's default measureElement
+    // returns the cached size when called without a ResizeObserver entry,
+    // which blocks shrinks after collapse / null render.
+    measureElement: (element) =>
+      (element as HTMLElement).offsetHeight,
+    // Pin the end while near bottom so streaming growth / appends don't
+    // jump the viewport; when the user scrolls up, isAtEnd is false and
+    // followOnAppend is a no-op.
+    anchorTo: "end",
+    followOnAppend: true,
+    scrollEndThreshold: 80,
+    // Defer RO → resizeItem to rAF — reduces WebView2 measurement races
+    // during fast scroll remounts.
+    useAnimationFrameWithResizeObserver: true,
   })
 
-  // Live tail (open group / streaming deltas) can grow without changing
-  // `count` — remeasure so stick-to-bottom sees the new scrollHeight.
+  // Live tail / streaming deltas grow without changing `count`. ResizeObserver
+  // usually handles this; we still remeasure mounted rows in place after paint
+  // as a safety net. Never call `virtualizer.measure()` here — it clears
+  // itemSizeCache and absolute rows overlap on stale estimateSize.
   useEffect(() => {
-    virtualizer.measure()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- measure on content growth only
+    const id = requestAnimationFrame(() => {
+      remeasureMountedVirtualItems(virtualizer)
+    })
+    return () => cancelAnimationFrame(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- remount on content growth only
   }, [streamContentKey, isStreaming, displayItems.length])
 
-  // WorkGroup expand/collapse changes row height; remeasure before
+  // WorkGroup expand/collapse changes row height; remeasure in place before
   // re-sticking so virtual offsets stay correct (esp. WebView2).
   const onLayoutChange = useCallback(() => {
-    virtualizer.measure()
+    remeasureMountedVirtualItems(virtualizer)
     handleLayoutChange()
   }, [virtualizer, handleLayoutChange])
 
-  // WebView2 (Windows) can report stale row heights while content is
-  // scrolling into the overscan window — remeasure after scroll settles.
+  // During scroll, tanstack skips sync measureElement while isScrolling;
+  // WebView2 can also report stale heights on overscan remounts. Remeasure
+  // mounted rows in place after scroll settles — never wipe the size cache.
   const scrollRemeasureTimer = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   )
@@ -269,7 +302,7 @@ export const TurnTimeline = ({
     }
     scrollRemeasureTimer.current = setTimeout(() => {
       scrollRemeasureTimer.current = null
-      virtualizer.measure()
+      remeasureMountedVirtualItems(virtualizer)
     }, 50)
   }, [handleScroll, virtualizer])
 

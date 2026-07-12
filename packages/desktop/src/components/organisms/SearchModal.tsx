@@ -149,6 +149,7 @@ export const SearchModal = ({ open, onClose }: SearchModalProps) => {
   return createPortal(
     <div
       className="fixed inset-0 z-[300] flex justify-center bg-black/20 animate-backdrop-in"
+      data-suppress-native-webview=""
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
@@ -159,6 +160,7 @@ export const SearchModal = ({ open, onClose }: SearchModalProps) => {
           "rounded-lg bg-panel shadow-[var(--shadow-popover)] animate-tray-in",
         )}
         role="dialog"
+        aria-modal="true"
         aria-label="Search agents"
       >
         <div className="flex items-center gap-1.5 border-b border-stroke-3 px-3 py-2.5">

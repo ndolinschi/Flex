@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import {
   buildDisplayItems,
+  estimateSizeForItem,
+  hasOpenWorkGroup,
   lastItemIsOpenWorkGroup,
   resumeLineForRows,
   shouldSkipCv,
@@ -306,6 +308,45 @@ describe("buildDisplayItems", () => {
       expect(lastItemIsOpenWorkGroup(items)).toBe(false)
     })
   })
+
+  describe("hasOpenWorkGroup", () => {
+    it("is true whenever any open group exists, even when lastItemIsOpenWorkGroup is false", () => {
+      const openGroup: DisplayItem = {
+        kind: "group",
+        id: "group:turn-1",
+        isOpen: true,
+        rows: [],
+      }
+      // Settled answer from another turn with a footer — lastItemIsOpenWorkGroup
+      // treats footer as "not live narration", so trailing-only check is false.
+      const settledAnswer: DisplayItem = {
+        kind: "row",
+        row: {
+          type: "assistant",
+          id: "a-1",
+          messageId: "m-1",
+          text: "Done.",
+          tsMs: 2,
+        },
+        footer: { tsMs: 2, copyText: "Done." },
+      }
+      const items = [openGroup, settledAnswer]
+      expect(lastItemIsOpenWorkGroup(items)).toBe(false)
+      expect(hasOpenWorkGroup(items)).toBe(true)
+    })
+
+    it("is false when every group is collapsed", () => {
+      const items: DisplayItem[] = [
+        {
+          kind: "group",
+          id: "group:turn-1",
+          isOpen: false,
+          rows: [],
+        },
+      ]
+      expect(hasOpenWorkGroup(items)).toBe(false)
+    })
+  })
 })
 
 describe("shouldSkipCv", () => {
@@ -350,5 +391,152 @@ describe("shouldSkipCv", () => {
     expect(shouldSkipCv(closedGroup, false)).toBe(true)
     expect(shouldSkipCv(openGroup, false)).toBe(true)
     expect(shouldSkipCv(liveAssistant, false)).toBe(true)
+  })
+})
+
+describe("estimateSizeForItem", () => {
+  it("scales assistant estimates with content length (avoids tiny fixed 120px)", () => {
+    const short: DisplayItem = {
+      kind: "row",
+      row: {
+        type: "assistant",
+        id: "a-short",
+        messageId: "m-s",
+        text: "ok",
+        tsMs: 0,
+      },
+    }
+    const longText = Array.from({ length: 40 }, (_, i) =>
+      `Paragraph ${i}: ${"word ".repeat(20).trim()}.`,
+    ).join("\n\n")
+    const long: DisplayItem = {
+      kind: "row",
+      row: {
+        type: "assistant",
+        id: "a-long",
+        messageId: "m-l",
+        text: longText,
+        tsMs: 0,
+      },
+    }
+
+    const shortPx = estimateSizeForItem(short, true)
+    const longPx = estimateSizeForItem(long, true)
+    expect(shortPx).toBeGreaterThanOrEqual(36)
+    expect(longPx).toBeGreaterThan(shortPx)
+    expect(longPx).toBeGreaterThan(400)
+  })
+
+  it("keeps thinking estimates collapsed-sized even with long text", () => {
+    const longThinking: DisplayItem = {
+      kind: "row",
+      row: {
+        type: "thinking",
+        id: "t-long",
+        messageId: "m-t",
+        text: "Reasoning step…\n".repeat(40),
+        tsMs: 0,
+      },
+    }
+    // ThinkingBlock mounts collapsed — must not reserve hundreds of px.
+    expect(estimateSizeForItem(longThinking, true)).toBeLessThanOrEqual(32)
+  })
+
+  it("estimates open work groups from nested rows without sizing full thinking text", () => {
+    const closed: DisplayItem = {
+      kind: "group",
+      id: "g-closed",
+      isOpen: false,
+      rows: [],
+    }
+    const open: DisplayItem = {
+      kind: "group",
+      id: "g-open",
+      isOpen: true,
+      rows: [
+        {
+          type: "thinking",
+          id: "t-1",
+          messageId: "m-1",
+          text: "Thinking about the approach…\n".repeat(40),
+          tsMs: 0,
+        },
+        {
+          type: "tool",
+          id: "tool-1",
+          call: {
+            id: "c-1",
+            session_id: "s",
+            turn_id: "t",
+            message_id: "m",
+            tool_name: "Bash",
+            input: {},
+            read_only: false,
+            origin: { origin: "model" },
+            status: { state: "completed" },
+            timing: { queued_at_ms: 0 },
+            result: { content: [{ type: "markdown", text: "" }], is_error: false },
+          },
+          tsMs: 0,
+        },
+        {
+          type: "assistant",
+          id: "a-1",
+          messageId: "m-1",
+          text: "Here is a long mid-turn narration.\n".repeat(12),
+          tsMs: 0,
+        },
+      ],
+    }
+
+    expect(estimateSizeForItem(closed, true)).toBe(32)
+    const openPx = estimateSizeForItem(open, true)
+    expect(openPx).toBeGreaterThan(estimateSizeForItem(closed, true))
+    // Long thinking must not dominate — collapsed ~24px, not full text.
+    expect(openPx).toBeLessThan(900)
+  })
+})
+
+describe("mid-turn plan does not split the work group", () => {
+  it("keeps tools before and after plan in one open group while streaming", () => {
+    const bash1 = bashCall("npm run dev")
+    const bash2 = bashCall("npm install")
+    const planRow: TimelineRow = {
+      type: "plan",
+      id: "plan-1",
+      entries: [{ content: "Scaffold app", status: "pending" }],
+      tsMs: 50,
+    }
+    const thinking: TimelineRow = {
+      type: "thinking",
+      id: "think-1",
+      messageId: "m-think",
+      text: "Planning next steps…\n".repeat(20),
+      tsMs: 60,
+    }
+
+    const rows: TimelineRow[] = [
+      userRow("Build the app"),
+      turnStarted("turn-1"),
+      toolRow(bash1, 10),
+      planRow,
+      thinking,
+      toolRow(bash2, 70),
+    ]
+
+    const items = buildDisplayItems(rows, true)
+
+    expect(items.some((i) => i.kind === "row" && i.row.type === "plan")).toBe(
+      false,
+    )
+    const groups = items.filter((i) => i.kind === "group")
+    expect(groups).toHaveLength(1)
+    expect(groups[0]).toMatchObject({ kind: "group", isOpen: true })
+    if (groups[0]?.kind !== "group") return
+    expect(groups[0].rows.map((r) => r.type)).toEqual([
+      "tool",
+      "thinking",
+      "tool",
+    ])
   })
 })

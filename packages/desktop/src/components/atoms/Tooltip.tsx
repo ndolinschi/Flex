@@ -7,6 +7,7 @@ import {
   type ReactElement,
 } from "react"
 import { createPortal } from "react-dom"
+import { isProgrammaticScroll } from "../../lib/programmaticScroll"
 import { cn } from "../../lib/utils"
 
 type TooltipSide = "top" | "bottom" | "right"
@@ -45,10 +46,14 @@ export const Tooltip = ({ label, side = "top", children }: TooltipProps) => {
     setRect(null)
   }
 
-  // Hide on any scroll while visible (capture phase catches inner scrollers too).
+  // Hide on user scroll while visible (capture phase catches inner scrollers).
+  // Ignore timeline stick-to-bottom scrolls during streaming.
   useEffect(() => {
     if (!rect) return
-    const onScroll = () => setRect(null)
+    const onScroll = () => {
+      if (isProgrammaticScroll()) return
+      setRect(null)
+    }
     window.addEventListener("scroll", onScroll, true)
     return () => window.removeEventListener("scroll", onScroll, true)
   }, [rect])

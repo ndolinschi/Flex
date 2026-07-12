@@ -55,7 +55,9 @@ fn load_enabled_mcp_servers() -> McpBridgeConfig {
             }
         };
         match toml::from_str::<McpServerConfig>(&content) {
-            Ok(server) if server.enabled => servers.push(server),
+            Ok(server) if server.enabled => {
+                servers.push(resolve_mcp_server_secrets(server));
+            }
             Ok(_) => {}
             Err(err) => {
                 tracing::warn!(path = %path.display(), error = %err, "could not parse MCP server config");
@@ -67,6 +69,42 @@ fn load_enabled_mcp_servers() -> McpBridgeConfig {
     if let Err(err) = config.validate() {
         tracing::warn!(error = %err, "MCP server configuration is invalid; no MCP servers loaded");
         return McpBridgeConfig::default();
+    }
+    config
+}
+
+/// Merge encrypted MCP secrets (env + positional-arg suffix) into a server
+/// config so stdio spawn sees real tokens. Used by [`load_enabled_mcp_servers`]
+/// and by `commands::mcp_test`.
+pub(crate) fn resolve_mcp_server_secrets(mut config: McpServerConfig) -> McpServerConfig {
+    let (secret_env, args_suffix) = match crate::config::load_mcp_server_secrets(&config.name) {
+        Ok(pair) => pair,
+        Err(err) => {
+            tracing::warn!(
+                server = %config.name,
+                error = %err,
+                "failed to load MCP secrets; starting without them"
+            );
+            return config;
+        }
+    };
+    if secret_env.is_empty() && args_suffix.is_empty() {
+        return config;
+    }
+    match &mut config.transport {
+        agentloop_sdk::McpServerTransport::Stdio(stdio) => {
+            for (k, v) in secret_env {
+                stdio.env.insert(k, v);
+            }
+            stdio.args.extend(args_suffix);
+        }
+        agentloop_sdk::McpServerTransport::StreamableHttp(http)
+        | agentloop_sdk::McpServerTransport::Sse(http) => {
+            for (k, v) in secret_env {
+                http.headers.insert(k, v);
+            }
+        }
+        _ => {}
     }
     config
 }

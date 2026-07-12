@@ -15,6 +15,7 @@ import {
 } from "./agentTerminal"
 import { maybeToastDevServerUrl } from "./devServerToast"
 import { maybeAutoTitleSession } from "./autoTitle"
+import { invalidateGitQueries } from "../invalidateGitQueries"
 import { log } from "../debug/log"
 
 const RUNNING_VERDICT_STATES: ReadonlySet<ToolCallStatus["state"]> = new Set([
@@ -265,7 +266,7 @@ export const applyGlobalSessionEvent = (
   // correct, it just never got told to refetch for consumers that weren't
   // mounted at turn-settle time.
   if (payload.kind === "turn_completed" || payload.kind === "session_error") {
-    void opts?.queryClient?.invalidateQueries({ queryKey: ["git-status"] })
+    if (opts?.queryClient) invalidateGitQueries(opts.queryClient)
   }
 
   // Background-completion notification + unread dot: only for live events

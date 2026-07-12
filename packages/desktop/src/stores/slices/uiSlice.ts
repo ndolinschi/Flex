@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand"
 import type { AppState, UiSliceState, UiTheme } from "../types"
+import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import { persistUiState } from "../persist"
 import { syncCrashReportingFlag, syncDebugFlag } from "../../lib/debug/log"
 
@@ -30,27 +31,43 @@ export const createUiSlice: StateCreator<
   unreadBySession: {},
   toasts: [],
   setRoute: (route) =>
-    set((state) => ({
-      route,
-      // Navigating away from chat leaves the panel with nothing sensible to
-      // anchor to — close it rather than let it linger off-screen.
-      subagentViewer: route === "chat" ? state.subagentViewer : null,
-      // Legacy dedicated routes (settings/customize/automations/memory) now
-      // all mount the same SettingsShell — preselect the nav section that
-      // corresponds to whichever shortcut was clicked, so e.g. the sidebar's
-      // "Memory" button still lands the user on the Memory section.
-      settingsSection:
-        route === "memory"
-          ? "memory"
-          : route === "automations"
-            ? "automations"
-            : route === "customize"
-              ? "tools-mcp"
-              : route === "settings"
-                ? state.settingsSection
-                : state.settingsSection,
-    })),
-  setSettingsSection: (section) => set({ settingsSection: section }),
+    set((state) => {
+      // Automations UI is feature-flagged off by default — treat the legacy
+      // route as Settings so stale shortcuts / deep-links don't blank out.
+      const effectiveRoute =
+        route === "automations" && !AUTOMATIONS_UI_ENABLED ? "settings" : route
+
+      let settingsSection = state.settingsSection
+      if (effectiveRoute === "memory") {
+        settingsSection = "memory"
+      } else if (route === "automations" && AUTOMATIONS_UI_ENABLED) {
+        settingsSection = "automations"
+      } else if (effectiveRoute === "customize") {
+        settingsSection = "tools-mcp"
+      }
+      if (settingsSection === "automations" && !AUTOMATIONS_UI_ENABLED) {
+        settingsSection = "general"
+      }
+
+      return {
+        route: effectiveRoute,
+        // Navigating away from chat leaves the panel with nothing sensible to
+        // anchor to — close it rather than let it linger off-screen.
+        subagentViewer: effectiveRoute === "chat" ? state.subagentViewer : null,
+        // Legacy dedicated routes (settings/customize/automations/memory) now
+        // all mount the same SettingsShell — preselect the nav section that
+        // corresponds to whichever shortcut was clicked, so e.g. the sidebar's
+        // "Memory" button still lands the user on the Memory section.
+        settingsSection,
+      }
+    }),
+  setSettingsSection: (section) => {
+    if (section === "automations" && !AUTOMATIONS_UI_ENABLED) {
+      set({ settingsSection: "general" })
+      return
+    }
+    set({ settingsSection: section })
+  },
   setTheme: (theme) => {
     applyThemeToDom(theme)
     set({ theme })

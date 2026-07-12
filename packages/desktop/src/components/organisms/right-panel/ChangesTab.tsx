@@ -10,6 +10,7 @@ import {
   gitStatusSinceBaseline,
   isIsolated,
 } from "../../../lib/tauri"
+import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import type { SessionMeta } from "../../../lib/types"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
@@ -28,11 +29,23 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
   // repo — defaults to `true` while loading/no cwd so this never flashes the
   // "not a git repository" empty state for an instant on a real repo before
   // the query resolves (mirrors ContextBar's `isRepo` gating).
-  const { data: isRepo = true } = useQuery({
+  //
+  // Re-check aggressively: `git init` in the Terminal (or mid-session) must
+  // not leave a sticky `false` that permanently disables the status query.
+  // Nested repos under this cwd are intentionally NOT auto-detected — the
+  // session's own cwd is the product boundary.
+  const {
+    data: isRepo = true,
+    isFetching: isRepoFetching,
+    refetch: refetchIsRepo,
+  } = useQuery({
     queryKey: ["git-is-repo", cwd],
     queryFn: () => gitIsRepo(cwd),
     enabled: !!cwd,
-    staleTime: 15_000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 5_000,
   })
 
   const { data: summary, refetch, isFetching } = useQuery({
@@ -42,6 +55,12 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     refetchInterval: 5_000,
     refetchOnWindowFocus: true,
   })
+
+  const handleRefresh = () => {
+    invalidateGitQueries(queryClient)
+    void refetchIsRepo()
+    if (isRepo) void refetch()
+  }
 
   // `files` is the server-capped row list (see `MAX_STATUS_FILES` in
   // commands.rs) — a session with hundreds of changed files (e.g. after
@@ -95,7 +114,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
   const prevStreaming = useRef(isStreaming)
   useEffect(() => {
     if (prevStreaming.current && !isStreaming) {
-      void queryClient.invalidateQueries({ queryKey: ["git-status"] })
+      invalidateGitQueries(queryClient)
     }
     prevStreaming.current = isStreaming
   }, [isStreaming, queryClient])
@@ -123,11 +142,23 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
 
   // No git repo in this cwd at all — calm empty state, not an error. A repo
   // with an unborn HEAD (no commits yet) is still `isRepo === true` and
-  // keeps the regular UI below (see `git_is_repo`'s doc comment).
+  // keeps the regular UI below (see `git_is_repo`'s doc comment). Refresh
+  // re-runs `git_is_repo` so a just-ran `git init` in this session cwd is
+  // picked up without leaving and re-entering the tab.
   if (!isRepo) {
     return (
-      <div className="flex flex-1 items-center justify-center px-6 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="text-sm text-ink-muted">Not a git repository.</p>
+        <IconButton
+          label="Refresh changes"
+          onClick={handleRefresh}
+          className="h-7 w-7"
+        >
+          <RefreshCw
+            className={cn("h-3.5 w-3.5", isRepoFetching && "animate-spin")}
+            aria-hidden
+          />
+        </IconButton>
       </div>
     )
   }
@@ -144,11 +175,14 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
           <DiffStat summary={totals} size="sm" />
           <IconButton
             label="Refresh changes"
-            onClick={() => void refetch()}
+            onClick={handleRefresh}
             className="h-6 w-6"
           >
             <RefreshCw
-              className={cn("h-3 w-3", isFetching && "animate-spin")}
+              className={cn(
+                "h-3 w-3",
+                (isFetching || isRepoFetching) && "animate-spin",
+              )}
               aria-hidden
             />
           </IconButton>
@@ -238,6 +272,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       {!isolated && sessionId ? (
         <CommitCenter
           sessionId={sessionId}
+          cwd={cwd}
           selectedPaths={[...selected]}
           totalFiles={files.length}
           onError={setError}

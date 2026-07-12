@@ -19,7 +19,7 @@
 use std::sync::{Arc, Mutex};
 
 use tauri::{
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, State, Url, WebviewBuilder,
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Rect, State, Url, WebviewBuilder,
     WebviewUrl,
 };
 
@@ -800,8 +800,15 @@ fn apply_bounds(
     width: f64,
     height: f64,
 ) -> DesktopResult<()> {
-    webview.set_position(LogicalPosition::new(x, y))?;
-    webview.set_size(LogicalSize::new(width.max(1.0), height.max(1.0)))?;
+    // Atomic bounds — never set_position then set_size. On macOS the child
+    // NSView is bottom-anchored; splitting the calls lets an intermediate
+    // size change slide the top edge over the React toolbar. `set_bounds`
+    // also updates wry's rate-based autoresize so window Resized keeps the
+    // webview glued to the content area without our stale absolute reapply.
+    webview.set_bounds(Rect {
+        position: LogicalPosition::new(x, y).into(),
+        size: LogicalSize::new(width.max(1.0), height.max(1.0)).into(),
+    })?;
     Ok(())
 }
 
@@ -822,27 +829,6 @@ pub async fn browser_set_bounds(
         apply_bounds(webview, x, y, width, height)?;
     }
     Ok(())
-}
-
-/// Re-asserts the last frontend-requested bounds. Called from the window's
-/// `Resized`/`ScaleFactorChanged` events: on macOS the child webview NSView
-/// lives in non-flipped (bottom-left origin) contentView coordinates with no
-/// autoresizing mask, so a window-height change shifts it relative to the top
-/// edge — shrinking the window slides the page up over the toolbar. The JS
-/// resync path uses rAF, which WKWebView can throttle/suspend during live
-/// resize, so the native side must self-correct too. Sync + `try_lock`:
-/// runs on the event-loop thread; if the webview mutex is busy a subsequent
-/// resize event (or the JS path) re-corrects.
-pub fn reapply_browser_bounds(state: &AppState) {
-    let Some((x, y, w, h)) = state.browser_bounds.lock().ok().and_then(|g| *g) else {
-        return;
-    };
-    let Ok(guard) = state.browser_webview.try_lock() else {
-        return;
-    };
-    if let Some(webview) = guard.as_ref() {
-        let _ = apply_bounds(webview, x, y, w, h);
-    }
 }
 
 #[tracing::instrument(level = "debug", skip_all, err)]

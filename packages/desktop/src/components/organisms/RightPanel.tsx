@@ -127,7 +127,10 @@ export const RightPanel = () => {
     queryKey: ["git-is-repo", active?.cwd ?? ""],
     queryFn: () => gitIsRepo(active!.cwd),
     enabled: !!active?.cwd,
-    staleTime: 15_000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: 5_000,
   }).data
 
   const changesSummary = useQuery({
@@ -278,7 +281,7 @@ export const RightPanel = () => {
         </div>
         <div
           className={cn(
-            "min-h-0 flex-1 flex-col",
+            "relative min-h-0 flex-1 flex-col",
             tab === "browser" && openIds.includes("browser") ? "flex" : "hidden",
           )}
         >

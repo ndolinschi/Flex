@@ -34,6 +34,19 @@ const PROFILE_KEYS_ACCOUNT: &str = "profile_keys";
 /// so they can't collide with profile ids (which are `"default"` or
 /// `"profile-<suffix>"` — see `commands::new_profile_id`).
 const LEGACY_KEY_PREFIX: &str = "legacy:";
+/// Namespace for MCP server secrets (env vars + positional arg values) inside
+/// the shared `secrets.enc` store. Format:
+/// - env: `mcp:{server_id}:{ENV_NAME}` → value
+/// - positional args suffix (JSON array): `mcp:{server_id}:__args_suffix__`
+///
+/// Kept out of [`ProviderConfig::profile_keys`] so provider persistence can't
+/// clobber or mis-attribute them (see [`strip_profile_keys`] /
+/// [`persist_config`]).
+pub const MCP_SECRET_PREFIX: &str = "mcp:";
+/// Meta key (under [`MCP_SECRET_PREFIX`]`{server_id}:`) holding a JSON array
+/// of secret positional-arg values appended after the TOML `args` at resolve
+/// time (e.g. postgres connection string).
+const MCP_ARGS_SUFFIX_META: &str = "__args_suffix__";
 /// The synthesized id given to the one profile created by migrating a legacy
 /// single-provider config on first load.
 const DEFAULT_PROFILE_ID: &str = "default";
@@ -457,11 +470,13 @@ fn legacy_migration_marker_path(dir: &std::path::Path) -> PathBuf {
 }
 
 /// Non-legacy (profile-keyed) entries of the combined secrets map: anything
-/// *not* namespaced under [`LEGACY_KEY_PREFIX`].
+/// *not* namespaced under [`LEGACY_KEY_PREFIX`] or [`MCP_SECRET_PREFIX`].
 fn strip_profile_keys(secrets: &BTreeMap<String, String>) -> BTreeMap<String, String> {
     secrets
         .iter()
-        .filter(|(k, _)| !k.starts_with(LEGACY_KEY_PREFIX))
+        .filter(|(k, _)| {
+            !k.starts_with(LEGACY_KEY_PREFIX) && !k.starts_with(MCP_SECRET_PREFIX)
+        })
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect()
 }
@@ -469,7 +484,8 @@ fn strip_profile_keys(secrets: &BTreeMap<String, String>) -> BTreeMap<String, St
 /// Re-merge the legacy (`keys`) and per-profile (`profile_keys`) maps back
 /// into one combined map suitable for `SecretsStore::save_all`, namespacing
 /// the legacy side under [`LEGACY_KEY_PREFIX`] so the two id spaces can't
-/// collide.
+/// collide. MCP secrets are *not* included here — callers that replace the
+/// whole store must re-merge them via [`preserve_mcp_secrets`].
 fn merge_combined_secrets(
     keys: &BTreeMap<String, String>,
     profile_keys: &BTreeMap<String, String>,
@@ -479,6 +495,174 @@ fn merge_combined_secrets(
         combined.insert(format!("{LEGACY_KEY_PREFIX}{id}"), key.clone());
     }
     combined
+}
+
+/// Copy every `mcp:*` entry from `existing` into `combined` so a provider
+/// `persist_config` never wipes MCP tokens/connection strings.
+fn preserve_mcp_secrets(
+    combined: &mut BTreeMap<String, String>,
+    existing: &BTreeMap<String, String>,
+) {
+    for (k, v) in existing {
+        if k.starts_with(MCP_SECRET_PREFIX) {
+            combined.insert(k.clone(), v.clone());
+        }
+    }
+}
+
+fn mcp_server_prefix(server_id: &str) -> String {
+    format!("{MCP_SECRET_PREFIX}{server_id}:")
+}
+
+fn mcp_env_secret_key(server_id: &str, env_name: &str) -> String {
+    format!("{}{env_name}", mcp_server_prefix(server_id))
+}
+
+fn mcp_args_suffix_key(server_id: &str) -> String {
+    format!("{}{MCP_ARGS_SUFFIX_META}", mcp_server_prefix(server_id))
+}
+
+/// Whether an env var *name* looks like a credential (used to split manual
+/// form env lines and to migrate plaintext secrets out of MCP TOML files).
+/// Workspace IDs / channel allowlists (`SLACK_TEAM_ID`, `SLACK_CHANNEL_IDS`)
+/// intentionally do **not** match.
+pub fn is_likely_secret_env_name(name: &str) -> bool {
+    let upper = name.to_ascii_uppercase();
+    if upper.ends_with("_TEAM_ID") || upper.ends_with("_CHANNEL_IDS") || upper.ends_with("_CHANNEL_ID")
+    {
+        return false;
+    }
+    upper.contains("TOKEN")
+        || upper.contains("SECRET")
+        || upper.contains("PASSWORD")
+        || upper.contains("PASSWD")
+        || upper.contains("API_KEY")
+        || upper.ends_with("_KEY")
+        || upper.contains("ACCESS_KEY")
+        || upper.contains("PRIVATE_KEY")
+        || upper.contains("AUTH")
+}
+
+/// Load every secret belonging to one MCP server: env map + optional
+/// positional-args suffix (values appended after the TOML `args` at resolve).
+pub fn load_mcp_server_secrets(
+    server_id: &str,
+) -> DesktopResult<(BTreeMap<String, String>, Vec<String>)> {
+    let dir = secrets_dir()?;
+    let all = SecretsStore::load_all(&dir, &[])?;
+    let prefix = mcp_server_prefix(server_id);
+    let mut env = BTreeMap::new();
+    let mut args_suffix = Vec::new();
+    for (k, v) in all {
+        let Some(rest) = k.strip_prefix(&prefix) else {
+            continue;
+        };
+        if rest == MCP_ARGS_SUFFIX_META {
+            args_suffix = serde_json::from_str(v.as_str()).unwrap_or_default();
+            continue;
+        }
+        if rest.is_empty() || rest.contains(':') {
+            // Unknown meta / nested key — ignore rather than treat as env.
+            continue;
+        }
+        env.insert(rest.to_owned(), v);
+    }
+    Ok((env, args_suffix))
+}
+
+/// Env key names that currently have a stored secret for `server_id`
+/// (values never returned to the frontend).
+pub fn list_mcp_configured_secret_env(server_id: &str) -> DesktopResult<Vec<String>> {
+    let (env, _) = load_mcp_server_secrets(server_id)?;
+    Ok(env.into_keys().collect())
+}
+
+/// Whether this server has any stored secret positional-arg suffix.
+pub fn mcp_has_secret_args_suffix(server_id: &str) -> DesktopResult<bool> {
+    let (_, suffix) = load_mcp_server_secrets(server_id)?;
+    Ok(!suffix.is_empty())
+}
+
+/// Upsert MCP secrets for one server.
+///
+/// - `secret_env`: non-empty values overwrite; empty/missing keys that already
+///   exist are **kept** (mirrors provider profile `api_key` semantics). Pass
+///   `replace_env: true` to drop any previously stored env keys not present
+///   in `secret_env` (used when the caller sends the full desired set).
+/// - `args_suffix`: `Some(vec)` replaces the suffix; `None` keeps existing;
+///   `Some(empty)` clears it.
+pub fn upsert_mcp_server_secrets(
+    server_id: &str,
+    secret_env: &BTreeMap<String, String>,
+    replace_env: bool,
+    args_suffix: Option<&[String]>,
+) -> DesktopResult<()> {
+    let dir = secrets_dir()?;
+    let mut all = SecretsStore::load_all(&dir, &[])?;
+    let prefix = mcp_server_prefix(server_id);
+
+    if replace_env {
+        let stale: Vec<String> = all
+            .keys()
+            .filter(|k| {
+                k.strip_prefix(&prefix)
+                    .is_some_and(|rest| rest != MCP_ARGS_SUFFIX_META && !rest.is_empty() && !rest.contains(':'))
+            })
+            .cloned()
+            .collect();
+        for k in stale {
+            // Keep keys the caller is about to set (possibly empty = keep).
+            let rest = k.strip_prefix(&prefix).unwrap_or("");
+            if secret_env.contains_key(rest) {
+                continue;
+            }
+            all.remove(&k);
+        }
+    }
+
+    for (name, value) in secret_env {
+        let key = mcp_env_secret_key(server_id, name);
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            // Empty = keep existing (configure dialog "leave blank to keep").
+            continue;
+        }
+        all.insert(key, trimmed.to_owned());
+    }
+
+    if let Some(suffix) = args_suffix {
+        let key = mcp_args_suffix_key(server_id);
+        if suffix.is_empty() {
+            all.remove(&key);
+        } else {
+            let encoded = serde_json::to_string(suffix)
+                .map_err(|e| DesktopError::Config(e.to_string()))?;
+            all.insert(key, encoded);
+        }
+    }
+
+    SecretsStore::save_all(&dir, &all)?;
+    Ok(())
+}
+
+/// Remove every secret belonging to one MCP server (called from `mcp_remove`).
+pub fn clear_mcp_server_secrets(server_id: &str) -> DesktopResult<()> {
+    let dir = secrets_dir()?;
+    let mut all = SecretsStore::load_all(&dir, &[])?;
+    let prefix = mcp_server_prefix(server_id);
+    let stale: Vec<String> = all
+        .keys()
+        .filter(|k| k.starts_with(&prefix))
+        .cloned()
+        .collect();
+    if stale.is_empty() {
+        return Ok(());
+    }
+    for k in stale {
+        all.remove(&k);
+    }
+    SecretsStore::save_all(&dir, &all)?;
+    Ok(())
 }
 
 pub fn load_config() -> DesktopResult<ProviderConfig> {
@@ -503,7 +687,12 @@ pub fn load_config() -> DesktopResult<ProviderConfig> {
 pub fn persist_config(cfg: &ProviderConfig) -> DesktopResult<()> {
     save_prefs(&cfg.prefs)?;
     let dir = secrets_dir()?;
-    let combined = merge_combined_secrets(&cfg.keys, &cfg.profile_keys);
+    // Provider keys replace their own namespace, but MCP secrets live in the
+    // same `secrets.enc` blob — re-merge them so saving a provider profile
+    // never deletes Slack/GitHub/Brave tokens.
+    let existing = SecretsStore::load_all(&dir, &[])?;
+    let mut combined = merge_combined_secrets(&cfg.keys, &cfg.profile_keys);
+    preserve_mcp_secrets(&mut combined, &existing);
     SecretsStore::save_all(&dir, &combined)?;
     Ok(())
 }
@@ -688,5 +877,17 @@ mod tests {
             !prefs.auto_context,
             "auto-context must default off (opt-in via Settings or AGENTLOOP_AUTO_CONTEXT)"
         );
+    }
+
+    #[test]
+    fn secret_env_name_heuristic_matches_tokens_not_team_ids() {
+        assert!(is_likely_secret_env_name("SLACK_BOT_TOKEN"));
+        assert!(is_likely_secret_env_name("GITHUB_PERSONAL_ACCESS_TOKEN"));
+        assert!(is_likely_secret_env_name("BRAVE_API_KEY"));
+        assert!(is_likely_secret_env_name("OPENAI_API_KEY"));
+        assert!(!is_likely_secret_env_name("SLACK_TEAM_ID"));
+        assert!(!is_likely_secret_env_name("SLACK_CHANNEL_IDS"));
+        assert!(!is_likely_secret_env_name("PATH"));
+        assert!(!is_likely_secret_env_name("HOME"));
     }
 }

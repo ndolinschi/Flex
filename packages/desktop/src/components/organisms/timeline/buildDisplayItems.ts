@@ -52,8 +52,29 @@ export const marginForItem = (item: DisplayItem, isFirst: boolean): string => {
   }
 }
 
-/** Rough px estimate for `@tanstack/react-virtual` before first measure —
- * mirrors `.cv-auto*` contain-intrinsic-size hints in index.css. */
+/** Approx line height (px) used by content-aware size estimates — keep in
+ * sync with `text-base` / `leading-relaxed` on timeline markdown. Slightly
+ * under real wrap height so estimates stay conservative. */
+const ESTIMATE_LINE_PX = 18
+/** Rough characters per wrapped line at the content-rail width. */
+const ESTIMATE_CHARS_PER_LINE = 100
+/** Collapsed ThinkingBlock / WorkGroup header — matches `min-h-5` + chrome. */
+const ESTIMATE_COLLAPSED_ROW_PX = 24
+
+/** Prefer slight underestimates: measured heights grow via ResizeObserver /
+ * `remeasureMountedVirtualItems`. Overestimates leave persistent gaps when
+ * content is collapsed (thinking defaults closed) or null-rendered. */
+const estimateTextBlockPx = (text: string, minPx: number, maxPx: number): number => {
+  const trimmed = text.trim()
+  if (!trimmed) return minPx
+  const hardLines = trimmed.split("\n").length
+  const wrapLines = Math.ceil(trimmed.length / ESTIMATE_CHARS_PER_LINE)
+  return Math.min(maxPx, Math.max(minPx, Math.max(hardLines, wrapLines) * ESTIMATE_LINE_PX))
+}
+
+/** Rough px estimate for `@tanstack/react-virtual` before first measure.
+ * Content-aware but conservative — absolute rows grow into measured sizes;
+ * inflated estimates leave the sparse gaps seen when thinking/work collapses. */
 export const estimateSizeForItem = (item: DisplayItem, isFirst: boolean): number => {
   const pad = isFirst
     ? 0
@@ -68,19 +89,40 @@ export const estimateSizeForItem = (item: DisplayItem, isFirst: boolean): number
               item.row.type === "command")
           ? 8
           : 4
-  if (item.kind === "group") return pad + (item.isOpen ? 200 : 32)
+  if (item.kind === "group") {
+    if (!item.isOpen) return pad + 32
+    // Header + nested rows. ThinkingBlock defaults collapsed — do not size
+    // from full thinking text or open groups overshoot by hundreds of px.
+    const nested = item.rows.reduce((sum, row) => {
+      if (row.type === "thinking") return sum + ESTIMATE_COLLAPSED_ROW_PX
+      if (row.type === "assistant") {
+        return sum + estimateTextBlockPx(row.text, 28, 480)
+      }
+      if (row.type === "tool") return sum + 28
+      if (row.type === "plan") return sum
+      return sum + ESTIMATE_COLLAPSED_ROW_PX
+    }, 0)
+    return pad + 36 + nested + (item.footer ? 24 : 0)
+  }
   switch (item.row.type) {
     case "user":
-      return pad + 80
+      return pad + estimateTextBlockPx(item.row.text, 40, 280)
     case "assistant":
-      return pad + 120
+      return pad + estimateTextBlockPx(item.row.text, 36, 1200)
+    case "thinking":
+      // ThinkingBlock mounts collapsed ("Thought for …") — full text is
+      // behind Collapsible and must not drive the virtual slot.
+      return pad + ESTIMATE_COLLAPSED_ROW_PX
+    case "plan":
+      // Not rendered in the timeline (right-panel Plan tab).
+      return pad
     case "meta":
     case "fallback":
     case "command":
     case "error":
       return pad + 32
     default:
-      return pad + 80
+      return pad + 48
   }
 }
 
@@ -243,14 +285,21 @@ export const buildDisplayItems = (
       items.push({ kind: "row", row })
       continue
     }
-    if (row.type === "user" || row.type === "error" || row.type === "plan") {
+    if (row.type === "plan") {
+      // Right-panel Plan tab owns the plan (`TimelineRowView` returns null).
+      // Never emit a display item, and never flush the open work group —
+      // flushing left orphan flat thinking/tool rows with inflated estimates
+      // and the huge vertical gaps between "Thought" / "Ran N command".
+      continue
+    }
+    if (row.type === "user" || row.type === "error") {
       // The engine can emit `turn_started` BEFORE the user message that
       // opens it (real wire order: turn_started, user_message, ...) — so a
-      // `user`/`error`/`plan` row arriving while `pending` is still EMPTY is
-      // just the turn's own opening row, not a mid-turn interruption. Render
-      // it as a flat row same as always, but leave `pending` open (still
-      // empty) so the thinking/tool rows that follow populate THIS turn's
-      // group instead of falling through to the `!pending` branch above and
+      // `user`/`error` row arriving while `pending` is still EMPTY is just
+      // the turn's own opening row, not a mid-turn interruption. Render it
+      // as a flat row same as always, but leave `pending` open (still empty)
+      // so the thinking/tool rows that follow populate THIS turn's group
+      // instead of falling through to the `!pending` branch above and
       // rendering as ungrouped flat rows for the rest of the turn.
       if (pending.all.length === 0) {
         items.push({ kind: "row", row })
@@ -268,6 +317,13 @@ export const buildDisplayItems = (
   return items
 }
 
+/** True when any open (live) WorkGroup is on screen — its header already
+ * owns the single Thinking/Working cue, so the bottom-of-feed backstop must
+ * stay hidden even if something trails the group in `displayItems` (meta
+ * log rows, checkpoints, etc.). */
+export const hasOpenWorkGroup = (items: DisplayItem[]): boolean =>
+  items.some((item) => item.kind === "group" && item.isOpen)
+
 /** True when the trailing display item is an open (live) WorkGroup, OR a
  * trailing live-narration row that `flush()` pulled out of one — its own
  * "Working" cue (RunningDot + shimmer, see `WorkGroup`) already covers the
@@ -276,7 +332,10 @@ export const buildDisplayItems = (
  * see `flush`'s `!keepOpen` gate), which is what distinguishes it from a
  * genuinely finished turn's answer row sitting last. Any other trailing item
  * (a finished turn's answer row, a gap before `turn_started`, a subagent,
- * etc.) keeps the backstop so the feed never looks dead while `isStreaming`. */
+ * etc.) keeps the backstop so the feed never looks dead while `isStreaming`.
+ *
+ * Prefer [`hasOpenWorkGroup`] for gating the bottom indicator — it also
+ * covers open groups that are no longer literally last. */
 export const lastItemIsOpenWorkGroup = (items: DisplayItem[]): boolean => {
   const last = items[items.length - 1]
   if (!last) return false

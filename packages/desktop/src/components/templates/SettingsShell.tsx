@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react"
 import { ArrowLeft } from "lucide-react"
 import { IconButton } from "../atoms"
 import { SettingsNav } from "../molecules"
+import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import type { SettingsSectionId } from "../../lib/settingsSearchIndex"
 import { searchSettings, type SettingsSearchEntry } from "../../lib/settingsSearchIndex"
 import { useAppStore } from "../../stores/appStore"
@@ -43,6 +44,12 @@ export const SettingsShell = ({
   const highlightTimeoutRef = useRef<number | null>(null)
 
   const results = searchSettings(query)
+
+  useEffect(() => {
+    if (activeSection === "automations" && !AUTOMATIONS_UI_ENABLED) {
+      setActiveSection("general")
+    }
+  }, [activeSection, setActiveSection])
 
   useEffect(() => {
     setResultIndex(0)

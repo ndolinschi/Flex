@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { Button, TextArea, TextInput } from "../../../components/atoms"
 import { ErrorBanner, FieldRow, SettingsSection } from "../../../components/molecules"
-import { emptyMcpForm, MCP_ID_RE, parseArgs, parseEnv, type McpFormState } from "../../../lib/mcp"
+import { emptyMcpForm, MCP_ID_RE, parseArgs, parseEnv, splitEnvSecrets, type McpFormState } from "../../../lib/mcp"
 import { mcpUpsert, toInvokeError } from "../../../lib/tauri"
 import type { McpServerDto } from "../../../lib/types"
 
@@ -40,11 +40,14 @@ export const CreateMcpServerForm = ({
       return
     }
 
+    const parsed = parseEnv(form.envText)
+    const { env, secretEnv } = splitEnvSecrets(parsed)
     const server: McpServerDto = {
       id,
       command: form.command.trim(),
       args: parseArgs(form.args),
-      env: parseEnv(form.envText),
+      env,
+      secretEnv,
       enabled: form.enabled,
     }
 
@@ -92,7 +95,7 @@ export const CreateMcpServerForm = ({
       <FieldRow
         label="Environment variables (optional)"
         htmlFor="mcp-env"
-        hint='One "KEY=value" pair per line.'
+        hint='One "KEY=value" pair per line. Names containing TOKEN, KEY, SECRET, PASSWORD, or AUTH are stored encrypted.'
       >
         <TextArea
           id="mcp-env"

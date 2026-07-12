@@ -231,6 +231,7 @@ pub fn run() {
             commands::respond_question,
             commands::is_configured,
             commands::git_is_repo,
+            commands::git_has_remote,
             commands::git_branch,
             commands::git_list_branches,
             commands::git_checkout,
@@ -320,13 +321,10 @@ pub fn run() {
                     }
                 });
             }
-            // macOS anchors child webviews to the window bottom (non-flipped
-            // NSView coords); re-assert the frontend-requested bounds so the
-            // browser page never slides over the React toolbar mid-resize.
-            tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. } => {
-                let state = window.state::<AppState>();
-                crate::browser::reapply_browser_bounds(&state);
-            }
+            // Child-webview resize is handled by wry's rate-based autoresize
+            // (updated on every `set_bounds`). Do NOT re-apply stored absolute
+            // pixels here — that freezes the browser at the pre-resize height
+            // and leaves a black gap under the page on macOS.
             _ => {}
         })
         .run(tauri::generate_context!())

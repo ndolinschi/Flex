@@ -1460,6 +1460,24 @@ pub fn git_is_repo(cwd: String) -> bool {
         .unwrap_or(false)
 }
 
+/// Whether `cwd`'s repo has at least one configured remote (`git remote`
+/// prints a non-empty name). Gates Commit vs Commit & Push in the UI — no
+/// remote means push would fail with "No configured push destination", so
+/// the chrome must not offer push.
+#[tracing::instrument(level = "debug", skip_all)]
+#[tauri::command]
+pub fn git_has_remote(cwd: String) -> bool {
+    crate::win_console::command("git")
+        .args(["remote"])
+        .current_dir(cwd)
+        .output()
+        .map(|out| {
+            out.status.success()
+                && !String::from_utf8_lossy(&out.stdout).trim().is_empty()
+        })
+        .unwrap_or(false)
+}
+
 /// Read-only current-branch lookup for the composer context bar.
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
@@ -3130,20 +3148,43 @@ pub struct McpServerDto {
     pub command: String,
     #[serde(default)]
     pub args: Vec<String>,
+    /// Non-secret environment variables (persisted in the MCP TOML file).
     #[serde(default)]
     pub env: std::collections::BTreeMap<String, String>,
+    /// Secret environment values to write into the encrypted secrets store.
+    /// On upsert: non-empty values overwrite; empty string keeps the existing
+    /// secret (configure dialog). On list responses this map is always empty
+    /// — see [`configured_secret_env`].
+    #[serde(default)]
+    pub secret_env: std::collections::BTreeMap<String, String>,
+    /// Secret positional-arg values appended after `args` at resolve time
+    /// (e.g. a Postgres connection string). Same keep-if-empty semantics as
+    /// `secret_env` when `has_secret_args` is already true; omitted/`None` on
+    /// list. Frontend sends these only for catalog installs that declare
+    /// secret `argKeys`.
+    #[serde(default)]
+    pub secret_args: Option<Vec<String>>,
+    /// Env key names that currently have a stored secret (values never
+    /// returned). Populated on list; ignored on upsert.
+    #[serde(default)]
+    pub configured_secret_env: Vec<String>,
+    /// Whether a secret positional-args suffix is stored for this server.
+    #[serde(default)]
+    pub has_secret_args: bool,
     pub enabled: bool,
 }
 
-fn mcp_dto_to_config(dto: McpServerDto) -> agentloop_sdk::McpServerConfig {
+fn mcp_dto_to_config(dto: &McpServerDto) -> agentloop_sdk::McpServerConfig {
     agentloop_sdk::McpServerConfig {
-        name: dto.id,
+        name: dto.id.clone(),
         display_name: None,
         enabled: dto.enabled,
         transport: agentloop_sdk::McpServerTransport::Stdio(agentloop_sdk::StdioServerConfig {
-            command: dto.command,
-            args: dto.args,
-            env: dto.env,
+            command: dto.command.clone(),
+            args: dto.args.clone(),
+            // Only non-secret env lands in the TOML file. Secrets are merged
+            // back at resolve time (compose / mcp_test) from the encrypted store.
+            env: dto.env.clone(),
             cwd: None,
         }),
         tool_name_prefix: None,
@@ -3151,7 +3192,7 @@ fn mcp_dto_to_config(dto: McpServerDto) -> agentloop_sdk::McpServerConfig {
 }
 
 fn mcp_config_to_dto(config: agentloop_sdk::McpServerConfig) -> McpServerDto {
-    let (command, args, env) = match config.transport {
+    let (command, args, mut env) = match config.transport {
         agentloop_sdk::McpServerTransport::Stdio(stdio) => (stdio.command, stdio.args, stdio.env),
         // The desktop UI only manages stdio servers (MVP scope); any other
         // transport a `.toml` file might carry (hand-edited, or added by a
@@ -3162,11 +3203,99 @@ fn mcp_config_to_dto(config: agentloop_sdk::McpServerConfig) -> McpServerDto {
         | agentloop_sdk::McpServerTransport::Sse(http) => (http.url, Vec::new(), http.headers),
         _ => (String::new(), Vec::new(), std::collections::BTreeMap::new()),
     };
+
+    // Migrate any plaintext credential-looking env vars still sitting in the
+    // TOML (installed before secret storage landed) into the encrypted store,
+    // then strip them from the DTO so the renderer never sees the values.
+    let mut migrated_secrets = std::collections::BTreeMap::new();
+    let secret_keys: Vec<String> = env
+        .keys()
+        .filter(|k| crate::config::is_likely_secret_env_name(k))
+        .cloned()
+        .collect();
+    for key in secret_keys {
+        if let Some(value) = env.remove(&key) {
+            if !value.trim().is_empty() {
+                migrated_secrets.insert(key, value);
+            }
+        }
+    }
+    if !migrated_secrets.is_empty() {
+        match crate::config::upsert_mcp_server_secrets(
+            &config.name,
+            &migrated_secrets,
+            false,
+            None,
+        ) {
+            Ok(()) => {
+                // Rewrite the TOML without the migrated secrets so they don't
+                // linger on disk in plaintext (sync write — avoids nesting
+                // `block_on` inside the async `mcp_list` path).
+                if let Some(dir) = agentloop_sdk::mcp_store::default_mcp_dir() {
+                    let cleaned = agentloop_sdk::McpServerConfig {
+                        name: config.name.clone(),
+                        display_name: config.display_name.clone(),
+                        enabled: config.enabled,
+                        transport: agentloop_sdk::McpServerTransport::Stdio(
+                            agentloop_sdk::StdioServerConfig {
+                                command: command.clone(),
+                                args: args.clone(),
+                                env: env.clone(),
+                                cwd: None,
+                            },
+                        ),
+                        tool_name_prefix: config.tool_name_prefix.clone(),
+                    };
+                    match toml::to_string_pretty(&cleaned) {
+                        Ok(content) => {
+                            let path = dir.join(format!("{}.toml", config.name));
+                            if let Err(err) = std::fs::write(&path, content) {
+                                tracing::warn!(
+                                    path = %path.display(),
+                                    error = %err,
+                                    "failed to rewrite MCP TOML after secret migration"
+                                );
+                            }
+                        }
+                        Err(err) => {
+                            tracing::warn!(
+                                server = %config.name,
+                                error = %err,
+                                "failed to serialize MCP TOML after secret migration"
+                            );
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                tracing::warn!(
+                    server = %config.name,
+                    error = %err,
+                    "failed to migrate plaintext MCP env secrets into encrypted store"
+                );
+                // Put them back so the server still works this session even if
+                // the secrets write failed.
+                for (k, v) in migrated_secrets {
+                    env.insert(k, v);
+                }
+            }
+        }
+    }
+
+    let configured_secret_env =
+        crate::config::list_mcp_configured_secret_env(&config.name).unwrap_or_default();
+    let has_secret_args =
+        crate::config::mcp_has_secret_args_suffix(&config.name).unwrap_or(false);
+
     McpServerDto {
         id: config.name,
         command,
         args,
         env,
+        secret_env: std::collections::BTreeMap::new(),
+        secret_args: None,
+        configured_secret_env,
+        has_secret_args,
         enabled: config.enabled,
     }
 }
@@ -3225,7 +3354,41 @@ pub async fn mcp_upsert(state: State<'_, AppState>, server: McpServerDto) -> Des
     if server.command.trim().is_empty() {
         return Err(DesktopError::Message("command is required".into()));
     }
-    let config = mcp_dto_to_config(server);
+
+    // Split credential-looking keys out of the plaintext `env` map as a
+    // safety net (manual "Add server" form, or a catalog client that forgot
+    // to use `secretEnv`). Catalog installs should already send them in
+    // `secret_env`.
+    let mut plaintext_env = server.env.clone();
+    let mut secret_env = server.secret_env.clone();
+    let leaked: Vec<String> = plaintext_env
+        .keys()
+        .filter(|k| crate::config::is_likely_secret_env_name(k))
+        .cloned()
+        .collect();
+    for key in leaked {
+        if let Some(value) = plaintext_env.remove(&key) {
+            secret_env.entry(key).or_insert(value);
+        }
+    }
+
+    let args_suffix = server.secret_args.as_deref();
+    crate::config::upsert_mcp_server_secrets(
+        &server.id,
+        &secret_env,
+        /* replace_env */ false,
+        args_suffix,
+    )?;
+
+    let dto_for_toml = McpServerDto {
+        env: plaintext_env,
+        secret_env: std::collections::BTreeMap::new(),
+        secret_args: None,
+        configured_secret_env: Vec::new(),
+        has_secret_args: false,
+        ..server
+    };
+    let config = mcp_dto_to_config(&dto_for_toml);
     let store = mcp_store()?;
     store
         .upsert(config)
@@ -3244,6 +3407,9 @@ pub async fn mcp_remove(state: State<'_, AppState>, id: String) -> DesktopResult
         .remove(id)
         .await
         .map_err(|e| DesktopError::Message(e.to_string()))?;
+    if let Err(err) = crate::config::clear_mcp_server_secrets(id) {
+        tracing::warn!(server = %id, error = %err, "failed to clear MCP secrets on remove");
+    }
     rebuild_service_after_mcp_change(&state).await;
     Ok(())
 }
@@ -3263,6 +3429,7 @@ pub async fn mcp_test(id: String) -> DesktopResult<Vec<String>> {
         .await
         .map_err(|e| DesktopError::Message(e.to_string()))?
         .ok_or_else(|| DesktopError::Message(format!("server `{id}` not found")))?;
+    let server = crate::compose::resolve_mcp_server_secrets(server);
 
     let client = agentloop_sdk::mcp::RmcpToolClient::from_configs(std::slice::from_ref(&server));
     let tools = client
@@ -4073,6 +4240,60 @@ mod git_status_tests {
         assert_eq!(summary.total_added, 10);
         assert_eq!(summary.total_removed, 5);
         assert!(!summary.truncated);
+    }
+
+    #[test]
+    fn git_has_remote_false_without_remotes() {
+        let dir = std::env::temp_dir().join(format!(
+            "flex-git-has-remote-none-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let out = crate::win_console::command("git")
+            .args(["init", "-q"])
+            .current_dir(&dir)
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        assert!(
+            !git_has_remote(dir.to_string_lossy().into_owned()),
+            "fresh init must report no remotes"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn git_has_remote_true_with_origin() {
+        let dir = std::env::temp_dir().join(format!(
+            "flex-git-has-remote-origin-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let init = crate::win_console::command("git")
+            .args(["init", "-q"])
+            .current_dir(&dir)
+            .output()
+            .unwrap();
+        assert!(init.status.success());
+        let add = crate::win_console::command("git")
+            .args(["remote", "add", "origin", "https://example.com/repo.git"])
+            .current_dir(&dir)
+            .output()
+            .unwrap();
+        assert!(add.status.success());
+        assert!(
+            git_has_remote(dir.to_string_lossy().into_owned()),
+            "configured origin must count as a push remote"
+        );
+        std::fs::remove_dir_all(&dir).ok();
     }
 }
 

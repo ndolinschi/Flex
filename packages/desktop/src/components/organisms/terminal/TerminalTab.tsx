@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { List, Plus, Terminal as TerminalIcon } from "lucide-react"
 import { IconButton, ScrollArea } from "../../atoms"
 import { ConfirmDialog, EmptyState } from "../../molecules"
@@ -21,7 +21,10 @@ const EMPTY_TERMINALS: TerminalMeta[] = []
  * terminal list. All sessions' `TerminalInstance`s stay mounted (PTYs + xterm
  * scrollback survive session switches); only the active session's active
  * terminal is visible. Stays mounted when inactive (parent hides via
- * display:none). */
+ * display:none).
+ *
+ * Opening the tab with zero workspace terminals auto-creates one PTY so the
+ * user lands in a shell instead of an empty state. */
 export const TerminalTab = ({ active }: { active: boolean }) => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const sessionKey = sessionScopeKey(activeSessionId)
@@ -50,6 +53,10 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
   const [pendingClose, setPendingClose] = useState<string | null>(null)
   const [closing, setClosing] = useState(false)
   const now = useNowTicker(30_000)
+  /** Sessions for which we've already tried default spawn this tab visit —
+   * prevents StrictMode double-create and recreate-after-close while still
+   * on the Terminal tab. Cleared when the tab becomes inactive. */
+  const autoSpawnAttemptedRef = useRef(new Set<string>())
 
   // Register the output listener before any terminal can be created, so the
   // shell's first output (the prompt) is buffered even if no xterm instance
@@ -73,9 +80,23 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
         createdAtMs: info.createdAtMs,
       })
       setActiveTerminalId(sessionKey, info.id)
-    } catch (err) {
+    } catch {
+      // Leave EmptyState / Plus button available for a manual retry.
     }
   }
+
+  // Default: opening Terminal with no workspace PTYs creates one shell.
+  useEffect(() => {
+    if (!active) {
+      autoSpawnAttemptedRef.current.delete(sessionKey)
+      return
+    }
+    if (terminals.length > 0) return
+    if (autoSpawnAttemptedRef.current.has(sessionKey)) return
+    autoSpawnAttemptedRef.current.add(sessionKey)
+    void handleNewTerminal()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- spawn once per empty tab open
+  }, [active, sessionKey, terminals.length, activeSession?.cwd])
 
   const handleConfirmClose = async () => {
     if (!pendingClose) return

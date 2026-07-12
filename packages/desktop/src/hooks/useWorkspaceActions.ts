@@ -5,6 +5,7 @@ import {
   integrateSession,
   toInvokeError,
 } from "../lib/tauri"
+import { invalidateGitQueries } from "../lib/invalidateGitQueries"
 import { useAppStore } from "../stores/appStore"
 import { log } from "../lib/debug/log"
 
@@ -32,7 +33,7 @@ export const useWorkspaceActions = (
       void queryClient.invalidateQueries({ queryKey: ["sessions"] })
       void queryClient.invalidateQueries({ queryKey: ["is-isolated"] })
       void queryClient.invalidateQueries({ queryKey: ["workspace-status"] })
-      void queryClient.invalidateQueries({ queryKey: ["git-status"] })
+      invalidateGitQueries(queryClient)
       pushToast(successText, "success")
       onDone?.()
     } catch (err) {
@@ -71,7 +72,7 @@ export const invalidateReviewQueries = (
   path?: string,
 ) => {
   void queryClient.invalidateQueries({ queryKey: ["workspace-status"] })
-  void queryClient.invalidateQueries({ queryKey: ["git-status"] })
+  invalidateGitQueries(queryClient)
   if (path) {
     void queryClient.invalidateQueries({ queryKey: ["review-file-diff", path] })
   } else {

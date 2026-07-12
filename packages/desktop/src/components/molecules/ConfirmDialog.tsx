@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 import { Button } from "../atoms"
 import { cn } from "../../lib/utils"
 
@@ -15,7 +16,9 @@ type ConfirmDialogProps = {
   children?: ReactNode
 }
 
-/** In-app modal shell for rename / delete (replaces window.prompt/confirm). */
+/** In-app modal shell for rename / delete (replaces window.prompt/confirm).
+ * Portaled to `document.body` so virtualized timeline rows (and other
+ * remounting parents) cannot unmount an open dialog mid-stream. */
 export const ConfirmDialog = ({
   open,
   title,
@@ -51,10 +54,11 @@ export const ConfirmDialog = ({
 
   if (!open) return null
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-start justify-center bg-black/20 pt-[100px] animate-backdrop-in"
       role="presentation"
+      data-suppress-native-webview=""
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel()
       }}
@@ -98,6 +102,7 @@ export const ConfirmDialog = ({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
