@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NewSessionParams",
+  "description": "Options for creating a session.",
+  "type": "object",
+  "properties": {
+    "cwd": {
+      "description": "Working directory; defaults to the engine process's cwd.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "extra": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "fallback_models": {
+      "description": "Session-level default fallback chain (see\n[`TurnOptions::fallback_models`]); used by every turn on this session\nthat doesn't set its own `TurnOptions.fallback_models`.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ModelRef"
+      }
+    },
+    "isolation": {
+      "description": "Requested isolation posture for this session. `None` defers to the\nengine/role default. Only honored for root sessions; subagents inherit\ntheir parent's working directory.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/IsolationPolicy"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "mode": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "model": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ModelRef"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "permission_mode": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PermissionMode"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "role": {
+      "description": "Role this root session runs as (e.g. `searcher`). Selects the role's\ntool profile and model chain; `None` = the main role. Unknown role\nnames are rejected at session creation.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "$defs": {
+    "IsolationPolicy": {
+      "description": "Whether a root session runs inside an isolated working copy, and how\nstrictly that is required.",
+      "oneOf": [
+        {
+          "description": "Never isolate; the session works directly in the base directory.",
+          "type": "string",
+          "const": "never"
+        },
+        {
+          "description": "Isolate when possible; fall back to the base directory (with a warning)\nif a workspace can't be provisioned.",
+          "type": "string",
+          "const": "optional"
+        },
+        {
+          "description": "Isolation is mandatory; session creation fails if a workspace can't be\nprovisioned.",
+          "type": "string",
+          "const": "required"
+        }
+      ]
+    },
+    "ModelRef": {
+      "description": "Reference to a model, optionally provider-qualified:\n`\"anthropic/claude-sonnet-4-5\"` or a bare `\"claude-sonnet-4-5\"`.",
+      "type": "string"
+    },
+    "PermissionMode": {
+      "description": "How the engine treats tool calls that would normally ask the user.",
+      "oneOf": [
+        {
+          "description": "Ask on anything not covered by a rule.",
+          "type": "string",
+          "const": "default"
+        },
+        {
+          "description": "Auto-allow file edits (the `Fs` category); ask for the rest.",
+          "type": "string",
+          "const": "accept_edits"
+        },
+        {
+          "description": "Deny all mutating tools; read-only research still runs.",
+          "type": "string",
+          "const": "plan"
+        },
+        {
+          "description": "Never ask: deny anything that would prompt.",
+          "type": "string",
+          "const": "dont_ask"
+        },
+        {
+          "description": "Allow everything. Requires an explicit opt-in flag on the runner.",
+          "type": "string",
+          "const": "bypass_permissions"
+        }
+      ]
+    }
+  }
+}

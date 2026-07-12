@@ -1,0 +1,73 @@
+import { useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { Plus } from "lucide-react"
+import { Button, Spinner } from "../../../components/atoms"
+import { ErrorBanner, SettingsSection } from "../../../components/molecules"
+import { routinesList, toInvokeError } from "../../../lib/tauri"
+import { CreateRoutineForm } from "./CreateRoutineForm"
+import { EMPTY_ROUTINES, ROUTINES_KEY } from "./constants"
+import { RoutineRow } from "./RoutineRow"
+
+/** Automations content — scheduled/webhook-triggered routines (cron/webhook
+ * run_goal). Mounted inside the Settings shell's "Automations" section
+ * (design-map/07-settings.md build brief §3); no `SettingsShell` wrapper
+ * here anymore since the shell owns nav+header+page title. */
+export const AutomationsContent = () => {
+  const [creating, setCreating] = useState(false)
+  const queryClient = useQueryClient()
+
+  const routinesQuery = useQuery({
+    queryKey: ROUTINES_KEY,
+    queryFn: routinesList,
+  })
+
+  const routines = routinesQuery.data ?? EMPTY_ROUTINES
+
+  const newAutomationButton = (
+    <Button size="sm" onClick={() => setCreating(true)}>
+      <Plus className="h-3.5 w-3.5" aria-hidden /> New automation
+    </Button>
+  )
+
+  return (
+    <div className="flex flex-col gap-4">
+      <SettingsSection
+        title="Routines"
+        description="Run on a schedule or webhook and start a new session automatically"
+        actions={!creating ? newAutomationButton : undefined}
+        className="mb-0"
+        rowId="automations-routines"
+      >
+        {routinesQuery.isLoading ? (
+          <div className="flex items-center gap-2 p-3 text-sm text-ink-muted">
+            <Spinner size="sm" /> Loading automations…
+          </div>
+        ) : routinesQuery.isError ? (
+          <div className="p-3">
+            <ErrorBanner message={toInvokeError(routinesQuery.error)} />
+          </div>
+        ) : routines.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+            <p className="text-[13px] text-ink-secondary">No automations yet</p>
+            <p className="text-xs text-ink-faint">
+              Create an automation to run a prompt on a schedule or webhook.
+            </p>
+            {newAutomationButton}
+          </div>
+        ) : (
+          routines.map((routine) => <RoutineRow key={routine.id} routine={routine} />)
+        )}
+      </SettingsSection>
+
+      {creating ? (
+        <CreateRoutineForm
+          onCancel={() => setCreating(false)}
+          onSaved={() => {
+            setCreating(false)
+            void queryClient.invalidateQueries({ queryKey: ROUTINES_KEY })
+          }}
+        />
+      ) : null}
+    </div>
+  )
+}

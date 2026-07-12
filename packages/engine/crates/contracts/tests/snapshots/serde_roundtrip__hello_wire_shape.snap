@@ -1,0 +1,35 @@
+---
+source: crates/contracts/tests/serde_roundtrip.rs
+expression: hello
+---
+{
+  "protocol_version": 1,
+  "engine": {
+    "name": "[product]",
+    "version": "[version]"
+  },
+  "capabilities": {
+    "models": {
+      "kind": "none"
+    },
+    "permissions": {
+      "interactive": false,
+      "modes": [
+        "default"
+      ],
+      "tool_scoping": false
+    },
+    "reasoning_visible": false,
+    "streaming": "message_level",
+    "resume": "none",
+    "attachments": {
+      "images": false,
+      "files": false
+    },
+    "mcp_passthrough": "none",
+    "subagents": false,
+    "cost_reporting": false,
+    "cancellation": "kill_only",
+    "emits_structured_events": true
+  }
+}

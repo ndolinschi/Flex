@@ -1,0 +1,5 @@
+Deployment notes
+================
+The admin console historically ran on port 8080 but was retired.
+The gateway's public port is defined in config/gateway.conf.
+The metrics sidecar scrapes on its own port; see config/metrics.conf.

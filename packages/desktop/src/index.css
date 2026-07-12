@@ -1,0 +1,545 @@
+@import "tailwindcss";
+@import "./styles/tokens.css";
+@import "./styles/terminal.css";
+@import "./styles/highlight.css";
+
+@theme {
+  /* reference canon: semibold = 590 (see design-map/00-foundations.md) */
+  --font-weight-semibold: 590;
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --color-base: var(--color-base);
+  --color-chrome: var(--color-chrome);
+  --color-panel: var(--color-panel);
+  --color-elevated: var(--color-elevated);
+  --color-editor: var(--color-editor);
+
+  --color-text-1: var(--color-text-1);
+  --color-text-2: var(--color-text-2);
+  --color-text-3: var(--color-text-3);
+  --color-text-4: var(--color-text-4);
+  --color-icon-1: var(--color-icon-1);
+  --color-icon-2: var(--color-icon-2);
+  --color-icon-3: var(--color-icon-3);
+  --color-icon-4: var(--color-icon-4);
+  --color-fill-1: var(--color-fill-1);
+  --color-fill-2: var(--color-fill-2);
+  --color-fill-3: var(--color-fill-3);
+  --color-fill-4: var(--color-fill-4);
+  --color-fill-5: var(--color-fill-5);
+  --color-stroke-1: var(--color-stroke-1);
+  --color-stroke-2: var(--color-stroke-2);
+  --color-stroke-3: var(--color-stroke-3);
+  --color-stroke-4: var(--color-stroke-4);
+
+  --color-red: var(--color-red);
+  --color-yellow: var(--color-yellow);
+  --color-green: var(--color-green);
+  --color-blue: var(--color-blue);
+  --color-cyan: var(--color-cyan);
+  --color-magenta: var(--color-magenta);
+  --color-purple: var(--color-purple);
+  --color-orange: var(--color-orange);
+  --color-diff-added: var(--color-diff-added);
+  --color-diff-removed: var(--color-diff-removed);
+  --color-code-inline: var(--color-code-inline);
+  --color-send: var(--color-send);
+  --color-send-fg: var(--color-send-fg);
+
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-surface-muted: var(--color-surface-muted);
+  --color-ink: var(--color-ink);
+  --color-ink-secondary: var(--color-ink-secondary);
+  --color-ink-muted: var(--color-ink-muted);
+  --color-ink-faint: var(--color-ink-faint);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-subtle: var(--color-accent-subtle);
+  --color-accent-text: var(--color-accent-text);
+  --color-link: var(--color-link);
+  --color-user-bubble: var(--color-user-bubble);
+  --color-code-bg: var(--color-code-bg);
+  --color-success: var(--color-success);
+  --color-success-subtle: var(--color-success-subtle);
+  --color-warning: var(--color-warning);
+  --color-warning-subtle: var(--color-warning-subtle);
+  --color-danger: var(--color-danger);
+  --color-danger-subtle: var(--color-danger-subtle);
+  --color-thinking: var(--color-thinking);
+  --color-settings-card: var(--color-settings-card);
+  --color-switch-on: var(--color-switch-on);
+
+  --spacing-1: var(--space-1);
+  --spacing-2: var(--space-2);
+  --spacing-3: var(--space-3);
+  --spacing-4: var(--space-4);
+  --spacing-5: var(--space-5);
+  --spacing-6: var(--space-6);
+  --spacing-8: var(--space-8);
+  --spacing-10: var(--space-10);
+  --spacing-12: var(--space-12);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+  --radius-3xl: var(--radius-3xl);
+  --radius-bubble: var(--radius-bubble);
+  --radius-composer: var(--radius-composer);
+  --radius-full: var(--radius-full);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-composer: var(--shadow-composer);
+  --shadow-composer-focus: var(--shadow-composer-focus);
+  --shadow-popover: var(--shadow-popover);
+
+  --text-xs: var(--text-xs);
+  --text-xs--line-height: 14px;
+  --text-sm: var(--text-sm);
+  --text-sm--line-height: 16px;
+  --text-base: var(--text-base);
+  --text-base--line-height: 18px;
+  --text-lg: var(--text-lg);
+  --text-lg--line-height: 20px;
+  --text-xl: var(--text-xl);
+  --text-xl--line-height: 24px;
+  --text-2xl: var(--text-2xl);
+  --text-2xl--line-height: 28px;
+
+  --leading-tight: var(--leading-tight);
+  --leading-normal: var(--leading-normal);
+  --leading-relaxed: var(--leading-relaxed);
+
+  --tracking-caption: var(--tracking-caption);
+  --tracking-body: var(--tracking-body);
+
+  --color-select-active: var(--color-select-active);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  font-weight: 400;
+  color: var(--color-ink);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color var(--duration-normal) var(--easing-default),
+    color var(--duration-normal) var(--easing-default);
+}
+
+/* Keyboard-first focus — thin neutral ring, never accent glow (Feel: Keyboard-first focus). */
+:focus-visible:not(input):not(textarea):not(select) {
+  outline: 1px solid var(--color-stroke-2);
+  outline-offset: 2px;
+}
+
+/* Composer textarea owns its own chrome — suppress the global ring. */
+[data-composer]:focus-visible,
+textarea[data-composer]:focus-visible {
+  outline: none;
+}
+
+::selection {
+  background: var(--color-accent-subtle);
+  color: var(--color-ink);
+}
+
+/* Plan tab's Find-in-Plan highlight pass (usePlanFind) — plain <mark>s
+ * inserted over the rendered markdown's text nodes, so both themes just
+ * need this one rule rather than per-theme Tailwind classes on generated
+ * DOM nodes. */
+mark[data-plan-find-mark] {
+  background: var(--color-accent-subtle);
+  color: inherit;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px transparent;
+}
+
+mark[data-plan-find-mark].plan-find-mark-active {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+/* Plan-tab comment highlights (usePlanCommentHighlights). Distinct from
+ * find marks so both can coexist conceptually (find temporarily clears
+ * comment marks while open). */
+mark[data-plan-comment-id] {
+  background: color-mix(in srgb, var(--color-yellow, #c9a227) 28%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  box-decoration-break: clone;
+  cursor: pointer;
+}
+
+mark[data-plan-comment-id].plan-comment-mark-active {
+  background: color-mix(in srgb, var(--color-yellow, #c9a227) 55%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-yellow, #c9a227) 70%, transparent);
+}
+
+/*
+ * Timeline row containment helpers (`.cv-auto*`) — kept for potential
+ * non-virtualized surfaces. The chat timeline itself does NOT apply these:
+ * `@tanstack/react-virtual` already unmounts off-screen rows, and
+ * `content-visibility: auto` on the mounted overscan window races with
+ * ResizeObserver measurement on WebView2 (Windows scroll overlap).
+ */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 80px;
+}
+
+/* User bubbles are short one-liners most of the time. */
+.cv-auto-user {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 80px;
+}
+
+/* Assistant markdown answers run longer on average than a user bubble. */
+.cv-auto-assistant {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+
+/* Collapsed "Worked for Ns" groups — short header row when collapsed. */
+.cv-auto-group {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+
+/* Meta/fallback/command/error rows are single lines. */
+.cv-auto-meta {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 32px;
+}
+
+/* Thin translucent scrollbars — track invisible, thumb ≈ fill hover (Feel: Thin scrollbars). */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-fill-2);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-fill-1);
+}
+
+/* Running indicator */
+@keyframes dot-grid-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Tray / popover — closed-transform: -4px Y + 0.99 scale */
+@keyframes tray-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* Live-stacking tool rows ("Explored 3 files" cluster growing
+ * one row at a time while streaming) — a new row slides in from just below
+ * its own resting position rather than popping in, so a fast run of tool
+ * events reads as a smooth stack instead of a jump-cut. */
+@keyframes tool-step-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 3px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-tool-step-in {
+  animation: tool-step-in 150ms var(--easing-out) both;
+}
+
+/* Soft content fade for pane swaps (settings ↔ chat) */
+@keyframes pane-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes end-turn-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 2px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Content reveal — "fadeInSlideUp": opacity + a short lift. */
+@keyframes content-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Wizard step transition — light slide/fade between question steps,
+ * reusing the content-in "fadeInSlideUp" convention but on
+ * --duration-normal so a step-to-step advance stays snappy. */
+@keyframes wizard-step-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Streaming label shimmer — a soft highlight sweeps across the text. */
+@keyframes text-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* Modal entrance — reference modal scale-in. */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Toast entrance — reference notifications: slide up from below + fade in. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-tray-in {
+  animation: tray-in var(--duration-fast) var(--easing-out-strong) both;
+}
+
+/* Subagent viewer panel — bottom-anchored overlay open/close (150ms
+ * ease-out both, translateY(4px)+scale(.99)+opacity), reusing the same
+ * closed-transform shape as tray-in but on --duration-normal/--easing-out
+ * per the reference design's tray primitive timing (not the fast/strong pair
+ * `tray-in` uses elsewhere). */
+@keyframes subagent-viewer-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes subagent-viewer-out {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0) scale(0.99);
+  }
+}
+
+.animate-subagent-viewer-in {
+  animation: subagent-viewer-in var(--duration-normal) var(--easing-out) both;
+}
+
+.animate-subagent-viewer-out {
+  animation: subagent-viewer-out var(--duration-normal) var(--easing-out) both;
+}
+
+/* Feed dim mask behind the open subagent viewer — independent, hardcoded
+ * .16s timing (not tied to --duration-normal), matching the reference design. */
+.subagent-viewer-mask {
+  transition: opacity 0.16s ease-out;
+}
+
+.animate-pane-fade {
+  animation: pane-fade var(--duration-normal) var(--easing-default) both;
+}
+
+.animate-row-fade {
+  animation: pane-fade var(--duration-fast) var(--easing-default) both;
+}
+
+.animate-content-in {
+  animation: content-in var(--duration-content) var(--easing-out-strong) both;
+}
+
+.animate-wizard-step-in {
+  animation: wizard-step-in var(--duration-normal) var(--easing-out-strong) both;
+}
+
+/* Applied to a running label; needs a gradient background clipped to text. */
+.animate-shimmer-text {
+  background: linear-gradient(
+    100deg,
+    var(--color-ink-muted) 40%,
+    var(--color-ink) 50%,
+    var(--color-ink-muted) 60%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: text-shimmer 2s linear infinite;
+}
+
+.animate-backdrop-in {
+  animation: backdrop-in var(--duration-fast) var(--easing-default) both;
+}
+
+.animate-end-turn-in {
+  animation: end-turn-in var(--duration-end-turn) var(--easing-end-turn) both;
+}
+
+.animate-modal-in {
+  animation: modal-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-toast-in {
+  animation: toast-in 300ms var(--easing-out) both;
+}
+
+/* Settings search "jump to result" pulse (design-map/07-settings.md §9) —
+ * ring grows 2px→4px then fades to transparent, once, over the row the
+ * search result navigated to. */
+@keyframes settings-row-highlight {
+  0% {
+    box-shadow: 0 0 0 2px var(--color-accent);
+  }
+  75%,
+  to {
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
+.animate-settings-row-highlight {
+  animation: settings-row-highlight 1.5s cubic-bezier(0, 0, 0.2, 1) 1;
+}
+
+/* sash hover-highlight transition — shared utility so RightPanel's
+ * (and, as a follow-up, SessionSidebar's) drag-sash hover-line can pick up
+ * the same timing without duplicating the value. Targets the sash's own
+ * `::after` highlight line, since Tailwind's `after:` variant can't apply an
+ * arbitrary custom class. */
+.sash-line-transition::after {
+  transition: background-color 0.1s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-tray-in,
+  .animate-pane-fade,
+  .animate-row-fade,
+  .animate-content-in,
+  .animate-wizard-step-in,
+  .animate-backdrop-in,
+  .animate-end-turn-in,
+  .animate-modal-in,
+  .animate-toast-in,
+  .animate-subagent-viewer-in,
+  .animate-subagent-viewer-out,
+  .animate-settings-row-highlight,
+  .animate-tool-step-in {
+    animation: none;
+  }
+
+  .subagent-viewer-mask {
+    transition: none;
+  }
+
+  /* Keep the shimmer text readable (not transparent) without the sweep. */
+  .animate-shimmer-text {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    color: var(--color-ink-secondary);
+  }
+
+  body {
+    transition: none;
+  }
+
+  [data-composer] {
+    transition: none !important;
+  }
+}

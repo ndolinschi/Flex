@@ -1,0 +1,47 @@
+/* glass terminal chrome: wrapper padding + scrollbar + stripped decorations. */
+.glass-terminal-wrapper {
+  padding: 8px 4px 8px 8px;
+}
+
+.glass-terminal-wrapper .xterm {
+  padding-left: 0;
+  height: 100%;
+}
+
+/* Vertical scrollbar only — `height` here makes WKWebView reserve a
+   horizontal gutter and paint a native ::-webkit-resizer (the diagonal
+   triangle) in the bottom-right of the black terminal surface. */
+.glass-terminal-wrapper .xterm-viewport {
+  resize: none;
+  overflow-x: hidden;
+}
+
+.glass-terminal-wrapper .xterm-viewport::-webkit-scrollbar {
+  width: 14px;
+}
+
+.glass-terminal-wrapper .xterm-viewport::-webkit-resizer,
+.glass-terminal-wrapper .xterm-viewport::-webkit-scrollbar-corner {
+  display: none;
+}
+
+.glass-terminal-wrapper .xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.glass-terminal-wrapper .xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--color-stroke-2);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 9999px;
+}
+
+.glass-terminal-wrapper .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: var(--color-stroke-1);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.glass-terminal-wrapper .xterm-decoration-overview-ruler {
+  display: none;
+}

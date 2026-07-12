@@ -1,0 +1,259 @@
+:root,
+[data-theme="dark"] {
+  /* ── reference design dark — authentic values from the reference stylesheet.
+     Cool, blue-tinted near-black surfaces; text is a cool off-white at low alpha;
+     fills/strokes are white-alpha overlays (hover = white 7%). ─────────────── */
+  --color-base: #eef2fa;
+  --color-chrome: #0c0e11; /* chat pane / main surface */
+  --color-panel: #14171d; /* sidebar + popovers */
+  --color-editor: #14171d;
+  --color-elevated: #1b1f27; /* chat bubbles / raised tiles */
+
+  --color-text-1: rgb(236 241 250 / 0.85);
+  --color-text-2: rgb(226 233 244 / 0.62);
+  --color-text-3: rgb(226 233 244 / 0.42);
+  --color-text-4: rgb(226 233 244 / 0.3);
+
+  --color-icon-1: rgb(236 241 250 / 0.88);
+  --color-icon-2: rgb(226 233 244 / 0.62);
+  --color-icon-3: rgb(226 233 244 / 0.42);
+  --color-icon-4: rgb(226 233 244 / 0.3);
+
+  /* Whisper fills — hover ≈6–7%, selected ≈7–8% (Feel: Whisper fills). */
+  --color-fill-1: rgb(255 255 255 / 0.1);
+  --color-fill-2: rgb(255 255 255 / 0.08); /* selected / active */
+  --color-fill-3: rgb(255 255 255 / 0.05);
+  --color-fill-4: rgb(255 255 255 / 0.065); /* list hover */
+  --color-fill-5: rgb(255 255 255 / 0.03);
+
+  --color-stroke-1: rgb(255 255 255 / 0.16);
+  --color-stroke-2: rgb(255 255 255 / 0.12);
+  --color-stroke-3: rgb(255 255 255 / 0.09);
+  --color-stroke-4: rgb(255 255 255 / 0.05);
+
+  --color-accent: #81a1c1;
+  --color-accent-hover: #92aecb;
+  --color-accent-subtle: color-mix(in srgb, #81a1c1 18%, transparent);
+  --color-accent-text: #0c0e11;
+  --color-red: #e34671;
+  --color-yellow: #f1b467;
+  --color-green: #3fa266;
+  --color-blue: #81a1c1;
+  --color-cyan: #88c0d0;
+  --color-magenta: #b48ead;
+  --color-purple: #9d7cd8;
+  --color-orange: #ff9e64;
+  --color-diff-added: #3fa26633;
+  --color-diff-removed: #e3467133;
+
+  --color-user-bubble: #1b1f27; /* solid elevated tile (glass-chat-bubble) */
+  --color-code-inline: rgb(255 255 255 / 0.08);
+  --color-send: #eef2fa;
+  --color-send-fg: #0c0e11;
+
+  /* Settings shell (design-map/07-settings.md) — panel-tier card background
+     (reference `--cursor-bg-quinary`, one step past --color-panel/elevated;
+     we don't have a fifth surface tier, so this adds one scoped to Settings
+     group cards rather than overloading --color-elevated everywhere). */
+  --color-settings-card: rgb(255 255 255 / 0.035);
+  /* Toggle ON track — reference default is GREEN, not accent-blue (§5). */
+  --color-switch-on: #3fa266;
+
+  /* Elevation — dark drops onto near-black, so shadows stay dark. */
+  --shadow-color: rgb(0 0 0 / 0.45);
+  --shadow-ambient: rgb(0 0 0 / 0.22);
+}
+
+[data-theme="light"] {
+  /* ── reference glass light (nWn) ────────────────────────────────────────── */
+  --color-base: #141414;
+  --color-chrome: #fcfcfc;
+  --color-panel: #f3f3f3;
+  --color-editor: #fcfcfc;
+
+  --color-text-1: rgb(20 20 20 / 0.92);
+  --color-text-2: rgb(20 20 20 / 0.74);
+  --color-text-3: rgb(20 20 20 / 0.6);
+  --color-text-4: rgb(20 20 20 / 0.36);
+
+  --color-icon-1: rgb(20 20 20 / 0.92);
+  --color-icon-2: rgb(20 20 20 / 0.66);
+  --color-icon-3: rgb(20 20 20 / 0.52);
+  --color-icon-4: rgb(20 20 20 / 0.28);
+
+  /* Whisper fills — hover ≈6–8%, selected slightly stronger (Feel: Whisper fills). */
+  --color-fill-1: rgb(20 20 20 / 0.12);
+  --color-fill-2: rgb(20 20 20 / 0.08); /* selected / active */
+  --color-fill-3: rgb(20 20 20 / 0.05);
+  --color-fill-4: rgb(20 20 20 / 0.06); /* list hover */
+  --color-fill-5: rgb(20 20 20 / 0.02);
+
+  --color-stroke-1: rgb(20 20 20 / 0.16);
+  --color-stroke-2: rgb(20 20 20 / 0.1);
+  --color-stroke-3: rgb(20 20 20 / 0.06);
+  --color-stroke-4: rgb(20 20 20 / 0.03);
+
+  --color-accent: #2778c1;
+  --color-accent-hover: #1f6aad;
+  --color-accent-subtle: color-mix(in srgb, #2778c1 14%, transparent);
+  --color-accent-text: #ffffff;
+  --color-red: #ce405b;
+  --color-yellow: #a46700;
+  --color-green: #00854c;
+  --color-blue: #3d7ec4;
+  --color-cyan: #5a7f9a;
+  --color-magenta: #9a6f94;
+  --color-purple: #6f64d4;
+  --color-orange: #b86f55;
+  --color-diff-added: #00854c33;
+  --color-diff-removed: #ce405b33;
+
+  --color-user-bubble: rgb(20 20 20 / 0.04);
+  --color-code-inline: rgb(20 20 20 / 0.06);
+  --color-send: #141414;
+  --color-send-fg: #f8f8f8;
+
+  /* Settings shell (design-map/07-settings.md) — see dark theme comment. */
+  --color-settings-card: rgb(20 20 20 / 0.03);
+  --color-switch-on: #00854c;
+
+  /* Elevation — light surfaces need a soft, low-alpha shadow, not near-black. */
+  --shadow-color: rgb(20 20 20 / 0.14);
+  --shadow-ambient: rgb(20 20 20 / 0.06);
+}
+
+:root {
+  /* Semantic aliases */
+  --color-bg: var(--color-chrome);
+  --color-surface: var(--color-panel);
+  --color-surface-raised: var(--color-fill-4);
+  --color-surface-muted: var(--color-fill-3);
+  --color-select-hover: var(--color-fill-4);
+  --color-select-active: var(--color-fill-2);
+  --color-ink: var(--color-text-1);
+  --color-ink-secondary: var(--color-text-2);
+  --color-ink-muted: var(--color-text-3);
+  --color-ink-faint: var(--color-text-4);
+  --color-border: var(--color-stroke-3);
+  --color-border-strong: var(--color-stroke-2);
+  --color-link: var(--color-accent);
+  --color-success: var(--color-green);
+  --color-success-subtle: color-mix(in srgb, var(--color-green) 15%, transparent);
+  --color-warning: var(--color-yellow);
+  --color-warning-subtle: color-mix(in srgb, var(--color-yellow) 15%, transparent);
+  --color-danger: var(--color-red);
+  --color-danger-subtle: color-mix(in srgb, var(--color-red) 15%, transparent);
+  --color-thinking: var(--color-text-3);
+  --color-code-bg: var(--color-panel);
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+    sans-serif;
+  --font-mono: Menlo, Monaco, ui-monospace, "SF Mono", "Courier New", monospace;
+
+  /* reference canon (design-map/00-foundations.md: "Semibold canonical weight
+     = 590; 600 only in 3 minor, apparently-stale spots"). Needs the matching
+     `--font-weight-semibold: var(--font-weight-semibold);` line added to the
+     `@theme` block in src/index.css for Tailwind's `font-semibold` utility to
+     actually emit 590 (out of scope here — see report). 600 kept as a
+     documented fallback in case the 590 reading is ever contested. */
+  --font-weight-semibold: 590; /* fallback 600 */
+
+  --text-xs: 0.6875rem;
+  --text-sm: 0.75rem;
+  --text-base: 0.8125rem;
+  --text-lg: 0.875rem;
+  --text-xl: 1rem;
+  --text-2xl: 1.25rem;
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.4;
+  --leading-relaxed: 1.5;
+
+  /* Micro tracking — captions 11–12px / body 13–14px (Feel: Semibold is 590). */
+  --tracking-caption: 0.07px;
+  --tracking-body: -0.078px;
+
+  /* Spacing — 4px grid */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* Radius — reference glass scale (sm6 / base8 / lg10 / xl14 / 2xl16). */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
+  --radius-3xl: 18px;
+  --radius-bubble: 14px; /* conversation-surface-border-radius = radius-xl */
+  --radius-full: 9999px;
+  --radius-composer: 14px;
+
+  /* Shadows — reference glass: stroke ring + theme-aware elevation.
+     Colors come from per-theme --shadow-color / --shadow-ambient so they read
+     correctly on both near-black (dark) and light surfaces. */
+  --shadow-sm: 0 0 0 1px var(--color-stroke-3), 0 2px 8px var(--shadow-ambient);
+  --shadow-md:
+    0 0 0 1px var(--color-stroke-3),
+    0 0 4px var(--shadow-ambient),
+    0 8px 24px -2px var(--shadow-color);
+  --shadow-lg:
+    0 0 0 1px var(--color-stroke-3),
+    0 0 4px var(--shadow-ambient),
+    0 16px 32px -4px var(--shadow-color);
+  /* Composer: crisp 1px ring + soft drop so the box reads grounded, not floating. */
+  --shadow-composer:
+    0 0 0 1px var(--color-stroke-3),
+    0 1px 2px var(--shadow-ambient),
+    0 8px 24px -6px var(--shadow-color);
+  /* the reference design has no accent glow on composer focus — neutral ring only. */
+  --shadow-composer-focus:
+    0 0 0 1px var(--color-stroke-2),
+    0 1px 2px var(--shadow-ambient),
+    0 10px 28px -6px var(--shadow-color);
+  /* Popover chrome — the reference design's box-shadow-xl (borderless, 4-layer). */
+  --shadow-popover:
+    0 0 0 1px var(--color-stroke-3),
+    0 0 4px 0 var(--shadow-ambient),
+    0 12px 24px 0 var(--shadow-ambient),
+    0 24px 36px 0 var(--shadow-ambient);
+
+  /* Motion — reference glass (subtle) */
+  --duration-instant: 50ms;
+  --duration-fast: 100ms;
+  --duration-normal: 150ms;
+  --duration-slow: 200ms;
+  --duration-slower: 300ms;
+  --duration-content: 220ms;
+  --duration-end-turn: 160ms;
+  /* reference accordion: max-height .25s + opacity .2s ease-in-out. */
+  --duration-expand: 250ms;
+  --duration-expand-fade: 200ms;
+  --easing-default: ease;
+  --easing-in: ease-in;
+  --easing-out: ease-out;
+  --easing-in-out: ease-in-out;
+  --easing-out-strong: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --easing-in-strong: cubic-bezier(0.895, 0.03, 0.685, 0.22);
+  --easing-end-turn: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* Layout */
+  --sidebar-width: 16.5rem;
+  --header-height: 34px;
+  --composer-min-height: 2.25rem;
+  --composer-max-height: 12.5rem;
+  --timeline-row-min-height: 1.25rem;
+  --status-bar-height: 1.75rem;
+  --content-rail: 52.5rem;
+  --form-rail: 32rem;
+  --welcome-rail: 28rem;
+  --end-of-turn-reserved-height: 1.25rem;
+}

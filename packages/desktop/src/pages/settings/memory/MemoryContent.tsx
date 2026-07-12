@@ -1,0 +1,81 @@
+import { useQuery } from "@tanstack/react-query"
+import { FileText } from "lucide-react"
+import { Spinner } from "../../../components/atoms"
+import { EmptyState, ErrorBanner } from "../../../components/molecules"
+import {
+  memoryGet,
+  memoryList,
+  memoryRemove,
+  memorySetExpiry,
+  toInvokeError,
+} from "../../../lib/tauri"
+import { EMPTY_MEMORIES, MEMORY_KEY, type MemoryScope } from "./constants"
+import { MemoryRow } from "./MemoryRow"
+import { ProjectMemorySection } from "./ProjectMemorySection"
+import { useProjectCwds } from "./useProjectCwds"
+
+/** Memory content — mounted inside the Settings shell's "Memory" section
+ * (design-map/07-settings.md build brief §3). No `SettingsShell` wrapper
+ * here anymore; the shell owns nav+header+page title. */
+export const MemoryContent = () => {
+  const memoryQuery = useQuery({
+    queryKey: MEMORY_KEY,
+    queryFn: memoryList,
+  })
+  const projectCwds = useProjectCwds()
+
+  const memories = memoryQuery.data ?? EMPTY_MEMORIES
+
+  const globalScope: MemoryScope = {
+    getMemory: memoryGet,
+    removeMemory: memoryRemove,
+    setExpiry: memorySetExpiry,
+    invalidateKey: MEMORY_KEY,
+  }
+
+  const isEmpty = !memoryQuery.isLoading && !memoryQuery.isError && memories.length === 0
+
+  return (
+    <div>
+      <div className="mb-4">
+        <p className="text-xs text-ink-muted">
+          Durable notes the agent saves as it works — user preferences, project facts,
+          environment quirks. They load into every future session automatically. New
+          memories are always written to the global store; per-project notes shown
+          below are read-only from here for now. Set an expiry on any note to make it
+          short-term — it's purged automatically once it lapses.
+        </p>
+      </div>
+
+      <section className="mb-6" data-settings-row="memory-global">
+        <div className="mb-2 flex items-center gap-2">
+          <h2 className="text-[13px] font-medium text-ink">Global</h2>
+          <span className="text-[11px] text-ink-faint">{memories.length}</span>
+        </div>
+        {memoryQuery.isLoading ? (
+          <div className="flex items-center gap-2 py-8 text-xs text-ink-muted">
+            <Spinner size="sm" /> Loading memory…
+          </div>
+        ) : memoryQuery.isError ? (
+          <ErrorBanner message={toInvokeError(memoryQuery.error)} />
+        ) : isEmpty ? (
+          <EmptyState
+            icon={<FileText className="h-5 w-5" aria-hidden />}
+            title="No memories yet"
+            description="The agent saves reusable knowledge here as it works."
+          />
+        ) : (
+          <div className="flex flex-col gap-1.5 pl-5">
+            {memories.map((memory) => (
+              <MemoryRow key={memory.id} memory={memory} scope={globalScope} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {projectCwds.map((cwd) => (
+        <ProjectMemorySection key={cwd} cwd={cwd} />
+      ))}
+    </div>
+  )
+}

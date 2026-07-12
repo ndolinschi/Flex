@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Flex — an open-source agent-loop engine in Rust. Composable, provider-agnostic, headless. One Agent interface, every LLM.">
+  <title>Flex — The agent-loop engine</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@340;400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Navigation -->
+  <nav class="site-nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-brand">Flex</a>
+      <ul class="nav-links">
+        <li><a href="https://github.com/ndolinschi/Flex">GitHub</a></li>
+        <li><a href="https://github.com/ndolinschi/Flex/blob/main/AGENTS.md">AGENTS.md</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <!-- Hero -->
+    <header class="hero">
+      <div class="container">
+        <h1 class="reveal">The engine powering agentic workflows.</h1>
+        <p class="hero-subtext reveal">
+          Composable. Provider-agnostic. Headless. One Agent interface, every LLM.
+          NDJSON over stdio. Embeddable in your own Rust project.
+        </p>
+        <div class="hero-actions">
+          <a href="https://github.com/ndolinschi/Flex#quick-start--the-flex-runner" class="btn btn-primary reveal">Get started</a>
+          <kbd class="reveal">$</kbd>
+          <a href="https://github.com/ndolinschi/Flex" class="btn btn-ghost reveal">View on GitHub</a>
+        </div>
+        <p class="hero-caption reveal">Install in seconds. No API keys required for local models.</p>
+      </div>
+    </header>
+
+    <!-- Code Mockup -->
+    <section class="container">
+      <div class="code-mockup-wrap scroll-reveal">
+        <div class="code-mockup">
+          <div class="code-mockup-titlebar">
+            <span class="code-mockup-dot"></span>
+            <span class="code-mockup-dot"></span>
+            <span class="code-mockup-dot"></span>
+            <span class="code-mockup-tab">session: 019f4...</span>
+          </div>
+          <div class="code-mockup-body">
+<pre>{"<span class="token-key">type</span>":"<span class="token-string">session_created</span>","<span class="token-key">session_id</span>":"<span class="token-string">019f4a2c-...</span>","<span class="token-key">timestamp</span>":<span class="token-number">1719876543</span>}
+{"<span class="token-key">type</span>":"<span class="token-string">user_message</span>","<span class="token-key">content</span>":"<span class="token-string">explain this codebase</span>"}
+{"<span class="token-key">type</span>":"<span class="token-string">thinking_delta</span>","<span class="token-key">content</span>":"<span class="token-string">Let me explore the repository structure...</span>"}
+{"<span class="token-key">type</span>":"<span class="token-string">tool_call</span>","<span class="token-key">tool</span>":"<span class="token-string">glob</span>","<span class="token-key">args</span>":{"<span class="token-key">pattern</span>":"<span class="token-string">**/*.rs</span>"}}
+{"<span class="token-key">type</span>":"<span class="token-string">tool_result</span>","<span class="token-key">files</span>":[<span class="token-string">"src/main.rs"</span>,<span class="token-string">"src/lib.rs"</span>,<span class="token-string">"..."</span>]}
+{"<span class="token-key">type</span>":"<span class="token-string">markdown_delta</span>","<span class="token-key">content</span>":"<span class="token-string">This is a Rust project organized as...</span>"}
+{"<span class="token-key">type</span>":"<span class="token-string">turn_completed</span>","<span class="token-key">tokens</span>":{"<span class="token-key">input</span>":<span class="token-number">1247</span>,"<span class="token-key">output</span>":<span class="token-number">583</span>}}</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3-Up Feature Row -->
+    <section class="features">
+      <div class="container">
+        <div class="features-grid">
+          <article class="feature-item scroll-reveal">
+            <h3>Provider-agnostic</h3>
+            <p>Native loop calls LLMs directly. Anthropic, OpenAI, Gemini, Ollama, Bedrock, Copilot, DeepSeek. Connectors drive external agents behind the same interface.</p>
+          </article>
+          <article class="feature-item scroll-reveal">
+            <h3>Deep search</h3>
+            <p>Optional plugin: search_web + scrape_page + researcher role. DuckDuckGo and SearXNG backends with automatic fallback.</p>
+          </article>
+          <article class="feature-item scroll-reveal">
+            <h3>Embeddable SDK</h3>
+            <p>AgentBuilder fluent API composes providers + engine + plugins. The flex headless runner streams NDJSON over stdio.</p>
+          </article>
+          <article class="feature-item scroll-reveal">
+            <h3>Independent verification</h3>
+            <p>Verify/SubmitVerdict spawn a fresh-context subagent that never sees the maker's reasoning — only artifacts and a rubric. Optional plugin, zero footprint when disabled.</p>
+          </article>
+          <article class="feature-item scroll-reveal">
+            <h3>Goal-loops &amp; Routines</h3>
+            <p>run_goal drives repeated turns to a stated outcome under explicit stop-rules. flex serve --enable-routines runs the same goals unattended, on a cron schedule or a webhook.</p>
+          </article>
+          <article class="feature-item scroll-reveal">
+            <h3>Headless HTTP API</h3>
+            <p>flex serve: bearer-auth HTTP/SSE with an OpenAPI spec. Binds loopback-only unless given an explicit token — no CORS layer, no unauthenticated routes.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Start -->
+    <section class="quickstart">
+      <div class="container">
+        <h2 class="section-heading scroll-reveal">Get started</h2>
+        <div class="card scroll-reveal">
+          <div class="command-block">
+            <kbd>$</kbd>
+            <code>./scripts/install_mac.sh</code>
+          </div>
+          <p style="font-family: var(--font-mono); font-size: var(--font-body); font-weight: var(--font-body-weight); line-height: var(--font-body-line); letter-spacing: var(--font-body-tracking); color: var(--color-body); margin: var(--spacing-lg) 0;">
+            Builds the release binary and installs the <code>flex</code> runner to <code>~/.local/bin</code> (macOS/Linux). On Windows use <code>./scripts/install_windows.sh</code> (Git Bash / WSL / MSYS2) → <code>%USERPROFILE%\.local\bin</code>. Works from any project directory.
+          </p>
+          <div class="command-block">
+            <kbd>$</kbd>
+            <code>flex run --provider deepseek --model deepseek-v4-pro -p "explain this codebase"</code>
+          </div>
+          <p class="quickstart-note">Works with any project. No configuration needed.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SDK API -->
+    <section class="sdk-docs" id="sdk">
+      <div class="container">
+        <h2 class="section-heading scroll-reveal">SDK API</h2>
+        <div class="card scroll-reveal">
+          <p class="arch-description">
+            The <code>AgentBuilder</code> fluent API composes providers, the native
+            engine, and plugins into an <code>EngineService</code>. It ships in the
+            <code>agentloop-sdk</code> crate under <code>packages/sdk</code>.
+          </p>
+          <div class="command-block">
+            <kbd>$</kbd>
+            <code>use agentloop_sdk::AgentBuilder;</code>
+          </div>
+          <div class="command-block">
+            <pre>let service = AgentBuilder::new()
+    .provider("deepseek")
+    .model("deepseek-v4-pro")
+    .provider_key("deepseek", "sk-...")
+    .enable_plugin("search")
+    .build()?;</pre>
+          </div>
+          <div class="api-grid">
+            <div class="api-item">
+              <code class="api-sig">.provider(id)</code>
+              <p>Preferred provider (anthropic, openai, gemini, deepseek, ...).</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.model(ref)</code>
+              <p>Default model, optionally <code>provider/model</code>-qualified.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.provider_key(id, key)</code>
+              <p>API key for a built-in provider, bypassing env vars.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.cwd(path) / .headless()</code>
+              <p>Sandbox to a directory (default: cwd), or run read-only with no project.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.verbosity(level)</code>
+              <p>NDJSON output verbosity: <code>Low</code>, <code>Medium</code>, <code>High</code>.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.enable_plugin(id)</code>
+              <p>Enable a built-in plugin (<code>"search"</code>, <code>"learning"</code>, <code>"verifier"</code>).</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.plugin(impl Plugin)</code>
+              <p>Register a custom plugin.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.custom_providers(specs)</code>
+              <p>Client-configured OpenAI-compatible providers.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.all_providers(true)</code>
+              <p>Register every provider whose credentials resolve.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.fallback_models(models)</code>
+              <p>Engine-wide failover chain for sessions that don't set their own.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.enable_workflow_tool(true)</code>
+              <p>Register RunWorkflow: declarative multi-step subagent pipelines.</p>
+            </div>
+            <div class="api-item">
+              <code class="api-sig">.build()</code>
+              <p>Resolve providers, fold in plugins, return <code>EngineService</code>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Provider Status -->
+    <section class="provider-status" id="providers">
+      <div class="container">
+        <h2 class="section-heading scroll-reveal">Provider status</h2>
+        <div class="card scroll-reveal">
+          <p class="arch-description">
+            Built-in providers are detected from environment variables. Use
+            <code>.provider_key(id, key)</code> to supply keys programmatically.
+            OpenAI-compatible endpoints can be added via
+            <code>.custom_providers(vec![CustomProviderSpec { ... }])</code>.
+          </p>
+          <div class="provider-grid">
+            <div class="provider-row provider-row-header">
+              <span class="provider-id">Provider</span>
+              <span class="provider-auth">Auth</span>
+              <span class="provider-status-label">Status</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">anthropic</span>
+              <span class="provider-auth">ANTHROPIC_API_KEY</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">openai</span>
+              <span class="provider-auth">OPENAI_API_KEY</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">deepseek</span>
+              <span class="provider-auth">DEEPSEEK_API_KEY</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">gemini</span>
+              <span class="provider-auth">GEMINI_API_KEY</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">bedrock</span>
+              <span class="provider-auth">AWS credentials + region</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">ollama</span>
+              <span class="provider-auth">localhost:11434</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">copilot</span>
+              <span class="provider-auth">device-flow sign-in</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+            <div class="provider-row">
+              <span class="provider-id">custom</span>
+              <span class="provider-auth">CustomProviderSpec</span>
+              <span class="provider-badge badge-ok">stable</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section class="architecture">
+      <div class="container">
+        <h2 class="section-heading scroll-reveal">Architecture</h2>
+        <div class="card scroll-reveal">
+          <p class="arch-description">
+            Hub-and-spoke, layered bottom-up: contracts (pure data types) at the base,
+            core (traits and registries) above, then everything else depends outward.
+            The engine crate knows nothing about providers — the providers facade
+            resolves credentials and hands a prebuilt registry to the engine.
+          </p>
+          <div class="arch-layers">
+            <div class="arch-layer arch-layer-sdk">
+              <span class="arch-layer-label">SDK</span>
+              <span class="arch-layer-detail">AgentBuilder · flex runner · composition root</span>
+            </div>
+            <div class="arch-layer arch-layer-providers">
+              <span class="arch-layer-label">providers</span>
+              <span class="arch-layer-detail">anthropic · openai · gemini · ollama · bedrock · copilot · deepseek · delegators</span>
+            </div>
+            <div class="arch-layer arch-layer-gateway">
+              <span class="arch-layer-label">gateway</span>
+              <span class="arch-layer-detail">Channel trait · Routine{Spec,Trigger,Store} — contract-only, no EngineService dep</span>
+            </div>
+            <div class="arch-layer arch-layer-engine">
+              <span class="arch-layer-label">engine</span>
+              <span class="arch-layer-detail">loop · prompts · session · tools · mcp · workspace · transports/{stdio,http} · learning · verifier</span>
+            </div>
+            <div class="arch-layer arch-layer-search">
+              <span class="arch-layer-label">search</span>
+              <span class="arch-layer-detail">search_web · scrape_page · researcher role</span>
+            </div>
+            <div class="arch-layer arch-layer-core">
+              <span class="arch-layer-label">core</span>
+              <span class="arch-layer-detail">Agent · Provider · Tool · SessionStore · Plugin · Hook · Workspaces</span>
+            </div>
+            <div class="arch-layer arch-layer-contracts">
+              <span class="arch-layer-label">contracts</span>
+              <span class="arch-layer-detail">events · content blocks · ToolCall · ids · caps · errors · branding</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-col scroll-reveal">
+          <h4>Product</h4>
+          <ul>
+            <li><a href="https://github.com/ndolinschi/Flex#what-it-is">Overview</a></li>
+            <li><a href="https://github.com/ndolinschi/Flex#quick-start--the-flex-runner">Install</a></li>
+            <li><a href="#sdk">Configuration</a></li>
+          </ul>
+        </div>
+        <div class="footer-col scroll-reveal">
+          <h4>Resources</h4>
+          <ul>
+            <li><a href="https://github.com/ndolinschi/Flex/blob/main/AGENTS.md">AGENTS.md (architecture)</a></li>
+            <li><a href="#sdk">SDK API docs</a></li>
+            <li><a href="#providers">Provider status</a></li>
+          </ul>
+        </div>
+        <div class="footer-col scroll-reveal">
+          <h4>Community</h4>
+          <ul>
+            <li><a href="https://github.com/ndolinschi/Flex">GitHub</a></li>
+            <li><a href="https://github.com/ndolinschi/Flex/issues">Issues</a></li>
+            <li><a href="https://github.com/ndolinschi/Flex/discussions">Discussions</a></li>
+          </ul>
+        </div>
+        <div class="footer-col scroll-reveal">
+          <h4>License</h4>
+          <ul>
+            <li><a href="https://github.com/ndolinschi/Flex/blob/main/LICENSE-MIT">MIT</a></li>
+            <li><a href="https://github.com/ndolinschi/Flex/blob/main/LICENSE-APACHE">Apache 2.0</a></li>
+          </ul>
+        </div>
+      </div>
+      <hr class="footer-divider">
+      <div class="footer-bottom">
+        <span class="footer-wordmark">Flex</span>
+        <span class="footer-tagline">Pre-alpha. Built in Rust.</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Three.js (global) -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <!-- GSAP + ScrollTrigger -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
+  <!-- Custom animations -->
+  <script>
+    // Three.js particle field — 180 particles floating upward
+    (function() {
+      if (typeof THREE === 'undefined') return;
+      try {
+      const canvas = document.getElementById('bg-canvas');
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.z = 50;
+
+      function resize() {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+      }
+
+      const COUNT = 180;
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(COUNT * 3);
+      const colors = new Float32Array(COUNT * 3);
+      const velocities = new Float32Array(COUNT);
+
+      const amber = new THREE.Color('#d4a84b');
+      const white = new THREE.Color('#ffffff');
+
+      for (let i = 0; i < COUNT; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 80;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 80;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 40;
+
+        const color = Math.random() < 0.4 ? amber : white;
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+
+        velocities[i] = 0.008 + Math.random() * 0.025;
+      }
+
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const material = new THREE.PointsMaterial({
+        size: 0.2,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      const points = new THREE.Points(geometry, material);
+      scene.add(points);
+
+      const startTime = performance.now();
+
+      function animate(time) {
+        requestAnimationFrame(animate);
+
+        const elapsed = (time - startTime) / 1000;
+        material.opacity = Math.min(0.7, elapsed / 2 * 0.7);
+
+        const pos = geometry.attributes.position.array;
+        for (let i = 0; i < COUNT; i++) {
+          pos[i * 3 + 1] += velocities[i];
+          pos[i * 3] += (Math.sin(time * 0.001 + i) * 0.003);
+
+          if (pos[i * 3 + 1] > 40) {
+            pos[i * 3 + 1] = -40;
+            pos[i * 3] = (Math.random() - 0.5) * 80;
+          }
+        }
+        geometry.attributes.position.needsUpdate = true;
+
+        renderer.render(scene, camera);
+      }
+
+      window.addEventListener('resize', resize);
+      resize();
+      requestAnimationFrame(animate);
+      } catch(e) { console.warn('Three.js particle field failed:', e); }
+    })();
+
+    // GSAP animations (skip if GSAP didn't load)
+    if (typeof gsap !== 'undefined') {
+    gsap.registerPlugin(ScrollTrigger);
+
+    // Hero entrance timeline
+    var tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+    tl.from('.hero h1', { opacity: 0, y: 30, duration: 0.8 });
+    tl.from('.hero-subtext', { opacity: 0, y: 20, duration: 0.6 }, '-=0.4');
+    tl.from('.hero-actions .btn, .hero-actions kbd', { opacity: 0, scale: 0.95, stagger: 0.1, duration: 0.5 }, '-=0.2');
+    tl.from('.hero-caption', { opacity: 0, duration: 0.5 }, '-=0.1');
+
+    // Code mockup
+    gsap.from('.code-mockup-wrap', {
+      scrollTrigger: { trigger: '.code-mockup-wrap', start: 'top 80%', toggleActions: 'play none none none' },
+      opacity: 0, y: 40, duration: 0.6, ease: 'power2.out'
+    });
+
+    // Feature items
+    gsap.from('.feature-item', {
+      scrollTrigger: { trigger: '.features-grid', start: 'top 85%', toggleActions: 'play none none none' },
+      opacity: 0, y: 20, stagger: 0.15, duration: 0.5, ease: 'power2.out'
+    });
+
+    // Quick start
+    gsap.from('.quickstart .section-heading', {
+      scrollTrigger: { trigger: '.quickstart', start: 'top 85%', toggleActions: 'play none none none' },
+      opacity: 0, duration: 0.5
+    });
+    gsap.from('.quickstart .card', {
+      scrollTrigger: { trigger: '.quickstart .card', start: 'top 88%', toggleActions: 'play none none none' },
+      opacity: 0, y: 30, duration: 0.6, ease: 'power2.out'
+    });
+
+    // SDK API
+    gsap.from('.sdk-docs .section-heading', {
+      scrollTrigger: { trigger: '.sdk-docs', start: 'top 85%', toggleActions: 'play none none none' },
+      opacity: 0, duration: 0.5
+    });
+    gsap.from('.sdk-docs .card', {
+      scrollTrigger: { trigger: '.sdk-docs .card', start: 'top 88%', toggleActions: 'play none none none' },
+      opacity: 0, y: 30, duration: 0.6, ease: 'power2.out'
+    });
+
+    // Provider status
+    gsap.from('.provider-status .section-heading', {
+      scrollTrigger: { trigger: '.provider-status', start: 'top 85%', toggleActions: 'play none none none' },
+      opacity: 0, duration: 0.5
+    });
+    gsap.from('.provider-status .card', {
+      scrollTrigger: { trigger: '.provider-status .card', start: 'top 88%', toggleActions: 'play none none none' },
+      opacity: 0, y: 30, duration: 0.6, ease: 'power2.out'
+    });
+
+    // Architecture
+    gsap.from('.architecture .section-heading', {
+      scrollTrigger: { trigger: '.architecture', start: 'top 85%', toggleActions: 'play none none none' },
+      opacity: 0, duration: 0.5
+    });
+    gsap.from('.architecture .card', {
+      scrollTrigger: { trigger: '.architecture .card', start: 'top 88%', toggleActions: 'play none none none' },
+      opacity: 0, y: 30, duration: 0.6, ease: 'power2.out'
+    });
+
+    // Footer
+    gsap.from('.footer-col', {
+      scrollTrigger: { trigger: '.site-footer', start: 'top 90%', toggleActions: 'play none none none' },
+      opacity: 0, y: 20, stagger: 0.1, duration: 0.5, ease: 'power2.out'
+    });
+    } // end if gsap
+  </script>
+
+</body>
+</html>

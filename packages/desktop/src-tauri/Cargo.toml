@@ -1,0 +1,77 @@
+[package]
+name = "desktop"
+version = "0.1.0"
+description = "Desktop UI for the agent-loop engine"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["unstable", "devtools"] }
+tauri-plugin-opener = "2"
+tauri-plugin-store = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-window-state = "2"
+# Platform detection for the Security section's macOS-only Keychain option.
+tauri-plugin-os = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Reads MCP server configs (~/.config/agentloop/mcp/*.toml) synchronously at
+# service-composition time; agentloop-sdk's FileMcpStore covers the async CRUD path.
+toml = "0.8"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+futures = "0.3"
+keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
+# Local encrypted secrets store (safeStorage-style pattern) — see src/secrets.rs.
+aes-gcm = "0.11"
+rand = "0.10"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dirs = "6"
+# Gitignore-aware file walk backing the composer @-mention file search.
+ignore = "0.4"
+# CancellationToken for the routines cron-loop lifecycle.
+tokio-util = "0.7"
+# Cross-platform PTY spawning backing the terminal panel.
+portable-pty = "0.9"
+
+# Composition root — never call EngineService::native or providers::resolve_* here.
+agentloop-sdk = { path = "../../sdk/crates/sdk", features = ["search", "index", "learning", "verifier"] }
+# Wire DTOs for command payloads (not re-exported by the SDK).
+agentloop-contracts = { path = "../../engine/crates/contracts" }
+# Persistent session log across app restarts / provider rebuilds.
+agentloop-session = { path = "../../engine/crates/session" }
+# Git worktree isolation backend.
+agentloop-workspace = { path = "../../engine/crates/workspace" }
+# WorkspaceStatus DTO for workspace_status command.
+agentloop-core = { path = "../../engine/crates/core" }
+# RoleSpec/RoleToolProfile for composing Flex composer-mode roles — not re-exported by the SDK.
+agentloop-engine = { path = "../../engine/crates/engine" }
+# RoutineSpec/RoutineTrigger/RoutineStore/RoutineRunRecord — not re-exported by the SDK.
+agentloop-channel = { path = "../../gateway/crates/channel" }
+# load_memory_section/MemoryConfig for per-project memory prompt injection — not re-exported by the SDK.
+agentloop-prompts = { path = "../../engine/crates/prompts" }
+tracing-appender = "0.2.5"
+tauri-plugin-updater = "2.10.1"
+tauri-plugin-process = "2.3.1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Private WKWebView inspector APIs (`_inspector` / `detach`) so DevTools opens
+# undocked instead of full-width into the main window.
+objc2 = "0.6"
+
+[dev-dependencies]
+# tauri's mock runtime — lets command unit tests build a real `State<AppState>`
+# via `tauri::test::mock_app()` instead of a live window.
+tauri = { version = "2", features = ["unstable", "devtools", "test"] }
+# Needed to implement the `agentloop_core::Agent` trait for a test-only stub
+# (the trait itself is `#[async_trait]`, so an impl of it must be too).
+async-trait = "0.1"

@@ -1,0 +1,84 @@
+---
+source: crates/contracts/tests/reduce_test.rs
+expression: transcript
+---
+{
+  "items": [
+    {
+      "message_id": "msg-1",
+      "role": "user",
+      "blocks": [
+        {
+          "type": "markdown",
+          "text": "Read hello.txt for me"
+        }
+      ]
+    },
+    {
+      "message_id": "msg-2",
+      "role": "assistant",
+      "blocks": [
+        {
+          "type": "thinking",
+          "text": "The user wants the file contents. I should read it."
+        },
+        {
+          "type": "markdown",
+          "text": "Reading the file."
+        },
+        {
+          "type": "tool_call",
+          "id": "call-1",
+          "session_id": "sess-1",
+          "turn_id": "turn-1",
+          "message_id": "msg-2",
+          "tool_name": "Read",
+          "input": {
+            "file_path": "/tmp/demo/hello.txt"
+          },
+          "read_only": true,
+          "origin": {
+            "origin": "model"
+          },
+          "status": {
+            "state": "completed"
+          },
+          "timing": {
+            "queued_at_ms": 2000,
+            "started_at_ms": 2010,
+            "finished_at_ms": 2055
+          },
+          "result": {
+            "content": [
+              {
+                "type": "markdown",
+                "text": "hello world"
+              }
+            ],
+            "is_error": false
+          }
+        }
+      ],
+      "model": "claude-sonnet-4-5",
+      "usage": {
+        "input": 120,
+        "output": 40
+      }
+    },
+    {
+      "message_id": "msg-4",
+      "role": "assistant",
+      "blocks": [
+        {
+          "type": "markdown",
+          "text": "The file contains: `hello world`."
+        }
+      ],
+      "model": "claude-sonnet-4-5",
+      "usage": {
+        "input": 180,
+        "output": 25
+      }
+    }
+  ]
+}

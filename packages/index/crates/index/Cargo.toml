@@ -1,0 +1,50 @@
+[package]
+name = "agentloop-index"
+description = "Agentic code-index crate: lexical (BM25) + symbol + embedding search over a repo, exposed as SearchCode/FindSymbol tools"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+agentloop-contracts = { workspace = true }
+agentloop-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+schemars = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tokio-util = { workspace = true }
+ignore = { workspace = true }
+blake3 = { workspace = true }
+tantivy = { workspace = true }
+tree-sitter = { workspace = true }
+tree-sitter-typescript = { workspace = true }
+tree-sitter-javascript = { workspace = true }
+tree-sitter-rust = { workspace = true }
+tree-sitter-python = { workspace = true }
+tree-sitter-go = { workspace = true }
+bincode = { workspace = true }
+ureq = { workspace = true }
+fastembed = { workspace = true, optional = true, features = [
+    "ort-download-binaries-native-tls",
+    "hf-hub-native-tls",
+] }
+
+[features]
+# Real local ONNX embeddings (bge-small-en-v1.5, 384d) via `fastembed`. NOT
+# in default features: pulls in `ort`/`hf-hub`/a bundled ONNX runtime and can
+# download model weights on first use. Opt in via
+# `AGENTLOOP_EMBEDDINGS=local` once this feature is compiled into a
+# composition root; CI never builds or tests with this feature enabled.
+local-embeddings = ["dep:fastembed"]
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

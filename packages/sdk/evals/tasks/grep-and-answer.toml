@@ -1,0 +1,8 @@
+id = "grep-and-answer"
+prompt = "What TCP port does the gateway service listen on in this project? Search the repository configuration, then write just the port number to a new file named answer.txt."
+fixture = "fixtures/grep-and-answer"
+timeout_secs = 300
+
+[check]
+cmd = "grep -q 8443 answer.txt"
+expect_files = ["answer.txt"]

@@ -1,0 +1,98 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/providers",
+    "crates/anthropic",
+    "crates/bedrock",
+    "crates/common",
+    "crates/copilot",
+    "crates/gemini",
+    "crates/ollama",
+    "crates/openai",
+    "crates/delegators/acp",
+    "crates/delegators/claude-code",
+    "crates/delegators/common",
+    "crates/delegators/copilot",
+    "crates/delegators/cursor",
+    "crates/delegators/opencode",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ndolinschi/Flex"
+publish = true
+
+[workspace.dependencies]
+# facade
+agentloop-providers = { path = "crates/providers", version = "0.1.0" }
+# provider clients
+agentloop-provider-anthropic = { path = "crates/anthropic", version = "0.1.0" }
+agentloop-provider-bedrock = { path = "crates/bedrock", version = "0.1.0" }
+agentloop-provider-common = { path = "crates/common", version = "0.1.0" }
+agentloop-provider-copilot = { path = "crates/copilot", version = "0.1.0" }
+agentloop-provider-gemini = { path = "crates/gemini", version = "0.1.0" }
+agentloop-provider-ollama = { path = "crates/ollama", version = "0.1.0" }
+agentloop-provider-openai = { path = "crates/openai", version = "0.1.0" }
+# external-agent connectors (delegators)
+agentloop-delegator-acp = { path = "crates/delegators/acp", version = "0.1.0" }
+agentloop-delegator-claude-code = { path = "crates/delegators/claude-code", version = "0.1.0" }
+agentloop-delegator-common = { path = "crates/delegators/common", version = "0.1.0" }
+agentloop-delegator-copilot = { path = "crates/delegators/copilot", version = "0.1.0" }
+agentloop-delegator-cursor = { path = "crates/delegators/cursor", version = "0.1.0" }
+agentloop-delegator-opencode = { path = "crates/delegators/opencode", version = "0.1.0" }
+# engine (path deps into the sibling engine workspace)
+agentloop-contracts = { path = "../engine/crates/contracts", version = "0.1.0" }
+agentloop-core = { path = "../engine/crates/core", version = "0.1.0" }
+agentloop-engine = { path = "../engine/crates/engine", version = "0.1.0" }
+agentloop-loop = { path = "../engine/crates/loop", version = "0.1.0" }
+agentloop-session = { path = "../engine/crates/session", version = "0.1.0" }
+agentloop-tools = { path = "../engine/crates/tools", version = "0.1.0" }
+agentloop-prompts = { path = "../engine/crates/prompts", version = "0.1.0" }
+agentloop-workspace = { path = "../engine/crates/workspace", version = "0.1.0" }
+agentloop-mcp = { path = "../engine/crates/mcp", version = "0.1.0" }
+# external
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v7", "serde"] }
+anyhow = "1"
+async-trait = "0.1"
+futures = "0.3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "io-std", "fs", "process", "signal"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+metrics = "0.24"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "charset", "gzip"] }
+globset = "0.4"
+ignore = "0.4"
+regex = "1"
+htmd = "0.2"
+base64 = "0.22"
+sha2 = "0.10"
+getrandom = "0.2"
+http = "1"
+# dev
+insta = { version = "1", features = ["json", "redactions"] }
+pretty_assertions = "1"
+tempfile = "3"
+temp_env = { package = "temp-env", version = "0.3" }
+wiremock = "0.6"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+dbg_macro = "warn"
+todo = "warn"
+print_stdout = "warn"
+print_stderr = "warn"

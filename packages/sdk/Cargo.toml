@@ -1,0 +1,73 @@
+[workspace]
+resolver = "3"
+members = ["crates/sdk", "crates/eval"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ndolinschi/Flex"
+publish = true
+
+[workspace.dependencies]
+# engine (path deps into the sibling engine workspace)
+agentloop-contracts = { path = "../engine/crates/contracts", version = "0.1.0" }
+agentloop-core = { path = "../engine/crates/core", version = "0.1.0" }
+agentloop-engine = { path = "../engine/crates/engine", version = "0.1.0" }
+agentloop-executors = { path = "../engine/crates/executors", version = "0.1.0" }
+agentloop-learning = { path = "../engine/crates/learning", version = "0.1.0" }
+agentloop-mcp = { path = "../engine/crates/mcp", version = "0.1.0" }
+agentloop-verifier = { path = "../engine/crates/verifier", version = "0.1.0" }
+agentloop-session = { path = "../engine/crates/session", version = "0.1.0" }
+agentloop-transport-stdio = { path = "../engine/crates/transports/stdio", version = "0.1.0" }
+agentloop-transport-http = { path = "../engine/crates/transports/http", version = "0.1.0" }
+agentloop-testkit = { path = "../engine/crates/testkit", version = "0.1.0" }
+
+# local members
+agentloop-eval = { path = "crates/eval", version = "0.1.0" }
+
+# providers facade + search/index plugins (sibling workspaces)
+agentloop-providers = { path = "../providers/crates/providers", version = "0.1.0" }
+agentloop-search = { path = "../search/crates/search", version = "0.1.0" }
+agentloop-index = { path = "../index/crates/index", version = "0.1.0" }
+
+# gateway (sibling workspace) — Routines' trigger/store contracts
+agentloop-channel = { path = "../gateway/crates/channel", version = "0.1.0" }
+
+# external
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+tempfile = "3"
+thiserror = "2"
+anyhow = "1"
+async-trait = "0.1"
+futures = "0.3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util", "io-std", "fs", "process", "signal"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+axum = "0.8"
+# Cron-expression parsing for Routines scheduling (crates/sdk/src/routines.rs)
+# — the only third-party crate this workspace phase adds; everything else
+# reuses what was already in the dependency tree. chrono comes along
+# transitively as croner's own DateTime type, used directly for the poll loop.
+croner = "3"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# Dev-only: the routine-webhook HTTP integration test (mirrors the one in
+# transports/http's own test suite, which uses reqwest the same way).
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "stream"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+dbg_macro = "warn"
+todo = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
