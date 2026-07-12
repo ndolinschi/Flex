@@ -85,11 +85,23 @@ export const estimateSizeForItem = (item: DisplayItem, isFirst: boolean): number
 }
 
 /**
- * Long-session perf: off-screen timeline rows skip layout/paint/style via
- * `content-visibility: auto` (see `.cv-auto*` in index.css). Picks a size
- * hint per row kind so the placeholder height is close before the row is
- * ever measured. Live / streaming rows are excluded — see [`shouldSkipCv`].
+ * Growing / live rows must not use `content-visibility: auto`: on some
+ * Chromium/WebView2 builds (notably Windows at fractional DPI) cv reports
+ * stale heights to the virtualizer's ResizeObserver, so absolutely
+ * positioned rows stack on top of each other.
+ *
+ * With `@tanstack/react-virtual`, off-screen rows are already unmounted —
+ * applying cv to the *mounted* overscan window is redundant and harmful
+ * (scroll-in measurement races). Always skip cv on virtualized timeline
+ * rows; the helper remains so call sites stay explicit.
  */
+export const shouldSkipCv = (
+  _item: DisplayItem,
+  _isStreaming: boolean,
+): boolean => true
+
+/** Class names for `.cv-auto*` in `index.css`. Not applied by the
+ * virtualized chat timeline (see [`shouldSkipCv`]). */
 export const cvClassForItem = (item: DisplayItem): string => {
   if (item.kind === "group") return "cv-auto-group"
   switch (item.row.type) {
@@ -105,24 +117,6 @@ export const cvClassForItem = (item: DisplayItem): string => {
     default:
       return "cv-auto"
   }
-}
-
-/**
- * Growing / live rows must not use `content-visibility: auto`: on some
- * Chromium/WebView2 builds (notably Windows at fractional DPI) cv reports
- * stale heights to the virtualizer's ResizeObserver, so absolutely
- * positioned rows stack on top of each other. Open WorkGroups already
- * skipped cv for the same reason; live-prefixed rows and any row while a
- * turn is streaming join that exemption.
- */
-export const shouldSkipCv = (
-  item: DisplayItem,
-  isStreaming: boolean,
-): boolean => {
-  if (isStreaming) return true
-  if (item.kind === "group" && item.isOpen) return true
-  if (item.kind === "row" && item.row.id.startsWith("live-")) return true
-  return false
 }
 
 /** Plain-text line for one non-assistant row of a turn, for the "Copy

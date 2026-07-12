@@ -343,18 +343,13 @@ describe("shouldSkipCv", () => {
     rows: [],
   }
 
-  it("skips every row while a turn is streaming", () => {
+  it("always skips content-visibility on virtualized timeline rows", () => {
+    // Virtualization already unmounts off-screen rows; cv on the mounted
+    // overscan window races with WebView2 measurement during scroll.
+    expect(shouldSkipCv(settledUser, false)).toBe(true)
     expect(shouldSkipCv(settledUser, true)).toBe(true)
-    expect(shouldSkipCv(closedGroup, true)).toBe(true)
-  })
-
-  it("skips open work groups and live-* rows when idle", () => {
+    expect(shouldSkipCv(closedGroup, false)).toBe(true)
     expect(shouldSkipCv(openGroup, false)).toBe(true)
     expect(shouldSkipCv(liveAssistant, false)).toBe(true)
-  })
-
-  it("keeps content-visibility on settled rows when idle", () => {
-    expect(shouldSkipCv(settledUser, false)).toBe(false)
-    expect(shouldSkipCv(closedGroup, false)).toBe(false)
   })
 })
