@@ -20,6 +20,7 @@ import {
   sessionScopeKey,
   type BrowserViewportPreset,
 } from "../stores/appStore"
+import { log } from "../lib/debug/log"
 
 /* ── Viewport presets ─────────────────────────────────────────────────── */
 
@@ -94,9 +95,19 @@ export const useBrowserSession = (active: boolean) => {
       setBrowserOwnerSessionId(sessionKey)
       clearLoadingSoon()
       if (browserStarted) {
-        void browserNavigate(trimmed).catch(() => {})
+        void browserNavigate(trimmed).catch((err) => {
+          log.error("browser", "navigate failed", {
+            url: trimmed,
+            error: toInvokeError(err),
+          })
+        })
       } else {
-        void browserOpen(trimmed).catch(() => {})
+        void browserOpen(trimmed).catch((err) => {
+          log.error("browser", "open failed", {
+            url: trimmed,
+            error: toInvokeError(err),
+          })
+        })
       }
     },
     [
@@ -113,7 +124,12 @@ export const useBrowserSession = (active: boolean) => {
     setBrowserSessionState(sessionKey, { loading: true, loadError: null })
     clearLoadingSoon()
     if (browserUrl) {
-      void browserNavigate(browserUrl).catch(() => {})
+      void browserNavigate(browserUrl).catch((err) => {
+        log.error("browser", "navigate failed", {
+          url: browserUrl,
+          error: toInvokeError(err),
+        })
+      })
     }
   }, [
     browserUrl,
@@ -141,7 +157,9 @@ export const useBrowserSession = (active: boolean) => {
       })
       pushToast("Screenshot attached to composer", "success")
     } catch (err) {
-      pushToast(toInvokeError(err), "error")
+      const message = toInvokeError(err)
+      log.error("browser", "screenshot failed", { error: message })
+      pushToast(message, "error")
     }
   }, [addAttachment, pushToast])
 
@@ -150,6 +168,7 @@ export const useBrowserSession = (active: boolean) => {
     setBrowserSessionState(sessionKey, { loading: true })
     clearLoadingSoon()
     void browserHardReload().catch((err) => {
+      log.error("browser", "hard reload failed", { error: toInvokeError(err) })
       pushToast(toInvokeError(err), "error")
     })
   }, [
@@ -198,7 +217,9 @@ export const useBrowserSession = (active: boolean) => {
       await browserClearData()
       pushToast("Browsing data cleared", "success")
     } catch (err) {
-      pushToast(toInvokeError(err), "error")
+      const message = toInvokeError(err)
+      log.error("browser", "clear data failed", { error: message })
+      pushToast(message, "error")
     }
   }, [pushToast])
 

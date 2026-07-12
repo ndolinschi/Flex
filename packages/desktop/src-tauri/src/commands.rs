@@ -1043,6 +1043,7 @@ list when overriding a subagent's model.
 You run with DontAsk permissions, and every subagent you spawn inherits \
 that: never leave a permission ask pending, and never block waiting on one.";
 
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn prompt(
     state: State<'_, AppState>,
@@ -3747,6 +3748,7 @@ pub fn debug_log_path() -> String {
 }
 
 /// App version baked into the desktop crate (mirrors `tauri.conf.json`).
+#[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
 pub fn app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
@@ -3762,6 +3764,7 @@ pub fn app_version() -> String {
 /// the payload local until a DSN + privacy review land. The frontend's
 /// opt-in "crash reporting" toggle only controls whether uncaught errors
 /// are retained in the in-memory crash ring included in `frontend_payload`.
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn export_diagnostics_bundle(
     app: tauri::AppHandle,
@@ -3829,6 +3832,7 @@ pub async fn export_diagnostics_bundle(
 /// Poll the on-disk code index for `cwd` without rebuilding. Status lives
 /// in app-data (`agentloop/index/<hash>`), never in the user's repo — no
 /// AgentEvent is emitted (avoids schema churn).
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn index_status(cwd: String) -> DesktopResult<agentloop_sdk::index::IndexStatus> {
     let path = PathBuf::from(cwd.trim());
@@ -3843,6 +3847,7 @@ pub async fn index_status(cwd: String) -> DesktopResult<agentloop_sdk::index::In
 
 /// Force a (re)build of the code index for `cwd`. Returns status + update
 /// stats so Settings can show progress after a rebuild click.
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn index_rebuild(cwd: String) -> DesktopResult<IndexRebuildResult> {
     let path = PathBuf::from(cwd.trim());

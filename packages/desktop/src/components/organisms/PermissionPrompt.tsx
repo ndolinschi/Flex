@@ -5,6 +5,7 @@ import { ErrorBanner } from "../molecules"
 import { respondPermission, toInvokeError } from "../../lib/tauri"
 import type { PendingPermission } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
+import { log } from "../../lib/debug/log"
 
 /** Backend error when the engine no longer has this request in memory
  * (engine restarted / session gone) — the request itself, if it still
@@ -72,11 +73,21 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
     } catch (err) {
       const message = toInvokeError(err)
       if (isStalePermissionError(message)) {
+        log.warn("session", "permission respond stale — dismissing", {
+          requestId: permission.requestId,
+          sessionId: permission.sessionId,
+          error: message,
+        })
         // The engine-side request is gone (restart / session ended) — dismiss
         // instead of hard-blocking on an error that can never be resolved.
         setPendingPermission(null)
         pushToast("Permission request expired", "error")
       } else {
+        log.error("session", "permission respond failed", {
+          requestId: permission.requestId,
+          sessionId: permission.sessionId,
+          error: message,
+        })
         setError(message)
       }
     } finally {

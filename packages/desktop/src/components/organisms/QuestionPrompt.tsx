@@ -5,6 +5,7 @@ import { respondQuestion, toInvokeError } from "../../lib/tauri"
 import type { PendingQuestion, Question } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
+import { log } from "../../lib/debug/log"
 
 type QuestionPromptProps = {
   question: PendingQuestion
@@ -161,7 +162,13 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
       })
       setPendingQuestion(null)
     } catch (err) {
-      setError(toInvokeError(err))
+      const message = toInvokeError(err)
+      log.error("session", "question respond failed", {
+        requestId: question.requestId,
+        sessionId: question.sessionId,
+        error: message,
+      })
+      setError(message)
     } finally {
       setIsSubmitting(false)
     }

@@ -6,6 +6,7 @@ import type {
   SessionId,
 } from "../lib/types"
 import type { RightPanelTab, UiTheme } from "./types"
+import { log } from "../lib/debug/log"
 
 export type UiPersisted = {
   activeSessionId: SessionId | null
@@ -67,8 +68,11 @@ export const persistUiState = async (partial: Partial<UiPersisted>) => {
     }
     await cachedStore.set(UI_KEY, { ...current, ...partial })
     await cachedStore.save()
-  } catch {
-    // Non-fatal
+  } catch (err) {
+    // Non-fatal — UI still works with in-memory state.
+    log.warn("boot", "persistUiState failed", {
+      error: err instanceof Error ? err.message : String(err),
+    })
   }
 }
 
@@ -93,7 +97,10 @@ export const restoreUiState = async (): Promise<UiPersisted> => {
         recentCwds: [],
       }
     )
-  } catch {
+  } catch (err) {
+    log.warn("boot", "restoreUiState failed — using defaults", {
+      error: err instanceof Error ? err.message : String(err),
+    })
     return {
       activeSessionId: null,
       selectedModelId: null,

@@ -6,6 +6,7 @@ import {
   toInvokeError,
 } from "../lib/tauri"
 import { useAppStore } from "../stores/appStore"
+import { log } from "../lib/debug/log"
 
 /**
  * Shared integrate/discard actions for isolated-workspace sessions
@@ -36,6 +37,10 @@ export const useWorkspaceActions = (
       onDone?.()
     } catch (err) {
       const message = toInvokeError(err)
+      log.error("git", "workspace action failed", {
+        sessionId,
+        error: message,
+      })
       pushToast(message, "error")
       onError?.(message)
     } finally {

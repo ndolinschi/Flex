@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { Check, Copy, FolderOpen } from "lucide-react"
 import { Button, Toggle } from "../../components/atoms"
 import { SettingsCard, SettingRow } from "../../components/molecules"
-import { exportDebugLog, exportDiagnostics } from "../../lib/debug/log"
+import { exportDebugLog, exportDiagnostics, log } from "../../lib/debug/log"
 import {
   checkForAppUpdate,
   installAppUpdateAndRelaunch,
@@ -40,7 +40,9 @@ export const DiagnosticsContent = () => {
       const path = await exportDiagnostics()
       pushToast(`Diagnostics saved to ${path}`, "success")
     } catch (err) {
-      pushToast(toInvokeError(err), "error")
+      const message = toInvokeError(err)
+      log.error("boot", "export diagnostics failed", { error: message })
+      pushToast(message, "error")
     } finally {
       setExporting(false)
     }
@@ -52,7 +54,9 @@ export const DiagnosticsContent = () => {
       const path = await exportDebugLog()
       pushToast(`Debug log saved to ${path}`, "success")
     } catch (err) {
-      pushToast(toInvokeError(err), "error")
+      const message = toInvokeError(err)
+      log.error("boot", "export session debug log failed", { error: message })
+      pushToast(message, "error")
     } finally {
       setExportingSession(false)
     }
@@ -65,7 +69,9 @@ export const DiagnosticsContent = () => {
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1500)
     } catch (err) {
-      pushToast(toInvokeError(err), "error")
+      const message = toInvokeError(err)
+      log.error("boot", "copy log path failed", { error: message })
+      pushToast(message, "error")
     }
   }
 
@@ -75,7 +81,9 @@ export const DiagnosticsContent = () => {
       const { revealItemInDir } = await import("@tauri-apps/plugin-opener")
       await revealItemInDir(path)
     } catch (err) {
-      pushToast(toInvokeError(err), "error")
+      const message = toInvokeError(err)
+      log.error("boot", "open logs folder failed", { error: message })
+      pushToast(message, "error")
     }
   }
 
