@@ -329,6 +329,13 @@ async fn execute_one_call(
     );
     match verdict {
         Verdict::Deny { reason } => {
+            tracing::info!(
+                target: "tool",
+                tool = %descriptor.name,
+                call_id = %request.id,
+                reason = %reason,
+                "tool denied by policy"
+            );
             if let Some(call) = transition(
                 ToolCallStatus::Denied {
                     reason: Some(reason),
@@ -341,6 +348,13 @@ async fn execute_one_call(
         }
         Verdict::Ask => {
             let request_id = PermissionRequestId::generate();
+            tracing::info!(
+                target: "tool",
+                tool = %descriptor.name,
+                call_id = %request.id,
+                request_id = %request_id,
+                "permission requested"
+            );
             if let Some(call) = transition(
                 ToolCallStatus::AwaitingPermission {
                     request_id: request_id.clone(),
@@ -387,6 +401,15 @@ async fn execute_one_call(
             .unwrap_or(PermissionDecision::Deny {
                 reason: Some("permission request timed out or was interrupted".to_owned()),
             });
+
+            tracing::info!(
+                target: "tool",
+                tool = %descriptor.name,
+                call_id = %request.id,
+                request_id = %request_id,
+                decision = ?decision,
+                "permission resolved"
+            );
 
             let _ = handle
                 .emit_persistent(
@@ -512,6 +535,13 @@ async fn execute_one_call(
     let result = match outcome {
         Some(ToolJobOutcome::Output(result)) => result,
         Some(ToolJobOutcome::Panicked { message }) => {
+            tracing::error!(
+                target: "tool",
+                tool = %descriptor.name,
+                call_id = %request.id,
+                message = %message,
+                "tool panicked"
+            );
             if let Some(call) = transition(
                 ToolCallStatus::Failed {
                     error: format!("tool panicked: {message}"),

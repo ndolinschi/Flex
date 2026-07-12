@@ -366,6 +366,7 @@ impl Agent for NativeAgent {
             .unwrap_or_else(|p| p.into_inner())
             .clone();
         if let Some(token) = token {
+            tracing::info!(target: "turn", session_id = %session, "cancel requested");
             token.cancel();
         }
         Ok(())

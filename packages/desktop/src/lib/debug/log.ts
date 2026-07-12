@@ -1,16 +1,19 @@
-// App-wide namespaced/leveled debug logger.
+// App-wide namespaced/leveled logger.
 //
-// Gated by ONE debug flag (see `isDebugEnabled` below), sourced from either
-// a persisted Settings toggle (mirrored into `localStorage["flex.debug"]`
-// so it's readable synchronously before the settings store/React has
-// mounted — see `setDebugLoggingEnabled`) or a manual
-// `localStorage.setItem("flex.debug", "1")` for ad-hoc debugging.
+// ONE debug flag (see `isDebugEnabled` below) gates verbose levels, sourced
+// from either a persisted Settings toggle (mirrored into
+// `localStorage["flex.debug"]` so it's readable synchronously before the
+// settings store/React has mounted — see `setDebugLoggingEnabled`) or a
+// manual `localStorage.setItem("flex.debug", "1")` for ad-hoc debugging.
 //
-// When OFF: every `log.*` call is a single boolean check + return — no
-// string formatting, no ring-buffer push, near-zero overhead.
-// When ON: mirrors to `console.<level>` with a `[ns]` prefix and appends a
-// structured entry to a capped in-memory ring buffer (`RING_CAPACITY`),
-// which `exportDebugLog()` / `exportDiagnostics()` can serialize.
+// Level policy:
+//   - `debug` / `info`: only when the flag is ON (dev verbose)
+//   - `warn` / `error`: always recorded (production error catch)
+//   - raw session events (`recordRawEvent`): only when the flag is ON
+//
+// Emitted entries mirror to `console.<level>` with a `[ns]` prefix and append
+// to a capped in-memory ring buffer (`RING_CAPACITY`), which
+// `exportDebugLog()` / `exportDiagnostics()` can serialize.
 //
 // Separately, an opt-in crash ring (`crashReportingEnabled`) always retains
 // uncaught errors/rejections for the diagnostics export — no remote upload
@@ -146,8 +149,14 @@ const consoleFns: Record<LogLevel, (...args: unknown[]) => void> = {
   error: console.error,
 }
 
+/** `warn`/`error` always emit (production); `debug`/`info` need the flag. */
+const isLevelEnabled = (level: LogLevel): boolean => {
+  if (level === "warn" || level === "error") return true
+  return isDebugEnabled()
+}
+
 const emit = (level: LogLevel, ns: LogNamespace, msg: string, data?: unknown): void => {
-  if (!isDebugEnabled()) return
+  if (!isLevelEnabled(level)) return
   const entry: LogEntry = { tsMs: Date.now(), level, ns, msg, data }
   push(entry)
   const prefix = `[${ns}]`
@@ -253,10 +262,20 @@ export const exportDiagnostics = async (): Promise<string> => {
 
 let globalHandlersInstalled = false
 
+/** Clears in-memory rings — for tests / DevTools (`window.__flexLog.clear`). */
+export const clearLogRings = (): void => {
+  ringBuffer = []
+  crashRingBuffer = []
+  eventRingBuffer = []
+}
+
+/** Snapshot of the leveled log ring — for tests / DevTools. */
+export const getLogEntries = (): readonly LogEntry[] => ringBuffer
+
 /** Installs `window.addEventListener("error"|"unhandledrejection")` logging
- * once per page load. Debug-on entries go to the verbose ring via
- * `log.error`; crash-reporting-on entries always land in the crash ring
- * (even when verbose debug is off). Call once from `App.tsx`. */
+ * once per page load. Errors go to the leveled ring via `log.error` (always
+ * on); crash-reporting-on entries also land in the crash ring. Call once
+ * from `App.tsx`. */
 export const initGlobalErrorLogging = (): void => {
   if (globalHandlersInstalled || typeof window === "undefined") return
   globalHandlersInstalled = true
@@ -318,11 +337,7 @@ if (typeof window !== "undefined") {
     entries: () => ringBuffer,
     crashes: () => crashRingBuffer,
     events: () => eventRingBuffer,
-    clear: () => {
-      ringBuffer = []
-      crashRingBuffer = []
-      eventRingBuffer = []
-    },
+    clear: clearLogRings,
     isEnabled: isDebugEnabled,
     export: exportDebugLog,
     exportDiagnostics,

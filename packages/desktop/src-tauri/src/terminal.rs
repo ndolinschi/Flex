@@ -75,6 +75,7 @@ fn default_shell() -> String {
     "powershell.exe".to_owned()
 }
 
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn terminal_create(
     app: AppHandle,
@@ -179,6 +180,7 @@ pub async fn terminal_create(
     })
 }
 
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn terminal_write(
     state: State<'_, AppState>,
@@ -203,6 +205,7 @@ pub async fn terminal_write(
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn terminal_resize(
     state: State<'_, AppState>,
@@ -229,6 +232,7 @@ pub async fn terminal_resize(
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn terminal_kill(state: State<'_, AppState>, id: String) -> DesktopResult<()> {
     let mut handle = {
@@ -244,6 +248,7 @@ pub async fn terminal_kill(state: State<'_, AppState>, id: String) -> DesktopRes
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn terminal_list(state: State<'_, AppState>) -> DesktopResult<Vec<TerminalInfo>> {
     let terminals = state

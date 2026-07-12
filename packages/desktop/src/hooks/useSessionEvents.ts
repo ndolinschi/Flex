@@ -21,6 +21,7 @@ import {
   trackThinkingSpan,
   type ThinkingSpan,
 } from "../lib/timeline/thinkingSpans"
+import { log } from "../lib/debug/log"
 
 /** Stable empty buffers — never allocate a fresh object as a selector fallback
  * (that would defeat zustand's Object.is bail-out on every unrelated update). */
@@ -147,6 +148,13 @@ export const useSessionEvents = (sessionId: string | null) => {
       // for this session means the engine is talking again (or the turn
       // ended), so it clears whatever reconnect status was showing.
       if (event.payload.kind === "retry_scheduled") {
+        log.info("session", "reconnect / retry scheduled", {
+          sessionId: event.session_id,
+          attempt: event.payload.attempt,
+          maxAttempts: event.payload.max_attempts,
+          delayMs: event.payload.delay_ms,
+          error: event.payload.error,
+        })
         setReconnectStatus({
           attempt: event.payload.attempt,
           maxAttempts: event.payload.max_attempts,
@@ -309,7 +317,12 @@ export const useSessionEvents = (sessionId: string | null) => {
         })
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err))
+          const message = err instanceof Error ? err.message : String(err)
+          log.error("session", "replay boot failed", {
+            sessionId,
+            error: message,
+          })
+          setError(message)
         }
       } finally {
         if (!cancelled) setIsLoading(false)
@@ -360,8 +373,12 @@ export const useSessionEvents = (sessionId: string | null) => {
           useAppStore.getState().setIsStreaming(false)
           useAppStore.getState().clearStreamingForSession(sessionId)
         }
-      } catch {
+      } catch (err) {
         // Keep the current view; the next gap will retry.
+        log.warn("session", "resync replay failed", {
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        })
       } finally {
         resyncing = false
       }

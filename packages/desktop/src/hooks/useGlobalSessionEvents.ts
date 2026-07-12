@@ -131,7 +131,6 @@ export const useGlobalSessionEvents = () => {
           // dropped (no subscriber attached on the backend's broadcast
           // channel). Surface it loudly but don't let it become an
           // unhandled promise rejection.
-          console.error("[useGlobalSessionEvents] subscribe_session failed", id, err)
           log.error("session", "subscribe_session failed", { sessionId: id, err })
         })
     }
@@ -139,7 +138,6 @@ export const useGlobalSessionEvents = () => {
       prev.delete(id)
       useAppStore.getState().setSessionSubscribed(id, false)
       void unsubscribeSession(id).catch((err) => {
-        console.error("[useGlobalSessionEvents] unsubscribe_session failed", id, err)
         log.error("session", "unsubscribe_session failed", { sessionId: id, err })
       })
     }

@@ -121,7 +121,7 @@ export const DiagnosticsContent = () => {
         <SettingRow
           rowId="diagnostics-debug-logging"
           title="Debug logging"
-          description="Verbose namespaced logs (IPC calls, session events, store transitions) in the DevTools console, plus a bounded in-memory buffer you can export. Also raises the backend's log level on next launch."
+          description="Warn/error always recorded for production. Debug/info and raw session events only when this is on. Backend log level rises on next launch."
           first
         >
           <Toggle

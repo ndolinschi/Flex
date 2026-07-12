@@ -21,6 +21,7 @@ import { resumeSession, toInvokeError } from "../../lib/tauri"
 import { sessionLabel } from "../../lib/types"
 import { basename, cn } from "../../lib/utils"
 import { useAppStore, type RightPanelTab } from "../../stores/appStore"
+import { log } from "../../lib/debug/log"
 
 type CommandEntry = {
   id: string
@@ -61,14 +62,17 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
 
   const handleSelectSession = async (id: string) => {
     // Mirrors SessionSidebar.handleSelect's happy path (resume then activate)
-    // without duplicating its per-row error-banner state — a console.error
-    // here is enough for a palette action the user can just retry.
+    // without duplicating its per-row error-banner state — log.error is enough
+    // for a palette action the user can just retry.
     try {
       await resumeSession(id)
       setActiveSessionId(id)
       setRoute("chat")
     } catch (err) {
-      console.error("resume_session failed", id, toInvokeError(err))
+      log.error("session", "resume_session failed", {
+        sessionId: id,
+        error: toInvokeError(err),
+      })
     }
   }
 

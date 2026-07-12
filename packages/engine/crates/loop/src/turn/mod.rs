@@ -199,6 +199,13 @@ pub(crate) async fn run_turn(
                     break;
                 }
                 Err(err) => {
+                    tracing::error!(
+                        target: "turn",
+                        session_id = %handle.id,
+                        turn_id = %turn_id,
+                        error = %err,
+                        "turn failed"
+                    );
                     for call in manager.cancel_in_flight() {
                         let _ = handle
                             .emit_persistent(Some(&turn_id), AgentEvent::ToolCallUpdated { call })
@@ -266,6 +273,17 @@ pub(crate) async fn run_turn(
                 },
             )
             .await?;
+
+        tracing::info!(
+            target: "turn",
+            session_id = %handle.id,
+            turn_id = %turn_id,
+            stop_reason = ?summary.stop_reason,
+            duration_ms = summary.duration_ms,
+            num_model_calls = summary.num_model_calls,
+            num_tool_calls = summary.num_tool_calls,
+            "turn completed"
+        );
 
         if let Some(workspace) = &deps.workspace {
             match workspace

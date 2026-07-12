@@ -850,10 +850,16 @@ pub async fn subscribe_session(
     let handle = tokio::spawn(async move {
         let mut stream = stream;
         while let Some(event) = stream.next().await {
-            if app.emit("session-event", &event).is_err() {
+            if let Err(err) = app.emit("session-event", &event) {
+                tracing::warn!(
+                    session_id = %key,
+                    error = %err,
+                    "session-event emit failed; ending subscription relay"
+                );
                 break;
             }
         }
+        tracing::debug!(session_id = %key, "session subscription stream ended");
     });
 
     state.subscriptions.lock().await.insert(key, handle);
@@ -867,6 +873,7 @@ pub async fn unsubscribe_session(
     session_id: String,
 ) -> DesktopResult<()> {
     if let Some(handle) = state.subscriptions.lock().await.remove(&session_id) {
+        tracing::debug!(session_id = %session_id, "unsubscribing session event relay");
         handle.abort();
     }
     Ok(())

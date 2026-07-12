@@ -38,6 +38,7 @@ import { isSessionNotFoundError } from "../../lib/sessions"
 import type { SessionMeta } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { persistUiState, useAppStore } from "../../stores/appStore"
+import { log } from "../../lib/debug/log"
 import { SIDEBAR_DEFAULT_WIDTH } from "../../stores/layoutConstants"
 
 const isMac =
@@ -150,8 +151,8 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         setRoute("chat")
         if (narrow) setSidebarCollapsed(true)
       } catch (err) {
-        console.error("resume_session failed", id, err)
         const message = toInvokeError(err)
+        log.error("session", "resume_session failed", { sessionId: id, error: message })
         const notFound = isSessionNotFoundError(message)
         if (notFound) {
           setRowErrors((prev) => {

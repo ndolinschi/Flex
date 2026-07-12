@@ -15,6 +15,7 @@ import {
 } from "./agentTerminal"
 import { maybeToastDevServerUrl } from "./devServerToast"
 import { maybeAutoTitleSession } from "./autoTitle"
+import { log } from "../debug/log"
 
 const RUNNING_VERDICT_STATES: ReadonlySet<ToolCallStatus["state"]> = new Set([
   "pending",
@@ -60,6 +61,12 @@ export const applyGlobalSessionEvent = (
   // permission request" handling). *_resolved clearing, by contrast, is safe
   // to apply during replay — it can only ever remove state, never wedge it.
   if (payload.kind === "permission_requested" && !opts?.ignoreStreaming) {
+    log.info("session", "permission requested", {
+      sessionId: event.session_id,
+      requestId: payload.id,
+      callId: payload.call_id,
+      title: payload.title,
+    })
     store.setPendingPermission({
       sessionId: event.session_id,
       requestId: payload.id,
@@ -70,12 +77,21 @@ export const applyGlobalSessionEvent = (
     })
   }
   if (payload.kind === "permission_resolved") {
+    log.debug("session", "permission resolved", {
+      sessionId: event.session_id,
+      requestId: payload.id,
+    })
     if (store.pendingPermission?.requestId === payload.id) {
       store.setPendingPermission(null)
     }
   }
 
   if (payload.kind === "question_requested" && !opts?.ignoreStreaming) {
+    log.info("session", "question requested", {
+      sessionId: event.session_id,
+      requestId: payload.id,
+      questionCount: payload.questions?.length,
+    })
     store.setPendingQuestion({
       sessionId: event.session_id,
       requestId: payload.id,
@@ -83,6 +99,10 @@ export const applyGlobalSessionEvent = (
     })
   }
   if (payload.kind === "question_resolved") {
+    log.debug("session", "question resolved", {
+      sessionId: event.session_id,
+      requestId: payload.id,
+    })
     if (store.pendingQuestion?.requestId === payload.id) {
       store.setPendingQuestion(null)
     }
@@ -110,6 +130,10 @@ export const applyGlobalSessionEvent = (
 
   if (!opts?.ignoreStreaming) {
     if (payload.kind === "turn_started") {
+      log.debug("session", "turn started", {
+        sessionId: event.session_id,
+        turnId: payload.turn_id,
+      })
       // New turn supersedes any recorded terminal turn_id so its deltas can
       // legitimately (re-)arm streaming again.
       store.clearCompletedTurn(event.session_id)
@@ -143,6 +167,12 @@ export const applyGlobalSessionEvent = (
       store.noteSessionError(event.session_id)
     }
     if (payload.kind === "turn_completed" || payload.kind === "session_error") {
+      log.debug("session", payload.kind === "turn_completed" ? "turn completed" : "session error", {
+        sessionId: event.session_id,
+        turnId: payload.kind === "turn_completed" ? payload.turn_id : undefined,
+        stopReason:
+          payload.kind === "turn_completed" ? payload.summary?.stop_reason : undefined,
+      })
       // `turn_completed`'s payload always carries its own turn_id (per the
       // AgentEvent union); `session_error` carries none. Either way
       // `markTurnCompleted` records SOME completion marker for this session
@@ -299,7 +329,7 @@ export const applyGlobalSessionEvent = (
 
   if (payload.kind === "unknown") {
     // Forward-compat fallback — surface it instead of dropping silently.
-    console.warn("[agent-event] unrecognized event kind", payload.raw)
+    log.warn("session", "unrecognized event kind", { raw: payload.raw })
   }
 
   const activeId = store.activeSessionId

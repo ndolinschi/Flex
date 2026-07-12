@@ -11,6 +11,7 @@ import { markRawPromptTitle } from "../lib/sessionSideEffects/autoTitle"
 import type { ComposerAttachment, ModelInfoDto, SessionMeta } from "../lib/types"
 import { useAppStore } from "../stores/appStore"
 import { modeToPermission } from "../components/molecules"
+import { log } from "../lib/debug/log"
 
 export const EMPTY_QUEUE: string[] = []
 
@@ -63,12 +64,20 @@ export const armStreamingVerification = (
     // nothing so it can't clobber that newer turn's state.
     if (store.getTurnGeneration(sessionId) !== generation) return
     if (!store.streamingSessions[sessionId]) return
+    log.warn("composer", "streaming safety timeout — requesting resync", {
+      sessionId,
+      generation,
+    })
     requestResync(sessionId)
     window.setTimeout(() => {
       const latest = useAppStore.getState()
       if (latest.getTurnGeneration(sessionId) !== generation) return
       if (!latest.streamingSessions[sessionId]) return
       // Resync didn't turn up a real in-flight turn either — give up.
+      log.warn("composer", "streaming safety timeout — force-clearing streaming", {
+        sessionId,
+        generation,
+      })
       latest.setSessionStreaming(sessionId, false)
       if (latest.activeSessionId === sessionId) {
         latest.setIsStreaming(false)
@@ -139,6 +148,10 @@ export const useComposerSend = ({
 
     // Queue follow-ups while a turn is in flight.
     if (isStreaming && overrideText === undefined) {
+      log.debug("composer", "queueing follow-up while streaming", {
+        sessionId: activeSessionId,
+        textLen: text.length,
+      })
       enqueueMessage(activeSessionId, text)
       setComposerDraft("")
       return
@@ -156,6 +169,14 @@ export const useComposerSend = ({
     }
 
     setError(null)
+
+    log.debug("composer", "send start", {
+      sessionId: activeSessionId,
+      textLen: text.length,
+      attachmentCount: overrideText === undefined ? attachments.length : 0,
+      isDrain: overrideText !== undefined,
+      model: selectedModelId,
+    })
 
     // `prompt()` awaits the whole turn (see commands.rs::prompt), so a
     // provider/turn failure both returns the error here AND is broadcast as a
@@ -216,6 +237,12 @@ export const useComposerSend = ({
       // subscriber attaches, so wait for it (bounded) before sending.
       if (!useAppStore.getState().subscribedSessions[activeSessionId]) {
         await waitForSubscription(activeSessionId)
+        if (!useAppStore.getState().subscribedSessions[activeSessionId]) {
+          log.warn("composer", "subscribe wait timed out before prompt", {
+            sessionId: activeSessionId,
+            timeoutMs: SUBSCRIBE_READY_TIMEOUT_MS,
+          })
+        }
       }
 
       // Rename draft "New Agent" from the first prompt . Recorded via
@@ -256,6 +283,10 @@ export const useComposerSend = ({
     } catch (err) {
       const message = toInvokeError(err)
       if (message.includes(TURN_IN_PROGRESS_MARKER)) {
+        log.info("composer", "TURN_IN_PROGRESS — requeueing and re-arming streaming", {
+          sessionId: activeSessionId,
+          textLen: text.length,
+        })
         // The engine just told us a turn IS live for this session — our own
         // optimistic streaming flag lagging/missing (e.g. the subscribe race
         // above) is what let this second send through in the first place.
@@ -297,6 +328,10 @@ export const useComposerSend = ({
           .getState()
           .pushToast("Queued — waiting for current turn", "success")
       } else {
+        log.error("composer", "prompt failed", {
+          sessionId: activeSessionId,
+          error: message,
+        })
         // Suppress the composer banner when this same failure already landed
         // as a `session_error` timeline row (prompt() awaited the turn, so a
         // provider error returns here AND broadcasts session_error) — one
@@ -343,6 +378,10 @@ export const useComposerSend = ({
     if (!queue || queue.length === 0) return
     const next = useAppStore.getState().shiftQueuedMessage(activeSessionId)
     if (!next) return
+    log.debug("composer", "draining queued message", {
+      sessionId: activeSessionId,
+      remaining: (queue.length ?? 1) - 1,
+    })
     flushingRef.current = true
     void handleSend(next).finally(() => {
       flushingRef.current = false
@@ -358,6 +397,7 @@ export const useComposerSend = ({
   const handleStop = async () => {
     if (!activeSessionId) return
     setError(null)
+    log.info("composer", "stop requested", { sessionId: activeSessionId })
     // Always clear local streaming — cancel is a no-op when the engine turn
     // already died (e.g. app restarted mid-turn), which used to leave the
     // Stop button stuck and the follow-up queue frozen.
@@ -377,7 +417,12 @@ export const useComposerSend = ({
     try {
       await cancel(activeSessionId)
     } catch (err) {
-      setError(toInvokeError(err))
+      const message = toInvokeError(err)
+      log.error("composer", "cancel failed", {
+        sessionId: activeSessionId,
+        error: message,
+      })
+      setError(message)
     }
   }
 

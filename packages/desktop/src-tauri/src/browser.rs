@@ -296,6 +296,7 @@ fn probe_and_emit_finished(
     });
 }
 
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_open(
     app: AppHandle,
@@ -398,6 +399,7 @@ pub async fn browser_open(
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_navigate(
     app: AppHandle,
@@ -414,6 +416,7 @@ pub async fn browser_navigate(
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_back(state: State<'_, AppState>) -> DesktopResult<()> {
     let guard = state.browser_webview.lock().await;
@@ -423,6 +426,7 @@ pub async fn browser_back(state: State<'_, AppState>) -> DesktopResult<()> {
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_forward(state: State<'_, AppState>) -> DesktopResult<()> {
     let guard = state.browser_webview.lock().await;
@@ -432,6 +436,7 @@ pub async fn browser_forward(state: State<'_, AppState>) -> DesktopResult<()> {
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_reload(state: State<'_, AppState>) -> DesktopResult<()> {
     let guard = state.browser_webview.lock().await;
@@ -453,6 +458,7 @@ fn apply_bounds(
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_set_bounds(
     state: State<'_, AppState>,
@@ -492,6 +498,7 @@ pub fn reapply_browser_bounds(state: &AppState) {
     }
 }
 
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_set_visible(state: State<'_, AppState>, visible: bool) -> DesktopResult<()> {
     let bounds = state.browser_bounds.lock().ok().and_then(|g| *g);
@@ -511,6 +518,7 @@ pub async fn browser_set_visible(state: State<'_, AppState>, visible: bool) -> D
     Ok(())
 }
 
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_close(state: State<'_, AppState>) -> DesktopResult<()> {
     let mut guard = state.browser_webview.lock().await;
@@ -524,6 +532,7 @@ pub async fn browser_close(state: State<'_, AppState>) -> DesktopResult<()> {
 /// app's main webview. No-ops (rather than erroring) if the browser hasn't
 /// been opened yet, matching the other `browser_*` commands' tolerance for a
 /// missing webview.
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_open_devtools(state: State<'_, AppState>) -> DesktopResult<()> {
     let guard = state.browser_webview.lock().await;
@@ -538,6 +547,7 @@ pub async fn browser_open_devtools(state: State<'_, AppState>) -> DesktopResult<
 /// re-fetch rather than potentially serve from its own cache. `reload()`
 /// remains available as the soft-reload path (`browser_reload`); this command
 /// is the "…" menu's cache-busting variant.
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_hard_reload(app: AppHandle, state: State<'_, AppState>) -> DesktopResult<()> {
     let guard = state.browser_webview.lock().await;
@@ -554,6 +564,7 @@ pub async fn browser_hard_reload(app: AppHandle, state: State<'_, AppState>) -> 
 /// child webview via wry/Tauri's `clear_all_browsing_data` — shipped as one
 /// "Clear Browsing Data" action rather than separate cookie/cache items since
 /// the underlying API doesn't expose that granularity.
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_clear_data(state: State<'_, AppState>) -> DesktopResult<()> {
     let guard = state.browser_webview.lock().await;
@@ -582,6 +593,7 @@ pub async fn browser_clear_data(state: State<'_, AppState>) -> DesktopResult<()>
 /// a toast — see the module's error-path convention) rather than failing to
 /// compile or panicking at runtime.
 #[cfg(target_os = "macos")]
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_screenshot(state: State<'_, AppState>) -> DesktopResult<String> {
     let guard = state.browser_webview.lock().await;
@@ -630,6 +642,7 @@ pub async fn browser_screenshot(state: State<'_, AppState>) -> DesktopResult<Str
 /// (Windows would need a Win32/GDI capture, Linux would need portal/X11
 /// grab). Returns a clear, user-visible error instead of silently no-op'ing.
 #[cfg(not(target_os = "macos"))]
+#[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_screenshot(_state: State<'_, AppState>) -> DesktopResult<String> {
     Err(DesktopError::Message(
