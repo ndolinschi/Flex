@@ -10,7 +10,7 @@ use agentloop_sdk::{AgentBuilder, EngineService, IndexPlugin, McpBridgeConfig, M
 use agentloop_session::JsonlStore;
 use agentloop_workspace::GitWorktrees;
 
-use crate::config::{sessions_dir, worktrees_dir, ProviderConfig};
+use crate::config::{ProviderConfig, sessions_dir, worktrees_dir};
 use crate::error::{DesktopError, DesktopResult};
 
 /// Read every enabled MCP server spec from `~/.config/agentloop/mcp/*.toml`
@@ -27,7 +27,7 @@ fn load_enabled_mcp_servers() -> McpBridgeConfig {
     let entries = match std::fs::read_dir(&dir) {
         Ok(entries) => entries,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            return McpBridgeConfig::default()
+            return McpBridgeConfig::default();
         }
         Err(err) => {
             tracing::warn!(error = %err, "could not read MCP server directory");

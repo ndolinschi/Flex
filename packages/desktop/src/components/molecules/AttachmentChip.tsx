@@ -1,4 +1,4 @@
-import { FileIcon, ImageIcon, X } from "lucide-react"
+import { FileIcon, ImageIcon, MousePointer2, X } from "lucide-react"
 import type { ComposerAttachment } from "../../lib/types"
 import { cn } from "../../lib/utils"
 
@@ -7,9 +7,14 @@ type AttachmentChipProps = {
   onRemove: (id: string) => void
 }
 
-/** context pill: file icon + name + inline remove. */
+/** context pill: icon + name + inline remove. */
 export const AttachmentChip = ({ attachment, onRemove }: AttachmentChipProps) => {
-  const Icon = attachment.kind === "image" ? ImageIcon : FileIcon
+  const Icon =
+    attachment.kind === "image"
+      ? ImageIcon
+      : attachment.kind === "dom"
+        ? MousePointer2
+        : FileIcon
 
   return (
     <span

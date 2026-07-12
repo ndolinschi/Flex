@@ -294,6 +294,7 @@ pub fn run() {
             browser::browser_hard_reload,
             browser::browser_clear_data,
             browser::browser_screenshot,
+            browser::browser_set_design_mode,
         ])
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { .. } => {

@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import { Button } from "../atoms"
 import { useBrowserSession } from "../../hooks/useBrowserSession"
+import { isBrowserPreview, registerPreviewBrowserIframe } from "../../lib/browserMock"
 import { BrowserToolbar } from "./browser/BrowserToolbar"
 
 /** Browser right-panel tab: toolbar + omnibar + content area.
@@ -44,6 +45,8 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
     handleClearData,
     handleAskAgent,
     handleOpenDevtools,
+    browserDesignMode,
+    toggleDesignMode,
     setBrowserSessionState,
     browserBack,
     browserForward,
@@ -82,6 +85,8 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
         handleCopyUrl={handleCopyUrl}
         handleClearHistory={handleClearHistory}
         handleClearData={handleClearData}
+        browserDesignMode={browserDesignMode}
+        toggleDesignMode={toggleDesignMode}
       />
 
       {/* Content — dedicated bounds target for the native child webview */}
@@ -137,7 +142,17 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
               title="Browser"
               src={browserUrl || undefined}
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              onLoad={() => setBrowserSessionState(sessionKey, { loading: false })}
+              onLoad={(e) => {
+                setBrowserSessionState(sessionKey, { loading: false })
+                if (isBrowserPreview()) {
+                  registerPreviewBrowserIframe(e.currentTarget)
+                }
+              }}
+              ref={(node) => {
+                if (isBrowserPreview()) {
+                  registerPreviewBrowserIframe(node)
+                }
+              }}
               className="h-full border-0 bg-white"
               style={{
                 width: presetWidth ? `min(${presetWidth}px, 100%)` : "100%",

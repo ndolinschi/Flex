@@ -3,6 +3,7 @@ import { listen as tauriListen, type UnlistenFn } from "@tauri-apps/api/event"
 import {
   browserInvoke,
   browserListenBrowserState,
+  browserListenBrowserDesign,
   browserListenSessionEvents,
   browserListenTerminalExit,
   browserListenTerminalOutput,
@@ -43,6 +44,7 @@ import type {
   TurnSummary,
   UpdateSessionInput,
   WorkspaceStatusDto,
+  BrowserDesignEvent,
 } from "./types"
 
 /** Single choke point for every IPC call (native Tauri `invoke` or the
@@ -496,6 +498,10 @@ export const browserClearData = (): Promise<void> => invoke("browser_clear_data"
  * `src-tauri/src/browser.rs::browser_screenshot`. */
 export const browserScreenshot = (): Promise<string> => invoke("browser_screenshot")
 
+/** Enable/disable Design Mode (element picker) in the embedded browser. */
+export const browserSetDesignMode = (enabled: boolean): Promise<void> =>
+  invoke("browser_set_design_mode", { enabled })
+
 export const listenTerminalOutput = (
   handler: (event: TerminalOutputEvent) => void,
 ): Promise<UnlistenFn> => {
@@ -519,6 +525,15 @@ export const listenBrowserState = (
 ): Promise<UnlistenFn> => {
   if (isBrowserPreview()) return browserListenBrowserState(handler)
   return tauriListen<BrowserStateEvent>("browser-state", (e) => {
+    handler(e.payload)
+  })
+}
+
+export const listenBrowserDesign = (
+  handler: (event: BrowserDesignEvent) => void,
+): Promise<UnlistenFn> => {
+  if (isBrowserPreview()) return browserListenBrowserDesign(handler)
+  return tauriListen<BrowserDesignEvent>("browser-design-event", (e) => {
     handler(e.payload)
   })
 }

@@ -562,6 +562,14 @@ export type BrowserStateEvent = {
   error?: { host: string; message: string } | null
 }
 
+export type {
+  BrowserDesignEvent,
+  BrowserDesignSelectEvent,
+  BrowserDesignExitEvent,
+  BrowserDomElement,
+  BrowserDomRect,
+} from "../browserDesign"
+
 // Per-file / per-hunk review actions (Changes tab Keep/Undo — the reference design pattern).
 
 /** Where a `review_apply_patch` call applies its patch: the session's
