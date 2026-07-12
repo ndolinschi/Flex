@@ -8,8 +8,8 @@ use std::sync::Arc;
 // import used everywhere else in this struct.
 use std::sync::Mutex as SyncMutex;
 
-use agentloop_sdk::providers::copilot::DeviceAuthorization;
 use agentloop_sdk::EngineService;
+use agentloop_sdk::providers::copilot::DeviceAuthorization;
 use agentloop_session::JsonlStore;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -136,6 +136,10 @@ pub struct AppState {
     /// over the React toolbar until bounds are re-asserted. Sync mutex — read
     /// from the (synchronous) window-event handler.
     pub browser_bounds: SyncMutex<Option<(f64, f64, f64, f64)>>,
+    /// Whether Design Mode (element picker) is active in the embedded browser.
+    /// Sync mutex so `on_page_load` / `on_navigation` callbacks can read it
+    /// without awaiting. When true, Finished re-injects the picker script.
+    pub browser_design_mode: SyncMutex<bool>,
     /// Per-session repo baselines for non-isolated sessions, keyed by
     /// session id string. See [`SessionBaseline`]. Hot in-memory cache over
     /// the file persisted via [`save_session_baselines`]; loaded from disk
@@ -161,6 +165,7 @@ impl AppState {
             next_terminal_seq: SyncMutex::new(0),
             browser_webview: Mutex::new(None),
             browser_bounds: SyncMutex::new(None),
+            browser_design_mode: SyncMutex::new(false),
             session_baselines: Mutex::new(load_session_baselines()),
             pending_copilot_auth: Mutex::new(HashMap::new()),
         }

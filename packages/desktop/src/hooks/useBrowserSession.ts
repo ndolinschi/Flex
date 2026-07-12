@@ -10,7 +10,9 @@ import {
   browserReload,
   browserScreenshot,
   browserSetBounds,
+  browserSetDesignMode,
   browserSetVisible,
+  listenBrowserDesign,
   listenBrowserState,
   toInvokeError,
 } from "../lib/tauri"
@@ -21,6 +23,7 @@ import {
   type BrowserViewportPreset,
 } from "../stores/appStore"
 import { log } from "../lib/debug/log"
+import type { BrowserDomElement } from "../lib/browserDesign"
 
 /* ── Viewport presets ─────────────────────────────────────────────────── */
 
@@ -56,13 +59,16 @@ export const useBrowserSession = (active: boolean) => {
 
   const browserOwnerSessionId = useAppStore((s) => s.browserOwnerSessionId)
   const isOwner = browserOwnerSessionId === sessionKey
+  const browserDesignMode = useAppStore((s) => s.browserDesignMode)
 
   const setBrowserSessionState = useAppStore((s) => s.setBrowserSessionState)
   const setBrowserOwnerSessionId = useAppStore(
     (s) => s.setBrowserOwnerSessionId,
   )
+  const setBrowserDesignMode = useAppStore((s) => s.setBrowserDesignMode)
   const resetBrowserSession = useAppStore((s) => s.resetBrowserSession)
   const addAttachment = useAppStore((s) => s.addAttachment)
+  const clearAttachments = useAppStore((s) => s.clearAttachments)
   const setComposerDraft = useAppStore((s) => s.setComposerDraft)
   const pushToast = useAppStore((s) => s.pushToast)
 
@@ -247,6 +253,56 @@ export const useBrowserSession = (active: boolean) => {
     void browserOpenDevtools()
   }, [pushToast])
 
+  const toggleDesignMode = useCallback(async () => {
+    if (!browserStarted || !isOwner) {
+      pushToast("Open a page before using Design Mode", "error")
+      return
+    }
+    if (loadError) {
+      pushToast("Design Mode needs a loaded page", "error")
+      return
+    }
+    const next = !useAppStore.getState().browserDesignMode
+    try {
+      await browserSetDesignMode(next)
+      setBrowserDesignMode(next)
+      if (next) {
+        window.dispatchEvent(new CustomEvent("flex:focus-composer"))
+      }
+    } catch (err) {
+      const message = toInvokeError(err)
+      log.error("browser", "design mode toggle failed", { error: message })
+      pushToast(message, "error")
+    }
+  }, [
+    browserStarted,
+    isOwner,
+    loadError,
+    pushToast,
+    setBrowserDesignMode,
+  ])
+
+  const addDomChip = useCallback(
+    (name: string, element: BrowserDomElement, additive: boolean) => {
+      if (!additive) {
+        // Replace prior DOM chips; keep image/file attachments.
+        const keep = useAppStore
+          .getState()
+          .attachments.filter((a) => a.kind !== "dom")
+        clearAttachments()
+        for (const att of keep) addAttachment(att)
+      }
+      addAttachment({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        kind: "dom",
+        name,
+        payload: element,
+      })
+      window.dispatchEvent(new CustomEvent("flex:focus-composer"))
+    },
+    [addAttachment, clearAttachments],
+  )
+
   // Effect 1: browser-state subscription (mount once). Applies to whichever
   // session currently owns the webview, not necessarily the viewed session.
   useEffect(() => {
@@ -313,6 +369,45 @@ export const useBrowserSession = (active: boolean) => {
       }
     }
   }, [])
+
+  // Design Mode events → composer DOM chips; Escape-exit syncs the toolbar flag.
+  useEffect(() => {
+    let cancelled = false
+    let unlisten: (() => void) | null = null
+    const boot = async () => {
+      unlisten = await listenBrowserDesign((e) => {
+        if (e.type === "exit") {
+          useAppStore.getState().setBrowserDesignMode(false)
+          return
+        }
+        if (e.type === "select") {
+          addDomChip(e.name, e.element, e.additive)
+        }
+      })
+      if (cancelled) {
+        unlisten()
+        unlisten = null
+      }
+    }
+    void boot()
+    return () => {
+      cancelled = true
+      if (unlisten) unlisten()
+    }
+  }, [addDomChip])
+
+  // ⌘⇧D / Ctrl⇧D toggles Design Mode when the Browser tab is active.
+  useEffect(() => {
+    if (!active) return
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey) return
+      if (e.key !== "d" && e.key !== "D") return
+      e.preventDefault()
+      void toggleDesignMode()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [active, toggleDesignMode])
 
   // Effect 2: bounds sync (native only) — re-run when webview starts or tab activates.
   // Owns reveal too: the webview must never be shown before its first real
@@ -446,6 +541,8 @@ export const useBrowserSession = (active: boolean) => {
     handleClearData,
     handleAskAgent,
     handleOpenDevtools,
+    browserDesignMode,
+    toggleDesignMode,
     setBrowserSessionState,
     browserBack: () => void browserBack(),
     browserForward: () => void browserForward(),

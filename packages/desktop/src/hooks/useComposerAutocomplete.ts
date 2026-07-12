@@ -133,7 +133,11 @@ export const useComposerAutocomplete = ({
     setComposerDraft(before + insert + after)
 
     // Attach the file so the engine inlines its contents (dedupe by path).
-    if (!attachments.some((a) => a.path === hit.path)) {
+    if (
+      !attachments.some(
+        (a) => (a.kind === "image" || a.kind === "file") && a.path === hit.path,
+      )
+    ) {
       addAttachment({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         path: hit.path,

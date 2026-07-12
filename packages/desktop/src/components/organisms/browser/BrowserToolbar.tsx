@@ -12,6 +12,7 @@ import {
   Maximize,
   MoreHorizontal,
   Monitor,
+  MousePointer2,
   RotateCw,
   Smartphone,
   Tablet,
@@ -76,6 +77,8 @@ export type BrowserToolbarProps = {
   handleCopyUrl: () => void | Promise<void>
   handleClearHistory: () => void
   handleClearData: () => void | Promise<void>
+  browserDesignMode: boolean
+  toggleDesignMode: () => void | Promise<void>
 }
 
 /** Browser chrome: nav buttons, omnibar, viewport presets, overflow menu. */
@@ -101,6 +104,8 @@ export const BrowserToolbar = ({
   handleCopyUrl,
   handleClearHistory,
   handleClearData,
+  browserDesignMode,
+  toggleDesignMode,
 }: BrowserToolbarProps) => {
   const menuRootRef = useRef<HTMLDivElement>(null)
 
@@ -219,6 +224,20 @@ export const BrowserToolbar = ({
           </Tooltip>
         ))}
       </div>
+
+      <Tooltip label={browserDesignMode ? "Exit Design Mode (⌘⇧D)" : "Design Mode (⌘⇧D)"}>
+        <IconButton
+          label={browserDesignMode ? "Exit Design Mode" : "Design Mode"}
+          disabled={!showLiveContent}
+          onClick={() => void toggleDesignMode()}
+          className={cn(
+            "h-6 w-6",
+            browserDesignMode && "bg-surface-muted text-ink",
+          )}
+        >
+          <MousePointer2 className="h-3.5 w-3.5" aria-hidden />
+        </IconButton>
+      </Tooltip>
 
       <Tooltip label="Open DevTools">
         <IconButton

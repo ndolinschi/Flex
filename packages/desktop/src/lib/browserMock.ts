@@ -1,6 +1,7 @@
 import type { UnlistenFn } from "@tauri-apps/api/event"
 import type {
   BackgroundProcessDto,
+  BrowserDesignEvent,
   BrowserStateEvent,
   BuiltinProvider,
   CreateSessionInput,
@@ -25,6 +26,10 @@ import type {
   TurnSummary,
   UpdateSessionInput,
 } from "./types"
+import {
+  chipNameForElement,
+  describeDomElement,
+} from "./browserDesign"
 
 const now = () => Date.now()
 
@@ -3720,7 +3725,10 @@ export const browserInvoke = async <T>(
     }
     case "browser_set_bounds":
     case "browser_set_visible":
+      return undefined as T
     case "browser_close":
+      mockDesignMode = false
+      teardownPreviewDesignMode()
       return undefined as T
     // Native-only: opening a real DevTools window has no preview equivalent.
     // BrowserTab.tsx checks `isBrowserPreview()` and shows a toast instead of
@@ -3736,6 +3744,21 @@ export const browserInvoke = async <T>(
     // calling this, but throw here too in case it's ever invoked directly.
     case "browser_screenshot":
       throw new Error("Screenshot unavailable in preview")
+    case "browser_set_design_mode": {
+      const enabled = Boolean(args?.enabled)
+      mockDesignMode = enabled
+      if (enabled) {
+        const ok = injectPreviewDesignMode()
+        if (!ok) {
+          throw new Error(
+            "Design Mode needs a same-origin page in preview (or the native app)",
+          )
+        }
+      } else {
+        teardownPreviewDesignMode()
+      }
+      return undefined as T
+    }
     default:
       throw new Error(`Browser preview mock: unhandled command "${cmd}"`)
   }
@@ -3868,5 +3891,147 @@ export const browserListenBrowserState = (
   browserStateHandlers.add(handler)
   return Promise.resolve(() => {
     browserStateHandlers.delete(handler)
+  })
+}
+
+// ── Design Mode (preview iframe) ──────────────────────────────────────────
+
+const browserDesignHandlers = new Set<(e: BrowserDesignEvent) => void>()
+let mockDesignMode = false
+let previewIframe: HTMLIFrameElement | null = null
+let previewDesignCleanup: (() => void) | null = null
+
+const emitBrowserDesign = (e: BrowserDesignEvent) => {
+  for (const handler of browserDesignHandlers) handler(e)
+}
+
+/** Register the preview BrowserTab iframe so Design Mode can inject into it. */
+export const registerPreviewBrowserIframe = (
+  iframe: HTMLIFrameElement | null,
+): void => {
+  previewIframe = iframe
+  if (mockDesignMode && iframe) {
+    injectPreviewDesignMode()
+  }
+}
+
+const injectPreviewDesignMode = (): boolean => {
+  teardownPreviewDesignMode()
+  const iframe = previewIframe
+  if (!iframe) return false
+  let doc: Document
+  try {
+    doc = iframe.contentDocument as Document
+    if (!doc?.body) return false
+  } catch {
+    return false
+  }
+
+  const STYLE_ID = "__agentloop-design-style"
+  const ATTR = "data-agentloop-design-hl"
+  let last: Element | null = null
+  let active = true
+
+  const ensureStyle = () => {
+    if (doc.getElementById(STYLE_ID)) return
+    const s = doc.createElement("style")
+    s.id = STYLE_ID
+    s.textContent = `[${ATTR}]{outline:2px solid #3b82f6 !important;outline-offset:2px !important;cursor:crosshair !important;}`
+    ;(doc.head || doc.documentElement).appendChild(s)
+  }
+
+  const clearHl = () => {
+    if (last) {
+      try {
+        last.removeAttribute(ATTR)
+      } catch {
+        /* ignore */
+      }
+      last = null
+    }
+  }
+
+  const pickTarget = (el: EventTarget | null): Element | null => {
+    if (!(el instanceof Element)) return null
+    if (el === doc.documentElement || el === doc.body) return null
+    if (el.id === STYLE_ID) return null
+    return el
+  }
+
+  const onMove = (e: Event) => {
+    if (!active) return
+    const t = pickTarget((e as MouseEvent).target)
+    if (t === last) return
+    clearHl()
+    if (!t) return
+    ensureStyle()
+    try {
+      t.setAttribute(ATTR, "1")
+    } catch {
+      /* ignore */
+    }
+    last = t
+  }
+
+  const onClick = (e: Event) => {
+    if (!active) return
+    const me = e as MouseEvent
+    const t = pickTarget(me.target)
+    if (!t) return
+    me.preventDefault()
+    me.stopPropagation()
+    emitBrowserDesign({
+      type: "select",
+      additive: !!me.shiftKey,
+      name: chipNameForElement(t),
+      element: describeDomElement(t),
+    })
+  }
+
+  const onKey = (e: Event) => {
+    if (!active) return
+    const ke = e as KeyboardEvent
+    if (ke.key === "Escape") {
+      ke.preventDefault()
+      mockDesignMode = false
+      teardownPreviewDesignMode()
+      emitBrowserDesign({ type: "exit" })
+    }
+  }
+
+  ensureStyle()
+  doc.addEventListener("mousemove", onMove, true)
+  doc.addEventListener("click", onClick, true)
+  doc.addEventListener("keydown", onKey, true)
+
+  previewDesignCleanup = () => {
+    active = false
+    clearHl()
+    doc.removeEventListener("mousemove", onMove, true)
+    doc.removeEventListener("click", onClick, true)
+    doc.removeEventListener("keydown", onKey, true)
+    const s = doc.getElementById(STYLE_ID)
+    if (s) {
+      try {
+        s.remove()
+      } catch {
+        /* ignore */
+      }
+    }
+    previewDesignCleanup = null
+  }
+  return true
+}
+
+const teardownPreviewDesignMode = () => {
+  if (previewDesignCleanup) previewDesignCleanup()
+}
+
+export const browserListenBrowserDesign = (
+  handler: (e: BrowserDesignEvent) => void,
+): Promise<UnlistenFn> => {
+  browserDesignHandlers.add(handler)
+  return Promise.resolve(() => {
+    browserDesignHandlers.delete(handler)
   })
 }

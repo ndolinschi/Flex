@@ -1,12 +1,21 @@
 import { useEffect, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import {
+  browserScreenshot,
   cancel,
   prompt,
   toInvokeError,
   updateSession,
 } from "../lib/tauri"
-import { effortLabel, isDefaultSessionTitle, titleFromPrompt } from "../lib/types"
+import { isBrowserPreview } from "../lib/browserMock"
+import { mergeDomContextWithDraft } from "../lib/browserDesign"
+import {
+  effortLabel,
+  isDefaultSessionTitle,
+  isDomAttachment,
+  isFileAttachment,
+  titleFromPrompt,
+} from "../lib/types"
 import { markRawPromptTitle } from "../lib/sessionSideEffects/autoTitle"
 import type { ComposerAttachment, ModelInfoDto, SessionMeta } from "../lib/types"
 import { useAppStore } from "../stores/appStore"
@@ -265,16 +274,42 @@ export const useComposerSend = ({
       const mode = store.composerMode
       const bypass =
         mode === "agent" && !!store.sessionBypassBySession[activeSessionId]
+
+      const domPending = pending.filter(isDomAttachment)
+      const filePending = pending.filter(isFileAttachment)
+      let sendText = mergeDomContextWithDraft(text, domPending)
+
+      // Cursor Design Mode sends identity + a viewport screenshot. Best-effort:
+      // screenshot failures must not block the text/DOM context send.
+      if (domPending.length > 0 && !isBrowserPreview()) {
+        try {
+          const path = await browserScreenshot()
+          const name = path.split(/[/\\]/).pop() ?? "browser-screenshot.png"
+          filePending.push({
+            id: `${Date.now()}-design-shot`,
+            path,
+            kind: "image",
+            name,
+          })
+        } catch (err) {
+          log.debug("composer", "design-mode screenshot skipped", {
+            error: toInvokeError(err),
+          })
+        }
+      }
+
+      if (!sendText.trim() && filePending.length === 0) return
+
       await prompt({
         sessionId: activeSessionId,
-        text,
+        text: sendText,
         model: selectedModelId ?? undefined,
         permissionMode: bypass
           ? "bypass_permissions"
           : modeToPermission(mode),
         composerMode: mode,
         effort: selectedEffort ?? undefined,
-        attachments: pending.map((a) => ({
+        attachments: filePending.map((a) => ({
           path: a.path,
           kind: a.kind,
           name: a.name,

@@ -8,7 +8,7 @@ use keyring::Entry;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{DesktopError, DesktopResult};
-use crate::secrets::{resolve_mode, set_configured_mode, SecretStorageMode, SecretsStore};
+use crate::secrets::{SecretStorageMode, SecretsStore, resolve_mode, set_configured_mode};
 
 const SERVICE: &str = "agentloop.desktop";
 /// Keychain account that *used to* hold the legacy single-provider key map

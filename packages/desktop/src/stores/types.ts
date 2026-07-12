@@ -308,6 +308,8 @@ export type PanelExtrasSliceState = {
   agentStreamSessions: Record<string, boolean>
   browserBySession: Record<string, BrowserSessionState>
   browserOwnerSessionId: string | null
+  /** Global Design Mode flag for the singleton browser webview. */
+  browserDesignMode: boolean
   subagentViewer: { sessionId: SessionId; title: string } | null
   /** "Open Tabs" — which right-panel tabs are currently open
    * for a given session. Empty/absent = chat-only, no aux tabs. Tabs open
@@ -339,6 +341,7 @@ export type PanelExtrasSliceState = {
     partial: Partial<BrowserSessionState>,
   ) => void
   setBrowserOwnerSessionId: (sessionKey: string | null) => void
+  setBrowserDesignMode: (enabled: boolean) => void
   resetBrowserSession: (sessionKey: string) => void
   openSubagentViewer: (sessionId: SessionId, title: string) => void
   closeSubagentViewer: () => void

@@ -10,6 +10,11 @@
 //! so after Finished we probe the document via `eval_with_callback` for
 //! chrome-error / about:neterror schemes and connection-refused body text,
 //! then emit `BrowserStateEvent.error` for the frontend load-error UI.
+//!
+//! Design Mode: an injected page script highlights elements on hover and, on
+//! click, stashes a JSON payload then navigates to `agentloop-design://…`.
+//! `on_navigation` cancels that scheme, reads the payload via
+//! `eval_with_callback`, and emits `browser-design-event` for the Composer.
 
 use std::sync::{Arc, Mutex};
 
@@ -23,6 +28,7 @@ use crate::state::AppState;
 
 const BROWSER_LABEL: &str = "panel-browser";
 const DEFAULT_URL: &str = "https://www.google.com";
+const DESIGN_SCHEME: &str = "agentloop-design";
 
 /// Runs in the child webview after `PageLoadEvent::Finished`. Returns a JSON
 /// object `{ "error": bool, "message"?: string }` for `eval_with_callback`.
@@ -96,6 +102,239 @@ const DETECT_LOAD_ERROR_JS: &str = r#"(function () {
   }
 })()"#;
 
+/// Injected when Design Mode is enabled. Idempotent: tears down any prior
+/// install first. Click → stash payload on `window.__agentloopDesign` →
+/// navigate to `agentloop-design://select` (cancelled by `on_navigation`).
+/// Escape → `agentloop-design://exit`.
+const DESIGN_MODE_INJECT_JS: &str = r#"(function () {
+  try {
+    if (window.__agentloopDesignApi && typeof window.__agentloopDesignApi.teardown === "function") {
+      window.__agentloopDesignApi.teardown();
+    }
+  } catch (_) {}
+  var STYLE_ID = "__agentloop-design-style";
+  var ATTR = "data-agentloop-design-hl";
+  var last = null;
+  var active = true;
+
+  function ensureStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    var s = document.createElement("style");
+    s.id = STYLE_ID;
+    s.textContent = "[" + ATTR + "]{outline:2px solid #3b82f6 !important;outline-offset:2px !important;cursor:crosshair !important;}";
+    (document.head || document.documentElement).appendChild(s);
+  }
+
+  function clearHl() {
+    if (last) {
+      try { last.removeAttribute(ATTR); } catch (_) {}
+      last = null;
+    }
+  }
+
+  function pickTarget(el) {
+    if (!el || el.nodeType !== 1) return null;
+    if (el === document.documentElement || el === document.body) return null;
+    if (el.id === STYLE_ID) return null;
+    return el;
+  }
+
+  function cssEscape(v) {
+    if (window.CSS && CSS.escape) return CSS.escape(v);
+    return String(v).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+  }
+
+  function buildSelector(el) {
+    if (el.id && /^[A-Za-z][\w:-]*$/.test(el.id)) return '#' + cssEscape(el.id);
+    var testId = el.getAttribute("data-testid");
+    if (testId) return "[data-testid=\"" + String(testId).replace(/"/g, '\\"') + "\"]";
+    var parts = [];
+    var cur = el;
+    for (var depth = 0; cur && cur.nodeType === 1 && depth < 6; depth++) {
+      if (cur === document.body || cur === document.documentElement) break;
+      var tag = cur.tagName.toLowerCase();
+      if (cur.id && /^[A-Za-z][\w:-]*$/.test(cur.id)) {
+        parts.unshift('#' + cssEscape(cur.id));
+        break;
+      }
+      var parent = cur.parentElement;
+      if (!parent) {
+        parts.unshift(tag);
+        break;
+      }
+      var siblings = parent.children;
+      var same = 0;
+      var idx = 0;
+      for (var i = 0; i < siblings.length; i++) {
+        if (siblings[i].tagName === cur.tagName) {
+          same++;
+          if (siblings[i] === cur) idx = same;
+        }
+      }
+      parts.unshift(same > 1 ? tag + ":nth-of-type(" + idx + ")" : tag);
+      cur = parent;
+    }
+    return parts.join(" > ");
+  }
+
+  function buildXPath(el) {
+    var parts = [];
+    var cur = el;
+    while (cur && cur.nodeType === 1 && cur !== document.documentElement) {
+      var tag = cur.tagName.toLowerCase();
+      var parent = cur.parentElement;
+      if (!parent) {
+        parts.unshift(tag);
+        break;
+      }
+      var siblings = Array.prototype.filter.call(parent.children, function (c) {
+        return c.tagName === cur.tagName;
+      });
+      var ix = siblings.indexOf(cur) + 1;
+      parts.unshift(siblings.length > 1 ? tag + "[" + ix + "]" : tag);
+      cur = parent;
+    }
+    return "/" + parts.join("/");
+  }
+
+  function keyAttrs(el) {
+    var keys = ["href", "name", "type", "role", "aria-label", "data-testid", "placeholder", "title", "alt", "for", "value"];
+    var out = {};
+    for (var i = 0; i < keys.length; i++) {
+      var v = el.getAttribute(keys[i]);
+      if (v != null && v !== "") out[keys[i]] = String(v).slice(0, 200);
+    }
+    return out;
+  }
+
+  function keyStyles(el) {
+    var cs = window.getComputedStyle(el);
+    return {
+      display: cs.display,
+      color: cs.color,
+      backgroundColor: cs.backgroundColor,
+      font: cs.font,
+      width: cs.width,
+      height: cs.height,
+      padding: cs.padding,
+      margin: cs.margin
+    };
+  }
+
+  function describe(el) {
+    var r = el.getBoundingClientRect();
+    var html = "";
+    try { html = String(el.outerHTML || "").slice(0, 2000); } catch (_) {}
+    var classes = "";
+    try {
+      classes = typeof el.className === "string" ? el.className : (el.className && el.className.baseVal) || "";
+    } catch (_) {}
+    return {
+      url: String(location.href || ""),
+      tag: el.tagName.toLowerCase(),
+      id: el.id || null,
+      classes: classes || null,
+      selector: buildSelector(el),
+      xpath: buildXPath(el),
+      attributes: keyAttrs(el),
+      outerHtml: html,
+      styles: keyStyles(el),
+      rect: { x: r.x, y: r.y, width: r.width, height: r.height }
+    };
+  }
+
+  function chipName(el) {
+    var tag = el.tagName.toLowerCase();
+    if (el.id) return tag + '#' + el.id;
+    var testId = el.getAttribute("data-testid");
+    if (testId) return tag + "[data-testid=" + testId + "]";
+    var cls = "";
+    try {
+      cls = typeof el.className === "string" ? el.className.trim().split(/\s+/)[0] : "";
+    } catch (_) {}
+    if (cls) return tag + "." + cls;
+    return "<" + tag + ">";
+  }
+
+  function signal(kind, payload) {
+    try {
+      window.__agentloopDesign = payload || { type: kind };
+      location.href = "agentloop-design://" + kind;
+    } catch (_) {}
+  }
+
+  function onMove(e) {
+    if (!active) return;
+    var t = pickTarget(e.target);
+    if (t === last) return;
+    clearHl();
+    if (!t) return;
+    ensureStyle();
+    try { t.setAttribute(ATTR, "1"); } catch (_) {}
+    last = t;
+  }
+
+  function onClick(e) {
+    if (!active) return;
+    var t = pickTarget(e.target);
+    if (!t) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+    signal("select", {
+      type: "select",
+      additive: !!e.shiftKey,
+      name: chipName(t),
+      element: describe(t)
+    });
+  }
+
+  function onKey(e) {
+    if (!active) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      signal("exit", { type: "exit" });
+    }
+  }
+
+  function teardown() {
+    active = false;
+    clearHl();
+    document.removeEventListener("mousemove", onMove, true);
+    document.removeEventListener("click", onClick, true);
+    document.removeEventListener("keydown", onKey, true);
+    var s = document.getElementById(STYLE_ID);
+    if (s) try { s.remove(); } catch (_) {}
+    try { delete window.__agentloopDesignApi; } catch (_) { window.__agentloopDesignApi = null; }
+  }
+
+  ensureStyle();
+  document.addEventListener("mousemove", onMove, true);
+  document.addEventListener("click", onClick, true);
+  document.addEventListener("keydown", onKey, true);
+  window.__agentloopDesignApi = { teardown: teardown, active: function () { return active; } };
+  return true;
+})()"#;
+
+const DESIGN_MODE_TEARDOWN_JS: &str = r#"(function () {
+  try {
+    if (window.__agentloopDesignApi && typeof window.__agentloopDesignApi.teardown === "function") {
+      window.__agentloopDesignApi.teardown();
+    }
+  } catch (_) {}
+  return true;
+})()"#;
+
+const DESIGN_MODE_READ_PAYLOAD_JS: &str = r#"(function () {
+  try {
+    var p = window.__agentloopDesign || null;
+    window.__agentloopDesign = null;
+    return p;
+  } catch (_) {
+    return null;
+  }
+})()"#;
+
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserStateEvent {
@@ -118,11 +357,38 @@ pub struct BrowserLoadError {
     pub message: String,
 }
 
+/// Frontend-facing Design Mode event (select / exit).
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum BrowserDesignEvent {
+    #[serde(rename = "select", rename_all = "camelCase")]
+    Select {
+        additive: bool,
+        name: String,
+        element: serde_json::Value,
+    },
+    #[serde(rename = "exit")]
+    Exit,
+}
+
 #[derive(Debug, serde::Deserialize)]
 struct DetectLoadErrorResult {
     error: bool,
     #[serde(default)]
     message: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct DesignSelectPayload {
+    #[serde(default)]
+    #[allow(dead_code)]
+    r#type: Option<String>,
+    #[serde(default)]
+    additive: bool,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    element: Option<serde_json::Value>,
 }
 
 fn normalize_url(raw: &str) -> DesktopResult<Url> {
@@ -154,6 +420,78 @@ fn looks_like_error_url(url: &Url) -> bool {
         || s.starts_with("chrome://error")
         || s.contains("chromewebdata")
         || (scheme == "about" && s.contains("neterror"))
+}
+
+fn is_design_scheme(url: &Url) -> bool {
+    url.scheme() == DESIGN_SCHEME
+}
+
+fn design_mode_enabled(app: &AppHandle) -> bool {
+    app.try_state::<AppState>()
+        .and_then(|s| s.browser_design_mode.lock().ok().map(|g| *g))
+        .unwrap_or(false)
+}
+
+fn set_design_mode_flag(app: &AppHandle, enabled: bool) {
+    if let Some(state) = app.try_state::<AppState>() {
+        if let Ok(mut g) = state.browser_design_mode.lock() {
+            *g = enabled;
+        }
+    }
+}
+
+fn inject_design_mode(webview: &tauri::Webview) {
+    let _ = webview.eval(DESIGN_MODE_INJECT_JS);
+}
+
+fn teardown_design_mode(webview: &tauri::Webview) {
+    let _ = webview.eval(DESIGN_MODE_TEARDOWN_JS);
+}
+
+fn parse_eval_json<T: serde::de::DeserializeOwned>(raw: &str) -> Option<T> {
+    serde_json::from_str(raw).ok().or_else(|| {
+        serde_json::from_str::<String>(raw)
+            .ok()
+            .and_then(|inner| serde_json::from_str(&inner).ok())
+    })
+}
+
+/// Handle `agentloop-design://…` navigations: cancel them, read the stashed
+/// payload, emit `browser-design-event`. Called from `on_navigation`.
+fn handle_design_navigation(app: &AppHandle, url: &Url) {
+    let kind = url.host_str().unwrap_or("select");
+    let Some(webview) = app.get_webview(BROWSER_LABEL) else {
+        return;
+    };
+
+    if kind == "exit" {
+        set_design_mode_flag(app, false);
+        teardown_design_mode(&webview);
+        let _ = app.emit("browser-design-event", &BrowserDesignEvent::Exit);
+        return;
+    }
+
+    // Default: select (and any unknown kind treated as select).
+    let emit_app = app.clone();
+    let _ = webview.eval_with_callback(DESIGN_MODE_READ_PAYLOAD_JS, move |raw| {
+        let parsed: Option<DesignSelectPayload> = parse_eval_json(&raw);
+        let Some(payload) = parsed else {
+            return;
+        };
+        let element = payload.element.unwrap_or(serde_json::Value::Null);
+        let name = payload
+            .name
+            .filter(|n| !n.is_empty())
+            .unwrap_or_else(|| "element".into());
+        let _ = emit_app.emit(
+            "browser-design-event",
+            &BrowserDesignEvent::Select {
+                additive: payload.additive,
+                name,
+                element,
+            },
+        );
+    });
 }
 
 fn emit_state(
@@ -333,6 +671,10 @@ pub async fn browser_open(
 
     let builder = WebviewBuilder::new(BROWSER_LABEL, WebviewUrl::External(target.clone()))
         .on_navigation(move |url| {
+            if is_design_scheme(url) {
+                handle_design_navigation(&nav_app, url);
+                return false;
+            }
             if looks_like_error_url(url) {
                 let shown = display_url(&nav_last_requested, url);
                 emit_state(&nav_app, &shown, None, true, None);
@@ -357,6 +699,11 @@ pub async fn browser_open(
                     emit_state(&load_app, &url, None, true, None);
                 }
                 tauri::webview::PageLoadEvent::Finished => {
+                    // Re-inject Design Mode after every Finished so SPA /
+                    // full navigations keep the picker while the flag is on.
+                    if design_mode_enabled(&load_app) {
+                        inject_design_mode(&webview);
+                    }
                     probe_and_emit_finished(
                         load_app.clone(),
                         webview,
@@ -520,10 +867,32 @@ pub async fn browser_set_visible(state: State<'_, AppState>, visible: bool) -> D
 
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
-pub async fn browser_close(state: State<'_, AppState>) -> DesktopResult<()> {
+pub async fn browser_close(app: AppHandle, state: State<'_, AppState>) -> DesktopResult<()> {
+    set_design_mode_flag(&app, false);
     let mut guard = state.browser_webview.lock().await;
     if let Some(webview) = guard.take() {
         webview.close()?;
+    }
+    Ok(())
+}
+
+/// Enable or disable Design Mode (element picker) in the embedded browser.
+/// Persists a flag so Finished-load handlers re-inject after navigations.
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn browser_set_design_mode(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> DesktopResult<()> {
+    set_design_mode_flag(&app, enabled);
+    let guard = state.browser_webview.lock().await;
+    if let Some(webview) = guard.as_ref() {
+        if enabled {
+            inject_design_mode(webview);
+        } else {
+            teardown_design_mode(webview);
+        }
     }
     Ok(())
 }

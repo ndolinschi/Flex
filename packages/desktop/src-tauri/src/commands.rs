@@ -12,9 +12,9 @@ use agentloop_contracts::{
     SessionMetaPatch, TurnOptions, TurnSummary,
 };
 use agentloop_core::{BackgroundEntrySummary, ChatRequest, ProviderStreamEvent, WorkspaceStatus};
-use agentloop_sdk::mcp::McpToolClient;
-use agentloop_sdk::routines::{default_routines_dir, FileRoutineStore, RoutineRunner};
 use agentloop_sdk::EngineService;
+use agentloop_sdk::mcp::McpToolClient;
+use agentloop_sdk::routines::{FileRoutineStore, RoutineRunner, default_routines_dir};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
@@ -22,8 +22,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::compose::build_service;
 use crate::config::{
-    persist_config, ProviderConfig, ProviderConfigView, ProviderProfile, ProviderProfileInput,
-    ProviderProfileView, SaveProviderConfigInput,
+    ProviderConfig, ProviderConfigView, ProviderProfile, ProviderProfileInput, ProviderProfileView,
+    SaveProviderConfigInput, persist_config,
 };
 use crate::error::{DesktopError, DesktopResult};
 use crate::secrets::SecretStorageMode;
@@ -1396,7 +1396,7 @@ pub async fn copilot_auth_wait(
     state: State<'_, AppState>,
     session_id: String,
 ) -> DesktopResult<CopilotAuthStatus> {
-    use agentloop_sdk::providers::copilot::{store_github_token, DeviceFlow};
+    use agentloop_sdk::providers::copilot::{DeviceFlow, store_github_token};
 
     let session_id = session_id.trim().to_owned();
     let (auth, cancel) = {

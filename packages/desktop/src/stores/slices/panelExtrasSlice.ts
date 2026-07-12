@@ -17,6 +17,7 @@ export const createPanelExtrasSlice: StateCreator<
   agentStreamSessions: {},
   browserBySession: {},
   browserOwnerSessionId: null,
+  browserDesignMode: false,
   subagentViewer: null,
   openTabsBySession: {},
   selectedTabBySession: {},
@@ -121,6 +122,7 @@ export const createPanelExtrasSlice: StateCreator<
   },
   setBrowserOwnerSessionId: (sessionKey) =>
     set({ browserOwnerSessionId: sessionKey }),
+  setBrowserDesignMode: (enabled) => set({ browserDesignMode: enabled }),
   resetBrowserSession: (sessionKey) =>
     set((state) => ({
       browserBySession: {

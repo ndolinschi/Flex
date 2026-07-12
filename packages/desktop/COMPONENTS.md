@@ -49,7 +49,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `BranchPicker` | List/checkout local git branches | `cwd`, `onError?` | ContextBar |
 | `PopoverTray` | Shared Esc/click-outside/↑↓ tray | `open`, `onClose`, `placement`, `children` | Model/Mode/Plus/Project/Branch pickers |
 | `ConfirmDialog` | In-app modal (rename/delete) | `open`, `title`, `onConfirm`, `onCancel` | SessionMenu |
-| `AttachmentChip` | Pending attachment pill | `attachment`, `onRemove` | Composer |
+| `AttachmentChip` | Pending attachment pill (file/image/dom) | `attachment`, `onRemove` | Composer |
 | `SendButton` | Circular send / stop / queue | `isStreaming`, `canQueue?`, `onSend`, `onStop` | Composer |
 | `MarkdownBody` | GFM + lazy highlight.js language pack; `live` plain pre-wrap fast-path | `content`, `live?` | TurnTimeline (`TimelineRowView`) |
 | `EmptyState` | Empty async surface | `title`, `description?`, `action?` | SessionSidebar, TurnTimeline |
@@ -79,7 +79,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `QuestionPrompt` | AskUserQuestion HITL | `question` | ChatPage |
 | `RightPanel` | Plan / Changes / Terminal / Browser; tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`) | — | App shell |
 | `AppHeader` | Title + session menu | — | ChatShell |
-| `BrowserTab` | Embedded browser panel; chrome under `organisms/browser/` | `active` | RightPanel |
+| `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | RightPanel |
 | `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/` | — | RightPanel |
 | `CommandPalette` | ⌘K-style action palette (nav, theme, new agent); rows via `CommandPaletteRow`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell |
 | `SearchModal` | Fuzzy session search overlay; rows via `FuzzySessionRow` + `HighlightedLabel`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell (via SessionSidebar's `onOpenSearch`) |
@@ -92,7 +92,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `organisms/timeline/` | `buildDisplayItems` (+ `estimateSizeForItem`), `TimelineRowView`, `WorkGroupBody`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
 | `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
 | `organisms/right-panel/` | `PlanTab`, `ChangesTab`, `FileRow`, `CommitCenter`, `RightPanelTabBar`, `tabs` |
-| `organisms/browser/` | `BrowserToolbar`, `BrowserOverflowMenu` — composed by `BrowserTab` |
+| `organisms/browser/` | `BrowserToolbar` (Design Mode toggle), `BrowserOverflowMenu` — composed by `BrowserTab` |
 | `organisms/terminal/` | `TerminalTab`, `TerminalInstance`, `TerminalRow`, `AgentTerminalRow`, `time` helpers |
 
 ## Templates / Pages
@@ -126,6 +126,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/lib/toolPresentation.ts` | Pure tool classify/summarize/cluster helpers |
 | `src/lib/sessionSideEffects/` | Global-event side effects (`applyGlobalEvent`, `agentTerminal`, `devServerToast`) |
 | `src/lib/browserMock.ts` | Vite preview only — never used under Tauri |
+| `src/lib/browserDesign.ts` | Design Mode DOM payload + markdown serializer for composer chips |
 | `e2e/` + `playwright.config.ts` | Phase 3.1 PR-gate Playwright smoke (vite + browserMock) |
 | `scripts/soak.mjs` | Phase 3.2 nightly soak skeleton (N mock turns + memory samples) |
 | `scripts/preview-verify.mjs` | Manual screenshot walk against a running `pnpm dev` |
