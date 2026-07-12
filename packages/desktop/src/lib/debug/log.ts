@@ -142,13 +142,6 @@ const pushCrash = (entry: LogEntry): void => {
   }
 }
 
-const consoleFns: Record<LogLevel, (...args: unknown[]) => void> = {
-  debug: console.debug,
-  info: console.info,
-  warn: console.warn,
-  error: console.error,
-}
-
 /** `warn`/`error` always emit (production); `debug`/`info` need the flag. */
 const isLevelEnabled = (level: LogLevel): boolean => {
   if (level === "warn" || level === "error") return true
@@ -160,8 +153,17 @@ const emit = (level: LogLevel, ns: LogNamespace, msg: string, data?: unknown): v
   const entry: LogEntry = { tsMs: Date.now(), level, ns, msg, data }
   push(entry)
   const prefix = `[${ns}]`
-  if (data !== undefined) consoleFns[level](prefix, msg, data)
-  else consoleFns[level](prefix, msg)
+  // Resolve console methods at call time so DevTools / test spies apply.
+  const write =
+    level === "debug"
+      ? console.debug
+      : level === "info"
+        ? console.info
+        : level === "warn"
+          ? console.warn
+          : console.error
+  if (data !== undefined) write(prefix, msg, data)
+  else write(prefix, msg)
 }
 
 export const log = {
