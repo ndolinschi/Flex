@@ -59,16 +59,27 @@ Optional screenshot walk (manual): start `pnpm dev`, then
 - **Follow-ups not automated yet:** large-repo battery (3.3), Win/Linux port
   pass (3.5).
 
-Production build (macOS arm64 `.app` + `.dmg`):
+Production builds:
 
 ```bash
-pnpm build:mac
+pnpm build:mac   # macOS .app + .dmg
+pnpm build:win   # Windows NSIS installer
+```
+
+From the repo root, platform install scripts also build and install the desktop
+app next to the CLI:
+
+```bash
+./scripts/install_mac.sh                 # → /Applications/Flex.app
+# Windows PowerShell:
+#   .\scripts\install_windows.ps1        # → %LOCALAPPDATA%\Programs\Flex\Flex.exe
 ```
 
 Artifacts land under `src-tauri/target/release/bundle/`:
 
 - `macos/Flex.app` — launch directly (`open …/Flex.app`)
 - `dmg/Flex_*_aarch64.dmg` — drag-to-Applications installer
+- `nsis/Flex_*_x64-setup.exe` — Windows NSIS installer
 
 Builds are unsigned until Apple Developer certs are wired (see
 `.github/workflows/release.yml`). Tag `v*` pushes draft a GitHub Release with

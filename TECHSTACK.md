@@ -63,8 +63,10 @@ Companions: [ARCHITECTURE.md](ARCHITECTURE.md), [COMPONENTS.md](COMPONENTS.md).
   `agentloop-sdk::AgentBuilder` and stores API keys in the OS keychain
   (`keyring`). Run: `cd packages/desktop && pnpm tauri dev`. E2E:
   `pnpm test:e2e`.
-- **Install**: `./scripts/install_mac.sh` (macOS/Linux) or `./scripts/install_windows.sh`
-  (Git Bash / WSL / MSYS2) builds the release runner from `packages/sdk` and installs the
-  binary to `~/.local/bin` / `%USERPROFILE%\.local\bin` (override with `FLEX_BIN_DIR`).
+- **Install**: `./scripts/install_mac.sh` (macOS) or `.\scripts\install_windows.ps1` /
+  `./scripts/install_windows.sh` (Windows) builds the release runner from `packages/sdk` and
+  the desktop app from `packages/desktop`, then installs CLI + app (`~/.local/bin` +
+  `/Applications/Flex.app` on macOS; `%USERPROFILE%\.local\bin` +
+  `%LOCALAPPDATA%\Programs\Flex` on Windows). Overrides: `FLEX_BIN_DIR`, `FLEX_APP_DIR`.
 - **Harness config**: `.claude/settings.json` (permission allowlist for cargo/git
   commands) and `.claude/skills/` (verify, record-fixtures).

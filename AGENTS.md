@@ -331,12 +331,14 @@ done
 ( cd packages/engine && cargo xtask schema --check )
 ```
 
-**Install the runner globally**: `./scripts/install_mac.sh` (macOS/Linux) or
-`./scripts/install_windows.sh` (Git Bash / WSL / MSYS2) builds the release binary from
-`packages/sdk` and copies `flex` to `~/.local/bin` / `%USERPROFILE%\.local\bin` (override with
-`FLEX_BIN_DIR`). The binary defaults its workdir to the current directory, so
-`cd my-project && flex doctor` works from any project. `flex run -p "..."` streams one turn as
-NDJSON.
+**Install CLI + desktop**: `./scripts/install_mac.sh` (macOS) builds the release runner from
+`packages/sdk` and the Tauri app from `packages/desktop`, then installs `flex` to `~/.local/bin`
+and `Flex.app` to `/Applications` (overrides: `FLEX_BIN_DIR`, `FLEX_APP_DIR`). On Windows use
+`.\scripts\install_windows.ps1` (preferred) or `./scripts/install_windows.sh` (Git Bash / MSYS2)
+→ `%USERPROFILE%\.local\bin\flex.exe` and `%LOCALAPPDATA%\Programs\Flex\Flex.exe`. Flags:
+`--cli-only` / `--desktop-only` (PowerShell: `-CliOnly` / `-DesktopOnly`). The CLI defaults its
+workdir to the current directory, so `cd my-project && flex doctor` works from any project.
+`flex run -p "..."` streams one turn as NDJSON.
 
 **Providers facade**: `agentloop_providers::{native, native_all}` resolve a `ProviderRegistry`
 (single preferred provider, or every provider whose credentials resolve) and hand it to

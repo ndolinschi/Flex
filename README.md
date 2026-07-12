@@ -41,8 +41,9 @@ it's what powers them.
 ├── AGENTS.md                  # architecture map, layer contracts, contributor rules
 ├── README.md                  # this file
 ├── scripts/
-│   ├── install_mac.sh         # build + install the `flex` runner (macOS/Linux)
-│   └── install_windows.sh     # same for Windows (Git Bash / WSL / MSYS2)
+│   ├── install_mac.sh         # build + install CLI + Flex.app (macOS)
+│   ├── install_windows.ps1    # same for Windows (PowerShell)
+│   └── install_windows.sh     # Windows via Git Bash / MSYS2 (WSL: CLI only)
 ├── packages/
 │   ├── desktop/               # Tauri 2 + React desktop app — second composition root
 │   ├── engine/                # cargo workspace — provider-agnostic native engine
@@ -84,9 +85,12 @@ it's what powers them.
 Install globally and use from any project directory:
 
 ```bash
-./scripts/install_mac.sh                  # macOS/Linux → ~/.local/bin/flex
-# Windows (Git Bash / WSL / MSYS2):
-# ./scripts/install_windows.sh            # → %USERPROFILE%\.local\bin\flex.exe
+./scripts/install_mac.sh                  # macOS → ~/.local/bin/flex + /Applications/Flex.app
+# Windows (PowerShell):
+#   .\scripts\install_windows.ps1         # → %USERPROFILE%\.local\bin\flex.exe
+#                                         #    + %LOCALAPPDATA%\Programs\Flex\Flex.exe
+# Windows (Git Bash / MSYS2):
+#   ./scripts/install_windows.sh
 flex --version                            # prints version
 flex doctor                               # shows resolved provider, model, workdir
 ```
@@ -136,6 +140,11 @@ agents-first chat UI, not an IDE:
   wizard, background bash, and retry-on-network-loss.
 
 ```bash
+# Install CLI + desktop (macOS / Windows):
+./scripts/install_mac.sh
+# .\scripts\install_windows.ps1
+
+# Or run in dev:
 cd packages/desktop
 pnpm install
 pnpm tauri dev
