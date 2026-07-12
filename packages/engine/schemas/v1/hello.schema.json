@@ -1,0 +1,412 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Hello",
+  "description": "Handshake frame: protocol version, engine identity, and the capabilities\nof the agent implementation serving this connection.",
+  "type": "object",
+  "properties": {
+    "capabilities": {
+      "$ref": "#/$defs/AgentCaps"
+    },
+    "engine": {
+      "$ref": "#/$defs/EngineIdentity"
+    },
+    "protocol_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "protocol_version",
+    "engine",
+    "capabilities"
+  ],
+  "$defs": {
+    "AgentCaps": {
+      "description": "Everything an `Agent` implementation declares about itself.\n\nMerged from static profile defaults and startup probes; flows to clients\nverbatim via the `Hello` handshake and transport initialization.",
+      "type": "object",
+      "properties": {
+        "attachments": {
+          "$ref": "#/$defs/AttachmentCaps"
+        },
+        "cancellation": {
+          "$ref": "#/$defs/CancelSupport"
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CommandInfo"
+          }
+        },
+        "cost_reporting": {
+          "type": "boolean"
+        },
+        "emits_structured_events": {
+          "description": "False for agents that emit only plain markdown (no structured events).",
+          "type": "boolean"
+        },
+        "mcp_passthrough": {
+          "$ref": "#/$defs/McpPassthrough"
+        },
+        "models": {
+          "$ref": "#/$defs/ModelDiscovery"
+        },
+        "modes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModeInfo"
+          }
+        },
+        "permissions": {
+          "$ref": "#/$defs/PermissionCaps"
+        },
+        "reasoning_visible": {
+          "description": "Whether reasoning/thinking output is visible in the stream.",
+          "type": "boolean"
+        },
+        "resume": {
+          "$ref": "#/$defs/ResumeSupport"
+        },
+        "streaming": {
+          "$ref": "#/$defs/StreamingGranularity"
+        },
+        "subagents": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "models",
+        "permissions",
+        "reasoning_visible",
+        "streaming",
+        "resume",
+        "attachments",
+        "mcp_passthrough",
+        "subagents",
+        "cost_reporting",
+        "cancellation",
+        "emits_structured_events"
+      ]
+    },
+    "AttachmentCaps": {
+      "description": "Which attachment kinds a prompt may carry.",
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "boolean"
+        },
+        "images": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "images",
+        "files"
+      ]
+    },
+    "CancelSupport": {
+      "description": "How a turn can be interrupted.",
+      "oneOf": [
+        {
+          "description": "Clean interrupt; the session survives.",
+          "type": "string",
+          "const": "graceful"
+        },
+        {
+          "description": "Only by killing the backing process.",
+          "type": "string",
+          "const": "kill_only"
+        }
+      ]
+    },
+    "CommandInfo": {
+      "description": "One available slash command, declared so clients can render autocomplete.",
+      "type": "object",
+      "properties": {
+        "args_hint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "name": {
+          "description": "Name without the leading slash.",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/CommandSource"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "source"
+      ]
+    },
+    "CommandSource": {
+      "description": "Where a slash command comes from.",
+      "oneOf": [
+        {
+          "description": "Shipped with the engine (template or engine-control command).",
+          "type": "string",
+          "const": "builtin"
+        },
+        {
+          "description": "From the user's config directory.",
+          "type": "string",
+          "const": "user"
+        },
+        {
+          "description": "From the project's config directory.",
+          "type": "string",
+          "const": "project"
+        },
+        {
+          "description": "Native to a delegated agent, passed through.",
+          "type": "string",
+          "const": "agent"
+        }
+      ]
+    },
+    "EngineIdentity": {
+      "description": "Identity of the serving engine.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ]
+    },
+    "McpPassthrough": {
+      "description": "How MCP server configuration reaches a delegated agent.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "none"
+          ]
+        },
+        {
+          "description": "Via a launch flag (e.g. `--mcp-config`).",
+          "type": "string",
+          "const": "flag"
+        },
+        {
+          "description": "Via the protocol's session setup (e.g. ACP `session/new.mcpServers`).",
+          "type": "string",
+          "const": "session_new"
+        }
+      ]
+    },
+    "ModeInfo": {
+      "description": "An operating mode a delegated agent exposes (e.g. build/plan).",
+      "type": "object",
+      "properties": {
+        "display_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "ModelDiscovery": {
+      "description": "How an agent's model list is discovered.",
+      "oneOf": [
+        {
+          "description": "A fixed list known up front.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "static"
+            },
+            "models": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ModelInfo"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "models"
+          ]
+        },
+        {
+          "description": "Probed at runtime (e.g. opencode's `/config/providers`).",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "dynamic"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "description": "The agent owns model selection; the engine cannot choose.",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "none"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    },
+    "ModelInfo": {
+      "description": "One selectable model.",
+      "type": "object",
+      "properties": {
+        "context_window": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "display_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "reasoning": {
+          "type": "boolean",
+          "default": false
+        },
+        "vision": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "PermissionCaps": {
+      "description": "Permission-related capabilities of an agent implementation.",
+      "type": "object",
+      "properties": {
+        "interactive": {
+          "description": "Can surface live permission round-trips (vs static policy only).",
+          "type": "boolean"
+        },
+        "modes": {
+          "description": "Which modes the agent honors.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PermissionMode"
+          }
+        },
+        "tool_scoping": {
+          "description": "Supports `ToolName(specifier)` scoping.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "interactive",
+        "modes",
+        "tool_scoping"
+      ]
+    },
+    "PermissionMode": {
+      "description": "How the engine treats tool calls that would normally ask the user.",
+      "oneOf": [
+        {
+          "description": "Ask on anything not covered by a rule.",
+          "type": "string",
+          "const": "default"
+        },
+        {
+          "description": "Auto-allow file edits (the `Fs` category); ask for the rest.",
+          "type": "string",
+          "const": "accept_edits"
+        },
+        {
+          "description": "Deny all mutating tools; read-only research still runs.",
+          "type": "string",
+          "const": "plan"
+        },
+        {
+          "description": "Never ask: deny anything that would prompt.",
+          "type": "string",
+          "const": "dont_ask"
+        },
+        {
+          "description": "Allow everything. Requires an explicit opt-in flag on the runner.",
+          "type": "string",
+          "const": "bypass_permissions"
+        }
+      ]
+    },
+    "ResumeSupport": {
+      "description": "Whether and how a session can be resumed.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "none"
+          ]
+        },
+        {
+          "description": "The backing agent resumes its own session natively.",
+          "type": "string",
+          "const": "native"
+        },
+        {
+          "description": "Resumed by replaying seed history into a fresh session.",
+          "type": "string",
+          "const": "replay"
+        }
+      ]
+    },
+    "StreamingGranularity": {
+      "description": "Granularity of the event stream an agent emits.",
+      "oneOf": [
+        {
+          "description": "Token-level deltas.",
+          "type": "string",
+          "const": "token_deltas"
+        },
+        {
+          "description": "Whole messages as they complete.",
+          "type": "string",
+          "const": "message_level"
+        },
+        {
+          "description": "Full-text snapshots that supersede earlier ones.",
+          "type": "string",
+          "const": "snapshot_only"
+        }
+      ]
+    }
+  }
+}

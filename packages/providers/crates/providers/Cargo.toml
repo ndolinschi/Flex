@@ -1,0 +1,30 @@
+[package]
+name = "agentloop-providers"
+description = "Provider facade: resolution, registry construction, and connector re-exports"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+agentloop-contracts = { workspace = true }
+agentloop-core = { workspace = true }
+agentloop-engine = { workspace = true }
+agentloop-session = { workspace = true }
+agentloop-provider-anthropic = { workspace = true }
+agentloop-provider-bedrock = { workspace = true }
+agentloop-provider-copilot = { workspace = true }
+agentloop-provider-gemini = { workspace = true }
+agentloop-provider-ollama = { workspace = true }
+agentloop-provider-openai = { workspace = true }
+agentloop-delegator-acp = { workspace = true }
+agentloop-delegator-claude-code = { workspace = true }
+agentloop-delegator-copilot = { workspace = true }
+agentloop-delegator-cursor = { workspace = true }
+agentloop-delegator-opencode = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,148 @@
+/* Theme-aware highlight.js tokens — we never ship a hardcoded dark
+   code-block background baked into the syntax theme; the surface color
+   comes from our own code-block chrome (see MarkdownBody's `pre`/`code`
+   tokens). This file only supplies token *foreground* colors per theme. */
+
+:root,
+[data-theme="dark"] {
+  --hljs-keyword: #ff9e64; /* orange */
+  --hljs-string: #3fa266; /* green */
+  --hljs-comment: rgb(226 233 244 / 0.42); /* ink-muted */
+  --hljs-number: #88c0d0; /* cyan */
+  --hljs-title: #81a1c1; /* blue */
+  --hljs-function: #81a1c1;
+  --hljs-attr: #f1b467; /* yellow */
+  --hljs-built_in: #88c0d0;
+  --hljs-literal: #b48ead; /* magenta */
+  --hljs-type: #b48ead;
+  --hljs-params: rgb(236 241 250 / 0.85); /* ink */
+  --hljs-meta: rgb(226 233 244 / 0.42);
+  --hljs-tag: #e34671; /* red */
+  --hljs-symbol: #f1b467;
+  --hljs-addition-bg: #3fa26633;
+  --hljs-addition-fg: #3fa266;
+  --hljs-deletion-bg: #e3467133;
+  --hljs-deletion-fg: #e34671;
+}
+
+[data-theme="light"] {
+  --hljs-keyword: #b86f55; /* orange */
+  --hljs-string: #00854c; /* green */
+  --hljs-comment: rgb(20 20 20 / 0.6); /* ink-muted */
+  --hljs-number: #5a7f9a; /* cyan */
+  --hljs-title: #3d7ec4; /* blue */
+  --hljs-function: #3d7ec4;
+  --hljs-attr: #a46700; /* yellow */
+  --hljs-built_in: #5a7f9a;
+  --hljs-literal: #9a6f94; /* magenta */
+  --hljs-type: #9a6f94;
+  --hljs-params: rgb(20 20 20 / 0.92); /* ink */
+  --hljs-meta: rgb(20 20 20 / 0.6);
+  --hljs-tag: #ce405b; /* red */
+  --hljs-symbol: #a46700;
+  --hljs-addition-bg: #00854c33;
+  --hljs-addition-fg: #00854c;
+  --hljs-deletion-bg: #ce405b33;
+  --hljs-deletion-fg: #ce405b;
+}
+
+/* No background here — the code-block surface comes from MarkdownBody's
+   `pre`/`code` tokens (bg-panel / bg-code-inline). */
+.hljs {
+  color: inherit;
+  background: transparent;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-doctag {
+  color: var(--hljs-keyword);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-template-tag,
+.hljs-template-variable {
+  color: var(--hljs-string);
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--hljs-comment);
+  font-style: italic;
+}
+
+.hljs-number,
+.hljs-deletion .hljs-number {
+  color: var(--hljs-number);
+}
+
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.class_.inherited__ {
+  color: var(--hljs-title);
+}
+
+.hljs-title.function_ {
+  color: var(--hljs-function);
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-selector-attr {
+  color: var(--hljs-attr);
+}
+
+.hljs-built_in,
+.hljs-builtin-name {
+  color: var(--hljs-built_in);
+}
+
+.hljs-literal {
+  color: var(--hljs-literal);
+}
+
+.hljs-type,
+.hljs-class .hljs-title {
+  color: var(--hljs-type);
+}
+
+.hljs-params {
+  color: var(--hljs-params);
+}
+
+.hljs-meta,
+.hljs-meta .hljs-keyword {
+  color: var(--hljs-meta);
+}
+
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: var(--hljs-tag);
+}
+
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link {
+  color: var(--hljs-symbol);
+}
+
+.hljs-addition {
+  color: var(--hljs-addition-fg);
+  background: var(--hljs-addition-bg);
+}
+
+.hljs-deletion {
+  color: var(--hljs-deletion-fg);
+  background: var(--hljs-deletion-bg);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}

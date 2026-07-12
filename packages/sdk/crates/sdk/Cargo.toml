@@ -1,0 +1,58 @@
+[package]
+name = "agentloop-sdk"
+description = "Composable agent builder — providers + native engine + plugins, plus the headless runner binary"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "flex"
+path = "src/main.rs"
+# This is the only file that may mention the product brand name (per brand-gate exemption).
+
+[dependencies]
+agentloop-contracts = { workspace = true }
+agentloop-core = { workspace = true }
+agentloop-engine = { workspace = true }
+agentloop-executors = { workspace = true }
+agentloop-mcp = { workspace = true }
+agentloop-session = { workspace = true }
+agentloop-transport-stdio = { workspace = true }
+agentloop-transport-http = { workspace = true }
+agentloop-providers = { workspace = true }
+agentloop-eval = { workspace = true }
+agentloop-search = { workspace = true, optional = true }
+agentloop-index = { workspace = true, optional = true }
+agentloop-learning = { workspace = true, optional = true }
+agentloop-verifier = { workspace = true, optional = true }
+agentloop-channel = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+axum = { workspace = true }
+croner = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+agentloop-testkit = { workspace = true }
+tempfile = { workspace = true }
+reqwest = { workspace = true }
+
+[features]
+search = ["agentloop-search"]
+index = ["agentloop-index"]
+learning = ["agentloop-learning"]
+verifier = ["agentloop-verifier"]
+
+[lints]
+workspace = true

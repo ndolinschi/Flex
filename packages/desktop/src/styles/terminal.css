@@ -1,0 +1,35 @@
+/* glass terminal chrome: wrapper padding + scrollbar + stripped decorations. */
+.glass-terminal-wrapper {
+  padding: 8px 4px 8px 8px;
+}
+
+.glass-terminal-wrapper .xterm {
+  padding-left: 0;
+  height: 100%;
+}
+
+.glass-terminal-wrapper .xterm-viewport::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+.glass-terminal-wrapper .xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.glass-terminal-wrapper .xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--color-stroke-2);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 9999px;
+}
+
+.glass-terminal-wrapper .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: var(--color-stroke-1);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.glass-terminal-wrapper .xterm-decoration-overview-ruler {
+  display: none;
+}

@@ -1,0 +1,15 @@
+{
+  "turns": [
+    {
+      "events": [
+        { "text": "I'll echo that back to check the round-trip." },
+        { "tool": { "name": "echo", "input": { "text": "ping" } } }
+      ]
+    },
+    {
+      "events": [
+        { "text": "The echo tool returned: ping." }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,180 @@
+name: Release
+
+# Builds the unsigned macOS arm64 .dmg for the desktop app and attaches it to a
+# draft GitHub Release for the pushed tag. Code signing / notarization is not
+# wired yet (no Apple Developer certs) — see the commented env block on the
+# build step. Once secrets exist, uncomment that block and nothing else in this
+# job should need to change (tauri-cli reads APPLE_* automatically).
+#
+# Updater channel (phase 2.3):
+# - `tauri.conf.json` points at
+#   https://github.com/ndolinschi/Flex/releases/latest/download/latest.json
+# - Updater artifact signing needs GitHub secret `TAURI_SIGNING_PRIVATE_KEY`
+#   (pair generated with `pnpm tauri signer generate`; public key already in
+#   tauri.conf.json). Without it we disable `createUpdaterArtifacts` for this
+#   build so packaging CI stays green, and skip uploading latest.json.
+# - TODO secrets (not yet configured):
+#     TAURI_SIGNING_PRIVATE_KEY
+#     TAURI_SIGNING_PRIVATE_KEY_PASSWORD   # only if the key was password-protected
+#     APPLE_CERTIFICATE / APPLE_*         # phase 2.2 — blocked on user
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos-dmg:
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: packages/desktop
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            packages/desktop/src-tauri
+            packages/engine
+            packages/providers
+            packages/search
+            packages/index
+            packages/sdk
+            packages/gateway
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: packages/desktop/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      # Updater artifacts need TAURI_SIGNING_PRIVATE_KEY. Enable only when
+      # that secret is present so unsigned packaging CI stays green.
+      - name: Enable updater artifacts when signing key present
+        if: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("src-tauri/tauri.conf.json")
+          conf = json.loads(path.read_text())
+          conf.setdefault("bundle", {})["createUpdaterArtifacts"] = True
+          path.write_text(json.dumps(conf, indent=2) + "\n")
+          print("createUpdaterArtifacts=true (TAURI_SIGNING_PRIVATE_KEY present)")
+          PY
+
+      # Unsigned build: Gatekeeper only blocks *downloaded* apps (quarantine
+      # bit), so local / CI artifacts are fine for now. When Apple Developer
+      # certs land (phase 2.2), uncomment the env block below before
+      # `tauri build` — tauri-cli picks them up automatically — and add a
+      # notarization step if needed:
+      #
+      # env:
+      #   APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      #   APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      #   APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      #   APPLE_ID: ${{ secrets.APPLE_ID }}
+      #   APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      #   APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Build dmg (unsigned)
+        env:
+          # TODO: add repo secret TAURI_SIGNING_PRIVATE_KEY (contents of the
+          # private key from `pnpm tauri signer generate`). Public half is
+          # already baked into tauri.conf.json plugins.updater.pubkey.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm tauri build --bundles dmg
+
+      - name: Locate dmg
+        id: dmg
+        run: |
+          set -euo pipefail
+          path=$(find src-tauri/target/release/bundle/dmg -name '*.dmg' -type f | head -n 1)
+          if [ -z "$path" ]; then
+            echo "No .dmg under src-tauri/target/release/bundle/dmg" >&2
+            ls -laR src-tauri/target/release/bundle || true
+            exit 1
+          fi
+          echo "Found $path ($(du -h "$path" | cut -f1))"
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+
+      # When updater artifacts were signed, assemble latest.json for the
+      # GitHub Releases channel consumed by tauri-plugin-updater.
+      - name: Assemble latest.json
+        id: updater
+        if: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # macOS updater artifact is typically *.app.tar.gz next to a .sig
+          archive=$(find src-tauri/target/release/bundle -name '*.app.tar.gz' -type f | head -n 1 || true)
+          sig=$(find src-tauri/target/release/bundle -name '*.app.tar.gz.sig' -type f | head -n 1 || true)
+          if [ -z "${archive}" ] || [ -z "${sig}" ]; then
+            echo "Updater artifacts missing — skipping latest.json" >&2
+            ls -laR src-tauri/target/release/bundle || true
+            echo "has_updater=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version="${TAG#v}"
+          sig_body=$(cat "$sig")
+          name=$(basename "$archive")
+          url="https://github.com/${{ github.repository }}/releases/download/${TAG}/${name}"
+          export UPDATER_VERSION="$version"
+          export UPDATER_URL="$url"
+          export UPDATER_SIG="$sig_body"
+          python3 - <<'PY'
+          import json, pathlib, datetime, os
+          sig = os.environ["UPDATER_SIG"]
+          url = os.environ["UPDATER_URL"]
+          body = {
+            "version": os.environ["UPDATER_VERSION"],
+            "notes": "See the release notes for this tag.",
+            "pub_date": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            "platforms": {
+              "darwin-aarch64": {"signature": sig, "url": url},
+              "darwin-x86_64": {"signature": sig, "url": url},
+            },
+          }
+          out = pathlib.Path("latest.json")
+          out.write_text(json.dumps(body, indent=2) + "\n")
+          print(out.resolve())
+          PY
+          echo "has_updater=true" >> "$GITHUB_OUTPUT"
+          echo "archive=${archive}" >> "$GITHUB_OUTPUT"
+          echo "sig=${sig}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packages/desktop/${{ steps.dmg.outputs.path }}
+          draft: true
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+
+      # Separate upload for updater channel assets so a missing latest.json
+      # never breaks the dmg-only path (unsigned packaging CI).
+      - name: Upload updater channel assets
+        if: ${{ steps.updater.outputs.has_updater == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            packages/desktop/${{ steps.updater.outputs.archive }}
+            packages/desktop/${{ steps.updater.outputs.sig }}
+            packages/desktop/latest.json
+          draft: true
+          fail_on_unmatched_files: true
+          generate_release_notes: true

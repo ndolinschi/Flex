@@ -1,0 +1,28 @@
+# Rust
+target/
+*.profraw
+
+# Environment / secrets
+.env
+.env.*
+
+# Local pnpm content-addressable store (never commit)
+.pnpm-store/
+
+# Local planning / handoff docs (not for public commit)
+GAPS-MASTERPLAN.md
+HANDOFF-OPUS.md
+HANDOFF-*.md
+
+# OS noise
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
+
+# Insta pending snapshots
+*.snap.new
+*.pending-snap
+.cursor/
+.playwright-mcp/
