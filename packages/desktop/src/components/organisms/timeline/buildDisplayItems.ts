@@ -88,9 +88,7 @@ export const estimateSizeForItem = (item: DisplayItem, isFirst: boolean): number
  * Long-session perf: off-screen timeline rows skip layout/paint/style via
  * `content-visibility: auto` (see `.cv-auto*` in index.css). Picks a size
  * hint per row kind so the placeholder height is close before the row is
- * ever measured. No row kind is excluded — the timeline has no xterm or
- * other always-live content (xterm only lives in the right-panel Terminal
- * tab), so every top-level row is a safe candidate for containment.
+ * ever measured. Live / streaming rows are excluded — see [`shouldSkipCv`].
  */
 export const cvClassForItem = (item: DisplayItem): string => {
   if (item.kind === "group") return "cv-auto-group"
@@ -107,6 +105,24 @@ export const cvClassForItem = (item: DisplayItem): string => {
     default:
       return "cv-auto"
   }
+}
+
+/**
+ * Growing / live rows must not use `content-visibility: auto`: on some
+ * Chromium/WebView2 builds (notably Windows at fractional DPI) cv reports
+ * stale heights to the virtualizer's ResizeObserver, so absolutely
+ * positioned rows stack on top of each other. Open WorkGroups already
+ * skipped cv for the same reason; live-prefixed rows and any row while a
+ * turn is streaming join that exemption.
+ */
+export const shouldSkipCv = (
+  item: DisplayItem,
+  isStreaming: boolean,
+): boolean => {
+  if (isStreaming) return true
+  if (item.kind === "group" && item.isOpen) return true
+  if (item.kind === "row" && item.row.id.startsWith("live-")) return true
+  return false
 }
 
 /** Plain-text line for one non-assistant row of a turn, for the "Copy

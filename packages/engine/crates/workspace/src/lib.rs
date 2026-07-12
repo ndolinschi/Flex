@@ -18,6 +18,19 @@ use agentloop_contracts::branding::PRODUCT_SLUG;
 use agentloop_contracts::{IntegrationOutcome, IsolationPolicy, SessionId};
 use agentloop_core::workspace::{Workspace, WorkspaceError, WorkspaceStatus, Workspaces};
 
+/// Win32 `CREATE_NO_WINDOW` — do not allocate a new console for the child.
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// Apply creation flags so a console child does not flash a window when
+/// spawned from a GUI parent (desktop). No-op on non-Windows.
+fn hide_console(command: &mut Command) {
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+    #[cfg(not(windows))]
+    let _ = command;
+}
+
 /// Provisions git-worktree-backed isolated workspaces under `root`.
 pub struct GitWorktrees {
     /// Directory under which per-session worktrees are created.
@@ -41,7 +54,9 @@ impl GitWorktrees {
 /// Run `git` in `dir`, returning trimmed stdout. Spawn failure → `GitUnavailable`;
 /// a non-zero exit → `GitFailed` (with stderr).
 async fn git(dir: &Path, args: &[&str]) -> Result<String, WorkspaceError> {
-    let output = Command::new("git")
+    let mut command = Command::new("git");
+    hide_console(&mut command);
+    let output = command
         .current_dir(dir)
         .args(args)
         .output()
@@ -256,7 +271,9 @@ impl Workspaces for GitWorktrees {
 /// Run a verify command via `sh -c` in `root`. Returns `Ok(None)` on success,
 /// `Ok(Some(tail))` with a truncated output tail on failure.
 async fn run_verify(root: &Path, cmd: &str) -> Result<Option<String>, WorkspaceError> {
-    let output = Command::new("sh")
+    let mut command = Command::new("sh");
+    hide_console(&mut command);
+    let output = command
         .arg("-c")
         .arg(cmd)
         .current_dir(root)

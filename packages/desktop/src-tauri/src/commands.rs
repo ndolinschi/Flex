@@ -1313,7 +1313,7 @@ pub async fn is_configured(state: State<'_, AppState>) -> DesktopResult<bool> {
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
 pub fn git_is_repo(cwd: String) -> bool {
-    std::process::Command::new("git")
+    crate::win_console::command("git")
         .args(["rev-parse", "--git-dir"])
         .current_dir(cwd)
         .output()
@@ -1325,7 +1325,7 @@ pub fn git_is_repo(cwd: String) -> bool {
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
 pub fn git_branch(cwd: String) -> Option<String> {
-    let output = std::process::Command::new("git")
+    let output = crate::win_console::command("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(cwd)
         .output()
@@ -1341,7 +1341,7 @@ pub fn git_branch(cwd: String) -> Option<String> {
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub fn git_list_branches(cwd: String) -> DesktopResult<Vec<String>> {
-    let output = std::process::Command::new("git")
+    let output = crate::win_console::command("git")
         .args(["branch", "--format=%(refname:short)"])
         .current_dir(cwd)
         .output()
@@ -1373,7 +1373,7 @@ pub fn git_checkout(cwd: String, branch: String) -> DesktopResult<()> {
     if branch.is_empty() || branch.starts_with('-') {
         return Err(DesktopError::Message("invalid branch name".into()));
     }
-    let output = std::process::Command::new("git")
+    let output = crate::win_console::command("git")
         .args(["checkout", branch])
         .current_dir(cwd)
         .output()
@@ -1463,7 +1463,7 @@ pub fn git_status(cwd: String) -> DesktopResult<GitStatusSummary> {
 /// [`git_status_since_baseline`]. Returns the full, untruncated list —
 /// callers cap/summarize via [`summarize`].
 fn git_status_full(cwd: &str) -> DesktopResult<Vec<GitFileStatus>> {
-    let porcelain = match std::process::Command::new("git")
+    let porcelain = match crate::win_console::command("git")
         .args(["status", "--porcelain"])
         .current_dir(cwd)
         .output()
@@ -1475,7 +1475,7 @@ fn git_status_full(cwd: &str) -> DesktopResult<Vec<GitFileStatus>> {
     // Line counts per changed file; binary files report "-" and are skipped.
     let mut counts: std::collections::HashMap<String, (u32, u32)> =
         std::collections::HashMap::new();
-    if let Ok(out) = std::process::Command::new("git")
+    if let Ok(out) = crate::win_console::command("git")
         .args(["diff", "--numstat", "HEAD"])
         .current_dir(cwd)
         .output()
@@ -1607,7 +1607,7 @@ pub async fn git_status_since_baseline(
 /// on any git failure (missing file, not a git repo, etc.) so callers can
 /// treat the path as "unknown" rather than failing outright.
 fn hash_object(cwd: &std::path::Path, path: &str) -> Option<String> {
-    let out = std::process::Command::new("git")
+    let out = crate::win_console::command("git")
         .args(["hash-object", path])
         .current_dir(cwd)
         .output()
@@ -1622,7 +1622,7 @@ fn hash_object(cwd: &std::path::Path, path: &str) -> Option<String> {
 /// (e.g. a freshly initialized repo with no commits) rather than an error,
 /// since that's a legitimate baseline state.
 fn current_head_sha(cwd: &std::path::Path) -> String {
-    std::process::Command::new("git")
+    crate::win_console::command("git")
         .args(["rev-parse", "HEAD"])
         .current_dir(cwd)
         .output()
@@ -1641,7 +1641,7 @@ fn current_head_sha(cwd: &std::path::Path) -> String {
 /// simply yields no baseline, and `git_status_since_baseline` gracefully
 /// degrades to the full-repo `git_status` in that case.
 fn capture_session_baseline(cwd: &std::path::Path) -> Option<crate::state::SessionBaseline> {
-    let porcelain = std::process::Command::new("git")
+    let porcelain = crate::win_console::command("git")
         .args(["status", "--porcelain"])
         .current_dir(cwd)
         .output()
@@ -1716,7 +1716,7 @@ fn truncate_diff(mut text: String) -> String {
 /// against `/dev/null` when the file has no history against `rev` (i.e. it's
 /// untracked there). Shared by `git_diff` and `review_file_diff`.
 fn diff_against_rev(dir: &std::path::Path, rev: &str, path: &str) -> DesktopResult<String> {
-    let tracked = std::process::Command::new("git")
+    let tracked = crate::win_console::command("git")
         .args(["diff", rev, "--", path])
         .current_dir(dir)
         .output()
@@ -1731,7 +1731,7 @@ fn diff_against_rev(dir: &std::path::Path, rev: &str, path: &str) -> DesktopResu
     if text.trim().is_empty() {
         // Untracked file: diff against /dev/null (exit code 1 means "differs",
         // which is success for --no-index; >1 is a real error).
-        let untracked = std::process::Command::new("git")
+        let untracked = crate::win_console::command("git")
             .args(["diff", "--no-index", "--", "/dev/null", path])
             .current_dir(dir)
             .output()
@@ -1792,7 +1792,7 @@ pub async fn git_commit(
         ));
     }
 
-    let add = std::process::Command::new("git")
+    let add = crate::win_console::command("git")
         .args(["add", "-A"])
         .current_dir(&cwd)
         .output()
@@ -1806,7 +1806,7 @@ pub async fn git_commit(
         }));
     }
 
-    let commit = std::process::Command::new("git")
+    let commit = crate::win_console::command("git")
         .args(["commit", "-m"])
         .arg(message)
         .current_dir(&cwd)
@@ -1821,7 +1821,7 @@ pub async fn git_commit(
         }));
     }
 
-    let sha = std::process::Command::new("git")
+    let sha = crate::win_console::command("git")
         .args(["rev-parse", "--short", "HEAD"])
         .current_dir(cwd)
         .output()
@@ -1849,7 +1849,7 @@ pub async fn git_push(state: State<'_, AppState>, session_id: String) -> Desktop
         ));
     }
 
-    let push = std::process::Command::new("git")
+    let push = crate::win_console::command("git")
         .args(["push"])
         .current_dir(cwd)
         .output()
@@ -1876,7 +1876,7 @@ pub async fn git_push(state: State<'_, AppState>, session_id: String) -> Desktop
 /// -u origin <branch>`) instead of failing with "no upstream branch". Shared
 /// by `git_commit_and_push` and `git_create_pr`.
 fn push_current_branch(cwd: &std::path::Path) -> DesktopResult<()> {
-    let push = std::process::Command::new("git")
+    let push = crate::win_console::command("git")
         .args(["push"])
         .current_dir(cwd)
         .output()
@@ -1892,7 +1892,7 @@ fn push_current_branch(cwd: &std::path::Path) -> DesktopResult<()> {
     if stderr.contains("has no upstream branch") || stderr.contains("--set-upstream") {
         let branch = git_branch(cwd.to_string_lossy().to_string())
             .ok_or_else(|| DesktopError::Message("could not determine current branch".into()))?;
-        let retry = std::process::Command::new("git")
+        let retry = crate::win_console::command("git")
             .args(["push", "-u", "origin", &branch])
             .current_dir(cwd)
             .output()
@@ -1944,7 +1944,7 @@ async fn commit_selected_paths(
         ));
     }
 
-    let mut add_cmd = std::process::Command::new("git");
+    let mut add_cmd = crate::win_console::command("git");
     add_cmd.arg("add").arg("--").args(&relative_paths);
     let add = add_cmd
         .current_dir(&cwd)
@@ -1959,7 +1959,7 @@ async fn commit_selected_paths(
         }));
     }
 
-    let commit = std::process::Command::new("git")
+    let commit = crate::win_console::command("git")
         .args(["commit", "-m"])
         .arg(message)
         .current_dir(&cwd)
@@ -1974,7 +1974,7 @@ async fn commit_selected_paths(
         }));
     }
 
-    let sha = std::process::Command::new("git")
+    let sha = crate::win_console::command("git")
         .args(["rev-parse", "--short", "HEAD"])
         .current_dir(&cwd)
         .output()
@@ -2042,7 +2042,7 @@ pub async fn git_create_branch_and_commit(
         ));
     }
 
-    let checkout = std::process::Command::new("git")
+    let checkout = crate::win_console::command("git")
         .args(["checkout", "-b", branch])
         .current_dir(&cwd)
         .output()
@@ -2079,7 +2079,7 @@ pub async fn git_create_pr(
     let (cwd, sha) = commit_selected_paths(&state, &session_id, &message, &paths).await?;
     push_current_branch(&cwd)?;
 
-    let gh_check = std::process::Command::new("gh")
+    let gh_check = crate::win_console::command("gh")
         .args(["auth", "status"])
         .current_dir(&cwd)
         .output();
@@ -2092,7 +2092,7 @@ pub async fn git_create_pr(
         });
     }
 
-    let mut pr_cmd = std::process::Command::new("gh");
+    let mut pr_cmd = crate::win_console::command("gh");
     pr_cmd.arg("pr").arg("create");
     match (&title, &body) {
         (Some(t), Some(b)) if !t.trim().is_empty() => {
@@ -2241,7 +2241,7 @@ fn validate_repo_relative_path(path: &str) -> DesktopResult<&str> {
 /// Two-letter `git status --porcelain` code for a single path (e.g. `"??"`,
 /// `" M"`, `"D "`), or `None` if the path has no pending changes.
 fn porcelain_code(dir: &std::path::Path, path: &str) -> DesktopResult<Option<String>> {
-    let out = std::process::Command::new("git")
+    let out = crate::win_console::command("git")
         .args(["-C"])
         .arg(dir)
         .args(["status", "--porcelain", "--", path])
@@ -2272,7 +2272,7 @@ fn porcelain_code(dir: &std::path::Path, path: &str) -> DesktopResult<Option<Str
 /// state to diff/restore against for isolated sessions (the worktree's own
 /// HEAD can move — `integrate_session` commits agent changes into it).
 fn base_head_sha(base_dir: &std::path::Path) -> DesktopResult<String> {
-    let out = std::process::Command::new("git")
+    let out = crate::win_console::command("git")
         .args(["-C"])
         .arg(base_dir)
         .args(["rev-parse", "HEAD"])
@@ -2346,7 +2346,7 @@ pub async fn review_undo_file(
     }
 
     let checkout_from = |rev: &str| -> DesktopResult<std::process::Output> {
-        std::process::Command::new("git")
+        crate::win_console::command("git")
             .args(["-C"])
             .arg(&dir)
             .args(["checkout", rev, "--", path])
@@ -2508,7 +2508,7 @@ pub async fn review_apply_patch(
     let patch_path_str = patch_path.to_string_lossy();
     args.push(&patch_path_str);
 
-    let result = std::process::Command::new("git").args(&args).output();
+    let result = crate::win_console::command("git").args(&args).output();
 
     let cleanup = std::fs::remove_file(&patch_path);
     if let Err(e) = cleanup {
@@ -3566,7 +3566,7 @@ pub struct UserIdentityDto {
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn user_identity(_state: State<'_, AppState>) -> DesktopResult<UserIdentityDto> {
-    let git_name = std::process::Command::new("git")
+    let git_name = crate::win_console::command("git")
         .args(["config", "user.name"])
         .output()
         .ok()
@@ -3994,7 +3994,7 @@ mod session_baseline_tests {
         ));
         std::fs::create_dir_all(&dir).unwrap();
         let run = |args: &[&str]| {
-            let out = std::process::Command::new("git")
+            let out = crate::win_console::command("git")
                 .args(args)
                 .current_dir(&dir)
                 .output()
@@ -4020,12 +4020,12 @@ mod session_baseline_tests {
     }
 
     fn commit_all(dir: &std::path::Path, msg: &str) {
-        std::process::Command::new("git")
+        crate::win_console::command("git")
             .args(["add", "-A"])
             .current_dir(dir)
             .output()
             .unwrap();
-        std::process::Command::new("git")
+        crate::win_console::command("git")
             .args(["commit", "-q", "-m", msg])
             .current_dir(dir)
             .output()
@@ -4273,7 +4273,7 @@ mod commit_center_tests {
         ));
         std::fs::create_dir_all(&dir).unwrap();
         let run = |args: &[&str]| {
-            let out = std::process::Command::new("git")
+            let out = crate::win_console::command("git")
                 .args(args)
                 .current_dir(&dir)
                 .output()
@@ -4299,12 +4299,12 @@ mod commit_center_tests {
     }
 
     fn commit_all(dir: &Path, msg: &str) {
-        std::process::Command::new("git")
+        crate::win_console::command("git")
             .args(["add", "-A"])
             .current_dir(dir)
             .output()
             .unwrap();
-        std::process::Command::new("git")
+        crate::win_console::command("git")
             .args(["commit", "-q", "-m", msg])
             .current_dir(dir)
             .output()
@@ -4314,7 +4314,7 @@ mod commit_center_tests {
     /// `git status --porcelain` lines for a repo dir, for asserting which
     /// paths are (not) still dirty after a commit.
     fn status_lines(dir: &Path) -> Vec<String> {
-        let out = std::process::Command::new("git")
+        let out = crate::win_console::command("git")
             .args(["status", "--porcelain"])
             .current_dir(dir)
             .output()
@@ -4326,7 +4326,7 @@ mod commit_center_tests {
     }
 
     fn current_branch(dir: &Path) -> String {
-        let out = std::process::Command::new("git")
+        let out = crate::win_console::command("git")
             .args(["rev-parse", "--abbrev-ref", "HEAD"])
             .current_dir(dir)
             .output()
@@ -4548,7 +4548,7 @@ mod commit_center_tests {
         .expect_err("push must fail with no remote configured");
         assert!(matches!(err, DesktopError::Message(_)));
 
-        let log = std::process::Command::new("git")
+        let log = crate::win_console::command("git")
             .args(["log", "--oneline", "-1"])
             .current_dir(&dir)
             .output()
@@ -4576,7 +4576,7 @@ mod commit_center_tests {
         // reinitialize as bare directly.
         std::fs::remove_dir_all(&remote_dir).ok();
         std::fs::create_dir_all(&remote_dir).unwrap();
-        let out = std::process::Command::new("git")
+        let out = crate::win_console::command("git")
             .args(["init", "--bare", "-q"])
             .current_dir(&remote_dir)
             .output()
@@ -4586,7 +4586,7 @@ mod commit_center_tests {
         let dir = init_repo();
         write(&dir, "a.txt", "v1\n");
         commit_all(&dir, "initial commit");
-        std::process::Command::new("git")
+        crate::win_console::command("git")
             .args(["remote", "add", "origin"])
             .arg(&remote_dir)
             .current_dir(&dir)
@@ -4595,7 +4595,7 @@ mod commit_center_tests {
         // Push the initial commit once first so the bare remote has the
         // branch's history; still no upstream tracking ref is set, so the
         // *next* push exercises the "no upstream" -u retry path.
-        std::process::Command::new("git")
+        crate::win_console::command("git")
             .args(["push", "origin", "HEAD"])
             .current_dir(&dir)
             .output()
@@ -4617,7 +4617,7 @@ mod commit_center_tests {
         assert!(!sha.is_empty());
 
         let branch = current_branch(&dir);
-        let remote_log = std::process::Command::new("git")
+        let remote_log = crate::win_console::command("git")
             .args(["log", "--oneline", "-1", &branch])
             .current_dir(&remote_dir)
             .output()
@@ -4629,7 +4629,7 @@ mod commit_center_tests {
         );
 
         // Upstream tracking must now be set (the `-u` retry path ran).
-        let upstream = std::process::Command::new("git")
+        let upstream = crate::win_console::command("git")
             .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
             .current_dir(&dir)
             .output()
@@ -4667,7 +4667,7 @@ mod commit_center_tests {
 
         assert_eq!(current_branch(&dir), "feature/my-branch");
 
-        let branches = std::process::Command::new("git")
+        let branches = crate::win_console::command("git")
             .args(["branch", "--list", "feature/my-branch"])
             .current_dir(&dir)
             .output()
@@ -4722,18 +4722,18 @@ mod commit_center_tests {
         let remote_dir = init_repo();
         std::fs::remove_dir_all(&remote_dir).ok();
         std::fs::create_dir_all(&remote_dir).unwrap();
-        std::process::Command::new("git")
+        crate::win_console::command("git")
             .args(["init", "--bare", "-q"])
             .current_dir(&remote_dir)
             .output()
             .unwrap();
-        std::process::Command::new("git")
+        crate::win_console::command("git")
             .args(["remote", "add", "origin"])
             .arg(&remote_dir)
             .current_dir(&dir)
             .output()
             .unwrap();
-        std::process::Command::new("git")
+        crate::win_console::command("git")
             .args(["push", "-u", "origin", "HEAD"])
             .current_dir(&dir)
             .output()
@@ -4761,7 +4761,7 @@ mod commit_center_tests {
         static PATH_MUTATION_GUARD: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
         let _path_guard = PATH_MUTATION_GUARD.lock().await;
 
-        let git_path = std::process::Command::new("which")
+        let git_path = crate::win_console::command("which")
             .arg("git")
             .output()
             .ok()
@@ -4799,7 +4799,7 @@ mod commit_center_tests {
 
         // The commit + push must have gone through even though the PR step
         // was skipped.
-        let remote_log = std::process::Command::new("git")
+        let remote_log = crate::win_console::command("git")
             .args(["log", "--oneline", "-1"])
             .current_dir(&remote_dir)
             .output()

@@ -124,6 +124,8 @@ async fn run_formatter(argv: &[String], env: &[(String, String)], file: &str) ->
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .kill_on_drop(true);
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000);
     for (key, value) in env {
         cmd.env(key, value);
     }

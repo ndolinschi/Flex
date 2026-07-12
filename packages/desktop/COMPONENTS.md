@@ -168,6 +168,6 @@ Keep this file in sync when adding or renaming components.
 
 ## Perf notes (Wave 3)
 
-- **Timeline virtualization:** `TurnTimeline` uses `@tanstack/react-virtual` over `displayItems`. Live tail (Working / reconnect / FilesChangedCard / bottom sentinel) stays outside the virtual window so stick-to-bottom remains correct. Settled rows keep `content-visibility: auto` (`cv-auto*`); open live WorkGroups skip cv so ResizeObserver measurement stays accurate. Item spacing uses padding (`pt-*`) so virtual `measureElement` includes gaps.
+- **Timeline virtualization:** `TurnTimeline` uses `@tanstack/react-virtual` over `displayItems`. Live tail (Working / reconnect / FilesChangedCard / bottom sentinel) stays outside the virtual window so stick-to-bottom remains correct. Settled rows keep `content-visibility: auto` (`cv-auto*`); open live WorkGroups, `live-*` rows, and all rows while a turn is streaming skip cv so ResizeObserver measurement stays accurate (avoids WebView2/Windows row overlap). Item spacing uses padding (`pt-*`) so virtual `measureElement` includes gaps.
 - **React Compiler:** Enabled in `vite.config.ts` via `babel-plugin-react-compiler` (React 19 target). Verified with `tsc --noEmit`, `vitest run`, and `vite build`.
 - **Markdown highlight:** Core language pack loads as a separate chunk (`lib/markdownHighlight.ts`); GFM renders immediately, highlight upgrades after the dynamic import.

@@ -28,6 +28,8 @@ fn shell_command(script: &str) -> Command {
     {
         let mut command = Command::new("cmd");
         command.arg("/C").arg(script);
+        // GUI parents (desktop) must not flash a conhost for every Bash call.
+        crate::win_console::hide_console(&mut command);
         command
     }
     #[cfg(not(windows))]

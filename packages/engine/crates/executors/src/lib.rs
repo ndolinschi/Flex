@@ -15,6 +15,7 @@ mod process_group;
 mod remote_fn;
 mod run;
 mod ssh;
+mod win_console;
 
 pub use container_image::ContainerImageExecutor;
 pub use docker::DockerExecutor;

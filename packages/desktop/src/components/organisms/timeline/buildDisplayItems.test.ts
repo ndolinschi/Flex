@@ -3,6 +3,8 @@ import {
   buildDisplayItems,
   lastItemIsOpenWorkGroup,
   resumeLineForRows,
+  shouldSkipCv,
+  type DisplayItem,
 } from "./buildDisplayItems"
 import type { TimelineRow, ToolCall, TurnSummary } from "../../../lib/types"
 
@@ -304,5 +306,55 @@ describe("buildDisplayItems", () => {
       const items = buildDisplayItems(rows, false)
       expect(lastItemIsOpenWorkGroup(items)).toBe(false)
     })
+  })
+})
+
+describe("shouldSkipCv", () => {
+  const settledUser: DisplayItem = {
+    kind: "row",
+    row: {
+      type: "user",
+      id: "row-user-1",
+      messageId: "m-1",
+      text: "hi",
+      tsMs: 0,
+    },
+  }
+  const liveAssistant: DisplayItem = {
+    kind: "row",
+    row: {
+      type: "assistant",
+      id: "live-assistant:m-2",
+      messageId: "m-2",
+      text: "streaming…",
+      tsMs: 0,
+    },
+  }
+  const openGroup: DisplayItem = {
+    kind: "group",
+    id: "group-1",
+    isOpen: true,
+    rows: [],
+  }
+  const closedGroup: DisplayItem = {
+    kind: "group",
+    id: "group-2",
+    isOpen: false,
+    rows: [],
+  }
+
+  it("skips every row while a turn is streaming", () => {
+    expect(shouldSkipCv(settledUser, true)).toBe(true)
+    expect(shouldSkipCv(closedGroup, true)).toBe(true)
+  })
+
+  it("skips open work groups and live-* rows when idle", () => {
+    expect(shouldSkipCv(openGroup, false)).toBe(true)
+    expect(shouldSkipCv(liveAssistant, false)).toBe(true)
+  })
+
+  it("keeps content-visibility on settled rows when idle", () => {
+    expect(shouldSkipCv(settledUser, false)).toBe(false)
+    expect(shouldSkipCv(closedGroup, false)).toBe(false)
   })
 })
