@@ -1,7 +1,7 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-  Install the `flex` CLI and the Windows desktop app from a local checkout.
+  Install the flex CLI and the Windows desktop app from a local checkout.
 
 .DESCRIPTION
   Release-builds the runner from packages/sdk and the Tauri desktop app from
@@ -25,8 +25,8 @@
 
 .NOTES
   Defaults:
-    CLI  → %USERPROFILE%\.local\bin\flex.exe
-    App  → %LOCALAPPDATA%\Programs\Flex\Flex.exe
+    CLI  -> %USERPROFILE%\.local\bin\flex.exe
+    App  -> %LOCALAPPDATA%\Programs\Flex\Flex.exe
   Override with FLEX_BIN_DIR / FLEX_APP_DIR.
   macOS: see .\scripts\install_mac.sh
 #>
@@ -58,22 +58,22 @@ $AppDestDir = if ($env:FLEX_APP_DIR) { $env:FLEX_APP_DIR } else {
   Join-Path $env:LOCALAPPDATA "Programs\Flex"
 }
 
-function Test-Command {
+function Test-FlexCommand {
   param([string]$Name)
   return [bool](Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
-function Require-Command {
+function Assert-FlexCommand {
   param(
     [string]$Name,
     [string]$Hint
   )
-  if (-not (Test-Command $Name)) {
-    throw "error: '$Name' not found — $Hint"
+  if (-not (Test-FlexCommand $Name)) {
+    throw "error: '$Name' not found - $Hint"
   }
 }
 
-function Ensure-UserPathEntry {
+function Test-UserPathEntry {
   param([string]$Dir)
   $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
   if (-not $userPath) { $userPath = "" }
@@ -97,9 +97,9 @@ function Add-UserPathEntry {
 }
 
 function Install-FlexCli {
-  Require-Command "cargo" "install Rust from https://rustup.rs and retry."
+  Assert-FlexCommand "cargo" "install Rust from https://rustup.rs and retry."
 
-  Write-Host "==> Building $BinName (release)…"
+  Write-Host "==> Building $BinName (release)..."
   Push-Location $SdkDir
   try {
     & cargo build --release
@@ -119,11 +119,11 @@ function Install-FlexCli {
   Copy-Item -LiteralPath $built -Destination $destPath -Force
   Write-Host "==> Installed $destPath"
 
-  if (Ensure-UserPathEntry $DestDir) {
+  if (Test-UserPathEntry $DestDir) {
     Write-Host "==> CLI ready. Run '$BinName' inside any project folder."
   } else {
     Write-Host ""
-    Write-Host "NOTE: $DestDir is not on your User PATH. Adding it now…"
+    Write-Host "NOTE: $DestDir is not on your User PATH. Adding it now..."
     Add-UserPathEntry $DestDir
     Write-Host "==> Added to User PATH. Open a new terminal, then run '$BinName'."
   }
@@ -147,16 +147,16 @@ function New-StartMenuShortcut {
 }
 
 function Install-FlexDesktop {
-  Require-Command "pnpm" "install from https://pnpm.io and retry."
-  Require-Command "cargo" "install Rust from https://rustup.rs and retry."
+  Assert-FlexCommand "pnpm" "install from https://pnpm.io and retry."
+  Assert-FlexCommand "cargo" "install Rust from https://rustup.rs and retry."
 
-  Write-Host "==> Installing desktop JS deps…"
+  Write-Host "==> Installing desktop JS deps..."
   Push-Location $DesktopDir
   try {
     & pnpm install
     if ($LASTEXITCODE -ne 0) { throw "pnpm install failed ($LASTEXITCODE)" }
 
-    Write-Host "==> Building desktop (release, nsis + exe)…"
+    Write-Host "==> Building desktop (release, nsis + exe)..."
     & pnpm exec tauri build --bundles nsis
     if ($LASTEXITCODE -ne 0) { throw "tauri build failed ($LASTEXITCODE)" }
   } finally {
@@ -192,7 +192,7 @@ function Install-FlexDesktop {
 
   New-StartMenuShortcut -TargetPath $destExe -ShortcutName "Flex.lnk"
   Write-Host "==> Installed $destExe"
-  Write-Host "==> Desktop ready. Launch from Start Menu or: & '$destExe'"
+  Write-Host "==> Desktop ready. Launch from Start Menu or run: $destExe"
 
   # Prefer silent NSIS when the installer exists (registers uninstaller, etc.).
   $nsisDir = Join-Path $releaseDir "bundle\nsis"
