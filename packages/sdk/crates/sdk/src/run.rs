@@ -18,6 +18,7 @@ pub(crate) async fn run(args: RunArgs) -> anyhow::Result<()> {
         args.provider.as_deref(),
         args.model.clone(),
         &args.fallback_models,
+        &args.plugins,
         args.workdir.as_deref(),
     )
     .await?;

@@ -42,6 +42,7 @@ pub(crate) async fn resolve_service(
     provider: Option<&str>,
     model: Option<String>,
     fallback_models: &[String],
+    plugins: &[String],
     workdir: Option<&Path>,
 ) -> anyhow::Result<Resolution> {
     let mut trace = Vec::new();
@@ -83,13 +84,13 @@ pub(crate) async fn resolve_service(
                 "explicit --provider {}",
                 provider.unwrap_or_default()
             ));
-            let service = native_service(provider, model, fallback_models, workdir)?;
+            let service = native_service(provider, model, fallback_models, plugins, workdir)?;
             trace.push("selected native loop".to_owned());
             return Ok(Resolution { service, trace });
         }
         Some("native") => {
             trace.push("explicit --agent native".to_owned());
-            let service = native_service(provider, model, fallback_models, workdir)?;
+            let service = native_service(provider, model, fallback_models, plugins, workdir)?;
             trace.push("selected native loop (provider from environment)".to_owned());
             return Ok(Resolution { service, trace });
         }
@@ -100,7 +101,7 @@ pub(crate) async fn resolve_service(
         None => {}
     }
 
-    match native_service(None, model, fallback_models, workdir) {
+    match native_service(None, model, fallback_models, plugins, workdir) {
         Ok(service) => {
             trace.push("provider API key found in environment".to_owned());
             trace.push("selected native loop".to_owned());
@@ -135,6 +136,7 @@ fn native_service(
     provider: Option<&str>,
     model: Option<String>,
     fallback_models: &[String],
+    plugins: &[String],
     workdir: Option<&Path>,
 ) -> Result<EngineService, EngineServiceError> {
     let mut builder = AgentBuilder::new().date(today());
@@ -158,6 +160,9 @@ fn native_service(
             builder = builder.all_providers(true);
         }
         builder = builder.fallback_models(fallback_models.to_vec());
+    }
+    for id in plugins {
+        builder = builder.enable_plugin(id);
     }
     builder.build()
 }
@@ -466,7 +471,7 @@ pub(crate) async fn doctor(workdir: &Path) -> anyhow::Result<()> {
     }
 
     println!("resolution:");
-    match resolve_service(None, None, None, None, &[], workdir).await {
+    match resolve_service(None, None, None, None, &[], &[], workdir).await {
         Ok(resolution) => {
             for line in &resolution.trace {
                 println!("  - {line}");

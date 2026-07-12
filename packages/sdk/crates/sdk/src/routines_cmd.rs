@@ -39,7 +39,7 @@ pub(crate) async fn routines_cmd(args: &[String]) -> anyhow::Result<()> {
             let spec = agentloop_channel::RoutineStore::get(&store, id)
                 .await?
                 .with_context(|| format!("routine `{id}` not found"))?;
-            let resolution = crate::resolve::resolve_service(None, None, None, None, &[], None)
+            let resolution = crate::resolve::resolve_service(None, None, None, None, &[], &[], None)
                 .await
                 .context("resolving an agent to run the routine with")?;
             let runner = RoutineRunner::new(Arc::new(resolution.service), Arc::new(store));

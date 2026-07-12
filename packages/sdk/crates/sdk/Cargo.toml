@@ -49,6 +49,7 @@ tempfile = { workspace = true }
 reqwest = { workspace = true }
 
 [features]
+default = ["search", "index", "learning", "verifier"]
 search = ["agentloop-search"]
 index = ["agentloop-index"]
 learning = ["agentloop-learning"]

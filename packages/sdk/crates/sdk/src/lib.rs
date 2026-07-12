@@ -126,26 +126,34 @@ impl AgentBuilder {
 
     /// Enable a built-in plugin by id. Currently recognizes `"search"`,
     /// `"index"`, `"learning"`, and `"verifier"` (when the matching feature
-    /// is enabled); unknown ids are ignored. Use [`AgentBuilder::plugin`] for
-    /// custom plugins.
+    /// is enabled); unknown or feature-disabled ids are ignored with a
+    /// warning. Use [`AgentBuilder::plugin`] for custom plugins.
     pub fn enable_plugin(mut self, id: &str) -> Self {
+        let mut matched = false;
         #[cfg(feature = "search")]
         if id == "search" {
             self.plugins.push(Arc::new(SearchPlugin::default()));
+            matched = true;
         }
         #[cfg(feature = "index")]
         if id == "index" {
             self.plugins.push(Arc::new(IndexPlugin::new()));
+            matched = true;
         }
         #[cfg(feature = "learning")]
         if id == "learning" {
             if let Some(plugin) = LearningPlugin::with_default_dir() {
                 self.plugins.push(Arc::new(plugin));
             }
+            matched = true;
         }
         #[cfg(feature = "verifier")]
         if id == "verifier" {
             self.plugins.push(Arc::new(VerifierPlugin));
+            matched = true;
+        }
+        if !matched {
+            tracing::warn!(plugin = id, "unknown or feature-disabled plugin ignored");
         }
         self
     }
@@ -252,5 +260,31 @@ mod index_wiring_tests {
         assert!(names.contains(&"FindSymbol".to_owned()), "{names:?}");
         assert!(names.contains(&"RepoMap".to_owned()), "{names:?}");
         assert_eq!(plugin.id(), "index");
+    }
+}
+
+#[cfg(all(test, feature = "search"))]
+mod search_wiring_tests {
+    use super::*;
+    use agentloop_core::Plugin;
+
+    #[test]
+    fn enable_plugin_search_registers_search_tools() {
+        let _builder = AgentBuilder::new().enable_plugin("search");
+        let plugin: Arc<dyn Plugin> = Arc::new(SearchPlugin::default());
+        let names: Vec<String> = plugin.tools().iter().map(|t| t.descriptor().name).collect();
+        assert!(names.contains(&"search_web".to_owned()), "{names:?}");
+        assert!(names.contains(&"scrape_page".to_owned()), "{names:?}");
+        assert_eq!(plugin.id(), "search");
+    }
+}
+
+#[cfg(test)]
+mod enable_plugin_tests {
+    use super::*;
+
+    #[test]
+    fn enable_plugin_unknown_id_does_not_panic() {
+        let _builder = AgentBuilder::new().enable_plugin("not-a-real-plugin");
     }
 }

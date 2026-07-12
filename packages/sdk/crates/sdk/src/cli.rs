@@ -14,6 +14,7 @@ pub(crate) struct RunArgs {
     pub(crate) provider: Option<String>,
     pub(crate) model: Option<String>,
     pub(crate) fallback_models: Vec<String>,
+    pub(crate) plugins: Vec<String>,
     pub(crate) prompt: String,
     pub(crate) workdir: Option<PathBuf>,
     pub(crate) output_format: OutputFormat,
@@ -31,6 +32,7 @@ pub(crate) struct ServeArgs {
     pub(crate) provider: Option<String>,
     pub(crate) model: Option<String>,
     pub(crate) fallback_models: Vec<String>,
+    pub(crate) plugins: Vec<String>,
     pub(crate) workdir: Option<PathBuf>,
     pub(crate) bind: SocketAddr,
     pub(crate) token: Option<String>,
@@ -45,6 +47,7 @@ pub(crate) fn parse_serve_args(args: &[String]) -> anyhow::Result<ServeArgs> {
     let mut provider: Option<String> = None;
     let mut model: Option<String> = None;
     let mut fallback_models: Vec<String> = Vec::new();
+    let mut plugins: Vec<String> = Vec::new();
     let mut workdir: Option<PathBuf> = None;
     let mut bind: Option<String> = None;
     let mut token: Option<String> = None;
@@ -60,6 +63,7 @@ pub(crate) fn parse_serve_args(args: &[String]) -> anyhow::Result<ServeArgs> {
             "--fallback-model" => {
                 fallback_models.push(take_value(args, &mut index, "--fallback-model")?)
             }
+            "--plugin" => plugins.push(take_value(args, &mut index, "--plugin")?),
             "--workdir" => {
                 workdir = Some(PathBuf::from(take_value(args, &mut index, "--workdir")?))
             }
@@ -94,6 +98,7 @@ pub(crate) fn parse_serve_args(args: &[String]) -> anyhow::Result<ServeArgs> {
         provider,
         model,
         fallback_models,
+        plugins,
         workdir,
         bind,
         enable_routines,
@@ -107,6 +112,7 @@ pub(crate) fn parse_run_args(args: &[String]) -> anyhow::Result<RunArgs> {
     let mut provider: Option<String> = None;
     let mut model: Option<String> = None;
     let mut fallback_models: Vec<String> = Vec::new();
+    let mut plugins: Vec<String> = Vec::new();
     let mut prompt: Option<String> = None;
     let mut workdir: Option<PathBuf> = None;
     let output_format = OutputFormat::Ndjson;
@@ -128,6 +134,9 @@ pub(crate) fn parse_run_args(args: &[String]) -> anyhow::Result<RunArgs> {
             }
             "--fallback-model" => {
                 fallback_models.push(take_value(args, &mut index, "--fallback-model")?);
+            }
+            "--plugin" => {
+                plugins.push(take_value(args, &mut index, "--plugin")?);
             }
             "-p" | "--prompt" => {
                 prompt = Some(take_value(args, &mut index, "-p/--prompt")?);
@@ -156,6 +165,7 @@ pub(crate) fn parse_run_args(args: &[String]) -> anyhow::Result<RunArgs> {
         provider,
         model,
         fallback_models,
+        plugins,
         prompt: prompt.context("missing prompt: pass -p \"...\" or --prompt \"...\"")?,
         workdir,
         output_format,
@@ -174,12 +184,12 @@ pub(crate) fn usage() -> String {
         "usage:\n  {slug} --version\n  {slug} doctor\n  {slug} run [--agent native|claude-code|copilot|opencode|cursor|acp] \
          [--agent-cmd <program>] \
          [--provider anthropic|openai|gemini|ollama|copilot] [--model <model>] \
-         [--fallback-model <model>]... -p <prompt> \
+         [--fallback-model <model>]... [--plugin <id>]... -p <prompt> \
          [--workdir <path>] [--output-format ndjson]\n  {slug} eval [--task <id>]... \
          [--tasks-dir <dir>] [--agent <agent>] [--provider <id>] [--model <model>] \
          [--repeat <n>] [--out <dir>] [--json <path>] [--baseline <report.json>]\n  \
          {slug} serve [--agent ...] [--agent-cmd <program>] [--provider ...] [--model <model>] \
-         [--fallback-model <model>]... [--enable-routines] \
+         [--fallback-model <model>]... [--plugin <id>]... [--enable-routines] \
          [--workdir <path>] [--bind <host:port>] [--port <port>] [--token <token>]\n  \
          {slug} routines <list|run|remove> [id]\n\n\
          With no --agent/--provider, the engine auto-detects: provider API keys in the \
@@ -189,6 +199,8 @@ pub(crate) fn usage() -> String {
          auth rejection on the current model advance to the next). A `provider/model` entry \
          naming a different provider than --provider automatically enables multi-provider \
          resolution (each provider's credentials must still be present in the environment).\n\n\
+         --plugin may repeat to enable built-in plugins on the native loop (search, index, \
+         learning, verifier). Plugins stay opt-in at runtime even when compiled in.\n\n\
          `serve` binds 127.0.0.1:4517 by default and requires a bearer token on every route \
          but /health. With no --token, one is generated and printed once to stderr; binding \
          beyond loopback requires an explicit --token or {env_prefix}_SERVE_TOKEN. On `serve`, \
@@ -246,6 +258,45 @@ mod tests {
         assert_eq!(
             args.fallback_models,
             vec!["openai/gpt-5".to_owned(), "ollama/llama3".to_owned()]
+        );
+    }
+
+    #[test]
+    fn run_args_collect_repeated_plugin_in_order() {
+        let args = parse_run_args(&[
+            "--plugin".to_owned(),
+            "search".to_owned(),
+            "--plugin".to_owned(),
+            "index".to_owned(),
+            "-p".to_owned(),
+            "hi".to_owned(),
+        ])
+        .expect("parses");
+        assert_eq!(
+            args.plugins,
+            vec!["search".to_owned(), "index".to_owned()]
+        );
+    }
+
+    #[test]
+    fn run_args_default_to_no_plugins() {
+        let args =
+            parse_run_args(&["-p".to_owned(), "hi".to_owned()]).expect("parses without flags");
+        assert!(args.plugins.is_empty());
+    }
+
+    #[test]
+    fn serve_args_collect_repeated_plugin_in_order() {
+        let args = parse_serve_args(&[
+            "--plugin".to_owned(),
+            "learning".to_owned(),
+            "--plugin".to_owned(),
+            "verifier".to_owned(),
+        ])
+        .expect("parses");
+        assert_eq!(
+            args.plugins,
+            vec!["learning".to_owned(), "verifier".to_owned()]
         );
     }
 }

@@ -20,6 +20,7 @@ pub(crate) async fn serve(args: ServeArgs) -> anyhow::Result<()> {
         args.provider.as_deref(),
         args.model.clone(),
         &args.fallback_models,
+        &args.plugins,
         args.workdir.as_deref(),
     )
     .await?;
