@@ -330,7 +330,11 @@ pub fn resolve_real_providers(
             Ok((providers, ModelRef(format!("{GEMINI_PROVIDER_ID}/{model}"))))
         }
         COPILOT_PROVIDER_ID => {
-            let provider = CopilotProvider::from_env()?;
+            let provider = if let Some(key) = provider_keys.get(COPILOT_PROVIDER_ID) {
+                CopilotProvider::new(CopilotConfig::with_token(key.clone()))
+            } else {
+                CopilotProvider::from_env()?
+            };
             let model = model_arg.unwrap_or_else(|| provider.default_model().to_owned());
             let mut providers = ProviderRegistry::new();
             providers.register(Arc::new(provider));
@@ -489,10 +493,18 @@ pub fn resolve_available_providers(
                     })
                 }
             }
-            COPILOT_PROVIDER_ID => CopilotProvider::from_env().map(|p| {
-                let model = p.default_model().to_owned();
-                boxed(p, model)
-            }),
+            COPILOT_PROVIDER_ID => {
+                if let Some(key) = provider_keys.get(COPILOT_PROVIDER_ID) {
+                    let provider = CopilotProvider::new(CopilotConfig::with_token(key.clone()));
+                    let model = provider.default_model().to_owned();
+                    Ok(boxed(provider, model))
+                } else {
+                    CopilotProvider::from_env().map(|p| {
+                        let model = p.default_model().to_owned();
+                        boxed(p, model)
+                    })
+                }
+            }
             OLLAMA_PROVIDER_ID => {
                 let provider = OllamaProvider::from_env();
                 let model = provider.default_model().to_owned();

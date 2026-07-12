@@ -14,6 +14,8 @@ import type {
   BrowserStateEvent,
   BuiltinProvider,
   CommandInfoDto,
+  CopilotAuthStart,
+  CopilotAuthStatus,
   CreateSessionInput,
   FileHit,
   GitStatusSummary,
@@ -126,6 +128,23 @@ export const profileActivate = (id: string): Promise<ProviderConfigView> =>
 export const validateProfile = (
   input: ProviderProfileInput,
 ): Promise<ModelInfoDto[]> => invoke("validate_profile", { input })
+
+/** Whether a GitHub Copilot OAuth token is discoverable (env or apps.json). */
+export const copilotAuthStatus = (): Promise<CopilotAuthStatus> =>
+  invoke("copilot_auth_status")
+
+/** Start a GitHub device-code sign-in; returns the user code to show. */
+export const copilotAuthStart = (): Promise<CopilotAuthStart> =>
+  invoke("copilot_auth_start")
+
+/** Poll until the user confirms the code on github.com. */
+export const copilotAuthWait = (
+  sessionId: string,
+): Promise<CopilotAuthStatus> => invoke("copilot_auth_wait", { sessionId })
+
+/** Cancel an in-flight Copilot device-flow wait. */
+export const copilotAuthCancel = (sessionId: string): Promise<void> =>
+  invoke("copilot_auth_cancel", { sessionId })
 
 export const listModels = (): Promise<ModelInfoDto[]> => invoke("list_models")
 

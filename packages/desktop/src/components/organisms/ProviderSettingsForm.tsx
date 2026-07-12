@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react"
 import {
   ConfirmDialog,
+  CopilotSignInDialog,
   ProviderConnectionForm,
   ProviderProfileList,
   SecretStorageSection,
 } from "../molecules"
+import { useCopilotAuth } from "../../hooks/useCopilotAuth"
 import { useProviderProfiles } from "../../hooks/useProviderProfiles"
 import { useProviderConfig } from "../../hooks/useProviderConfig"
 import { useModels } from "../../hooks/useModels"
@@ -78,6 +80,17 @@ export const ProviderSettingsForm = () => {
   const [formError, setFormError] = useState<string | null>(null)
   const [validateMessage, setValidateMessage] = useState<string | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const [copilotSignInOpen, setCopilotSignInOpen] = useState(false)
+  const pushToast = useAppStore((s) => s.pushToast)
+
+  const isCopilotProvider = provider === "copilot"
+  const {
+    signedIn: copilotSignedIn,
+    start: copilotStart,
+    wait: copilotWait,
+    cancel: copilotCancel,
+    refetchStatus: refetchCopilotStatus,
+  } = useCopilotAuth(isCopilotProvider)
 
   // Platform gate for the Security section's "System Keychain" option —
   // detected once via `@tauri-apps/plugin-os` (mock mode reports "macos" so
@@ -151,6 +164,12 @@ export const ProviderSettingsForm = () => {
   const validateForm = (): string | null => {
     if (!label.trim()) return "Connection name is required"
     if (!provider.trim()) return "Select a provider"
+    if (provider === "copilot") {
+      if (!apiKey.trim() && !hasStoredKey && !copilotSignedIn) {
+        return "Sign in with GitHub or paste a Copilot token"
+      }
+      return null
+    }
     if (requiresKey && !apiKey.trim() && !hasStoredKey) {
       return "API key is required for this provider"
     }
@@ -273,6 +292,7 @@ export const ProviderSettingsForm = () => {
         defaultIsolation={defaultIsolation}
         hasStoredKey={hasStoredKey}
         isBedrock={isBedrock}
+        copilotSignedIn={copilotSignedIn}
         models={models}
         defaultModelOptions={defaultModelOptions}
         builtinProviders={builtinProviders}
@@ -291,6 +311,7 @@ export const ProviderSettingsForm = () => {
         onDefaultIsolationChange={setDefaultIsolation}
         onValidate={() => void handleValidate()}
         onSave={() => void handleSave()}
+        onCopilotSignIn={() => setCopilotSignInOpen(true)}
       />
 
       <SecretStorageSection
@@ -309,6 +330,19 @@ export const ProviderSettingsForm = () => {
         danger
         onConfirm={() => void handleDelete()}
         onCancel={() => setPendingDeleteId(null)}
+      />
+
+      <CopilotSignInDialog
+        open={copilotSignInOpen}
+        onClose={() => setCopilotSignInOpen(false)}
+        onSuccess={() => {
+          setCopilotSignInOpen(false)
+          void refetchCopilotStatus()
+          pushToast("Signed in to GitHub Copilot", "success")
+        }}
+        start={copilotStart}
+        wait={copilotWait}
+        cancel={copilotCancel}
       />
     </div>
   )

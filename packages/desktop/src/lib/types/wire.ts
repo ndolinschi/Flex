@@ -316,6 +316,20 @@ export type BuiltinProvider = {
   requiresApiKey: boolean
 }
 
+/** Result of `copilot_auth_status` / `copilot_auth_wait`. */
+export type CopilotAuthStatus = {
+  signedIn: boolean
+}
+
+/** Public half of a pending device-flow session (`copilot_auth_start`). The
+ * private device code stays in the Tauri backend. */
+export type CopilotAuthStart = {
+  sessionId: string
+  userCode: string
+  verificationUri: string
+  expiresIn: number
+}
+
 /** A named provider connection ("profile") — e.g. "AWS work" (Bedrock, key A,
  * us-east-1) vs. "AWS personal" (Bedrock, key B, eu-west-1). The API key
  * itself is never returned; `hasKey` reports whether one is stored. See

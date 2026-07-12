@@ -29,7 +29,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `CommandPaletteRow` | Palette list row (icon + label + hint) | `index`, `active`, `label`, `hint?`, `icon?`, `onActivate`, `onHover` | CommandPalette |
 | `FuzzySessionRow` | Search-modal session row with highlight + relative time | `index`, `active`, `label`, `query`, `updatedAtMs`, `onActivate`, `onHover` | SearchModal |
 | `ProviderProfileList` | Connections list (select / activate / delete) | `profiles`, `editingId`, `onSelect`, … | ProviderSettingsForm |
-| `ProviderConnectionForm` | Connection create/edit form + models + isolation | form field props + `onValidate` / `onSave` | ProviderSettingsForm |
+| `ProviderConnectionForm` | Connection create/edit form + models + isolation; Copilot branch uses device-flow sign-in | form field props + `onValidate` / `onSave` / `onCopilotSignIn?` | ProviderSettingsForm |
+| `CopilotSignInDialog` | GitHub Copilot device-flow modal (user code + Open GitHub + poll) | `open`, `start` / `wait` / `cancel`, `onSuccess` | ProviderSettingsForm, WelcomePage |
 | `SecretStorageSection` | Security: secret-storage backend select | `secretStorage`, `isMac`, `onChange`, `error?` | ProviderSettingsForm |
 | `SessionListItem` | Agent row + rename/delete + running/unread via per-id store selectors | `session`, `isActive`, `memo` | SessionSidebar |
 | `SessionRowSubtitle` | Diff + relative-time under a session title | `updatedAtMs`, `workspaceStatus?`, `gitStatus?` | SessionListItem |
@@ -147,6 +148,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/hooks/useGroupedModels.ts` | Model picker grouping |
 | `src/hooks/useKeyboardShortcuts.ts` | Enter / ⌘N / ⌘K / ⌘L / Esc |
 | `src/hooks/useProviderConfig.ts` | Provider + plugin + fallback prefs |
+| `src/hooks/useCopilotAuth.ts` | GitHub Copilot device-flow status + start/wait/cancel |
 
 ## Theme & motion
 

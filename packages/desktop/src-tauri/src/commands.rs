@@ -87,7 +87,9 @@ pub async fn list_builtin_providers() -> DesktopResult<Vec<BuiltinProvider>> {
         BuiltinProvider::new("xai", "xAI", true),
         BuiltinProvider::new("ollama", "Ollama", false),
         BuiltinProvider::new("bedrock", "Amazon Bedrock", true),
-        BuiltinProvider::new("copilot", "GitHub Copilot", true),
+        // Copilot uses GitHub device-flow OAuth (or an existing editor
+        // sign-in), not a required pasted API key.
+        BuiltinProvider::new("copilot", "GitHub Copilot", false),
     ])
 }
 
@@ -154,7 +156,9 @@ pub async fn save_provider_config(
 // ---------------------------------------------------------------------------
 
 fn profile_view(cfg: &ProviderConfig, profile: &ProviderProfile) -> ProviderProfileView {
-    let has_key = cfg.profile_keys.contains_key(&profile.id);
+    let has_key = cfg.profile_keys.contains_key(&profile.id)
+        || (profile.provider == "copilot"
+            && agentloop_sdk::providers::copilot::CopilotConfig::discoverable());
     let is_active = cfg.prefs.active_profile_id.as_deref() == Some(profile.id.as_str());
     ProviderProfileView {
         id: profile.id.clone(),
@@ -397,7 +401,9 @@ pub async fn validate_profile(
 
     // Precedence: a freshly typed key always wins; otherwise fall back to
     // whatever is already stored for this profile id (re-validating an
-    // existing connection without retyping the key).
+    // existing connection without retyping the key). Copilot and Ollama
+    // may validate without a profile key when credentials are discoverable
+    // (editor/device-flow sign-in for Copilot; local host for Ollama).
     if let Some(key) = input
         .api_key
         .as_ref()
@@ -405,7 +411,11 @@ pub async fn validate_profile(
         .filter(|s| !s.is_empty())
     {
         cfg.profile_keys.insert(id.clone(), key.to_owned());
-    } else if built.provider != "ollama" && !cfg.profile_keys.contains_key(&id) {
+    } else if built.provider != "ollama"
+        && !(built.provider == "copilot"
+            && agentloop_sdk::providers::copilot::CopilotConfig::discoverable())
+        && !cfg.profile_keys.contains_key(&id)
+    {
         return Err(DesktopError::Message(
             "API key is required for this provider".into(),
         ));
@@ -488,7 +498,10 @@ fn apply_save_input(
         .filter(|s| !s.is_empty())
     {
         cfg.keys.insert(id.to_owned(), key.to_owned());
-    } else if id != "ollama" && !cfg.keys.contains_key(id) {
+    } else if id != "ollama"
+        && !(id == "copilot" && agentloop_sdk::providers::copilot::CopilotConfig::discoverable())
+        && !cfg.keys.contains_key(id)
+    {
         return Err(DesktopError::Message(
             "API key is required for this provider".into(),
         ));
@@ -1301,6 +1314,120 @@ pub async fn is_configured(state: State<'_, AppState>) -> DesktopResult<bool> {
     let cfg = state.config.lock().await;
     let has_service = state.service.lock().await.is_some();
     Ok(cfg.is_ready() && has_service)
+}
+
+// ---------------------------------------------------------------------------
+// GitHub Copilot device-flow sign-in. The private `device_code` never leaves
+// AppState — the frontend only sees a session id plus the public user code
+// and verification URI. On success the token is written to the shared
+// `~/.config/github-copilot/apps.json` that VS Code / JetBrains / Copilot CLI
+// also use.
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CopilotAuthStatus {
+    pub signed_in: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CopilotAuthStart {
+    pub session_id: String,
+    pub user_code: String,
+    pub verification_uri: String,
+    pub expires_in: u64,
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn copilot_auth_status() -> DesktopResult<CopilotAuthStatus> {
+    Ok(CopilotAuthStatus {
+        signed_in: agentloop_sdk::providers::copilot::CopilotConfig::discoverable(),
+    })
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn copilot_auth_start(state: State<'_, AppState>) -> DesktopResult<CopilotAuthStart> {
+    use crate::state::PendingCopilotAuth;
+    use agentloop_sdk::providers::copilot::DeviceFlow;
+
+    let auth = DeviceFlow::new()
+        .start()
+        .await
+        .map_err(|e| DesktopError::Message(e.to_string()))?;
+
+    let session_id = format!("copilot-auth-{}", uuid_like_suffix());
+    let view = CopilotAuthStart {
+        session_id: session_id.clone(),
+        user_code: auth.user_code.clone(),
+        verification_uri: auth.verification_uri.clone(),
+        expires_in: auth.expires_in,
+    };
+
+    let mut pending = state.pending_copilot_auth.lock().await;
+    // A new start cancels any prior in-flight wait so only one dialog can
+    // own the poll loop at a time.
+    for (_, prior) in pending.drain() {
+        prior.cancel.cancel();
+    }
+    pending.insert(
+        session_id,
+        PendingCopilotAuth {
+            auth,
+            cancel: CancellationToken::new(),
+        },
+    );
+    Ok(view)
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn copilot_auth_wait(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> DesktopResult<CopilotAuthStatus> {
+    use agentloop_sdk::providers::copilot::{store_github_token, DeviceFlow};
+
+    let session_id = session_id.trim().to_owned();
+    let (auth, cancel) = {
+        let pending = state.pending_copilot_auth.lock().await;
+        let entry = pending.get(&session_id).ok_or_else(|| {
+            DesktopError::Message("copilot sign-in session not found — start a new sign-in".into())
+        })?;
+        (entry.auth.clone(), entry.cancel.clone())
+    };
+
+    let result = DeviceFlow::new().poll(&auth, cancel).await;
+    // Drop the session either way so a cancelled/failed wait can't be
+    // retried against an expired device code.
+    state.pending_copilot_auth.lock().await.remove(&session_id);
+
+    match result {
+        Ok(token) => {
+            store_github_token(&token).map_err(|e| DesktopError::Message(e.to_string()))?;
+            Ok(CopilotAuthStatus { signed_in: true })
+        }
+        Err(agentloop_core::ProviderError::Cancelled { .. }) => {
+            Err(DesktopError::Message("sign-in cancelled".into()))
+        }
+        Err(err) => Err(DesktopError::Message(err.to_string())),
+    }
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn copilot_auth_cancel(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> DesktopResult<()> {
+    let session_id = session_id.trim();
+    let mut pending = state.pending_copilot_auth.lock().await;
+    if let Some(entry) = pending.remove(session_id) {
+        entry.cancel.cancel();
+    }
+    Ok(())
 }
 
 /// Whether `cwd` is inside a git repository at all (`git rev-parse

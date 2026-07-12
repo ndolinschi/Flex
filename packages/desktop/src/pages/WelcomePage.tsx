@@ -1,7 +1,12 @@
 import { useMemo, useState } from "react"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
 import { Button, Kbd, TextInput } from "../components/atoms"
-import { ErrorBanner, ModelSelect } from "../components/molecules"
+import {
+  CopilotSignInDialog,
+  ErrorBanner,
+  ModelSelect,
+} from "../components/molecules"
+import { useCopilotAuth } from "../hooks/useCopilotAuth"
 import { useModels } from "../hooks/useModels"
 import { useProviderProfiles } from "../hooks/useProviderProfiles"
 import { useSessions } from "../hooks/useSessions"
@@ -16,13 +21,14 @@ type Step = "provider" | "model" | "project"
 const STEPS: Step[] = ["provider", "model", "project"]
 
 const stepTitle: Record<Step, string> = {
-  provider: "Add a provider key",
+  provider: "Add a provider",
   model: "Pick a default model",
   project: "Optional — open a project",
 }
 
 const stepHint: Record<Step, string> = {
-  provider: "Choose a native provider and paste an API key. Keys stay encrypted locally.",
+  provider:
+    "Choose a native provider. Paste an API key, or sign in with GitHub for Copilot. Credentials stay encrypted locally.",
   model: "This becomes the default for new agents. You can change it anytime in the composer.",
   project:
     "Open a folder to start in that workspace. Repo indexing runs automatically when the index plugin is enabled — skip to start chatting immediately.",
@@ -36,6 +42,7 @@ export const WelcomePage = () => {
   const { createSession } = useSessions()
   const setSelectedModelId = useAppStore((s) => s.setSelectedModelId)
   const pushRecentCwd = useAppStore((s) => s.pushRecentCwd)
+  const pushToast = useAppStore((s) => s.pushToast)
 
   const [step, setStep] = useState<Step>("provider")
   const [provider, setProvider] = useState("")
@@ -44,9 +51,19 @@ export const WelcomePage = () => {
   const [projectPath, setProjectPath] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [copilotSignInOpen, setCopilotSignInOpen] = useState(false)
+  const [showCopilotToken, setShowCopilotToken] = useState(false)
 
   const selectedBuiltin = builtinProviders.find((p) => p.id === provider)
   const requiresKey = selectedBuiltin?.requiresApiKey ?? true
+  const isCopilot = provider === "copilot"
+  const {
+    signedIn: copilotSignedIn,
+    start: copilotStart,
+    wait: copilotWait,
+    cancel: copilotCancel,
+    refetchStatus: refetchCopilotStatus,
+  } = useCopilotAuth(isCopilot)
 
   const providerModels = useMemo(
     () => (provider ? models.filter((m) => m.providerId === provider) : models),
@@ -59,6 +76,7 @@ export const WelcomePage = () => {
     setProvider(id)
     setApiKey("")
     setError(null)
+    setShowCopilotToken(false)
     const first = models.find((m) => m.providerId === id)
     if (first) setModelId(first.id)
   }
@@ -69,7 +87,12 @@ export const WelcomePage = () => {
       setError("Select a provider")
       return
     }
-    if (requiresKey && !apiKey.trim()) {
+    if (isCopilot) {
+      if (!apiKey.trim() && !copilotSignedIn) {
+        setError("Sign in with GitHub or paste a Copilot token")
+        return
+      }
+    } else if (requiresKey && !apiKey.trim()) {
       setError("API key is required for this provider")
       return
     }
@@ -199,7 +222,45 @@ export const WelcomePage = () => {
                 ))}
               </select>
             </label>
-            {requiresKey ? (
+            {isCopilot ? (
+              <div className="flex flex-col gap-2 rounded-md border border-border bg-surface px-3 py-3">
+                <p className="text-sm text-ink">
+                  {copilotSignedIn ? (
+                    <span className="text-success">Signed in to GitHub Copilot</span>
+                  ) : (
+                    <span className="text-ink-muted">Not signed in</span>
+                  )}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => setCopilotSignInOpen(true)}
+                    disabled={busy}
+                  >
+                    {copilotSignedIn ? "Sign in again" : "Sign in with GitHub"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowCopilotToken((v) => !v)}
+                    disabled={busy}
+                  >
+                    {showCopilotToken ? "Hide token field" : "Use existing token"}
+                  </Button>
+                </div>
+                {showCopilotToken ? (
+                  <TextInput
+                    type="password"
+                    autoComplete="off"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="gho_…"
+                    aria-label="GitHub Copilot token"
+                    disabled={busy}
+                  />
+                ) : null}
+              </div>
+            ) : requiresKey ? (
               <label className="flex flex-col gap-1.5 text-sm text-ink">
                 <span className="text-xs font-medium text-ink-muted">API key</span>
                 <TextInput
@@ -261,7 +322,9 @@ export const WelcomePage = () => {
                     <span className="break-all font-medium">{projectPath}</span>
                   </>
                 ) : (
-                  <span className="text-ink-muted">No folder selected — you can open one later.</span>
+                  <span className="text-ink-muted">
+                    No folder selected — you can open one later.
+                  </span>
                 )}
               </p>
               <div className="mt-3">
@@ -312,6 +375,19 @@ export const WelcomePage = () => {
           </span>
         </div>
       </div>
+
+      <CopilotSignInDialog
+        open={copilotSignInOpen}
+        onClose={() => setCopilotSignInOpen(false)}
+        onSuccess={() => {
+          setCopilotSignInOpen(false)
+          void refetchCopilotStatus()
+          pushToast("Signed in to GitHub Copilot", "success")
+        }}
+        start={copilotStart}
+        wait={copilotWait}
+        cancel={copilotCancel}
+      />
     </div>
   )
 }
