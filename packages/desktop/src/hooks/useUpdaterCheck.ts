@@ -1,5 +1,8 @@
 import { useEffect, useRef } from "react"
-import { checkForAppUpdate } from "../lib/updater"
+import {
+  checkForAppUpdate,
+  installAppUpdateAndRelaunch,
+} from "../lib/updater"
 import { useAppStore } from "../stores/appStore"
 
 /** Fire-and-forget update check after bootstrap. Surfaces a toast with an
@@ -22,7 +25,6 @@ export const useUpdaterCheck = (enabled: boolean) => {
         onAction: () => {
           void (async () => {
             try {
-              const { installAppUpdateAndRelaunch } = await import("../lib/updater")
               await installAppUpdateAndRelaunch()
             } catch (err) {
               pushToast(

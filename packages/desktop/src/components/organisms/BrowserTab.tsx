@@ -6,7 +6,7 @@ import {
 } from "lucide-react"
 import { Button } from "../atoms"
 import { useBrowserSession } from "../../hooks/useBrowserSession"
-import { isBrowserPreview, registerPreviewBrowserIframe } from "../../lib/browserMock"
+import { NATIVE_APP_REQUIRED } from "../../lib/browserPreview"
 import { BrowserToolbar } from "./browser/BrowserToolbar"
 
 /** Browser right-panel tab: toolbar + omnibar + content area.
@@ -22,7 +22,6 @@ import { BrowserToolbar } from "./browser/BrowserToolbar"
  * the chrome view that consumes it. Toolbar/overflow live under `./browser/`. */
 export const BrowserTab = ({ active }: { active: boolean }) => {
   const {
-    sessionKey,
     contentRef,
     toolbarRef,
     browserUrl,
@@ -34,7 +33,6 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
     preview,
     showLiveContent,
     showElsewhere,
-    presetWidth,
     commitNavigate,
     handleReclaim,
     handleScreenshot,
@@ -47,7 +45,6 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
     handleOpenDevtools,
     browserDesignMode,
     toggleDesignMode,
-    setBrowserSessionState,
     browserBack,
     browserForward,
   } = useBrowserSession(active)
@@ -91,7 +88,15 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
 
       {/* Content — dedicated bounds target for the native child webview */}
       <div ref={contentRef} className="relative z-0 min-h-0 flex-1 bg-bg">
-        {!browserStarted ? (
+        {preview ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 bg-bg px-6">
+            <Globe className="h-8 w-8 text-ink-faint opacity-60" aria-hidden />
+            <p className="text-[14px] font-medium text-ink">Browser</p>
+            <p className="max-w-[320px] text-center text-sm text-ink-muted">
+              {NATIVE_APP_REQUIRED}
+            </p>
+          </div>
+        ) : !browserStarted ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 bg-bg">
             <Globe className="h-8 w-8 text-ink-faint opacity-60" aria-hidden />
             <p className="text-[14px] font-medium text-ink">Browser</p>
@@ -135,29 +140,6 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
                 {`GET ${browserUrl}\n${loadError.host} refused to connect\n${loadError.message}`}
               </pre>
             ) : null}
-          </div>
-        ) : preview ? (
-          <div className="flex h-full w-full items-stretch justify-center bg-fill-3">
-            <iframe
-              title="Browser"
-              src={browserUrl || undefined}
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              onLoad={(e) => {
-                setBrowserSessionState(sessionKey, { loading: false })
-                if (isBrowserPreview()) {
-                  registerPreviewBrowserIframe(e.currentTarget)
-                }
-              }}
-              ref={(node) => {
-                if (isBrowserPreview()) {
-                  registerPreviewBrowserIframe(node)
-                }
-              }}
-              className="h-full border-0 bg-white"
-              style={{
-                width: presetWidth ? `min(${presetWidth}px, 100%)` : "100%",
-              }}
-            />
           </div>
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-bg">

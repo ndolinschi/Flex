@@ -24,6 +24,24 @@ export default defineConfig(async () => ({
     tailwindcss(),
   ],
 
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "react-vendor": ["react", "react-dom"],
+          tanstack: ["@tanstack/react-query", "@tanstack/react-virtual"],
+          markdown: [
+            "react-markdown",
+            "remark-gfm",
+            "rehype-highlight",
+            "highlight.js",
+          ],
+          xterm: ["@xterm/xterm", "@xterm/addon-fit"],
+        },
+      },
+    },
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

@@ -16,7 +16,7 @@ import {
   listenBrowserState,
   toInvokeError,
 } from "../lib/tauri"
-import { isBrowserPreview } from "../lib/browserMock"
+import { isBrowserPreview, NATIVE_APP_REQUIRED } from "../lib/browserPreview"
 import {
   useAppStore,
   sessionScopeKey,
@@ -149,7 +149,7 @@ export const useBrowserSession = (active: boolean) => {
 
   const handleScreenshot = useCallback(async () => {
     if (isBrowserPreview()) {
-      pushToast("Screenshot unavailable in preview", "success")
+      pushToast(NATIVE_APP_REQUIRED, "error")
       return
     }
     try {
@@ -216,7 +216,7 @@ export const useBrowserSession = (active: boolean) => {
 
   const handleClearData = useCallback(async () => {
     if (isBrowserPreview()) {
-      pushToast("Clear Browsing Data unavailable in preview", "success")
+      pushToast(NATIVE_APP_REQUIRED, "error")
       return
     }
     try {
@@ -247,7 +247,7 @@ export const useBrowserSession = (active: boolean) => {
 
   const handleOpenDevtools = useCallback(() => {
     if (isBrowserPreview()) {
-      pushToast("DevTools unavailable in preview", "success")
+      pushToast(NATIVE_APP_REQUIRED, "error")
       return
     }
     void browserOpenDevtools()

@@ -9,9 +9,8 @@ import type { ToolCall } from "./types/wire"
 
 /**
  * Regression coverage for `clusterToolRows` — the twice-regressed
- * timeline clustering bug (see HANDOFF-OPUS.md, `preview-session-6`/
- * `preview-session-8` fixtures in `browserMock.ts`). Fixtures below mirror
- * those exact event sequences: a real turn interleaves mid-turn assistant
+ * timeline clustering bug. Fixtures mirror historical preview-session
+ * event sequences: a real turn interleaves mid-turn assistant
  * narration (visible or empty-text/invisible) between same-family tool
  * calls, and clustering must not treat that narration as a boundary.
  */

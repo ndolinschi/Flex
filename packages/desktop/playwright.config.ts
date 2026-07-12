@@ -4,8 +4,7 @@ const port = Number(process.env.E2E_PORT ?? 1420)
 const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${port}`
 
 /**
- * Fast PR-gate E2E: Vite + browserMock (no Tauri, no real providers).
- * Nightly osascript / soak live in `.github/workflows/nightly.yml`.
+ * PR-gate E2E: Vite preview asserts the native-app-required gate (no mock IPC).
  */
 export default defineConfig({
   testDir: "./e2e",

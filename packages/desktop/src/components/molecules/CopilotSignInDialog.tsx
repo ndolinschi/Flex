@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "../atoms"
 import { ErrorBanner } from "./ErrorBanner"
-import { isBrowserPreview } from "../../lib/browserMock"
+import { isBrowserPreview } from "../../lib/browserPreview"
 import { cn } from "../../lib/utils"
 import type { CopilotAuthStart } from "../../lib/types"
 

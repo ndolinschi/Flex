@@ -1,7 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react"
-import { Terminal, type ITheme } from "@xterm/xterm"
-import { FitAddon } from "@xterm/addon-fit"
-import "@xterm/xterm/css/xterm.css"
+import type { ITheme, Terminal } from "@xterm/xterm"
 import { terminalResize, terminalWrite } from "../lib/tauri"
 import { subscribeTerminal } from "../lib/terminalBus"
 
@@ -62,10 +60,15 @@ export type UseTerminalOptions = {
   readOnly?: boolean
 }
 
+type FitAddonLike = { fit: () => void }
+
 /**
  * Owns one xterm.js `Terminal` instance bound to a backend PTY session `id`.
  * Mount one `useTerminal` per rendered terminal container; the hook wires
  * input/output/resize/exit and disposes everything on unmount.
+ *
+ * xterm + CSS are dynamic-imported inside the effect so the chat shell does
+ * not pay for the terminal vendor chunk until a terminal tab mounts.
  */
 export const useTerminal = (
   id: string,
@@ -74,74 +77,109 @@ export const useTerminal = (
   options?: UseTerminalOptions,
 ) => {
   const readOnly = options?.readOnly ?? false
-  const fitRef = useRef<FitAddon | null>(null)
+  const fitRef = useRef<FitAddonLike | null>(null)
   const termRef = useRef<Terminal | null>(null)
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
-    const theme = readThemeVars()
-    const term = new Terminal({
-      fontFamily: 'Menlo, Monaco, ui-monospace, "SF Mono", monospace',
-      fontSize: 12,
-      lineHeight: 1.4,
-      cursorBlink: true,
-      scrollback: 5000,
-      theme,
-      allowProposedApi: false,
-      disableStdin: readOnly,
-    })
-    termRef.current = term
+    let cancelled = false
+    let term: Terminal | null = null
+    let dataDisposable: { dispose: () => void } | null = null
+    let themeObserver: MutationObserver | null = null
+    let resizeObserver: ResizeObserver | null = null
+    let unsubscribe: (() => void) | null = null
 
-    const fitAddon = new FitAddon()
-    fitRef.current = fitAddon
-    term.loadAddon(fitAddon)
+    void (async () => {
+      const [{ Terminal: TerminalCtor }, { FitAddon }] = await Promise.all([
+        import("@xterm/xterm"),
+        import("@xterm/addon-fit"),
+      ])
+      await import("@xterm/xterm/css/xterm.css")
+      if (cancelled) return
 
-    term.open(container)
-    if (container.clientWidth > 0 && container.clientHeight > 0) {
-      fitAddon.fit()
-      if (!readOnly) void terminalResize(id, term.cols, term.rows)
-    }
+      const theme = readThemeVars()
+      term = new TerminalCtor({
+        fontFamily: 'Menlo, Monaco, ui-monospace, "SF Mono", monospace',
+        fontSize: 12,
+        lineHeight: 1.4,
+        cursorBlink: true,
+        scrollback: 5000,
+        theme,
+        allowProposedApi: false,
+        disableStdin: readOnly,
+      })
+      if (cancelled) {
+        term.dispose()
+        term = null
+        return
+      }
+      termRef.current = term
 
-    const dataDisposable = readOnly
-      ? null
-      : term.onData((data) => {
-          void terminalWrite(id, data)
-        })
+      const fitAddon = new FitAddon()
+      fitRef.current = fitAddon
+      term.loadAddon(fitAddon)
 
-    const themeObserver = new MutationObserver(() => {
-      term.options.theme = readThemeVars()
-    })
-    themeObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
-    })
+      term.open(container)
+      if (container.clientWidth > 0 && container.clientHeight > 0) {
+        fitAddon.fit()
+        if (!readOnly) void terminalResize(id, term.cols, term.rows)
+      }
 
-    const resizeObserver = new ResizeObserver(() => {
-      if (container.clientWidth === 0 || container.clientHeight === 0) return
-      fitAddon.fit()
-      if (!readOnly) void terminalResize(id, term.cols, term.rows)
-    })
-    resizeObserver.observe(container)
+      dataDisposable = readOnly
+        ? null
+        : term.onData((data) => {
+            void terminalWrite(id, data)
+          })
 
-    // Synchronous subscribe via the bus: replays buffered scrollback first,
-    // so output emitted before this instance mounted (shell prompt, StrictMode
-    // remount gaps) is never lost.
-    const unsubscribe = subscribeTerminal(id, (data) => term.write(data))
+      themeObserver = new MutationObserver(() => {
+        if (!term) return
+        term.options.theme = readThemeVars()
+      })
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-theme"],
+      })
 
-    if (active) {
-      term.focus()
-    }
+      resizeObserver = new ResizeObserver(() => {
+        if (container.clientWidth === 0 || container.clientHeight === 0) return
+        fitAddon.fit()
+        if (!readOnly && term) void terminalResize(id, term.cols, term.rows)
+      })
+      resizeObserver.observe(container)
+
+      // Synchronous subscribe via the bus: replays buffered scrollback first,
+      // so output emitted before this instance mounted (shell prompt, StrictMode
+      // remount gaps) is never lost.
+      unsubscribe = subscribeTerminal(id, (data) => term?.write(data))
+
+      if (cancelled) {
+        themeObserver.disconnect()
+        resizeObserver.disconnect()
+        dataDisposable?.dispose()
+        unsubscribe()
+        fitRef.current = null
+        termRef.current = null
+        term.dispose()
+        term = null
+        return
+      }
+
+      if (active) {
+        term.focus()
+      }
+    })()
 
     return () => {
-      themeObserver.disconnect()
-      resizeObserver.disconnect()
+      cancelled = true
+      themeObserver?.disconnect()
+      resizeObserver?.disconnect()
       dataDisposable?.dispose()
-      unsubscribe()
+      unsubscribe?.()
       fitRef.current = null
       termRef.current = null
-      term.dispose()
+      term?.dispose()
     }
   }, [id, containerRef, readOnly])
 

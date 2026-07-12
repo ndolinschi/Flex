@@ -1,7 +1,6 @@
 import { useEffect } from "react"
-import { isBrowserPreview } from "../lib/browserMock"
 import { initGlobalErrorLogging, log } from "../lib/debug/log"
-import { isConfigured, listSessions, resumeSession } from "../lib/tauri"
+import { isConfigured, resumeSession } from "../lib/tauri"
 import type { AppRoute } from "../lib/types/ui"
 import { restoreUiState, useAppStore } from "../stores/appStore"
 import type { UiTheme } from "../stores/types"
@@ -56,23 +55,10 @@ export const useBootstrap = (
           } catch {
             useAppStore.getState().setActiveSessionId(null)
           }
-        } else if (isBrowserPreview()) {
-          try {
-            const sessions = await listSessions()
-            const first = sessions[0]
-            if (first) {
-              await resumeSession(first.id)
-              useAppStore.getState().setActiveSessionId(first.id)
-            }
-          } catch {
-            // Preview can still open without a session
-          }
         }
 
         if (ui.selectedModelId) {
           useAppStore.getState().setSelectedModelId(ui.selectedModelId)
-        } else if (isBrowserPreview()) {
-          useAppStore.getState().setSelectedModelId("anthropic/claude-sonnet-4")
         }
 
         if (ui.selectedIsolation) {

@@ -10,7 +10,7 @@ import { useCopilotAuth } from "../hooks/useCopilotAuth"
 import { useModels } from "../hooks/useModels"
 import { useProviderProfiles } from "../hooks/useProviderProfiles"
 import { useSessions } from "../hooks/useSessions"
-import { isBrowserPreview } from "../lib/browserMock"
+import { isBrowserPreview, NATIVE_APP_REQUIRED } from "../lib/browserPreview"
 import { newAgentCreateInput } from "../lib/sessions"
 import type { ProviderProfileInput } from "../lib/types"
 import { useAppStore } from "../stores/appStore"
@@ -132,7 +132,7 @@ export const WelcomePage = () => {
     setError(null)
     try {
       if (isBrowserPreview()) {
-        setProjectPath("/preview/project")
+        setError(NATIVE_APP_REQUIRED)
         return
       }
       const selected = await openDialog({

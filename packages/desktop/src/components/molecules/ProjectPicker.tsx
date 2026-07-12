@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { Check, Folder, FolderOpen } from "lucide-react"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
 import { createSession, toInvokeError, updateSession } from "../../lib/tauri"
-import { isBrowserPreview } from "../../lib/browserMock"
+import { isBrowserPreview, NATIVE_APP_REQUIRED } from "../../lib/browserPreview"
 import { DEFAULT_SESSION_TITLE } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
 import { basename } from "../../lib/utils"
@@ -111,7 +111,7 @@ export const ProjectPicker = ({
   const handleOpenFolder = async () => {
     try {
       if (isBrowserPreview()) {
-        await applyCwd(`/Users/preview/opened-${Date.now()}`)
+        onError?.(NATIVE_APP_REQUIRED)
         return
       }
       const selected = await openDialog({

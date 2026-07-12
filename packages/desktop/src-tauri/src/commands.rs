@@ -861,21 +861,25 @@ pub async fn subscribe_session(
 
     let key = session_id.clone();
     let handle = tokio::spawn(async move {
+        let session_key = key;
         let mut stream = stream;
         while let Some(event) = stream.next().await {
             if let Err(err) = app.emit("session-event", &event) {
                 tracing::warn!(
-                    session_id = %key,
+                    session_id = %session_key.as_str(),
                     error = %err,
                     "session-event emit failed; ending subscription relay"
                 );
                 break;
             }
         }
-        tracing::debug!(session_id = %key, "session subscription stream ended");
+        tracing::debug!(
+            session_id = %session_key.as_str(),
+            "session subscription stream ended"
+        );
     });
 
-    state.subscriptions.lock().await.insert(key, handle);
+    state.subscriptions.lock().await.insert(session_id, handle);
     Ok(())
 }
 

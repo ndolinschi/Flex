@@ -10,10 +10,9 @@ import type { TimelineRow, ToolCall, TurnSummary } from "../../../lib/types"
 
 /**
  * Regression coverage for `buildDisplayItems` — the second twice-regressed
- * timeline bug (see HANDOFF-OPUS.md). Fixtures mirror the exact
- * `preview-session-6`/`preview-session-8` event sequences from
- * `browserMock.ts`: a turn with mid-turn tool calls and interleaved
- * narration, both completed and still-streaming.
+ * timeline bug. Fixtures mirror historical preview-session event sequences:
+ * a turn with mid-turn tool calls and interleaved narration, both completed
+ * and still-streaming.
  */
 
 let callSeq = 0

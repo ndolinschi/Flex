@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       soak_turns:
-        description: "browserMock soak turn count"
+        description: "soak turn count (unused until Tauri soak lands)"
         required: false
         default: "5"
 
@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── 3.2 lightweight soak (vite + browserMock, N turns) ────────────────────
+  # ── 3.2 soak placeholder (mock IPC removed; skip until Tauri soak) ───────
   soak-browser-mock:
     runs-on: ubuntu-latest
     defaults:
@@ -40,30 +40,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: packages/desktop/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      # Keep vite in the same step as soak — background jobs die when a step ends.
-      - name: Run soak against Vite preview
-        run: |
-          pnpm exec vite --host 127.0.0.1 --port 1420 --strictPort &
-          vite_pid=$!
-          trap 'kill $vite_pid 2>/dev/null || true' EXIT
-          for i in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:1420/ >/dev/null; then
-              break
-            fi
-            if ! kill -0 "$vite_pid" 2>/dev/null; then
-              echo "vite exited early" >&2
-              exit 1
-            fi
-            sleep 1
-            if [[ "$i" -eq 60 ]]; then
-              echo "vite did not become ready" >&2
-              exit 1
-            fi
-          done
-          SOAK_BASE_URL=http://127.0.0.1:1420 SOAK_OUT=.soak/ci-summary.json pnpm soak
-        env:
-          SOAK_TURNS: ${{ github.event.inputs.soak_turns || '5' }}
+      - name: Run soak placeholder
+        run: SOAK_OUT=.soak/ci-summary.json pnpm soak
       - uses: actions/upload-artifact@v4
         if: always()
         with:

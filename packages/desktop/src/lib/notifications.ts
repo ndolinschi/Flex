@@ -1,4 +1,4 @@
-import { isBrowserPreview } from "./browserMock"
+import { isBrowserPreview } from "./browserPreview"
 
 /**
  * Native "turn finished" notification (the reference design parity). Dynamically imports

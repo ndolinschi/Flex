@@ -9,7 +9,7 @@
 //
 // Browser preview / Vite-only runs never load the native plugin — every
 // helper short-circuits to a safe stub.
-import { isBrowserPreview } from "./browserMock"
+import { isBrowserPreview } from "./browserPreview"
 import { log } from "./debug/log"
 
 export type UpdateCheckResult =

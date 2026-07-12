@@ -1,7 +1,7 @@
 import { useState, type ClipboardEvent, type DragEvent } from "react"
 import { open } from "@tauri-apps/plugin-dialog"
 import { attachImageBlob } from "../components/organisms/composer/composerAttachments"
-import { isBrowserPreview } from "../lib/browserMock"
+import { isBrowserPreview, NATIVE_APP_REQUIRED } from "../lib/browserPreview"
 import { toInvokeError } from "../lib/tauri"
 import { useAppStore } from "../stores/appStore"
 
@@ -19,13 +19,7 @@ export const useComposerAttachments = () => {
   const handlePick = async (kind: "file" | "image") => {
     try {
       if (isBrowserPreview()) {
-        const name = kind === "image" ? "preview.png" : "preview.txt"
-        addAttachment({
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          path: `/Users/preview/${name}`,
-          kind,
-          name,
-        })
+        setError(NATIVE_APP_REQUIRED)
         return
       }
       const selected = await open({

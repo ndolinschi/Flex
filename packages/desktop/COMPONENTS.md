@@ -125,11 +125,11 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/lib/timeline/` | Pure timeline fold: `applyEvent`, `applyStreaming`, `parseWorkflow`, `thinkingSpans`, `rowIds` |
 | `src/lib/toolPresentation.ts` | Pure tool classify/summarize/cluster helpers |
 | `src/lib/sessionSideEffects/` | Global-event side effects (`applyGlobalEvent`, `agentTerminal`, `devServerToast`) |
-| `src/lib/browserMock.ts` | Vite preview only — never used under Tauri |
+| `src/lib/browserPreview.ts` | Tiny `isBrowserPreview` + `NATIVE_APP_REQUIRED` gate (no mock backend) |
 | `src/lib/browserDesign.ts` | Design Mode DOM payload + markdown serializer for composer chips |
-| `e2e/` + `playwright.config.ts` | Phase 3.1 PR-gate Playwright smoke (vite + browserMock) |
-| `scripts/soak.mjs` | Phase 3.2 nightly soak skeleton (N mock turns + memory samples) |
-| `scripts/preview-verify.mjs` | Manual screenshot walk against a running `pnpm dev` |
+| `e2e/` + `playwright.config.ts` | Asserts Vite preview shows native-app-required (no IPC mock) |
+| `scripts/soak.mjs` | Soak skeleton — exits unless real Tauri is available |
+| `scripts/preview-verify.mjs` | Manual screenshot walk (requires native app) |
 | `src/lib/mcp.ts` | Pure MCP form helpers: `parseArgs`, `parseEnv`, `MCP_ID_RE`, `buildCatalogServerDto` |
 | `src/lib/sessionGrouping.ts` | Pure `groupByRepo` — groups/sorts sessions by `cwd` for SessionSidebar |
 | `src/lib/fuzzySearch.ts` | Shared `fuzzyScore` / `fuzzyMatchIndices` for CommandPalette + SearchModal |
@@ -172,5 +172,6 @@ Keep this file in sync when adding or renaming components.
 ## Perf notes (Wave 3)
 
 - **Timeline virtualization:** `TurnTimeline` uses `@tanstack/react-virtual` over `displayItems`. Live tail (Working / reconnect / FilesChangedCard / bottom sentinel) stays outside the virtual window so stick-to-bottom remains correct. Virtualized rows do **not** use `content-visibility: auto` — cv on the mounted overscan window races with WebView2 measurement during scroll (Windows overlap). Off-screen work is already skipped by unmounting. Item spacing uses padding (`pt-*`) so virtual `measureElement` includes gaps; `translateY` offsets are rounded to integer px for fractional DPI.
+- **Windows consoles:** Release builds are GUI-subsystem. Ordinary children (`git`/`gh`/`cmd`) use `CREATE_NO_WINDOW` via `src-tauri/src/win_console.rs` and the engine `executors` helpers. The Terminal tab's ConPTY PowerShell must **not** use that flag (breaks pipe I/O); instead `ensure_hidden_parent_console` allocates a hidden parent console at startup so ConPTY children do not pop a visible window. Terminal cwd uses `dirs::home_dir` / USERPROFILE (not `$HOME`→`/`) and collapses doubled `\` path escapes.
 - **React Compiler:** Enabled in `vite.config.ts` via `babel-plugin-react-compiler` (React 19 target). Verified with `tsc --noEmit`, `vitest run`, and `vite build`.
 - **Markdown highlight:** Core language pack loads as a separate chunk (`lib/markdownHighlight.ts`); GFM renders immediately, highlight upgrades after the dynamic import.

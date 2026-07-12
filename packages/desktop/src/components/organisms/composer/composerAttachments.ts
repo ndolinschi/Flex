@@ -1,5 +1,5 @@
 import type { ComposerAttachment } from "../../../lib/types"
-import { isBrowserPreview } from "../../../lib/browserMock"
+import { isBrowserPreview } from "../../../lib/browserPreview"
 import { writeTempBlob } from "../../../lib/tauri"
 
 export const extForMimeType = (mimeType: string): string => {
@@ -11,8 +11,7 @@ export const extForMimeType = (mimeType: string): string => {
 
 /** Attach a clipboard/drop image blob.
  *
- * Preview: no real filesystem, so the attachment's `path` is an object URL —
- * good enough for the thumbnail preview, never sent anywhere.
+ * Preview: no filesystem — return false so the caller can surface an error.
  *
  * Native: the blob only exists in memory (clipboard/drag data), and the
  * engine's attachment contract only understands file paths
@@ -29,18 +28,9 @@ export const attachImageBlob = async (
   addAttachment: (att: ComposerAttachment) => void,
   suggestedName?: string,
 ): Promise<boolean> => {
+  if (isBrowserPreview()) return false
   const ext = extForMimeType(blob.type)
   const name = suggestedName ?? `pasted-${Date.now()}.${ext}`
-  if (isBrowserPreview()) {
-    const url = URL.createObjectURL(blob)
-    addAttachment({
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      path: url,
-      kind: "image",
-      name,
-    })
-    return true
-  }
   try {
     const bytes = new Uint8Array(await blob.arrayBuffer())
     const path = await writeTempBlob(bytes, ext)

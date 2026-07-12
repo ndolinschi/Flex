@@ -23,15 +23,13 @@ pnpm install
 pnpm tauri dev
 ```
 
-Browser UI preview (no Tauri, mock backend):
+UI requires the native Tauri runtime — there is no mock IPC backend for
+`pnpm dev` alone. Opening Vite in a plain browser shows a "Desktop app
+required" screen.
 
-```bash
-pnpm dev
-```
+### E2E (Playwright) — PR gate
 
-### E2E (Playwright + browserMock) — PR gate
-
-Fast UI smoke against Vite + `src/lib/browserMock.ts` (no Tauri, no API keys):
+Asserts the Vite preview gate (no Tauri, no simulated backend):
 
 ```bash
 cd packages/desktop
@@ -44,14 +42,10 @@ Specs live in `e2e/`. Playwright starts Vite on `127.0.0.1:1420` automatically
 unless `E2E_BASE_URL` is set (then it reuses that server). CI job: `desktop-e2e`
 in `.github/workflows/ci.yml`.
 
-Optional screenshot walk (manual): start `pnpm dev`, then
-`node scripts/preview-verify.mjs`.
-
 ### Nightly soak / provider matrix
 
-- **Soak (3.2 skeleton):** with `pnpm dev` running,
-  `SOAK_TURNS=5 pnpm soak` — N mock turns + heap/DOM samples → `.soak/`.
-  Nightly workflow: `.github/workflows/nightly.yml` → `soak-browser-mock`.
+- **Soak:** placeholder — real soak needs a Tauri + provider harness (mock IPC
+  path removed). Nightly job may be skipped or soft-fail until that lands.
 - **Provider matrix (3.4 skeleton):** env-gated, soft-pass without keys:
   `./packages/sdk/scripts/provider-matrix-smoke.sh`
   (nightly job `provider-matrix`). Missing `*_API_KEY` secrets skip providers.

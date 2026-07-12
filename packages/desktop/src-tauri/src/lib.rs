@@ -122,6 +122,11 @@ fn chrono_today_suffix() -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Before any ConPTY / portable-pty spawn: give this GUI-subsystem process
+    // a hidden console so Windows does not pop a visible PowerShell window
+    // per terminal tab. See `win_console::ensure_hidden_parent_console`.
+    win_console::ensure_hidden_parent_console();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())

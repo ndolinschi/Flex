@@ -1,14 +1,6 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core"
 import { listen as tauriListen, type UnlistenFn } from "@tauri-apps/api/event"
-import {
-  browserInvoke,
-  browserListenBrowserState,
-  browserListenBrowserDesign,
-  browserListenSessionEvents,
-  browserListenTerminalExit,
-  browserListenTerminalOutput,
-  isBrowserPreview,
-} from "./browserMock"
+import { isBrowserPreview, NATIVE_APP_REQUIRED } from "./browserPreview"
 import { log, truncateForLog } from "./debug/log"
 import type {
   BackgroundProcessDto,
@@ -47,18 +39,24 @@ import type {
   BrowserDesignEvent,
 } from "./types"
 
-/** Single choke point for every IPC call (native Tauri `invoke` or the
- * browser-preview mock) — the highest-value place to log from, since every
- * frontend/backend round-trip passes through here. Logs the command name,
- * truncated args, duration, and (on failure) the error, all under the
+/** Single choke point for every native Tauri `invoke`. Browser preview has
+ * no backend — reject clearly instead of simulating IPC. Logs the command
+ * name, truncated args, duration, and (on failure) the error under the
  * "ipc" namespace — no-op when debug logging is off (see
  * `log.ts::isDebugEnabled`). */
 const invoke = async <T>(cmd: string, args?: Record<string, unknown>): Promise<T> => {
   const startedAt = performance.now()
+  if (isBrowserPreview()) {
+    const err = new Error(NATIVE_APP_REQUIRED)
+    log.error("ipc", `${cmd} failed`, {
+      args: args ? truncateForLog(args) : undefined,
+      durationMs: Math.round(performance.now() - startedAt),
+      error: err.message,
+    })
+    throw err
+  }
   try {
-    const result = isBrowserPreview()
-      ? await browserInvoke<T>(cmd, args)
-      : await tauriInvoke<T>(cmd, args)
+    const result = await tauriInvoke<T>(cmd, args)
     log.debug("ipc", cmd, {
       args: args ? truncateForLog(args) : undefined,
       durationMs: Math.round(performance.now() - startedAt),
@@ -100,10 +98,9 @@ export const setSecretStorage = (
 /** OS platform family (`"macos" | "windows" | "linux" | ...`), via
  * `@tauri-apps/plugin-os`'s `type()` — gates the Security section's "System
  * Keychain" option to macOS only (the backend rejects it elsewhere; see
- * `secrets.rs`). In browser preview (no plugin runtime) this always resolves
- * to `"macos"` so the option is visible for design review. */
+ * `secrets.rs`). */
 export const platformType = async (): Promise<string> => {
-  if (isBrowserPreview()) return "macos"
+  if (isBrowserPreview()) throw new Error(NATIVE_APP_REQUIRED)
   const { type } = await import("@tauri-apps/plugin-os")
   return type()
 }
@@ -363,7 +360,7 @@ export const revertSnapshot = (
 export const listenSessionEvents = (
   handler: (event: SessionEvent) => void,
 ): Promise<UnlistenFn> => {
-  if (isBrowserPreview()) return browserListenSessionEvents(handler)
+  if (isBrowserPreview()) return Promise.resolve(() => {})
   return tauriListen<SessionEvent>("session-event", (e) => {
     handler(e.payload)
   })
@@ -505,7 +502,7 @@ export const browserSetDesignMode = (enabled: boolean): Promise<void> =>
 export const listenTerminalOutput = (
   handler: (event: TerminalOutputEvent) => void,
 ): Promise<UnlistenFn> => {
-  if (isBrowserPreview()) return browserListenTerminalOutput(handler)
+  if (isBrowserPreview()) return Promise.resolve(() => {})
   return tauriListen<TerminalOutputEvent>("terminal-output", (e) => {
     handler(e.payload)
   })
@@ -514,7 +511,7 @@ export const listenTerminalOutput = (
 export const listenTerminalExit = (
   handler: (event: TerminalExitEvent) => void,
 ): Promise<UnlistenFn> => {
-  if (isBrowserPreview()) return browserListenTerminalExit(handler)
+  if (isBrowserPreview()) return Promise.resolve(() => {})
   return tauriListen<TerminalExitEvent>("terminal-exit", (e) => {
     handler(e.payload)
   })
@@ -523,7 +520,7 @@ export const listenTerminalExit = (
 export const listenBrowserState = (
   handler: (event: BrowserStateEvent) => void,
 ): Promise<UnlistenFn> => {
-  if (isBrowserPreview()) return browserListenBrowserState(handler)
+  if (isBrowserPreview()) return Promise.resolve(() => {})
   return tauriListen<BrowserStateEvent>("browser-state", (e) => {
     handler(e.payload)
   })
@@ -532,7 +529,7 @@ export const listenBrowserState = (
 export const listenBrowserDesign = (
   handler: (event: BrowserDesignEvent) => void,
 ): Promise<UnlistenFn> => {
-  if (isBrowserPreview()) return browserListenBrowserDesign(handler)
+  if (isBrowserPreview()) return Promise.resolve(() => {})
   return tauriListen<BrowserDesignEvent>("browser-design-event", (e) => {
     handler(e.payload)
   })
@@ -622,10 +619,7 @@ export const indexStatus = (cwd: string): Promise<IndexStatus> =>
 export const indexRebuild = (cwd: string): Promise<IndexRebuildResult> =>
   invoke("index_rebuild", { cwd })
 
-export const appVersion = (): Promise<string> => {
-  if (isBrowserPreview()) return Promise.resolve("0.1.0-preview")
-  return invoke("app_version")
-}
+export const appVersion = (): Promise<string> => invoke("app_version")
 
 /** Persists a pasted/dropped image blob's raw bytes to a uniquely-named file
  * in the OS temp dir and returns the absolute path — the only way to turn an
@@ -638,13 +632,5 @@ export const writeTempBlob = (bytes: Uint8Array, ext: string): Promise<string> =
 
 /** Absolute path of the backend's rolling debug log file (see `init_tracing`
  * in `src-tauri/src/lib.rs`), for the Settings Diagnostics section's "Copy
- * log path"/"Open logs folder" affordance. No browser-preview mock exists
- * for this command (there is no backend process in preview), so this
- * short-circuits to a placeholder path there instead of routing through
- * `invoke`/`browserInvoke`. */
-export const debugLogPath = (): Promise<string> => {
-  if (isBrowserPreview()) {
-    return Promise.resolve("/preview/logs/flex-desktop.log")
-  }
-  return invoke("debug_log_path")
-}
+ * log path"/"Open logs folder" affordance. */
+export const debugLogPath = (): Promise<string> => invoke("debug_log_path")

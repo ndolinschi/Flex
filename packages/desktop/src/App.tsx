@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { lazy, Suspense, useRef, useState } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { useBootstrap } from "./hooks/useBootstrap"
 import { useGlobalSessionEvents } from "./hooks/useGlobalSessionEvents"
@@ -6,6 +6,7 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts"
 import { useSessions } from "./hooks/useSessions"
 import { useUpdaterCheck } from "./hooks/useUpdaterCheck"
 import { useViewportWidth } from "./hooks/useViewportWidth"
+import { isBrowserPreview } from "./lib/browserPreview"
 import { cancel } from "./lib/tauri"
 import {
   CommandPalette,
@@ -15,10 +16,13 @@ import {
 } from "./components/organisms"
 import { ToastHost } from "./components/molecules"
 import { ChatPage } from "./pages/ChatPage"
-import { SettingsPage } from "./pages/SettingsPage"
 import { WelcomePage } from "./pages/WelcomePage"
 import { useAppStore } from "./stores/appStore"
 import { cn } from "./lib/utils"
+
+const SettingsPage = lazy(() =>
+  import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
+)
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,6 +32,19 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+const NativeAppRequired = () => (
+  <div className="flex h-full min-h-screen flex-col items-center justify-center gap-3 bg-bg px-6">
+    <p className="text-[18px] font-medium text-ink">Desktop app required</p>
+    <p className="max-w-[420px] text-center text-sm text-ink-muted">
+      Browser preview has no backend. Run{" "}
+      <code className="rounded bg-fill-3 px-1.5 py-0.5 text-[12px] text-ink">
+        pnpm tauri dev
+      </code>{" "}
+      or open the installed app.
+    </p>
+  </div>
+)
 
 const AppRoutes = () => {
   const route = useAppStore((s) => s.route)
@@ -170,7 +187,15 @@ const AppRoutes = () => {
           route === "automations" ||
           route === "memory" ? (
             <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
-              <SettingsPage embedded />
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center text-sm text-ink-muted">
+                    Loading…
+                  </div>
+                }
+              >
+                <SettingsPage embedded />
+              </Suspense>
             </div>
           ) : null}
         </div>
@@ -190,6 +215,7 @@ const AppRoutes = () => {
 }
 
 const App = () => {
+  if (isBrowserPreview()) return <NativeAppRequired />
   return (
     <QueryClientProvider client={queryClient}>
       <div className="h-full">

@@ -7,7 +7,7 @@ import {
   toInvokeError,
   updateSession,
 } from "../lib/tauri"
-import { isBrowserPreview } from "../lib/browserMock"
+import { isBrowserPreview } from "../lib/browserPreview"
 import { mergeDomContextWithDraft } from "../lib/browserDesign"
 import {
   effortLabel,

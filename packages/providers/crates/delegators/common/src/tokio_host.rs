@@ -75,6 +75,12 @@ impl ProcessHost for TokioCommandHost {
             Stdio::null()
         });
         command.kill_on_drop(true);
+        // GUI parents (desktop) must not flash a conhost for connector CLIs.
+        #[cfg(windows)]
+        {
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            command.creation_flags(CREATE_NO_WINDOW);
+        }
 
         let mut child = command.spawn().map_err(|err| match err.kind() {
             ErrorKind::NotFound => DelegatorHostError::NotInstalled {

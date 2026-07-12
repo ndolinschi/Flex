@@ -294,8 +294,8 @@ jobs:
       - run: pnpm exec tsc --noEmit
       - run: pnpm test
 
-  # Phase 3.1 fast layer: Playwright against vite + browserMock (no Tauri).
-  # Nightly soak / provider matrix / osascript stub live in nightly.yml.
+  # Phase 3.1 fast layer: Playwright asserts Vite shows native-app-required
+  # (no mock IPC). Nightly soak / provider matrix live in nightly.yml.
   desktop-e2e:
     runs-on: ubuntu-latest
     env:
