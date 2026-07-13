@@ -235,9 +235,11 @@ export const SessionListItem = memo(function SessionListItem({
               <p
                 className={cn(
                   "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-sm",
-                  "[mask-image:linear-gradient(to_right,#000_calc(100%-16px),transparent)]",
-                  "group-hover:[mask-image:linear-gradient(to_right,#000_calc(100%-88px),transparent)]",
-                  "group-focus-within:[mask-image:linear-gradient(to_right,#000_calc(100%-88px),transparent)]",
+                  // Soft edge always; on hover/focus widen the dissolve so the
+                  // title fades into shadow under the trailing action tray.
+                  "[mask-image:linear-gradient(to_right,black_0%,black_calc(100%-12px),transparent_100%)]",
+                  "group-hover:[mask-image:linear-gradient(to_right,black_0%,black_calc(100%-72px),transparent_100%)]",
+                  "group-focus-within:[mask-image:linear-gradient(to_right,black_0%,black_calc(100%-72px),transparent_100%)]",
                   isActive ? "text-ink" : "text-ink-secondary",
                 )}
               >
@@ -266,6 +268,21 @@ export const SessionListItem = memo(function SessionListItem({
           />
         ) : null}
       </span>
+
+      {/* Surface scrub under trailing actions — long titles dissolve into the
+          row chrome instead of sitting under the pin/archive/more icons. */}
+      {isEditing ? null : (
+        <span
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute inset-y-0 right-0 z-[1] w-[5.75rem] rounded-r-sm bg-panel",
+            "opacity-0 transition-opacity duration-[100ms] ease-[var(--easing-default)]",
+            "group-hover:opacity-100 group-focus-within:opacity-100",
+            // Soft left edge so the title fades into shadow toward the buttons.
+            "[mask-image:linear-gradient(to_left,black_0%,black_42%,transparent_100%)]",
+          )}
+        />
+      )}
 
       {isEditing ? null : (
         <SessionRowActions

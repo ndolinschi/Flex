@@ -54,7 +54,7 @@ export const SessionRowActions = ({
           intrinsic button height can never inflate the row's own height. */}
       <span
         className={cn(
-          "absolute right-2 top-1/2 flex max-w-0 -translate-y-1/2 items-center overflow-hidden opacity-0",
+          "absolute right-2 top-1/2 z-[2] flex max-w-0 -translate-y-1/2 items-center overflow-hidden opacity-0",
           "pointer-events-none transition-[max-width,opacity] duration-[100ms] ease-[var(--easing-default)]",
           "group-hover:pointer-events-auto group-hover:max-w-[90px] group-hover:opacity-100",
           "group-focus-within:pointer-events-auto group-focus-within:max-w-[90px] group-focus-within:opacity-100",
