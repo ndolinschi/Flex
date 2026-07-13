@@ -66,7 +66,7 @@ export type UiTheme = "dark" | "light"
  * overlays), "tight" < 680px (narrow behavior plus tighter chat gutters). */
 export type Viewport = "wide" | "narrow" | "tight"
 
-export type RightPanelTab = "plan" | "changes" | "terminal" | "browser"
+export type RightPanelTab = "plan" | "changes" | "terminal" | "browser" | "files"
 
 export type TerminalMeta = {
   id: string
@@ -406,6 +406,19 @@ export type PanelExtrasSliceState = {
   openTab: (sessionKey: string, tab: RightPanelTab) => void
   closeTab: (sessionKey: string, tab: RightPanelTab) => void
   setOpenTabsBySession: (value: Record<string, RightPanelTab[]>) => void
+  /** Open text files in the Files (Monaco) panel — paths relative to session cwd. */
+  openFilesBySession: Record<string, string[]>
+  activeFileBySession: Record<string, string | null>
+  /** Dirty drafts keyed by session → path → content. Absent = matches disk. */
+  fileDraftsBySession: Record<string, Record<string, string>>
+  openWorkspaceFile: (sessionKey: string, path: string) => void
+  closeWorkspaceFile: (sessionKey: string, path: string) => void
+  setActiveWorkspaceFile: (sessionKey: string, path: string | null) => void
+  setWorkspaceFileDraft: (
+    sessionKey: string,
+    path: string,
+    draft: string | null,
+  ) => void
   pushSnapshot: (sessionId: SessionId, snapshotId: string) => void
   setSnapshotIndex: (sessionId: SessionId, index: number) => void
   clearSnapshots: (sessionId: SessionId) => void

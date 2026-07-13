@@ -3,6 +3,7 @@ import { createPortal } from "react-dom"
 import {
   Bot,
   Brain,
+  FileCode2,
   MessagesSquare,
   Moon,
   Network,
@@ -118,6 +119,13 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
         label: "Switch to Changes tab",
         group: "Commands",
         run: () => openRightPanelTab("changes"),
+      },
+      {
+        id: "tab-files",
+        label: "Switch to Files tab",
+        icon: FileCode2,
+        group: "Commands",
+        run: () => openRightPanelTab("files"),
       },
       {
         id: "tab-terminal",
