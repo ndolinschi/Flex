@@ -74,16 +74,32 @@ export const useComposerAutocomplete = ({
 
   const atQuery = atToken?.query ?? null
 
+  // Debounce the IPC walk — every keystroke used to re-walk the tree and
+  // made `@` feel multi-second even after backend caps.
+  const [debouncedAtQuery, setDebouncedAtQuery] = useState<string | null>(null)
+  useEffect(() => {
+    if (atQuery === null) {
+      setDebouncedAtQuery(null)
+      return
+    }
+    const handle = window.setTimeout(() => setDebouncedAtQuery(atQuery), 120)
+    return () => window.clearTimeout(handle)
+  }, [atQuery])
+
   const { data: fileHits = [] } = useQuery({
-    queryKey: ["at-files", cwd, atQuery],
-    queryFn: () => listFiles(cwd ?? "", atQuery ?? ""),
-    enabled: atQuery !== null && !!cwd && !atDismissed,
-    staleTime: 5_000,
+    queryKey: ["at-files", cwd, debouncedAtQuery],
+    queryFn: () => listFiles(cwd ?? "", debouncedAtQuery ?? ""),
+    enabled: debouncedAtQuery !== null && !!cwd && !atDismissed,
+    staleTime: 15_000,
     placeholderData: keepPreviousData,
   })
 
   const atOpen =
-    !slashOpen && atQuery !== null && !atDismissed && fileHits.length > 0
+    !slashOpen &&
+    atQuery !== null &&
+    debouncedAtQuery !== null &&
+    !atDismissed &&
+    fileHits.length > 0
 
   // Reset highlight + un-dismiss whenever the query changes.
   useEffect(() => {
@@ -129,12 +145,10 @@ export const useComposerAutocomplete = ({
     const pos = Math.min(caret, composerDraft.length)
     const before = composerDraft.slice(0, atToken.start)
     const after = composerDraft.slice(pos)
-    const isDir = !!hit.is_dir
-    const insert = isDir ? `@${hit.name}/ ` : `@${hit.name} `
+    const insert = `@${hit.name} `
     setComposerDraft(before + insert + after)
 
-    // Attach so the engine inlines file contents / directory path (dedupe by path).
-    const kind = isDir ? "directory" : "file"
+    // Attach so the engine inlines file contents (dedupe by path).
     if (
       !attachments.some(
         (a) =>
@@ -145,8 +159,8 @@ export const useComposerAutocomplete = ({
       addAttachment({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         path: hit.path,
-        kind,
-        name: isDir ? `${hit.name}/` : hit.name,
+        kind: "file",
+        name: hit.name,
       })
     }
 
