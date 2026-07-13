@@ -14,3 +14,7 @@ const envBool = (name: keyof ImportMetaEnv, defaultValue: boolean): boolean => {
  * palette, and the legacy `automations` route. Default off until the surface
  * is ready to ship. Enable with `VITE_AUTOMATIONS_UI=true`. */
 export const AUTOMATIONS_UI_ENABLED = envBool("VITE_AUTOMATIONS_UI", false)
+
+/** Composer "Flex" mode (orchestrator across planning / review / workers).
+ * Default off until ready to ship. Enable with `VITE_FLEX_MODE=true`. */
+export const FLEX_MODE_ENABLED = envBool("VITE_FLEX_MODE", false)

@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand"
 import type { AppState, ComposerSliceState } from "../types"
+import { FLEX_MODE_ENABLED } from "../../lib/featureFlags"
 import { persistUiState } from "../persist"
 
 export const createComposerSlice: StateCreator<
@@ -34,8 +35,9 @@ export const createComposerSlice: StateCreator<
     }))
   },
   setComposerMode: (mode) => {
-    set({ composerMode: mode })
-    void persistUiState({ composerMode: mode })
+    const next = mode === "flex" && !FLEX_MODE_ENABLED ? "agent" : mode
+    set({ composerMode: next })
+    void persistUiState({ composerMode: next })
   },
   setDefaultPermissionMode: (mode) => {
     set({ defaultPermissionMode: mode })

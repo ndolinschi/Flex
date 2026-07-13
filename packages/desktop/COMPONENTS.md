@@ -189,6 +189,7 @@ Keep this file in sync when adding or renaming components.
 | Flag | Default | Env | Effect |
 |---|---|---|---|
 | `AUTOMATIONS_UI_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_AUTOMATIONS_UI=true` | Shows Automations in settings nav/search, sidebar, command palette, and the legacy `automations` route |
+| `FLEX_MODE_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_FLEX_MODE=true` | Shows composer Flex mode in the ModePicker (orchestrator across plan / review / workers) |
 
 ## Perf notes (Wave 3)
 

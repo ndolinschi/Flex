@@ -5,6 +5,7 @@ import {
   Brain,
   MessagesSquare,
   Moon,
+  Network,
   PanelLeft,
   PanelRight,
   SlidersHorizontal,
@@ -16,7 +17,10 @@ import {
 import type { LucideIcon } from "lucide-react"
 import { CommandPaletteRow } from "../molecules"
 import { useSessions } from "../../hooks/useSessions"
-import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
+import {
+  AUTOMATIONS_UI_ENABLED,
+  FLEX_MODE_ENABLED,
+} from "../../lib/featureFlags"
 import { fuzzyScore } from "../../lib/fuzzySearch"
 import { resumeSession, toInvokeError } from "../../lib/tauri"
 import { sessionLabel } from "../../lib/types"
@@ -207,6 +211,20 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
           setComposerMode("ask")
         },
       },
+      ...(FLEX_MODE_ENABLED
+        ? [
+            {
+              id: "mode-flex",
+              label: "Mode: Flex",
+              icon: Network,
+              group: "Commands",
+              run: () => {
+                setRoute("chat")
+                setComposerMode("flex")
+              },
+            } satisfies CommandEntry,
+          ]
+        : []),
       ...sessions.map((session): CommandEntry => ({
         id: `session:${session.id}`,
         label: sessionLabel(session),
