@@ -64,7 +64,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `ToolCallChip` | Single tool as Cursor-style step | `call` | TurnTimeline |
 | `ToolStepGroup` | Aggregated explore/edit/shell summary + card expand | `calls` | TurnTimeline (via ToolStepList) |
 | `ToolStepList` | Clusters consecutive same-kind tool rows | `rows`, `renderOther` | TurnTimeline |
-| `DetailRow` / `BackgroundBashRow` / `ExecTail` | Tool-step detail / background bash / exec tail | — | ToolStepGroup |
+| `DetailRow` / `BackgroundBashRow` / `ExecTail` | Tool-step detail / background bash / exec tail; Open file → Files tab when path known | — | ToolStepGroup |
 | `StreamingCaret` | Streaming caret | — | TurnTimeline |
 | `SubagentGroup` | Nested subagent work block | `task`, `role?`, `phase` | TurnTimeline |
 | `WorkGroup` | "Worked for Xs" / live "Working" XOR "Thinking" XOR "Compacting context…"; `memo` | `isOpen`, `liveStatus?`, `durationMs?` | TurnTimeline |
