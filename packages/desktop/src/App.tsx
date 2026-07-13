@@ -244,7 +244,11 @@ const AppRoutes = () => {
 
   if (!isBootstrapped) {
     return (
-      <div className="flex h-full items-center justify-center bg-bg text-sm text-ink-muted">
+      <div
+        className="flex h-full items-center justify-center bg-bg text-sm text-ink-muted"
+        role="status"
+        aria-live="polite"
+      >
         Loading…
       </div>
     )
