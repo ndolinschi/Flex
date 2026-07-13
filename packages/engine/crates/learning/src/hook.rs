@@ -84,6 +84,7 @@ mod tests {
             turn_id: None,
             data: HookData::Stop { continuation },
             store: None,
+            events: None,
         }
     }
 

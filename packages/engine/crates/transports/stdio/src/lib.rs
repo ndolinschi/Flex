@@ -69,6 +69,8 @@ fn event_visible(event: &AgentEvent, verbosity: OutputVerbosity) -> bool {
                 | AgentEvent::SubagentCompleted { .. }
                 | AgentEvent::CompactionStarted { .. }
                 | AgentEvent::CompactionBoundary { .. }
+                | AgentEvent::IndexingStarted { .. }
+                | AgentEvent::IndexingCompleted { .. }
                 | AgentEvent::Gap { .. }
         ),
     }

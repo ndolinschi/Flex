@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use agentloop_contracts::{AgentEvent, HookOutcomeKind, HookPoint, TurnId};
 use agentloop_core::AgentError;
+use agentloop_core::EventSink;
 use agentloop_core::hook::{HookContext, HookData, HookOutcome};
 
 use crate::deps::TurnDeps;
@@ -17,6 +18,7 @@ pub(super) async fn run_hooks(
     point: HookPoint,
     turn_id: &TurnId,
     mut data: HookData<'_>,
+    events: Option<EventSink>,
 ) -> Result<HookOutcome, AgentError> {
     let mut aggregate = HookOutcome::Continue;
     for hook in &deps.hooks {
@@ -28,6 +30,7 @@ pub(super) async fn run_hooks(
             turn_id: Some(turn_id),
             data: std::mem::replace(&mut data, HookData::Session),
             store: Some(deps.store.clone()),
+            events: events.clone(),
         };
         let outcome = hook
             .on(point, &mut ctx)

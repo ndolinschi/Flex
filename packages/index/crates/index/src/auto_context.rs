@@ -346,6 +346,7 @@ mod tests {
             turn_id: Some(&TurnId::from("turn-1")),
             data: HookData::UserPrompt { input: &mut input },
             store: Some(store),
+            events: None,
         };
         let outcome = hook
             .on(HookPoint::UserPromptSubmit, &mut ctx)
@@ -376,6 +377,7 @@ mod tests {
             turn_id: None,
             data: HookData::UserPrompt { input: &mut input },
             store: None,
+            events: None,
         };
         let outcome = hook
             .on(HookPoint::UserPromptSubmit, &mut ctx)

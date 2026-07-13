@@ -184,6 +184,7 @@ mod tests {
             turn_id: None,
             data: HookData::ToolUse { call: &mut call },
             store: Some(store),
+            events: None,
         };
         let outcome = VerifiedMemoryGateHook::new()
             .on(HookPoint::PreToolUse, &mut ctx)
@@ -205,6 +206,7 @@ mod tests {
             turn_id: None,
             data: HookData::ToolUse { call: &mut call },
             store: Some(store),
+            events: None,
         };
         let outcome = VerifiedMemoryGateHook::new()
             .on(HookPoint::PreToolUse, &mut ctx)
@@ -226,6 +228,7 @@ mod tests {
             turn_id: None,
             data: HookData::ToolUse { call: &mut call },
             store: Some(store),
+            events: None,
         };
         let outcome = VerifiedMemoryGateHook::new()
             .on(HookPoint::PreToolUse, &mut ctx)
@@ -247,6 +250,7 @@ mod tests {
             turn_id: None,
             data: HookData::ToolUse { call: &mut call },
             store: Some(store),
+            events: None,
         };
         let outcome = VerifiedMemoryGateHook::new()
             .on(HookPoint::PreToolUse, &mut ctx)

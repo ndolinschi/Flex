@@ -86,67 +86,8 @@ pub(crate) async fn run_turn(
         handle.set_turn_permission_mode(opts.permission_mode);
         handle.set_turn_effort(opts.effort);
 
-        let outcome = run_hooks(
-            deps,
-            &handle,
-            HookPoint::UserPromptSubmit,
-            &turn_id,
-            HookData::UserPrompt { input: &mut input },
-        )
-        .await?;
-        if let HookOutcome::Block { reason } = outcome {
-            return Err(AgentError::Other(format!(
-                "prompt rejected by hook: {reason}"
-            )));
-        }
-        resolve_blob_paths(&mut input, &meta.cwd).await?;
-
-        handle
-            .emit_persistent(
-                Some(&turn_id),
-                AgentEvent::TurnStarted {
-                    turn_id: turn_id.clone(),
-                },
-            )
-            .await?;
-        if let Some(command) = &input.command {
-            handle
-                .emit_persistent(
-                    Some(&turn_id),
-                    AgentEvent::CommandExpanded {
-                        name: command.name.clone(),
-                        args: command.args.clone(),
-                    },
-                )
-                .await?;
-        }
-        handle
-            .emit_persistent(
-                Some(&turn_id),
-                AgentEvent::UserMessage {
-                    message_id: MessageId::generate(),
-                    content: input.parts.clone(),
-                },
-            )
-            .await?;
-        if meta.title.is_none() && input.command.is_none() {
-            let text = input.joined_text();
-            let trimmed = text.trim();
-            if !trimmed.is_empty() {
-                let title: String = trimmed.chars().take(60).collect();
-                let _ = deps
-                    .store
-                    .update_meta(
-                        &handle.id,
-                        SessionMetaPatch {
-                            title: Some(title),
-                            ..Default::default()
-                        },
-                    )
-                    .await;
-            }
-        }
-
+        // Sink is created before UserPromptSubmit so hooks (e.g. auto-context
+        // indexing) can emit live progress into the same drain as tools.
         let (sink, mut sink_rx) = EventSink::channel();
         let drain = tokio::spawn({
             let handle = handle.clone();
@@ -162,155 +103,223 @@ pub(crate) async fn run_turn(
             }
         });
 
-        let mut usage_total = TokenUsage::default();
-        let mut num_model_calls = 0u32;
-        let mut num_tool_calls = 0u32;
-        let mut manager = ToolCallManager::new();
-        let mut stop_reason = TurnStopReason::MaxIterations;
-        // Model that produced the most recent assistant message this turn;
-        // used to price `usage_total` (see the attribution note in
-        // `run_iteration`).
-        let mut last_model: Option<String> = None;
-
-        for _iteration in 0..deps.limits.max_iterations {
-            if cancel.is_cancelled() {
-                stop_reason = TurnStopReason::Cancelled;
-                break;
-            }
-            let outcome = run_iteration(
+        let turn_result = async {
+            let outcome = run_hooks(
                 deps,
                 &handle,
-                &meta,
+                HookPoint::UserPromptSubmit,
                 &turn_id,
-                &opts,
-                &cancel,
-                &sink,
-                &mut manager,
-                &mut usage_total,
-                &mut num_model_calls,
-                &mut num_tool_calls,
-                &mut last_model,
-            )
-            .await;
-            match outcome {
-                Ok(IterationOutcome::Continue) => continue,
-                Ok(IterationOutcome::Stop(reason)) => {
-                    stop_reason = reason;
-                    break;
-                }
-                Err(err) => {
-                    tracing::error!(
-                        target: "turn",
-                        session_id = %handle.id,
-                        turn_id = %turn_id,
-                        error = %err,
-                        "turn failed"
-                    );
-                    for call in manager.cancel_in_flight() {
-                        let _ = handle
-                            .emit_persistent(Some(&turn_id), AgentEvent::ToolCallUpdated { call })
-                            .await;
-                    }
-                    let _ = handle
-                        .emit_persistent(
-                            Some(&turn_id),
-                            AgentEvent::SessionError {
-                                error: err.to_engine_error(),
-                            },
-                        )
-                        .await;
-                    let summary = TurnSummary {
-                        turn_id: turn_id.clone(),
-                        stop_reason: TurnStopReason::Error,
-                        usage: usage_total,
-                        cost_usd: cost_for_turn(last_model.as_deref(), &usage_total),
-                        num_model_calls,
-                        num_tool_calls,
-                        duration_ms: now_ms().saturating_sub(started_at),
-                    };
-                    let _ = handle
-                        .emit_persistent(
-                            Some(&turn_id),
-                            AgentEvent::TurnCompleted {
-                                turn_id: turn_id.clone(),
-                                summary,
-                            },
-                        )
-                        .await;
-                    drop(sink);
-                    let _ = drain.await;
-                    return Err(err);
-                }
-            }
-        }
-
-        if cancel.is_cancelled() {
-            stop_reason = TurnStopReason::Cancelled;
-        }
-        if stop_reason == TurnStopReason::Cancelled {
-            for call in manager.cancel_in_flight() {
-                let _ = handle
-                    .emit_persistent(Some(&turn_id), AgentEvent::ToolCallUpdated { call })
-                    .await;
-            }
-        }
-
-        let summary = TurnSummary {
-            turn_id: turn_id.clone(),
-            stop_reason,
-            usage: usage_total,
-            cost_usd: cost_for_turn(last_model.as_deref(), &usage_total),
-            num_model_calls,
-            num_tool_calls,
-            duration_ms: now_ms().saturating_sub(started_at),
-        };
-        handle
-            .emit_persistent(
-                Some(&turn_id),
-                AgentEvent::TurnCompleted {
-                    turn_id: turn_id.clone(),
-                    summary: summary.clone(),
-                },
+                HookData::UserPrompt { input: &mut input },
+                Some(sink.clone()),
             )
             .await?;
+            if let HookOutcome::Block { reason } = outcome {
+                return Err(AgentError::Other(format!(
+                    "prompt rejected by hook: {reason}"
+                )));
+            }
+            resolve_blob_paths(&mut input, &meta.cwd).await?;
 
-        tracing::info!(
-            target: "turn",
-            session_id = %handle.id,
-            turn_id = %turn_id,
-            stop_reason = ?summary.stop_reason,
-            duration_ms = summary.duration_ms,
-            num_model_calls = summary.num_model_calls,
-            num_tool_calls = summary.num_tool_calls,
-            "turn completed"
-        );
-
-        if let Some(workspace) = &deps.workspace {
-            match workspace
-                .snapshot(&meta.cwd, &format!("turn {turn_id}"))
-                .await
-            {
-                Ok(Some(snapshot_id)) => {
-                    let _ = handle
-                        .emit_persistent(
-                            Some(&turn_id),
-                            AgentEvent::SnapshotCreated {
-                                snapshot_id,
-                                turn_id: turn_id.clone(),
+            handle
+                .emit_persistent(
+                    Some(&turn_id),
+                    AgentEvent::TurnStarted {
+                        turn_id: turn_id.clone(),
+                    },
+                )
+                .await?;
+            if let Some(command) = &input.command {
+                handle
+                    .emit_persistent(
+                        Some(&turn_id),
+                        AgentEvent::CommandExpanded {
+                            name: command.name.clone(),
+                            args: command.args.clone(),
+                        },
+                    )
+                    .await?;
+            }
+            handle
+                .emit_persistent(
+                    Some(&turn_id),
+                    AgentEvent::UserMessage {
+                        message_id: MessageId::generate(),
+                        content: input.parts.clone(),
+                    },
+                )
+                .await?;
+            if meta.title.is_none() && input.command.is_none() {
+                let text = input.joined_text();
+                let trimmed = text.trim();
+                if !trimmed.is_empty() {
+                    let title: String = trimmed.chars().take(60).collect();
+                    let _ = deps
+                        .store
+                        .update_meta(
+                            &handle.id,
+                            SessionMetaPatch {
+                                title: Some(title),
+                                ..Default::default()
                             },
                         )
                         .await;
                 }
-                Ok(None) => {}
-                Err(err) => {
-                    tracing::debug!(target: "turn", error = %err, "workspace snapshot skipped");
+            }
+
+            let mut usage_total = TokenUsage::default();
+            let mut num_model_calls = 0u32;
+            let mut num_tool_calls = 0u32;
+            let mut manager = ToolCallManager::new();
+            let mut stop_reason = TurnStopReason::MaxIterations;
+            // Model that produced the most recent assistant message this turn;
+            // used to price `usage_total` (see the attribution note in
+            // `run_iteration`).
+            let mut last_model: Option<String> = None;
+
+            for _iteration in 0..deps.limits.max_iterations {
+                if cancel.is_cancelled() {
+                    stop_reason = TurnStopReason::Cancelled;
+                    break;
+                }
+                let outcome = run_iteration(
+                    deps,
+                    &handle,
+                    &meta,
+                    &turn_id,
+                    &opts,
+                    &cancel,
+                    &sink,
+                    &mut manager,
+                    &mut usage_total,
+                    &mut num_model_calls,
+                    &mut num_tool_calls,
+                    &mut last_model,
+                )
+                .await;
+                match outcome {
+                    Ok(IterationOutcome::Continue) => continue,
+                    Ok(IterationOutcome::Stop(reason)) => {
+                        stop_reason = reason;
+                        break;
+                    }
+                    Err(err) => {
+                        tracing::error!(
+                            target: "turn",
+                            session_id = %handle.id,
+                            turn_id = %turn_id,
+                            error = %err,
+                            "turn failed"
+                        );
+                        for call in manager.cancel_in_flight() {
+                            let _ = handle
+                                .emit_persistent(
+                                    Some(&turn_id),
+                                    AgentEvent::ToolCallUpdated { call },
+                                )
+                                .await;
+                        }
+                        let _ = handle
+                            .emit_persistent(
+                                Some(&turn_id),
+                                AgentEvent::SessionError {
+                                    error: err.to_engine_error(),
+                                },
+                            )
+                            .await;
+                        let summary = TurnSummary {
+                            turn_id: turn_id.clone(),
+                            stop_reason: TurnStopReason::Error,
+                            usage: usage_total,
+                            cost_usd: cost_for_turn(last_model.as_deref(), &usage_total),
+                            num_model_calls,
+                            num_tool_calls,
+                            duration_ms: now_ms().saturating_sub(started_at),
+                        };
+                        let _ = handle
+                            .emit_persistent(
+                                Some(&turn_id),
+                                AgentEvent::TurnCompleted {
+                                    turn_id: turn_id.clone(),
+                                    summary,
+                                },
+                            )
+                            .await;
+                        return Err(err);
+                    }
                 }
             }
+
+            if cancel.is_cancelled() {
+                stop_reason = TurnStopReason::Cancelled;
+            }
+            if stop_reason == TurnStopReason::Cancelled {
+                for call in manager.cancel_in_flight() {
+                    let _ = handle
+                        .emit_persistent(Some(&turn_id), AgentEvent::ToolCallUpdated { call })
+                        .await;
+                }
+            }
+
+            let summary = TurnSummary {
+                turn_id: turn_id.clone(),
+                stop_reason,
+                usage: usage_total,
+                cost_usd: cost_for_turn(last_model.as_deref(), &usage_total),
+                num_model_calls,
+                num_tool_calls,
+                duration_ms: now_ms().saturating_sub(started_at),
+            };
+            handle
+                .emit_persistent(
+                    Some(&turn_id),
+                    AgentEvent::TurnCompleted {
+                        turn_id: turn_id.clone(),
+                        summary: summary.clone(),
+                    },
+                )
+                .await?;
+
+            tracing::info!(
+                target: "turn",
+                session_id = %handle.id,
+                turn_id = %turn_id,
+                stop_reason = ?summary.stop_reason,
+                duration_ms = summary.duration_ms,
+                num_model_calls = summary.num_model_calls,
+                num_tool_calls = summary.num_tool_calls,
+                "turn completed"
+            );
+
+            if let Some(workspace) = &deps.workspace {
+                match workspace
+                    .snapshot(&meta.cwd, &format!("turn {turn_id}"))
+                    .await
+                {
+                    Ok(Some(snapshot_id)) => {
+                        let _ = handle
+                            .emit_persistent(
+                                Some(&turn_id),
+                                AgentEvent::SnapshotCreated {
+                                    snapshot_id,
+                                    turn_id: turn_id.clone(),
+                                },
+                            )
+                            .await;
+                    }
+                    Ok(None) => {}
+                    Err(err) => {
+                        tracing::debug!(target: "turn", error = %err, "workspace snapshot skipped");
+                    }
+                }
+            }
+
+            Ok(summary)
         }
+        .await;
 
         drop(sink);
         let _ = drain.await;
-        Ok(summary)
+        turn_result
     }
     .instrument(span)
     .await

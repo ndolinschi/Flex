@@ -466,6 +466,7 @@ async fn execute_one_call(
                 HookPoint::PreToolUse,
                 turn_id,
                 agentloop_core::HookData::ToolUse { call: &mut call },
+                Some(sink.clone()),
             )
             .await
             .unwrap_or(agentloop_core::HookOutcome::Continue);
@@ -572,6 +573,7 @@ async fn execute_one_call(
                         call: &call,
                         output: &mut output,
                     },
+                    Some(sink.clone()),
                 )
                 .await;
             }

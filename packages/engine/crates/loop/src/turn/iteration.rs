@@ -457,6 +457,7 @@ pub(super) async fn run_iteration(
             HookData::Stop {
                 continuation: &mut continuation,
             },
+            Some(sink.clone()),
         )
         .await?;
         if !matches!(outcome, HookOutcome::Block { .. }) {

@@ -68,6 +68,9 @@ pub struct HookContext<'a> {
     /// degrade gracefully. Hooks never write through this — mutation goes
     /// through `data`.
     pub store: Option<Arc<dyn SessionStore>>,
+    /// Optional sink for live session events (e.g. indexing progress during
+    /// `UserPromptSubmit`). `None` in unit tests and hooks that don't need it.
+    pub events: Option<crate::EventSink>,
 }
 
 /// An ordered interceptor. Hooks run in registration order; the first

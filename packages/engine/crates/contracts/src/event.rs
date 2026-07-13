@@ -166,6 +166,21 @@ pub enum AgentEvent {
     CompactionStarted {
         strategy: String,
     },
+    /// Code index build is about to run (first build or a substantial update).
+    /// Ephemeral: not persisted — a UI can show "Indexing repository…" until
+    /// the following [`AgentEvent::IndexingCompleted`] (or turn end / error).
+    /// `reason` is a short machine tag (`first_build`, `update`).
+    IndexingStarted {
+        reason: String,
+    },
+    /// Code index build finished. Persisted so the chat can show a settled
+    /// "Indexed N files" card. Counts mirror `UpdateStats` from the index crate.
+    IndexingCompleted {
+        added: u32,
+        changed: u32,
+        removed: u32,
+        unchanged: u32,
+    },
     /// The turn's model was switched mid-work (provider failure, rate limit).
     ModelFallback {
         from: crate::capability::ModelRef,
@@ -286,6 +301,7 @@ impl AgentEvent {
                 | Self::ExecChunk { .. }
                 | Self::SubagentEvent { .. }
                 | Self::CompactionStarted { .. }
+                | Self::IndexingStarted { .. }
                 | Self::RetryScheduled { .. }
                 | Self::Gap { .. }
         )
@@ -317,6 +333,8 @@ impl AgentEvent {
             Self::CommandExpanded { .. } => "command_expanded",
             Self::CompactionBoundary { .. } => "compaction_boundary",
             Self::CompactionStarted { .. } => "compaction_started",
+            Self::IndexingStarted { .. } => "indexing_started",
+            Self::IndexingCompleted { .. } => "indexing_completed",
             Self::ModelFallback { .. } => "model_fallback",
             Self::RetryScheduled { .. } => "retry_scheduled",
             Self::HookFired { .. } => "hook_fired",
