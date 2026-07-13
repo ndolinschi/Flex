@@ -5,7 +5,7 @@ import type {
   PermissionMode,
   SessionId,
 } from "../lib/types"
-import type { RightPanelTab, UiTheme } from "./types"
+import type { RightPanelTab, UiTheme, PlanAnnotationsPersisted } from "./types"
 import { log } from "../lib/debug/log"
 
 export type UiPersisted = {
@@ -38,6 +38,8 @@ export type UiPersisted = {
   browserLastUrl?: string
   pinnedSessionIds?: string[]
   archivedSessionIds?: string[]
+  /** Plan-tab annotations + last-opened plan id, keyed by session id. */
+  planAnnotationsBySession?: Record<string, PlanAnnotationsPersisted>
 }
 
 export const UI_STORE_FILE = "ui.json"

@@ -5,8 +5,11 @@ import {
   ClipboardCopy,
   Hammer,
   MoreHorizontal,
+  Pencil,
+  RotateCcw,
   Save,
   Search,
+  Sparkles,
   X,
 } from "lucide-react"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
@@ -23,6 +26,9 @@ type PlanToolbarProps = {
   repo: string
   /** Truncated title — first heading of the plan doc, or the session title. */
   title: string
+  /** When true, the "Plans" crumb is a button that returns to the multi-plan list. */
+  showPlansListCrumb?: boolean
+  onBackToPlans?: () => void
   models: ModelInfoDto[]
   builtinProviders?: BuiltinProvider[]
   modelId: string | null
@@ -48,6 +54,10 @@ type PlanToolbarProps = {
   onSaveToWorkspace: () => void
   saveDisabled?: boolean
   saveDisabledReason?: string
+  onRewrite?: () => void
+  onRestart?: () => void
+  onAskReview?: () => void
+  actionsDisabled?: boolean
   className?: string
 }
 
@@ -158,6 +168,8 @@ const PlanModelPill = ({
 export const PlanToolbar = ({
   repo,
   title,
+  showPlansListCrumb,
+  onBackToPlans,
   models,
   builtinProviders,
   modelId,
@@ -172,6 +184,10 @@ export const PlanToolbar = ({
   onSaveToWorkspace,
   saveDisabled,
   saveDisabledReason,
+  onRewrite,
+  onRestart,
+  onAskReview,
+  actionsDisabled,
   className,
 }: PlanToolbarProps) => {
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
@@ -185,6 +201,28 @@ export const PlanToolbar = ({
   }
 
   const menuItems: ContextMenuItem[] = [
+    {
+      type: "item",
+      label: "Ask agent to review",
+      icon: Sparkles,
+      disabled: !!actionsDisabled || !onAskReview,
+      onSelect: () => onAskReview?.(),
+    },
+    {
+      type: "item",
+      label: "Rewrite plan",
+      icon: Pencil,
+      disabled: !!actionsDisabled || !onRewrite,
+      onSelect: () => onRewrite?.(),
+    },
+    {
+      type: "item",
+      label: "Restart / try again",
+      icon: RotateCcw,
+      disabled: !!actionsDisabled || !onRestart,
+      onSelect: () => onRestart?.(),
+    },
+    { type: "separator" },
     {
       type: "item",
       label: "Copy as Markdown",
@@ -215,7 +253,17 @@ export const PlanToolbar = ({
       <div className="flex h-9 items-center gap-1.5 px-3 text-sm">
         <span className="min-w-0 truncate text-ink-muted">{repo}</span>
         <span className="text-ink-faint">›</span>
-        <span className="text-ink-muted">Plans</span>
+        {showPlansListCrumb && onBackToPlans ? (
+          <button
+            type="button"
+            onClick={onBackToPlans}
+            className="text-ink-muted transition-colors hover:text-ink"
+          >
+            Plans
+          </button>
+        ) : (
+          <span className="text-ink-muted">Plans</span>
+        )}
         <span className="text-ink-faint">›</span>
         <span className="min-w-0 truncate text-ink-secondary">{title}</span>
 
