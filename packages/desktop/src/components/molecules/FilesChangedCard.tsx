@@ -69,8 +69,8 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
   const hiddenCount = Math.max(0, totalCount - files.length)
 
   return (
-    <div className="overflow-hidden rounded-lg border border-stroke-3 bg-transparent">
-      <div className="flex h-9 items-center gap-1 px-1.5">
+    <div className="overflow-hidden rounded-[var(--radius-lg)] border border-stroke-3 bg-transparent">
+      <div className="flex h-9 items-center gap-2 px-2">
         <button
           type="button"
           onClick={handleToggle}
@@ -93,8 +93,8 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
           <span className="truncate text-[13px] text-ink">
             {totalCount} file{totalCount === 1 ? "" : "s"} changed
           </span>
-          <DiffStat summary={totals} size="sm" />
         </button>
+        <DiffStat summary={totals} size="sm" className="shrink-0" />
         <button
           type="button"
           onClick={handleReview}
@@ -106,7 +106,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
       </div>
 
       {expanded ? (
-        <ul className="border-t border-stroke-3 px-2 py-1.5" role="list">
+        <ul className="border-t border-stroke-3 px-1.5 py-1.5" role="list">
           {files.map((file) => {
             const isDir = file.path.endsWith("/")
             const name = isDir ? file.path : basename(file.path)
@@ -143,24 +143,26 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
                     ) : null}
                     <span className="text-ink">{name}</span>
                   </span>
-                  {(file.added ?? 0) > 0 || (file.removed ?? 0) > 0 ? (
-                    <DiffStat
-                      summary={{
-                        added: file.added ?? 0,
-                        removed: file.removed ?? 0,
-                      }}
-                      size="xs"
-                    />
-                  ) : (
-                    <span
-                      className={cn(
-                        "shrink-0 font-mono text-[11px]",
-                        statusClass,
-                      )}
-                    >
-                      {file.status}
-                    </span>
-                  )}
+                  <span className="flex w-[4.75rem] shrink-0 items-center justify-end">
+                    {(file.added ?? 0) > 0 || (file.removed ?? 0) > 0 ? (
+                      <DiffStat
+                        summary={{
+                          added: file.added ?? 0,
+                          removed: file.removed ?? 0,
+                        }}
+                        size="xs"
+                      />
+                    ) : (
+                      <span
+                        className={cn(
+                          "font-mono text-[11px]",
+                          statusClass,
+                        )}
+                      >
+                        {file.status === "?" ? "U" : file.status}
+                      </span>
+                    )}
+                  </span>
                 </button>
               </li>
             )

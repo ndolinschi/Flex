@@ -142,45 +142,59 @@ export const CommitCenter = ({
 
   if (totalFiles === 0) return null
 
+  const selectionLabel = nothingSelected
+    ? "Select files to commit"
+    : `${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"}`
+
   return (
-    <div className="flex shrink-0 flex-col gap-2 border-t border-stroke-3 px-3 py-2.5">
+    <div className="flex shrink-0 flex-col gap-2.5 border-t border-stroke-3 bg-fill-5/40 px-3 py-3">
       <TextArea
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         placeholder="Commit message"
         aria-label="Commit message"
         autoFocus
-        rows={3}
+        rows={2}
         disabled={busy}
-        className="text-sm"
+        className="min-h-[2.75rem] resize-none text-sm"
       />
-      <div ref={rootRef} className="relative flex items-center">
-        <Button
-          variant="primary"
-          size="sm"
-          className="rounded-r-none border-r border-r-accent-hover/40"
-          isLoading={busy}
-          disabled={disabled}
-          onClick={() => void run(effectivePrimary)}
+      <div ref={rootRef} className="relative flex items-center justify-between gap-3">
+        <span
+          className={cn(
+            "min-w-0 truncate text-xs",
+            nothingSelected ? "text-ink-faint" : "text-ink-muted",
+          )}
         >
-          <GitMerge className="h-3 w-3" aria-hidden />
-          {MODE_LABEL[effectivePrimary]}
-        </Button>
-        <Button
-          variant="primary"
-          size="sm"
-          aria-label="Commit options"
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          className="w-7 rounded-l-none px-0"
-          disabled={disabled}
-          onClick={() => setMenuOpen((v) => !v)}
-        >
-          <ChevronDown
-            className={cn("h-3 w-3", menuOpen && "rotate-180")}
-            aria-hidden
-          />
-        </Button>
+          {selectionLabel}
+        </span>
+        <div className="flex shrink-0 items-center">
+          <Button
+            variant="primary"
+            size="sm"
+            className="rounded-r-none border-r border-r-accent-hover/40"
+            isLoading={busy}
+            disabled={disabled}
+            onClick={() => void run(effectivePrimary)}
+          >
+            <GitMerge className="h-3 w-3" aria-hidden />
+            {MODE_LABEL[effectivePrimary]}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            aria-label="Commit options"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            className="w-7 rounded-l-none px-0"
+            disabled={disabled}
+            onClick={() => setMenuOpen((v) => !v)}
+          >
+            <ChevronDown
+              className={cn("h-3 w-3", menuOpen && "rotate-180")}
+              aria-hidden
+            />
+          </Button>
+        </div>
 
         <PopoverTray
           open={menuOpen}
@@ -234,12 +248,6 @@ export const CommitCenter = ({
             ) : null}
           </ul>
         </PopoverTray>
-
-        {nothingSelected ? (
-          <span className="ml-2 text-xs text-ink-faint">
-            Select files to commit
-          </span>
-        ) : null}
       </div>
     </div>
   )

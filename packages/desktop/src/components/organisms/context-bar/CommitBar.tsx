@@ -110,12 +110,14 @@ export const CommitBar = ({
           setRightPanelTab("changes")
         }}
         className={cn(
-          "flex h-6 max-w-[10rem] shrink items-center gap-1 truncate rounded-full",
+          "flex h-6 max-w-[12rem] shrink items-center gap-1.5 truncate rounded-md",
           "bg-fill-3 px-2 text-xs text-ink-muted whitespace-nowrap",
           "transition-colors hover:bg-fill-2 hover:text-ink-secondary",
         )}
       >
-        {totalCount} change{totalCount === 1 ? "" : "s"}
+        <span className="truncate">
+          {totalCount} change{totalCount === 1 ? "" : "s"}
+        </span>
         <DiffStat summary={totals} />
       </button>
 

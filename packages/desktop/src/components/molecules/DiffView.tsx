@@ -43,7 +43,13 @@ const PlainDiff = ({ diff }: { diff: string }) => {
   return (
     <>
       {lines.map((line, i) => (
-        <div key={i} className={cn("whitespace-pre px-3", lineClass(line))}>
+        <div
+          key={i}
+          className={cn(
+            "whitespace-pre px-3 py-px font-mono text-[12px] leading-[1.45]",
+            lineClass(line),
+          )}
+        >
           {line || " "}
         </div>
       ))}
@@ -64,8 +70,8 @@ const HunkBlock = ({
 }) => {
   return (
     <div className="group/hunk">
-      <div className="flex items-center gap-2 px-3">
-        <span className="min-w-0 flex-1 whitespace-pre text-cyan">
+      <div className="flex items-center gap-2 border-b border-stroke-4/60 bg-fill-4/50 px-3 py-0.5">
+        <span className="min-w-0 flex-1 truncate whitespace-pre font-mono text-[11px] text-cyan">
           {hunk.header}
         </span>
         <span className="flex shrink-0 items-center gap-2 opacity-0 transition-opacity duration-[var(--duration-fast)] group-hover/hunk:opacity-100">
@@ -92,7 +98,13 @@ const HunkBlock = ({
         </span>
       </div>
       {hunk.lines.map((line, i) => (
-        <div key={i} className={cn("whitespace-pre px-3", lineClass(line))}>
+        <div
+          key={i}
+          className={cn(
+            "whitespace-pre px-3 py-px font-mono text-[12px] leading-[1.45]",
+            lineClass(line),
+          )}
+        >
           {line || " "}
         </div>
       ))}
