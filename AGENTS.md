@@ -25,7 +25,8 @@ plus a Tauri desktop UI:
   acp, claude-code, copilot, cursor, opencode — still `Agent` impls), plus a `providers` facade
   crate that holds the provider-resolution logic and hands a registry to the engine.
 - **`packages/search`** — an optional deep-search plugin (`core::Plugin`): `search_web` +
-  `scrape_page` tools and a `researcher` role, enabled/disabled by config.
+  `scrape_page` tools and a `researcher` role, enabled/disabled by config. Default search
+  backends are DuckDuckGo Instant Answer + Wikipedia (optional Brave / SearXNG via env).
 - **`packages/sdk`** — a builder API composing providers + engine + plugins, and the `flex`
   headless runner bin.
 - **`packages/gateway`** — the chat-channel *contract*: a `Channel` trait plus normalized
@@ -219,9 +220,11 @@ at the composition root (`AgentBuilder::enable_plugin("search")`).
   `roles`) + `PluginRegistry`, folded into composition by `EngineService::native`. Roles use the
   loop-independent `core::PluginRole` (mapped to `RoleSpec` in the engine, since `RoleSpec` lives
   in `loop`). The SDK's `AgentBuilder::enable_plugin` decides which ship.
-- **`packages/search` is the first plugin**: `search_web` (DuckDuckGo HTML, no paid API, swappable
-  `SearchBackend`) + `scrape_page` (reqwest + htmd) tools and a `researcher` role whose prompt
-  encodes an Analyze/Plan → Execute/Evaluate → Synthesis/Citation workflow. Dispatchable via `Agent`.
+- **`packages/search` is the first plugin**: `search_web` (DuckDuckGo Instant Answer +
+  Wikipedia OpenSearch by default — no paid API; optional `BRAVE_SEARCH_API_KEY` /
+  `SEARXNG_BASE_URL`; HTML scrape is last-ditch) + `scrape_page` (reqwest + htmd) tools
+  and a `researcher` role whose prompt encodes an Analyze/Plan → Execute/Evaluate →
+  Synthesis/Citation workflow. Dispatchable via `Agent`.
 - **The independent verifier is the opt-in `verifier` plugin**: `agentloop-verifier`
   (`crates/verifier`) ships `Verify` (loop-intercepted by name into a fresh `verifier`-role
   subagent) and `SubmitVerdict` (structured `VerificationVerdict` result). Zero footprint when

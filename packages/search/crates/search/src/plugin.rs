@@ -12,15 +12,15 @@ use agentloop_core::{Plugin, PluginRole, PluginRoleTools, Tool};
 use crate::rerank::KeywordReranker;
 use crate::scrape_page::ScrapePageTool;
 use crate::search_backend::{
-    DuckDuckGoBackend, FallbackSearchBackend, SearchBackend, SearxNGBackend,
+    default_search_backends, FallbackSearchBackend, SearchBackend,
 };
 use crate::search_web::SearchWebTool;
 
 /// The deep-search plugin.
 ///
 /// Enabled via `AgentBuilder::enable_plugin("search")`. Uses a swappable
-/// [`SearchBackend`]; the default is a fallback chain of DuckDuckGo → SearXNG
-/// with keyword-based result re-ranking.
+/// [`SearchBackend`]; the default is Instant Answer + Wikipedia (optional
+/// Brave / SearXNG via env) with keyword-based result re-ranking.
 pub struct SearchPlugin {
     backend: Arc<dyn SearchBackend>,
 }
@@ -33,13 +33,12 @@ impl SearchPlugin {
 }
 
 impl Default for SearchPlugin {
-    /// Defaults to a fallback chain: DuckDuckGo → SearXNG (public instance).
+    /// Defaults to Instant Answer + Wikipedia (and optional Brave/SearXNG).
+    /// Public SearXNG instances are *not* hard-coded — they 429 constantly
+    /// and made `search_web` look permanently rate-limited.
     fn default() -> Self {
         Self {
-            backend: Arc::new(FallbackSearchBackend::new(vec![
-                Arc::new(DuckDuckGoBackend::new()),
-                Arc::new(SearxNGBackend::new("https://search.sapti.me".to_owned())),
-            ])),
+            backend: Arc::new(FallbackSearchBackend::new(default_search_backends())),
         }
     }
 }
