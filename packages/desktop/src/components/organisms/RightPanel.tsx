@@ -7,8 +7,6 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { ChevronsLeft } from "lucide-react"
-import { IconButton } from "../atoms"
 import { ContextMenu, type ContextMenuItem } from "../molecules"
 import { gitStatusSinceBaseline } from "../../lib/tauri"
 import { useAppStore, sessionScopeKey, type RightPanelTab } from "../../stores/appStore"
@@ -59,6 +57,13 @@ export const RightPanel = () => {
   const [addMenuPos, setAddMenuPos] = useState<{ x: number; y: number } | null>(
     null,
   )
+
+  // Slim "collapsed strip" was a second right-panel control alongside
+  // AppHeader's PanelRight — Cursor-style is one toggle. Clear any
+  // persisted collapsed bit so bootstrap never resurrects the strip.
+  useEffect(() => {
+    if (collapsed) setCollapsed(false)
+  }, [collapsed, setCollapsed])
 
   // Tabs are on-demand ("Open Tabs") — only render the tabs the
   // session has actually opened (via a trigger or the "+" menu below), never
@@ -126,20 +131,13 @@ export const RightPanel = () => {
       (!prev.active || prev.planId !== awaitingPlanId)
     if (armed) {
       setRightPanelOpen(true)
-      setCollapsed(false)
       setTab("plan")
     }
     prevAwaitingRef.current = {
       active: awaitingApprovalForActive,
       planId: awaitingPlanId,
     }
-  }, [
-    awaitingApprovalForActive,
-    awaitingPlanId,
-    setRightPanelOpen,
-    setCollapsed,
-    setTab,
-  ])
+  }, [awaitingApprovalForActive, awaitingPlanId, setRightPanelOpen, setTab])
 
   // Gate the tab's changes-count badge on the cwd being a git repo — see
   // ChangesTab's own `isRepo` gating for the full rationale.
@@ -188,50 +186,6 @@ export const RightPanel = () => {
   const handleSashDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
     e.preventDefault()
     setWidth(RIGHT_PANEL_DEFAULT_WIDTH, true)
-  }
-
-  // Collapsed variant: a slim icon strip, wide layout only (narrow/tight
-  // already collapse via the full-panel overlay mechanics). Re-expanding
-  // keeps every tab's underlying state intact (terminal PTY / browser
-  // webview never unmount here) — this is purely presentational.
-  //
-  // Self-heal: an open+collapsed panel with zero open tabs has no icons and
-  // no "+" (the add control lives on the expanded tab bar). Expand so the
-  // user can open a tab instead of staring at an empty « strip.
-  useEffect(() => {
-    if (open && collapsed && !narrow && openIds.length === 0) {
-      setCollapsed(false)
-    }
-  }, [open, collapsed, narrow, openIds.length, setCollapsed])
-
-  if (open && collapsed && !narrow) {
-    return (
-      <aside
-        style={{ width: 40 }}
-        className="flex h-full shrink-0 flex-col items-center gap-1 border-l border-stroke-3 bg-bg py-1.5"
-        aria-label="Details panel (collapsed)"
-      >
-        <IconButton label="Expand panel" onClick={() => setCollapsed(false)}>
-          <ChevronsLeft className="h-3.5 w-3.5" aria-hidden />
-        </IconButton>
-        {openTabDefs.map((t) => {
-          const Icon = t.icon
-          return (
-            <IconButton
-              key={t.id}
-              label={t.label}
-              onClick={() => {
-                setTab(t.id)
-                setCollapsed(false)
-              }}
-              className={cn(tab === t.id && "bg-fill-2 text-ink")}
-            >
-              {Icon ? <Icon className="h-3.5 w-3.5" aria-hidden /> : null}
-            </IconButton>
-          )
-        })}
-      </aside>
-    )
   }
 
   return (
@@ -286,7 +240,6 @@ export const RightPanel = () => {
           onSelectTab={setTab}
           onCloseTab={handleCloseTab}
           onOpenAddMenu={(e) => setAddMenuPos({ x: e.clientX, y: e.clientY })}
-          onCollapse={() => setCollapsed(true)}
           onClosePanel={() => setRightPanelOpen(false)}
         />
 
