@@ -2465,6 +2465,90 @@ fn validate_repo_relative_path(path: &str) -> DesktopResult<&str> {
     Ok(trimmed)
 }
 
+fn normalize_path_slashes(s: &str) -> String {
+    s.replace('\\', "/")
+}
+
+/// Strip `worktree` from an absolute `path`, returning a forward-slashed
+/// relative path. Lexical first (so deleted files still resolve), then
+/// canonicalize when both sides exist (symlinks / Windows drive casing).
+fn strip_worktree_prefix(path: &std::path::Path, worktree: &std::path::Path) -> DesktopResult<PathBuf> {
+    if let Ok(rel) = path.strip_prefix(worktree) {
+        return Ok(rel.to_path_buf());
+    }
+
+    let path_s = normalize_path_slashes(&path.to_string_lossy());
+    let mut root_s = normalize_path_slashes(&worktree.to_string_lossy());
+    while root_s.ends_with('/') {
+        root_s.pop();
+    }
+    if path_s == root_s {
+        return Ok(PathBuf::new());
+    }
+    let prefix = format!("{root_s}/");
+    if let Some(rest) = path_s.strip_prefix(&prefix) {
+        return Ok(PathBuf::from(rest));
+    }
+    // Windows FS is case-insensitive — tool `file_path`s and SessionMeta.cwd
+    // often disagree on drive-letter casing (`C:\` vs `c:\`).
+    #[cfg(windows)]
+    {
+        let path_l = path_s.to_ascii_lowercase();
+        let root_l = root_s.to_ascii_lowercase();
+        if path_l == root_l {
+            return Ok(PathBuf::new());
+        }
+        let prefix_l = format!("{root_l}/");
+        if let Some(rest) = path_l.strip_prefix(&prefix_l) {
+            // Preserve the caller's casing from the original path suffix.
+            return Ok(PathBuf::from(&path_s[path_s.len() - rest.len()..]));
+        }
+    }
+
+    if let (Ok(c_path), Ok(c_root)) = (path.canonicalize(), worktree.canonicalize()) {
+        if let Ok(rel) = c_path.strip_prefix(&c_root) {
+            return Ok(rel.to_path_buf());
+        }
+    }
+
+    Err(DesktopError::Message(format!(
+        "file is outside the session workspace (`{}`)",
+        worktree.display()
+    )))
+}
+
+/// Accept a repo-relative path *or* an absolute path under `worktree`
+/// (Write/Edit tool inputs are always absolute). Returns a forward-slashed
+/// relative path for `git … -- <path>`. Isolation is irrelevant — non-isolated
+/// sessions still have absolute tool paths that must strip against `cwd`.
+fn resolve_review_path(path: &str, worktree: &std::path::Path) -> DesktopResult<String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err(DesktopError::Message("path is required".into()));
+    }
+    let as_path = std::path::Path::new(trimmed);
+    let relative = if as_path.is_absolute() {
+        strip_worktree_prefix(as_path, worktree)?
+    } else {
+        validate_repo_relative_path(trimmed)?;
+        PathBuf::from(trimmed)
+    };
+    if relative.as_os_str().is_empty() {
+        return Err(DesktopError::Message(
+            "path must be a file inside the session workspace, not the workspace root".into(),
+        ));
+    }
+    if relative
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err(DesktopError::Message(format!(
+            "path must not contain '..': {trimmed}"
+        )));
+    }
+    Ok(normalize_path_slashes(&relative.to_string_lossy()))
+}
+
 /// Two-letter `git status --porcelain` code for a single path (e.g. `"??"`,
 /// `" M"`, `"D "`), or `None` if the path has no pending changes.
 fn porcelain_code(dir: &std::path::Path, path: &str) -> DesktopResult<Option<String>> {
@@ -2557,12 +2641,12 @@ pub async fn review_undo_file(
     session_id: String,
     path: String,
 ) -> DesktopResult<()> {
-    let path = validate_repo_relative_path(&path)?;
     let (dir, base_cwd) = review_dirs(&state, &session_id).await?;
+    let path = resolve_review_path(&path, &dir)?;
 
-    if let Some(code) = porcelain_code(&dir, path)? {
+    if let Some(code) = porcelain_code(&dir, &path)? {
         if code == "??" {
-            let full = dir.join(path);
+            let full = dir.join(&path);
             return std::fs::remove_file(&full).map_err(|e| {
                 DesktopError::Message(format!(
                     "failed to delete untracked file `{}`: {e}",
@@ -2576,7 +2660,7 @@ pub async fn review_undo_file(
         crate::win_console::command("git")
             .args(["-C"])
             .arg(&dir)
-            .args(["checkout", rev, "--", path])
+            .args(["checkout", rev, "--", &path])
             .output()
             .map_err(|e| {
                 DesktopError::Message(format!(
@@ -2643,14 +2727,14 @@ pub async fn review_keep_file(
     session_id: String,
     path: String,
 ) -> DesktopResult<()> {
-    let path = validate_repo_relative_path(&path)?;
     let (worktree, base_cwd) = review_dirs(&state, &session_id).await?;
+    let path = resolve_review_path(&path, &worktree)?;
     let Some(base_dir) = base_cwd else {
         return Err(DesktopError::Message("session is not isolated".into()));
     };
 
-    let src = worktree.join(path);
-    let dst = base_dir.join(path);
+    let src = worktree.join(&path);
+    let dst = base_dir.join(&path);
 
     if src.exists() {
         if let Some(parent) = dst.parent() {
@@ -2771,14 +2855,14 @@ pub async fn review_file_diff(
     session_id: String,
     path: String,
 ) -> DesktopResult<String> {
-    let path = validate_repo_relative_path(&path)?;
     let (worktree, base_cwd) = review_dirs(&state, &session_id).await?;
+    let path = resolve_review_path(&path, &worktree)?;
 
     let base_head = match &base_cwd {
         Some(base_dir) => base_head_sha(base_dir)?,
         None => "HEAD".to_string(),
     };
-    diff_against_rev(&worktree, &base_head, path)
+    diff_against_rev(&worktree, &base_head, &path)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -3973,42 +4057,11 @@ pub async fn user_identity(_state: State<'_, AppState>) -> DesktopResult<UserIde
 
 // ---------------------------------------------------------------------------
 // Plan tab: Save to Workspace — writes the rendered plan markdown to a file
-// inside the session's cwd. Traversal-hardened the same way as
-// `project_memory_dir`/`validate_repo_relative_path` above: canonicalize the
-// cwd, join the caller-supplied relative path, then verify the WRITTEN
-// file's parent directory canonicalizes to somewhere still inside the
-// canonical cwd — this catches `..` segments that a components() scan alone
-// could miss once symlinks are involved (a plain "reject any ParentDir
-// component" check, as `validate_repo_relative_path` does for git paths, is
-// enough there because git resolves those paths itself; a raw filesystem
-// write needs the stronger belt-and-suspenders canonicalize-and-prefix-check
-// since we do the join ourselves).
+// inside the session's cwd. Traversal-hardened: canonicalize the cwd, join
+// the (resolved) relative path, then verify the written file's parent still
+// sits inside the canonical cwd. Absolute Write/Edit-style paths are
+// accepted via [`resolve_review_path`] and stripped to repo-relative first.
 // ---------------------------------------------------------------------------
-
-/// Rejects absolute paths and any `..` path component before it's ever
-/// joined onto a base directory — first line of defense, mirrors
-/// `validate_repo_relative_path`'s component scan.
-fn validate_relative_write_path(path: &str) -> DesktopResult<&str> {
-    let trimmed = path.trim();
-    if trimmed.is_empty() {
-        return Err(DesktopError::Message("path is required".into()));
-    }
-    let as_path = std::path::Path::new(trimmed);
-    if as_path.is_absolute() {
-        return Err(DesktopError::Message(format!(
-            "path must be relative to the session cwd, got absolute path: {trimmed}"
-        )));
-    }
-    if as_path
-        .components()
-        .any(|c| matches!(c, std::path::Component::ParentDir))
-    {
-        return Err(DesktopError::Message(format!(
-            "path must not contain '..': {trimmed}"
-        )));
-    }
-    Ok(trimmed)
-}
 
 /// Hard cap for the Files (Monaco) editor — keeps the UI responsive and
 /// rejects accidental binary dumps. Matches ~ Cursor's soft ceiling for
@@ -4029,7 +4082,7 @@ pub async fn read_text_file(
     let id = SessionId::from(session_id);
     let meta = service.session_meta(&id).await?;
 
-    let relative = validate_relative_write_path(&relative_path)?.to_string();
+    let relative = resolve_review_path(&relative_path, &meta.cwd)?;
     let cwd = meta.cwd.clone();
 
     tokio::task::spawn_blocking(move || {
@@ -4097,14 +4150,14 @@ pub async fn save_text_file(
     let id = SessionId::from(session_id);
     let meta = service.session_meta(&id).await?;
 
-    let relative = validate_relative_write_path(&relative_path)?;
+    let relative = resolve_review_path(&relative_path, &meta.cwd)?;
 
     let canonical_cwd = meta
         .cwd
         .canonicalize()
         .map_err(|e| DesktopError::Message(format!("invalid session cwd: {e}")))?;
 
-    let target = canonical_cwd.join(relative);
+    let target = canonical_cwd.join(&relative);
     let parent = target
         .parent()
         .ok_or_else(|| DesktopError::Message("path has no parent directory".into()))?;
@@ -4348,8 +4401,45 @@ pub async fn respawn_cron_loop(state: &AppState) {
 }
 
 #[cfg(test)]
-mod git_status_tests {
+mod resolve_review_path_tests {
     use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn keeps_repo_relative_paths() {
+        let root = PathBuf::from("/repo");
+        assert_eq!(
+            resolve_review_path("packages/desktop/src/App.tsx", &root).unwrap(),
+            "packages/desktop/src/App.tsx"
+        );
+    }
+
+    #[test]
+    fn strips_absolute_path_under_worktree() {
+        let root = PathBuf::from("/repo");
+        assert_eq!(
+            resolve_review_path("/repo/packages/desktop/src/App.tsx", &root).unwrap(),
+            "packages/desktop/src/App.tsx"
+        );
+    }
+
+    #[test]
+    fn rejects_absolute_path_outside_worktree() {
+        let root = PathBuf::from("/repo");
+        let err = resolve_review_path("/other/file.rs", &root).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("outside the session workspace"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn rejects_parent_dir_segments() {
+        let root = PathBuf::from("/repo");
+        assert!(resolve_review_path("../secret", &root).is_err());
+    }
+}
 
     /// `summarize` must cap rendered rows at `MAX_STATUS_FILES` while keeping
     /// totals (count/added/removed) computed over the *full*, untruncated

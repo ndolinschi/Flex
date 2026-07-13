@@ -1,8 +1,9 @@
 import { useState, type MouseEvent } from "react"
 import { ChevronRight, FileCode2, ListEnd, LoaderCircle } from "lucide-react"
-import { backgroundDemote, reviewFileDiff } from "../../lib/tauri"
-import { cn } from "../../lib/utils"
+import { backgroundDemote, reviewFileDiff, toInvokeError } from "../../lib/tauri"
+import { cn, toSessionRelativePath } from "../../lib/utils"
 import { sessionScopeKey, useAppStore } from "../../stores/appStore"
+import { useSessions } from "../../hooks/useSessions"
 import { Collapsible } from "./Collapsible"
 import { DiffView } from "./DiffView"
 import { IconButton } from "../atoms/IconButton"
@@ -45,38 +46,43 @@ type DetailRowProps = {
 export const DetailRow = ({ detail, note }: DetailRowProps) => {
   const sessionId = useAppStore((s) => s.activeSessionId)
   const openWorkspaceFile = useAppStore((s) => s.openWorkspaceFile)
+  const { sessions } = useSessions()
+  const cwd = sessions.find((s) => s.id === sessionId)?.cwd
   const [expanded, setExpanded] = useState(false)
   const [diff, setDiff] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   if (detail.background) {
     return <BackgroundBashRow detail={detail} />
   }
 
-  const canExpand = !!detail.diffPath && !!sessionId
-  const openPath = detail.diffPath ?? detail.filePath
+  const rawPath = detail.diffPath ?? detail.filePath
+  const relativePath = rawPath
+    ? toSessionRelativePath(rawPath, cwd)
+    : undefined
+  const canExpand = !!detail.diffPath && !!sessionId && !!relativePath
   const canOpenFile =
-    !!sessionId && !!openPath && !openPath.endsWith("/")
+    !!sessionId && !!relativePath && !relativePath.endsWith("/")
 
   const handleToggle = () => {
-    if (!canExpand) return
+    if (!canExpand || !relativePath) return
     const next = !expanded
     setExpanded(next)
     if (next && diff === null && !loading) {
       setLoading(true)
-      setError(false)
-      reviewFileDiff(sessionId!, detail.diffPath!)
+      setError(null)
+      reviewFileDiff(sessionId!, relativePath)
         .then((text) => setDiff(text))
-        .catch(() => setError(true))
+        .catch((err) => setError(toInvokeError(err)))
         .finally(() => setLoading(false))
     }
   }
 
   const handleOpenFile = (e: MouseEvent) => {
     e.stopPropagation()
-    if (!sessionId || !openPath) return
-    openWorkspaceFile(sessionScopeKey(sessionId), openPath)
+    if (!sessionId || !relativePath) return
+    openWorkspaceFile(sessionScopeKey(sessionId), relativePath)
   }
 
   return (
@@ -160,15 +166,18 @@ export const DetailRow = ({ detail, note }: DetailRowProps) => {
               </div>
             ) : error ? (
               <div className="px-3 py-1 text-[12px] text-ink-faint">
-                Diff unavailable — file may be outside this session's workspace
+                Diff unavailable — {error}
               </div>
             ) : diff ? (
               <DiffView diff={diff} />
-            ) : null}
+            ) : (
+              <div className="px-3 py-1 text-[12px] text-ink-faint">
+                No changes vs HEAD
+              </div>
+            )}
           </div>
         </Collapsible>
       ) : null}
     </li>
   )
 }
-
