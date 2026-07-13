@@ -193,6 +193,46 @@ describe("clusterToolRows", () => {
   })
 })
 
+describe("Plan presentation", () => {
+  it("does not nest a duplicate 'Plan' detail under a Plan header", () => {
+    const plan = makeCall({
+      tool_name: "Plan",
+      input: {
+        entries: [
+          { content: "Scaffold Next.js project", status: "in_progress" },
+          { content: "Add Auth.js", status: "pending" },
+          { content: "Wire Prisma", status: "pending" },
+        ],
+      },
+    })
+
+    expect(classifyTool("Plan")).toBe("plan")
+    expect(classifyTool("ExitPlanMode")).toBe("generic")
+
+    const summary = summarizeToolCalls([plan])
+    expect(summary.title).toBe("Updated plan · 3 steps")
+    expect(summary.details.map((d) => d.label)).toEqual([
+      "Scaffold Next.js project",
+      "Add Auth.js",
+      "Wire Prisma",
+    ])
+    expect(summary.details.some((d) => d.label === "Plan")).toBe(false)
+    expect(summary.details[0]?.sublabel).toBe("in progress")
+  })
+
+  it("shows Updating plan… while running, without echoing Plan as a detail", () => {
+    const plan = makeCall({
+      tool_name: "Plan",
+      input: {},
+      status: { state: "running" },
+    })
+    const summary = summarizeToolCalls([plan])
+    expect(summary.title).toBe("Updating plan…")
+    expect(summary.running).toBe(true)
+    expect(summary.details).toEqual([])
+  })
+})
+
 describe("SearchCode / FindSymbol presentation", () => {
   it("classifies both as explore and labels query/symbol", () => {
     const search = makeCall({

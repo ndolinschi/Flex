@@ -1,10 +1,12 @@
 import type { ToolCall } from "./types"
 import { basename } from "./utils"
 
-export type ToolKind = "explore" | "edit" | "shell" | "generic"
+export type ToolKind = "explore" | "edit" | "shell" | "plan" | "generic"
 
 export const classifyTool = (name: string): ToolKind => {
   const n = name.toLowerCase()
+  // Exact `plan` only — don't match ExitPlanMode / plan-ish names via includes.
+  if (n === "plan") return "plan"
   if (
     n === "read" ||
     n === "glob" ||
@@ -381,17 +383,80 @@ const genericDetail = (call: ToolCall): ToolStepDetail => {
   }
 }
 
+/** Checklist items from a `Plan` tool call's `input.entries`. */
+const planEntriesFromInput = (
+  call: ToolCall,
+): Array<{ content: string; status?: string }> => {
+  const input = asRecord(call.input)
+  const entries = input?.entries
+  if (!Array.isArray(entries)) return []
+  const out: Array<{ content: string; status?: string }> = []
+  for (const raw of entries) {
+    const entry = asRecord(raw)
+    const content = stringField(entry, ["content"])
+    if (!content) continue
+    const status = stringField(entry, ["status"]) ?? undefined
+    out.push({ content, status })
+  }
+  return out
+}
+
+/** One detail row per plan step — never echo the tool name "Plan" as the
+ * only body line under a "Plan" header (the live QA stray "Plan > Plan"). */
+const planDetails = (calls: ToolCall[]): ToolStepDetail[] => {
+  const details: ToolStepDetail[] = []
+  for (const call of calls) {
+    const entries = planEntriesFromInput(call)
+    if (entries.length === 0) continue
+    for (let i = 0; i < entries.length; i += 1) {
+      const entry = entries[i]!
+      details.push({
+        id: `${call.id}:entry:${i}`,
+        label: entry.content,
+        sublabel:
+          entry.status && entry.status !== "pending"
+            ? entry.status.replace(/_/g, " ")
+            : undefined,
+        running: false,
+        failed: isFailed(call),
+      })
+    }
+  }
+  return details
+}
+
 export const summarizeToolCalls = (calls: ToolCall[]): ToolStepSummary => {
   const kind = classifyTool(calls[0]?.tool_name ?? "generic")
-  const details = calls.map((call) => {
-    if (kind === "explore") return exploreDetail(call)
-    if (kind === "edit") return editDetail(call)
-    if (kind === "shell") return shellDetail(call)
-    return genericDetail(call)
-  })
+  const details =
+    kind === "plan"
+      ? planDetails(calls)
+      : calls.map((call) => {
+          if (kind === "explore") return exploreDetail(call)
+          if (kind === "edit") return editDetail(call)
+          if (kind === "shell") return shellDetail(call)
+          return genericDetail(call)
+        })
 
-  const running = details.some((d) => d.running)
-  const failed = details.some((d) => d.failed)
+  const running =
+    kind === "plan"
+      ? calls.some(isRunning)
+      : details.some((d) => d.running)
+  const failed =
+    kind === "plan"
+      ? calls.some(isFailed)
+      : details.some((d) => d.failed)
+
+  if (kind === "plan") {
+    const stepCount = details.length
+    const title = running
+      ? "Updating plan…"
+      : stepCount === 0
+        ? "Updated plan"
+        : stepCount === 1
+          ? "Updated plan · 1 step"
+          : `Updated plan · ${stepCount} steps`
+    return { kind, title, running, failed, details }
+  }
 
   if (kind === "explore") {
     const fileSet = new Set<string>()
@@ -495,14 +560,15 @@ export const buildWorkResumeLine = (calls: ToolCall[]): string | null => {
     edit: [],
     explore: [],
     shell: [],
+    plan: [],
     generic: [],
   }
   for (const call of calls) {
     buckets[classifyTool(call.tool_name)].push(call)
   }
 
-  // Order matches the plan resume: edits → explores → commands → other.
-  const order: ToolKind[] = ["edit", "explore", "shell", "generic"]
+  // Order matches the plan resume: edits → explores → commands → plan → other.
+  const order: ToolKind[] = ["edit", "explore", "shell", "plan", "generic"]
   const parts: string[] = []
   for (const kind of order) {
     const group = buckets[kind]
