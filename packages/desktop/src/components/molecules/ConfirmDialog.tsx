@@ -58,7 +58,6 @@ export const ConfirmDialog = ({
     <div
       className="fixed inset-0 z-[100] flex items-start justify-center bg-black/20 pt-[100px] animate-backdrop-in"
       role="presentation"
-      data-suppress-native-webview=""
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel()
       }}

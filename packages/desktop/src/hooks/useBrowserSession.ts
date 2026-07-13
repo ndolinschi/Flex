@@ -466,18 +466,19 @@ export const useBrowserSession = (active: boolean) => {
     const panelEl = document.querySelector<HTMLElement>(
       '[aria-label="Details panel"]',
     )
-    const shouldHideWebview = () =>
-      isNativeWebviewSuppressed() || useAppStore.getState().rightPanelDragging
+    const shouldHideWebview = (slotRect: DOMRectReadOnly) =>
+      isNativeWebviewSuppressed(slotRect) ||
+      useAppStore.getState().rightPanelDragging
     const measure = (force: boolean) => {
       if (cancelled) return
-      // Native child webviews sit above every HTML stacking context — hide
-      // while modals/palettes claim the screen or the resize sash is dragged.
-      if (shouldHideWebview()) {
+      const rect = slot.getBoundingClientRect()
+      // Native child webviews sit above every HTML stacking context — hide only
+      // when a modal/menu actually covers this slot (or the sash is dragging).
+      if (shouldHideWebview(rect)) {
         lastSent = null
         void browserSetVisible(false)
         return
       }
-      const rect = slot.getBoundingClientRect()
       if (rect.width < 2 || rect.height < 2) {
         lastSent = null
         void browserSetVisible(false)
@@ -517,7 +518,7 @@ export const useBrowserSession = (active: boolean) => {
       lastSent = { x, y, w: width, h: height }
       void browserSetBounds(x, y, width, height).then(() => {
         if (cancelled) return
-        if (shouldHideWebview()) {
+        if (shouldHideWebview(slot.getBoundingClientRect())) {
           void browserSetVisible(false)
           return
         }

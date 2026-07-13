@@ -297,7 +297,6 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
   return createPortal(
     <div
       className="fixed inset-0 z-[300] flex justify-center bg-black/20 animate-backdrop-in"
-      data-suppress-native-webview=""
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
