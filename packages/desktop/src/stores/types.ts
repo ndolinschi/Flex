@@ -302,11 +302,9 @@ export type LayoutSliceState = {
   rightPanelOpen: boolean
   rightPanelTab: RightPanelTab
   rightPanelWidth: number
-  /** Slim-strip collapsed variant of the right panel — distinct from
-   * `rightPanelOpen` (open/closed). Collapsed keeps the panel "open"
-   * architecturally (terminals/webview alive) but renders a narrow strip
-   * instead of the full-width tab content. Persisted globally, same as
-   * `rightPanelOpen`. */
+  /** Legacy slim-strip flag — UI no longer offers collapse-to-strip (one
+   * PanelRight toggle only, Cursor-style). Kept for persist/bootstrap compat;
+   * RightPanel clears it on mount if set. */
   rightPanelCollapsed: boolean
   /** True while the right-panel resize sash is being dragged — hides the
    * native browser child webview so the sash stays clickable. */
