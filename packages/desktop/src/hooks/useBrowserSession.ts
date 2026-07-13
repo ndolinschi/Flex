@@ -51,13 +51,21 @@ export const useBrowserSession = (active: boolean) => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const sessionKey = sessionScopeKey(activeSessionId)
 
-  const browserBySession = useAppStore((s) => s.browserBySession)
-  const sessionState = browserBySession[sessionKey]
-  const browserUrl = sessionState?.url ?? ""
-  const browserLoading = sessionState?.loading ?? false
-  const browserStarted = sessionState?.started ?? false
-  const viewportPreset = sessionState?.viewportPreset ?? "fill"
-  const loadError = sessionState?.loadError ?? null
+  const browserUrl = useAppStore(
+    (s) => s.browserBySession[sessionKey]?.url ?? "",
+  )
+  const browserLoading = useAppStore(
+    (s) => s.browserBySession[sessionKey]?.loading ?? false,
+  )
+  const browserStarted = useAppStore(
+    (s) => s.browserBySession[sessionKey]?.started ?? false,
+  )
+  const viewportPreset = useAppStore(
+    (s) => s.browserBySession[sessionKey]?.viewportPreset ?? "fill",
+  )
+  const loadError = useAppStore(
+    (s) => s.browserBySession[sessionKey]?.loadError ?? null,
+  )
 
   const browserOwnerSessionId = useAppStore((s) => s.browserOwnerSessionId)
   const isOwner = browserOwnerSessionId === sessionKey

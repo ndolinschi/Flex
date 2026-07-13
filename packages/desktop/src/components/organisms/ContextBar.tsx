@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { gitIsRepo, isIsolated } from "../../lib/tauri"
+import { isIsolated } from "../../lib/tauri"
+import { useIsGitRepo } from "../../hooks/useIsGitRepo"
 import { BranchPicker } from "../molecules/BranchPicker"
 import { ProjectPicker } from "../molecules/ProjectPicker"
 import { UsageRing } from "./context-bar/UsageRing"
@@ -38,18 +39,10 @@ export const ContextBar = ({
   // while the query is loading (or has no cwd yet) so the chrome doesn't
   // flash away/in on every session switch; it only ever hides once we
   // positively know there's no repo.
-  const { data: isRepo = true } = useQuery({
-    queryKey: ["git-is-repo", cwd],
-    queryFn: () => gitIsRepo(cwd!),
-    enabled: !!cwd,
-    staleTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 5_000,
-  })
+  const { data: isRepo = true } = useIsGitRepo(cwd)
 
   return (
-    <div className="flex min-h-[var(--status-bar-height)] items-center gap-2 px-1">
+    <div className="flex min-h-[var(--status-bar-height)] items-center gap-2 px-0">
       {/* min-w-0 + flex-1 (not justify-between) so this group is what shrinks
           under pressure — the gap to the right-hand cluster is a real flex
           gap, not `justify-between`'s leftover space, so it can never

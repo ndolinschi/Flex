@@ -115,7 +115,7 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
         {showOverlay ? (
           <div className="absolute inset-0 z-10 bg-bg">
             {preview ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 px-6">
+              <div className="flex h-full flex-col items-center justify-center gap-2 px-4">
                 <Globe className="h-8 w-8 text-ink-faint opacity-60" aria-hidden />
                 <p className="text-[14px] font-medium text-ink">Browser</p>
                 <p className="max-w-[320px] text-center text-sm text-ink-muted">
@@ -141,7 +141,7 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
                 </Button>
               </div>
             ) : showLiveContent && loadError ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 px-6">
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
                 <AlertTriangle className="h-8 w-8 text-danger opacity-80" aria-hidden />
                 <p className="text-[14px] font-medium text-ink">
                   Can't connect to server

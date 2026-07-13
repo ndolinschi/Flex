@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import { useMemo, type ReactNode } from "react"
 import { ToolStepGroup } from "./ToolStepGroup"
 import {
   clusterToolRows,
@@ -19,7 +19,7 @@ export const ToolStepList = ({
    * call inside that cluster is still running. */
   forceOpenDetails?: boolean
 }) => {
-  const clusters = clusterToolRows(rows)
+  const clusters = useMemo(() => clusterToolRows(rows), [rows])
   return (
     <>
       {clusters.map((cluster, i) =>

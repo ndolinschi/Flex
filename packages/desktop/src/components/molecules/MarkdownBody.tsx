@@ -11,6 +11,7 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Check, Copy } from "lucide-react"
 import { cn } from "../../lib/utils"
+import { StreamingCaret } from "./StreamingCaret"
 
 type MarkdownBodyProps = {
   content: string
@@ -120,6 +121,42 @@ const MARKDOWN_PROSE_CLASS = cn(
   "[&_tbody_tr:last-child_td]:border-b-0",
 )
 
+const MARKDOWN_COMPONENTS: NonNullable<
+  ComponentProps<typeof ReactMarkdown>["components"]
+> = {
+  table: (props) => (
+    <div className="my-1.5 overflow-x-auto rounded-lg border border-stroke-3 first:mt-0 last:mb-0">
+      <table {...props} />
+    </div>
+  ),
+  pre: CodeBlock,
+  // Links must never navigate the app's own webview (that replaces the
+  // whole UI with the page). Route web links into the embedded Browser
+  // panel; hand any other scheme to the OS opener.
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      onClick={(e) => {
+        if (!href) return
+        e.preventDefault()
+        if (/^https?:\/\//i.test(href)) {
+          window.dispatchEvent(
+            new CustomEvent("flex:open-in-browser", {
+              detail: { url: href },
+            }),
+          )
+        } else {
+          void import("@tauri-apps/plugin-opener")
+            .then((m) => m.openUrl(href))
+            .catch(() => {})
+        }
+      }}
+    >
+      {children}
+    </a>
+  ),
+}
+
 /** Conversation markdown — compact reference-like body scale.
  * Highlight.js language packs load lazily via `lib/markdownHighlight` so the
  * initial chunk stays lean; GFM still renders immediately. */
@@ -129,7 +166,8 @@ export const MarkdownBody = memo(({ content, className, live = false }: Markdown
   >([])
 
   useEffect(() => {
-    if (live) return
+    // Load (or preload while `live`) so settle does not flash unhighlighted →
+    // highlighted on a second paint. Live path ignores rehype until settled.
     let cancelled = false
     void import("../../lib/markdownHighlight").then((mod) => {
       if (cancelled) return
@@ -144,6 +182,7 @@ export const MarkdownBody = memo(({ content, className, live = false }: Markdown
     return (
       <div className={cn(MARKDOWN_BODY_CLASS, "whitespace-pre-wrap", className)}>
         {content}
+        <StreamingCaret />
       </div>
     )
   }
@@ -153,37 +192,7 @@ export const MarkdownBody = memo(({ content, className, live = false }: Markdown
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={rehypePlugins}
-        components={{
-          table: (props) => (
-            <div className="my-1.5 overflow-x-auto rounded-lg border border-stroke-3 first:mt-0 last:mb-0">
-              <table {...props} />
-            </div>
-          ),
-          pre: CodeBlock,
-          // Links must never navigate the app's own webview (that replaces the
-          // whole UI with the page). Route web links into the embedded Browser
-          // panel; hand any other scheme to the OS opener.
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              onClick={(e) => {
-                if (!href) return
-                e.preventDefault()
-                if (/^https?:\/\//i.test(href)) {
-                  window.dispatchEvent(
-                    new CustomEvent("flex:open-in-browser", { detail: { url: href } }),
-                  )
-                } else {
-                  void import("@tauri-apps/plugin-opener")
-                    .then((m) => m.openUrl(href))
-                    .catch(() => {})
-                }
-              }}
-            >
-              {children}
-            </a>
-          ),
-        }}
+        components={MARKDOWN_COMPONENTS}
       >
         {content}
       </ReactMarkdown>

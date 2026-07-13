@@ -21,6 +21,12 @@ export type WorkGroupItem = {
    * (i.e. the turn had no trailing assistant answer) — renders the
    * end-of-turn footer right after the group. */
   footer?: TurnFooterInfo
+  /** Precomputed for the virtualizer — avoids rescanning `rows` each render. */
+  verdict?: VerificationVerdict
+  /** Collapsed resume line; null while the group is open (live). */
+  resumeLine: string | null
+  /** True when an open group contains a live-thinking row (Thinking cue). */
+  hasLiveThinking: boolean
 }
 
 export type DisplayItem =
@@ -267,6 +273,14 @@ export const buildDisplayItems = (
         summary,
         rows: work,
         footer: tail.length === 0 ? footer : undefined,
+        verdict: latestVerdictInRows(work),
+        resumeLine: keepOpen ? null : resumeLineForRows(work),
+        hasLiveThinking: keepOpen
+          ? work.some(
+              (r) =>
+                r.type === "thinking" && r.id.startsWith("live-thinking:"),
+            )
+          : false,
       })
     }
     tail.forEach((row, i) => {

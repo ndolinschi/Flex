@@ -155,7 +155,10 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/hooks/useSessionSidebarGroups.ts` | Pin/archive/repo grouping + stable order for SessionSidebar |
 | `src/hooks/useSessionEvents.ts` | Active-session replay + timeline rows (thin over `lib/timeline`) |
 | `src/hooks/useLatestVerdict.ts` | Narrow per-session latest Verify verdict (Plan tab) |
-| `src/hooks/useGlobalSessionEvents.ts` | App-level `session-event` fan-out + subscribe |
+| `src/hooks/useIsGitRepo.ts` | Shared `git-is-repo` TanStack query (ContextBar / FilesChangedCard / RightPanel / ChangesTab) |
+| `src/hooks/useGlobalSessionEvents.ts` | App-level session-event fan-out + subscribe (via `sessionEventBus`) |
+| `src/lib/sessionEventBus.ts` | Ref-counted single Tauri `session-event` listener; demux to React subscribers |
+| `src/components/organisms/timeline/mergeLiveRows.ts` | Pure live+materialized row merge with O(1) id Sets |
 | `src/hooks/useComposerSend.ts` | Subscribe-wait + send/queue constants |
 | `src/hooks/useStickToBottom.ts` | Timeline stick-to-bottom scroll (narrow `streamContentKey` dep) |
 | `src/hooks/useGroupedModels.ts` | Model picker grouping |
@@ -165,7 +168,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 
 ## Theme & motion
 
-- Themes: `data-theme="dark"|"light"` on `<html>` (Cursor Glass palettes).
+- Themes: `data-theme="dark"|"light"` on `<html>` (Cursor-tight premium palettes — neutral charcoal / clean white, close surface steps, whisper fills, soft product blue accent).
 - Feel principles (local `design-map/README.md`): compact density, quiet chrome, whisper fills, opacity hover, micro-motion, alpha hierarchy, keyboard focus, weight 590 + micro tracking, alpha borders, radius-by-role, neutral interactive chrome, thin scrollbars.
 - Motion: hover 100ms ease; trays `animate-tray-in`; pane swaps `animate-pane-fade`; timeline rows `animate-row-fade`; end-of-turn `animate-end-turn-in` (160ms); HITL cards `animate-modal-in` (scale .97→1); overlays `animate-backdrop-in`.
 - Composer: `--radius-composer` 14px, soft elevation + stroke focus (no accent glow), auto-grow 36–200px; quiet toolbar opacity (0.5→0.8); mode/model pills neutral fill + stroke.
@@ -193,3 +196,14 @@ Keep this file in sync when adding or renaming components.
 - **Windows consoles:** Release builds are GUI-subsystem. Ordinary children (`git`/`gh`/`cmd`) use `CREATE_NO_WINDOW` via `src-tauri/src/win_console.rs` and the engine `executors` helpers. The Terminal tab's ConPTY PowerShell must **not** use that flag (breaks pipe I/O); instead `ensure_hidden_parent_console` allocates a hidden parent console at startup so ConPTY children do not pop a visible window. Terminal cwd uses `dirs::home_dir` / USERPROFILE (not `$HOME`→`/`) and collapses doubled `\` path escapes.
 - **React Compiler:** Enabled in `vite.config.ts` via `babel-plugin-react-compiler` (React 19 target). Verified with `tsc --noEmit`, `vitest run`, and `vite build`.
 - **Markdown highlight:** Core language pack loads as a separate chunk (`lib/markdownHighlight.ts`); GFM renders immediately, highlight upgrades after the dynamic import.
+
+## Perf notes (Wave 4)
+
+- **Streaming liveRows:** `mergeLiveRows` builds message/tool id Sets once per rows change so streaming buffer lookups are O(1) instead of `rows.some` per key each rAF.
+- **WorkGroup props:** `buildDisplayItems` precomputes `verdict` / `resumeLine` / `hasLiveThinking` on each `WorkGroupItem` so the virtualizer map does not re-scan `item.rows` every parent render. Compacting/indexing cues still override at render time from session status.
+- **Tool / workflow memo:** `ToolStepList` memos `clusterToolRows`; `WorkflowGroup` memos `resolveSteps`.
+- **Session-event demux:** `lib/sessionEventBus` attaches one Tauri `session-event` listener; `useGlobalSessionEvents` and each `useSessionEvents` subscribe to the bus (SubagentViewer no longer triples wire delivery).
+- **Browser / terminal selectors:** `useBrowserSession` selects per-session primitives; `TerminalTab` mounts xterm only for the active session's terminals (+ that session's agent terminal). `useIsGitRepo` shares the 5s `git-is-repo` poll across ContextBar / FilesChangedCard / RightPanel / ChangesTab.
+- **MarkdownBody:** module-scoped `components` map so settled `react-markdown` trees keep stable element constructors across parent re-renders.
+- **Spacing balance (careful):** chat chrome/gutters converge on `px-4` — AppHeader matches the timeline/composer rail; loading/error/empty states drop `p-6`/`px-6` jumps; ContextBar loses inner `px-1`; composer toolbar aligns with textarea `px-3`; ChatShell/timeline bottom stack eased `pb-3`→`pb-2`; RightPanel tab bar `px-2` toward body headers.
+- **Streaming visuals:** `StreamingCaret` renders inline inside live `MarkdownBody` (including mid-turn narration in work groups); live assistant rows reserve `MessageActions` height; highlight.js preloads while live; `TurnTimeline` uses per-session `streamingSessions[id]` (SubagentViewer-safe); bottom “Working” hides when live answer text is visible; double-rAF remeasure on stream settle.

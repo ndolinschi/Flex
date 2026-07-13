@@ -36,7 +36,7 @@ export const RightPanelTabBar = ({
   onClosePanel,
 }: RightPanelTabBarProps) => {
   return (
-    <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1 border-b border-stroke-3 px-1" data-browser-chrome="tabs">
+    <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1 border-b border-stroke-3 px-2" data-browser-chrome="tabs">
       {openTabDefs.map((t) => (
         <button
           key={t.id}

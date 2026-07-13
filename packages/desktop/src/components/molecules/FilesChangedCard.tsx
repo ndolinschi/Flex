@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { ArrowRight, ChevronDown, ChevronRight } from "lucide-react"
-import { gitIsRepo, gitStatusSinceBaseline } from "../../lib/tauri"
+import { gitStatusSinceBaseline } from "../../lib/tauri"
+import { useIsGitRepo } from "../../hooks/useIsGitRepo"
 import { useAppStore } from "../../stores/appStore"
 import { basename, cn, fileIconForPath } from "../../lib/utils"
 import { DiffStat } from "../atoms"
@@ -29,15 +30,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
   const setRightPanelOpen = useAppStore((s) => s.setRightPanelOpen)
   const setRightPanelTab = useAppStore((s) => s.setRightPanelTab)
 
-  const { data: isRepo } = useQuery({
-    queryKey: ["git-is-repo", cwd ?? ""],
-    queryFn: () => gitIsRepo(cwd!),
-    enabled: !!cwd,
-    staleTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 5_000,
-  })
+  const { data: isRepo } = useIsGitRepo(cwd)
 
   const { data: summary } = useQuery({
     queryKey: ["git-status", cwd ?? "", sessionId ?? null],

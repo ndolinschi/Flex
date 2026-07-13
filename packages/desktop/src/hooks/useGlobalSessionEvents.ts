@@ -1,14 +1,10 @@
 import { useEffect, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import {
-  listenSessionEvents,
-  subscribeSession,
-  unsubscribeSession,
-} from "../lib/tauri"
+import { subscribeSession, unsubscribeSession } from "../lib/tauri"
+import { subscribeSessionEvents } from "../lib/sessionEventBus"
 import { useAppStore } from "../stores/appStore"
 import { applyGlobalSessionEvent } from "../lib/sessionSideEffects/applyGlobalEvent"
 import { agentTerminalId } from "../lib/sessionSideEffects/agentTerminal"
-import { isEventDumpEnabled, recordRawEvent } from "../lib/eventDump"
 import { log } from "../lib/debug/log"
 
 export { applyGlobalSessionEvent }
@@ -22,40 +18,28 @@ export { agentTerminalId }
 const DRAIN_TIMEOUT_MS = 10_000
 
 /**
- * App-level fan-out: one `session-event` listener for all sessions, plus
+ * App-level fan-out: demuxed `session-event` subscriber for all sessions, plus
  * subscribe/unsubscribe for the active session and any still-streaming ones.
+ * The Tauri listen itself lives in `sessionEventBus` (shared with
+ * `useSessionEvents`).
  */
 export const useGlobalSessionEvents = () => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const streamingSessions = useAppStore((s) => s.streamingSessions)
   const drainingSessions = useAppStore((s) => s.drainingSessions)
   const subscribedRef = useRef(new Set<string>())
-  const drainTimersRef = useRef(new Map<string, ReturnType<typeof window.setTimeout>>())
+  const drainTimersRef = useRef(
+    new Map<string, ReturnType<typeof window.setTimeout>>(),
+  )
   const queryClient = useQueryClient()
+  const queryClientRef = useRef(queryClient)
+  queryClientRef.current = queryClient
 
   useEffect(() => {
-    let cancelled = false
-    let unlisten: (() => void) | null = null
-
-    const boot = async () => {
-      const dumpEnabled = isEventDumpEnabled()
-      log.debug("session", "global session-event listener: attaching")
-      unlisten = await listenSessionEvents((event) => {
-        if (dumpEnabled) recordRawEvent(event)
-        applyGlobalSessionEvent(event, { queryClient })
-      })
-      if (cancelled) {
-        unlisten()
-        unlisten = null
-      }
-    }
-
-    void boot()
-
-    return () => {
-      cancelled = true
-      if (unlisten) unlisten()
-    }
+    log.debug("session", "global session-event listener: attaching via bus")
+    return subscribeSessionEvents((event) => {
+      applyGlobalSessionEvent(event, { queryClient: queryClientRef.current })
+    })
   }, [])
 
   useEffect(() => {
@@ -131,14 +115,20 @@ export const useGlobalSessionEvents = () => {
           // dropped (no subscriber attached on the backend's broadcast
           // channel). Surface it loudly but don't let it become an
           // unhandled promise rejection.
-          log.error("session", "subscribe_session failed", { sessionId: id, err })
+          log.error("session", "subscribe_session failed", {
+            sessionId: id,
+            err,
+          })
         })
     }
     for (const id of toRemove) {
       prev.delete(id)
       useAppStore.getState().setSessionSubscribed(id, false)
       void unsubscribeSession(id).catch((err) => {
-        log.error("session", "unsubscribe_session failed", { sessionId: id, err })
+        log.error("session", "unsubscribe_session failed", {
+          sessionId: id,
+          err,
+        })
       })
     }
   }, [activeSessionId, streamingSessions, drainingSessions])
@@ -159,7 +149,8 @@ export const useGlobalSessionEvents = () => {
       useAppStore.getState().setIsStreaming(false)
       return
     }
-    const streaming = !!useAppStore.getState().streamingSessions[activeSessionId]
+    const streaming =
+      !!useAppStore.getState().streamingSessions[activeSessionId]
     useAppStore.getState().setIsStreaming(streaming)
   }, [activeSessionId])
 }
