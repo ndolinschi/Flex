@@ -160,8 +160,9 @@ pub enum AgentEvent {
     },
     /// Context compaction is about to call the summarizer. Ephemeral: not
     /// persisted — a UI can show "Compacting context…" until the following
-    /// [`CompactionBoundary`] (or turn end / error) lands. `strategy` matches
-    /// the eventual boundary (`summarize_oldest`, `auto_summarize_oldest`, …).
+    /// [`AgentEvent::CompactionBoundary`] (or turn end / error) lands.
+    /// `strategy` matches the eventual boundary (`summarize_oldest`,
+    /// `auto_summarize_oldest`, …).
     CompactionStarted {
         strategy: String,
     },
