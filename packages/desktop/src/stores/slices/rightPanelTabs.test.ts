@@ -159,4 +159,21 @@ describe("right panel per-session tab state (BUG #37)", () => {
       "plan",
     ])
   })
+
+  it("openWorkspaceFile opens the Files tab and selects the path", () => {
+    useAppStore.setState({
+      openFilesBySession: {},
+      activeFileBySession: {},
+      fileDraftsBySession: {},
+    })
+    useAppStore.getState().setActiveSessionId(A)
+    useAppStore.getState().openWorkspaceFile(sessionScopeKey(A), "src/App.tsx")
+
+    const state = useAppStore.getState()
+    expect(state.rightPanelOpen).toBe(true)
+    expect(state.rightPanelTab).toBe("files")
+    expect(state.openTabsBySession[sessionScopeKey(A)]).toEqual(["files"])
+    expect(state.openFilesBySession[sessionScopeKey(A)]).toEqual(["src/App.tsx"])
+    expect(state.activeFileBySession[sessionScopeKey(A)]).toBe("src/App.tsx")
+  })
 })
