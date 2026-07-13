@@ -50,12 +50,14 @@ const StepBody = ({
   }
 
   return (
-    <fieldset className="flex flex-col gap-3">
-      <legend className="text-sm font-medium leading-normal text-ink">
-        <span className="mr-2 inline-block rounded bg-fill-3 px-1.5 py-0.5 text-xs text-ink-secondary">
+    <fieldset className="flex min-w-0 flex-col gap-2.5">
+      <legend className="mb-0.5 flex w-full min-w-0 flex-col gap-1.5">
+        <span className="w-fit rounded-md bg-fill-3 px-1.5 py-0.5 text-xs font-medium tracking-[var(--tracking-caption)] text-ink-secondary">
           {q.header}
         </span>
-        {q.question}
+        <span className="text-base font-medium leading-snug text-ink">
+          {q.question}
+        </span>
       </legend>
       <div className="flex flex-col gap-1.5">
         {q.options.map((opt) => {
@@ -67,7 +69,7 @@ const StepBody = ({
               aria-pressed={active}
               onClick={() => handleToggle(opt.label)}
               className={cn(
-                "rounded-md border px-3 py-2.5 text-left text-base",
+                "w-full rounded-md border px-3 py-2 text-left text-base leading-snug",
                 "transition-colors duration-[var(--duration-fast)]",
                 active
                   ? "border-accent bg-accent-subtle text-ink"
@@ -83,16 +85,16 @@ const StepBody = ({
             </button>
           )
         })}
+        {allowCustom ? (
+          <TextInput
+            value={draft.custom}
+            onChange={(e) => onChange({ selected: [], custom: e.target.value })}
+            placeholder="Or type a custom answer…"
+            aria-label={`Custom answer for ${q.header}`}
+            className="h-9 w-full text-base"
+          />
+        ) : null}
       </div>
-      {allowCustom ? (
-        <TextInput
-          value={draft.custom}
-          onChange={(e) => onChange({ selected: [], custom: e.target.value })}
-          placeholder="Or type a custom answer…"
-          aria-label={`Custom answer for ${q.header}`}
-          className="h-8 text-base"
-        />
-      ) : null}
     </fieldset>
   )
 }
@@ -101,7 +103,7 @@ const StepBody = ({
  *
  * Renders one question per step (reference-design wizard): a step
  * advances automatically on single-select choice, or via an explicit
- * Next button for multi-select steps. Back preserves prior answers.
+ * Next button for multi-select / custom answers. Back preserves prior answers.
  * The last step's Next becomes Submit, which still builds the full
  * answers map client-side and sends it through the unchanged
  * `respondQuestion` wire call. */
@@ -124,6 +126,15 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
     const d = currentDraft
     return d.selected.length > 0 || d.custom.trim().length > 0
   }, [currentDraft])
+
+  const showBack = stepIndex > 0
+  // Single-select mid-steps auto-advance on option click — no hollow footer.
+  // Custom text / multi-select / last step still need an explicit action.
+  const showAdvance =
+    !!currentQuestion.multi_select ||
+    isLastStep ||
+    currentDraft.custom.trim().length > 0
+  const showFooter = showBack || showAdvance
 
   const goToStep = (next: number) => {
     setStepIndex(next)
@@ -194,11 +205,12 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
           // (not the translucent panel token), so nothing behind it — feed
           // content included — can show through the header.
           "rounded-t-[var(--radius-composer)] border border-b-0 border-stroke-3",
-          "bg-user-bubble px-4 pb-4 pt-3.5 shadow-[0_-4px_16px_-4px_var(--shadow-color)]",
+          "bg-user-bubble px-4 pt-3 shadow-[0_-4px_16px_-4px_var(--shadow-color)]",
+          showFooter ? "pb-3" : "pb-3.5",
         )}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div>
+        <div className="flex items-baseline justify-between gap-3">
+          <div className="min-w-0">
             <h3 id="question-title" className="text-sm font-semibold text-ink">
               Agent needs your input
             </h3>
@@ -207,13 +219,13 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
             </p>
           </div>
           {total > 1 ? (
-            <span className="shrink-0 pt-0.5 text-xs text-ink-faint">
+            <span className="shrink-0 text-xs tabular-nums text-ink-faint">
               {stepIndex + 1} of {total}
             </span>
           ) : null}
         </div>
 
-        <div key={stepKey} className="mt-4 animate-wizard-step-in">
+        <div key={stepKey} className="mt-3 animate-wizard-step-in">
           <StepBody
             q={currentQuestion}
             draft={currentDraft}
@@ -234,32 +246,32 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
         </div>
 
         {error ? (
-          <div className="mt-3">
+          <div className="mt-2.5">
             <ErrorBanner message={error} />
           </div>
         ) : null}
 
-        <div className="mt-4 flex items-center justify-between gap-1.5 border-t border-stroke-4 pt-3">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleBack}
-            className={cn(stepIndex === 0 && "invisible")}
-          >
-            Back
-          </Button>
-
-          {currentQuestion.multi_select || isLastStep ? (
-            <Button
-              size="sm"
-              disabled={!currentStepFilled}
-              isLoading={isSubmitting}
-              onClick={handleAdvance}
-            >
-              {isLastStep ? "Submit" : "Next"}
-            </Button>
-          ) : null}
-        </div>
+        {showFooter ? (
+          <div className="mt-3 flex items-center justify-between gap-1.5 border-t border-stroke-4 pt-2.5">
+            {showBack ? (
+              <Button size="sm" variant="ghost" onClick={handleBack}>
+                Back
+              </Button>
+            ) : (
+              <span />
+            )}
+            {showAdvance ? (
+              <Button
+                size="sm"
+                disabled={!currentStepFilled}
+                isLoading={isSubmitting}
+                onClick={handleAdvance}
+              >
+                {isLastStep ? "Submit" : "Next"}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   )
