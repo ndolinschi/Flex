@@ -58,6 +58,42 @@ export const basename = (path: string): string => {
   return segment || trimmed || path
 }
 
+const hasDriveLetter = (path: string): boolean => /^[a-zA-Z]:\//.test(path)
+
+/** True when `path` looks absolute (POSIX `/…` or Windows `C:/…`). */
+export const isAbsolutePath = (path: string): boolean => {
+  const normalized = path.replace(/\\/g, "/")
+  return normalized.startsWith("/") || hasDriveLetter(normalized)
+}
+
+/** Strip `cwd` from an absolute tool `file_path` so review/Files commands
+ * get a repo-relative path. Write/Edit always record absolute paths; review
+ * APIs historically required relative ones — isolation is irrelevant. */
+export const toSessionRelativePath = (
+  path: string,
+  cwd: string | null | undefined,
+): string => {
+  const trimmed = path.trim()
+  if (!trimmed) return trimmed
+  const normalized = trimmed.replace(/\\/g, "/")
+  if (!cwd) return normalized
+  let root = cwd.replace(/\\/g, "/").replace(/\/+$/, "")
+  if (!root) return normalized
+  if (normalized === root) return ""
+  const prefix = `${root}/`
+  if (normalized.startsWith(prefix)) return normalized.slice(prefix.length)
+  // Windows: drive-letter / path casing often differs between tool args and
+  // SessionMeta.cwd.
+  const lower = normalized.toLowerCase()
+  const rootLower = root.toLowerCase()
+  if (lower === rootLower) return ""
+  const prefixLower = `${rootLower}/`
+  if (lower.startsWith(prefixLower)) {
+    return normalized.slice(prefix.length)
+  }
+  return normalized
+}
+
 /** Compact relative time for sidebar rows. */
 export const formatCompactTime = (tsMs: number): string => {
   const diff = Date.now() - tsMs
