@@ -198,9 +198,18 @@ export const applyGlobalSessionEvent = (
   if (payload.kind === "tool_call_updated" && payload.call.tool_name === "ExitPlanMode") {
     const plan = (payload.call.input as { plan?: unknown } | null)?.plan
     if (typeof plan === "string" && plan.trim()) {
-      store.setPlanDoc(event.session_id, plan)
+      store.upsertSessionPlan({
+        sessionId: event.session_id,
+        planId: payload.call.id,
+        markdown: plan,
+        createdAtMs: event.ts_ms,
+      })
       if (payload.call.status.state === "completed") {
-        store.setPendingPlanApproval({ sessionId: event.session_id, plan })
+        store.setPendingPlanApproval({
+          sessionId: event.session_id,
+          planId: payload.call.id,
+          plan,
+        })
       }
     }
   }

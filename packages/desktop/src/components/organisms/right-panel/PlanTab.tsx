@@ -2,51 +2,48 @@ import { useEffect, useRef, useState } from "react"
 import { ScrollArea } from "../../atoms"
 import {
   MarkdownBody,
+  PlanCommentButton,
+  PlanCommentList,
+  PlanCommentPopover,
+  PlanList,
   PlanStatusIcon,
   PlanToolbar,
   VerdictBadge,
   type PlanBuildStatus,
 } from "../../molecules"
+import { usePlanActions } from "../../../hooks/usePlanActions"
 import { usePlanBuild } from "../../../hooks/usePlanBuild"
+import { usePlanCommentHighlights } from "../../../hooks/usePlanCommentHighlights"
+import { usePlanComments } from "../../../hooks/usePlanComments"
 import { usePlanFind } from "../../../hooks/usePlanFind"
+import { usePlanSelectionComment } from "../../../hooks/usePlanSelectionComment"
 import { useModels } from "../../../hooks/useModels"
 import { useLatestVerdict } from "../../../hooks/useLatestVerdict"
+import { firstPlanHeading, slugifyPlanTitle } from "../../../lib/planTitle"
 import { saveTextFile, toInvokeError } from "../../../lib/tauri"
 import type { PlanEntry, SessionMeta } from "../../../lib/types"
 import { sessionLabel } from "../../../lib/types"
 import { formatRelativeTime } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
+import type { SessionPlan } from "../../../stores/types"
 import { basename, cn } from "../../../lib/utils"
 
 const EMPTY_ENTRIES: PlanEntry[] = []
+const EMPTY_PLANS: SessionPlan[] = []
 
 /* ── Plan tab ─────────────────────────────────────────────────────────── */
-
-/** First Markdown heading (`# `/`## `/…) in the plan doc, sans `#`s — used
- * as the toolbar breadcrumb's leaf when present, falling back to the
- * session title. Plain string scan (not a markdown parse) is enough since
- * we only need the FIRST heading line. */
-const firstHeading = (doc: string | undefined): string | null => {
-  if (!doc) return null
-  const match = /^#{1,6}\s+(.+)$/m.exec(doc)
-  return match ? match[1].trim() : null
-}
-
-/** Slugifies a title for `save_text_file`'s filename (see `handleSaveToWorkspace`). */
-const slugify = (s: string): string =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60) || "plan"
 
 export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
   const entries = useAppStore((s) =>
     active ? (s.plansBySession[active.id] ?? EMPTY_ENTRIES) : EMPTY_ENTRIES,
   )
-  const planDoc = useAppStore((s) =>
-    active ? s.planDocsBySession[active.id] : undefined,
+  const sessionPlans = useAppStore((s) =>
+    active ? (s.sessionPlansBySession[active.id] ?? EMPTY_PLANS) : EMPTY_PLANS,
   )
+  const activePlanId = useAppStore((s) =>
+    active ? (s.activePlanIdBySession[active.id] ?? null) : null,
+  )
+  const setActivePlanId = useAppStore((s) => s.setActivePlanId)
   const pendingPlanApproval = useAppStore((s) => s.pendingPlanApproval)
   const setPendingPlanApproval = useAppStore((s) => s.setPendingPlanApproval)
   const composerMode = useAppStore((s) => s.composerMode)
@@ -58,18 +55,72 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     active ? s.planBuildModelBySession[active.id] : undefined,
   )
   const setPlanBuildModel = useAppStore((s) => s.setPlanBuildModel)
-  const planBuilt = useAppStore((s) =>
-    active ? !!s.planBuiltBySession[active.id] : false,
-  )
   const pushToast = useAppStore((s) => s.pushToast)
   const { models, builtinProviders, isLoading: modelsLoading } = useModels()
   const { buildPlan, isBuilding } = usePlanBuild()
-  // Latest `Verify` call's verdict for this session, if any — verification
-  // only ever appears in `run_goal`/routine runs (GoalSpec.require_verification),
-  // never plain interactive prompts, so this is usually empty in normal chat.
-  // Stored in Zustand from `applyGlobalSessionEvent` (not useSessionEvents) so
-  // PlanTab avoids a duplicate timeline fold while the chat is also mounted.
+  const {
+    busy: planActionBusy,
+    rewritePlan,
+    restartPlan,
+    reviewPlan,
+  } = usePlanActions()
   const latestVerdict = useLatestVerdict(active?.id ?? null)
+
+  const multi = sessionPlans.length > 1
+  // Plan: with many plans, land on the Review plans list first. Pending
+  // approval (and an explicit row pick) open detail instead.
+  const [browsingList, setBrowsingList] = useState(true)
+
+  const awaitingApproval =
+    !!active &&
+    !!pendingPlanApproval &&
+    pendingPlanApproval.sessionId === active.id
+
+  // New ExitPlanMode approval → open that plan's detail.
+  useEffect(() => {
+    if (!active || !awaitingApproval || !pendingPlanApproval) return
+    setBrowsingList(false)
+    if (activePlanId !== pendingPlanApproval.planId) {
+      setActivePlanId(active.id, pendingPlanApproval.planId)
+    }
+  }, [
+    active,
+    awaitingApproval,
+    pendingPlanApproval,
+    activePlanId,
+    setActivePlanId,
+  ])
+
+  // Ensure a lone plan is always the active one (e.g. after restore).
+  useEffect(() => {
+    if (!active || sessionPlans.length !== 1) return
+    if (activePlanId !== sessionPlans[0].id) {
+      setActivePlanId(active.id, sessionPlans[0].id)
+    }
+    setBrowsingList(false)
+  }, [active, sessionPlans, activePlanId, setActivePlanId])
+
+  const showList = multi && browsingList && !awaitingApproval
+
+  const activePlan: SessionPlan | undefined =
+    sessionPlans.length === 1
+      ? sessionPlans[0]
+      : sessionPlans.find((p) => p.id === activePlanId) ??
+        (awaitingApproval && pendingPlanApproval
+          ? sessionPlans.find((p) => p.id === pendingPlanApproval.planId)
+          : undefined)
+
+  const planDoc = activePlan?.markdown
+  const planBuilt = !!activePlan?.built
+  const comments = activePlan?.comments ?? []
+
+  const {
+    activeCommentId,
+    setActiveCommentId,
+    saveComment,
+    saveAndSendComment,
+    removeComment,
+  } = usePlanComments(active?.id ?? null, activePlan?.id ?? null)
 
   const planBodyRef = useRef<HTMLDivElement>(null)
   const [findOpen, setFindOpen] = useState(false)
@@ -79,10 +130,18 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     findQuery,
     findOpen,
   )
+  usePlanCommentHighlights(planBodyRef, comments, activeCommentId, findOpen)
+  const {
+    selection,
+    composerOpen,
+    openComposer,
+    clearSelection,
+    draft,
+  } = usePlanSelectionComment(
+    planBodyRef,
+    !!planDoc && !findOpen && !showList,
+  )
 
-  // ⌘F while the Plan tab is visible opens Find-in-Plan instead of any
-  // browser/global search — scoped via this component's own mount lifetime
-  // (RightPanel only mounts PlanTab while its tab is selected).
   useEffect(() => {
     if (!planDoc) return
     const handler = (e: KeyboardEvent) => {
@@ -94,11 +153,6 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
   }, [planDoc])
-
-  const awaitingApproval =
-    !!active &&
-    !!pendingPlanApproval &&
-    pendingPlanApproval.sessionId === active.id
 
   const handleKeepPlanning = () => {
     setPendingPlanApproval(null)
@@ -117,13 +171,15 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
       .catch(() => pushToast("Couldn't copy plan", "error"))
   }
 
-  // Writes the plan doc to `plans/<slug>-<date>.md` inside the session's
-  // cwd via the `save_text_file` command (path-inside-cwd validated
-  // server-side — see src-tauri/src/commands.rs).
+  const title =
+    activePlan?.title ??
+    firstPlanHeading(planDoc) ??
+    (active ? sessionLabel(active) : "Plan")
+
   const handleSaveToWorkspace = () => {
     if (!active || !planDoc) return
     const date = new Date().toISOString().slice(0, 10)
-    const relativePath = `plans/${slugify(title)}-${date}.md`
+    const relativePath = `plans/${slugifyPlanTitle(title)}-${date}.md`
     void saveTextFile(active.id, relativePath, planDoc)
       .then((absolutePath) => {
         pushToast(`Saved plan to ${absolutePath}`, "success")
@@ -133,7 +189,27 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
       })
   }
 
-  if (!active || (entries.length === 0 && !planDoc)) {
+  const handleSaveComment = (body: string) => {
+    if (!draft) return
+    saveComment(draft, body)
+    clearSelection()
+    window.getSelection()?.removeAllRanges()
+  }
+
+  const handleSaveAndSendComment = (body: string) => {
+    if (!draft) return
+    const snapshot = draft
+    clearSelection()
+    window.getSelection()?.removeAllRanges()
+    void saveAndSendComment(snapshot, body).catch((err) => {
+      pushToast(
+        `Couldn't send comment: ${err instanceof Error ? err.message : String(err)}`,
+        "error",
+      )
+    })
+  }
+
+  if (!active || (sessionPlans.length === 0 && entries.length === 0)) {
     return (
       <div className="flex flex-1 items-center justify-center px-6 text-center">
         <p className="text-sm leading-relaxed text-ink-muted">
@@ -143,10 +219,22 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     )
   }
 
+  if (showList) {
+    return (
+      <PlanList
+        plans={sessionPlans}
+        onSelect={(planId) => {
+          setBrowsingList(false)
+          setActivePlanId(active.id, planId)
+        }}
+      />
+    )
+  }
+
+  // Detail view without a resolved plan (e.g. checklist-only) — show todos.
   const done = entries.filter((e) => e.status === "completed").length
   const running = entries.some((e) => e.status === "in_progress")
   const todosBuilt = entries.length > 0 && done === entries.length
-  // design: Build once a plan exists and work hasn't started yet.
   const canBuild =
     !!planDoc &&
     !todosBuilt &&
@@ -154,9 +242,6 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     !isStreaming &&
     (awaitingApproval || composerMode === "plan")
 
-  // "building" is ONLY the Build button's own in-flight turn (`isBuilding`,
-  // from `usePlanBuild`) — the plan checklist's own `running` to-dos (drafting
-  // the plan itself) are a different concept and must not show "Building…".
   const status: PlanBuildStatus = isBuilding
     ? "building"
     : planBuilt || todosBuilt
@@ -165,17 +250,27 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
         ? "ready"
         : "draft"
 
-  const title = firstHeading(planDoc) ?? sessionLabel(active)
+  const actionsDisabled = isStreaming || isBuilding || planActionBusy
 
   return (
     <>
       <PlanToolbar
         repo={basename(active.cwd || "~")}
         title={title}
+        showPlansListCrumb={multi}
+        onBackToPlans={
+          multi
+            ? () => {
+                setBrowsingList(true)
+                setActivePlanId(active.id, null)
+                setFindOpen(false)
+              }
+            : undefined
+        }
         models={models}
         builtinProviders={builtinProviders}
         modelId={planBuildModel ?? selectedModelId}
-        onModelChange={(id) => active && setPlanBuildModel(active.id, id)}
+        onModelChange={(id) => setPlanBuildModel(active.id, id)}
         modelsLoading={modelsLoading}
         status={status}
         onBuild={handleBuild}
@@ -197,6 +292,39 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
             : null
         }
         onSaveToWorkspace={handleSaveToWorkspace}
+        onRewrite={
+          planDoc
+            ? () => {
+                void rewritePlan(active.id, planDoc).catch((err) => {
+                  pushToast(
+                    `Couldn't rewrite: ${err instanceof Error ? err.message : String(err)}`,
+                    "error",
+                  )
+                })
+              }
+            : undefined
+        }
+        onRestart={() => {
+          void restartPlan(active.id).catch((err) => {
+            pushToast(
+              `Couldn't restart: ${err instanceof Error ? err.message : String(err)}`,
+              "error",
+            )
+          })
+        }}
+        onAskReview={
+          planDoc
+            ? () => {
+                void reviewPlan(active.id, planDoc).catch((err) => {
+                  pushToast(
+                    `Couldn't review: ${err instanceof Error ? err.message : String(err)}`,
+                    "error",
+                  )
+                })
+              }
+            : undefined
+        }
+        actionsDisabled={actionsDisabled}
       />
 
       <ScrollArea className="min-h-0 flex-1">
@@ -214,6 +342,15 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
             <div ref={planBodyRef} className="mt-5">
               <MarkdownBody content={planDoc} />
             </div>
+          ) : null}
+
+          {activePlan ? (
+            <PlanCommentList
+              comments={comments}
+              activeCommentId={activeCommentId}
+              onFocus={(id) => setActiveCommentId(id)}
+              onRemove={removeComment}
+            />
           ) : null}
 
           {latestVerdict ? (
@@ -271,9 +408,16 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
           ) : null}
         </div>
       </ScrollArea>
+
+      {!composerOpen ? (
+        <PlanCommentButton selection={selection} onComment={openComposer} />
+      ) : null}
+      <PlanCommentPopover
+        draft={draft}
+        onCancel={clearSelection}
+        onSave={handleSaveComment}
+        onSaveAndSend={handleSaveAndSendComment}
+      />
     </>
   )
 }
-
-/* ── Changes tab ──────────────────────────────────────────────────────── */
-

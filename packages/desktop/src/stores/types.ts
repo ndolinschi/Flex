@@ -26,6 +26,34 @@ export type LatestSessionVerdict = {
   tsMs: number
 }
 
+/** User annotation on a plan doc — anchored by source offsets + quote text. */
+export type PlanComment = {
+  id: string
+  quote: string
+  startOffset: number
+  endOffset: number
+  body: string
+  createdAtMs: number
+}
+
+/** One ExitPlanMode markdown plan kept in the session's plan history. */
+export type SessionPlan = {
+  /** ExitPlanMode tool-call id (stable across live stream + JSONL replay). */
+  id: string
+  markdown: string
+  /** First markdown heading, or a fallback title set by the upsert helper. */
+  title: string
+  createdAtMs: number
+  built: boolean
+  comments: PlanComment[]
+}
+
+/** Persisted plan UI extras (comments + last-opened plan) — keyed by session. */
+export type PlanAnnotationsPersisted = {
+  activePlanId?: string | null
+  commentsByPlanId: Record<string, PlanComment[]>
+}
+
 export type UiTheme = "dark" | "light"
 
 /** Window-width classification (see hooks/useViewportWidth.ts):
@@ -136,14 +164,30 @@ export type SessionSliceState = {
   sessionLogRows: Record<SessionId, Array<{ id: string; text: string; tsMs: number }>>
   pendingPermission: PendingPermission | null
   pendingQuestion: PendingQuestion | null
-  pendingPlanApproval: { sessionId: SessionId; plan: string } | null
+  pendingPlanApproval: {
+    sessionId: SessionId
+    planId: string
+    plan: string
+  } | null
   plansBySession: Record<SessionId, PlanEntry[]>
+  /** @deprecated Prefer `sessionPlansBySession` + `activePlanIdBySession`.
+   * Kept as a mirror of the active plan's markdown for older call sites. */
   planDocsBySession: Record<SessionId, string>
+  /** Multi-plan history per session (one entry per ExitPlanMode tool call). */
+  sessionPlansBySession: Record<SessionId, SessionPlan[]>
+  /** Active plan in the Plan tab; `null` means the multi-plan list view. */
+  activePlanIdBySession: Record<SessionId, string | null>
   planBuildModelBySession: Record<SessionId, string>
+  /** @deprecated Prefer per-plan `SessionPlan.built`. Mirrored from active plan. */
   planBuiltBySession: Record<SessionId, boolean>
   /** Latest `Verify` tool call per session (Plan tab Verification section). */
   latestVerdictBySession: Record<SessionId, LatestSessionVerdict>
   messageQueueBySession: Record<SessionId, string[]>
+  /**
+   * Boot-restored annotations waiting to merge into `sessionPlansBySession`
+   * as ExitPlanMode events replay. Cleared per plan once merged.
+   */
+  restoredPlanAnnotations: Record<SessionId, PlanAnnotationsPersisted>
   setActiveSessionId: (id: SessionId | null) => void
   setIsStreaming: (streaming: boolean) => void
   setSessionStreaming: (sessionId: SessionId, streaming: boolean) => void
@@ -179,12 +223,35 @@ export type SessionSliceState = {
   setPendingPermission: (permission: PendingPermission | null) => void
   setPendingQuestion: (question: PendingQuestion | null) => void
   setPendingPlanApproval: (
-    approval: { sessionId: SessionId; plan: string } | null,
+    approval: { sessionId: SessionId; planId: string; plan: string } | null,
   ) => void
   setPlanEntries: (sessionId: SessionId, entries: PlanEntry[]) => void
+  /** Upsert an ExitPlanMode plan into the session history and make it active. */
+  upsertSessionPlan: (input: {
+    sessionId: SessionId
+    planId: string
+    markdown: string
+    createdAtMs: number
+  }) => void
+  setActivePlanId: (sessionId: SessionId, planId: string | null) => void
+  /** @deprecated Prefer `upsertSessionPlan`. Mirrors into the active plan. */
   setPlanDoc: (sessionId: SessionId, plan: string) => void
   setPlanBuildModel: (sessionId: SessionId, modelId: string | null) => void
   setPlanBuilt: (sessionId: SessionId, built: boolean) => void
+  addPlanComment: (
+    sessionId: SessionId,
+    planId: string,
+    comment: PlanComment,
+  ) => void
+  removePlanComment: (
+    sessionId: SessionId,
+    planId: string,
+    commentId: string,
+  ) => void
+  /** Hydrate persisted annotations before JSONL replay merges them into plans. */
+  setRestoredPlanAnnotations: (
+    annotations: Record<SessionId, PlanAnnotationsPersisted>,
+  ) => void
   setLatestVerdict: (sessionId: SessionId, verdict: LatestSessionVerdict) => void
   enqueueMessage: (sessionId: SessionId, text: string) => void
   shiftQueuedMessage: (sessionId: SessionId) => string | null

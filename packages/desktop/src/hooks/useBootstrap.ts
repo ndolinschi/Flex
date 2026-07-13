@@ -125,6 +125,11 @@ export const useBootstrap = (
         if (ui.openTabsBySession) {
           useAppStore.getState().setOpenTabsBySession(ui.openTabsBySession)
         }
+        if (ui.planAnnotationsBySession) {
+          useAppStore
+            .getState()
+            .setRestoredPlanAnnotations(ui.planAnnotationsBySession)
+        }
         if (typeof ui.rightPanelWidth === "number") {
           useAppStore.getState().setRightPanelWidth(ui.rightPanelWidth)
         }

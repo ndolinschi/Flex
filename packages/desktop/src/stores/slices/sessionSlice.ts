@@ -1,8 +1,59 @@
 import type { StateCreator } from "zustand"
-import type { AppState, SessionSliceState } from "../types"
+import type {
+  AppState,
+  PlanAnnotationsPersisted,
+  PlanComment,
+  SessionPlan,
+  SessionSliceState,
+} from "../types"
 import { emptyStreaming, sessionScopeKey } from "../types"
 import { persistUiState } from "../persist"
+import { firstPlanHeading } from "../../lib/planTitle"
 import { log } from "../../lib/debug/log"
+import type { SessionId } from "../../lib/types"
+
+/** Snapshot annotations from in-memory plans for ui.json persistence. */
+const annotationsFromPlans = (
+  sessionPlansBySession: Record<SessionId, SessionPlan[]>,
+  activePlanIdBySession: Record<SessionId, string | null>,
+): Record<SessionId, PlanAnnotationsPersisted> => {
+  const out: Record<SessionId, PlanAnnotationsPersisted> = {}
+  for (const [sessionId, plans] of Object.entries(sessionPlansBySession)) {
+    const commentsByPlanId: Record<string, PlanComment[]> = {}
+    for (const plan of plans) {
+      if (plan.comments.length > 0) {
+        commentsByPlanId[plan.id] = plan.comments
+      }
+    }
+    const activePlanId = activePlanIdBySession[sessionId]
+    if (Object.keys(commentsByPlanId).length > 0 || activePlanId) {
+      out[sessionId] = { activePlanId: activePlanId ?? null, commentsByPlanId }
+    }
+  }
+  return out
+}
+
+const persistPlanAnnotations = (
+  sessionPlansBySession: Record<SessionId, SessionPlan[]>,
+  activePlanIdBySession: Record<SessionId, string | null>,
+) => {
+  void persistUiState({
+    planAnnotationsBySession: annotationsFromPlans(
+      sessionPlansBySession,
+      activePlanIdBySession,
+    ),
+  })
+}
+
+const mirrorActivePlan = (
+  plans: SessionPlan[],
+  activePlanId: string | null | undefined,
+): { markdown?: string; built?: boolean } => {
+  if (!activePlanId) return {}
+  const active = plans.find((p) => p.id === activePlanId)
+  if (!active) return {}
+  return { markdown: active.markdown, built: active.built }
+}
 
 export const createSessionSlice: StateCreator<
   AppState,
@@ -30,10 +81,13 @@ export const createSessionSlice: StateCreator<
   pendingPlanApproval: null,
   plansBySession: {},
   planDocsBySession: {},
+  sessionPlansBySession: {},
+  activePlanIdBySession: {},
   planBuildModelBySession: {},
   planBuiltBySession: {},
   latestVerdictBySession: {},
   messageQueueBySession: {},
+  restoredPlanAnnotations: {},
   setActiveSessionId: (id) => {
     set({ activeSessionId: id, subagentViewer: null })
     void persistUiState({ activeSessionId: id })
@@ -229,20 +283,123 @@ export const createSessionSlice: StateCreator<
     set((state) => ({
       plansBySession: { ...state.plansBySession, [sessionId]: entries },
     })),
-  setPlanDoc: (sessionId, plan) =>
+  upsertSessionPlan: ({ sessionId, planId, markdown, createdAtMs }) =>
     set((state) => {
-      // A new plan doc invalidates any prior "Built" status for this
-      // session — the Build button should read "Build" again, not "Built".
-      const prevPlan = state.planDocsBySession[sessionId]
-      const builtReset =
-        prevPlan !== plan && state.planBuiltBySession[sessionId]
-          ? { planBuiltBySession: { ...state.planBuiltBySession, [sessionId]: false } }
-          : null
+      const prevPlans = state.sessionPlansBySession[sessionId] ?? []
+      const existingIdx = prevPlans.findIndex((p) => p.id === planId)
+      const restored = state.restoredPlanAnnotations[sessionId]
+      const restoredComments = restored?.commentsByPlanId[planId]
+      const title = firstPlanHeading(markdown) ?? "Untitled plan"
+
+      let nextPlans: SessionPlan[]
+      if (existingIdx >= 0) {
+        const prev = prevPlans[existingIdx]
+        const markdownChanged = prev.markdown !== markdown
+        const updated: SessionPlan = {
+          ...prev,
+          markdown,
+          title,
+          // A rewritten plan body invalidates prior Build status.
+          built: markdownChanged ? false : prev.built,
+          comments:
+            prev.comments.length > 0 ? prev.comments : (restoredComments ?? []),
+        }
+        nextPlans = [...prevPlans]
+        nextPlans[existingIdx] = updated
+      } else {
+        nextPlans = [
+          ...prevPlans,
+          {
+            id: planId,
+            markdown,
+            title,
+            createdAtMs,
+            built: false,
+            comments: restoredComments ?? [],
+          },
+        ]
+      }
+
+      const nextRestored = { ...state.restoredPlanAnnotations }
+      if (restored) {
+        const { [planId]: _removed, ...restComments } = restored.commentsByPlanId
+        if (Object.keys(restComments).length === 0 && restored.activePlanId == null) {
+          delete nextRestored[sessionId]
+        } else {
+          nextRestored[sessionId] = {
+            ...restored,
+            commentsByPlanId: restComments,
+          }
+        }
+      }
+
+      const nextActiveIds = {
+        ...state.activePlanIdBySession,
+        [sessionId]: planId,
+      }
+      const mirrors = mirrorActivePlan(nextPlans, planId)
+
+      queueMicrotask(() => {
+        const s = get()
+        persistPlanAnnotations(s.sessionPlansBySession, s.activePlanIdBySession)
+      })
+
       return {
-        planDocsBySession: { ...state.planDocsBySession, [sessionId]: plan },
-        ...builtReset,
+        sessionPlansBySession: {
+          ...state.sessionPlansBySession,
+          [sessionId]: nextPlans,
+        },
+        activePlanIdBySession: nextActiveIds,
+        restoredPlanAnnotations: nextRestored,
+        planDocsBySession: {
+          ...state.planDocsBySession,
+          ...(mirrors.markdown !== undefined
+            ? { [sessionId]: mirrors.markdown }
+            : {}),
+        },
+        planBuiltBySession: {
+          ...state.planBuiltBySession,
+          ...(mirrors.built !== undefined ? { [sessionId]: mirrors.built } : {}),
+        },
       }
     }),
+  setActivePlanId: (sessionId, planId) =>
+    set((state) => {
+      const plans = state.sessionPlansBySession[sessionId] ?? []
+      const nextActiveIds = {
+        ...state.activePlanIdBySession,
+        [sessionId]: planId,
+      }
+      const mirrors = mirrorActivePlan(plans, planId)
+      queueMicrotask(() => {
+        const s = get()
+        persistPlanAnnotations(s.sessionPlansBySession, s.activePlanIdBySession)
+      })
+      return {
+        activePlanIdBySession: nextActiveIds,
+        planDocsBySession:
+          mirrors.markdown !== undefined
+            ? { ...state.planDocsBySession, [sessionId]: mirrors.markdown }
+            : state.planDocsBySession,
+        planBuiltBySession:
+          mirrors.built !== undefined
+            ? { ...state.planBuiltBySession, [sessionId]: mirrors.built }
+            : state.planBuiltBySession,
+      }
+    }),
+  setPlanDoc: (sessionId, plan) => {
+    // Legacy path: if there's an active plan, update it; otherwise create a
+    // synthetic id so older callers still populate the history list.
+    const state = get()
+    const activeId = state.activePlanIdBySession[sessionId]
+    const planId = activeId ?? `legacy-${sessionId}`
+    get().upsertSessionPlan({
+      sessionId,
+      planId,
+      markdown: plan,
+      createdAtMs: Date.now(),
+    })
+  },
   setPlanBuildModel: (sessionId, modelId) =>
     set((state) => {
       const next = { ...state.planBuildModelBySession }
@@ -251,9 +408,70 @@ export const createSessionSlice: StateCreator<
       return { planBuildModelBySession: next }
     }),
   setPlanBuilt: (sessionId, built) =>
-    set((state) => ({
-      planBuiltBySession: { ...state.planBuiltBySession, [sessionId]: built },
-    })),
+    set((state) => {
+      const activeId = state.activePlanIdBySession[sessionId]
+      const plans = state.sessionPlansBySession[sessionId] ?? []
+      let nextPlans = plans
+      if (activeId) {
+        nextPlans = plans.map((p) => (p.id === activeId ? { ...p, built } : p))
+      }
+      return {
+        sessionPlansBySession: {
+          ...state.sessionPlansBySession,
+          [sessionId]: nextPlans,
+        },
+        planBuiltBySession: { ...state.planBuiltBySession, [sessionId]: built },
+      }
+    }),
+  addPlanComment: (sessionId, planId, comment) =>
+    set((state) => {
+      const plans = state.sessionPlansBySession[sessionId] ?? []
+      const nextPlans = plans.map((p) =>
+        p.id === planId ? { ...p, comments: [...p.comments, comment] } : p,
+      )
+      queueMicrotask(() => {
+        const s = get()
+        persistPlanAnnotations(s.sessionPlansBySession, s.activePlanIdBySession)
+      })
+      return {
+        sessionPlansBySession: {
+          ...state.sessionPlansBySession,
+          [sessionId]: nextPlans,
+        },
+      }
+    }),
+  removePlanComment: (sessionId, planId, commentId) =>
+    set((state) => {
+      const plans = state.sessionPlansBySession[sessionId] ?? []
+      const nextPlans = plans.map((p) =>
+        p.id === planId
+          ? { ...p, comments: p.comments.filter((c) => c.id !== commentId) }
+          : p,
+      )
+      queueMicrotask(() => {
+        const s = get()
+        persistPlanAnnotations(s.sessionPlansBySession, s.activePlanIdBySession)
+      })
+      return {
+        sessionPlansBySession: {
+          ...state.sessionPlansBySession,
+          [sessionId]: nextPlans,
+        },
+      }
+    }),
+  setRestoredPlanAnnotations: (annotations) => {
+    set({ restoredPlanAnnotations: annotations })
+    // Also restore remembered active plan ids (plans themselves arrive via replay).
+    set((state) => {
+      const nextActive = { ...state.activePlanIdBySession }
+      for (const [sessionId, ann] of Object.entries(annotations)) {
+        if (ann.activePlanId !== undefined) {
+          nextActive[sessionId] = ann.activePlanId
+        }
+      }
+      return { activePlanIdBySession: nextActive }
+    })
+  },
   setLatestVerdict: (sessionId, verdict) =>
     set((state) => ({
       latestVerdictBySession: {

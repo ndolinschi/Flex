@@ -44,6 +44,10 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `ModePicker` | Agent / Plan / Ask pill switcher | `value`, `onChange` | Composer |
 | `PlanBuildBar` | Cursor-style Build CTA after ExitPlanMode | `onBuild`, `onKeepPlanning?`, `variant` | RightPanel Plan tab, ChatPage |
 | `PlanCard` | Checklist from `plan_updated` (right Plan tab; not inlined in timeline) | `entries` | RightPanel |
+| `PlanList` | Multi-plan “Review plans” list for a session | `plans`, `onSelect` | RightPanel Plan tab (`PlanTab`) |
+| `PlanCommentButton` | Floating Comment control on plan text selection | `selection`, `onComment` | RightPanel Plan tab (`PlanTab`) |
+| `PlanCommentPopover` | Selection → comment form (Save / Save & send) | `draft`, `onSave`, `onSaveAndSend` | RightPanel Plan tab (`PlanTab`) |
+| `PlanCommentList` | Annotations on the open plan | `comments`, `onFocus`, `onRemove` | RightPanel Plan tab (`PlanTab`) |
 | `PlusMenu` | Attach + mode shortcuts (Plan/Ask) | `onAttachFile`, `onAttachImage`, `onSetMode?` | Composer |
 | `ProjectPicker` | Recent cwds + Open Folder | `sessionId`, `cwd`, `onError?` | ContextBar |
 | `BranchPicker` | List/checkout local git branches | `cwd`, `onError?` | ContextBar |
@@ -65,7 +69,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `WorkflowGroup` | Multi-step workflow block (steps + nested subagents); organism-scale (261 lines) but kept in `molecules/` since it nests inside `TimelineRowView` like `SubagentGroup`/`WorkGroup` | `steps`, `subagents`, `status` | TurnTimeline (via `TimelineRowView`) |
 | `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?` | SessionSidebar |
 | `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle` | SessionSidebar |
-| `PlanToolbar` | Plan tab header: model/mode pickers + build actions | `value`, `onChange`, `status` | RightPanel Plan tab (`PlanTab`) |
+| `PlanToolbar` | Plan tab header: breadcrumbs, build/review/rewrite actions | `title`, `status`, `onBuild`, `onAskReview?` | RightPanel Plan tab (`PlanTab`) |
 
 ## Organisms
 

@@ -184,6 +184,22 @@ mark[data-plan-find-mark].plan-find-mark-active {
   box-shadow: 0 0 0 1px var(--color-accent);
 }
 
+/* Plan-tab comment highlights (usePlanCommentHighlights). Distinct from
+ * find marks so both can coexist conceptually (find temporarily clears
+ * comment marks while open). */
+mark[data-plan-comment-id] {
+  background: color-mix(in srgb, var(--color-yellow, #c9a227) 28%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  box-decoration-break: clone;
+  cursor: pointer;
+}
+
+mark[data-plan-comment-id].plan-comment-mark-active {
+  background: color-mix(in srgb, var(--color-yellow, #c9a227) 55%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-yellow, #c9a227) 70%, transparent);
+}
+
 /*
  * Timeline row containment helpers (`.cv-auto*`) — kept for potential
  * non-virtualized surfaces. The chat timeline itself does NOT apply these:
