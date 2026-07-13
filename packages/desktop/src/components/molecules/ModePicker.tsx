@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Check,
   ChevronDown,
@@ -8,6 +8,7 @@ import {
   Sparkles,
 } from "lucide-react"
 import type { ComposerMode, PermissionMode } from "../../lib/types"
+import { FLEX_MODE_ENABLED } from "../../lib/featureFlags"
 import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
 import { PopoverItem, PopoverTray } from "./PopoverTray"
@@ -51,18 +52,30 @@ const MODES: ModeOption[] = [
   },
 ]
 
+/** Modes shown in the picker — Flex gated by `FLEX_MODE_ENABLED`. */
+export const visibleComposerModes = (): ModeOption[] =>
+  MODES.filter((mode) => mode.id !== "flex" || FLEX_MODE_ENABLED)
+
 type ModePickerProps = {
   value: ComposerMode
   onChange: (mode: ComposerMode) => void
   disabled?: boolean
 }
 
-/** Agent / Plan / Ask mode pill for the composer footer. */
+/** Agent / Plan / Ask (/ Flex when flagged) mode pill for the composer footer. */
 export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
-  const selected = MODES.find((m) => m.id === value) ?? MODES[0]
+  const modes = useMemo(() => visibleComposerModes(), [])
+  const effectiveValue =
+    value === "flex" && !FLEX_MODE_ENABLED ? "agent" : value
+  const selected = modes.find((m) => m.id === effectiveValue) ?? modes[0]
   const Icon = selected.icon
+
+  // Persisted Flex mode while the flag is off → fall back to Agent.
+  useEffect(() => {
+    if (value === "flex" && !FLEX_MODE_ENABLED) onChange("agent")
+  }, [value, onChange])
 
   return (
     <div ref={rootRef} className="relative">
@@ -95,9 +108,9 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
         aria-label="Composer mode"
         className="left-0 w-56"
       >
-        {MODES.map((mode) => {
+        {modes.map((mode) => {
           const ModeIcon = mode.icon
-          const isActive = mode.id === value
+          const isActive = mode.id === effectiveValue
           return (
             <PopoverItem
               key={mode.id}
