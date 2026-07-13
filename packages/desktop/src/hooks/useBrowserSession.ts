@@ -77,8 +77,11 @@ export const useBrowserSession = (active: boolean) => {
   const setComposerDraft = useAppStore((s) => s.setComposerDraft)
   const pushToast = useAppStore((s) => s.pushToast)
 
-  /** Content area only — never the toolbar. Native webview bounds are taken
-   * from this rect so the OS child layer cannot cover React chrome. */
+  /** Full panel body below the tab bar — absolute-filled so height is never
+   * left to a flex-1 race. Bounds use this host's box, not the content child's. */
+  const hostRef = useRef<HTMLDivElement>(null)
+  /** Content area only — never the toolbar. Native webview top edge is the
+   * toolbar bottom; width/x come from this rect. */
   const contentRef = useRef<HTMLDivElement>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const loadingTimeoutRef = useRef<number | null>(null)
@@ -436,7 +439,8 @@ export const useBrowserSession = (active: boolean) => {
     }
     const content = contentRef.current
     const toolbar = toolbarRef.current
-    if (!content || !toolbar) {
+    const host = hostRef.current
+    if (!content || !toolbar || !host) {
       // Refs not committed yet — never leave a stale visible webview up.
       void browserSetVisible(false)
       return
@@ -456,22 +460,22 @@ export const useBrowserSession = (active: boolean) => {
         void browserSetVisible(false)
         return
       }
+      const hostRect = host.getBoundingClientRect()
       const contentRect = content.getBoundingClientRect()
       const toolbarRect = toolbar.getBoundingClientRect()
-      // Top must clear the in-flow toolbar. Fall back to h-9 when the chrome
-      // row briefly reports height 0 after display:none → flex (otherwise the
-      // native layer paints over the URL bar).
+      // Top = below the URL bar. Fall back to host top + h-9 when chrome
+      // briefly reports height 0 after display:none → visible.
       const toolbarBottom =
         toolbarRect.height >= 1
           ? toolbarRect.bottom
-          : toolbarRect.top + BROWSER_TOOLBAR_HEIGHT_PX
-      const top = Math.max(contentRect.top, toolbarBottom)
-      // Prefer the content host's own bottom; fall back to its flex parent if
-      // the host hasn't laid out yet after tab reveal.
-      const parentRect = content.parentElement?.getBoundingClientRect()
-      const bottom = Math.max(contentRect.bottom, parentRect?.bottom ?? 0)
+          : hostRect.top + BROWSER_TOOLBAR_HEIGHT_PX
+      const top = Math.max(toolbarBottom, hostRect.top + BROWSER_TOOLBAR_HEIGHT_PX)
+      // Max available height: stretch to the host bottom (panel body under the
+      // tab bar) and never stop short of the window bottom either.
+      const bottom = Math.max(hostRect.bottom, contentRect.bottom, window.innerHeight)
       const height = bottom - top
-      if (contentRect.width < 2 || height < 2) {
+      const widthSource = contentRect.width >= 2 ? contentRect.width : hostRect.width
+      if (widthSource < 2 || height < 2) {
         lastSent = null
         void browserSetVisible(false)
         return
@@ -482,9 +486,10 @@ export const useBrowserSession = (active: boolean) => {
         (p) => p.id === viewportPreset,
       )?.width
       const width = presetWidth
-        ? Math.min(presetWidth, contentRect.width)
-        : contentRect.width
-      const x = contentRect.left + (contentRect.width - width) / 2
+        ? Math.min(presetWidth, widthSource)
+        : widthSource
+      const left = contentRect.width >= 2 ? contentRect.left : hostRect.left
+      const x = left + (widthSource - width) / 2
       if (
         !force &&
         lastSent &&
@@ -518,9 +523,9 @@ export const useBrowserSession = (active: boolean) => {
     }
 
     const resizeObserver = new ResizeObserver(schedule)
+    resizeObserver.observe(host)
     resizeObserver.observe(content)
     resizeObserver.observe(toolbar)
-    if (content.parentElement) resizeObserver.observe(content.parentElement)
     window.addEventListener("resize", schedule)
     schedule()
     // Drift watchdog: ResizeObserver misses position-only moves (sidebar
@@ -557,6 +562,7 @@ export const useBrowserSession = (active: boolean) => {
 
   return {
     sessionKey,
+    hostRef,
     contentRef,
     toolbarRef,
     browserUrl,

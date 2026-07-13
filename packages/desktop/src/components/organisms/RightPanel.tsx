@@ -281,8 +281,8 @@ export const RightPanel = () => {
         </div>
         <div
           className={cn(
-            "relative min-h-0 flex-1 flex-col",
-            tab === "browser" && openIds.includes("browser") ? "flex" : "hidden",
+            "relative min-h-0 flex-1",
+            tab === "browser" && openIds.includes("browser") ? "block" : "hidden",
           )}
         >
           <BrowserTab active={open && tab === "browser"} />

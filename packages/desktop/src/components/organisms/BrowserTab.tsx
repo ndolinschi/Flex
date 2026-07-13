@@ -17,11 +17,16 @@ import { BrowserToolbar } from "./browser/BrowserToolbar"
  * with a button to reclaim the webview. Stays mounted when inactive (parent
  * hides via display:none).
  *
+ * Layout: absolute-fill host under the tab bar so the native webview always
+ * has a definite box (toolbar on top, content flex-1 below) — flex-only
+ * hosts were measuring short and leaving a black gap under the page.
+ *
  * All session/ownership/webview-bounds/navigation logic lives in
  * `useBrowserSession` (src/hooks/useBrowserSession.ts) — this component is
  * the chrome view that consumes it. Toolbar/overflow live under `./browser/`. */
 export const BrowserTab = ({ active }: { active: boolean }) => {
   const {
+    hostRef,
     contentRef,
     toolbarRef,
     browserUrl,
@@ -59,10 +64,12 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
   }, [loadError])
 
   return (
-    // In-flow chrome: toolbar is shrink-0 in the column so contentRef's
-    // getBoundingClientRect is always the area *below* the URL bar. Absolute
-    // top-9 + overlapping native bounds left a black gap under the page.
-    <div className="relative flex min-h-0 flex-1 flex-col bg-bg">
+    // Absolute fill of the RightPanel body under the tab strip — height is
+    // the full remaining panel, not whatever flex-1 happened to settle on.
+    <div
+      ref={hostRef}
+      className="absolute inset-0 flex flex-col bg-bg"
+    >
       <BrowserToolbar
         toolbarRef={toolbarRef}
         browserUrl={browserUrl}
@@ -89,8 +96,7 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
         toggleDesignMode={toggleDesignMode}
       />
 
-      {/* Bounds target for the native child webview — flex-1 fills the
-       * remaining panel height so the OS layer has nowhere left empty. */}
+      {/* Native webview paints into this box (below the toolbar). */}
       <div
         ref={contentRef}
         className="relative z-0 min-h-0 flex-1 bg-bg"
