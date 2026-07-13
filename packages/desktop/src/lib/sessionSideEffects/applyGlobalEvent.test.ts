@@ -338,3 +338,41 @@ describe("applyGlobalSessionEvent — latest Verify verdict", () => {
     )
   })
 })
+
+describe("applyGlobalSessionEvent — HITL during replay", () => {
+  beforeEach(() => {
+    seq = 0
+    useAppStore.setState({
+      pendingPermission: {
+        sessionId: SID,
+        requestId: "req-live",
+        title: "Allow `Bash`?",
+        options: ["allow_once", "allow_always", "deny"],
+      },
+      pendingQuestion: null,
+    })
+  })
+
+  it("does not clear a live permission on JSONL permission_resolved", () => {
+    applyGlobalSessionEvent(
+      ev({
+        kind: "permission_resolved",
+        id: "req-live",
+        decision: { kind: "allow_once" },
+      } as AgentEvent),
+      { ignoreStreaming: true },
+    )
+    expect(useAppStore.getState().pendingPermission?.requestId).toBe("req-live")
+  })
+
+  it("clears pending permission on live permission_resolved", () => {
+    applyGlobalSessionEvent(
+      ev({
+        kind: "permission_resolved",
+        id: "req-live",
+        decision: { kind: "allow_once" },
+      } as AgentEvent),
+    )
+    expect(useAppStore.getState().pendingPermission).toBeNull()
+  })
+})
