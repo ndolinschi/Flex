@@ -435,13 +435,14 @@ export type GitStatusSummary = {
   truncated: boolean
 }
 
-/** A file/directory match from `list_files`, used by composer @-mentions. */
+/** A file match from `list_files`, used by composer @-mentions and Files browse.
+ * Always a file under the session project cwd (dirs are not returned). */
 export type FileHit = {
-  /** Path relative to the session cwd, forward-slashed (dirs end with `/`). */
+  /** Path relative to the session cwd, forward-slashed. */
   path: string
   /** Basename, shown as the primary label. */
   name: string
-  /** True when the hit is a directory. */
+  /** Legacy field — always false; directories are not returned. */
   is_dir?: boolean
 }
 

@@ -2872,12 +2872,50 @@ pub struct FileHit {
     pub path: String,
     /// Basename, shown as the primary label.
     pub name: String,
-    /// True when the hit is a directory (selectable as an @-mention).
+    /// True when the hit is a directory. Always `false` for `list_files`
+    /// (files only — dirs are not @-mentionable and inflate walk cost).
     #[serde(default)]
     pub is_dir: bool,
 }
 
+/// Directory basenames we never descend into, even if a project forgot to
+/// gitignore them — walking `node_modules` / build outputs is what made
+/// composer `@` feel multi-second on ordinary apps.
+const SKIP_DIR_NAMES: &[&str] = &[
+    "node_modules",
+    ".git",
+    "target",
+    "dist",
+    "build",
+    "out",
+    ".next",
+    ".nuxt",
+    ".output",
+    ".turbo",
+    ".cache",
+    ".parcel-cache",
+    "coverage",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "vendor",
+    "Pods",
+    ".svelte-kit",
+    ".vercel",
+    ".idea",
+    ".vscode",
+];
+
+fn is_skipped_dir_name(name: &str) -> bool {
+    SKIP_DIR_NAMES
+        .iter()
+        .any(|skip| name.eq_ignore_ascii_case(skip))
+}
+
 /// Rank a path against a lowercase needle. Lower is better; `None` = no match.
+/// Basename prefix/contains beat full-path contains. Subsequence matching is
+/// intentionally omitted — it matched almost everything and made ranking +
+/// result lists feel random/laggy.
 fn score_file(rel_path: &str, name: &str, needle: &str) -> Option<i32> {
     if needle.is_empty() {
         return Some(100); // browse mode — rank by path length afterwards
@@ -2893,19 +2931,13 @@ fn score_file(rel_path: &str, name: &str, needle: &str) -> Option<i32> {
     if path_l.contains(needle) {
         return Some(2);
     }
-    if is_subsequence(needle, &path_l) {
-        return Some(3);
-    }
     None
 }
 
-fn is_subsequence(needle: &str, hay: &str) -> bool {
-    let mut chars = hay.chars();
-    needle.chars().all(|nc| chars.by_ref().any(|hc| hc == nc))
-}
-
-/// Read-only fuzzy file/directory search under `cwd` for composer @-mentions.
-/// Respects `.gitignore`/`.git/exclude` (via the `ignore` crate) and caps results.
+/// Read-only fuzzy **file** search under `cwd` for composer @-mentions and
+/// the Files explorer. Scoped to the session project folder only: respects
+/// `.gitignore` / `.ignore` / `.git/exclude`, never descends into
+/// `node_modules` (and other heavy dirs), returns files only (no folders).
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
 pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
@@ -2916,56 +2948,86 @@ pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
     let needle = query.trim().to_lowercase();
 
     // Bound the walk so huge repos can't stall an interactive keystroke.
-    const MAX_WALK: usize = 20_000;
+    // Empty query is browse-only (shallow); typed queries may go deeper but
+    // still stop early once we have enough strong hits.
+    const MAX_HITS: usize = 40;
+    const MAX_WALK_BROWSE: usize = 2_000;
+    const MAX_WALK_SEARCH: usize = 8_000;
+    let max_walk = if needle.is_empty() {
+        MAX_WALK_BROWSE
+    } else {
+        MAX_WALK_SEARCH
+    };
+
     let mut hits: Vec<(i32, FileHit)> = Vec::new();
+    let mut walked = 0usize;
+    let mut strong_hits = 0usize; // basename prefix/contains
 
-    let walker = ignore::WalkBuilder::new(&root)
-        .hidden(false)
-        .git_ignore(true)
-        .git_exclude(true)
-        .ignore(true)
+    let mut builder = ignore::WalkBuilder::new(&root);
+    builder
+        .standard_filters(true) // hidden + gitignore + .ignore + exclude
         .parents(true)
-        .build();
+        .follow_links(false)
+        .filter_entry(|entry| {
+            // Prune before descending — gitignore alone still lets a missing
+            // ignore rule walk tens of thousands of node_modules files.
+            if entry.depth() > 0 && entry.file_type().is_some_and(|ft| ft.is_dir()) {
+                let name = entry.file_name().to_string_lossy();
+                if is_skipped_dir_name(&name) {
+                    return false;
+                }
+            }
+            true
+        });
+    // Bare `@` / empty Files search: only shallow files so we don't walk the
+    // whole tree just to show a browse list.
+    if needle.is_empty() {
+        builder.max_depth(Some(3));
+    }
 
-    for (walked, entry) in walker.flatten().enumerate() {
-        if walked >= MAX_WALK {
+    for entry in builder.build().flatten() {
+        walked += 1;
+        if walked > max_walk {
             break;
         }
         let Some(ft) = entry.file_type() else {
             continue;
         };
-        let is_dir = ft.is_dir();
-        let is_file = ft.is_file();
-        if !is_dir && !is_file {
+        if !ft.is_file() {
             continue;
         }
         let Ok(rel) = entry.path().strip_prefix(&root) else {
             continue;
         };
-        let mut rel_str = rel.to_string_lossy().replace('\\', "/");
-        if rel_str.is_empty() || rel_str.starts_with(".git/") || rel_str == ".git" {
+        let rel_str = rel.to_string_lossy().replace('\\', "/");
+        if rel_str.is_empty() {
             continue;
-        }
-        if is_dir && !rel_str.ends_with('/') {
-            rel_str.push('/');
         }
         let name = rel
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| rel_str.trim_end_matches('/').to_owned());
+            .unwrap_or_else(|| rel_str.clone());
         let Some(score) = score_file(&rel_str, &name, &needle) else {
             continue;
         };
-        // Prefer directories slightly when scores tie (browse / equal match).
-        let rank = if is_dir { score.saturating_sub(1) } else { score };
+        if score <= 1 {
+            strong_hits += 1;
+        }
         hits.push((
-            rank,
+            score,
             FileHit {
                 path: rel_str,
                 name,
-                is_dir,
+                is_dir: false,
             },
         ));
+        // Enough good basename matches — don't keep walking for weak path hits.
+        if !needle.is_empty() && strong_hits >= MAX_HITS {
+            break;
+        }
+        if hits.len() >= MAX_HITS * 4 {
+            break;
+        }
     }
 
     hits.sort_by(|a, b| {
@@ -2973,8 +3035,35 @@ pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
             .then_with(|| a.1.path.len().cmp(&b.1.path.len()))
             .then_with(|| a.1.path.cmp(&b.1.path))
     });
-    hits.truncate(50);
+    hits.truncate(MAX_HITS);
     hits.into_iter().map(|(_, h)| h).collect()
+}
+
+#[cfg(test)]
+mod list_files_ranking_tests {
+    use super::{is_skipped_dir_name, score_file};
+
+    #[test]
+    fn skips_heavy_vendor_dirs() {
+        assert!(is_skipped_dir_name("node_modules"));
+        assert!(is_skipped_dir_name("NODE_MODULES"));
+        assert!(is_skipped_dir_name(".git"));
+        assert!(is_skipped_dir_name("target"));
+        assert!(!is_skipped_dir_name("src"));
+    }
+
+    #[test]
+    fn scores_basename_prefix_best() {
+        assert_eq!(score_file("pkg/App.tsx", "App.tsx", "app"), Some(0));
+        assert_eq!(score_file("pkg/MyApp.tsx", "MyApp.tsx", "app"), Some(1));
+        assert_eq!(score_file("app/page.tsx", "page.tsx", "app"), Some(2));
+        assert_eq!(score_file("pkg/page.tsx", "page.tsx", "zzz"), None);
+    }
+
+    #[test]
+    fn empty_needle_is_browse_mode() {
+        assert_eq!(score_file("a.ts", "a.ts", ""), Some(100));
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
