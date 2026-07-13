@@ -9,6 +9,7 @@ import {
   ChevronRight,
   FilePenLine,
   FileSearch,
+  ListChecks,
   LoaderCircle,
   Terminal,
   Wrench,
@@ -51,6 +52,11 @@ const KindIcon = ({
   if (kind === "shell") {
     return (
       <Terminal className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
+    )
+  }
+  if (kind === "plan") {
+    return (
+      <ListChecks className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
     )
   }
   return <Wrench className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
