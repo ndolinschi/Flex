@@ -607,6 +607,23 @@
           ]
         },
         {
+          "description": "Context compaction is about to call the summarizer. Ephemeral: not\npersisted — a UI can show \"Compacting context…\" until the following\n[`CompactionBoundary`] (or turn end / error) lands. `strategy` matches\nthe eventual boundary (`summarize_oldest`, `auto_summarize_oldest`, …).",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "compaction_started"
+            },
+            "strategy": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "strategy"
+          ]
+        },
+        {
           "description": "The turn's model was switched mid-work (provider failure, rate limit).",
           "type": "object",
           "properties": {

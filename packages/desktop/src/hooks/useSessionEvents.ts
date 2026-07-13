@@ -40,6 +40,13 @@ export type ReconnectStatus = {
   tsMs: number
 }
 
+/** Transient "compacting context" status from `compaction_started` — ephemeral
+ * like reconnect. Cleared on the following boundary, turn end, or error. */
+export type CompactingStatus = {
+  strategy: string
+  tsMs: number
+}
+
 /** Event kinds that mean "streaming resumed (or the turn ended)" — any of
  * these clears a pending reconnect banner so it never lingers once the
  * engine is talking again. */
@@ -56,6 +63,15 @@ const RECONNECT_CLEARING_KINDS: ReadonlySet<AgentEvent["kind"]> = new Set([
   "turn_completed",
   "session_error",
   "model_fallback",
+  "compaction_started",
+  "compaction_boundary",
+])
+
+/** Clears a live compacting cue once summarization finished or the turn ended. */
+const COMPACTING_CLEARING_KINDS: ReadonlySet<AgentEvent["kind"]> = new Set([
+  "compaction_boundary",
+  "turn_completed",
+  "session_error",
 ])
 
 
@@ -83,6 +99,8 @@ export const useSessionEvents = (sessionId: string | null) => {
   const [reconnectStatus, setReconnectStatus] = useState<ReconnectStatus | null>(
     null,
   )
+  const [compactingStatus, setCompactingStatus] =
+    useState<CompactingStatus | null>(null)
   const rowsRef = useRef<TimelineRow[]>([])
   const sessionRef = useRef<string | null>(null)
   const resyncRef = useRef<(() => Promise<void>) | null>(null)
@@ -166,6 +184,21 @@ export const useSessionEvents = (sessionId: string | null) => {
         setReconnectStatus(null)
       }
 
+      // Same pattern for compaction: summarizer stream is local (no deltas),
+      // so without this cue the chat sits on a silent "Working" with no text.
+      if (event.payload.kind === "compaction_started") {
+        log.info("session", "compaction started", {
+          sessionId: event.session_id,
+          strategy: event.payload.strategy,
+        })
+        setCompactingStatus({
+          strategy: event.payload.strategy,
+          tsMs: event.ts_ms,
+        })
+      } else if (COMPACTING_CLEARING_KINDS.has(event.payload.kind)) {
+        setCompactingStatus(null)
+      }
+
       rowsRef.current = applyEventToTimeline(rowsRef.current, event)
 
       const materialized = materializedIdsFromRows(rowsRef.current)
@@ -218,6 +251,7 @@ export const useSessionEvents = (sessionId: string | null) => {
       thinkingSpansRef.current = {}
       setThinkingDurations({})
       setReconnectStatus(null)
+      setCompactingStatus(null)
       return
     }
 
@@ -231,6 +265,7 @@ export const useSessionEvents = (sessionId: string | null) => {
       setIsLoading(true)
       setError(null)
       setReconnectStatus(null)
+      setCompactingStatus(null)
       sessionRef.current = sessionId
       rowsRef.current = []
       setRows([])
@@ -345,6 +380,7 @@ export const useSessionEvents = (sessionId: string | null) => {
         // reconnect banner was showing is stale either way (retry_scheduled
         // itself is never replayed, so it can't come back from this rebuild).
         setReconnectStatus(null)
+        setCompactingStatus(null)
         let accumulated: TimelineRow[] = []
         let buffers = emptyStreamingBuffers()
         let spans: Record<string, ThinkingSpan> = {}
@@ -421,6 +457,7 @@ export const useSessionEvents = (sessionId: string | null) => {
     setRows([...rowsRef.current])
     // Explicit Stop ends the turn — any reconnect banner is stale.
     setReconnectStatus(null)
+    setCompactingStatus(null)
   }, [sessionId, sweepRequest, flushPending])
 
   // External resync trigger (Composer's optimistic-streaming safety timeout —
@@ -457,6 +494,9 @@ export const useSessionEvents = (sessionId: string | null) => {
     /** Transient "engine is retrying a dropped connection" status, or `null`
      * when nothing is in flight — see `ReconnectStatus`. */
     reconnectStatus,
+    /** Transient "context is being compacted" status, or `null` when idle —
+     * see `CompactingStatus`. */
+    compactingStatus,
   }
 }
 

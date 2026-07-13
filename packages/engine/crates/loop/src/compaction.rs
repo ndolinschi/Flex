@@ -83,6 +83,15 @@ pub(crate) async fn compact_session(
 
     let tokens_before = estimate_tokens(&source);
 
+    // Live cue for UIs: summarizer stream is local (no markdown deltas), so
+    // without this the chat would sit on a silent "Working" with no text.
+    handle.emit_ephemeral(
+        None,
+        AgentEvent::CompactionStarted {
+            strategy: strategy.to_owned(),
+        },
+    );
+
     let mut stream = provider.stream_chat(request, cancel.clone()).await?;
     let mut draft = AssistantDraft::new();
     while let Some(event) = stream.next().await {

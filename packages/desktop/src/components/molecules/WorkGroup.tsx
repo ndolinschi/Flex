@@ -30,8 +30,10 @@ type WorkGroupProps = {
   isStreaming?: boolean
   /** Live header label while `isOpen`. Prefer `"thinking"` when the group's
    * rows include streaming thinking so the header owns that cue (ThinkingBlock
-   * inside then suppresses its own shimmer via `suppressStatusLabel`). */
-  liveStatus?: "working" | "thinking"
+   * inside then suppresses its own shimmer via `suppressStatusLabel`). Prefer
+   * `"compacting"` while a live `compaction_started` is in flight — the
+   * summarizer emits no text, so "Working" would look hung. */
+  liveStatus?: "working" | "thinking" | "compacting"
   durationMs?: number
   /** Turn cost (USD) shown next to the duration when the group is collapsed. */
   costUsd?: number
@@ -51,7 +53,8 @@ type WorkGroupProps = {
 }
 
 /** Collapsible wrapper around a turn's work rows — one live status while open
- * ("Thinking" XOR "Working"), resume line + duration when settled. */
+ * ("Compacting context…" / "Thinking" / "Working"), resume line + duration
+ * when settled. */
 export const WorkGroup = memo(({
   isOpen,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- accepted
@@ -96,7 +99,12 @@ export const WorkGroup = memo(({
     return "Worked"
   })()
 
-  const openLabel = liveStatus === "thinking" ? "Thinking" : "Working"
+  const openLabel =
+    liveStatus === "compacting"
+      ? "Compacting context…"
+      : liveStatus === "thinking"
+        ? "Thinking"
+        : "Working"
 
   return (
     <div className={cn("flex flex-col", className)}>
@@ -112,9 +120,8 @@ export const WorkGroup = memo(({
       >
         {isOpen ? (
           // ONE live-status indicator lives here, on the header line —
-          // RunningDot + shimmering label together. Priority is Thinking when
-          // the group has streaming thinking rows (caller passes
-          // liveStatus="thinking"); otherwise Working. ThinkingBlock inside
+          // RunningDot + shimmering label together. Priority is Compacting
+          // (silent summarizer) > Thinking > Working. ThinkingBlock inside
           // an open group suppresses its own shimmer so we never show both.
           <>
             <RunningDot className="-ml-1 h-4 w-4" />

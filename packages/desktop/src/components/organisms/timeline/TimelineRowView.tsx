@@ -1,5 +1,6 @@
 import { memo } from "react"
 import {
+  CompactionCard,
   ErrorBanner,
   MarkdownBody,
   SubagentGroup,
@@ -130,6 +131,15 @@ export const TimelineRowView = memo(({
     case "meta":
       return (
         <p className="text-sm text-ink-faint animate-row-fade">{row.text}</p>
+      )
+    case "compaction":
+      return (
+        <CompactionCard
+          summaryMarkdown={row.summaryMarkdown}
+          strategy={row.strategy}
+          tokensBefore={row.tokensBefore}
+          tokensAfter={row.tokensAfter}
+        />
       )
     case "subagent":
       return (

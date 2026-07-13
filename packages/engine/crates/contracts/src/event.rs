@@ -158,6 +158,13 @@ pub enum AgentEvent {
     CompactionBoundary {
         summary: CompactionSummary,
     },
+    /// Context compaction is about to call the summarizer. Ephemeral: not
+    /// persisted — a UI can show "Compacting context…" until the following
+    /// [`CompactionBoundary`] (or turn end / error) lands. `strategy` matches
+    /// the eventual boundary (`summarize_oldest`, `auto_summarize_oldest`, …).
+    CompactionStarted {
+        strategy: String,
+    },
     /// The turn's model was switched mid-work (provider failure, rate limit).
     ModelFallback {
         from: crate::capability::ModelRef,
@@ -277,6 +284,8 @@ impl AgentEvent {
                 | Self::ToolProgress { .. }
                 | Self::ExecChunk { .. }
                 | Self::SubagentEvent { .. }
+                | Self::CompactionStarted { .. }
+                | Self::RetryScheduled { .. }
                 | Self::Gap { .. }
         )
     }
@@ -306,6 +315,7 @@ impl AgentEvent {
             Self::QuestionResolved { .. } => "question_resolved",
             Self::CommandExpanded { .. } => "command_expanded",
             Self::CompactionBoundary { .. } => "compaction_boundary",
+            Self::CompactionStarted { .. } => "compaction_started",
             Self::ModelFallback { .. } => "model_fallback",
             Self::RetryScheduled { .. } => "retry_scheduled",
             Self::HookFired { .. } => "hook_fired",

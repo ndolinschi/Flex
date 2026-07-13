@@ -3,12 +3,13 @@
 use std::sync::Arc;
 
 use agentloop_contracts::{
-    AgentEvent, ContentBlock, PromptInput, TurnOptions, TurnStopReason, reduce,
+    AgentEvent, ContentBlock, PromptInput, SessionEvent, TurnOptions, TurnStopReason, reduce,
 };
 use agentloop_core::{Agent, ProviderRegistry, SessionStore, StoredEvent};
 use agentloop_loop::NativeAgentBuilder;
 use agentloop_session::MemoryStore;
 use agentloop_testkit::{MOCK_MODEL, MOCK_PROVIDER_ID, MockProvider};
+use futures::StreamExt;
 
 fn provider_registry(provider: Arc<MockProvider>) -> ProviderRegistry {
     let mut providers = ProviderRegistry::new();
@@ -152,14 +153,68 @@ async fn compaction_boundary_event_is_persisted() {
         .expect("turn");
     assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
 
-    agent
-        .compact(&session, TurnOptions::default())
-        .await
-        .expect("compact");
+    let mut stream = agent.events(&session).expect("subscribe");
+    let compact = agent.compact(&session, TurnOptions::default());
+    tokio::pin!(compact);
+
+    let mut saw_started = false;
+    let mut saw_boundary = false;
+    loop {
+        tokio::select! {
+            result = &mut compact => {
+                result.expect("compact");
+                break;
+            }
+            event = stream.next() => {
+                let Some(SessionEvent { payload, .. }) = event else { continue };
+                match payload {
+                    AgentEvent::CompactionStarted { strategy } => {
+                        assert_eq!(strategy, "summarize_oldest");
+                        assert!(!saw_boundary, "CompactionStarted must precede CompactionBoundary");
+                        saw_started = true;
+                    }
+                    AgentEvent::CompactionBoundary { .. } => {
+                        saw_boundary = true;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    // Drain any remaining events after compact returns.
+    while let Ok(Some(SessionEvent { payload, .. })) =
+        tokio::time::timeout(std::time::Duration::from_millis(50), stream.next()).await
+    {
+        match payload {
+            AgentEvent::CompactionStarted { strategy } => {
+                assert_eq!(strategy, "summarize_oldest");
+                assert!(
+                    !saw_boundary,
+                    "CompactionStarted must precede CompactionBoundary"
+                );
+                saw_started = true;
+            }
+            AgentEvent::CompactionBoundary { .. } => {
+                saw_boundary = true;
+            }
+            _ => {}
+        }
+    }
+    assert!(
+        saw_started,
+        "CompactionStarted must be broadcast before summarizer finishes"
+    );
+    assert!(saw_boundary, "CompactionBoundary must be broadcast");
 
     let events = store.read(&session, 0).await.expect("events");
     assert!(events.iter().any(|StoredEvent { event, .. }| matches!(
         event,
         AgentEvent::CompactionBoundary { summary } if !summary.summary_markdown.is_empty()
     )));
+    assert!(
+        !events
+            .iter()
+            .any(|StoredEvent { event, .. }| matches!(event, AgentEvent::CompactionStarted { .. })),
+        "CompactionStarted is ephemeral and must not be persisted"
+    );
 }

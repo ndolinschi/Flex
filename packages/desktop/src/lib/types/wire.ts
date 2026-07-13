@@ -56,6 +56,14 @@ export type TurnSummary = {
   duration_ms: number
 }
 
+/** Record of a context compaction (`compaction_boundary` payload). */
+export type CompactionSummary = {
+  summary_markdown: string
+  strategy: string
+  tokens_before?: number
+  tokens_after?: number
+}
+
 export type ErrorCode =
   | "auth_missing"
   | "auth_expired"
@@ -221,7 +229,11 @@ export type AgentEvent =
   | { kind: "question_requested"; id: string; questions: Question[] }
   | { kind: "question_resolved"; id: string; answers: Answer[] }
   | { kind: "command_expanded"; name: string; args: string }
-  | { kind: "compaction_boundary"; summary: unknown }
+  | { kind: "compaction_boundary"; summary: CompactionSummary }
+  /** Ephemeral, live-broadcast only — never persisted. Fires right before
+   * the summarizer runs so the UI can show "Compacting context…" until the
+   * following `compaction_boundary` (or turn end / error) lands. */
+  | { kind: "compaction_started"; strategy: string }
   | { kind: "model_fallback"; from: string; to?: string; reason: EngineError }
   /** Ephemeral, live-broadcast only — never persisted to replay/JSONL. Fires
    * once per retry attempt right before the engine sleeps that attempt's

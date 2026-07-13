@@ -325,3 +325,32 @@ describe("applyEventToTimeline — tool-result-only user_message", () => {
     )
   })
 })
+
+describe("applyEventToTimeline — compaction_boundary", () => {
+  it("materializes a compaction row with summary and token delta", () => {
+    seq = 0
+    const event: SessionEvent = {
+      session_id: "s-1",
+      seq: nextSeq(),
+      ts_ms: 1_000,
+      payload: {
+        kind: "compaction_boundary",
+        summary: {
+          summary_markdown: "Earlier: read foo.ts and fixed the bug.",
+          strategy: "auto_summarize_oldest",
+          tokens_before: 12_400,
+          tokens_after: 840,
+        },
+      },
+    }
+    const rows = applyEventToTimeline([], event)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      type: "compaction",
+      summaryMarkdown: "Earlier: read foo.ts and fixed the bug.",
+      strategy: "auto_summarize_oldest",
+      tokensBefore: 12_400,
+      tokensAfter: 840,
+    })
+  })
+})
