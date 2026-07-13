@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Editor from "@monaco-editor/react"
-import { FileCode2, Save, X } from "lucide-react"
+import { FolderTree, Save, X } from "lucide-react"
 import { IconButton, Spinner } from "../../atoms"
 import { ConfirmDialog } from "../../molecules"
 import { ensureMonaco, languageForPath } from "../../../lib/monacoEnv"
@@ -16,6 +16,8 @@ import {
   useAppStore,
   type RightPanelTab,
 } from "../../../stores/appStore"
+import { useSessions } from "../../../hooks/useSessions"
+import { FileExplorer } from "./FileExplorer"
 
 type FilesTabProps = {
   /** True when the Files panel body is the visible right-panel tab. */
@@ -24,7 +26,8 @@ type FilesTabProps = {
 
 /** Cursor-style file strip + Monaco editor inside the right panel.
  * Keep mounted (hidden) while the Files tab stays in openTabs so buffers
- * and dirty drafts survive switching to Changes/Terminal. */
+ * and dirty drafts survive switching to Changes/Terminal. Empty Files tab
+ * shows a workspace file browser (not auto-closed). */
 export const FilesTab = ({ active }: FilesTabProps) => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const sessionKey = sessionScopeKey(activeSessionId)
@@ -41,6 +44,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
   const setActive = useAppStore((s) => s.setActiveWorkspaceFile)
   const closeFile = useAppStore((s) => s.closeWorkspaceFile)
   const setDraft = useAppStore((s) => s.setWorkspaceFileDraft)
+  const openWorkspaceFile = useAppStore((s) => s.openWorkspaceFile)
   const closeTab = useAppStore((s) => s.closeTab)
   const setRightPanelTab = useAppStore((s) => s.setRightPanelTab)
   const setRightPanelOpen = useAppStore((s) => s.setRightPanelOpen)
@@ -49,30 +53,35 @@ export const FilesTab = ({ active }: FilesTabProps) => {
   )
   const pushToast = useAppStore((s) => s.pushToast)
   const queryClient = useQueryClient()
+  const { sessions } = useSessions()
+  const activeSession = sessions.find((s) => s.id === activeSessionId)
+  const cwd = activeSession?.cwd ?? ""
   const [saving, setSaving] = useState(false)
   const [confirmClosePath, setConfirmClosePath] = useState<string | null>(null)
+  const [browseMode, setBrowseMode] = useState(false)
+  const hadOpenFilesRef = useRef(openFiles.length > 0)
 
   useEffect(() => {
     ensureMonaco()
   }, [])
 
-  const path = activePath && openFiles.includes(activePath) ? activePath : openFiles[0] ?? null
+  const path =
+    activePath && openFiles.includes(activePath) ? activePath : openFiles[0] ?? null
 
+  // Only tear down the Files tab after the user closes the last buffer —
+  // never when they open an empty Files tab to browse.
   useEffect(() => {
-    if (!path && openFiles.length === 0 && openTabs.includes("files")) {
-      // No buffers left — drop the Files panel tab itself. Mirror
-      // RightPanel.handleCloseTab: closing the last open tab also collapses
-      // the panel so we don't leave an empty header with tab="files".
-      closeTab(sessionKey, "files")
-      const remaining = openTabs.filter((t) => t !== "files")
-      if (remaining.length > 0) {
-        setRightPanelTab(remaining[remaining.length - 1])
-      } else {
-        setRightPanelOpen(false)
-      }
+    const had = hadOpenFilesRef.current
+    hadOpenFilesRef.current = openFiles.length > 0
+    if (!(had && openFiles.length === 0 && openTabs.includes("files"))) return
+    closeTab(sessionKey, "files")
+    const remaining = openTabs.filter((t) => t !== "files")
+    if (remaining.length > 0) {
+      setRightPanelTab(remaining[remaining.length - 1])
+    } else {
+      setRightPanelOpen(false)
     }
   }, [
-    path,
     openFiles.length,
     openTabs,
     closeTab,
@@ -80,6 +89,11 @@ export const FilesTab = ({ active }: FilesTabProps) => {
     setRightPanelTab,
     setRightPanelOpen,
   ])
+
+  // Opening a file leaves browse mode so the editor is visible.
+  useEffect(() => {
+    if (openFiles.length > 0) setBrowseMode(false)
+  }, [openFiles.length])
 
   const requestCloseFile = useCallback(
     (p: string) => {
@@ -100,7 +114,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
   } = useQuery({
     queryKey: ["workspace-file", activeSessionId, path],
     queryFn: () => readTextFile(activeSessionId!, path!),
-    enabled: !!activeSessionId && !!path,
+    enabled: !!activeSessionId && !!path && !browseMode,
     staleTime: 5_000,
   })
 
@@ -171,14 +185,65 @@ export const FilesTab = ({ active }: FilesTabProps) => {
     )
   }
 
-  if (openFiles.length === 0) {
+  const showExplorer = browseMode || openFiles.length === 0 || !path
+
+  if (showExplorer) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-        <FileCode2 className="h-7 w-7 text-ink-faint" aria-hidden />
-        <p className="text-sm text-ink-secondary">No files open</p>
-        <p className="text-xs text-ink-muted">
-          Open a file from Changes (Open) or use the command palette.
-        </p>
+      <div className="flex h-full min-h-0 flex-col">
+        {openFiles.length > 0 ? (
+          <div className="flex h-8 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-stroke-3 px-1">
+            {openFiles.map((p) => {
+              const isActive = p === path && !browseMode
+              const isDirty = drafts[p] !== undefined
+              return (
+                <div
+                  key={p}
+                  className={cn(
+                    "group flex h-6 max-w-[160px] items-center gap-1 rounded-md px-1.5 text-xs",
+                    isActive
+                      ? "bg-fill-2 text-ink"
+                      : "text-ink-muted hover:bg-fill-4 hover:text-ink-secondary",
+                  )}
+                >
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 truncate text-left"
+                    title={p}
+                    onClick={() => {
+                      setBrowseMode(false)
+                      setActive(sessionKey, p)
+                    }}
+                  >
+                    {isDirty ? "● " : ""}
+                    {basename(p)}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Close ${basename(p)}`}
+                    className="rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-fill-3"
+                    onClick={() => requestCloseFile(p)}
+                  >
+                    <X className="h-3 w-3" aria-hidden />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
+        {cwd ? (
+          <FileExplorer
+            cwd={cwd}
+            onOpenFile={(p) => openWorkspaceFile(sessionKey, p)}
+          />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+            <FolderTree className="h-7 w-7 text-ink-faint" aria-hidden />
+            <p className="text-sm text-ink-secondary">No project folder</p>
+            <p className="text-xs text-ink-muted">
+              Pick a working directory for this session to browse files.
+            </p>
+          </div>
+        )}
       </div>
     )
   }
@@ -188,6 +253,13 @@ export const FilesTab = ({ active }: FilesTabProps) => {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-8 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-stroke-3 px-1">
+        <IconButton
+          label="Browse files"
+          onClick={() => setBrowseMode(true)}
+          className="h-6 w-6 shrink-0"
+        >
+          <FolderTree className="h-3.5 w-3.5" aria-hidden />
+        </IconButton>
         {openFiles.map((p) => {
           const isActive = p === path
           const isDirty = drafts[p] !== undefined
