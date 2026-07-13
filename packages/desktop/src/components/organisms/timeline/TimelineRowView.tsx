@@ -93,20 +93,23 @@ export const TimelineRowView = memo(({
         </div>
       )
     }
-    case "assistant":
+    case "assistant": {
       if (!row.text.trim()) return null
+      const isLive = row.id.startsWith("live-assistant:")
       return (
         <div className="group/row min-h-5">
-          <MarkdownBody
-            content={row.text}
-            live={row.id.startsWith("live-assistant:")}
-          />
+          <MarkdownBody content={row.text} live={isLive} />
           {showActions && !footer ? (
             <MessageActions text={row.text} tsMs={row.tsMs} />
+          ) : isLive && !footer ? (
+            // Reserve the actions row height while streaming so materialization
+            // (MessageActions mount) does not jump the virtual row ~28px.
+            <div className="mt-1 h-7" aria-hidden />
           ) : null}
           {footer ? <TurnFooter {...footer} /> : null}
         </div>
       )
+    }
     case "thinking":
       // Show even without a measurable duration ("Thought") — deltas aren't
       // persisted on replay, and some providers emit a thinking block with

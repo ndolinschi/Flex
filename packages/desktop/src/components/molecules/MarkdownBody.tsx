@@ -11,6 +11,7 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Check, Copy } from "lucide-react"
 import { cn } from "../../lib/utils"
+import { StreamingCaret } from "./StreamingCaret"
 
 type MarkdownBodyProps = {
   content: string
@@ -165,7 +166,8 @@ export const MarkdownBody = memo(({ content, className, live = false }: Markdown
   >([])
 
   useEffect(() => {
-    if (live) return
+    // Load (or preload while `live`) so settle does not flash unhighlighted →
+    // highlighted on a second paint. Live path ignores rehype until settled.
     let cancelled = false
     void import("../../lib/markdownHighlight").then((mod) => {
       if (cancelled) return
@@ -180,6 +182,7 @@ export const MarkdownBody = memo(({ content, className, live = false }: Markdown
     return (
       <div className={cn(MARKDOWN_BODY_CLASS, "whitespace-pre-wrap", className)}>
         {content}
+        <StreamingCaret />
       </div>
     )
   }

@@ -7,7 +7,6 @@ import {
   EmptyState,
   ErrorBanner,
   FilesChangedCard,
-  StreamingCaret,
   WorkGroup,
 } from "../molecules"
 import { useSessionEvents } from "../../hooks/useSessionEvents"
@@ -53,7 +52,11 @@ export const TurnTimeline = ({
 }: TurnTimelineProps) => {
   const { rows, streaming, isLoading, error, thinkingDurations, reconnectStatus, compactingStatus, indexingStatus } =
     useSessionEvents(sessionId)
-  const isStreaming = useAppStore((s) => s.isStreaming)
+  // Per-session — SubagentViewer mounts a second TurnTimeline for a child id;
+  // the global `isStreaming` flag tracks only the active root session.
+  const isStreaming = useAppStore((s) =>
+    sessionId ? !!s.streamingSessions[sessionId] : false,
+  )
   // Client-side log rows (model/provider changes) — not part of the engine
   // event stream, so they're merged in here rather than in useSessionEvents.
   const sessionLogRows = useAppStore((s) =>
@@ -95,13 +98,22 @@ export const TurnTimeline = ({
     last.kind === "row" &&
     last.row.type === "thinking" &&
     last.row.id.startsWith("live-thinking:")
+  // Visible live answer already owns the feed's motion — hide the bottom
+  // "Working" backstop so it does not stack under streaming text.
+  const hasVisibleLiveAssistant = liveRows.some(
+    (r) =>
+      r.type === "assistant" &&
+      r.id.startsWith("live-assistant:") &&
+      r.text.trim().length > 0,
+  )
   const showWorkingIndicator =
     isStreaming &&
     !reconnectStatus &&
     !compactingStatus &&
     !indexingStatus &&
     !hasOpenWorkGroup(displayItems) &&
-    !lastIsLiveThinking
+    !lastIsLiveThinking &&
+    !hasVisibleLiveAssistant
 
   // The reconnect banner REPLACES the plain "Working" row while active —
   // never both. Only shown while the session is actually streaming (a
@@ -193,14 +205,28 @@ export const TurnTimeline = ({
 
   // Live tail / streaming deltas grow without changing `count`. ResizeObserver
   // usually handles this; we still remeasure mounted rows in place after paint
-  // as a safety net. Never call `virtualizer.measure()` here — it clears
-  // itemSizeCache and absolute rows overlap on stale estimateSize.
+  // as a safety net. Also remeasure when streaming stops (live→settled markdown
+  // + actions swap) even if streamContentKey is unchanged. Never call
+  // `virtualizer.measure()` here — it clears itemSizeCache and absolute rows
+  // overlap on stale estimateSize.
+  const wasStreamingRef = useRef(isStreaming)
   useEffect(() => {
-    const id = requestAnimationFrame(() => {
+    const settled = wasStreamingRef.current && !isStreaming
+    wasStreamingRef.current = isStreaming
+    let second: number | null = null
+    const first = requestAnimationFrame(() => {
       remeasureMountedVirtualItems(virtualizer)
+      if (!settled) return
+      // Second frame: GFM/prose margins apply after the live→settled swap.
+      second = requestAnimationFrame(() => {
+        remeasureMountedVirtualItems(virtualizer)
+      })
     })
-    return () => cancelAnimationFrame(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- remount on content growth only
+    return () => {
+      cancelAnimationFrame(first)
+      if (second !== null) cancelAnimationFrame(second)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- remount on content growth / settle only
   }, [streamContentKey, isStreaming, displayItems.length])
 
   // WorkGroup expand/collapse changes row height; remeasure in place before
@@ -364,11 +390,6 @@ export const TurnTimeline = ({
                         // sibling.
                         footer={item.footer}
                       />
-                      {item.row.type === "assistant" &&
-                      item.row.id.startsWith("live-assistant:") &&
-                      isStreaming ? (
-                        <StreamingCaret />
-                      ) : null}
                     </>
                   )}
                 </div>

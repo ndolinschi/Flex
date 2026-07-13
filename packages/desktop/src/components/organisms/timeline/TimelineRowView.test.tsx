@@ -71,6 +71,10 @@ describe("TimelineRowView", () => {
     expect(html).not.toContain("<strong>")
     expect(html).not.toContain("<pre")
     expect(html).toContain("whitespace-pre-wrap")
+    // Inline caret + reserved actions-row height (no MessageActions yet).
+    expect(html).toContain("animate-pulse")
+    expect(html).toContain("h-7")
+    expect(html).not.toContain("Copy message")
   })
 
   it("fully renders markdown for materialized assistant rows", () => {

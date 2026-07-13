@@ -13,6 +13,9 @@ describe("MarkdownBody", () => {
     expect(html).not.toContain("<strong>")
     expect(html).not.toContain("<pre")
     expect(html).not.toContain("hljs")
+    // Inline caret at the end of the live text (not a sibling below the row).
+    expect(html).toContain('aria-hidden="true"')
+    expect(html).toContain("animate-pulse")
   })
 
   it("parses GFM when not live", () => {
