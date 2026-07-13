@@ -9,7 +9,7 @@ use agentloop_contracts::{ToolOutput, ToolResultBlock};
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
 use crate::repomap::build_repo_map;
-use crate::tools::shared::open_and_build;
+use crate::tools::shared::open_and_build_with_events;
 
 const DEFAULT_BUDGET: usize = 2_000;
 const MIN_BUDGET: usize = 200;
@@ -62,8 +62,11 @@ impl Tool for RepoMapTool {
             .unwrap_or(DEFAULT_BUDGET)
             .clamp(MIN_BUDGET, MAX_BUDGET);
         let cwd = ctx.cwd.clone();
+        let events = ctx.events.clone();
+        let call_id = ctx.call_id.clone();
         let cancel = ctx.cancel.clone();
-        let handle = tokio::task::spawn_blocking(move || run_map(&cwd, budget));
+        let handle =
+            tokio::task::spawn_blocking(move || run_map(&cwd, budget, &events, &call_id));
         let rendered = tokio::select! {
             _ = cancel.cancelled() => return Err(ToolError::Cancelled),
             result = handle => result.map_err(|err| {
@@ -82,8 +85,13 @@ impl Tool for RepoMapTool {
     }
 }
 
-fn run_map(cwd: &std::path::Path, budget: usize) -> Result<String, ToolError> {
-    let store = open_and_build(cwd)?;
+fn run_map(
+    cwd: &std::path::Path,
+    budget: usize,
+    events: &agentloop_core::EventSink,
+    call_id: &agentloop_contracts::ToolCallId,
+) -> Result<String, ToolError> {
+    let store = open_and_build_with_events(cwd, events, Some(call_id))?;
     Ok(build_repo_map(&store, budget))
 }
 

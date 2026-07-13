@@ -607,7 +607,7 @@
           ]
         },
         {
-          "description": "Context compaction is about to call the summarizer. Ephemeral: not\npersisted — a UI can show \"Compacting context…\" until the following\n[`CompactionBoundary`] (or turn end / error) lands. `strategy` matches\nthe eventual boundary (`summarize_oldest`, `auto_summarize_oldest`, …).",
+          "description": "Context compaction is about to call the summarizer. Ephemeral: not\npersisted — a UI can show \"Compacting context…\" until the following\n[`AgentEvent::CompactionBoundary`] (or turn end / error) lands.\n`strategy` matches the eventual boundary (`summarize_oldest`,\n`auto_summarize_oldest`, …).",
           "type": "object",
           "properties": {
             "kind": {
@@ -621,6 +621,60 @@
           "required": [
             "kind",
             "strategy"
+          ]
+        },
+        {
+          "description": "Code index build is about to run (first build or a substantial update).\nEphemeral: not persisted — a UI can show \"Indexing repository…\" until\nthe following [`AgentEvent::IndexingCompleted`] (or turn end / error).\n`reason` is a short machine tag (`first_build`, `update`).",
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "indexing_started"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "reason"
+          ]
+        },
+        {
+          "description": "Code index build finished. Persisted so the chat can show a settled\n\"Indexed N files\" card. Counts mirror `UpdateStats` from the index crate.",
+          "type": "object",
+          "properties": {
+            "added": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "changed": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "kind": {
+              "type": "string",
+              "const": "indexing_completed"
+            },
+            "removed": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "unchanged": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "kind",
+            "added",
+            "changed",
+            "removed",
+            "unchanged"
           ]
         },
         {

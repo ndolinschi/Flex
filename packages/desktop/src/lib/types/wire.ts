@@ -234,6 +234,10 @@ export type AgentEvent =
    * the summarizer runs so the UI can show "Compacting context…" until the
    * following `compaction_boundary` (or turn end / error) lands. */
   | { kind: "compaction_started"; strategy: string }
+  /** Ephemeral — UI shows "Indexing repository…" until `indexing_completed`. */
+  | { kind: "indexing_started"; reason: string }
+  /** Persisted — settled "Indexed N files" card in the chat timeline. */
+  | { kind: "indexing_completed"; added: number; changed: number; removed: number; unchanged: number }
   | { kind: "model_fallback"; from: string; to?: string; reason: EngineError }
   /** Ephemeral, live-broadcast only — never persisted to replay/JSONL. Fires
    * once per retry attempt right before the engine sleeps that attempt's

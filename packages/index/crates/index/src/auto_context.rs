@@ -15,7 +15,7 @@ use agentloop_core::{Hook, HookContext, HookData, HookError, HookOutcome};
 
 use crate::retrieve::{Hit, search_hybrid};
 use crate::store::{IndexStore, StoreError as IndexStoreError, UpdateStats};
-use crate::tools::shared::{index_dir_for, index_root_base, open_and_build};
+use crate::tools::shared::{index_dir_for, index_root_base, open_and_build_with_events};
 
 /// Env var that enables auto-context when set to a truthy value
 /// (`1`/`true`/`on`/`yes`, case-insensitive). Used by
@@ -91,18 +91,22 @@ impl Hook for AutoContextHook {
         let k = self.k;
         let query = trimmed.to_owned();
         let cwd_owned = cwd;
-        let hits =
-            match tokio::task::spawn_blocking(move || fetch_hits(&cwd_owned, &query, k)).await {
-                Ok(Ok(hits)) => hits,
-                Ok(Err(err)) => {
-                    tracing::debug!(error = %err, "auto-context: retrieval failed");
-                    return Ok(HookOutcome::Continue);
-                }
-                Err(err) => {
-                    tracing::debug!(error = %err, "auto-context: worker join failed");
-                    return Ok(HookOutcome::Continue);
-                }
-            };
+        let events = ctx.events.clone();
+        let hits = match tokio::task::spawn_blocking(move || {
+            fetch_hits(&cwd_owned, &query, k, events.as_ref())
+        })
+        .await
+        {
+            Ok(Ok(hits)) => hits,
+            Ok(Err(err)) => {
+                tracing::debug!(error = %err, "auto-context: retrieval failed");
+                return Ok(HookOutcome::Continue);
+            }
+            Err(err) => {
+                tracing::debug!(error = %err, "auto-context: worker join failed");
+                return Ok(HookOutcome::Continue);
+            }
+        };
 
         if hits.is_empty() {
             return Ok(HookOutcome::Continue);
@@ -115,8 +119,16 @@ impl Hook for AutoContextHook {
     }
 }
 
-fn fetch_hits(cwd: &std::path::Path, query: &str, k: usize) -> Result<Vec<Hit>, String> {
-    let store = open_and_build(cwd).map_err(|e| e.to_string())?;
+fn fetch_hits(
+    cwd: &std::path::Path,
+    query: &str,
+    k: usize,
+    events: Option<&agentloop_core::EventSink>,
+) -> Result<Vec<Hit>, String> {
+    let store = match events {
+        Some(sink) => open_and_build_with_events(cwd, sink, None).map_err(|e| e.to_string())?,
+        None => crate::tools::shared::open_and_build(cwd).map_err(|e| e.to_string())?,
+    };
     search_hybrid(&store, query, k).map_err(|e| e.to_string())
 }
 
@@ -313,7 +325,7 @@ mod tests {
         let _gate = lock_index_root_override();
         set_index_root_override(Some(index_root.path().to_path_buf()));
 
-        let _ = open_and_build(repo.path()).unwrap_or_else(|e| panic!("{e}"));
+        let _ = crate::tools::shared::open_and_build(repo.path()).unwrap_or_else(|e| panic!("{e}"));
         assert!(index_dir_for(repo.path(), index_root.path()).exists());
 
         let session = SessionId::from("sess-ac");

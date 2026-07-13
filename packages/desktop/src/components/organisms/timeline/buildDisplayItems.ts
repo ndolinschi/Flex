@@ -45,6 +45,7 @@ export const marginForItem = (item: DisplayItem, isFirst: boolean): string => {
       return "pt-2"
     case "meta":
     case "compaction":
+    case "indexing":
     case "fallback":
     case "command":
       return "pt-2"
@@ -87,6 +88,7 @@ export const estimateSizeForItem = (item: DisplayItem, isFirst: boolean): number
             (item.row.type === "assistant" ||
               item.row.type === "meta" ||
               item.row.type === "compaction" ||
+              item.row.type === "indexing" ||
               item.row.type === "fallback" ||
               item.row.type === "command")
           ? 8

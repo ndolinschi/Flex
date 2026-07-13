@@ -57,6 +57,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `SendButton` | Circular send / stop / queue | `isStreaming`, `canQueue?`, `onSend`, `onStop` | Composer |
 | `MarkdownBody` | GFM + lazy highlight.js language pack; `live` plain pre-wrap fast-path | `content`, `live?` | TurnTimeline (`TimelineRowView`) |
 | `CompactionCard` | Settled context-compaction boundary (divider + expandable summary) | `summaryMarkdown`, `strategy`, `tokensBefore?`, `tokensAfter?` | TurnTimeline (`TimelineRowView`) |
+| `IndexingCard` | Settled code-index boundary (divider + file counts) | `added`, `changed`, `removed`, `unchanged` | TurnTimeline (`TimelineRowView`) |
 | `EmptyState` | Empty async surface | `title`, `description?`, `action?` | SessionSidebar, TurnTimeline |
 | `ErrorBanner` | Inline error | `message`, `onDismiss?` | Composer, Settings |
 | `ToolCallChip` | Single tool as Cursor-style step | `call` | TurnTimeline |

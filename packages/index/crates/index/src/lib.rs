@@ -75,6 +75,6 @@ pub use plugin::IndexPlugin;
 pub use repomap::build_repo_map;
 pub use retrieve::{Hit, HybridSearchError, search, search_hybrid};
 pub use store::{IndexStore, StoreError, UpdateStats};
-pub use tools::shared::{index_dir_for, index_root_base, open_and_build};
+pub use tools::shared::{index_dir_for, index_root_base, open_and_build, open_and_build_with_events};
 pub use tools::{FindSymbolTool, RepoMapTool, SearchCodeTool};
 pub use vector_store::{VectorHit, VectorStore, VectorStoreError};

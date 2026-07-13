@@ -10,7 +10,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use agentloop_core::ToolError;
+use agentloop_contracts::{AgentEvent, ToolCallId};
+use agentloop_core::{EventSink, ToolError};
 
 use crate::embed::resolve_embedder;
 use crate::store::{IndexStore, UpdateStats};
@@ -130,7 +131,16 @@ pub fn index_dir_for(cwd: &Path, base: &Path) -> PathBuf {
 /// [`index_root_base`]'s env/`$HOME` resolution (this workspace forbids
 /// `unsafe_code`, so tests can't scope an env-var override the way
 /// `packages/desktop`'s composition root does elsewhere in this repo).
-fn open_and_build_at(cwd: &Path, index_dir: &Path) -> Result<IndexStore, ToolError> {
+///
+/// When `events` is provided, emits `IndexingStarted` / progress notes /
+/// `IndexingCompleted` so the chat UI can show "Indexing repository…" instead
+/// of a silent hang. Progress notes use `ToolProgress` when `call_id` is set.
+fn open_and_build_at(
+    cwd: &Path,
+    index_dir: &Path,
+    events: Option<&EventSink>,
+    call_id: Option<&ToolCallId>,
+) -> Result<IndexStore, ToolError> {
     let embedder = resolve_embedder(index_dir).map_err(|err| {
         ToolError::Execution(format!(
             "Could not initialize embeddings for the code index: {err}."
@@ -150,13 +160,66 @@ fn open_and_build_at(cwd: &Path, index_dir: &Path) -> Result<IndexStore, ToolErr
     let was_empty = store.indexed_file_count() == 0;
     if was_empty {
         tracing::info!(cwd = %cwd.display(), "SearchCode/FindSymbol: building code index for the first time");
+        if let Some(sink) = events {
+            sink.emit(AgentEvent::IndexingStarted {
+                reason: "first_build".to_owned(),
+            });
+            if let Some(id) = call_id {
+                sink.emit(AgentEvent::ToolProgress {
+                    call_id: id.clone(),
+                    note: "Building code index for the first time…".to_owned(),
+                });
+            }
+        }
     }
 
+    let mut announced_update = false;
     let stats: UpdateStats = store
-        .build()
+        .build_with_progress(|done, total| {
+            if let Some(sink) = events {
+                if !was_empty && !announced_update && total > 0 {
+                    announced_update = true;
+                    sink.emit(AgentEvent::IndexingStarted {
+                        reason: "update".to_owned(),
+                    });
+                }
+                if total > 0 {
+                    let note = if was_empty {
+                        format!("Indexing repository… {done}/{total} files")
+                    } else {
+                        format!("Updating code index… {done}/{total} files")
+                    };
+                    if let Some(id) = call_id {
+                        sink.emit(AgentEvent::ToolProgress {
+                            call_id: id.clone(),
+                            note,
+                        });
+                    }
+                }
+            }
+        })
         .map_err(|err| ToolError::Execution(format!("Failed to build the code index: {err}.")))?;
 
     let total = stats.added + stats.changed + stats.unchanged;
+    let did_work = was_empty || stats.added + stats.changed > 0 || announced_update;
+    if did_work {
+        if let Some(sink) = events {
+            sink.emit(AgentEvent::IndexingCompleted {
+                added: stats.added as u32,
+                changed: stats.changed as u32,
+                removed: stats.removed as u32,
+                unchanged: stats.unchanged as u32,
+            });
+            if let Some(id) = call_id {
+                let indexed = stats.added + stats.changed + stats.unchanged;
+                sink.emit(AgentEvent::ToolProgress {
+                    call_id: id.clone(),
+                    note: format!("Indexed {indexed} files"),
+                });
+            }
+        }
+    }
+
     if was_empty && total > LARGE_REPO_FILE_THRESHOLD {
         tracing::info!(
             added = stats.added,
@@ -173,7 +236,18 @@ fn open_and_build_at(cwd: &Path, index_dir: &Path) -> Result<IndexStore, ToolErr
 /// Open (or create) the index rooted at `cwd` and bring it up to date.
 pub fn open_and_build(cwd: &Path) -> Result<IndexStore, ToolError> {
     let index_dir = index_dir_for(cwd, &index_root_base());
-    open_and_build_at(cwd, &index_dir)
+    open_and_build_at(cwd, &index_dir, None, None)
+}
+
+/// Like [`open_and_build`], but streams indexing status into `events` so the
+/// chat UI can show live "Indexing repository…" feedback.
+pub fn open_and_build_with_events(
+    cwd: &Path,
+    events: &EventSink,
+    call_id: Option<&ToolCallId>,
+) -> Result<IndexStore, ToolError> {
+    let index_dir = index_dir_for(cwd, &index_root_base());
+    open_and_build_at(cwd, &index_dir, Some(events), call_id)
 }
 
 /// Test-only equivalent of [`open_and_build`] that indexes under an explicit
@@ -182,7 +256,7 @@ pub fn open_and_build(cwd: &Path) -> Result<IndexStore, ToolError> {
 #[cfg(test)]
 pub(crate) fn open_and_build_in(cwd: &Path, index_root: &Path) -> Result<IndexStore, ToolError> {
     let index_dir = index_dir_for(cwd, index_root);
-    open_and_build_at(cwd, &index_dir)
+    open_and_build_at(cwd, &index_dir, None, None)
 }
 
 #[cfg(test)]

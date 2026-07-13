@@ -83,6 +83,15 @@ export type TimelineRow =
       tsMs: number
     }
   | {
+      type: "indexing"
+      id: string
+      added: number
+      changed: number
+      removed: number
+      unchanged: number
+      tsMs: number
+    }
+  | {
       type: "subagent"
       id: string
       childSession: SessionId

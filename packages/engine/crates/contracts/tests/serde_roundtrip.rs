@@ -109,6 +109,15 @@ fn all_variants() -> Vec<AgentEvent> {
         AgentEvent::CompactionStarted {
             strategy: "auto_summarize_oldest".to_owned(),
         },
+        AgentEvent::IndexingStarted {
+            reason: "first_build".to_owned(),
+        },
+        AgentEvent::IndexingCompleted {
+            added: 120,
+            changed: 3,
+            removed: 1,
+            unchanged: 400,
+        },
         AgentEvent::RetryScheduled {
             attempt: 1,
             max_attempts: 10,
@@ -200,6 +209,7 @@ fn persistence_classes_are_stable() {
             "compaction_started",
             "exec_chunk",
             "gap",
+            "indexing_started",
             "markdown_delta",
             "message_started",
             "retry_scheduled",

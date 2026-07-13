@@ -514,6 +514,18 @@ export const applyEventToTimeline = (
       })
       break
     }
+    case "indexing_completed": {
+      next.push({
+        type: "indexing",
+        id: rowId("index", String(seq), seq),
+        added: payload.added ?? 0,
+        changed: payload.changed ?? 0,
+        removed: payload.removed ?? 0,
+        unchanged: payload.unchanged ?? 0,
+        tsMs,
+      })
+      break
+    }
     case "hook_fired": {
       next.push({
         type: "meta",

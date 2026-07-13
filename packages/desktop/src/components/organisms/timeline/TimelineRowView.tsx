@@ -2,6 +2,7 @@ import { memo } from "react"
 import {
   CompactionCard,
   ErrorBanner,
+  IndexingCard,
   MarkdownBody,
   SubagentGroup,
   ToolCallChip,
@@ -139,6 +140,15 @@ export const TimelineRowView = memo(({
           strategy={row.strategy}
           tokensBefore={row.tokensBefore}
           tokensAfter={row.tokensAfter}
+        />
+      )
+    case "indexing":
+      return (
+        <IndexingCard
+          added={row.added}
+          changed={row.changed}
+          removed={row.removed}
+          unchanged={row.unchanged}
         />
       )
     case "subagent":

@@ -53,7 +53,7 @@ export const TurnTimeline = ({
   sessionId,
   onConversationEmpty,
 }: TurnTimelineProps) => {
-  const { rows, streaming, isLoading, error, thinkingDurations, reconnectStatus, compactingStatus } =
+  const { rows, streaming, isLoading, error, thinkingDurations, reconnectStatus, compactingStatus, indexingStatus } =
     useSessionEvents(sessionId)
   const isStreaming = useAppStore((s) => s.isStreaming)
   // Client-side log rows (model/provider changes) — not part of the engine
@@ -194,6 +194,7 @@ export const TurnTimeline = ({
     isStreaming &&
     !reconnectStatus &&
     !compactingStatus &&
+    !indexingStatus &&
     !hasOpenWorkGroup(displayItems) &&
     !lastIsLiveThinking
 
@@ -203,12 +204,18 @@ export const TurnTimeline = ({
   // and useSessionEvents clears it on turn_completed/session_error anyway,
   // but this guards the render regardless of ordering).
   const showReconnectBanner = isStreaming && !!reconnectStatus
-  // Compacting cue: priority reconnect > compacting > Working. When an open
-  // WorkGroup already owns the status via liveStatus="compacting", skip the
+  // Compacting cue: priority reconnect > compacting > indexing > Working.
+  // When an open WorkGroup already owns the status via liveStatus, skip the
   // bottom backstop (same XOR rule as Working/Thinking).
   const showCompactingIndicator =
     isStreaming &&
     !!compactingStatus &&
+    !reconnectStatus &&
+    !hasOpenWorkGroup(displayItems)
+  const showIndexingIndicator =
+    isStreaming &&
+    !!indexingStatus &&
+    !compactingStatus &&
     !reconnectStatus &&
     !hasOpenWorkGroup(displayItems)
 
@@ -398,14 +405,16 @@ export const TurnTimeline = ({
                         liveStatus={
                           item.isOpen && compactingStatus
                             ? "compacting"
-                            : item.isOpen &&
-                                item.rows.some(
-                                  (r) =>
-                                    r.type === "thinking" &&
-                                    r.id.startsWith("live-thinking:"),
-                                )
-                              ? "thinking"
-                              : "working"
+                            : item.isOpen && indexingStatus
+                              ? "indexing"
+                              : item.isOpen &&
+                                  item.rows.some(
+                                    (r) =>
+                                      r.type === "thinking" &&
+                                      r.id.startsWith("live-thinking:"),
+                                  )
+                                ? "thinking"
+                                : "working"
                         }
                         durationMs={item.summary?.duration_ms}
                         costUsd={item.summary?.cost_usd}
@@ -476,6 +485,11 @@ export const TurnTimeline = ({
             <div className="mt-1 flex min-h-6 items-center gap-1.5 text-base">
               <RunningDot className="-ml-1 h-4 w-4" />
               <span className="animate-shimmer-text">Compacting context…</span>
+            </div>
+          ) : showIndexingIndicator ? (
+            <div className="mt-1 flex min-h-6 items-center gap-1.5 text-base">
+              <RunningDot className="-ml-1 h-4 w-4" />
+              <span className="animate-shimmer-text">Indexing repository…</span>
             </div>
           ) : showWorkingIndicator ? (
             <div className="mt-1 flex min-h-6 items-center gap-1.5 text-base">

@@ -47,6 +47,12 @@ export type CompactingStatus = {
   tsMs: number
 }
 
+/** Transient "indexing repository" status from `indexing_started`. */
+export type IndexingStatus = {
+  reason: string
+  tsMs: number
+}
+
 /** Event kinds that mean "streaming resumed (or the turn ended)" — any of
  * these clears a pending reconnect banner so it never lingers once the
  * engine is talking again. */
@@ -65,11 +71,20 @@ const RECONNECT_CLEARING_KINDS: ReadonlySet<AgentEvent["kind"]> = new Set([
   "model_fallback",
   "compaction_started",
   "compaction_boundary",
+  "indexing_started",
+  "indexing_completed",
 ])
 
 /** Clears a live compacting cue once summarization finished or the turn ended. */
 const COMPACTING_CLEARING_KINDS: ReadonlySet<AgentEvent["kind"]> = new Set([
   "compaction_boundary",
+  "turn_completed",
+  "session_error",
+])
+
+/** Clears a live indexing cue once the build finished or the turn ended. */
+const INDEXING_CLEARING_KINDS: ReadonlySet<AgentEvent["kind"]> = new Set([
+  "indexing_completed",
   "turn_completed",
   "session_error",
 ])
@@ -101,6 +116,9 @@ export const useSessionEvents = (sessionId: string | null) => {
   )
   const [compactingStatus, setCompactingStatus] =
     useState<CompactingStatus | null>(null)
+  const [indexingStatus, setIndexingStatus] = useState<IndexingStatus | null>(
+    null,
+  )
   const rowsRef = useRef<TimelineRow[]>([])
   const sessionRef = useRef<string | null>(null)
   const resyncRef = useRef<(() => Promise<void>) | null>(null)
@@ -199,6 +217,21 @@ export const useSessionEvents = (sessionId: string | null) => {
         setCompactingStatus(null)
       }
 
+      // Code index builds can take a while with no other stream events —
+      // surface "Indexing repository…" instead of a silent hang.
+      if (event.payload.kind === "indexing_started") {
+        log.info("session", "indexing started", {
+          sessionId: event.session_id,
+          reason: event.payload.reason,
+        })
+        setIndexingStatus({
+          reason: event.payload.reason,
+          tsMs: event.ts_ms,
+        })
+      } else if (INDEXING_CLEARING_KINDS.has(event.payload.kind)) {
+        setIndexingStatus(null)
+      }
+
       rowsRef.current = applyEventToTimeline(rowsRef.current, event)
 
       const materialized = materializedIdsFromRows(rowsRef.current)
@@ -252,6 +285,7 @@ export const useSessionEvents = (sessionId: string | null) => {
       setThinkingDurations({})
       setReconnectStatus(null)
       setCompactingStatus(null)
+      setIndexingStatus(null)
       return
     }
 
@@ -266,6 +300,7 @@ export const useSessionEvents = (sessionId: string | null) => {
       setError(null)
       setReconnectStatus(null)
       setCompactingStatus(null)
+      setIndexingStatus(null)
       sessionRef.current = sessionId
       rowsRef.current = []
       setRows([])
@@ -381,6 +416,7 @@ export const useSessionEvents = (sessionId: string | null) => {
         // itself is never replayed, so it can't come back from this rebuild).
         setReconnectStatus(null)
         setCompactingStatus(null)
+        setIndexingStatus(null)
         let accumulated: TimelineRow[] = []
         let buffers = emptyStreamingBuffers()
         let spans: Record<string, ThinkingSpan> = {}
@@ -458,6 +494,7 @@ export const useSessionEvents = (sessionId: string | null) => {
     // Explicit Stop ends the turn — any reconnect banner is stale.
     setReconnectStatus(null)
     setCompactingStatus(null)
+    setIndexingStatus(null)
   }, [sessionId, sweepRequest, flushPending])
 
   // External resync trigger (Composer's optimistic-streaming safety timeout —
@@ -497,6 +534,9 @@ export const useSessionEvents = (sessionId: string | null) => {
     /** Transient "context is being compacted" status, or `null` when idle —
      * see `CompactingStatus`. */
     compactingStatus,
+    /** Transient "code index is building" status, or `null` when idle —
+     * see `IndexingStatus`. */
+    indexingStatus,
   }
 }
 

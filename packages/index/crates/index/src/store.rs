@@ -189,10 +189,25 @@ impl IndexStore {
     /// alone — this is what lets the index "self-heal" its vectors on the
     /// very next `build()` after invalidation, rather than requiring every
     /// file to change first.
-    pub fn build(&mut self) -> Result<UpdateStats, StoreError> {
+    /// Same as [`Self::build`], but invokes `on_progress(done, total)` after
+    /// each file that is actually re-indexed (added/changed). `total` is the
+    /// number of files that need work at the start of the pass; unchanged
+    /// files are skipped silently. Callers that don't care about progress
+    /// should use [`Self::build`].
+    pub fn build_with_progress<F>(&mut self, mut on_progress: F) -> Result<UpdateStats, StoreError>
+    where
+        F: FnMut(usize, usize),
+    {
         let scanned = scan_repo(&self.repo_root);
         let mut stats = UpdateStats::default();
         let mut seen = std::collections::HashSet::new();
+
+        let work: Vec<_> = scanned
+            .iter()
+            .filter(|file| self.manifest.files.get(&file.rel_path) != Some(&file.content_hash))
+            .collect();
+        let total = work.len();
+        let mut done = 0usize;
 
         for file in &scanned {
             seen.insert(file.rel_path.clone());
@@ -209,6 +224,8 @@ impl IndexStore {
             } else {
                 stats.changed += 1;
             }
+            done += 1;
+            on_progress(done, total);
         }
 
         // Drop files that disappeared since the last manifest.
@@ -228,6 +245,10 @@ impl IndexStore {
         self.persist_symbols()?;
         self.persist_vectors()?;
         Ok(stats)
+    }
+
+    pub fn build(&mut self) -> Result<UpdateStats, StoreError> {
+        self.build_with_progress(|_, _| {})
     }
 
     /// Incremental update over an explicit set of repo-relative paths

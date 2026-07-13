@@ -62,6 +62,19 @@ describe("WorkGroup", () => {
     expect(html.match(/animate-shimmer-text/g)?.length ?? 0).toBe(1)
   })
 
+  it("renders Indexing repository… when liveStatus is indexing", () => {
+    const html = renderToStaticMarkup(
+      <WorkGroup isOpen isStreaming liveStatus="indexing">
+        <div>body</div>
+      </WorkGroup>,
+    )
+
+    expect(html.match(/role="status"/g)?.length ?? 0).toBe(1)
+    expect(html).toContain("Indexing repository…")
+    expect(html.match(/>Working</g)?.length ?? 0).toBe(0)
+    expect(html.match(/animate-shimmer-text/g)?.length ?? 0).toBe(1)
+  })
+
   it("live group with streaming thinking shows exactly ONE shimmer status label", () => {
     // Mirrors TurnTimeline wiring: open group owns Thinking via liveStatus,
     // ThinkingBlock suppresses its duplicate shimmer.

@@ -10,7 +10,7 @@ use agentloop_contracts::{ToolOutput, ToolResultBlock};
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
 use crate::retrieve::{Hit, search_hybrid};
-use crate::tools::shared::open_and_build;
+use crate::tools::shared::open_and_build_with_events;
 
 /// Cap on total rendered output, chosen to stay well under ~2k tokens
 /// (roughly 4 chars/token, so ~8000 chars is a comfortable ceiling).
@@ -80,9 +80,13 @@ impl Tool for SearchCodeTool {
         let k = parsed.k.unwrap_or(DEFAULT_K).clamp(1, MAX_K);
         let cwd = ctx.cwd.clone();
         let query_owned = query.to_owned();
+        let events = ctx.events.clone();
+        let call_id = ctx.call_id.clone();
 
         let cancel = ctx.cancel.clone();
-        let handle = tokio::task::spawn_blocking(move || run_search(&cwd, &query_owned, k));
+        let handle = tokio::task::spawn_blocking(move || {
+            run_search(&cwd, &query_owned, k, &events, &call_id)
+        });
         let hits = tokio::select! {
             _ = cancel.cancelled() => return Err(ToolError::Cancelled),
             result = handle => result.map_err(|err| {
@@ -112,8 +116,14 @@ impl Tool for SearchCodeTool {
     }
 }
 
-fn run_search(cwd: &std::path::Path, query: &str, k: usize) -> Result<Vec<Hit>, ToolError> {
-    let store = open_and_build(cwd)?;
+fn run_search(
+    cwd: &std::path::Path,
+    query: &str,
+    k: usize,
+    events: &agentloop_core::EventSink,
+    call_id: &agentloop_contracts::ToolCallId,
+) -> Result<Vec<Hit>, ToolError> {
+    let store = open_and_build_with_events(cwd, events, Some(call_id))?;
     search_hybrid(&store, query, k)
         .map_err(|err| ToolError::Execution(format!("SearchCode retrieval failed: {err}.")))
 }

@@ -33,7 +33,7 @@ type WorkGroupProps = {
    * inside then suppresses its own shimmer via `suppressStatusLabel`). Prefer
    * `"compacting"` while a live `compaction_started` is in flight — the
    * summarizer emits no text, so "Working" would look hung. */
-  liveStatus?: "working" | "thinking" | "compacting"
+  liveStatus?: "working" | "thinking" | "compacting" | "indexing"
   durationMs?: number
   /** Turn cost (USD) shown next to the duration when the group is collapsed. */
   costUsd?: number
@@ -102,9 +102,11 @@ export const WorkGroup = memo(({
   const openLabel =
     liveStatus === "compacting"
       ? "Compacting context…"
-      : liveStatus === "thinking"
-        ? "Thinking"
-        : "Working"
+      : liveStatus === "indexing"
+        ? "Indexing repository…"
+        : liveStatus === "thinking"
+          ? "Thinking"
+          : "Working"
 
   return (
     <div className={cn("flex flex-col", className)}>

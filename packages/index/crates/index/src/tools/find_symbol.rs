@@ -9,7 +9,7 @@ use agentloop_contracts::{ToolOutput, ToolResultBlock};
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
 use crate::symbols::{Symbol, SymbolKind};
-use crate::tools::shared::open_and_build;
+use crate::tools::shared::open_and_build_with_events;
 
 const MAX_OUTPUT_CHARS: usize = 8_000;
 const MAX_MATCHES: usize = 50;
@@ -75,9 +75,12 @@ impl Tool for FindSymbolTool {
 
         let cwd = ctx.cwd.clone();
         let name_owned = name.to_owned();
+        let events = ctx.events.clone();
+        let call_id = ctx.call_id.clone();
         let cancel = ctx.cancel.clone();
-        let handle =
-            tokio::task::spawn_blocking(move || find_matches(&cwd, &name_owned, kind_filter));
+        let handle = tokio::task::spawn_blocking(move || {
+            find_matches(&cwd, &name_owned, kind_filter, &events, &call_id)
+        });
         let matches = tokio::select! {
             _ = cancel.cancelled() => return Err(ToolError::Cancelled),
             result = handle => result.map_err(|err| {
@@ -128,8 +131,10 @@ fn find_matches(
     cwd: &std::path::Path,
     name: &str,
     kind_filter: Option<SymbolKind>,
+    events: &agentloop_core::EventSink,
+    call_id: &agentloop_contracts::ToolCallId,
 ) -> Result<Vec<Symbol>, ToolError> {
-    let store = open_and_build(cwd)?;
+    let store = open_and_build_with_events(cwd, events, Some(call_id))?;
     Ok(query_matches(&store, name, kind_filter))
 }
 
