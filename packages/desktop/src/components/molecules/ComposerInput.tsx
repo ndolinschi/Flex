@@ -232,7 +232,10 @@ export const ComposerInput = ({
             seg.pill ? (
               <span
                 key={i}
-                className="rounded-[4px] bg-accent-subtle px-0.5 text-accent"
+                // No horizontal padding: the transparent textarea measures
+                // caret advance on unstyled glyphs; extra px would drift the
+                // caret left of the visible pill text.
+                className="rounded-[4px] bg-accent-subtle text-accent"
               >
                 {seg.value}
               </span>

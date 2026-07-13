@@ -12,11 +12,13 @@ import {
   Search,
   SlidersHorizontal,
   SquarePen,
+  Trash2,
   X,
 } from "lucide-react"
 import { IconButton, ScrollArea, Skeleton } from "../atoms"
 import {
   ArchivedSectionHeader,
+  ConfirmDialog,
   ContextMenu,
   EmptyState,
   ErrorBanner,
@@ -33,7 +35,11 @@ import { useWorkspaceStatuses } from "../../hooks/useWorkspaceStatuses"
 import { useGitStatuses } from "../../hooks/useGitStatuses"
 import { useIndexedRepos } from "../../hooks/useIndexedRepos"
 import { useSessionSidebarGroups } from "../../hooks/useSessionSidebarGroups"
-import { resumeSession, toInvokeError } from "../../lib/tauri"
+import {
+  discardIsolatedSession,
+  resumeSession,
+  toInvokeError,
+} from "../../lib/tauri"
 import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import { isSessionNotFoundError } from "../../lib/sessions"
 import type { SessionMeta } from "../../lib/types"
@@ -76,6 +82,12 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     cwd: string
     position: { x: number; y: number }
   } | null>(null)
+  const [deleteProject, setDeleteProject] = useState<{
+    cwd: string
+    label: string
+    sessions: SessionMeta[]
+  } | null>(null)
+  const [deletingProject, setDeletingProject] = useState(false)
   const {
     sessions: allSessions,
     isLoading,
@@ -266,8 +278,66 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
           label: collapsedRepos[repoMenu.cwd] ? "Expand" : "Collapse",
           onSelect: () => toggleRepo(repoMenu.cwd),
         },
+        { type: "separator" },
+        {
+          type: "item",
+          label: "Delete project & chats…",
+          icon: Trash2,
+          danger: true,
+          onSelect: () => {
+            const group = repoGroups.find((g) => g.cwd === repoMenu.cwd)
+            if (!group) return
+            setDeleteProject({
+              cwd: group.cwd,
+              label: group.label,
+              sessions: [...group.sessions],
+            })
+          },
+        },
       ]
     : []
+
+  const handleDeleteProject = useCallback(async () => {
+    if (!deleteProject) return
+    setDeletingProject(true)
+    const ids = deleteProject.sessions.map((s) => s.id)
+    const cwd = deleteProject.cwd
+    try {
+      for (const session of deleteProject.sessions) {
+        const isolated =
+          !!session.base_cwd &&
+          session.base_cwd !== session.cwd &&
+          !!session.workspace_id
+        if (isolated) {
+          try {
+            await discardIsolatedSession(session.id)
+          } catch {
+            // Best-effort — delete still proceeds.
+          }
+        }
+        await deleteSession(session.id)
+      }
+      const state = useAppStore.getState()
+      const pinnedSessionIds = state.pinnedSessionIds.filter(
+        (id) => !ids.includes(id),
+      )
+      const archivedSessionIds = state.archivedSessionIds.filter(
+        (id) => !ids.includes(id),
+      )
+      const recentCwds = state.recentCwds.filter((p) => p !== cwd)
+      useAppStore.setState({
+        pinnedSessionIds,
+        archivedSessionIds,
+        recentCwds,
+      })
+      void persistUiState({ pinnedSessionIds, archivedSessionIds, recentCwds })
+      setDeleteProject(null)
+    } catch (err) {
+      pushToast(toInvokeError(err), "error")
+    } finally {
+      setDeletingProject(false)
+    }
+  }, [deleteProject, deleteSession, pushToast])
 
   const handleSashDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -552,6 +622,24 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         position={repoMenu?.position ?? null}
         items={repoMenuItems}
         onClose={() => setRepoMenu(null)}
+      />
+      <ConfirmDialog
+        open={!!deleteProject}
+        title="Delete project & chats?"
+        description={
+          deleteProject
+            ? `Delete “${deleteProject.label}” and its ${deleteProject.sessions.length} chat${
+                deleteProject.sessions.length === 1 ? "" : "s"
+              }? This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        danger
+        isLoading={deletingProject}
+        onConfirm={() => void handleDeleteProject()}
+        onCancel={() => {
+          if (!deletingProject) setDeleteProject(null)
+        }}
       />
       </aside>
     </>

@@ -46,12 +46,16 @@ export const ProjectPicker = ({
 
   const recents = useMemo(() => {
     const sessions =
-      queryClient.getQueryData<{ cwd: string; parent_id?: string }[]>([
-        "sessions",
-      ]) ?? []
+      queryClient.getQueryData<
+        { cwd: string; base_cwd?: string; parent_id?: string }[]
+      >(["sessions"]) ?? []
     // Skip subagent children — their worktree paths aren't user projects.
-    const fromSessions = sessions.filter((s) => !s.parent_id).map((s) => s.cwd)
-    const merged = [...recentCwds, ...fromSessions, cwd].filter(
+    // Prefer base_cwd so isolated sessions don't pollute recents with UUID worktrees.
+    const fromSessions = sessions
+      .filter((s) => !s.parent_id)
+      .map((s) => s.base_cwd || s.cwd)
+    const projectCwd = cwd // caller should pass base_cwd ?? cwd
+    const merged = [...recentCwds, ...fromSessions, projectCwd].filter(
       (p): p is string => !!p && p.trim().length > 0,
     )
     const seen = new Set<string>()

@@ -134,7 +134,7 @@ export const SessionListItem = memo(function SessionListItem({
       label: "Copy Path",
       icon: Copy,
       onSelect: () => {
-        void navigator.clipboard.writeText(session.cwd)
+        void navigator.clipboard.writeText(session.base_cwd || session.cwd)
       },
     },
     {
@@ -142,7 +142,7 @@ export const SessionListItem = memo(function SessionListItem({
       label: "New Agent in this repo",
       icon: Plus,
       disabled: !onNewAgentInRepo,
-      onSelect: () => onNewAgentInRepo?.(session.cwd),
+      onSelect: () => onNewAgentInRepo?.(session.base_cwd || session.cwd),
     },
     { type: "separator" },
     {

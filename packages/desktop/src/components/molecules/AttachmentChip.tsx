@@ -1,4 +1,4 @@
-import { FileIcon, ImageIcon, MousePointer2, X } from "lucide-react"
+import { FileIcon, Folder, ImageIcon, MousePointer2, X } from "lucide-react"
 import type { ComposerAttachment } from "../../lib/types"
 import { cn } from "../../lib/utils"
 
@@ -14,7 +14,9 @@ export const AttachmentChip = ({ attachment, onRemove }: AttachmentChipProps) =>
       ? ImageIcon
       : attachment.kind === "dom"
         ? MousePointer2
-        : FileIcon
+        : attachment.kind === "directory"
+          ? Folder
+          : FileIcon
 
   return (
     <span

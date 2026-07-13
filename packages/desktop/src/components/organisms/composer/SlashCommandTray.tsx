@@ -1,4 +1,4 @@
-import type { RefObject } from "react"
+import { useEffect, useRef, type RefObject } from "react"
 import { PopoverItem, PopoverTray } from "../../molecules"
 import type { CommandInfoDto } from "../../../lib/types"
 
@@ -16,32 +16,44 @@ export const SlashCommandTray = ({
   matches,
   highlight,
   onSelect,
-}: SlashCommandTrayProps) => (
-  <PopoverTray
-    open={open}
-    onClose={() => {
-      /* keep draft; Esc handled in textarea keydown */
-    }}
-    anchorRef={anchorRef}
-    placement="above"
-    role="listbox"
-    aria-label="Slash commands"
-    className="left-0 right-0 w-full"
-  >
-    <ul className="max-h-48 overflow-y-auto py-0.5">
-      {matches.map((cmd, i) => (
-        <li key={cmd.name}>
-          <PopoverItem
-            active={i === highlight}
-            onClick={() => onSelect(cmd.name)}
-          >
-            <span className="font-mono text-ink">/{cmd.name}</span>
-            <span className="min-w-0 flex-1 truncate text-ink-muted">
-              {cmd.description}
-            </span>
-          </PopoverItem>
-        </li>
-      ))}
-    </ul>
-  </PopoverTray>
-)
+}: SlashCommandTrayProps) => {
+  const listRef = useRef<HTMLUListElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const el = listRef.current?.querySelector<HTMLElement>(
+      `[data-index="${highlight}"]`,
+    )
+    el?.scrollIntoView({ block: "nearest" })
+  }, [open, highlight, matches])
+
+  return (
+    <PopoverTray
+      open={open}
+      onClose={() => {
+        /* keep draft; Esc handled in textarea keydown */
+      }}
+      anchorRef={anchorRef}
+      placement="above"
+      role="listbox"
+      aria-label="Slash commands"
+      className="left-0 right-0 w-full"
+    >
+      <ul ref={listRef} className="max-h-48 overflow-y-auto py-0.5">
+        {matches.map((cmd, i) => (
+          <li key={cmd.name} data-index={i}>
+            <PopoverItem
+              active={i === highlight}
+              onClick={() => onSelect(cmd.name)}
+            >
+              <span className="font-mono text-ink">/{cmd.name}</span>
+              <span className="min-w-0 flex-1 truncate text-ink-muted">
+                {cmd.description}
+              </span>
+            </PopoverItem>
+          </li>
+        ))}
+      </ul>
+    </PopoverTray>
+  )
+}

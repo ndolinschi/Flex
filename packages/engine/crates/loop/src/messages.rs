@@ -5,9 +5,80 @@
 //! `ToolResult` blocks in a following user message. This is the inverse of the
 //! reducer's folding, applied to the compaction-aware context view.
 
-use agentloop_contracts::{ContentBlock, Message, Role, Transcript, TranscriptBlock};
+use agentloop_contracts::{BlobSource, ContentBlock, Message, Role, Transcript, TranscriptBlock};
+use base64::Engine as _;
 
 use crate::tool_results::output_or_synthetic;
+
+/// Media types whose payloads should be inlined as markdown for the model
+/// rather than left as opaque `File` placeholders (providers only render a
+/// `[file: …, base64 data]` stub for those).
+fn is_text_media_type(media_type: &str) -> bool {
+    let mt = media_type.trim().to_ascii_lowercase();
+    let base = mt.split(';').next().unwrap_or(mt.as_str()).trim();
+    base.starts_with("text/")
+        || matches!(
+            base,
+            "application/json"
+                | "application/xml"
+                | "application/javascript"
+                | "application/typescript"
+                | "application/x-yaml"
+                | "application/yaml"
+                | "application/toml"
+                | "application/sql"
+                | "application/x-sh"
+                | "application/x-python"
+        )
+}
+
+/// Fence language hint from a filename extension (best-effort).
+fn fence_lang(name: &str) -> &'static str {
+    let ext = std::path::Path::new(name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    match ext.as_str() {
+        "py" | "pyi" => "python",
+        "rs" => "rust",
+        "ts" | "tsx" => "typescript",
+        "js" | "jsx" | "mjs" | "cjs" => "javascript",
+        "go" => "go",
+        "java" => "java",
+        "md" | "markdown" => "markdown",
+        "json" => "json",
+        "yaml" | "yml" => "yaml",
+        "toml" => "toml",
+        "html" | "htm" => "html",
+        "css" => "css",
+        "sh" | "bash" | "zsh" => "bash",
+        "sql" => "sql",
+        "c" => "c",
+        "cpp" | "cc" | "cxx" | "hpp" | "h" => "cpp",
+        "rb" => "ruby",
+        "php" => "php",
+        "swift" => "swift",
+        _ => "",
+    }
+}
+
+/// Expand a text-ish `File` blob into fenced markdown the model can read.
+/// Returns `None` for binary / undecodable payloads (caller keeps `File`).
+fn expand_text_file(name: &str, media_type: &str, data: &BlobSource) -> Option<ContentBlock> {
+    if !is_text_media_type(media_type) {
+        return None;
+    }
+    let BlobSource::Base64 { data: b64 } = data else {
+        return None;
+    };
+    let bytes = base64::engine::general_purpose::STANDARD.decode(b64).ok()?;
+    let text = String::from_utf8(bytes).ok()?;
+    let lang = fence_lang(name);
+    Some(ContentBlock::markdown(format!(
+        "Attached file `{name}`:\n\n```{lang}\n{text}\n```"
+    )))
+}
 
 /// Build the provider-facing message list for the next model call.
 pub fn transcript_to_messages(transcript: &Transcript) -> Vec<Message> {
@@ -51,11 +122,15 @@ pub fn transcript_to_messages(transcript: &Transcript) -> Vec<Message> {
                     media_type,
                     data,
                 } => {
-                    content.push(ContentBlock::File {
-                        name: name.clone(),
-                        media_type: media_type.clone(),
-                        data: data.clone(),
-                    });
+                    if let Some(expanded) = expand_text_file(name, media_type, data) {
+                        content.push(expanded);
+                    } else {
+                        content.push(ContentBlock::File {
+                            name: name.clone(),
+                            media_type: media_type.clone(),
+                            data: data.clone(),
+                        });
+                    }
                 }
                 TranscriptBlock::Opaque { provider, data } => {
                     content.push(ContentBlock::Opaque {
@@ -209,6 +284,54 @@ mod tests {
         assert!(matches!(
             &messages[1].content[0],
             ContentBlock::Markdown { text } if text == "new question"
+        ));
+    }
+
+    #[test]
+    fn text_file_attachment_expands_to_markdown() {
+        let body = "def main():\n    print('hi')\n";
+        let b64 = base64::engine::general_purpose::STANDARD.encode(body.as_bytes());
+        let events = [AgentEvent::UserMessage {
+            message_id: MessageId::from("m1"),
+            content: vec![
+                ContentBlock::markdown("what does this do?"),
+                ContentBlock::File {
+                    name: "pcms_cli.py".to_owned(),
+                    media_type: "text/plain".to_owned(),
+                    data: BlobSource::Base64 { data: b64 },
+                },
+            ],
+        }];
+        let messages = transcript_to_messages(&reduce(events.iter()));
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].content.len(), 2);
+        let ContentBlock::Markdown { text } = &messages[0].content[1] else {
+            panic!(
+                "expected expanded markdown, got {:?}",
+                messages[0].content[1]
+            );
+        };
+        assert!(text.contains("pcms_cli.py"));
+        assert!(text.contains("def main()"));
+        assert!(text.contains("```python"));
+        assert!(!text.contains("base64"));
+    }
+
+    #[test]
+    fn binary_file_attachment_stays_file() {
+        let b64 = base64::engine::general_purpose::STANDARD.encode([0u8, 1, 2, 255]);
+        let events = [AgentEvent::UserMessage {
+            message_id: MessageId::from("m1"),
+            content: vec![ContentBlock::File {
+                name: "blob.bin".to_owned(),
+                media_type: "application/octet-stream".to_owned(),
+                data: BlobSource::Base64 { data: b64 },
+            }],
+        }];
+        let messages = transcript_to_messages(&reduce(events.iter()));
+        assert!(matches!(
+            &messages[0].content[0],
+            ContentBlock::File { name, .. } if name == "blob.bin"
         ));
     }
 }

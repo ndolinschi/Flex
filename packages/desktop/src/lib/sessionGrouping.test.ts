@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { orderByPinnedIds, orderStably } from "./sessionGrouping"
+import { groupByRepo, orderByPinnedIds, orderStably, projectCwd } from "./sessionGrouping"
 import type { SessionMeta } from "./types"
 
 /**
@@ -9,14 +9,57 @@ import type { SessionMeta } from "./types"
  * session's timestamp can never reshuffle the Pinned group.
  */
 
-const makeSession = (id: string, updatedAtMs: number): SessionMeta => ({
+const makeSession = (
+  id: string,
+  updatedAtMs: number,
+  cwd = "/repo",
+  baseCwd?: string,
+): SessionMeta => ({
   id,
   agent_id: "agent-1",
   depth: 0,
-  cwd: "/repo",
+  cwd,
+  ...(baseCwd ? { base_cwd: baseCwd } : {}),
   fallback_models: [],
   created_at_ms: updatedAtMs,
   updated_at_ms: updatedAtMs,
+})
+
+describe("projectCwd", () => {
+  it("prefers base_cwd over cwd for isolated sessions", () => {
+    expect(
+      projectCwd({
+        cwd: "/worktrees/019f5b2f-uuid",
+        base_cwd: "/Users/me/my-project",
+      }),
+    ).toBe("/Users/me/my-project")
+  })
+
+  it("falls back to cwd when base_cwd is absent", () => {
+    expect(projectCwd({ cwd: "/Users/me/my-project" })).toBe(
+      "/Users/me/my-project",
+    )
+  })
+})
+
+describe("groupByRepo", () => {
+  it("groups isolated worktree sessions under the base repo", () => {
+    const sessions = [
+      makeSession("a", 100, "/Users/me/my-project"),
+      makeSession(
+        "b",
+        200,
+        "/worktrees/019f5b2f-uuid",
+        "/Users/me/my-project",
+      ),
+      makeSession("c", 150, "/other/repo"),
+    ]
+    const groups = groupByRepo(sessions)
+    expect(groups.map((g) => g.label)).toEqual(["my-project", "repo"])
+    const project = groups.find((g) => g.label === "my-project")!
+    expect(project.cwd).toBe("/Users/me/my-project")
+    expect(project.sessions.map((s) => s.id).sort()).toEqual(["a", "b"])
+  })
 })
 
 describe("orderByPinnedIds", () => {

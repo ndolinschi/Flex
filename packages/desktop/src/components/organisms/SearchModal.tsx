@@ -4,42 +4,16 @@ import { Search } from "lucide-react"
 import { FuzzySessionRow } from "../molecules"
 import { useSessions } from "../../hooks/useSessions"
 import { fuzzyScore } from "../../lib/fuzzySearch"
+import { groupByRepo } from "../../lib/sessionGrouping"
 import { resumeSession, toInvokeError } from "../../lib/tauri"
-import type { SessionMeta } from "../../lib/types"
 import { sessionLabel } from "../../lib/types"
-import { basename, cn } from "../../lib/utils"
+import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
 import { log } from "../../lib/debug/log"
 
 type SearchModalProps = {
   open: boolean
   onClose: () => void
-}
-
-type SearchGroup = {
-  cwd: string
-  label: string
-  sessions: SessionMeta[]
-  latestMs: number
-}
-
-const groupByRepo = (sessions: SessionMeta[]): SearchGroup[] => {
-  const groups = new Map<string, SearchGroup>()
-  for (const session of sessions) {
-    const key = session.cwd || "~"
-    let group = groups.get(key)
-    if (!group) {
-      group = { cwd: key, label: basename(key), sessions: [], latestMs: 0 }
-      groups.set(key, group)
-    }
-    group.sessions.push(session)
-    group.latestMs = Math.max(group.latestMs, session.updated_at_ms)
-  }
-  const sorted = [...groups.values()].sort((a, b) => b.latestMs - a.latestMs)
-  for (const group of sorted) {
-    group.sessions.sort((a, b) => b.updated_at_ms - a.updated_at_ms)
-  }
-  return sorted
 }
 
 /**  "Search Agents" modal — same chrome as CommandPalette. */
@@ -78,13 +52,19 @@ export const SearchModal = ({ open, onClose }: SearchModalProps) => {
     const q = query.trim()
     if (!q) return sessions
     return sessions
-      .map((s) => ({ s, score: fuzzyScore(q, sessionLabel(s)) }))
-      .filter((r): r is { s: SessionMeta; score: number } => r.score !== null)
-      .sort((a, b) => a.score - b.score)
-      .map((r) => r.s)
+      .map((s) => ({ session: s, score: fuzzyScore(q, sessionLabel(s)) }))
+      .filter((x) => x.score !== null)
+      .sort(
+        (a, b) =>
+          a.score! - b.score! || b.session.updated_at_ms - a.session.updated_at_ms,
+      )
+      .map((x) => x.session)
   }, [sessions, query])
 
-  const groups = useMemo(() => groupByRepo(filteredSessions), [filteredSessions])
+  const groups = useMemo(
+    () => groupByRepo(filteredSessions),
+    [filteredSessions],
+  )
   const flatSessions = useMemo(() => groups.flatMap((g) => g.sessions), [groups])
 
   useEffect(() => {

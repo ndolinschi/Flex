@@ -163,7 +163,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
     if (syncedSessionRef.current === activeSessionId) return
     syncedSessionRef.current = activeSessionId
     if (active.model) setSelectedModelId(active.model)
-    if (active.cwd) pushRecentCwd(active.cwd)
+    if (active.cwd) pushRecentCwd(active.base_cwd || active.cwd)
   }, [activeSessionId, active, setSelectedModelId, pushRecentCwd])
 
   if (!activeSessionId) {
@@ -205,6 +205,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
       <div className="mx-auto mb-1.5 w-full max-w-[var(--content-rail)]">
         <ContextBar
           cwd={active?.cwd}
+          projectCwd={active ? active.base_cwd || active.cwd : undefined}
           sessionId={activeSessionId}
           disabled={false}
           onError={setError}

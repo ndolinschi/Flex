@@ -3,6 +3,7 @@ import type { AppState, LayoutSliceState, RightPanelTab, Viewport } from "../typ
 import { sessionScopeKey } from "../types"
 import {
   SIDEBAR_DEFAULT_WIDTH,
+  SIDEBAR_MIN_WIDTH,
   RIGHT_PANEL_DEFAULT_WIDTH,
   clampRightPanelWidth,
   clampSidebarWidth,
@@ -39,15 +40,37 @@ export const createLayoutSlice: StateCreator<
     })),
   setSidebarCollapsed: (collapsed) => {
     const state = get()
+    // When re-expanding in wide mode, bump a stuck-at-min width back to the
+    // default so the sidebar actually opens to a usable size (persisted min
+    // from a prior clamp can leave it "half open").
+    const widen =
+      !collapsed &&
+      state.viewport === "wide" &&
+      state.sidebarWidth <= SIDEBAR_MIN_WIDTH
+    const nextWidth = widen ? SIDEBAR_DEFAULT_WIDTH : state.sidebarWidth
     // Mobile (narrow/tight): only one full-width overlay at a time — opening
     // the sidebar closes the right panel.
     if (state.viewport !== "wide" && !collapsed && state.rightPanelOpen) {
-      set({ sidebarCollapsed: collapsed, rightPanelOpen: false })
-      void persistUiState({ sidebarCollapsed: collapsed, rightPanelOpen: false })
+      set({
+        sidebarCollapsed: collapsed,
+        rightPanelOpen: false,
+        ...(widen ? { sidebarWidth: nextWidth } : {}),
+      })
+      void persistUiState({
+        sidebarCollapsed: collapsed,
+        rightPanelOpen: false,
+        ...(widen ? { sidebarWidth: nextWidth } : {}),
+      })
       return
     }
-    set({ sidebarCollapsed: collapsed })
-    void persistUiState({ sidebarCollapsed: collapsed })
+    set({
+      sidebarCollapsed: collapsed,
+      ...(widen ? { sidebarWidth: nextWidth } : {}),
+    })
+    void persistUiState({
+      sidebarCollapsed: collapsed,
+      ...(widen ? { sidebarWidth: nextWidth } : {}),
+    })
   },
   toggleSidebarCollapsed: () => {
     get().setSidebarCollapsed(!get().sidebarCollapsed)

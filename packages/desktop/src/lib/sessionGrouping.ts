@@ -8,6 +8,13 @@ export type RepoGroup = {
   latestMs: number
 }
 
+/** Project root for sidebar/search grouping: isolated sessions keep their
+ * worktree in `cwd` but belong under `base_cwd` (the real repo). */
+export const projectCwd = (session: {
+  cwd?: string | null
+  base_cwd?: string | null
+}): string => session.base_cwd || session.cwd || "~"
+
 /** Orders sessions by `pinnedIds` (the order ids were pinned in) rather than
  * by recency. `sessions` is normally sorted most-recent-first and can
  * reorder whenever any pinned session's `updated_at_ms` changes (a
@@ -31,12 +38,14 @@ export const orderByPinnedIds = (
   return ordered
 }
 
-/** Groups sessions by their `cwd`, sorted by most-recently-updated group
- * first, with each group's sessions also sorted most-recent-first. */
+/** Groups sessions by their project root (`base_cwd ?? cwd`), sorted by
+ * most-recently-updated group first, with each group's sessions also sorted
+ * most-recent-first. Isolated worktree sessions stay under the real repo
+ * instead of appearing as a UUID-named project. */
 export const groupByRepo = (sessions: SessionMeta[]): RepoGroup[] => {
   const groups = new Map<string, RepoGroup>()
   for (const session of sessions) {
-    const key = session.cwd || "~"
+    const key = projectCwd(session)
     let group = groups.get(key)
     if (!group) {
       group = { cwd: key, label: basename(key), sessions: [], latestMs: 0 }

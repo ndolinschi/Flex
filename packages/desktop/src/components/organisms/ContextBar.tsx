@@ -8,7 +8,10 @@ import { IsolationPicker } from "./context-bar/IsolationPicker"
 import { CommitBar } from "./context-bar/CommitBar"
 
 type ContextBarProps = {
+  /** Working directory for tools/git (worktree root when isolated). */
   cwd?: string
+  /** Project root for the picker label (`base_cwd ?? cwd`). */
+  projectCwd?: string
   sessionId?: string | null
   disabled?: boolean
   onError?: (message: string) => void
@@ -17,6 +20,7 @@ type ContextBarProps = {
 /** Context row above the composer: project · branch · isolation · context %. */
 export const ContextBar = ({
   cwd,
+  projectCwd,
   sessionId,
   disabled = false,
   onError,
@@ -53,7 +57,7 @@ export const ContextBar = ({
       <div className="flex min-w-0 flex-1 items-center gap-0.5">
         <ProjectPicker
           sessionId={sessionId ?? null}
-          cwd={cwd}
+          cwd={projectCwd || cwd}
           disabled={disabled}
           onError={onError}
         />

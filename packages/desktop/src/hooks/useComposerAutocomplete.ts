@@ -129,20 +129,24 @@ export const useComposerAutocomplete = ({
     const pos = Math.min(caret, composerDraft.length)
     const before = composerDraft.slice(0, atToken.start)
     const after = composerDraft.slice(pos)
-    const insert = `@${hit.name} `
+    const isDir = !!hit.is_dir
+    const insert = isDir ? `@${hit.name}/ ` : `@${hit.name} `
     setComposerDraft(before + insert + after)
 
-    // Attach the file so the engine inlines its contents (dedupe by path).
+    // Attach so the engine inlines file contents / directory path (dedupe by path).
+    const kind = isDir ? "directory" : "file"
     if (
       !attachments.some(
-        (a) => (a.kind === "image" || a.kind === "file") && a.path === hit.path,
+        (a) =>
+          (a.kind === "image" || a.kind === "file" || a.kind === "directory") &&
+          a.path === hit.path,
       )
     ) {
       addAttachment({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         path: hit.path,
-        kind: "file",
-        name: hit.name,
+        kind,
+        name: isDir ? `${hit.name}/` : hit.name,
       })
     }
 

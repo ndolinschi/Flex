@@ -967,11 +967,22 @@ fn guess_media_type(path: &str, kind: &str) -> String {
         ("image", "webp") => "image/webp".into(),
         ("image", _) => "image/png".into(),
         (_, "pdf") => "application/pdf".into(),
-        (_, "md") => "text/markdown".into(),
+        (_, "md" | "markdown") => "text/markdown".into(),
         (_, "json") => "application/json".into(),
-        (_, "ts" | "tsx" | "js" | "jsx") => "text/plain".into(),
-        (_, "rs") => "text/plain".into(),
-        (_, "txt") => "text/plain".into(),
+        (_, "xml" | "svg") => "application/xml".into(),
+        (_, "html" | "htm") => "text/html".into(),
+        (_, "css") => "text/css".into(),
+        (_, "yaml" | "yml") => "text/yaml".into(),
+        (_, "toml") => "text/toml".into(),
+        (
+            _,
+            "ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" | "rs" | "txt" | "py" | "pyi" | "go"
+            | "java" | "kt" | "kts" | "c" | "cc" | "cpp" | "cxx" | "h" | "hh" | "hpp" | "cs"
+            | "rb" | "php" | "swift" | "sh" | "bash" | "zsh" | "fish" | "ps1" | "sql" | "r"
+            | "lua" | "vim" | "el" | "clj" | "scala" | "rsx" | "svelte" | "vue" | "astro"
+            | "gradle" | "dockerfile" | "makefile" | "cmake" | "ini" | "cfg" | "conf"
+            | "env" | "gitignore" | "dockerignore" | "editorconfig" | "lock",
+        ) => "text/plain".into(),
         _ => "application/octet-stream".into(),
     }
 }
@@ -987,8 +998,19 @@ fn build_prompt_input(input: &PromptCommandInput) -> PromptInput {
         let name = att
             .name
             .clone()
-            .or_else(|| path.file_name().and_then(|n| n.to_str()).map(str::to_owned))
+            .or_else(|| {
+                path.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|s| s.trim_end_matches('/').to_owned())
+            })
             .unwrap_or_else(|| "attachment".into());
+        if att.kind == "directory" {
+            let display = att.path.trim_end_matches('/');
+            parts.push(ContentBlock::markdown(format!(
+                "Referenced directory: `{display}/`"
+            )));
+            continue;
+        }
         let media_type = att
             .media_type
             .clone()
@@ -2718,6 +2740,9 @@ pub struct FileHit {
     pub path: String,
     /// Basename, shown as the primary label.
     pub name: String,
+    /// True when the hit is a directory (selectable as an @-mention).
+    #[serde(default)]
+    pub is_dir: bool,
 }
 
 /// Rank a path against a lowercase needle. Lower is better; `None` = no match.
@@ -2747,8 +2772,8 @@ fn is_subsequence(needle: &str, hay: &str) -> bool {
     needle.chars().all(|nc| chars.by_ref().any(|hc| hc == nc))
 }
 
-/// Read-only fuzzy file search under `cwd` for composer @-mentions. Respects
-/// `.gitignore`/`.git/exclude` (via the `ignore` crate) and caps results.
+/// Read-only fuzzy file/directory search under `cwd` for composer @-mentions.
+/// Respects `.gitignore`/`.git/exclude` (via the `ignore` crate) and caps results.
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
 pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
@@ -2774,28 +2799,39 @@ pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
         if walked >= MAX_WALK {
             break;
         }
-        if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
+        let Some(ft) = entry.file_type() else {
+            continue;
+        };
+        let is_dir = ft.is_dir();
+        let is_file = ft.is_file();
+        if !is_dir && !is_file {
             continue;
         }
         let Ok(rel) = entry.path().strip_prefix(&root) else {
             continue;
         };
-        let rel_str = rel.to_string_lossy().replace('\\', "/");
-        if rel_str.is_empty() || rel_str.starts_with(".git/") {
+        let mut rel_str = rel.to_string_lossy().replace('\\', "/");
+        if rel_str.is_empty() || rel_str.starts_with(".git/") || rel_str == ".git" {
             continue;
+        }
+        if is_dir && !rel_str.ends_with('/') {
+            rel_str.push('/');
         }
         let name = rel
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| rel_str.clone());
+            .unwrap_or_else(|| rel_str.trim_end_matches('/').to_owned());
         let Some(score) = score_file(&rel_str, &name, &needle) else {
             continue;
         };
+        // Prefer directories slightly when scores tie (browse / equal match).
+        let rank = if is_dir { score.saturating_sub(1) } else { score };
         hits.push((
-            score,
+            rank,
             FileHit {
                 path: rel_str,
                 name,
+                is_dir,
             },
         ));
     }

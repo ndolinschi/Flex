@@ -431,17 +431,19 @@ export type GitStatusSummary = {
   truncated: boolean
 }
 
-/** A file match from `list_files`, used by composer @-mentions. */
+/** A file/directory match from `list_files`, used by composer @-mentions. */
 export type FileHit = {
-  /** Path relative to the session cwd, forward-slashed. */
+  /** Path relative to the session cwd, forward-slashed (dirs end with `/`). */
   path: string
   /** Basename, shown as the primary label. */
   name: string
+  /** True when the hit is a directory. */
+  is_dir?: boolean
 }
 
 export type PromptAttachment = {
   path: string
-  kind: "image" | "file"
+  kind: "image" | "file" | "directory"
   name?: string
   mediaType?: string
 }

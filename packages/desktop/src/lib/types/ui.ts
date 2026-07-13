@@ -6,7 +6,7 @@ export type ComposerMode = "agent" | "plan" | "ask" | "flex"
 export type FileComposerAttachment = {
   id: string
   path: string
-  kind: "image" | "file"
+  kind: "image" | "file" | "directory"
   name: string
 }
 
@@ -22,7 +22,7 @@ export type ComposerAttachment = FileComposerAttachment | DomComposerAttachment
 export const isFileAttachment = (
   att: ComposerAttachment,
 ): att is FileComposerAttachment =>
-  att.kind === "image" || att.kind === "file"
+  att.kind === "image" || att.kind === "file" || att.kind === "directory"
 
 export const isDomAttachment = (
   att: ComposerAttachment,
