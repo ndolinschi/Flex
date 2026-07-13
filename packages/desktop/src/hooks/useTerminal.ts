@@ -42,10 +42,10 @@ const readThemeVars = (): ITheme => {
     cssColorToXterm(styles.getPropertyValue(name), fallback)
 
   return {
-    background: read("--color-chrome", "#0c0e11"),
-    foreground: read("--color-ink", "#eef2fa"),
-    cursor: read("--color-ink", "#eef2fa"),
-    cursorAccent: read("--color-chrome", "#0c0e11"),
+    background: read("--color-chrome", "#141414"),
+    foreground: read("--color-ink", "#f2f2f2"),
+    cursor: read("--color-ink", "#f2f2f2"),
+    cursorAccent: read("--color-chrome", "#141414"),
     selectionBackground: read("--color-fill-2", "rgba(255, 255, 255, 0.07)"),
   }
 }

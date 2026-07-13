@@ -5,45 +5,45 @@
 
 :root,
 [data-theme="dark"] {
-  --hljs-keyword: #ff9e64; /* orange */
-  --hljs-string: #3fa266; /* green */
-  --hljs-comment: rgb(226 233 244 / 0.42); /* ink-muted */
-  --hljs-number: #88c0d0; /* cyan */
-  --hljs-title: #81a1c1; /* blue */
-  --hljs-function: #81a1c1;
-  --hljs-attr: #f1b467; /* yellow */
-  --hljs-built_in: #88c0d0;
-  --hljs-literal: #b48ead; /* magenta */
-  --hljs-type: #b48ead;
-  --hljs-params: rgb(236 241 250 / 0.85); /* ink */
-  --hljs-meta: rgb(226 233 244 / 0.42);
-  --hljs-tag: #e34671; /* red */
-  --hljs-symbol: #f1b467;
-  --hljs-addition-bg: #3fa26633;
-  --hljs-addition-fg: #3fa266;
-  --hljs-deletion-bg: #e3467133;
-  --hljs-deletion-fg: #e34671;
+  --hljs-keyword: #ff9b6a; /* orange */
+  --hljs-string: #7fd97a; /* green */
+  --hljs-comment: rgb(250 250 250 / 0.4); /* ink-muted */
+  --hljs-number: #7dcfff; /* cyan */
+  --hljs-title: #6b9eff; /* blue */
+  --hljs-function: #6b9eff;
+  --hljs-attr: #e6b450; /* yellow */
+  --hljs-built_in: #7dcfff;
+  --hljs-literal: #c3a6e0; /* magenta */
+  --hljs-type: #c3a6e0;
+  --hljs-params: rgb(250 250 250 / 0.92); /* ink */
+  --hljs-meta: rgb(250 250 250 / 0.4);
+  --hljs-tag: #f07178; /* red */
+  --hljs-symbol: #e6b450;
+  --hljs-addition-bg: #7fd97a33;
+  --hljs-addition-fg: #7fd97a;
+  --hljs-deletion-bg: #f0717833;
+  --hljs-deletion-fg: #f07178;
 }
 
 [data-theme="light"] {
   --hljs-keyword: #b86f55; /* orange */
-  --hljs-string: #00854c; /* green */
-  --hljs-comment: rgb(20 20 20 / 0.6); /* ink-muted */
-  --hljs-number: #5a7f9a; /* cyan */
-  --hljs-title: #3d7ec4; /* blue */
-  --hljs-function: #3d7ec4;
-  --hljs-attr: #a46700; /* yellow */
-  --hljs-built_in: #5a7f9a;
-  --hljs-literal: #9a6f94; /* magenta */
-  --hljs-type: #9a6f94;
-  --hljs-params: rgb(20 20 20 / 0.92); /* ink */
-  --hljs-meta: rgb(20 20 20 / 0.6);
-  --hljs-tag: #ce405b; /* red */
-  --hljs-symbol: #a46700;
-  --hljs-addition-bg: #00854c33;
-  --hljs-addition-fg: #00854c;
-  --hljs-deletion-bg: #ce405b33;
-  --hljs-deletion-fg: #ce405b;
+  --hljs-string: #1a7f4b; /* green */
+  --hljs-comment: rgb(20 20 20 / 0.48); /* ink-muted */
+  --hljs-number: #3d7a96; /* cyan */
+  --hljs-title: #2f6fed; /* blue */
+  --hljs-function: #2f6fed;
+  --hljs-attr: #9a6700; /* yellow */
+  --hljs-built_in: #3d7a96;
+  --hljs-literal: #8f6b8a; /* magenta */
+  --hljs-type: #8f6b8a;
+  --hljs-params: rgb(20 20 20 / 0.94); /* ink */
+  --hljs-meta: rgb(20 20 20 / 0.48);
+  --hljs-tag: #d94a5b; /* red */
+  --hljs-symbol: #9a6700;
+  --hljs-addition-bg: #1a7f4b33;
+  --hljs-addition-fg: #1a7f4b;
+  --hljs-deletion-bg: #d94a5b33;
+  --hljs-deletion-fg: #d94a5b;
 }
 
 /* No background here — the code-block surface comes from MarkdownBody's
