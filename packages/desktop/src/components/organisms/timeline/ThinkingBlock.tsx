@@ -16,27 +16,37 @@ export const ThinkingBlock = ({
   streaming?: boolean
   /** When true (open live WorkGroup already owns the "Thinking" cue), skip
    * the shimmering status label so the turn shows exactly one live status.
-   * Thinking content stays expandable via the chevron. */
+   * While streaming, also skip the chevron-only chrome row — an orphan ▸
+   * under tool steps (Glob/Grep "Explored…") reads as a layout bug. Settled
+   * blocks still show "Thought for Xs" + expand. */
   suppressStatusLabel?: boolean
 }) => {
   const [collapsed, setCollapsed] = useState(true)
 
-  const statusLabel = (() => {
-    if (streaming) {
-      if (suppressStatusLabel) return null
-      return <span className="animate-shimmer-text">Thinking</span>
-    }
+  // Parent WorkGroup already shows "Thinking" — don't render a chevron-only
+  // header (no label left), which floats under the last tool detail.
+  if (streaming && suppressStatusLabel) {
     return (
-      <span>
-        Thought{" "}
-        {typeof durationMs === "number" ? (
-          <span className="text-ink-faint">
-            {thinkingDurationLabel(durationMs)}
-          </span>
-        ) : null}
-      </span>
+      <div className="min-h-5">
+        <p className="whitespace-pre-wrap pb-1 text-base leading-relaxed text-ink-muted opacity-50">
+          {text}
+        </p>
+      </div>
     )
-  })()
+  }
+
+  const statusLabel = streaming ? (
+    <span className="animate-shimmer-text">Thinking</span>
+  ) : (
+    <span>
+      Thought{" "}
+      {typeof durationMs === "number" ? (
+        <span className="text-ink-faint">
+          {thinkingDurationLabel(durationMs)}
+        </span>
+      ) : null}
+    </span>
+  )
 
   return (
     <div className="min-h-5">
@@ -45,13 +55,6 @@ export const ThinkingBlock = ({
           type="button"
           onClick={() => setCollapsed((v) => !v)}
           aria-expanded={!collapsed}
-          aria-label={
-            streaming && suppressStatusLabel
-              ? collapsed
-                ? "Expand thinking"
-                : "Collapse thinking"
-              : undefined
-          }
           className="group flex min-h-5 w-full items-center gap-1.5 text-left text-base text-ink-muted transition-colors hover:text-ink-secondary"
         >
           {statusLabel}
@@ -60,10 +63,6 @@ export const ThinkingBlock = ({
               "h-2.5 w-2.5 text-icon-3 opacity-0 transition-[transform,opacity] duration-[var(--duration-fast)]",
               "group-hover:opacity-100 group-focus-visible:opacity-100",
               !collapsed && "rotate-90 opacity-100",
-              // Keep the expand affordance visible when the status label is
-              // suppressed (otherwise an empty button with a hover-only
-              // chevron is easy to miss).
-              streaming && suppressStatusLabel && "opacity-100",
             )}
             aria-hidden
           />
@@ -77,4 +76,3 @@ export const ThinkingBlock = ({
     </div>
   )
 }
-
