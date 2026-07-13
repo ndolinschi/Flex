@@ -24,6 +24,7 @@ export const createLayoutSlice: StateCreator<
   rightPanelTab: "plan" as RightPanelTab,
   rightPanelWidth: RIGHT_PANEL_DEFAULT_WIDTH,
   rightPanelCollapsed: false,
+  rightPanelDragging: false,
   viewport: "wide" as Viewport,
   sidebarCollapsedBeforeNarrow: null,
   rightPanelOpenBeforeNarrow: null,
@@ -167,6 +168,7 @@ export const createLayoutSlice: StateCreator<
   toggleRightPanelCollapsed: () => {
     get().setRightPanelCollapsed(!get().rightPanelCollapsed)
   },
+  setRightPanelDragging: (dragging) => set({ rightPanelDragging: dragging }),
   setViewport: (viewport) => {
     const state = get()
     if (state.viewport === viewport) {

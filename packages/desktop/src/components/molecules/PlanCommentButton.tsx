@@ -28,6 +28,7 @@ export const PlanCommentButton = ({
 
   return (
     <div
+      data-suppress-native-webview=""
       className={cn("fixed z-50", className)}
       style={{ left, top }}
     >

@@ -126,7 +126,7 @@ const DESIGN_MODE_INJECT_JS: &str = r##"(function () {
     s.id = STYLE_ID;
     s.textContent = [
       "[" + ATTR + "]{outline:2px solid #3b82f6 !important;outline-offset:2px !important;cursor:crosshair !important;}",
-      "#" + LABEL_ID + "{position:fixed;z-index:2147483646;pointer-events:none;max-width:min(360px,calc(100vw - 16px));",
+      "#" + LABEL_ID + "{position:fixed;z-index:99999;isolation:isolate;pointer-events:none;max-width:min(360px,calc(100vw - 16px));",
       "padding:3px 8px;border-radius:4px;background:#1d4ed8;color:#fff;font:600 11px/1.35 ui-sans-serif,system-ui,-apple-system,sans-serif;",
       "box-shadow:0 2px 8px rgba(0,0,0,.28);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;",
       "transform:translateY(-100%);margin-top:-6px;}",
@@ -916,19 +916,17 @@ fn apply_bounds(
     width: f64,
     height: f64,
 ) -> DesktopResult<()> {
-    // Always stretch to the window bottom. Frontend flex hosts have repeatedly
-    // under-reported height (~30% of the panel), which left a black gap under
-    // the page even when x/y/width were fine. `window.inner_size` is the
-    // authoritative content height for child-webview coordinates.
+    // Trust the frontend-measured slot rect — stretching to the window bottom
+    // made the child webview bleed over the resize sash and adjacent panes.
+    let y = y.max(0.0);
+    let width = width.max(1.0);
+    let height = height.max(1.0);
     let window = webview.window();
     let scale = window.scale_factor().unwrap_or(1.0);
     let win_h = window
         .inner_size()
         .map(|s| s.to_logical::<f64>(scale).height)
         .unwrap_or(height + y);
-    let y = y.max(0.0);
-    let height = (win_h - y).max(height).max(1.0);
-    let width = width.max(1.0);
 
     // Atomic bounds — never set_position then set_size. On macOS the child
     // NSView is bottom-anchored; splitting the calls lets an intermediate
@@ -1055,40 +1053,55 @@ pub async fn browser_open_devtools(state: State<'_, AppState>) -> DesktopResult<
     #[cfg(target_os = "macos")]
     {
         // WebKit creates and DOCKS the _WKInspector asynchronously after
-        // open_devtools(); detaching in the same tick no-ops (the inspector
+        // open_devtools(); a single deferred detach often no-ops (the inspector
         // view doesn't exist yet), leaving it docked full-width over the panel.
-        // Defer so the detach lands after the inspector window is up.
-        // `with_webview` hops to the main thread internally, so a plain
-        // background thread + sleep is fine (matches the probe pattern above).
+        // Retry with backoff so detach lands after the inspector is up.
         std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(200));
-            let _ = webview.with_webview(|platform| {
-                detach_macos_inspector(platform.inner());
-            });
+            const DELAYS_MS: &[u64] = &[0, 200, 500, 1000];
+            let mut last_nil = false;
+            for &delay in DELAYS_MS {
+                if delay > 0 {
+                    std::thread::sleep(std::time::Duration::from_millis(delay));
+                }
+                let detached = webview
+                    .with_webview(|platform| detach_macos_inspector(platform.inner()))
+                    .unwrap_or(false);
+                if detached {
+                    return;
+                }
+                last_nil = true;
+            }
+            if last_nil {
+                tracing::warn!(
+                    target: "browser",
+                    "WKWebView _inspector was nil after retries — devtools may stay docked"
+                );
+            }
         });
     }
     Ok(())
 }
 
 /// Detach the WKWebView inspector into a floating window (private API).
+/// Returns `true` when `_inspector` was found and detach was invoked.
 #[cfg(target_os = "macos")]
-fn detach_macos_inspector(wk_webview: *mut std::ffi::c_void) {
+fn detach_macos_inspector(wk_webview: *mut std::ffi::c_void) -> bool {
     if wk_webview.is_null() {
-        return;
+        return false;
     }
     unsafe {
-        use objc2::runtime::AnyObject;
         use objc2::msg_send;
+        use objc2::runtime::AnyObject;
         let view: &AnyObject = &*wk_webview.cast::<AnyObject>();
         let inspector: *mut AnyObject = msg_send![view, _inspector];
         if inspector.is_null() {
-            tracing::warn!(target: "browser", "WKWebView _inspector was nil — cannot undock devtools");
-            return;
+            return false;
         }
         let insp: &AnyObject = &*inspector;
         // show is usually already called by open_devtools; detach undocks it.
         let _: () = msg_send![insp, show];
         let _: () = msg_send![insp, detach];
+        true
     }
 }
 

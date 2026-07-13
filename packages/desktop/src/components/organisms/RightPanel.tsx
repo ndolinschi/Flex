@@ -48,6 +48,7 @@ export const RightPanel = () => {
   const { sessions } = useSessions()
   const active = sessions.find((s) => s.id === activeSessionId)
   const [dragging, setDragging] = useState(false)
+  const setRightPanelDragging = useAppStore((s) => s.setRightPanelDragging)
   const sessionKey = sessionScopeKey(activeSessionId)
   const openTabsBySession = useAppStore((s) => s.openTabsBySession)
   const openTab = useAppStore((s) => s.openTab)
@@ -144,6 +145,7 @@ export const RightPanel = () => {
   const handleSashDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     e.preventDefault()
     setDragging(true)
+    setRightPanelDragging(true)
     const startX = e.clientX
     const startWidth = width
 
@@ -154,6 +156,7 @@ export const RightPanel = () => {
     const onUp = (ev: globalThis.PointerEvent) => {
       setWidth(startWidth + (startX - ev.clientX), true)
       setDragging(false)
+      setRightPanelDragging(false)
       window.removeEventListener("pointermove", onMove)
       window.removeEventListener("pointerup", onUp)
     }

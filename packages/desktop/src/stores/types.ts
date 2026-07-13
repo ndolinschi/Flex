@@ -306,6 +306,9 @@ export type LayoutSliceState = {
    * instead of the full-width tab content. Persisted globally, same as
    * `rightPanelOpen`. */
   rightPanelCollapsed: boolean
+  /** True while the right-panel resize sash is being dragged — hides the
+   * native browser child webview so the sash stays clickable. */
+  rightPanelDragging: boolean
   viewport: Viewport
   sidebarCollapsedBeforeNarrow: boolean | null
   rightPanelOpenBeforeNarrow: boolean | null
@@ -321,6 +324,7 @@ export type LayoutSliceState = {
   setRightPanelWidth: (width: number, persist?: boolean) => void
   setRightPanelCollapsed: (collapsed: boolean) => void
   toggleRightPanelCollapsed: () => void
+  setRightPanelDragging: (dragging: boolean) => void
   setViewport: (viewport: Viewport) => void
 }
 
