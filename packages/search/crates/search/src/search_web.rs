@@ -1,7 +1,8 @@
 //! `search_web` tool: query a web search engine and return formatted results.
 //!
 //! Powered by a swappable [`SearchBackend`]; the default implementation
-//! uses a fallback chain (DuckDuckGo → SearXNG). Results are returned as a
+//! uses Instant Answer + Wikipedia (optional Brave / SearXNG via env). Results
+//! are returned as a
 //! token-efficient markdown list with titles, URLs, and snippets. An optional
 //! [`SearchReranker`] re-orders results by relevance.
 
@@ -119,8 +120,9 @@ impl Tool for SearchWebTool {
                 Ok(r) => r,
                 Err(SearchError::RateLimited) => {
                     return Err(ToolError::Execution(
-                        "The search backend is rate-limited. Wait a moment and try again with \
-                         a slightly different or more specific query."
+                        "All configured search backends are rate-limited right now. Wait a \
+                         moment and retry, or set `BRAVE_SEARCH_API_KEY` (Brave Search) / \
+                         `SEARXNG_BASE_URL` (your own SearXNG) for a more reliable backend."
                             .to_owned(),
                     ));
                 }

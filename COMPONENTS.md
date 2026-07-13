@@ -122,9 +122,10 @@ External-agent `Agent` impls (connectors). `common`: `line_agent.rs`, `stream_ho
 ## packages/search
 
 ### search (`agentloop-search`) — `crates/search/src/`
-`SearchPlugin` (`core::Plugin`): `plugin.rs`, `search_web.rs` (DuckDuckGo backend,
-swappable via `search_backend.rs::SearchBackend`), `scrape_page.rs` (reqwest + htmd),
-`rerank.rs`. Contributes the `researcher` role.
+`SearchPlugin` (`core::Plugin`): `plugin.rs`, `search_web.rs` (default backends:
+DuckDuckGo Instant Answer + Wikipedia OpenSearch; optional Brave /
+`SEARXNG_BASE_URL`; swappable via `search_backend.rs::SearchBackend`),
+`scrape_page.rs` (reqwest + htmd), `rerank.rs`. Contributes the `researcher` role.
 
 ## packages/index
 
