@@ -609,6 +609,15 @@ export const saveTextFile = (
 ): Promise<string> =>
   invoke("save_text_file", { sessionId, relativePath, content })
 
+/** Reads a UTF-8 text file relative to `sessionId`'s cwd for the Files
+ * (Monaco) editor. Rejects absolute/`..` paths, binaries, non-UTF-8, and
+ * files over ~1.5MB. */
+export const readTextFile = (
+  sessionId: string,
+  relativePath: string,
+): Promise<string> =>
+  invoke("read_text_file", { sessionId, relativePath })
+
 /** Writes a diagnostics bundle (frontend payload + backend log tail) into
  * the app log directory — no active session required. */
 export const exportDiagnosticsBundle = (

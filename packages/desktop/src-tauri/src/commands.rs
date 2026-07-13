@@ -3992,6 +3992,76 @@ fn validate_relative_write_path(path: &str) -> DesktopResult<&str> {
     Ok(trimmed)
 }
 
+/// Hard cap for the Files (Monaco) editor — keeps the UI responsive and
+/// rejects accidental binary dumps. Matches ~ Cursor's soft ceiling for
+/// opening source in the side editor.
+const READ_TEXT_MAX_BYTES: u64 = 1_500_000;
+
+/// Reads a UTF-8 text file relative to `session_id`'s cwd. Same path
+/// sanitation as [`save_text_file`]. Rejects files larger than
+/// [`READ_TEXT_MAX_BYTES`] and non-UTF-8 content.
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn read_text_file(
+    state: State<'_, AppState>,
+    session_id: String,
+    relative_path: String,
+) -> DesktopResult<String> {
+    let service = require_service(&state).await?;
+    let id = SessionId::from(session_id);
+    let meta = service.session_meta(&id).await?;
+
+    let relative = validate_relative_write_path(&relative_path)?.to_string();
+    let cwd = meta.cwd.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let canonical_cwd = cwd
+            .canonicalize()
+            .map_err(|e| DesktopError::Message(format!("invalid session cwd: {e}")))?;
+        let target = canonical_cwd.join(&relative);
+
+        let canonical_target = target.canonicalize().map_err(|e| {
+            DesktopError::Message(format!("cannot open `{}`: {e}", target.display()))
+        })?;
+        if !canonical_target.starts_with(&canonical_cwd) {
+            return Err(DesktopError::Message(
+                "resolved path escapes the session's working directory".into(),
+            ));
+        }
+        if !canonical_target.is_file() {
+            return Err(DesktopError::Message(format!(
+                "`{}` is not a file",
+                relative
+            )));
+        }
+
+        let meta = std::fs::metadata(&canonical_target)
+            .map_err(|e| DesktopError::Message(format!("cannot stat `{}`: {e}", relative)))?;
+        if meta.len() > READ_TEXT_MAX_BYTES {
+            return Err(DesktopError::Message(format!(
+                "`{relative}` is too large to open in the editor ({} bytes, max {})",
+                meta.len(),
+                READ_TEXT_MAX_BYTES
+            )));
+        }
+
+        let bytes = std::fs::read(&canonical_target)
+            .map_err(|e| DesktopError::Message(format!("cannot read `{relative}`: {e}")))?;
+        if bytes.contains(&0) {
+            return Err(DesktopError::Message(format!(
+                "`{relative}` looks binary — open it in an external editor"
+            )));
+        }
+        String::from_utf8(bytes).map_err(|_| {
+            DesktopError::Message(format!(
+                "`{relative}` is not valid UTF-8 — open it in an external editor"
+            ))
+        })
+    })
+    .await
+    .map_err(|e| DesktopError::Message(format!("read join: {e}")))?
+}
+
 /// Writes `content` to `relative_path` inside `session_id`'s cwd, creating
 /// parent directories as needed (e.g. a not-yet-existing `plans/` folder).
 /// Returns the absolute path written. Used by the Plan tab's "Save to

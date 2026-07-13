@@ -1,6 +1,6 @@
 import { memo, useState, type MouseEvent as ReactMouseEvent } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, ChevronRight, Undo2 } from "lucide-react"
+import { Check, ChevronRight, FileCode2, Undo2 } from "lucide-react"
 import { IconButton, Spinner } from "../../atoms"
 import { Collapsible, ConfirmDialog, DiffView } from "../../molecules"
 import { invalidateReviewQueries } from "../../../hooks/useWorkspaceActions"
@@ -13,7 +13,7 @@ import {
   toInvokeError,
 } from "../../../lib/tauri"
 import type { GitFileStatus } from "../../../lib/types"
-import { useAppStore } from "../../../stores/appStore"
+import { useAppStore, sessionScopeKey } from "../../../stores/appStore"
 import { basename, cn, fileIconForPath } from "../../../lib/utils"
 
 export const STATUS_COLOR: Record<string, string> = {
@@ -93,6 +93,14 @@ export const FileRow = memo(function FileRow({
   })
 
   const pushToast = useAppStore((s) => s.pushToast)
+  const openWorkspaceFile = useAppStore((s) => s.openWorkspaceFile)
+  const sessionKey = sessionId ? sessionScopeKey(sessionId) : ""
+
+  const handleOpenFile = (e: ReactMouseEvent) => {
+    e.stopPropagation()
+    if (!sessionId || isDir || file.status === "D") return
+    openWorkspaceFile(sessionKey, file.path)
+  }
 
   const handleKeepFile = async (e: ReactMouseEvent) => {
     e.stopPropagation()
@@ -191,6 +199,7 @@ export const FileRow = memo(function FileRow({
         <button
           type="button"
           onClick={onToggle}
+          onDoubleClick={handleOpenFile}
           aria-expanded={expanded}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
         >
@@ -238,6 +247,15 @@ export const FileRow = memo(function FileRow({
             Keep is meaningless without a base repo (non-isolated sessions
             have nowhere to "keep" into), so it's isolated-only. */}
         <span className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-[var(--duration-fast)] group-hover:opacity-100">
+          {!isDir && file.status !== "D" ? (
+            <IconButton
+              label="Open file"
+              onClick={handleOpenFile}
+              className="h-6 w-6"
+            >
+              <FileCode2 className="h-3.5 w-3.5" aria-hidden />
+            </IconButton>
+          ) : null}
           {isolated ? (
             <IconButton
               label="Keep"
