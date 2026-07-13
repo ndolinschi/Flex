@@ -4,7 +4,6 @@ import {
   extractThinkingText,
   hasVisibleUserContent,
 } from "../types"
-import { formatTokens } from "../utils"
 import { useAppStore } from "../../stores/appStore"
 import { rowId } from "./rowIds"
 import {
@@ -501,18 +500,16 @@ export const applyEventToTimeline = (
       break
     }
     case "compaction_boundary": {
-      const s = (payload.summary ?? {}) as {
-        tokens_before?: number
-        tokens_after?: number
-      }
-      const sizes =
-        typeof s.tokens_before === "number" && typeof s.tokens_after === "number"
-          ? ` · ${formatTokens(s.tokens_before)} → ${formatTokens(s.tokens_after)} tokens`
-          : ""
+      const s = payload.summary
       next.push({
-        type: "meta",
+        type: "compaction",
         id: rowId("compact", String(seq), seq),
-        text: `Context compacted${sizes}`,
+        summaryMarkdown: s.summary_markdown ?? "",
+        strategy: s.strategy ?? "",
+        tokensBefore:
+          typeof s.tokens_before === "number" ? s.tokens_before : undefined,
+        tokensAfter:
+          typeof s.tokens_after === "number" ? s.tokens_after : undefined,
         tsMs,
       })
       break

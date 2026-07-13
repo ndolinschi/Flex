@@ -74,6 +74,15 @@ export type TimelineRow =
   | { type: "command"; id: string; name: string; args: string; tsMs: number }
   | { type: "meta"; id: string; text: string; tsMs: number }
   | {
+      type: "compaction"
+      id: string
+      summaryMarkdown: string
+      strategy: string
+      tokensBefore?: number
+      tokensAfter?: number
+      tsMs: number
+    }
+  | {
       type: "subagent"
       id: string
       childSession: SessionId

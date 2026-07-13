@@ -106,6 +106,15 @@ fn all_variants() -> Vec<AgentEvent> {
                 tokens_after: Some(12_000),
             },
         },
+        AgentEvent::CompactionStarted {
+            strategy: "auto_summarize_oldest".to_owned(),
+        },
+        AgentEvent::RetryScheduled {
+            attempt: 1,
+            max_attempts: 10,
+            delay_ms: 500,
+            error: "connection reset".to_owned(),
+        },
         AgentEvent::HookFired {
             point: HookPoint::PreToolUse,
             outcome: HookOutcomeKind::Continue,
@@ -188,10 +197,12 @@ fn persistence_classes_are_stable() {
     assert_eq!(
         ephemeral,
         vec![
+            "compaction_started",
             "exec_chunk",
             "gap",
             "markdown_delta",
             "message_started",
+            "retry_scheduled",
             "subagent_event",
             "text_snapshot",
             "thinking_delta",

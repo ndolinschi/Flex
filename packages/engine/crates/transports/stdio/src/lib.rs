@@ -67,6 +67,7 @@ fn event_visible(event: &AgentEvent, verbosity: OutputVerbosity) -> bool {
                 | AgentEvent::RetryScheduled { .. }
                 | AgentEvent::SubagentEvent { .. }
                 | AgentEvent::SubagentCompleted { .. }
+                | AgentEvent::CompactionStarted { .. }
                 | AgentEvent::CompactionBoundary { .. }
                 | AgentEvent::Gap { .. }
         ),

@@ -52,6 +52,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `AttachmentChip` | Pending attachment pill (file/image/dom) | `attachment`, `onRemove` | Composer |
 | `SendButton` | Circular send / stop / queue | `isStreaming`, `canQueue?`, `onSend`, `onStop` | Composer |
 | `MarkdownBody` | GFM + lazy highlight.js language pack; `live` plain pre-wrap fast-path | `content`, `live?` | TurnTimeline (`TimelineRowView`) |
+| `CompactionCard` | Settled context-compaction boundary (divider + expandable summary) | `summaryMarkdown`, `strategy`, `tokensBefore?`, `tokensAfter?` | TurnTimeline (`TimelineRowView`) |
 | `EmptyState` | Empty async surface | `title`, `description?`, `action?` | SessionSidebar, TurnTimeline |
 | `ErrorBanner` | Inline error | `message`, `onDismiss?` | Composer, Settings |
 | `ToolCallChip` | Single tool as Cursor-style step | `call` | TurnTimeline |
@@ -60,7 +61,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `DetailRow` / `BackgroundBashRow` / `ExecTail` | Tool-step detail / background bash / exec tail | — | ToolStepGroup |
 | `StreamingCaret` | Streaming caret | — | TurnTimeline |
 | `SubagentGroup` | Nested subagent work block | `task`, `role?`, `phase` | TurnTimeline |
-| `WorkGroup` | "Worked for Xs" / live "Working" XOR "Thinking"; `memo` | `isOpen`, `liveStatus?`, `durationMs?` | TurnTimeline |
+| `WorkGroup` | "Worked for Xs" / live "Working" XOR "Thinking" XOR "Compacting context…"; `memo` | `isOpen`, `liveStatus?`, `durationMs?` | TurnTimeline |
 | `WorkflowGroup` | Multi-step workflow block (steps + nested subagents); organism-scale (261 lines) but kept in `molecules/` since it nests inside `TimelineRowView` like `SubagentGroup`/`WorkGroup` | `steps`, `subagents`, `status` | TurnTimeline (via `TimelineRowView`) |
 | `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?` | SessionSidebar |
 | `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle` | SessionSidebar |

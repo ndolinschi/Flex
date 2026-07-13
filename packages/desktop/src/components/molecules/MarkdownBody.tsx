@@ -94,21 +94,25 @@ const MARKDOWN_BODY_CLASS =
   "markdown-body text-base leading-relaxed text-ink"
 
 const MARKDOWN_PROSE_CLASS = cn(
-  "[&_h1]:mb-[0.3em] [&_h1]:mt-[0.75em] [&_h1]:text-[1.214em] [&_h1]:font-semibold [&_h1]:leading-tight",
-  "[&_h2]:mb-[0.3em] [&_h2]:mt-[0.75em] [&_h2]:text-[1.214em] [&_h2]:font-semibold [&_h2]:leading-tight",
-  "[&_h3]:mb-[0.3em] [&_h3]:mt-[0.75em] [&_h3]:text-[1.1em] [&_h3]:font-semibold [&_h3]:leading-tight",
-  "[&_h4]:mb-1 [&_h4]:mt-2.5 [&_h4]:text-[1em] [&_h4]:font-semibold",
-  "[&_h1:first-child]:mt-0 [&_h2:first-child]:mt-0 [&_h3:first-child]:mt-0",
-  "[&_p]:mb-1.5 [&_p]:last:mb-0",
-  "[&_ul]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-5",
-  "[&_ol]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5",
-  "[&_li]:mb-0.5",
+  // Headings — balanced retreat above/below; first-child drops top margin.
+  "[&_h1]:my-[0.5em] [&_h1]:text-[1.214em] [&_h1]:font-semibold [&_h1]:leading-tight",
+  "[&_h2]:my-[0.5em] [&_h2]:text-[1.214em] [&_h2]:font-semibold [&_h2]:leading-tight",
+  "[&_h3]:my-[0.5em] [&_h3]:text-[1.1em] [&_h3]:font-semibold [&_h3]:leading-tight",
+  "[&_h4]:my-2 [&_h4]:text-[1em] [&_h4]:font-semibold",
+  "[&_h1:first-child]:mt-0 [&_h2:first-child]:mt-0 [&_h3:first-child]:mt-0 [&_h4:first-child]:mt-0",
+  // Blocks — equal top/bottom so stacks don't feel top-heavy; last child
+  // drops bottom so the message doesn't trail empty space.
+  "[&_p]:my-1.5 [&_p]:first:mt-0 [&_p]:last:mb-0",
+  "[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:first:mt-0 [&_ul]:last:mb-0",
+  "[&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:first:mt-0 [&_ol]:last:mb-0",
+  "[&_li]:my-0.5 [&_li]:first:mt-0 [&_li]:last:mb-0",
+  "[&_li>_ul]:my-0.5 [&_li>_ol]:my-0.5",
   "[&_strong]:font-semibold",
   "[&_a]:text-link [&_a]:underline-offset-2 hover:[&_a]:underline",
   "[&_code]:rounded-[5px] [&_code]:bg-code-inline [&_code]:px-1 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.9em]",
-  "[&_pre]:mb-1.5 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-stroke-3 [&_pre]:bg-panel [&_pre]:p-2.5 [&_pre]:text-[0.9em]",
+  "[&_pre]:my-1.5 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-stroke-3 [&_pre]:bg-panel [&_pre]:p-2.5 [&_pre]:text-[0.9em] [&_pre]:first:mt-0 [&_pre]:last:mb-0",
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0",
-  "[&_blockquote]:border-l-2 [&_blockquote]:border-stroke-2 [&_blockquote]:pl-3 [&_blockquote]:text-ink-muted",
+  "[&_blockquote]:my-1.5 [&_blockquote]:border-l-2 [&_blockquote]:border-stroke-2 [&_blockquote]:pl-3 [&_blockquote]:text-ink-muted [&_blockquote]:first:mt-0 [&_blockquote]:last:mb-0",
   "[&_hr]:my-2.5 [&_hr]:border-stroke-3",
   "[&_table]:w-full [&_table]:border-collapse [&_table]:text-left [&_table]:text-[0.928em]",
   "[&_th]:border-b [&_th]:border-stroke-3 [&_th]:px-2.5 [&_th]:py-1.5 [&_th]:font-semibold [&_th]:text-ink",
@@ -151,7 +155,7 @@ export const MarkdownBody = memo(({ content, className, live = false }: Markdown
         rehypePlugins={rehypePlugins}
         components={{
           table: (props) => (
-            <div className="mb-1.5 overflow-x-auto rounded-lg border border-stroke-3">
+            <div className="my-1.5 overflow-x-auto rounded-lg border border-stroke-3 first:mt-0 last:mb-0">
               <table {...props} />
             </div>
           ),

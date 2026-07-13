@@ -53,7 +53,7 @@ export const TurnTimeline = ({
   sessionId,
   onConversationEmpty,
 }: TurnTimelineProps) => {
-  const { rows, streaming, isLoading, error, thinkingDurations, reconnectStatus } =
+  const { rows, streaming, isLoading, error, thinkingDurations, reconnectStatus, compactingStatus } =
     useSessionEvents(sessionId)
   const isStreaming = useAppStore((s) => s.isStreaming)
   // Client-side log rows (model/provider changes) — not part of the engine
@@ -180,10 +180,10 @@ export const TurnTimeline = ({
   )
 
   // Bottom Working backstop while streaming — skip whenever ANY open
-  // WorkGroup already owns the Thinking/Working cue (header RunningDot),
-  // or the trailing item is a live thinking row (its own shimmer).
-  // Gating only on lastItemIsOpenWorkGroup let a second "Working" appear
-  // under an open group's "Thinking".
+  // WorkGroup already owns the Thinking/Working/Compacting cue (header
+  // RunningDot), or the trailing item is a live thinking row (its own
+  // shimmer). Gating only on lastItemIsOpenWorkGroup let a second "Working"
+  // appear under an open group's "Thinking".
   const last = displayItems[displayItems.length - 1]
   const lastIsLiveThinking =
     !!last &&
@@ -193,6 +193,7 @@ export const TurnTimeline = ({
   const showWorkingIndicator =
     isStreaming &&
     !reconnectStatus &&
+    !compactingStatus &&
     !hasOpenWorkGroup(displayItems) &&
     !lastIsLiveThinking
 
@@ -202,6 +203,14 @@ export const TurnTimeline = ({
   // and useSessionEvents clears it on turn_completed/session_error anyway,
   // but this guards the render regardless of ordering).
   const showReconnectBanner = isStreaming && !!reconnectStatus
+  // Compacting cue: priority reconnect > compacting > Working. When an open
+  // WorkGroup already owns the status via liveStatus="compacting", skip the
+  // bottom backstop (same XOR rule as Working/Thinking).
+  const showCompactingIndicator =
+    isStreaming &&
+    !!compactingStatus &&
+    !reconnectStatus &&
+    !hasOpenWorkGroup(displayItems)
 
   const latestUserId = useMemo(() => {
     for (let i = liveRows.length - 1; i >= 0; i--) {
@@ -387,14 +396,16 @@ export const TurnTimeline = ({
                         isOpen={item.isOpen}
                         isStreaming={isStreaming}
                         liveStatus={
-                          item.isOpen &&
-                          item.rows.some(
-                            (r) =>
-                              r.type === "thinking" &&
-                              r.id.startsWith("live-thinking:"),
-                          )
-                            ? "thinking"
-                            : "working"
+                          item.isOpen && compactingStatus
+                            ? "compacting"
+                            : item.isOpen &&
+                                item.rows.some(
+                                  (r) =>
+                                    r.type === "thinking" &&
+                                    r.id.startsWith("live-thinking:"),
+                                )
+                              ? "thinking"
+                              : "working"
                         }
                         durationMs={item.summary?.duration_ms}
                         costUsd={item.summary?.cost_usd}
@@ -461,6 +472,11 @@ export const TurnTimeline = ({
            * to-bottom and end-of-turn chrome stay correct. */}
           {showReconnectBanner && reconnectStatus ? (
             <ReconnectBanner status={reconnectStatus} />
+          ) : showCompactingIndicator ? (
+            <div className="mt-1 flex min-h-6 items-center gap-1.5 text-base">
+              <RunningDot className="-ml-1 h-4 w-4" />
+              <span className="animate-shimmer-text">Compacting context…</span>
+            </div>
           ) : showWorkingIndicator ? (
             <div className="mt-1 flex min-h-6 items-center gap-1.5 text-base">
               <RunningDot className="-ml-1 h-4 w-4" />
