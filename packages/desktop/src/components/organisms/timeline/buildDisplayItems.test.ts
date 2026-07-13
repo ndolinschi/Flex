@@ -546,8 +546,77 @@ describe("mid-turn plan does not split the work group", () => {
     if (groups[0]?.kind !== "group") return
     expect(groups[0].rows.map((r) => r.type)).toEqual([
       "tool",
-      "thinking",
       "tool",
+      "thinking",
     ])
+  })
+})
+
+describe("thinking sits at the end of the work group", () => {
+  it("moves thinking below tools and mid-turn narration while streaming", () => {
+    const thinking: TimelineRow = {
+      type: "thinking",
+      id: "think-1",
+      messageId: "m-think",
+      text: "Considering the redesign…",
+      tsMs: 5,
+    }
+    const narration = assistantRow("Good call — redesigning now.")
+    const edit1 = editCall("globals.css")
+
+    const rows: TimelineRow[] = [
+      userRow("Redesign the homepage"),
+      turnStarted("turn-1"),
+      thinking,
+      narration,
+      toolRow(edit1, 20),
+    ]
+
+    const items = buildDisplayItems(rows, true)
+    const group = items.find((i) => i.kind === "group")
+    expect(group?.kind).toBe("group")
+    if (group?.kind !== "group") throw new Error("expected group")
+    expect(group.isOpen).toBe(true)
+    expect(group.hasLiveThinking).toBe(false)
+    expect(group.rows.map((r) => (r.type === "tool" ? r.call.tool_name : r.type))).toEqual([
+      "assistant",
+      "Edit",
+      "thinking",
+    ])
+    expect(group.rows[2]).toBe(thinking)
+  })
+
+  it("keeps thinking at the end of settled work, before the final answer", () => {
+    const thinking: TimelineRow = {
+      type: "thinking",
+      id: "think-1",
+      messageId: "m-think",
+      text: "Done thinking",
+      tsMs: 5,
+    }
+    const edit1 = editCall("page.tsx")
+    const finalAnswer = assistantRow("Redesign shipped.")
+
+    const rows: TimelineRow[] = [
+      userRow("Redesign the homepage"),
+      turnStarted("turn-1"),
+      thinking,
+      toolRow(edit1, 20),
+      finalAnswer,
+      turnCompleted("turn-1", 100, summary),
+    ]
+
+    const items = buildDisplayItems(rows, false)
+    const group = items.find((i) => i.kind === "group")
+    expect(group?.kind).toBe("group")
+    if (group?.kind !== "group") throw new Error("expected group")
+    expect(group.rows.map((r) => (r.type === "tool" ? r.call.tool_name : r.type))).toEqual([
+      "Edit",
+      "thinking",
+    ])
+    expect(items[items.length - 1]).toMatchObject({
+      kind: "row",
+      row: { type: "assistant" },
+    })
   })
 })
