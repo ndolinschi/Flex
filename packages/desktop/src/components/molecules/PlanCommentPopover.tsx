@@ -56,7 +56,9 @@ export const PlanCommentPopover = ({
   return (
     <div
       role="dialog"
+      aria-modal="true"
       aria-label="Comment on plan"
+      data-suppress-native-webview=""
       className={cn(
         "fixed z-50 w-72 rounded-md border border-stroke-2 bg-surface-1 p-3 shadow-lg",
         className,

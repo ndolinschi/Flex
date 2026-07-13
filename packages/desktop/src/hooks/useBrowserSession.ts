@@ -62,6 +62,7 @@ export const useBrowserSession = (active: boolean) => {
   const browserOwnerSessionId = useAppStore((s) => s.browserOwnerSessionId)
   const isOwner = browserOwnerSessionId === sessionKey
   const browserDesignMode = useAppStore((s) => s.browserDesignMode)
+  const rightPanelDragging = useAppStore((s) => s.rightPanelDragging)
 
   const setBrowserSessionState = useAppStore((s) => s.setBrowserSessionState)
   const setBrowserOwnerSessionId = useAppStore(
@@ -428,8 +429,7 @@ export const useBrowserSession = (active: boolean) => {
   // of the toolbar.
   //
   // Bounds are 1:1 with the empty `data-browser-webview-slot` rect. Spacing
-  // (e.g. top gap) is CSS on that slot; Rust still stretches height to the
-  // window bottom from the measured y so a short flex box can't leave a gap.
+  // (e.g. top gap) is CSS on that slot; Rust applies the measured height as-is.
   //
   // Visibility is NOT gated on `browserLoading`. Hide only when the tab is
   // inactive, this session doesn't own the webview, the browser hasn't
@@ -455,11 +455,16 @@ export const useBrowserSession = (active: boolean) => {
     // Last bounds sent to Rust — the watchdog only re-sends on real drift so
     // the 500ms interval never spams IPC when layout is stable.
     let lastSent: { x: number; y: number; w: number; h: number } | null = null
+    const panelEl = document.querySelector<HTMLElement>(
+      '[aria-label="Details panel"]',
+    )
+    const shouldHideWebview = () =>
+      isNativeWebviewSuppressed() || useAppStore.getState().rightPanelDragging
     const measure = (force: boolean) => {
       if (cancelled) return
       // Native child webviews sit above every HTML stacking context — hide
-      // while modals/palettes claim the screen so they stay visible/clickable.
-      if (isNativeWebviewSuppressed()) {
+      // while modals/palettes claim the screen or the resize sash is dragged.
+      if (shouldHideWebview()) {
         lastSent = null
         void browserSetVisible(false)
         return
@@ -474,12 +479,23 @@ export const useBrowserSession = (active: boolean) => {
       const presetWidth = VIEWPORT_PRESETS.find(
         (p) => p.id === viewportPreset,
       )?.width
-      const width = presetWidth
+      let width = presetWidth
         ? Math.min(presetWidth, widthSource)
         : widthSource
-      const x = rect.left + (widthSource - width) / 2
-      const y = rect.top
-      const height = rect.height
+      let x = rect.left + (widthSource - width) / 2
+      let y = rect.top
+      let height = rect.height
+      const panelRect = panelEl?.getBoundingClientRect()
+      if (panelRect && panelRect.width > 0 && panelRect.height > 0) {
+        width = Math.min(width, panelRect.width)
+        height = Math.min(height, panelRect.bottom - y)
+        if (height < 2) {
+          lastSent = null
+          void browserSetVisible(false)
+          return
+        }
+        x = Math.max(panelRect.left, Math.min(x, panelRect.right - width))
+      }
       if (
         !force &&
         lastSent &&
@@ -493,7 +509,7 @@ export const useBrowserSession = (active: boolean) => {
       lastSent = { x, y, w: width, h: height }
       void browserSetBounds(x, y, width, height).then(() => {
         if (cancelled) return
-        if (isNativeWebviewSuppressed()) {
+        if (shouldHideWebview()) {
           void browserSetVisible(false)
           return
         }
@@ -517,10 +533,10 @@ export const useBrowserSession = (active: boolean) => {
     resizeObserver.observe(slot)
     const toolbar = toolbarRef.current
     if (toolbar) resizeObserver.observe(toolbar)
-    const panelEl = document.querySelector<HTMLElement>(
-      '[aria-label="Details panel"]',
-    )
     if (panelEl) resizeObserver.observe(panelEl)
+    const onScroll = () => schedule()
+    window.addEventListener("scroll", onScroll, true)
+    if (panelEl) panelEl.addEventListener("scroll", onScroll, true)
     window.addEventListener("resize", schedule)
     schedule()
     // Drift watchdog: ResizeObserver misses position-only moves (sidebar
@@ -543,12 +559,14 @@ export const useBrowserSession = (active: boolean) => {
       cancelled = true
       resizeObserver.disconnect()
       overlayObserver.disconnect()
+      window.removeEventListener("scroll", onScroll, true)
+      if (panelEl) panelEl.removeEventListener("scroll", onScroll, true)
       window.removeEventListener("resize", schedule)
       window.clearInterval(watchdog)
       if (rafId !== null) cancelAnimationFrame(rafId)
       void browserSetVisible(false)
     }
-  }, [active, isOwner, browserStarted, loadError, viewportPreset])
+  }, [active, isOwner, browserStarted, loadError, viewportPreset, rightPanelDragging])
 
   const preview = isBrowserPreview()
   const showLiveContent = browserStarted && isOwner
