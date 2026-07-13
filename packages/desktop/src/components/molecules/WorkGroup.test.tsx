@@ -91,9 +91,26 @@ describe("WorkGroup", () => {
     expect(html.match(/animate-shimmer-text/g)?.length ?? 0).toBe(1)
     expect(html.match(/>Thinking</g)?.length ?? 0).toBe(1)
     expect(html.match(/>Working</g)?.length ?? 0).toBe(0)
-    // Thinking content remains present and expandable (button + chevron).
+    // Content stays visible; no chevron-only expand button (orphan ▸ under
+    // tool steps when the status label is suppressed).
     expect(html).toContain("reasoning about the approach…")
-    expect(html).toContain('aria-label="Expand thinking"')
+    expect(html).not.toContain('aria-label="Expand thinking"')
+    expect(html).not.toContain('aria-label="Collapse thinking"')
+  })
+
+  it("does not render a chevron-only row for suppressed streaming thinking", () => {
+    const html = renderToStaticMarkup(
+      <ThinkingBlock
+        text="after Glob / Grep"
+        streaming
+        suppressStatusLabel
+      />,
+    )
+
+    expect(html).toContain("after Glob / Grep")
+    expect(html).not.toContain("aria-expanded")
+    // Lucide chevron path is absent when chrome is skipped.
+    expect(html.match(/lucide-chevron-right/g)?.length ?? 0).toBe(0)
   })
 
   it("ThinkingBlock without suppress still shimmers when rendered alone", () => {
