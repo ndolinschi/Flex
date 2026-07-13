@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { createPortal } from "react-dom"
 import { X } from "lucide-react"
 import { Button, IconButton } from "../atoms"
 import { ErrorBanner } from "../molecules"
@@ -127,13 +128,15 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
     setPendingPermission(null)
   }
 
-  return (
+  return createPortal(
     <div
       role="dialog"
+      aria-modal="true"
       aria-labelledby="permission-title"
-      className="w-full max-w-[640px] animate-modal-in"
+      className="pointer-events-none fixed inset-0 z-[90] flex items-end justify-center px-4 pb-28 sm:items-center sm:pb-0"
     >
-      <div className="relative rounded-xl border border-stroke-3 bg-panel p-3 shadow-lg">
+      <div className="pointer-events-auto w-full max-w-[640px] animate-modal-in">
+        <div className="relative rounded-xl border border-stroke-3 bg-panel p-3 shadow-lg">
         <IconButton
           label="Dismiss"
           onClick={handleDismiss}
@@ -204,7 +207,9 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
             </Button>
           ) : null}
         </div>
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

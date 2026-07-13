@@ -59,8 +59,11 @@ export const applyGlobalSessionEvent = (
   // history can contain a request whose engine-side pending entry no longer
   // exists (in-memory only), which would hard-block the app with a stale
   // modal that can never be resolved (see PermissionPrompt "no pending
-  // permission request" handling). *_resolved clearing, by contrast, is safe
-  // to apply during replay — it can only ever remove state, never wedge it.
+  // permission request" handling).
+  //
+  // *_resolved must ALSO be live-only when clearing UI state: during gap
+  // resync we skip *_requested (ignoreStreaming) but used to still apply
+  // *_resolved, which dismissed a live Allow/Ask modal mid-generation.
   if (payload.kind === "permission_requested" && !opts?.ignoreStreaming) {
     log.info("session", "permission requested", {
       sessionId: event.session_id,
@@ -77,7 +80,7 @@ export const applyGlobalSessionEvent = (
       callId: payload.call_id,
     })
   }
-  if (payload.kind === "permission_resolved") {
+  if (payload.kind === "permission_resolved" && !opts?.ignoreStreaming) {
     log.debug("session", "permission resolved", {
       sessionId: event.session_id,
       requestId: payload.id,
@@ -99,7 +102,7 @@ export const applyGlobalSessionEvent = (
       questions: payload.questions,
     })
   }
-  if (payload.kind === "question_resolved") {
+  if (payload.kind === "question_resolved" && !opts?.ignoreStreaming) {
     log.debug("session", "question resolved", {
       sessionId: event.session_id,
       requestId: payload.id,

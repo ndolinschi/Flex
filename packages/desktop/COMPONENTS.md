@@ -85,7 +85,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `PermissionPrompt` | Tool permission HITL | `permission` | ChatPage |
 | `QuestionPrompt` | AskUserQuestion HITL | `question` | ChatPage |
 | `RightPanel` | Plan / Changes / Files / Terminal / Browser; tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`) | — | App shell |
-| `FilesTab` | Cursor-style open-file strip + Monaco editor (`@monaco-editor/react`); open from Changes (`FileRow` Open / double-click) | `active` | RightPanel |
+| `FilesTab` | Cursor-style open-file strip + Monaco editor; empty state shows `FileExplorer` (searchable `list_files`) | `active` | RightPanel |
 | `AppHeader` | Title + session menu | — | ChatShell |
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | RightPanel |
 | `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/`. Opening the tab with zero workspace PTYs auto-creates one shell. | — | RightPanel |
@@ -99,7 +99,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|
 | `organisms/timeline/` | `buildDisplayItems` (+ `estimateSizeForItem`), `TimelineRowView`, `WorkGroupBody`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
 | `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
-| `organisms/right-panel/` | `PlanTab`, `ChangesTab`, `FilesTab` (Monaco), `FileRow`, `CommitCenter` (remote-aware Commit vs Commit & Push), `RightPanelTabBar`, `tabs` |
+| `organisms/right-panel/` | `PlanTab`, `ChangesTab`, `FilesTab` (Monaco), `FileExplorer`, `FileRow`, `CommitCenter` (remote-aware Commit vs Commit & Push), `RightPanelTabBar`, `tabs` |
 | `organisms/context-bar/` | `CommitBar` (remote-aware Commit vs Commit & Push), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
 | `organisms/browser/` | `BrowserToolbar` (Design Mode toggle), `BrowserOverflowMenu` — composed by `BrowserTab` |
 | `organisms/terminal/` | `TerminalTab`, `TerminalInstance`, `TerminalRow`, `AgentTerminalRow`, `time` helpers |

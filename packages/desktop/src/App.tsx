@@ -206,6 +206,19 @@ const AppRoutes = () => {
         setSearchModalOpen(false)
         return true
       }
+      // HITL overlays own Esc while visible — never cancel the in-flight turn
+      // underneath an Allow Bash / AskUserQuestion prompt (that looked like
+      // "generation closed all modals").
+      const activeId = state.activeSessionId
+      if (
+        activeId &&
+        ((state.pendingPermission &&
+          state.pendingPermission.sessionId === activeId) ||
+          (state.pendingQuestion &&
+            state.pendingQuestion.sessionId === activeId))
+      ) {
+        return true
+      }
       // Narrow/tight: an open sidebar or right-panel overlay covers the
       // chat area — Esc closes it before falling through to turn-cancel.
       if (state.viewport !== "wide") {
