@@ -1,5 +1,5 @@
 import type { MouseEvent as ReactMouseEvent } from "react"
-import { ChevronsRight, Plus, X } from "lucide-react"
+import { Plus, X } from "lucide-react"
 import { DiffStat, IconButton } from "../../atoms"
 import { cn } from "../../../lib/utils"
 import type { RightPanelTab } from "../../../stores/appStore"
@@ -17,11 +17,13 @@ export type RightPanelTabBarProps = {
   onSelectTab: (id: RightPanelTab) => void
   onCloseTab: (id: RightPanelTab) => void
   onOpenAddMenu: (e: ReactMouseEvent<HTMLButtonElement>) => void
-  onCollapse: () => void
   onClosePanel: () => void
 }
 
-/** Open-tabs strip for the right panel header (select / close / add / collapse). */
+/** Open-tabs strip for the right panel header (select / close / add).
+ * Wide layout: open/close is AppHeader's single ⌘J / PanelRight toggle
+ * (Cursor-style — no second collapse control here). Narrow overlay keeps
+ * an explicit close because the header toggle sits under the panel. */
 export const RightPanelTabBar = ({
   openTabDefs,
   closableTabDefs,
@@ -32,7 +34,6 @@ export const RightPanelTabBar = ({
   onSelectTab,
   onCloseTab,
   onOpenAddMenu,
-  onCollapse,
   onClosePanel,
 }: RightPanelTabBarProps) => {
   return (
@@ -92,19 +93,7 @@ export const RightPanelTabBar = ({
         </IconButton>
       ) : null}
 
-      {!narrow ? (
-        <IconButton
-          label="Collapse panel"
-          onClick={onCollapse}
-          className="ml-auto"
-        >
-          <ChevronsRight className="h-3.5 w-3.5" aria-hidden />
-        </IconButton>
-      ) : (
-        // Full-width overlay only — wide mode has no header close button
-        // (AppHeader's ⌘J toggle covers it there) and must stay
-        // byte-identical; at narrow the panel fills the chat area so a
-        // backdrop click alone is undiscoverable.
+      {narrow ? (
         <IconButton
           label="Close panel"
           onClick={onClosePanel}
@@ -112,7 +101,7 @@ export const RightPanelTabBar = ({
         >
           <X className="h-3.5 w-3.5" aria-hidden />
         </IconButton>
-      )}
+      ) : null}
     </div>
   )
 }
