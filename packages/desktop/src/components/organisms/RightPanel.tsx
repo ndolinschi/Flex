@@ -105,21 +105,41 @@ export const RightPanel = () => {
     },
   }))
 
-  // auto-reveal: the moment a plan awaits approval for the
-  // active session, surface it — open the panel and switch to Plan — instead
-  // of leaving it to a background tab the user might not be looking at.
+  // Auto-reveal Plan when approval arms for the active session — including
+  // switching into a session that already has a pending plan. Also re-open
+  // when the panel is closed while approval is still pending AND the plan id
+  // just changed (fresh hand-off), so a closed sidebar never swallows a new
+  // ExitPlanMode.
   const awaitingApprovalForActive =
     !!activeSessionId &&
     !!pendingPlanApproval &&
     pendingPlanApproval.sessionId === activeSessionId
-  const prevAwaitingRef = useRef(false)
+  const awaitingPlanId = pendingPlanApproval?.planId ?? null
+  const prevAwaitingRef = useRef<{ active: boolean; planId: string | null }>({
+    active: false,
+    planId: null,
+  })
   useEffect(() => {
-    if (awaitingApprovalForActive && !prevAwaitingRef.current) {
+    const prev = prevAwaitingRef.current
+    const armed =
+      awaitingApprovalForActive &&
+      (!prev.active || prev.planId !== awaitingPlanId)
+    if (armed) {
       setRightPanelOpen(true)
+      setCollapsed(false)
       setTab("plan")
     }
-    prevAwaitingRef.current = awaitingApprovalForActive
-  }, [awaitingApprovalForActive, setRightPanelOpen, setTab])
+    prevAwaitingRef.current = {
+      active: awaitingApprovalForActive,
+      planId: awaitingPlanId,
+    }
+  }, [
+    awaitingApprovalForActive,
+    awaitingPlanId,
+    setRightPanelOpen,
+    setCollapsed,
+    setTab,
+  ])
 
   // Gate the tab's changes-count badge on the cwd being a git repo — see
   // ChangesTab's own `isRepo` gating for the full rationale.
