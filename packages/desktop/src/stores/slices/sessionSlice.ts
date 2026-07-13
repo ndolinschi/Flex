@@ -282,16 +282,20 @@ export const createSessionSlice: StateCreator<
   setPendingPlanApproval: (approval) => {
     if (approval) {
       set({ pendingPlanApproval: approval })
-      // Go through setRightPanelTab so "plan" is registered in
-      // openTabsBySession — raw `rightPanelTab: "plan"` left the panel open
-      // with an empty body (`openIds.includes("plan")` was false) and no way
-      // to reach "+" while collapsed.
-      get().setRightPanelOpen(true)
-      get().setRightPanelCollapsed(false)
-      get().setRightPanelTab("plan")
+      // Only steal the right panel for the session the user is looking at —
+      // background ExitPlanMode still records pending approval; switching
+      // to that session (RightPanel rising-edge) opens Plan then.
+      if (get().activeSessionId === approval.sessionId) {
+        get().revealPlanPanel()
+      }
       return
     }
     set({ pendingPlanApproval: null })
+  },
+  revealPlanPanel: () => {
+    get().setRightPanelOpen(true)
+    get().setRightPanelCollapsed(false)
+    get().setRightPanelTab("plan")
   },
   setPlanEntries: (sessionId, entries) =>
     set((state) => {

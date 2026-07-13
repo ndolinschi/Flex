@@ -83,16 +83,10 @@ export const ToolStepGroup = memo(function ToolStepGroup({
   const open = forceOpen || expanded
   const canExpand = summary.details.length > 0
 
-  // Mirrors `WorkGroup`'s fold sync: `forceOpen` (from `ToolStepList`'s
-  // `forceOpenDetails || cluster.calls.some(isRunning)`) is true for the
-  // whole duration of a live turn, so `expanded`'s initial `useState` value
-  // above latches `true` at mount — but nothing was resetting it back to
-  // `false` once `forceOpen` dropped at turn-completion, so a cluster that
-  // was force-open while live stayed expanded forever afterwards (visible
-  // once its parent `WorkGroup` collapsed and was re-opened by the user).
-  // Only reacts to `forceOpen` actually flipping, same as `WorkGroup` — a
-  // user's own manual toggle of `expanded` must never get clobbered by an
-  // unrelated re-render where `forceOpen` hasn't changed.
+  // Auto-expand while `forceOpen` (cluster still running). When the run
+  // finishes, `forceOpen` drops and we collapse — user can re-expand via the
+  // header. Only reacts to `forceOpen` actually flipping so a manual toggle
+  // after finish is never clobbered by unrelated re-renders.
   const prevForceOpen = useRef(forceOpen)
   useEffect(() => {
     if (prevForceOpen.current !== forceOpen) {

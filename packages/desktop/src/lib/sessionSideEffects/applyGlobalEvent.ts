@@ -199,6 +199,10 @@ export const applyGlobalSessionEvent = (
     const plan = (payload.call.input as { plan?: unknown } | null)?.plan
     if (typeof plan === "string" && plan.trim()) {
       const liveEntries = store.plansBySession[event.session_id] ?? []
+      const existing =
+        store.sessionPlansBySession[event.session_id]?.some(
+          (p) => p.id === payload.call.id,
+        ) ?? false
       store.upsertSessionPlan({
         sessionId: event.session_id,
         planId: payload.call.id,
@@ -206,6 +210,16 @@ export const applyGlobalSessionEvent = (
         createdAtMs: event.ts_ms,
         ...(liveEntries.length > 0 ? { entries: liveEntries } : {}),
       })
+      // Live turns only: as soon as plan markdown exists for the active
+      // session, surface the Plan tab — even before ExitPlanMode completes
+      // (and even if the right panel was fully closed).
+      if (
+        !opts?.ignoreStreaming &&
+        store.activeSessionId === event.session_id &&
+        (!existing || payload.call.status.state === "completed")
+      ) {
+        store.revealPlanPanel()
+      }
       if (payload.call.status.state === "completed") {
         store.setPendingPlanApproval({
           sessionId: event.session_id,
