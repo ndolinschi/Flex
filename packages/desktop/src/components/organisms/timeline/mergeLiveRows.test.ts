@@ -34,10 +34,9 @@ describe("mergeLiveRows", () => {
     const live = mergeLiveRows(rows, streaming, undefined, 1000)
     expect(live).toEqual([
       {
-        type: "thinking",
-        id: "live-thinking:m-a",
-        messageId: "m-a",
-        text: "hmm",
+        type: "tool",
+        id: "live-tool:c-1",
+        call: streaming.toolCalls["c-1"],
         tsMs: 1000,
       },
       {
@@ -48,9 +47,10 @@ describe("mergeLiveRows", () => {
         tsMs: 1000,
       },
       {
-        type: "tool",
-        id: "live-tool:c-1",
-        call: streaming.toolCalls["c-1"],
+        type: "thinking",
+        id: "live-thinking:m-a",
+        messageId: "m-a",
+        text: "hmm",
         tsMs: 1000,
       },
     ])
