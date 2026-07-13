@@ -75,7 +75,7 @@ export type BrowserToolbarProps = {
   handleScreenshot: () => void | Promise<void>
   handleHardReload: () => void
   handleCopyUrl: () => void | Promise<void>
-  handleClearHistory: () => void
+  handleClearHistory: () => void | Promise<void>
   handleClearData: () => void | Promise<void>
   browserDesignMode: boolean
   toggleDesignMode: () => void | Promise<void>
@@ -243,6 +243,7 @@ export const BrowserToolbar = ({
       <Tooltip label="Open DevTools (floating)">
         <IconButton
           label="Open DevTools"
+          disabled={!showLiveContent}
           onClick={handleOpenDevtools}
           className="h-6 w-6"
         >
