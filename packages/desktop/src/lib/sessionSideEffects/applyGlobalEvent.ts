@@ -338,8 +338,14 @@ export const applyGlobalSessionEvent = (
       !autoActivatedCallIds.has(payload.call_id)
     ) {
       autoActivatedCallIds.add(payload.call_id)
+      // Always register the tab in the strip so output is one click away.
       store.openTab(event.session_id, "terminal")
-      store.setRightPanelTab("terminal")
+      // During an active generation, skip forced tab switch — mounting xterm
+      // mid exec_chunk flood freezes WebView2 on Windows. After the turn,
+      // switch so Bash output is still discoverable.
+      if (!store.streamingSessions[event.session_id]) {
+        store.setRightPanelTab("terminal")
+      }
     }
   }
 

@@ -185,7 +185,9 @@ export const TurnTimeline = ({
     getScrollElement: () => scrollRef.current,
     estimateSize: (index) =>
       estimateSizeForItem(displayItems[index], index === 0),
-    overscan: 10,
+    // Smaller overscan while streaming — WebView2 RO + remount churn on
+    // Windows freezes under a tall overscan window during tool turns.
+    overscan: isStreaming ? 4 : 10,
     getItemKey: (index) => displayItemKey(displayItems[index]),
     // Always read the live DOM height. TanStack's default measureElement
     // returns the cached size when called without a ResizeObserver entry,
@@ -209,21 +211,47 @@ export const TurnTimeline = ({
   // + actions swap) even if streamContentKey is unchanged. Never call
   // `virtualizer.measure()` here — it clears itemSizeCache and absolute rows
   // overlap on stale estimateSize.
+  //
+  // While streaming, coalesce remasure to ≤1 / 120ms — every markdown/tool
+  // delta used to schedule double-rAF remasure and peg WebView2 on Windows.
   const wasStreamingRef = useRef(isStreaming)
+  const lastStreamRemeasureAt = useRef(0)
   useEffect(() => {
     const settled = wasStreamingRef.current && !isStreaming
     wasStreamingRef.current = isStreaming
     let second: number | null = null
-    const first = requestAnimationFrame(() => {
+    let delayTimer: ReturnType<typeof setTimeout> | null = null
+    let first: number | null = null
+
+    const run = () => {
       remeasureMountedVirtualItems(virtualizer)
       if (!settled) return
       // Second frame: GFM/prose margins apply after the live→settled swap.
       second = requestAnimationFrame(() => {
         remeasureMountedVirtualItems(virtualizer)
       })
-    })
+    }
+
+    const schedule = () => {
+      first = requestAnimationFrame(run)
+    }
+
+    if (isStreaming && !settled) {
+      const wait = Math.max(
+        0,
+        120 - (performance.now() - lastStreamRemeasureAt.current),
+      )
+      delayTimer = setTimeout(() => {
+        lastStreamRemeasureAt.current = performance.now()
+        schedule()
+      }, wait)
+    } else {
+      schedule()
+    }
+
     return () => {
-      cancelAnimationFrame(first)
+      if (delayTimer !== null) clearTimeout(delayTimer)
+      if (first !== null) cancelAnimationFrame(first)
       if (second !== null) cancelAnimationFrame(second)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- remount on content growth / settle only

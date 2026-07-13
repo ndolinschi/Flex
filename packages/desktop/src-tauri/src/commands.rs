@@ -1759,9 +1759,13 @@ pub async fn git_status_since_baseline(
 ) -> DesktopResult<GitStatusSummary> {
     let (cwd, base_cwd) = review_dirs(&state, &session_id).await?;
     let cwd_str = cwd.to_string_lossy().to_string();
+    let cwd_path = cwd.clone();
 
     if base_cwd.is_some() {
-        return Ok(summarize(git_status_full(&cwd_str)?));
+        let cwd_for_git = cwd_str.clone();
+        return tokio::task::spawn_blocking(move || summarize(git_status_full(&cwd_for_git)?))
+            .await
+            .map_err(|e| DesktopError::Message(format!("git status join: {e}")))?;
     }
 
     let baseline = {
@@ -1771,33 +1775,40 @@ pub async fn git_status_since_baseline(
             .map(|b| (b.head_sha.clone(), b.files.clone()))
     };
     let Some((baseline_head, baseline_files)) = baseline else {
-        return Ok(summarize(git_status_full(&cwd_str)?));
+        let cwd_for_git = cwd_str.clone();
+        return tokio::task::spawn_blocking(move || summarize(git_status_full(&cwd_for_git)?))
+            .await
+            .map_err(|e| DesktopError::Message(format!("git status join: {e}")))?;
     };
 
-    if current_head_sha(&cwd) != baseline_head {
-        return Ok(summarize(git_status_full(&cwd_str)?));
-    }
+    tokio::task::spawn_blocking(move || {
+        if current_head_sha(&cwd_path) != baseline_head {
+            return Ok(summarize(git_status_full(&cwd_str)?));
+        }
 
-    let all = git_status_full(&cwd_str)?;
-    let filtered = all
-        .into_iter()
-        .filter(|f| match baseline_files.get(&f.path) {
-            None => true,
-            // Untracked dir already recorded at baseline time (see the "dir"
-            // sentinel in `capture_session_baseline`) — there's no blob to
-            // hash for a directory, and an already-untracked dir isn't a
-            // session change, so it's always filtered out regardless of what
-            // may have changed inside it (mirrors git's own porcelain
-            // granularity, which also collapses to the single dir entry).
-            Some(baseline_hash) if baseline_hash == "dir" => false,
-            Some(baseline_hash) => {
-                let current_hash =
-                    hash_object(&cwd, &f.path).unwrap_or_else(|| "deleted".to_string());
-                &current_hash != baseline_hash
-            }
-        })
-        .collect();
-    Ok(summarize(filtered))
+        let all = git_status_full(&cwd_str)?;
+        let filtered = all
+            .into_iter()
+            .filter(|f| match baseline_files.get(&f.path) {
+                None => true,
+                // Untracked dir already recorded at baseline time (see the "dir"
+                // sentinel in `capture_session_baseline`) — there's no blob to
+                // hash for a directory, and an already-untracked dir isn't a
+                // session change, so it's always filtered out regardless of what
+                // may have changed inside it (mirrors git's own porcelain
+                // granularity, which also collapses to the single dir entry).
+                Some(baseline_hash) if baseline_hash == "dir" => false,
+                Some(baseline_hash) => {
+                    let current_hash =
+                        hash_object(&cwd_path, &f.path).unwrap_or_else(|| "deleted".to_string());
+                    &current_hash != baseline_hash
+                }
+            })
+            .collect();
+        Ok(summarize(filtered))
+    })
+    .await
+    .map_err(|e| DesktopError::Message(format!("git status join: {e}")))?
 }
 
 /// `git hash-object <path>` relative to `cwd`; used to detect whether a
