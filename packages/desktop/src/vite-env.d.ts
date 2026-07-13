@@ -10,3 +10,14 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/** Monaco worker factory — set by `lib/monacoEnv.ts` before editor mount. */
+interface MonacoEnvironment {
+  getWorker(workerId: string, label: string): Worker
+}
+
+interface Window {
+  MonacoEnvironment?: MonacoEnvironment
+}
+
+declare var MonacoEnvironment: MonacoEnvironment | undefined

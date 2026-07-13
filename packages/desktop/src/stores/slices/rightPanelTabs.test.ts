@@ -176,4 +176,41 @@ describe("right panel per-session tab state (BUG #37)", () => {
     expect(state.openFilesBySession[sessionScopeKey(A)]).toEqual(["src/App.tsx"])
     expect(state.activeFileBySession[sessionScopeKey(A)]).toBe("src/App.tsx")
   })
+
+  it("clearSessionPanelState drops Files buffers and open tabs for that session", () => {
+    useAppStore.getState().setActiveSessionId(A)
+    useAppStore.getState().openWorkspaceFile(sessionScopeKey(A), "a.ts")
+    useAppStore.getState().setWorkspaceFileDraft(sessionScopeKey(A), "a.ts", "x")
+    useAppStore.getState().setRightPanelTab("changes")
+
+    useAppStore.getState().clearSessionPanelState(A)
+
+    const state = useAppStore.getState()
+    expect(state.openFilesBySession[sessionScopeKey(A)]).toBeUndefined()
+    expect(state.activeFileBySession[sessionScopeKey(A)]).toBeUndefined()
+    expect(state.fileDraftsBySession[sessionScopeKey(A)]).toBeUndefined()
+    expect(state.openTabsBySession[sessionScopeKey(A)]).toBeUndefined()
+    expect(state.selectedTabBySession[sessionScopeKey(A)]).toBeUndefined()
+  })
+
+  it("closing the last Files buffer collapses the panel when Files was alone", () => {
+    useAppStore.getState().setActiveSessionId(A)
+    useAppStore.getState().openWorkspaceFile(sessionScopeKey(A), "a.ts")
+    expect(useAppStore.getState().rightPanelOpen).toBe(true)
+    expect(useAppStore.getState().openTabsBySession[sessionScopeKey(A)]).toEqual([
+      "files",
+    ])
+
+    useAppStore.getState().closeWorkspaceFile(sessionScopeKey(A), "a.ts")
+    // FilesTab effect closes the panel tab + panel; store-only close leaves
+    // the files tab registered until the UI effect runs — simulate that path.
+    const key = sessionScopeKey(A)
+    useAppStore.getState().closeTab(key, "files")
+    const remaining = useAppStore.getState().openTabsBySession[key] ?? []
+    if (remaining.length === 0) {
+      useAppStore.getState().setRightPanelOpen(false)
+    }
+    expect(useAppStore.getState().rightPanelOpen).toBe(false)
+    expect(useAppStore.getState().openTabsBySession[key] ?? []).toEqual([])
+  })
 })

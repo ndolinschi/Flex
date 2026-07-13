@@ -7,8 +7,7 @@ import {
 } from "lucide-react"
 import type { RightPanelTab } from "../../../stores/appStore"
 
-/** Shared tab metadata — also consumed by SessionSidebar's "Open Tabs"
- * section so both surfaces render the same label/icon per tab id. */
+/** Shared tab metadata for the right-panel tab bar / "+" menu. */
 export const TABS: Array<{
   id: RightPanelTab
   label: string
