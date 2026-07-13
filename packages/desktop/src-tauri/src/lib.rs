@@ -239,6 +239,7 @@ pub fn run() {
             commands::background_kill,
             commands::background_demote,
             commands::respond_permission,
+            commands::set_turn_permission_mode,
             commands::respond_question,
             commands::is_configured,
             commands::git_is_repo,
