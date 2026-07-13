@@ -228,6 +228,8 @@ export type ToolStepDetail = {
   /** Repo-relative file path for edit/write rows — lets the row offer an
    * inline diff (lazy-fetched via `reviewFileDiff` on first expand). */
   diffPath?: string
+  /** Repo-relative path for open-in-Files (Read/explore rows without a diff). */
+  filePath?: string
   /** Shell/bash calls get a live mini-log tail rendered under the row while
    * running (see `execTailBus`). */
   isShell?: boolean
@@ -324,6 +326,7 @@ const exploreDetail = (call: ToolCall): ToolStepDetail => {
     sublabel,
     running: isRunning(call),
     failed: isFailed(call),
+    filePath: path && !path.endsWith("/") ? path : undefined,
   }
 }
 

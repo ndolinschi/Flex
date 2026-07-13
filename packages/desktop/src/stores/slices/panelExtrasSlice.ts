@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand"
 import type { AppState, PanelExtrasSliceState } from "../types"
-import { emptyBrowserSessionState } from "../types"
+import { emptyBrowserSessionState, sessionScopeKey } from "../types"
 import { persistUiState } from "../persist"
 
 export const createPanelExtrasSlice: StateCreator<
@@ -105,6 +105,28 @@ export const createPanelExtrasSlice: StateCreator<
         },
       }
     }),
+  clearSessionPanelState: (sessionId) => {
+    const key = sessionScopeKey(sessionId)
+    const omit = <T extends Record<string, unknown>>(map: T): T => {
+      if (!(key in map)) return map
+      const next = { ...map }
+      delete next[key]
+      return next
+    }
+    const openTabsBySession = omit(get().openTabsBySession)
+    set({
+      openTabsBySession,
+      selectedTabBySession: omit(get().selectedTabBySession),
+      openFilesBySession: omit(get().openFilesBySession),
+      activeFileBySession: omit(get().activeFileBySession),
+      fileDraftsBySession: omit(get().fileDraftsBySession),
+      terminalsBySession: omit(get().terminalsBySession),
+      activeTerminalIdBySession: omit(get().activeTerminalIdBySession),
+      agentStreamSessions: omit(get().agentStreamSessions),
+      browserBySession: omit(get().browserBySession),
+    })
+    void persistUiState({ openTabsBySession })
+  },
   pushSnapshot: (sessionId, snapshotId) =>
     set((state) => {
       const prev = state.snapshotsBySession[sessionId] ?? []
