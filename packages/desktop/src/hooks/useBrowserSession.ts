@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react"
 import {
   browserBack,
   browserClearData,
+  browserClose,
   browserForward,
   browserHardReload,
   browserNavigate,
@@ -205,10 +206,21 @@ export const useBrowserSession = (active: boolean) => {
   ])
 
   const handleReload = useCallback(() => {
+    if (!browserStarted || !isOwner) return
     setBrowserSessionState(sessionKey, { loading: true })
     clearLoadingSoon()
-    void browserReload()
-  }, [clearLoadingSoon, sessionKey, setBrowserSessionState])
+    void browserReload().catch((err) => {
+      log.error("browser", "reload failed", { error: toInvokeError(err) })
+      pushToast(toInvokeError(err), "error")
+    })
+  }, [
+    browserStarted,
+    clearLoadingSoon,
+    isOwner,
+    pushToast,
+    sessionKey,
+    setBrowserSessionState,
+  ])
 
   const handleCopyUrl = useCallback(() => {
     if (!browserUrl) return Promise.resolve()
@@ -218,34 +230,66 @@ export const useBrowserSession = (active: boolean) => {
       .catch(() => pushToast("Couldn't copy URL", "error"))
   }, [browserUrl, pushToast])
 
-  const handleClearHistory = useCallback(() => {
-    resetBrowserSession(sessionKey)
-    if (browserOwnerSessionId === sessionKey) {
-      setBrowserOwnerSessionId(null)
+  /** Cursor parity: clear the embedded session (close native webview + UI
+   * state). Only the owning session destroys the webview; other chats just
+   * drop their remembered URL/title. */
+  const handleClearHistory = useCallback(async () => {
+    try {
+      if (!isBrowserPreview() && isOwner && browserStarted) {
+        await browserClose()
+        setBrowserDesignMode(false)
+      }
+      resetBrowserSession(sessionKey)
+      if (browserOwnerSessionId === sessionKey) {
+        setBrowserOwnerSessionId(null)
+      }
+      pushToast("Browsing history cleared", "success")
+    } catch (err) {
+      const message = toInvokeError(err)
+      log.error("browser", "clear history failed", { error: message })
+      pushToast(message, "error")
     }
-    pushToast("Browsing history cleared", "success")
   }, [
     browserOwnerSessionId,
+    browserStarted,
+    isOwner,
     pushToast,
     resetBrowserSession,
     sessionKey,
+    setBrowserDesignMode,
     setBrowserOwnerSessionId,
   ])
 
+  /** Cursor parity: clear cookies/cache for the live webview, then hard-reload
+   * so the page reflects the wipe. */
   const handleClearData = useCallback(async () => {
     if (isBrowserPreview()) {
       pushToast(NATIVE_APP_REQUIRED, "error")
       return
     }
+    if (!browserStarted || !isOwner) {
+      pushToast("Open a page before clearing browsing data", "error")
+      return
+    }
     try {
       await browserClearData()
+      setBrowserSessionState(sessionKey, { loading: true })
+      clearLoadingSoon()
+      await browserHardReload()
       pushToast("Browsing data cleared", "success")
     } catch (err) {
       const message = toInvokeError(err)
       log.error("browser", "clear data failed", { error: message })
       pushToast(message, "error")
     }
-  }, [pushToast])
+  }, [
+    browserStarted,
+    clearLoadingSoon,
+    isOwner,
+    pushToast,
+    sessionKey,
+    setBrowserSessionState,
+  ])
 
   const handleAskAgent = useCallback(() => {
     if (!browserUrl) return
@@ -268,10 +312,30 @@ export const useBrowserSession = (active: boolean) => {
       pushToast(NATIVE_APP_REQUIRED, "error")
       return
     }
+    if (!browserStarted || !isOwner) {
+      pushToast("Open a page before opening DevTools", "error")
+      return
+    }
     void browserOpenDevtools().catch((err) => {
       pushToast(toInvokeError(err), "error")
     })
-  }, [pushToast])
+  }, [browserStarted, isOwner, pushToast])
+
+  const handleBack = useCallback(() => {
+    if (!browserStarted || !isOwner) return
+    void browserBack().catch((err) => {
+      log.error("browser", "back failed", { error: toInvokeError(err) })
+      pushToast(toInvokeError(err), "error")
+    })
+  }, [browserStarted, isOwner, pushToast])
+
+  const handleForward = useCallback(() => {
+    if (!browserStarted || !isOwner) return
+    void browserForward().catch((err) => {
+      log.error("browser", "forward failed", { error: toInvokeError(err) })
+      pushToast(toInvokeError(err), "error")
+    })
+  }, [browserStarted, isOwner, pushToast])
 
   const toggleDesignMode = useCallback(async () => {
     if (!browserStarted || !isOwner) {
@@ -627,7 +691,7 @@ export const useBrowserSession = (active: boolean) => {
     browserDesignMode,
     toggleDesignMode,
     setBrowserSessionState,
-    browserBack: () => void browserBack(),
-    browserForward: () => void browserForward(),
+    browserBack: handleBack,
+    browserForward: handleForward,
   }
 }

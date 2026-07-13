@@ -883,9 +883,10 @@ pub async fn browser_navigate(
 #[tauri::command]
 pub async fn browser_back(state: State<'_, AppState>) -> DesktopResult<()> {
     let guard = state.browser_webview.lock().await;
-    if let Some(webview) = guard.as_ref() {
-        webview.eval("history.back()")?;
-    }
+    let webview = guard
+        .as_ref()
+        .ok_or_else(|| DesktopError::Message("browser is not open".into()))?;
+    webview.eval("history.back()")?;
     Ok(())
 }
 
@@ -893,9 +894,10 @@ pub async fn browser_back(state: State<'_, AppState>) -> DesktopResult<()> {
 #[tauri::command]
 pub async fn browser_forward(state: State<'_, AppState>) -> DesktopResult<()> {
     let guard = state.browser_webview.lock().await;
-    if let Some(webview) = guard.as_ref() {
-        webview.eval("history.forward()")?;
-    }
+    let webview = guard
+        .as_ref()
+        .ok_or_else(|| DesktopError::Message("browser is not open".into()))?;
+    webview.eval("history.forward()")?;
     Ok(())
 }
 
@@ -903,9 +905,10 @@ pub async fn browser_forward(state: State<'_, AppState>) -> DesktopResult<()> {
 #[tauri::command]
 pub async fn browser_reload(state: State<'_, AppState>) -> DesktopResult<()> {
     let guard = state.browser_webview.lock().await;
-    if let Some(webview) = guard.as_ref() {
-        webview.reload()?;
-    }
+    let webview = guard
+        .as_ref()
+        .ok_or_else(|| DesktopError::Message("browser is not open".into()))?;
+    webview.reload()?;
     Ok(())
 }
 
@@ -1034,9 +1037,8 @@ pub async fn browser_set_design_mode(
 }
 
 /// Opens DevTools for the embedded browser's child webview only — never the
-/// app's main webview. No-ops (rather than erroring) if the browser hasn't
-/// been opened yet, matching the other `browser_*` commands' tolerance for a
-/// missing webview.
+/// app's main webview. Errors if the browser hasn't been opened yet so the
+/// frontend can toast instead of silently no-op'ing (Cursor parity).
 ///
 /// On macOS, WebKit's inspector defaults to docking into the parent window
 /// (full-width, shoving the right panel). After `show` we call private
@@ -1045,9 +1047,10 @@ pub async fn browser_set_design_mode(
 #[tauri::command]
 pub async fn browser_open_devtools(state: State<'_, AppState>) -> DesktopResult<()> {
     let guard = state.browser_webview.lock().await;
-    let Some(webview) = guard.as_ref().cloned() else {
-        return Ok(());
-    };
+    let webview = guard
+        .as_ref()
+        .cloned()
+        .ok_or_else(|| DesktopError::Message("browser is not open".into()))?;
     drop(guard);
     webview.open_devtools();
     #[cfg(target_os = "macos")]
@@ -1126,14 +1129,16 @@ pub async fn browser_hard_reload(app: AppHandle, state: State<'_, AppState>) -> 
 /// Clears cookies, cache, and other browsing data for the embedded browser's
 /// child webview via wry/Tauri's `clear_all_browsing_data` — shipped as one
 /// "Clear Browsing Data" action rather than separate cookie/cache items since
-/// the underlying API doesn't expose that granularity.
+/// the underlying API doesn't expose that granularity. Errors when no child
+/// webview is open (frontend disables the menu item; this is the safety net).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_clear_data(state: State<'_, AppState>) -> DesktopResult<()> {
     let guard = state.browser_webview.lock().await;
-    if let Some(webview) = guard.as_ref() {
-        webview.clear_all_browsing_data()?;
-    }
+    let webview = guard
+        .as_ref()
+        .ok_or_else(|| DesktopError::Message("browser is not open".into()))?;
+    webview.clear_all_browsing_data()?;
     Ok(())
 }
 
