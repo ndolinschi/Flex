@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState, type RefObject } from "react"
-import type { PlanCommentDraft } from "../components/molecules/PlanCommentPopover"
+
+export type PlanSelectionAnchor = {
+  quote: string
+  startOffset: number
+  endOffset: number
+  anchor: { x: number; y: number }
+}
 
 /** Compute the character offset of `node`/`offset` within `root`'s text. */
 const offsetWithin = (
@@ -20,33 +26,55 @@ const offsetWithin = (
 
 /**
  * Capture a non-empty text selection inside the plan body and expose a
- * draft suitable for `PlanCommentPopover`.
+ * floating Comment affordance. Opening the composer is a separate step
+ * (`openComposer`) so accidental selections don't jump straight into a form.
  */
 export const usePlanSelectionComment = (
   containerRef: RefObject<HTMLElement | null>,
   enabled: boolean,
 ) => {
-  const [draft, setDraft] = useState<PlanCommentDraft | null>(null)
+  const [selection, setSelection] = useState<PlanSelectionAnchor | null>(null)
+  const [composerOpen, setComposerOpen] = useState(false)
 
-  const clearDraft = useCallback(() => setDraft(null), [])
+  const clearSelection = useCallback(() => {
+    setSelection(null)
+    setComposerOpen(false)
+  }, [])
+
+  const openComposer = useCallback(() => {
+    if (selection) setComposerOpen(true)
+  }, [selection])
 
   useEffect(() => {
     if (!enabled) {
-      setDraft(null)
+      setSelection(null)
+      setComposerOpen(false)
       return
     }
 
     const onMouseUp = () => {
+      // Don't clobber an open composer.
+      if (composerOpen) return
+
       const root = containerRef.current
       if (!root) return
       const sel = window.getSelection()
-      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+        setSelection(null)
+        return
+      }
 
       const range = sel.getRangeAt(0)
-      if (!root.contains(range.commonAncestorContainer)) return
+      if (!root.contains(range.commonAncestorContainer)) {
+        setSelection(null)
+        return
+      }
 
       const quote = sel.toString().replace(/\s+/g, " ").trim()
-      if (!quote) return
+      if (!quote) {
+        setSelection(null)
+        return
+      }
 
       const startOffset = offsetWithin(
         root,
@@ -55,16 +83,17 @@ export const usePlanSelectionComment = (
       )
       const endOffset = offsetWithin(root, range.endContainer, range.endOffset)
       if (startOffset === null || endOffset === null || endOffset <= startOffset) {
+        setSelection(null)
         return
       }
 
       const rect = range.getBoundingClientRect()
-      setDraft({
+      setSelection({
         quote,
         startOffset,
         endOffset,
         anchor: {
-          x: rect.left,
+          x: rect.left + rect.width / 2,
           y: rect.bottom + 8,
         },
       })
@@ -72,7 +101,14 @@ export const usePlanSelectionComment = (
 
     document.addEventListener("mouseup", onMouseUp)
     return () => document.removeEventListener("mouseup", onMouseUp)
-  }, [containerRef, enabled])
+  }, [containerRef, enabled, composerOpen])
 
-  return { draft, setDraft, clearDraft }
+  return {
+    selection,
+    composerOpen,
+    openComposer,
+    clearSelection,
+    /** Draft for the popover — only when the composer is open. */
+    draft: composerOpen && selection ? selection : null,
+  }
 }

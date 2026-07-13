@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { ScrollArea } from "../../atoms"
 import {
   MarkdownBody,
+  PlanCommentButton,
   PlanCommentList,
   PlanCommentPopover,
   PlanList,
@@ -13,6 +14,7 @@ import {
 import { usePlanActions } from "../../../hooks/usePlanActions"
 import { usePlanBuild } from "../../../hooks/usePlanBuild"
 import { usePlanCommentHighlights } from "../../../hooks/usePlanCommentHighlights"
+import { usePlanComments } from "../../../hooks/usePlanComments"
 import { usePlanFind } from "../../../hooks/usePlanFind"
 import { usePlanSelectionComment } from "../../../hooks/usePlanSelectionComment"
 import { useModels } from "../../../hooks/useModels"
@@ -23,7 +25,7 @@ import type { PlanEntry, SessionMeta } from "../../../lib/types"
 import { sessionLabel } from "../../../lib/types"
 import { formatRelativeTime } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
-import type { PlanComment, SessionPlan } from "../../../stores/types"
+import type { SessionPlan } from "../../../stores/types"
 import { basename, cn } from "../../../lib/utils"
 
 const EMPTY_ENTRIES: PlanEntry[] = []
@@ -42,8 +44,6 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     active ? (s.activePlanIdBySession[active.id] ?? null) : null,
   )
   const setActivePlanId = useAppStore((s) => s.setActivePlanId)
-  const addPlanComment = useAppStore((s) => s.addPlanComment)
-  const removePlanComment = useAppStore((s) => s.removePlanComment)
   const pendingPlanApproval = useAppStore((s) => s.pendingPlanApproval)
   const setPendingPlanApproval = useAppStore((s) => s.setPendingPlanApproval)
   const composerMode = useAppStore((s) => s.composerMode)
@@ -63,19 +63,33 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     rewritePlan,
     restartPlan,
     reviewPlan,
-    sendPlanComment,
   } = usePlanActions()
   const latestVerdict = useLatestVerdict(active?.id ?? null)
 
-  // With multiple plans: list when no active selection; detail when one is
-  // selected. A single plan always opens detail. New ExitPlanMode upserts
-  // set the active id, so approval lands on the new plan's detail view.
   const multi = sessionPlans.length > 1
-  const activePlan: SessionPlan | undefined =
-    sessionPlans.length === 1
-      ? sessionPlans[0]
-      : sessionPlans.find((p) => p.id === activePlanId)
-  const showList = multi && !activePlan
+  // Plan: with many plans, land on the Review plans list first. Pending
+  // approval (and an explicit row pick) open detail instead.
+  const [browsingList, setBrowsingList] = useState(true)
+
+  const awaitingApproval =
+    !!active &&
+    !!pendingPlanApproval &&
+    pendingPlanApproval.sessionId === active.id
+
+  // New ExitPlanMode approval → open that plan's detail.
+  useEffect(() => {
+    if (!active || !awaitingApproval || !pendingPlanApproval) return
+    setBrowsingList(false)
+    if (activePlanId !== pendingPlanApproval.planId) {
+      setActivePlanId(active.id, pendingPlanApproval.planId)
+    }
+  }, [
+    active,
+    awaitingApproval,
+    pendingPlanApproval,
+    activePlanId,
+    setActivePlanId,
+  ])
 
   // Ensure a lone plan is always the active one (e.g. after restore).
   useEffect(() => {
@@ -83,23 +97,47 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     if (activePlanId !== sessionPlans[0].id) {
       setActivePlanId(active.id, sessionPlans[0].id)
     }
+    setBrowsingList(false)
   }, [active, sessionPlans, activePlanId, setActivePlanId])
+
+  const showList = multi && browsingList && !awaitingApproval
+
+  const activePlan: SessionPlan | undefined =
+    sessionPlans.length === 1
+      ? sessionPlans[0]
+      : sessionPlans.find((p) => p.id === activePlanId) ??
+        (awaitingApproval && pendingPlanApproval
+          ? sessionPlans.find((p) => p.id === pendingPlanApproval.planId)
+          : undefined)
 
   const planDoc = activePlan?.markdown
   const planBuilt = !!activePlan?.built
   const comments = activePlan?.comments ?? []
 
+  const {
+    activeCommentId,
+    setActiveCommentId,
+    saveComment,
+    saveAndSendComment,
+    removeComment,
+  } = usePlanComments(active?.id ?? null, activePlan?.id ?? null)
+
   const planBodyRef = useRef<HTMLDivElement>(null)
   const [findOpen, setFindOpen] = useState(false)
   const [findQuery, setFindQuery] = useState("")
-  const [activeCommentId, setActiveCommentId] = useState<string | null>(null)
   const { matchCount, activeIndex, next, prev } = usePlanFind(
     planBodyRef,
     findQuery,
     findOpen,
   )
   usePlanCommentHighlights(planBodyRef, comments, activeCommentId, findOpen)
-  const { draft, clearDraft } = usePlanSelectionComment(
+  const {
+    selection,
+    composerOpen,
+    openComposer,
+    clearSelection,
+    draft,
+  } = usePlanSelectionComment(
     planBodyRef,
     !!planDoc && !findOpen && !showList,
   )
@@ -115,12 +153,6 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
   }, [planDoc])
-
-  const awaitingApproval =
-    !!active &&
-    !!pendingPlanApproval &&
-    pendingPlanApproval.sessionId === active.id &&
-    (!activePlan || pendingPlanApproval.planId === activePlan.id)
 
   const handleKeepPlanning = () => {
     setPendingPlanApproval(null)
@@ -158,26 +190,18 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
   }
 
   const handleSaveComment = (body: string) => {
-    if (!active || !activePlan || !draft) return
-    const comment: PlanComment = {
-      id: `cmt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      quote: draft.quote,
-      startOffset: draft.startOffset,
-      endOffset: draft.endOffset,
-      body,
-      createdAtMs: Date.now(),
-    }
-    addPlanComment(active.id, activePlan.id, comment)
-    setActiveCommentId(comment.id)
-    clearDraft()
+    if (!draft) return
+    saveComment(draft, body)
+    clearSelection()
     window.getSelection()?.removeAllRanges()
   }
 
   const handleSaveAndSendComment = (body: string) => {
-    if (!active || !activePlan || !draft) return
-    const quote = draft.quote
-    handleSaveComment(body)
-    void sendPlanComment(active.id, quote, body).catch((err) => {
+    if (!draft) return
+    const snapshot = draft
+    clearSelection()
+    window.getSelection()?.removeAllRanges()
+    void saveAndSendComment(snapshot, body).catch((err) => {
       pushToast(
         `Couldn't send comment: ${err instanceof Error ? err.message : String(err)}`,
         "error",
@@ -199,7 +223,10 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     return (
       <PlanList
         plans={sessionPlans}
-        onSelect={(planId) => setActivePlanId(active.id, planId)}
+        onSelect={(planId) => {
+          setBrowsingList(false)
+          setActivePlanId(active.id, planId)
+        }}
       />
     )
   }
@@ -234,6 +261,7 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
         onBackToPlans={
           multi
             ? () => {
+                setBrowsingList(true)
                 setActivePlanId(active.id, null)
                 setFindOpen(false)
               }
@@ -321,10 +349,7 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
               comments={comments}
               activeCommentId={activeCommentId}
               onFocus={(id) => setActiveCommentId(id)}
-              onRemove={(id) => {
-                removePlanComment(active.id, activePlan.id, id)
-                if (activeCommentId === id) setActiveCommentId(null)
-              }}
+              onRemove={removeComment}
             />
           ) : null}
 
@@ -384,9 +409,12 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
         </div>
       </ScrollArea>
 
+      {!composerOpen ? (
+        <PlanCommentButton selection={selection} onComment={openComposer} />
+      ) : null}
       <PlanCommentPopover
         draft={draft}
-        onCancel={clearDraft}
+        onCancel={clearSelection}
         onSave={handleSaveComment}
         onSaveAndSend={handleSaveAndSendComment}
       />

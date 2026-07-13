@@ -1,16 +1,13 @@
 import { useEffect, useRef, useState } from "react"
 import { Button, TextArea } from "../atoms"
 import { cn } from "../../lib/utils"
+import type { PlanSelectionAnchor } from "../../hooks/usePlanSelectionComment"
 
-export type PlanCommentDraft = {
-  quote: string
-  startOffset: number
-  endOffset: number
-  anchor: { x: number; y: number }
-}
+/** @deprecated Prefer `PlanSelectionAnchor` from `usePlanSelectionComment`. */
+export type PlanCommentDraft = PlanSelectionAnchor
 
 type PlanCommentPopoverProps = {
-  draft: PlanCommentDraft | null
+  draft: PlanSelectionAnchor | null
   onCancel: () => void
   onSave: (body: string) => void
   onSaveAndSend: (body: string) => void

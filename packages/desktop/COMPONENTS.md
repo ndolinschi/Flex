@@ -45,6 +45,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `PlanBuildBar` | Cursor-style Build CTA after ExitPlanMode | `onBuild`, `onKeepPlanning?`, `variant` | RightPanel Plan tab, ChatPage |
 | `PlanCard` | Checklist from `plan_updated` (right Plan tab; not inlined in timeline) | `entries` | RightPanel |
 | `PlanList` | Multi-plan “Review plans” list for a session | `plans`, `onSelect` | RightPanel Plan tab (`PlanTab`) |
+| `PlanCommentButton` | Floating Comment control on plan text selection | `selection`, `onComment` | RightPanel Plan tab (`PlanTab`) |
 | `PlanCommentPopover` | Selection → comment form (Save / Save & send) | `draft`, `onSave`, `onSaveAndSend` | RightPanel Plan tab (`PlanTab`) |
 | `PlanCommentList` | Annotations on the open plan | `comments`, `onFocus`, `onRemove` | RightPanel Plan tab (`PlanTab`) |
 | `PlusMenu` | Attach + mode shortcuts (Plan/Ask) | `onAttachFile`, `onAttachImage`, `onSetMode?` | Composer |
