@@ -419,6 +419,8 @@ export type PanelExtrasSliceState = {
     path: string,
     draft: string | null,
   ) => void
+  /** Drop per-session right-panel / Files buffers after engine delete. */
+  clearSessionPanelState: (sessionId: SessionId) => void
   pushSnapshot: (sessionId: SessionId, snapshotId: string) => void
   setSnapshotIndex: (sessionId: SessionId, index: number) => void
   clearSnapshots: (sessionId: SessionId) => void
