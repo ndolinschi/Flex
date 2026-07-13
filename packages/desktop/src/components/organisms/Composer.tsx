@@ -14,9 +14,14 @@ import { useComposerAttachments } from "../../hooks/useComposerAttachments"
 import { useComposerSend, useComposerModelChange } from "../../hooks/useComposerSend"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
+import {
+  respondPermission,
+  setTurnPermissionMode,
+  toInvokeError,
+} from "../../lib/tauri"
+import { log } from "../../lib/debug/log"
 import { ContextBar } from "./ContextBar"
 import { ComposerQueue } from "./composer/ComposerQueue"
-
 type ComposerProps = {
   isHero?: boolean
 }
@@ -178,6 +183,42 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
     if (!activeSessionId || composerMode !== "agent") return
     const next = !sessionBypass
     setSessionBypass(activeSessionId, next)
+    const sessionId = activeSessionId
+    void (async () => {
+      try {
+        // Mid-run: push BypassPermissions into the in-flight turn so later
+        // tools stop prompting. Clearing when turning off reverts to session
+        // defaults for subsequent tools this turn.
+        await setTurnPermissionMode(
+          sessionId,
+          next ? "bypass_permissions" : null,
+        )
+      } catch (err) {
+        log.warn("session", "set_turn_permission_mode from composer shield", {
+          sessionId,
+          enabled: next,
+          error: toInvokeError(err),
+        })
+      }
+      if (!next) return
+      // Auto-resolve a pending ask for this session so the user isn't left
+      // staring at Allow Bash after they already flipped the shield on.
+      const pending = useAppStore.getState().pendingPermission
+      if (!pending || pending.sessionId !== sessionId) return
+      try {
+        await respondPermission({
+          sessionId,
+          requestId: pending.requestId,
+          decision: "allow_once",
+        })
+        useAppStore.getState().setPendingPermission(null)
+      } catch (err) {
+        log.warn("session", "auto-allow pending after bypass shield", {
+          sessionId,
+          error: toInvokeError(err),
+        })
+      }
+    })()
     if (next) {
       useAppStore
         .getState()

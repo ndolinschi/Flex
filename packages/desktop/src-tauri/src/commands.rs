@@ -1302,6 +1302,24 @@ pub struct RespondPermissionInput {
 
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
+pub async fn set_turn_permission_mode(
+    state: State<'_, AppState>,
+    session_id: String,
+    mode: Option<String>,
+) -> DesktopResult<()> {
+    let service = require_service(&state).await?;
+    let id = SessionId::from(session_id);
+    let parsed = match mode.as_deref() {
+        None | Some("") => None,
+        Some(raw) => Some(parse_permission_mode(Some(raw)).ok_or_else(|| {
+            DesktopError::Message(format!("unknown permission mode: {raw}"))
+        })?),
+    };
+    Ok(service.set_turn_permission_mode(&id, parsed)?)
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
 pub async fn respond_permission(
     state: State<'_, AppState>,
     input: RespondPermissionInput,
