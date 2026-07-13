@@ -33,14 +33,12 @@ export const SubagentViewer = () => {
         type="button"
         aria-label="Close subagent view"
         onClick={closeSubagentViewer}
-        data-suppress-native-webview=""
         className="subagent-viewer-mask absolute inset-0 z-10 cursor-default bg-bg/45"
       />
       <section
         role="dialog"
         aria-modal="true"
         aria-label={`Subagent: ${viewer.title}`}
-        data-suppress-native-webview=""
         className={[
           "absolute inset-x-0 bottom-0 z-20 flex max-h-[70dvh] min-h-[220px] flex-col overflow-hidden",
           "h-[70dvh] rounded-t-lg border-t border-stroke-3 bg-panel",
