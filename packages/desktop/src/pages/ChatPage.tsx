@@ -46,32 +46,35 @@ export const ChatPage = ({ embedded = false }: ChatPageProps) => {
       : null
   const overlay = questionForActive ? (
     <QuestionPrompt question={questionForActive} />
-  ) : permissionForActive ? (
-    <PermissionPrompt permission={permissionForActive} />
   ) : null
 
   return (
-    <ChatShell
-      hideSidebar={embedded}
-      timeline={
-        <>
-          <TurnTimeline
-            sessionId={activeSessionId}
-            onConversationEmpty={handleConversationEmpty}
-          />
-          {/* Anchors to ChatShell's relative <main>; the timeline wrapper is
-           * not positioned, so the tray overlays the whole conversation. */}
-          <SubagentViewer />
-        </>
-      }
-      composer={<Composer isHero={composerHero} />}
-      composerHero={composerHero}
-      heroTitle={heroTitle}
-      heroHint="Describe a task to start the native agent loop."
-      overlay={overlay}
-      // Only the question wizard reads as part of the composer stack —
-      // PermissionPrompt keeps its own floating-card treatment.
-      overlayDocked={!!questionForActive}
-    />
+    <>
+      <ChatShell
+        hideSidebar={embedded}
+        timeline={
+          <>
+            <TurnTimeline
+              sessionId={activeSessionId}
+              onConversationEmpty={handleConversationEmpty}
+            />
+            {/* Anchors to ChatShell's relative <main>; the timeline wrapper is
+             * not positioned, so the tray overlays the whole conversation. */}
+            <SubagentViewer />
+          </>
+        }
+        composer={<Composer isHero={composerHero} />}
+        composerHero={composerHero}
+        heroTitle={heroTitle}
+        heroHint="Describe a task to start the native agent loop."
+        overlay={overlay}
+        // Only the question wizard reads as part of the composer stack —
+        // PermissionPrompt portals to document.body on its own.
+        overlayDocked={!!questionForActive}
+      />
+      {permissionForActive ? (
+        <PermissionPrompt permission={permissionForActive} />
+      ) : null}
+    </>
   )
 }

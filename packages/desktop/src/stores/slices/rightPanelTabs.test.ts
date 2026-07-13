@@ -193,6 +193,20 @@ describe("right panel per-session tab state (BUG #37)", () => {
     expect(state.selectedTabBySession[sessionScopeKey(A)]).toBeUndefined()
   })
 
+  it("opening the Files tab with no buffers keeps the panel open", () => {
+    useAppStore.getState().setActiveSessionId(A)
+    useAppStore.getState().setRightPanelOpen(true)
+    useAppStore.getState().setRightPanelTab("files")
+    expect(useAppStore.getState().rightPanelOpen).toBe(true)
+    expect(useAppStore.getState().rightPanelTab).toBe("files")
+    expect(useAppStore.getState().openTabsBySession[sessionScopeKey(A)]).toEqual([
+      "files",
+    ])
+    expect(
+      useAppStore.getState().openFilesBySession[sessionScopeKey(A)] ?? [],
+    ).toEqual([])
+  })
+
   it("closing the last Files buffer collapses the panel when Files was alone", () => {
     useAppStore.getState().setActiveSessionId(A)
     useAppStore.getState().openWorkspaceFile(sessionScopeKey(A), "a.ts")
