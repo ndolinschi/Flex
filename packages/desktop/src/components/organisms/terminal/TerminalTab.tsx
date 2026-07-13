@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { List, Plus, Terminal as TerminalIcon } from "lucide-react"
 import { IconButton, ScrollArea } from "../../atoms"
 import { ConfirmDialog, EmptyState } from "../../molecules"
@@ -18,10 +18,10 @@ const EMPTY_TERMINALS: TerminalMeta[] = []
 
 /** Terminal right-panel tab: terminal list + xterm instances.
  * Scoped to the active session — switching sessions shows that session's own
- * terminal list. All sessions' `TerminalInstance`s stay mounted (PTYs + xterm
- * scrollback survive session switches); only the active session's active
- * terminal is visible. Stays mounted when inactive (parent hides via
- * display:none).
+ * terminal list. Only the active session's xterm instances stay mounted
+ * (Wave 4); the terminal bus still buffers PTY output for other sessions so
+ * remounting on switch restores scrollback without keeping N×xterm alive.
+ * Stays mounted when inactive (parent hides via display:none).
  *
  * Opening the tab with zero workspace terminals auto-creates one PTY so the
  * user lands in a shell instead of an empty state. */
@@ -29,8 +29,9 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const sessionKey = sessionScopeKey(activeSessionId)
 
-  const terminalsBySession = useAppStore((s) => s.terminalsBySession)
-  const terminals = terminalsBySession[sessionKey] ?? EMPTY_TERMINALS
+  const terminals = useAppStore(
+    (s) => s.terminalsBySession[sessionKey] ?? EMPTY_TERMINALS,
+  )
   const activeTerminalId = useAppStore(
     (s) => s.activeTerminalIdBySession[sessionKey] ?? null,
   )
@@ -44,8 +45,9 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
   // the same `activeTerminalIdBySession` map as workspace terminals since its
   // id is just a string (`agent:${sessionId}`) — no PTY/terminalCreate behind it.
   const agentId = activeSessionId ? agentTerminalId(activeSessionId) : null
-  const agentStreamSessions = useAppStore((s) => s.agentStreamSessions)
-  const hasAgentStream = agentId ? !!agentStreamSessions[agentId] : false
+  const hasAgentStream = useAppStore((s) =>
+    agentId ? !!s.agentStreamSessions[agentId] : false,
+  )
 
   const { sessions } = useSessions()
   const activeSession = sessions.find((s) => s.id === activeSessionId)
@@ -115,23 +117,6 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
       setPendingClose(null)
     }
   }
-
-  // Union of every session's terminals — instances stay mounted across
-  // session switches so PTYs and xterm scrollback survive (like the reference's
-  // tmux-style persistence). Only the current session's active terminal
-  // is visible; the rest render `hidden`.
-  const allTerminals = useMemo(
-    () => Object.values(terminalsBySession).flat(),
-    [terminalsBySession],
-  )
-
-  // Union of every session's agent terminals — stays mounted across session
-  // switches for the same reason as `allTerminals`, but keyed by the synthetic
-  // `agent:${sessionId}` id (no PTY / terminalCreate behind it).
-  const allAgentSessionKeys = useMemo(
-    () => Object.keys(agentStreamSessions).filter((key) => agentStreamSessions[key]),
-    [agentStreamSessions],
-  )
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -232,21 +217,21 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
               onAction={() => void handleNewTerminal()}
             />
           ) : null}
-          {allTerminals.map((t) => (
+          {terminals.map((t) => (
             <TerminalInstance
               key={t.id}
               id={t.id}
               active={active && t.id === activeTerminalId}
             />
           ))}
-          {allAgentSessionKeys.map((key) => (
+          {hasAgentStream && agentId ? (
             <TerminalInstance
-              key={key}
-              id={key}
-              active={active && key === activeTerminalId}
+              key={agentId}
+              id={agentId}
+              active={active && agentId === activeTerminalId}
               readOnly
             />
-          ))}
+          ) : null}
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import { ChevronRight, Workflow } from "lucide-react"
 import type {
   PlanStatus,
@@ -198,7 +198,10 @@ export const WorkflowGroup = ({
   subagents,
   status,
 }: WorkflowGroupProps) => {
-  const resolved = resolveSteps(steps, subagents)
+  const resolved = useMemo(
+    () => resolveSteps(steps, subagents),
+    [steps, subagents],
+  )
   const total = resolved.length
   const state = overallState(resolved, status)
   const doneCount = resolved.filter(

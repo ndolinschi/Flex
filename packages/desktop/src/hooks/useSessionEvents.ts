@@ -7,7 +7,8 @@ import type {
   TimelineRow,
   ToolCall,
 } from "../lib/types"
-import { listenSessionEvents, replay } from "../lib/tauri"
+import { replay } from "../lib/tauri"
+import { subscribeSessionEvents } from "../lib/sessionEventBus"
 import { applyGlobalSessionEvent } from "./useGlobalSessionEvents"
 import { emptyStreamingBuffers, useAppStore } from "../stores/appStore"
 import {
@@ -382,9 +383,14 @@ export const useSessionEvents = (sessionId: string | null) => {
         thinkingSpansRef.current = spans
         setThinkingDurations(durationsFromSpans(spans))
 
-        unlisten = await listenSessionEvents((event) => {
+        // Demux bus — one Tauri listen shared with useGlobalSessionEvents.
+        unlisten = subscribeSessionEvents((event) => {
           processEvent(event)
         })
+        if (cancelled) {
+          unlisten()
+          unlisten = null
+        }
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : String(err)

@@ -55,11 +55,12 @@ export const ComposerInput = ({
   const backdropRef = useRef<HTMLDivElement>(null)
   const { textareaRef } = useAutoGrowTextarea(composerDraft)
 
-  // Keep the caller's out-ref in sync with the auto-grow ref.
+  // Keep the caller's out-ref in sync with the auto-grow ref (once the
+  // textarea mounts / when the out-ref identity changes).
   useEffect(() => {
     if (!textareaRefOut) return
     textareaRefOut.current = textareaRef.current
-  })
+  }, [textareaRefOut, textareaRef])
 
   const {
     setCaret,

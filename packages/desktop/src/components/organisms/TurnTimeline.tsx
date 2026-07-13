@@ -13,7 +13,6 @@ import {
 import { useSessionEvents } from "../../hooks/useSessionEvents"
 import { useSessions } from "../../hooks/useSessions"
 import { useStickToBottom } from "../../hooks/useStickToBottom"
-import type { TimelineRow } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
 import { invalidateGitQueries } from "../../lib/invalidateGitQueries"
 import { cn } from "../../lib/utils"
@@ -22,11 +21,10 @@ import {
   collapseConsecutiveCheckpoints,
   estimateSizeForItem,
   hasOpenWorkGroup,
-  latestVerdictInRows,
   marginForItem,
-  resumeLineForRows,
   type DisplayItem,
 } from "./timeline/buildDisplayItems"
+import { mergeLiveRows } from "./timeline/mergeLiveRows"
 import { TimelineRowView } from "./timeline/TimelineRowView"
 import { TurnFooter } from "./timeline/TurnFooter"
 import { ReconnectBanner } from "./timeline/ReconnectBanner"
@@ -76,103 +74,10 @@ export const TurnTimeline = ({
     prevStreamingRef.current = isStreaming
   }, [isStreaming, sessionId, queryClient])
 
-  const liveRows = useMemo(() => {
-    const extra: TimelineRow[] = []
-
-    for (const [messageId, text] of Object.entries(streaming.thinking)) {
-      if (!text) continue
-      // Skip once either a materialized thinking row OR the assistant
-      // message for this id exists — otherwise a thinking-only
-      // assistant_message (no markdown) would duplicate the live row.
-      const materialized = rows.some(
-        (r) =>
-          (r.type === "thinking" || r.type === "assistant") &&
-          r.messageId === messageId,
-      )
-      if (materialized) continue
-      extra.push({
-        type: "thinking",
-        id: `live-thinking:${messageId}`,
-        messageId,
-        text,
-        tsMs: Date.now(),
-      })
-    }
-
-    for (const [messageId, text] of Object.entries(streaming.markdown)) {
-      if (!text) continue
-      const materialized = rows.some(
-        (r) => r.type === "assistant" && r.messageId === messageId,
-      )
-      if (materialized) continue
-      extra.push({
-        type: "assistant",
-        id: `live-assistant:${messageId}`,
-        messageId,
-        text,
-        tsMs: Date.now(),
-      })
-    }
-
-    for (const call of Object.values(streaming.toolCalls)) {
-      // RunWorkflow calls materialize as a `workflow` row and Verify calls as
-      // a `verdict` row (both in useSessionEvents) — never a plain `tool`
-      // row — skip the generic live-tool fallback here for both.
-      if (call.tool_name === "RunWorkflow" || call.tool_name === "Verify") continue
-      // Materialized tool rows are replaced in place with the latest state.
-      const inRows = rows.some((r) => r.type === "tool" && r.call.id === call.id)
-      if (inRows) continue
-      extra.push({
-        type: "tool",
-        id: `live-tool:${call.id}`,
-        call,
-        tsMs: Date.now(),
-      })
-    }
-
-    // Fold in client-side log rows (model/provider changes) as "meta" rows,
-    // ordered by tsMs alongside everything else — a log row lands between
-    // turns wherever its timestamp falls, without disturbing turn grouping.
-    const logRows: TimelineRow[] = (sessionLogRows ?? []).map((log) => ({
-      type: "meta",
-      id: log.id,
-      text: log.text,
-      tsMs: log.tsMs,
-    }))
-
-    // `rows` is already in authoritative event order — `applyEventToTimeline`
-    // appends new rows in arrival order and updates existing ones IN PLACE
-    // (same array index), so `rows` must never be re-sorted: a tool call's
-    // `tsMs` reflects its LATEST lifecycle update (e.g. completion time), not
-    // when it first appeared, so it isn't monotonic with array position once
-    // multiple calls run concurrently (see `clusterToolRows`/`buildDisplayItems`,
-    // both of which read this array positionally). Re-sorting the merged
-    // array by `tsMs` (as this used to do) could reorder settled `rows`
-    // relative to each other — splitting adjacent same-family tool rows that
-    // should cluster, or shuffling a tool row across a `turn_started`/
-    // `turn_completed` boundary — exactly the "clustering fails on real
-    // data" / "completed turn stays open" bugs a strictly-monotonic,
-    // non-concurrent mock event order used to hide.
-    // Only `logRows` (client-side, arbitrary tsMs, never touch the engine
-    // array) need slotting in by timestamp; live-only `extra` rows (not yet
-    // materialized) always represent the newest in-flight content, so they
-    // belong after everything materialized.
-    if (logRows.length === 0) return [...rows, ...extra]
-
-    const withLogs = [...rows]
-    for (const log of logRows) {
-      let insertAt = withLogs.length
-      for (let i = withLogs.length - 1; i >= 0; i--) {
-        if (withLogs[i].tsMs <= log.tsMs) {
-          insertAt = i + 1
-          break
-        }
-        insertAt = i
-      }
-      withLogs.splice(insertAt, 0, log)
-    }
-    return [...withLogs, ...extra]
-  }, [rows, streaming, sessionLogRows])
+  const liveRows = useMemo(
+    () => mergeLiveRows(rows, streaming, sessionLogRows),
+    [rows, streaming, sessionLogRows],
+  )
 
   const displayItems = useMemo(
     () => buildDisplayItems(collapseConsecutiveCheckpoints(liveRows), isStreaming),
@@ -407,12 +312,7 @@ export const TurnTimeline = ({
                             ? "compacting"
                             : item.isOpen && indexingStatus
                               ? "indexing"
-                              : item.isOpen &&
-                                  item.rows.some(
-                                    (r) =>
-                                      r.type === "thinking" &&
-                                      r.id.startsWith("live-thinking:"),
-                                  )
+                              : item.isOpen && item.hasLiveThinking
                                 ? "thinking"
                                 : "working"
                         }
@@ -423,10 +323,8 @@ export const TurnTimeline = ({
                             ? item.summary.usage.input + item.summary.usage.output
                             : undefined
                         }
-                        verdict={latestVerdictInRows(item.rows)}
-                        resumeLine={
-                          item.isOpen ? null : resumeLineForRows(item.rows)
-                        }
+                        verdict={item.verdict}
+                        resumeLine={item.resumeLine}
                         onLayoutChange={onLayoutChange}
                       >
                         <WorkGroupBody

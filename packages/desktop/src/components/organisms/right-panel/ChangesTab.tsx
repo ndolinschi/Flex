@@ -4,9 +4,9 @@ import { GitMerge, RefreshCw, XCircle } from "lucide-react"
 import { Button, DiffStat, IconButton, ScrollArea } from "../../atoms"
 import { ConfirmDialog } from "../../molecules"
 import { useWorkspaceActions } from "../../../hooks/useWorkspaceActions"
+import { useIsGitRepo } from "../../../hooks/useIsGitRepo"
 import {
   gitBranch,
-  gitIsRepo,
   gitStatusSinceBaseline,
   isIsolated,
 } from "../../../lib/tauri"
@@ -38,15 +38,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     data: isRepo = true,
     isFetching: isRepoFetching,
     refetch: refetchIsRepo,
-  } = useQuery({
-    queryKey: ["git-is-repo", cwd],
-    queryFn: () => gitIsRepo(cwd),
-    enabled: !!cwd,
-    staleTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 5_000,
-  })
+  } = useIsGitRepo(cwd || undefined)
 
   const { data: summary, refetch, isFetching } = useQuery({
     queryKey: ["git-status", cwd, sessionId],

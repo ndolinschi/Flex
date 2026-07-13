@@ -80,6 +80,17 @@ const turnCompleted = (turnId: string, tsMs: number, summary?: TurnSummary): Tim
   tsMs,
 })
 
+/** Manual WorkGroupItem fixtures for helpers that take `DisplayItem[]`. */
+const groupItem = (
+  partial: Pick<DisplayItem & { kind: "group" }, "id" | "isOpen" | "rows"> &
+    Partial<Extract<DisplayItem, { kind: "group" }>>,
+): Extract<DisplayItem, { kind: "group" }> => ({
+  kind: "group",
+  resumeLine: null,
+  hasLiveThinking: false,
+  ...partial,
+})
+
 const summary: TurnSummary = {
   turn_id: "turn-1",
   stop_reason: "end_turn",
@@ -139,6 +150,10 @@ describe("buildDisplayItems", () => {
     expect(group.rows[3]).toBe(narration)
     // No footer on the group since the final answer row carries it.
     expect(group.footer).toBeUndefined()
+    // Precomputed collapsed props (Wave 4) — avoid rescanning in the virtualizer.
+    expect(group.resumeLine).toBe("Edited 2 files · Explored 2 files · Ran 2 commands")
+    expect(group.hasLiveThinking).toBe(false)
+    expect(group.verdict).toBeUndefined()
 
     const answerItem = items[2]
     expect(answerItem).toMatchObject({ kind: "row", row: { type: "assistant" } })
@@ -193,6 +208,8 @@ describe("buildDisplayItems", () => {
     expect(items.some((i) => i.kind === "row" && i.row === narration)).toBe(false)
     // An open group never carries a footer.
     expect(group.footer).toBeUndefined()
+    expect(group.resumeLine).toBeNull()
+    expect(group.hasLiveThinking).toBe(false)
   })
 
   it("a turn with zero tool calls does not create an empty work group", () => {
@@ -311,12 +328,11 @@ describe("buildDisplayItems", () => {
 
   describe("hasOpenWorkGroup", () => {
     it("is true whenever any open group exists, even when lastItemIsOpenWorkGroup is false", () => {
-      const openGroup: DisplayItem = {
-        kind: "group",
+      const openGroup = groupItem({
         id: "group:turn-1",
         isOpen: true,
         rows: [],
-      }
+      })
       // Settled answer from another turn with a footer — lastItemIsOpenWorkGroup
       // treats footer as "not live narration", so trailing-only check is false.
       const settledAnswer: DisplayItem = {
@@ -337,12 +353,11 @@ describe("buildDisplayItems", () => {
 
     it("is false when every group is collapsed", () => {
       const items: DisplayItem[] = [
-        {
-          kind: "group",
+        groupItem({
           id: "group:turn-1",
           isOpen: false,
           rows: [],
-        },
+        }),
       ]
       expect(hasOpenWorkGroup(items)).toBe(false)
     })
@@ -370,18 +385,16 @@ describe("shouldSkipCv", () => {
       tsMs: 0,
     },
   }
-  const openGroup: DisplayItem = {
-    kind: "group",
+  const openGroup = groupItem({
     id: "group-1",
     isOpen: true,
     rows: [],
-  }
-  const closedGroup: DisplayItem = {
-    kind: "group",
+  })
+  const closedGroup = groupItem({
     id: "group-2",
     isOpen: false,
     rows: [],
-  }
+  })
 
   it("always skips content-visibility on virtualized timeline rows", () => {
     // Virtualization already unmounts off-screen rows; cv on the mounted
@@ -443,14 +456,12 @@ describe("estimateSizeForItem", () => {
   })
 
   it("estimates open work groups from nested rows without sizing full thinking text", () => {
-    const closed: DisplayItem = {
-      kind: "group",
+    const closed = groupItem({
       id: "g-closed",
       isOpen: false,
       rows: [],
-    }
-    const open: DisplayItem = {
-      kind: "group",
+    })
+    const open = groupItem({
       id: "g-open",
       isOpen: true,
       rows: [
@@ -487,7 +498,7 @@ describe("estimateSizeForItem", () => {
           tsMs: 0,
         },
       ],
-    }
+    })
 
     expect(estimateSizeForItem(closed, true)).toBe(32)
     const openPx = estimateSizeForItem(open, true)

@@ -10,13 +10,11 @@ import { useQuery } from "@tanstack/react-query"
 import { ChevronsLeft } from "lucide-react"
 import { IconButton } from "../atoms"
 import { ContextMenu, type ContextMenuItem } from "../molecules"
-import {
-  gitIsRepo,
-  gitStatusSinceBaseline,
-} from "../../lib/tauri"
+import { gitStatusSinceBaseline } from "../../lib/tauri"
 import { useAppStore, sessionScopeKey, type RightPanelTab } from "../../stores/appStore"
 import { RIGHT_PANEL_DEFAULT_WIDTH } from "../../stores/layoutConstants"
 import { useSessions } from "../../hooks/useSessions"
+import { useIsGitRepo } from "../../hooks/useIsGitRepo"
 import { cn } from "../../lib/utils"
 import { BrowserTab } from "./BrowserTab"
 import { TerminalTab } from "./TerminalTab"
@@ -123,15 +121,7 @@ export const RightPanel = () => {
 
   // Gate the tab's changes-count badge on the cwd being a git repo — see
   // ChangesTab's own `isRepo` gating for the full rationale.
-  const isRepoForBadge = useQuery({
-    queryKey: ["git-is-repo", active?.cwd ?? ""],
-    queryFn: () => gitIsRepo(active!.cwd),
-    enabled: !!active?.cwd,
-    staleTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 5_000,
-  }).data
+  const isRepoForBadge = useIsGitRepo(active?.cwd).data
 
   const changesSummary = useQuery({
     queryKey: ["git-status", active?.cwd ?? "", active?.id ?? null],

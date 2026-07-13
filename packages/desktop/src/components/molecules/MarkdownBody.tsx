@@ -120,6 +120,42 @@ const MARKDOWN_PROSE_CLASS = cn(
   "[&_tbody_tr:last-child_td]:border-b-0",
 )
 
+const MARKDOWN_COMPONENTS: NonNullable<
+  ComponentProps<typeof ReactMarkdown>["components"]
+> = {
+  table: (props) => (
+    <div className="my-1.5 overflow-x-auto rounded-lg border border-stroke-3 first:mt-0 last:mb-0">
+      <table {...props} />
+    </div>
+  ),
+  pre: CodeBlock,
+  // Links must never navigate the app's own webview (that replaces the
+  // whole UI with the page). Route web links into the embedded Browser
+  // panel; hand any other scheme to the OS opener.
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      onClick={(e) => {
+        if (!href) return
+        e.preventDefault()
+        if (/^https?:\/\//i.test(href)) {
+          window.dispatchEvent(
+            new CustomEvent("flex:open-in-browser", {
+              detail: { url: href },
+            }),
+          )
+        } else {
+          void import("@tauri-apps/plugin-opener")
+            .then((m) => m.openUrl(href))
+            .catch(() => {})
+        }
+      }}
+    >
+      {children}
+    </a>
+  ),
+}
+
 /** Conversation markdown — compact reference-like body scale.
  * Highlight.js language packs load lazily via `lib/markdownHighlight` so the
  * initial chunk stays lean; GFM still renders immediately. */
@@ -153,37 +189,7 @@ export const MarkdownBody = memo(({ content, className, live = false }: Markdown
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={rehypePlugins}
-        components={{
-          table: (props) => (
-            <div className="my-1.5 overflow-x-auto rounded-lg border border-stroke-3 first:mt-0 last:mb-0">
-              <table {...props} />
-            </div>
-          ),
-          pre: CodeBlock,
-          // Links must never navigate the app's own webview (that replaces the
-          // whole UI with the page). Route web links into the embedded Browser
-          // panel; hand any other scheme to the OS opener.
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              onClick={(e) => {
-                if (!href) return
-                e.preventDefault()
-                if (/^https?:\/\//i.test(href)) {
-                  window.dispatchEvent(
-                    new CustomEvent("flex:open-in-browser", { detail: { url: href } }),
-                  )
-                } else {
-                  void import("@tauri-apps/plugin-opener")
-                    .then((m) => m.openUrl(href))
-                    .catch(() => {})
-                }
-              }}
-            >
-              {children}
-            </a>
-          ),
-        }}
+        components={MARKDOWN_COMPONENTS}
       >
         {content}
       </ReactMarkdown>
