@@ -35,7 +35,7 @@ export const SidebarFooter = ({
       </div>
 
       {isCreating ? (
-        <div className="flex items-center gap-2 border-t border-stroke-3 px-4 py-2 text-xs text-ink-muted">
+        <div className="flex items-center gap-2 border-t border-stroke-3 px-2 py-2 text-xs text-ink-muted">
           <Spinner size="sm" />
           Creating…
         </div>

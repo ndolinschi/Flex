@@ -248,7 +248,7 @@ export const TurnTimeline = ({
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-3 p-6">
+      <div className="flex flex-col gap-3 px-4 py-3">
         {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-16 w-full" />
         ))}
@@ -258,7 +258,7 @@ export const TurnTimeline = ({
 
   if (error) {
     return (
-      <div className="p-6">
+      <div className="px-4 py-3">
         <ErrorBanner message={error} />
       </div>
     )
@@ -280,7 +280,7 @@ export const TurnTimeline = ({
           "[scrollbar-width:thin] [scrollbar-color:var(--color-stroke-3)_transparent]",
         )}
       >
-        <div className="mx-auto mt-auto flex w-full max-w-[var(--content-rail)] flex-col pb-3">
+        <div className="mx-auto mt-auto flex w-full max-w-[var(--content-rail)] flex-col pb-2">
           <div
             className="relative w-full"
             style={{ height: virtualizer.getTotalSize() }}

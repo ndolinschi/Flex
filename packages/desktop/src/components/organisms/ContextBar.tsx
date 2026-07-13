@@ -42,7 +42,7 @@ export const ContextBar = ({
   const { data: isRepo = true } = useIsGitRepo(cwd)
 
   return (
-    <div className="flex min-h-[var(--status-bar-height)] items-center gap-2 px-1">
+    <div className="flex min-h-[var(--status-bar-height)] items-center gap-2 px-0">
       {/* min-w-0 + flex-1 (not justify-between) so this group is what shrinks
           under pressure — the gap to the right-hand cluster is a real flex
           gap, not `justify-between`'s leftover space, so it can never

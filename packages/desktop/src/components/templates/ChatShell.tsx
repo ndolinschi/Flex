@@ -104,10 +104,10 @@ export const ChatShell = ({
               </div>
             </div>
             {composer}
-            <div className="pb-3" />
+            <div className="pb-2" />
           </div>
         ) : (
-          <div className="relative z-50 shrink-0 pb-3">
+          <div className="relative z-50 shrink-0 pb-2">
             {overlay ? (
               <div
                 className={cn(

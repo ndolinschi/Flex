@@ -168,7 +168,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
 
   if (!activeSessionId) {
     return (
-      <div className="px-6 pb-6 text-center text-sm text-ink-muted">
+      <div className="px-4 pb-3 text-center text-sm text-ink-muted">
         Select or create a session to start chatting.
       </div>
     )
@@ -250,7 +250,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
           textareaRefOut={textareaRef}
         />
 
-        <div className="flex items-center justify-between gap-1.5 px-2.5 pb-2.5 pt-2">
+        <div className="flex items-center justify-between gap-1.5 px-3 pb-2.5 pt-2">
           <div className="flex min-w-0 items-center gap-0.5">
             <PlusMenu
               onAttachFile={() => void handlePick("file")}

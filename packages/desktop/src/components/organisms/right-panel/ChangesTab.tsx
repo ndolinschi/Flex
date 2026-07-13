@@ -126,7 +126,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
 
   if (!active) {
     return (
-      <div className="flex flex-1 items-center justify-center px-6 text-center">
+      <div className="flex flex-1 items-center justify-center px-4 text-center">
         <p className="text-sm text-ink-muted">No active session.</p>
       </div>
     )
@@ -139,7 +139,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
   // picked up without leaving and re-entering the tab.
   if (!isRepo) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 text-center">
         <p className="text-sm text-ink-muted">Not a git repository.</p>
         <IconButton
           label="Refresh changes"
@@ -219,7 +219,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
 
       <ScrollArea className="min-h-0 flex-1">
         {totalCount === 0 ? (
-          <p className="px-6 py-8 text-center text-sm text-ink-muted">
+          <p className="px-4 py-8 text-center text-sm text-ink-muted">
             No changes{branch ? ` in ${branch}` : ""}.
           </p>
         ) : (
