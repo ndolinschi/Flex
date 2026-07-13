@@ -230,6 +230,8 @@ export type SessionSliceState = {
   setPendingPlanApproval: (
     approval: { sessionId: SessionId; planId: string; plan: string } | null,
   ) => void
+  /** Open + expand the right panel on the Plan tab for the active session. */
+  revealPlanPanel: () => void
   setPlanEntries: (sessionId: SessionId, entries: PlanEntry[]) => void
   /** Upsert an ExitPlanMode plan into the session history and make it active.
    * `entries` (optional) snapshots the Plan-tool checklist at handoff time. */

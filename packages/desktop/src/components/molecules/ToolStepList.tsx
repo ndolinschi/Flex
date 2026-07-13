@@ -10,13 +10,16 @@ export const ToolStepList = ({
   rows,
   renderOther,
   progress,
-  forceOpenDetails = false,
 }: {
   rows: TimelineToolRowLike[]
   renderOther: (row: TimelineToolRowLike) => ReactNode
   progress?: Record<string, string>
-  /** Keep every tool-step cluster expanded (live turn) — not only while a
-   * call inside that cluster is still running. */
+  /**
+   * @deprecated No longer forces tool clusters open for the whole live turn.
+   * Clusters auto-expand only while a call inside them is running, then
+   * collapse so the user can re-expand manually. Kept as an optional unused
+   * prop so WorkGroupBody call sites stay stable.
+   */
   forceOpenDetails?: boolean
 }) => {
   const clusters = useMemo(() => clusterToolRows(rows), [rows])
@@ -32,7 +35,7 @@ export const ToolStepList = ({
             // DOM subtree replaced) instead of an in-place update.
             key={`tools:${cluster.calls[0].id}`}
             calls={cluster.calls}
-            forceOpen={forceOpenDetails || cluster.calls.some(isRunning)}
+            forceOpen={cluster.calls.some(isRunning)}
             progress={progress}
           />
         ) : (
