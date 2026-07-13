@@ -21,6 +21,9 @@ export const createPanelExtrasSlice: StateCreator<
   subagentViewer: null,
   openTabsBySession: {},
   selectedTabBySession: {},
+  openFilesBySession: {},
+  activeFileBySession: {},
+  fileDraftsBySession: {},
   openTab: (sessionKey, tab) => {
     const prev = get().openTabsBySession[sessionKey] ?? []
     if (prev.includes(tab)) return
@@ -39,6 +42,69 @@ export const createPanelExtrasSlice: StateCreator<
     void persistUiState({ openTabsBySession: next })
   },
   setOpenTabsBySession: (value) => set({ openTabsBySession: value }),
+  openWorkspaceFile: (sessionKey, path) => {
+    const trimmed = path.trim()
+    if (!trimmed || trimmed.endsWith("/")) return
+    const prev = get().openFilesBySession[sessionKey] ?? []
+    const openFilesBySession = prev.includes(trimmed)
+      ? get().openFilesBySession
+      : {
+          ...get().openFilesBySession,
+          [sessionKey]: [...prev, trimmed],
+        }
+    set({
+      openFilesBySession,
+      activeFileBySession: {
+        ...get().activeFileBySession,
+        [sessionKey]: trimmed,
+      },
+    })
+    get().openTab(sessionKey, "files")
+    get().setRightPanelOpen(true)
+    get().setRightPanelTab("files")
+  },
+  closeWorkspaceFile: (sessionKey, path) => {
+    const prev = get().openFilesBySession[sessionKey] ?? []
+    if (!prev.includes(path)) return
+    const remaining = prev.filter((p) => p !== path)
+    const drafts = { ...(get().fileDraftsBySession[sessionKey] ?? {}) }
+    delete drafts[path]
+    const active = get().activeFileBySession[sessionKey]
+    set({
+      openFilesBySession: {
+        ...get().openFilesBySession,
+        [sessionKey]: remaining,
+      },
+      activeFileBySession: {
+        ...get().activeFileBySession,
+        [sessionKey]:
+          active === path ? (remaining[remaining.length - 1] ?? null) : active,
+      },
+      fileDraftsBySession: {
+        ...get().fileDraftsBySession,
+        [sessionKey]: drafts,
+      },
+    })
+  },
+  setActiveWorkspaceFile: (sessionKey, path) =>
+    set((state) => ({
+      activeFileBySession: {
+        ...state.activeFileBySession,
+        [sessionKey]: path,
+      },
+    })),
+  setWorkspaceFileDraft: (sessionKey, path, draft) =>
+    set((state) => {
+      const drafts = { ...(state.fileDraftsBySession[sessionKey] ?? {}) }
+      if (draft === null) delete drafts[path]
+      else drafts[path] = draft
+      return {
+        fileDraftsBySession: {
+          ...state.fileDraftsBySession,
+          [sessionKey]: drafts,
+        },
+      }
+    }),
   pushSnapshot: (sessionId, snapshotId) =>
     set((state) => {
       const prev = state.snapshotsBySession[sessionId] ?? []

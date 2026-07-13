@@ -20,6 +20,7 @@ import { BrowserTab } from "./BrowserTab"
 import { TerminalTab } from "./TerminalTab"
 import { PlanTab } from "./right-panel/PlanTab"
 import { ChangesTab } from "./right-panel/ChangesTab"
+import { FilesTab } from "./right-panel/FilesTab"
 import { RightPanelTabBar } from "./right-panel/RightPanelTabBar"
 import { TABS } from "./right-panel/tabs"
 
@@ -283,6 +284,16 @@ export const RightPanel = () => {
               <ChangesTab active={active} />
             </div>
           ) : null}
+          <div
+            className={cn(
+              "absolute inset-0 flex flex-col",
+              tab === "files" && openIds.includes("files")
+                ? "flex"
+                : "hidden",
+            )}
+          >
+            <FilesTab active={open && tab === "files"} />
+          </div>
           <div
             className={cn(
               "absolute inset-0 flex flex-col",

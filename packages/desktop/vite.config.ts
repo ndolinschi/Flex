@@ -37,6 +37,7 @@ export default defineConfig(async () => ({
             "highlight.js",
           ],
           xterm: ["@xterm/xterm", "@xterm/addon-fit"],
+          monaco: ["monaco-editor", "@monaco-editor/react"],
         },
       },
     },

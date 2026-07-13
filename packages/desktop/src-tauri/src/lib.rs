@@ -288,6 +288,7 @@ pub fn run() {
             commands::project_memory_set_expiry,
             commands::user_identity,
             commands::save_text_file,
+            commands::read_text_file,
             commands::export_diagnostics_bundle,
             commands::write_temp_blob,
             commands::debug_log_path,
