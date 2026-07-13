@@ -461,6 +461,7 @@ export const useComposerSend = ({
     useAppStore.getState().setSessionDraining(activeSessionId, true)
     try {
       await cancel(activeSessionId)
+      useAppStore.getState().pushToast("Turn stopped", "success")
     } catch (err) {
       const message = toInvokeError(err)
       log.error("composer", "cancel failed", {

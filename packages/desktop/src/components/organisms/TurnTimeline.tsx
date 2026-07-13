@@ -379,6 +379,7 @@ export const TurnTimeline = ({
                         }
                         verdict={item.verdict}
                         resumeLine={item.resumeLine}
+                        stopped={item.summary?.stop_reason === "cancelled"}
                         onLayoutChange={onLayoutChange}
                       >
                         <WorkGroupBody

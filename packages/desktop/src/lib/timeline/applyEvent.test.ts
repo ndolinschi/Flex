@@ -326,6 +326,45 @@ describe("applyEventToTimeline — tool-result-only user_message", () => {
   })
 })
 
+describe("applyEventToTimeline — cancelled turn", () => {
+  it("inserts a Stopped meta row when Stop ends an empty turn", () => {
+    seq = 0
+    let rows = applyEventToTimeline([], {
+      session_id: "s-1",
+      seq: nextSeq(),
+      ts_ms: 1,
+      payload: { kind: "turn_started", turn_id: "turn-stop" },
+    })
+    rows = applyEventToTimeline(rows, {
+      session_id: "s-1",
+      seq: nextSeq(),
+      ts_ms: 2,
+      payload: {
+        kind: "turn_completed",
+        turn_id: "turn-stop",
+        summary: {
+          turn_id: "turn-stop",
+          stop_reason: "cancelled",
+          usage: { input: 0, output: 0 },
+          num_model_calls: 0,
+          num_tool_calls: 0,
+          duration_ms: 40,
+        },
+      },
+    })
+    expect(rows.some((r) => r.type === "meta" && r.text === "Stopped")).toBe(
+      true,
+    )
+    const items = buildDisplayItems(rows, false)
+    const group = items.find((i) => i.kind === "group")
+    expect(group?.kind).toBe("group")
+    if (group?.kind === "group") {
+      expect(group.summary?.stop_reason).toBe("cancelled")
+      expect(group.footer?.stopped).toBe(true)
+    }
+  })
+})
+
 describe("applyEventToTimeline — compaction_boundary", () => {
   it("materializes a compaction row with summary and token delta", () => {
     seq = 0

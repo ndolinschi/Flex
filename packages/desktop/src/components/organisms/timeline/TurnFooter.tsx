@@ -5,7 +5,12 @@ import { useAppStore } from "../../../stores/appStore"
 import { formatDuration, formatRelativeTime } from "../../../lib/utils"
 import type { TurnFooterInfo } from "./buildDisplayItems"
 
-export const TurnFooter = ({ tsMs, durationMs, copyText }: TurnFooterInfo) => {
+export const TurnFooter = ({
+  tsMs,
+  durationMs,
+  copyText,
+  stopped = false,
+}: TurnFooterInfo) => {
   const [copied, setCopied] = useState(false)
   const pushToast = useAppStore((s) => s.pushToast)
 
@@ -20,11 +25,19 @@ export const TurnFooter = ({ tsMs, durationMs, copyText }: TurnFooterInfo) => {
     }
   }
 
+  const durationPart =
+    stopped
+      ? ""
+      : typeof durationMs === "number"
+        ? ` · Worked for ${formatDuration(durationMs)}`
+        : ""
+
   return (
     <div className="mt-1 flex h-7 items-center justify-start gap-0.5">
       <span className="px-1 text-sm text-ink-faint [font-variant-numeric:tabular-nums]">
         {formatRelativeTime(tsMs)}
-        {typeof durationMs === "number" ? ` · Worked for ${formatDuration(durationMs)}` : ""}
+        {durationPart}
+        {stopped ? " · Stopped" : ""}
       </span>
       <Tooltip label="Copy response">
         <IconButton
