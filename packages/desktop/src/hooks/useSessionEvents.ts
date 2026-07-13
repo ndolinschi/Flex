@@ -426,12 +426,23 @@ export const useSessionEvents = (sessionId: string | null) => {
         let accumulated: TimelineRow[] = []
         let buffers = emptyStreamingBuffers()
         let spans: Record<string, ThinkingSpan> = {}
+        // Detect an open turn from JSONL without trusting orphan turn_started
+        // flags via applyGlobal (ignoreStreaming). Used so a mid-turn gap
+        // resync does not clear streamingSessions and freeze the Stop button.
+        let turnOpenFromReplay = false
         useAppStore.getState().resetSessionTotals(sessionId)
         for (const event of events) {
           accumulated = applyEventToTimeline(accumulated, event)
           const materialized = materializedIdsFromRows(accumulated)
           buffers = applyEventToStreaming(buffers, event.payload, materialized)
           spans = trackThinkingSpan(spans, event)
+          if (event.payload.kind === "turn_started") turnOpenFromReplay = true
+          if (
+            event.payload.kind === "turn_completed" ||
+            event.payload.kind === "session_error"
+          ) {
+            turnOpenFromReplay = false
+          }
           // Same as boot: never restore streaming from JSONL (orphan turn_started).
           applyGlobalSessionEvent(event, { ignoreStreaming: true })
           if (event.payload.kind === "plan_updated") {
@@ -451,10 +462,17 @@ export const useSessionEvents = (sessionId: string | null) => {
         useAppStore.getState().setStreamingBuffers(sessionId, buffers)
         thinkingSpansRef.current = spans
         setThinkingDurations(durationsFromSpans(spans))
-        useAppStore.getState().setSessionStreaming(sessionId, false)
-        if (useAppStore.getState().activeSessionId === sessionId) {
-          useAppStore.getState().setIsStreaming(false)
-          useAppStore.getState().clearStreamingForSession(sessionId)
+        if (turnOpenFromReplay) {
+          useAppStore.getState().setSessionStreaming(sessionId, true)
+          if (useAppStore.getState().activeSessionId === sessionId) {
+            useAppStore.getState().setIsStreaming(true)
+          }
+        } else {
+          useAppStore.getState().setSessionStreaming(sessionId, false)
+          if (useAppStore.getState().activeSessionId === sessionId) {
+            useAppStore.getState().setIsStreaming(false)
+            useAppStore.getState().clearStreamingForSession(sessionId)
+          }
         }
       } catch (err) {
         // Keep the current view; the next gap will retry.

@@ -71,6 +71,11 @@ export const useBrowserSession = (active: boolean) => {
   const isOwner = browserOwnerSessionId === sessionKey
   const browserDesignMode = useAppStore((s) => s.browserDesignMode)
   const rightPanelDragging = useAppStore((s) => s.rightPanelDragging)
+  // Slow the child-webview bounds watchdog while a turn is streaming — timeline
+  // growth shifts the slot every frame and rapid set_bounds freezes WebView2.
+  const sessionStreaming = useAppStore((s) =>
+    activeSessionId ? !!s.streamingSessions[activeSessionId] : false,
+  )
 
   const setBrowserSessionState = useAppStore((s) => s.setBrowserSessionState)
   const setBrowserOwnerSessionId = useAppStore(
@@ -553,7 +558,10 @@ export const useBrowserSession = (active: boolean) => {
     // by WKWebView (live window resize, occlusion), leaving the native child
     // webview over the toolbar. A plain interval keeps firing in those cases;
     // measure(false) only re-sends when the rect actually drifted.
-    const watchdog = window.setInterval(() => measure(false), 500)
+    // While streaming, poll slowly — chat growth would otherwise spam
+    // set_bounds every 500ms + RO storms on Windows WebView2.
+    const watchdogMs = sessionStreaming ? 2000 : 500
+    const watchdog = window.setInterval(() => measure(false), watchdogMs)
     // Overlay open/close doesn't resize the content host — observe DOM so
     // CommandPalette / ConfirmDialog / etc. immediately hide the webview.
     const overlayObserver = new MutationObserver(() => measure(true))
@@ -575,7 +583,15 @@ export const useBrowserSession = (active: boolean) => {
       if (rafId !== null) cancelAnimationFrame(rafId)
       void browserSetVisible(false)
     }
-  }, [active, isOwner, browserStarted, loadError, viewportPreset, rightPanelDragging])
+  }, [
+    active,
+    isOwner,
+    browserStarted,
+    loadError,
+    viewportPreset,
+    rightPanelDragging,
+    sessionStreaming,
+  ])
 
   const preview = isBrowserPreview()
   const showLiveContent = browserStarted && isOwner
