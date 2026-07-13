@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Editor from "@monaco-editor/react"
 import { FileCode2, Save, X } from "lucide-react"
 import { IconButton, Spinner } from "../../atoms"
+import { ConfirmDialog } from "../../molecules"
 import { ensureMonaco, languageForPath } from "../../../lib/monacoEnv"
 import {
   readTextFile,
@@ -42,12 +43,14 @@ export const FilesTab = ({ active }: FilesTabProps) => {
   const setDraft = useAppStore((s) => s.setWorkspaceFileDraft)
   const closeTab = useAppStore((s) => s.closeTab)
   const setRightPanelTab = useAppStore((s) => s.setRightPanelTab)
+  const setRightPanelOpen = useAppStore((s) => s.setRightPanelOpen)
   const openTabs = useAppStore(
     (s) => s.openTabsBySession[sessionKey] ?? EMPTY_TABS,
   )
   const pushToast = useAppStore((s) => s.pushToast)
   const queryClient = useQueryClient()
   const [saving, setSaving] = useState(false)
+  const [confirmClosePath, setConfirmClosePath] = useState<string | null>(null)
 
   useEffect(() => {
     ensureMonaco()
@@ -57,12 +60,37 @@ export const FilesTab = ({ active }: FilesTabProps) => {
 
   useEffect(() => {
     if (!path && openFiles.length === 0 && openTabs.includes("files")) {
-      // No buffers left — drop the Files panel tab itself.
+      // No buffers left — drop the Files panel tab itself. Mirror
+      // RightPanel.handleCloseTab: closing the last open tab also collapses
+      // the panel so we don't leave an empty header with tab="files".
       closeTab(sessionKey, "files")
       const remaining = openTabs.filter((t) => t !== "files")
-      if (remaining.length > 0) setRightPanelTab(remaining[remaining.length - 1])
+      if (remaining.length > 0) {
+        setRightPanelTab(remaining[remaining.length - 1])
+      } else {
+        setRightPanelOpen(false)
+      }
     }
-  }, [path, openFiles.length, openTabs, closeTab, sessionKey, setRightPanelTab])
+  }, [
+    path,
+    openFiles.length,
+    openTabs,
+    closeTab,
+    sessionKey,
+    setRightPanelTab,
+    setRightPanelOpen,
+  ])
+
+  const requestCloseFile = useCallback(
+    (p: string) => {
+      if (drafts[p] !== undefined) {
+        setConfirmClosePath(p)
+        return
+      }
+      closeFile(sessionKey, p)
+    },
+    [drafts, closeFile, sessionKey],
+  )
 
   const {
     data: diskContent,
@@ -186,7 +214,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
                 type="button"
                 aria-label={`Close ${basename(p)}`}
                 className="rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-fill-3"
-                onClick={() => closeFile(sessionKey, p)}
+                onClick={() => requestCloseFile(p)}
               >
                 <X className="h-3 w-3" aria-hidden />
               </button>
@@ -195,7 +223,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
         })}
         <div className="ml-auto flex shrink-0 items-center gap-0.5 pr-1">
           <IconButton
-            label="Save"
+            label={dirty ? "Save" : "Save (no changes)"}
             disabled={!dirty || saving || !path}
             onClick={() => void handleSave()}
             className="h-6 w-6"
@@ -254,6 +282,23 @@ export const FilesTab = ({ active }: FilesTabProps) => {
           />
         ) : null}
       </div>
+
+      <ConfirmDialog
+        open={confirmClosePath !== null}
+        title="Discard unsaved changes?"
+        description={
+          confirmClosePath
+            ? `${basename(confirmClosePath)} has unsaved edits. Close anyway?`
+            : undefined
+        }
+        confirmLabel="Discard"
+        danger
+        onConfirm={() => {
+          if (confirmClosePath) closeFile(sessionKey, confirmClosePath)
+          setConfirmClosePath(null)
+        }}
+        onCancel={() => setConfirmClosePath(null)}
+      />
     </div>
   )
 }

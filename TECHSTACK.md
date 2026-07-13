@@ -59,8 +59,9 @@ Companions: [ARCHITECTURE.md](ARCHITECTURE.md), [COMPONENTS.md](COMPONENTS.md).
   (`desktop-e2e`). Nightly soak / env-gated provider matrix:
   `.github/workflows/nightly.yml`.
 - **Desktop UI**: `packages/desktop` — Tauri 2, React 19, Tailwind v4, Zustand,
-  TanStack Query, Playwright E2E for the Vite native-app-required gate; Rust
-  shell composes via
+  TanStack Query, Playwright E2E for the Vite native-app-required gate; right-panel
+  Files tab uses Monaco (`monaco-editor` / `@monaco-editor/react`) for open/edit;
+  Rust shell composes via
   `agentloop-sdk::AgentBuilder` and stores API keys in the OS keychain
   (`keyring`). Run: `cd packages/desktop && pnpm tauri dev`. E2E:
   `pnpm test:e2e`.

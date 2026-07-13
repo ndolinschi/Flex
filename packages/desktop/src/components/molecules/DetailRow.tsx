@@ -1,8 +1,8 @@
-import { useState } from "react"
-import { ChevronRight, ListEnd, LoaderCircle } from "lucide-react"
+import { useState, type MouseEvent } from "react"
+import { ChevronRight, FileCode2, ListEnd, LoaderCircle } from "lucide-react"
 import { backgroundDemote, reviewFileDiff } from "../../lib/tauri"
 import { cn } from "../../lib/utils"
-import { useAppStore } from "../../stores/appStore"
+import { sessionScopeKey, useAppStore } from "../../stores/appStore"
 import { Collapsible } from "./Collapsible"
 import { DiffView } from "./DiffView"
 import { IconButton } from "../atoms/IconButton"
@@ -44,6 +44,7 @@ type DetailRowProps = {
  * tab). Rows without a path behave exactly as before. */
 export const DetailRow = ({ detail, note }: DetailRowProps) => {
   const sessionId = useAppStore((s) => s.activeSessionId)
+  const openWorkspaceFile = useAppStore((s) => s.openWorkspaceFile)
   const [expanded, setExpanded] = useState(false)
   const [diff, setDiff] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -54,6 +55,9 @@ export const DetailRow = ({ detail, note }: DetailRowProps) => {
   }
 
   const canExpand = !!detail.diffPath && !!sessionId
+  const openPath = detail.diffPath ?? detail.filePath
+  const canOpenFile =
+    !!sessionId && !!openPath && !openPath.endsWith("/")
 
   const handleToggle = () => {
     if (!canExpand) return
@@ -67,6 +71,12 @@ export const DetailRow = ({ detail, note }: DetailRowProps) => {
         .catch(() => setError(true))
         .finally(() => setLoading(false))
     }
+  }
+
+  const handleOpenFile = (e: MouseEvent) => {
+    e.stopPropagation()
+    if (!sessionId || !openPath) return
+    openWorkspaceFile(sessionScopeKey(sessionId), openPath)
   }
 
   return (
@@ -93,7 +103,7 @@ export const DetailRow = ({ detail, note }: DetailRowProps) => {
             : undefined
         }
         className={cn(
-          "flex min-h-6 items-center gap-1 text-[13px] leading-[1.5] text-ink-muted",
+          "group/detail flex min-h-6 items-center gap-1 text-[13px] leading-[1.5] text-ink-muted",
           canExpand && "cursor-pointer",
         )}
       >
@@ -124,6 +134,15 @@ export const DetailRow = ({ detail, note }: DetailRowProps) => {
           <span className="shrink-0 text-ink-faint">{detail.sublabel}</span>
         ) : null}
         <DiffBadge added={detail.added} removed={detail.removed} />
+        {canOpenFile ? (
+          <IconButton
+            label="Open file"
+            onClick={handleOpenFile}
+            className="ml-auto h-5 w-5 shrink-0 opacity-0 group-hover/detail:opacity-100"
+          >
+            <FileCode2 className="h-3 w-3" aria-hidden />
+          </IconButton>
+        ) : null}
         {detail.canDemote ? <DemoteButton callId={detail.id} /> : null}
       </div>
       {detail.isShell ? (

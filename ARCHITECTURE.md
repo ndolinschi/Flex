@@ -19,6 +19,7 @@ packages/search     # optional deep-search plugin (core::Plugin)
 packages/sdk        # AgentBuilder composition root + the headless runner bin
 packages/gateway    # chat-channel contract (Channel trait) — adapters not built yet
 packages/desktop    # Tauri 2 + React UI — second composition root via AgentBuilder
+                    # (right panel: Plan / Changes / Files+Monaco / Terminal / Browser)
 ```
 
 One `Agent` trait (`packages/engine/crates/core/src/agent.rs`) with two implementation

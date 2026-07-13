@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { ArrowRight, ChevronDown, ChevronRight } from "lucide-react"
 import { gitStatusSinceBaseline } from "../../lib/tauri"
 import { useIsGitRepo } from "../../hooks/useIsGitRepo"
-import { useAppStore } from "../../stores/appStore"
+import { sessionScopeKey, useAppStore } from "../../stores/appStore"
 import { basename, cn, fileIconForPath } from "../../lib/utils"
 import { DiffStat } from "../atoms"
 
@@ -22,13 +22,14 @@ const STATUS_COLOR: Record<string, string> = {
 
 /**
  * Compact "N files changed" summary in the chat feed after a turn. Click the
- * headline to expand an inline file list; "Review" still opens the Changes
- * tab for full undo/diff/commit actions.
+ * headline to expand an inline file list; click a file to open it in the
+ * Files (Monaco) tab. "Review" still opens Changes for undo/diff/commit.
  */
 export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
   const [expanded, setExpanded] = useState(false)
   const setRightPanelOpen = useAppStore((s) => s.setRightPanelOpen)
   const setRightPanelTab = useAppStore((s) => s.setRightPanelTab)
+  const openWorkspaceFile = useAppStore((s) => s.openWorkspaceFile)
 
   const { data: isRepo } = useIsGitRepo(cwd)
 
@@ -58,6 +59,11 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
   const handleReview = () => {
     setRightPanelOpen(true)
     setRightPanelTab("changes")
+  }
+
+  const handleOpenFile = (path: string, status: string, isDir: boolean) => {
+    if (!sessionId || isDir || status === "D") return
+    openWorkspaceFile(sessionScopeKey(sessionId), path)
   }
 
   const hiddenCount = Math.max(0, totalCount - files.length)
@@ -110,39 +116,52 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
                 : ""
             const FileGlyph = fileIconForPath(file.path)
             const statusClass = STATUS_COLOR[file.status] ?? "text-ink-muted"
+            const canOpen = !isDir && file.status !== "D" && !!sessionId
             return (
-              <li
-                key={file.path}
-                className="flex h-7 items-center gap-2 rounded-md px-1.5 text-[13px]"
-              >
-                <FileGlyph
-                  className={cn("h-3.5 w-3.5 shrink-0", statusClass)}
-                  aria-hidden
-                />
-                <span className="min-w-0 flex-1 truncate">
-                  {dir ? (
-                    <span className="text-ink-faint">{dir}</span>
-                  ) : null}
-                  <span className="text-ink">{name}</span>
-                </span>
-                {(file.added ?? 0) > 0 || (file.removed ?? 0) > 0 ? (
-                  <DiffStat
-                    summary={{
-                      added: file.added ?? 0,
-                      removed: file.removed ?? 0,
-                    }}
-                    size="xs"
+              <li key={file.path} className="list-none">
+                <button
+                  type="button"
+                  disabled={!canOpen}
+                  title={canOpen ? `Open ${file.path}` : file.path}
+                  onClick={() =>
+                    handleOpenFile(file.path, file.status, isDir)
+                  }
+                  className={cn(
+                    "flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-[13px]",
+                    canOpen
+                      ? "hover:bg-fill-3"
+                      : "cursor-default opacity-70",
+                  )}
+                >
+                  <FileGlyph
+                    className={cn("h-3.5 w-3.5 shrink-0", statusClass)}
+                    aria-hidden
                   />
-                ) : (
-                  <span
-                    className={cn(
-                      "shrink-0 font-mono text-[11px]",
-                      statusClass,
-                    )}
-                  >
-                    {file.status}
+                  <span className="min-w-0 flex-1 truncate">
+                    {dir ? (
+                      <span className="text-ink-faint">{dir}</span>
+                    ) : null}
+                    <span className="text-ink">{name}</span>
                   </span>
-                )}
+                  {(file.added ?? 0) > 0 || (file.removed ?? 0) > 0 ? (
+                    <DiffStat
+                      summary={{
+                        added: file.added ?? 0,
+                        removed: file.removed ?? 0,
+                      }}
+                      size="xs"
+                    />
+                  ) : (
+                    <span
+                      className={cn(
+                        "shrink-0 font-mono text-[11px]",
+                        statusClass,
+                      )}
+                    >
+                      {file.status}
+                    </span>
+                  )}
+                </button>
               </li>
             )
           })}
