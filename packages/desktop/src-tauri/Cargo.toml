@@ -42,6 +42,10 @@ ignore = "0.4"
 tokio-util = "0.7"
 # Cross-platform PTY spawning backing the terminal panel.
 portable-pty = "0.9"
+# Database UI plugin drivers (SQLite / Postgres / MySQL).
+rusqlite = { version = "0.32", features = ["bundled"] }
+tokio-postgres = "0.7"
+mysql_async = "0.34"
 
 # Composition root — never call EngineService::native or providers::resolve_* here.
 agentloop-sdk = { path = "../../sdk/crates/sdk", features = ["search", "index", "learning", "verifier"] }

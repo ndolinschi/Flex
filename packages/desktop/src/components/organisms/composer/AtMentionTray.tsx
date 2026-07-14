@@ -1,18 +1,25 @@
 import { useEffect, useRef, type RefObject } from "react"
-import { FileIcon } from "lucide-react"
+import { FileIcon, Folder, Table2 } from "lucide-react"
 import { PopoverItem, PopoverTray } from "../../molecules"
-import type { FileHit } from "../../../lib/types"
+import type { AtMentionHit } from "../../../lib/atMentionHits"
 
 type AtMentionTrayProps = {
   open: boolean
   anchorRef: RefObject<HTMLElement | null>
-  hits: FileHit[]
+  hits: AtMentionHit[]
   highlight: number
   onClose: () => void
-  onSelect: (hit: FileHit) => void
+  onSelect: (hit: AtMentionHit) => void
 }
 
-/** Composer `@` file picker — project files only (no folders). */
+const MentionIcon = ({ kind }: { kind: AtMentionHit["kind"] }) => {
+  const className = "h-3.5 w-3.5 shrink-0 text-icon-3"
+  if (kind === "folder") return <Folder className={className} aria-hidden />
+  if (kind === "table") return <Table2 className={className} aria-hidden />
+  return <FileIcon className={className} aria-hidden />
+}
+
+/** Composer `@` suggestion tray — files, folders, and plugin hits (tables). */
 export const AtMentionTray = ({
   open,
   anchorRef,
@@ -39,17 +46,14 @@ export const AtMentionTray = ({
       anchorRef={anchorRef}
       placement="above"
       role="listbox"
-      aria-label="Mention a file"
+      aria-label="Mention a file, folder, or table"
       className="left-0 right-0 w-full"
     >
       <ul ref={listRef} className="max-h-56 overflow-y-auto py-0.5">
         {hits.map((hit, i) => (
-          <li key={hit.path} data-index={i}>
+          <li key={`${hit.kind}:${hit.path}:${hit.name}`} data-index={i}>
             <PopoverItem active={i === highlight} onClick={() => onSelect(hit)}>
-              <FileIcon
-                className="h-3.5 w-3.5 shrink-0 text-icon-3"
-                aria-hidden
-              />
+              <MentionIcon kind={hit.kind} />
               <span className="shrink-0 font-mono text-ink">{hit.name}</span>
               <span className="min-w-0 flex-1 truncate text-right text-ink-faint">
                 {hit.path}

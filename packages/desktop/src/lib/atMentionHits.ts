@@ -1,0 +1,31 @@
+import type { UiMentionHit } from "../plugins/types"
+
+/** Unified @-mention row for the composer tray (files, folders, DB tables). */
+export type AtMentionHit = {
+  kind: "file" | "folder" | "table"
+  name: string
+  path: string
+  /** Text inserted after `@`. Defaults to `name`. */
+  insertText?: string
+  /** Absolute/relative path for file/folder attachments. */
+  attachPath?: string
+}
+
+export const fileHitToAtMention = (hit: {
+  name: string
+  path: string
+  is_dir?: boolean
+}): AtMentionHit => ({
+  kind: hit.is_dir ? "folder" : "file",
+  name: hit.name,
+  path: hit.path,
+  insertText: hit.name,
+  attachPath: hit.path,
+})
+
+export const pluginHitToAtMention = (hit: UiMentionHit): AtMentionHit => ({
+  kind: hit.kind,
+  name: hit.name,
+  path: hit.path,
+  insertText: hit.insertText || hit.name,
+})

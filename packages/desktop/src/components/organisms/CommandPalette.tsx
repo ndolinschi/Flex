@@ -3,6 +3,7 @@ import { createPortal } from "react-dom"
 import {
   Bot,
   Brain,
+  Database,
   FileCode2,
   MessagesSquare,
   Moon,
@@ -20,6 +21,7 @@ import { CommandPaletteRow } from "../molecules"
 import { useSessions } from "../../hooks/useSessions"
 import {
   AUTOMATIONS_UI_ENABLED,
+  DATABASE_TAB_ENABLED,
   FLEX_MODE_ENABLED,
   MEMORY_TAB_ENABLED,
 } from "../../lib/featureFlags"
@@ -149,6 +151,17 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
               icon: Brain,
               group: "Commands" as const,
               run: () => openRightPanelTab("memory"),
+            },
+          ]
+        : []),
+      ...(DATABASE_TAB_ENABLED
+        ? [
+            {
+              id: "tab-database",
+              label: "Switch to Database tab",
+              icon: Database,
+              group: "Commands" as const,
+              run: () => openRightPanelTab("database"),
             },
           ]
         : []),

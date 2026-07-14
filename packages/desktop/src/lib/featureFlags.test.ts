@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   AUTOMATIONS_UI_ENABLED,
+  DATABASE_TAB_ENABLED,
   FLEX_MODE_ENABLED,
   MEMORY_TAB_ENABLED,
   isRightPanelTabEnabled,
@@ -8,6 +9,8 @@ import {
 import { visibleComposerModes } from "../components/molecules/ModePicker"
 import { SETTINGS_NAV_ITEMS } from "../components/molecules/SettingsNav"
 import { visibleRightPanelTabs } from "../components/organisms/right-panel/tabs"
+import { registerBuiltinUiPlugins } from "../plugins/builtins"
+import { resetUiPluginsForTests } from "../plugins/registry"
 
 describe("FLEX_MODE_ENABLED", () => {
   it("defaults off so Flex is hidden from the mode picker", () => {
@@ -31,6 +34,7 @@ describe("AUTOMATIONS_UI_ENABLED", () => {
 
 describe("MEMORY_TAB_ENABLED", () => {
   it("defaults off so Memory is hidden from the right-panel tab strip", () => {
+    resetUiPluginsForTests()
     expect(MEMORY_TAB_ENABLED).toBe(false)
     expect(isRightPanelTabEnabled("memory")).toBe(false)
     expect(visibleRightPanelTabs().map((t) => t.id)).not.toContain("memory")
@@ -41,5 +45,15 @@ describe("MEMORY_TAB_ENABLED", () => {
       "terminal",
       "browser",
     ])
+  })
+})
+
+describe("DATABASE_TAB_ENABLED", () => {
+  it("defaults on and appears via the UI plugin registry", () => {
+    resetUiPluginsForTests()
+    registerBuiltinUiPlugins()
+    expect(DATABASE_TAB_ENABLED).toBe(true)
+    expect(isRightPanelTabEnabled("database")).toBe(true)
+    expect(visibleRightPanelTabs().map((t) => t.id)).toContain("database")
   })
 })

@@ -3088,8 +3088,7 @@ pub struct FileHit {
     pub path: String,
     /// Basename, shown as the primary label.
     pub name: String,
-    /// True when the hit is a directory. Always `false` for `list_files`
-    /// (files only — dirs are not @-mentionable and inflate walk cost).
+    /// True when the hit is a directory (folder icon in @-mentions / Files).
     #[serde(default)]
     pub is_dir: bool,
 }
@@ -3150,10 +3149,11 @@ fn score_file(rel_path: &str, name: &str, needle: &str) -> Option<i32> {
     None
 }
 
-/// Read-only fuzzy **file** search under `cwd` for composer @-mentions and
-/// the Files explorer. Scoped to the session project folder only: respects
-/// `.gitignore` / `.ignore` / `.git/exclude`, never descends into
-/// `node_modules` (and other heavy dirs), returns files only (no folders).
+/// Read-only fuzzy file **and folder** search under `cwd` for composer
+/// @-mentions and the Files explorer. Scoped to the session project folder:
+/// respects `.gitignore` / `.ignore` / `.git/exclude`, never descends into
+/// `node_modules` (and other heavy dirs). Folders are included so the
+/// suggestion tray can show distinct file/folder icons.
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
 pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
@@ -3195,7 +3195,7 @@ pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
             }
             true
         });
-    // Bare `@` / empty Files search: only shallow files so we don't walk the
+    // Bare `@` / empty Files search: only shallow entries so we don't walk the
     // whole tree just to show a browse list.
     if needle.is_empty() {
         builder.max_depth(Some(3));
@@ -3209,7 +3209,13 @@ pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
         let Some(ft) = entry.file_type() else {
             continue;
         };
-        if !ft.is_file() {
+        let is_dir = ft.is_dir();
+        let is_file = ft.is_file();
+        if !is_dir && !is_file {
+            continue;
+        }
+        // Skip the walk root itself.
+        if entry.depth() == 0 {
             continue;
         }
         let Ok(rel) = entry.path().strip_prefix(&root) else {
@@ -3226,15 +3232,18 @@ pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
         let Some(score) = score_file(&rel_str, &name, &needle) else {
             continue;
         };
+        // Prefer files slightly over folders when scores tie (files more often
+        // what users @-mention), but still surface folders with folder icons.
+        let rank = if is_dir { score + 10 } else { score };
         if score <= 1 {
             strong_hits += 1;
         }
         hits.push((
-            score,
+            rank,
             FileHit {
                 path: rel_str,
                 name,
-                is_dir: false,
+                is_dir,
             },
         ));
         // Enough good basename matches — don't keep walking for weak path hits.
