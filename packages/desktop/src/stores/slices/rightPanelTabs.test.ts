@@ -271,4 +271,20 @@ describe("right panel per-session tab state (BUG #37)", () => {
     expect(useAppStore.getState().rightPanelOpen).toBe(false)
     expect(useAppStore.getState().openTabsBySession[key] ?? []).toEqual([])
   })
+
+  it("renameWorkspaceFile retargets open buffers, drafts, and active path", () => {
+    const key = sessionScopeKey(A)
+    useAppStore.getState().setActiveSessionId(A)
+    useAppStore.getState().openWorkspaceFile(key, "src/old.ts")
+    useAppStore.getState().openWorkspaceFile(key, "src/keep.ts")
+    useAppStore.getState().setWorkspaceFileDraft(key, "src/old.ts", "draft")
+    useAppStore.getState().setActiveWorkspaceFile(key, "src/old.ts")
+
+    useAppStore.getState().renameWorkspaceFile(key, "src/old.ts", "src/new.ts")
+
+    const state = useAppStore.getState()
+    expect(state.openFilesBySession[key]).toEqual(["src/new.ts", "src/keep.ts"])
+    expect(state.activeFileBySession[key]).toBe("src/new.ts")
+    expect(state.fileDraftsBySession[key]).toEqual({ "src/new.ts": "draft" })
+  })
 })

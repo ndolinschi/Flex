@@ -95,7 +95,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `RightPanel` | Plan / Changes / Files / Terminal / Browser / Memory (flagged) / plugin tabs (Database); tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`) + `src/plugins/` registry. Plan opens empty via `+`, ⌘J, or Plan mode. Memory gated by `MEMORY_TAB_ENABLED` (default off). Database via UI plugin (`DATABASE_TAB_ENABLED`, default on). | — | App shell |
 | `MemoryTab` | Right-panel Memory surface; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | RightPanel |
 | `DatabaseTab` | UI plugin: SQLite / Postgres / MySQL connections, schemas, tables, SQL + result grid | `active`, `session` | RightPanel (plugin registry) |
-| `FilesTab` | Cursor-style open-file strip + Monaco editor; empty state shows `FileExplorer` (searchable `list_files`) | `active` | RightPanel |
+| `FilesTab` | Cursor-style open-file strip + Monaco editor; empty/browse shows `FileExplorer` (create / rename / delete + searchable `list_files`) | `active` | RightPanel |
 | `AppHeader` | Title + sole right-panel toggle (⌘J) + session menu | — | ChatShell |
 | `WindowTitleBar` | Cursor-style custom window chrome (`decorations: false`): traffic lights / caption buttons + File/Edit/View/Help + drag region | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | RightPanel |
@@ -110,7 +110,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|
 | `organisms/timeline/` | `buildDisplayItems` (+ `estimateSizeForItem`), `TimelineRowView`, `WorkGroupBody`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
 | `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
-| `organisms/right-panel/` | `PlanTab`, `ChangesTab` (single header: select-all + count/branch + diffstat), `FilesTab` (Monaco), `FileExplorer`, `FileRow` (aligned +/- / status columns), `CommitCenter` (message + selection label + split commit), `RightPanelTabBar`, `tabs` |
+| `organisms/right-panel/` | `PlanTab`, `ChangesTab` (single header: select-all + count/branch + diffstat), `FilesTab` (Monaco), `FileExplorer` (browse + New file + right-click Open/Rename/Delete), `FileRow` (aligned +/- / status columns), `CommitCenter` (message + selection label + split commit), `RightPanelTabBar`, `tabs` |
 | `organisms/context-bar/` | `CommitBar` (changes chip + Commit / Commit & Push / Create PR), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
 | `organisms/browser/` | `BrowserToolbar` (Design Mode toggle), `BrowserOverflowMenu` — composed by `BrowserTab` |
 | `organisms/terminal/` | `TerminalTab`, `TerminalInstance`, `TerminalRow`, `AgentTerminalRow`, `time` helpers |

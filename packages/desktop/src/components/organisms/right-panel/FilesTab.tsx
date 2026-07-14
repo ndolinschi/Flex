@@ -232,6 +232,8 @@ export const FilesTab = ({ active }: FilesTabProps) => {
         ) : null}
         {cwd ? (
           <FileExplorer
+            sessionId={activeSessionId!}
+            sessionKey={sessionKey}
             cwd={cwd}
             onOpenFile={(p) => openWorkspaceFile(sessionKey, p)}
           />
