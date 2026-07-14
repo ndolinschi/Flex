@@ -1763,7 +1763,7 @@ pub async fn git_status_since_baseline(
 
     if base_cwd.is_some() {
         let cwd_for_git = cwd_str.clone();
-        return tokio::task::spawn_blocking(move || summarize(git_status_full(&cwd_for_git)?))
+        return tokio::task::spawn_blocking(move || Ok(summarize(git_status_full(&cwd_for_git)?)))
             .await
             .map_err(|e| DesktopError::Message(format!("git status join: {e}")))?;
     }
@@ -1776,7 +1776,7 @@ pub async fn git_status_since_baseline(
     };
     let Some((baseline_head, baseline_files)) = baseline else {
         let cwd_for_git = cwd_str.clone();
-        return tokio::task::spawn_blocking(move || summarize(git_status_full(&cwd_for_git)?))
+        return tokio::task::spawn_blocking(move || Ok(summarize(git_status_full(&cwd_for_git)?)))
             .await
             .map_err(|e| DesktopError::Message(format!("git status join: {e}")))?;
     };
