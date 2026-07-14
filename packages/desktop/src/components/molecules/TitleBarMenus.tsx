@@ -176,12 +176,12 @@ export const TitleBarMenus = ({
   }
 
   return (
-    <div ref={rootRef} className="flex h-full items-center gap-0.5">
+    <div ref={rootRef} className="flex h-full items-center gap-px px-0.5">
       {(Object.keys(menus) as MenuId[]).map((id) => {
         const menu = menus[id]
         const open = openMenu === id
         return (
-          <div key={id} className="relative h-full">
+          <div key={id} className="relative flex h-full items-center">
             <button
               type="button"
               aria-haspopup="menu"
@@ -191,7 +191,7 @@ export const TitleBarMenus = ({
                 if (openMenu && openMenu !== id) setOpenMenu(id)
               }}
               className={cn(
-                "flex h-full items-center rounded-sm px-2 text-[12px] leading-none text-ink-secondary transition-colors",
+                "flex h-[22px] items-center rounded-sm px-1.5 text-[11px] leading-none text-ink-secondary transition-colors",
                 "hover:bg-fill-3 hover:text-ink",
                 open && "bg-fill-3 text-ink",
               )}
@@ -204,7 +204,7 @@ export const TitleBarMenus = ({
               placement="below"
               role="menu"
               aria-label={menu.label}
-              className="left-0 top-full mt-0.5 min-w-[200px] py-1"
+              className="left-0 top-full mt-0.5 min-w-[188px] py-1"
             >
               {menu.items.map((item) =>
                 item.separator ? (
@@ -264,12 +264,12 @@ const MenuRow = ({
 export const AppMark = ({ className }: { className?: string }) => (
   <div
     className={cn(
-      "flex h-full items-center justify-center px-2 text-ink-secondary",
+      "flex h-full items-center justify-center px-1.5 text-ink-secondary",
       className,
     )}
     aria-hidden
   >
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
       <path
         d="M8 1.5L14 5v6L8 14.5 2 11V5L8 1.5Z"
         stroke="currentColor"

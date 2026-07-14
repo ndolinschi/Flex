@@ -11,8 +11,8 @@ export const TitleTab = ({ title, className }: TitleTabProps) => {
   return (
     <div
       className={cn(
-        "flex min-w-0 items-center rounded-sm px-2 py-1",
-        "text-base text-ink-secondary opacity-70",
+        "flex min-w-0 items-center rounded-sm px-1.5 py-0.5",
+        "text-sm text-ink-secondary opacity-70",
         className,
       )}
     >

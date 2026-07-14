@@ -38,16 +38,16 @@ export const WindowTitleBar = ({
   return (
     <header
       className={cn(
-        "flex h-[var(--titlebar-height)] shrink-0 items-stretch select-none",
+        "flex h-[var(--titlebar-height)] shrink-0 items-center select-none",
         "border-b border-stroke-3 bg-bg",
         className,
       )}
       role="banner"
       aria-label="Window"
     >
-      <div className="flex shrink-0 items-center">
+      <div className="flex h-full shrink-0 items-center gap-0.5">
         {isMac ? (
-          <div className="flex h-full items-center pl-3 pr-1">
+          <div className="flex h-full items-center pl-2.5 pr-0.5">
             <TrafficLights />
           </div>
         ) : (

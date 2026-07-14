@@ -47,6 +47,6 @@ describe("WindowControls", () => {
     expect(html).toContain('aria-label="Close"')
     expect(html).toContain('aria-label="Minimize"')
     expect(html).toContain('aria-label="Maximize"')
-    expect(html).toContain("w-[46px]")
+    expect(html).toContain("w-10")
   })
 })

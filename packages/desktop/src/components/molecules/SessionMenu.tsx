@@ -179,9 +179,10 @@ export const SessionMenu = ({
       <IconButton
         label="Chat actions"
         onClick={() => setOpen((v) => !v)}
-        className={cn(open && "bg-fill-3 text-ink")}
+        quiet
+        className={cn("h-6 w-6", open && "bg-fill-3 text-ink opacity-100")}
       >
-        <Ellipsis className="h-3.5 w-3.5" aria-hidden />
+        <Ellipsis className="h-3 w-3" aria-hidden />
       </IconButton>
 
       {open ? (
