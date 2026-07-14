@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type RefObject } from "react"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { segmentAtMentions } from "../lib/mentionSegments"
 import { listCommands, listFiles } from "../lib/tauri"
 import type { ComposerAttachment, FileHit } from "../lib/types"
 
@@ -110,29 +111,8 @@ export const useComposerAutocomplete = ({
   // Split the draft into plain-text and mention-pill segments for the overlay.
   // A mention is an `@<name>` token whose name matches a current attachment.
   const mentionSegments = useMemo(() => {
-    const names = attachments
-      .map((a) => a.name)
-      .filter(Boolean)
-      .sort((a, b) => b.length - a.length) // longest-first so overlaps prefer full names
-    if (names.length === 0) {
-      return [{ pill: false, value: composerDraft }]
-    }
-    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    const re = new RegExp(`@(?:${names.map(esc).join("|")})`, "g")
-    const segments: Array<{ pill: boolean; value: string }> = []
-    let last = 0
-    let m: RegExpExecArray | null
-    while ((m = re.exec(composerDraft)) !== null) {
-      if (m.index > last) {
-        segments.push({ pill: false, value: composerDraft.slice(last, m.index) })
-      }
-      segments.push({ pill: true, value: m[0] })
-      last = m.index + m[0].length
-    }
-    if (last < composerDraft.length) {
-      segments.push({ pill: false, value: composerDraft.slice(last) })
-    }
-    return segments
+    const names = attachments.map((a) => a.name).filter(Boolean)
+    return segmentAtMentions(composerDraft, names)
   }, [composerDraft, attachments])
 
   const handleInsertCommand = (name: string) => {
