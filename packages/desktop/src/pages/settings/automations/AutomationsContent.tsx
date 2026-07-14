@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Plus } from "lucide-react"
 import { Button, Spinner } from "../../../components/atoms"
-import { ErrorBanner, SettingsSection } from "../../../components/molecules"
+import { ErrorBanner, EmptyState, SettingsSection } from "../../../components/molecules"
 import { routinesList, toInvokeError } from "../../../lib/tauri"
 import { CreateRoutineForm } from "./CreateRoutineForm"
 import { EMPTY_ROUTINES, ROUTINES_KEY } from "./constants"
@@ -39,21 +39,20 @@ export const AutomationsContent = () => {
         rowId="automations-routines"
       >
         {routinesQuery.isLoading ? (
-          <div className="flex items-center gap-2 p-3 text-sm text-ink-muted">
+          <div className="flex items-center gap-2 px-3.5 py-3 text-sm text-ink-muted">
             <Spinner size="sm" /> Loading automations…
           </div>
         ) : routinesQuery.isError ? (
-          <div className="p-3">
+          <div className="px-3.5 py-3">
             <ErrorBanner message={toInvokeError(routinesQuery.error)} />
           </div>
         ) : routines.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-            <p className="text-[13px] text-ink-secondary">No automations yet</p>
-            <p className="text-xs text-ink-faint">
-              Create an automation to run a prompt on a schedule or webhook.
-            </p>
-            {newAutomationButton}
-          </div>
+          <EmptyState
+            title="No automations yet"
+            description="Create an automation to run a prompt on a schedule or webhook."
+            actionLabel="New automation"
+            onAction={() => setCreating(true)}
+          />
         ) : (
           routines.map((routine) => <RoutineRow key={routine.id} routine={routine} />)
         )}

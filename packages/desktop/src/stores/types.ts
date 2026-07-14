@@ -71,7 +71,16 @@ export type {
  * overlays), "tight" < 680px (narrow behavior plus tighter chat gutters). */
 export type Viewport = "wide" | "narrow" | "tight"
 
-export type RightPanelTab = "plan" | "changes" | "terminal" | "browser" | "files"
+export type RightPanelTab =
+  | "plan"
+  | "changes"
+  | "terminal"
+  | "browser"
+  | "files"
+  | "memory"
+  | "database"
+  /** Plugin-contributed tab ids (string & {} keeps autocomplete for builtins). */
+  | (string & {})
 
 export type TerminalMeta = {
   id: string

@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState, type RefObject } from "react"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import {
+  fileHitToAtMention,
+  pluginHitToAtMention,
+  type AtMentionHit,
+} from "../lib/atMentionHits"
+import { segmentAtMentions } from "../lib/mentionSegments"
 import { listCommands, listFiles } from "../lib/tauri"
-import type { ComposerAttachment, FileHit } from "../lib/types"
+import { searchPluginMentions } from "../plugins/registry"
+import type { ComposerAttachment } from "../lib/types"
 
 type UseComposerAutocompleteArgs = {
   composerDraft: string
@@ -14,8 +21,7 @@ type UseComposerAutocompleteArgs = {
 }
 
 /** Slash-command and @-mention autocomplete: token detection/segmenting state
- * machine plus the underlying queries (commands + file hits). Slash wins over
- * @-mention when both could apply (see `atToken`, gated on `slashQuery === null`). */
+ * machine plus the underlying queries (commands + file/folder/plugin hits). */
 export const useComposerAutocomplete = ({
   composerDraft,
   setComposerDraft,
@@ -59,7 +65,6 @@ export const useComposerAutocomplete = ({
     setSlashHighlight(0)
   }, [slashQuery])
 
-  // @-mention: the "@word" token immediately before the cursor (slash wins).
   const atToken = useMemo(() => {
     if (slashQuery !== null) return null
     const pos = Math.min(caret, composerDraft.length)
@@ -74,8 +79,6 @@ export const useComposerAutocomplete = ({
 
   const atQuery = atToken?.query ?? null
 
-  // Debounce the IPC walk — every keystroke used to re-walk the tree and
-  // made `@` feel multi-second even after backend caps.
   const [debouncedAtQuery, setDebouncedAtQuery] = useState<string | null>(null)
   useEffect(() => {
     if (atQuery === null) {
@@ -94,45 +97,36 @@ export const useComposerAutocomplete = ({
     placeholderData: keepPreviousData,
   })
 
+  const { data: pluginHits = [] } = useQuery({
+    queryKey: ["at-plugin-mentions", cwd, debouncedAtQuery],
+    queryFn: () => searchPluginMentions(debouncedAtQuery ?? "", cwd),
+    enabled: debouncedAtQuery !== null && !atDismissed,
+    staleTime: 10_000,
+    placeholderData: keepPreviousData,
+  })
+
+  const atHits: AtMentionHit[] = useMemo(() => {
+    const files = fileHits.map(fileHitToAtMention)
+    const plugins = pluginHits.map(pluginHitToAtMention)
+    // Tables first when the query looks schema-ish, otherwise files/folders first.
+    return [...files, ...plugins].slice(0, 40)
+  }, [fileHits, pluginHits])
+
   const atOpen =
     !slashOpen &&
     atQuery !== null &&
     debouncedAtQuery !== null &&
     !atDismissed &&
-    fileHits.length > 0
+    atHits.length > 0
 
-  // Reset highlight + un-dismiss whenever the query changes.
   useEffect(() => {
     setAtHighlight(0)
     setAtDismissed(false)
   }, [atQuery])
 
-  // Split the draft into plain-text and mention-pill segments for the overlay.
-  // A mention is an `@<name>` token whose name matches a current attachment.
   const mentionSegments = useMemo(() => {
-    const names = attachments
-      .map((a) => a.name)
-      .filter(Boolean)
-      .sort((a, b) => b.length - a.length) // longest-first so overlaps prefer full names
-    if (names.length === 0) {
-      return [{ pill: false, value: composerDraft }]
-    }
-    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    const re = new RegExp(`@(?:${names.map(esc).join("|")})`, "g")
-    const segments: Array<{ pill: boolean; value: string }> = []
-    let last = 0
-    let m: RegExpExecArray | null
-    while ((m = re.exec(composerDraft)) !== null) {
-      if (m.index > last) {
-        segments.push({ pill: false, value: composerDraft.slice(last, m.index) })
-      }
-      segments.push({ pill: true, value: m[0] })
-      last = m.index + m[0].length
-    }
-    if (last < composerDraft.length) {
-      segments.push({ pill: false, value: composerDraft.slice(last) })
-    }
-    return segments
+    const names = attachments.map((a) => a.name).filter(Boolean)
+    return segmentAtMentions(composerDraft, names)
   }, [composerDraft, attachments])
 
   const handleInsertCommand = (name: string) => {
@@ -140,28 +134,31 @@ export const useComposerAutocomplete = ({
     textareaRef.current?.focus()
   }
 
-  const handleInsertFile = (hit: FileHit) => {
+  const handleInsertMention = (hit: AtMentionHit) => {
     if (!atToken) return
     const pos = Math.min(caret, composerDraft.length)
     const before = composerDraft.slice(0, atToken.start)
     const after = composerDraft.slice(pos)
-    const insert = `@${hit.name} `
+    const token = hit.insertText ?? hit.name
+    const insert = `@${token} `
     setComposerDraft(before + insert + after)
 
-    // Attach so the engine inlines file contents (dedupe by path).
-    if (
-      !attachments.some(
-        (a) =>
-          (a.kind === "image" || a.kind === "file" || a.kind === "directory") &&
-          a.path === hit.path,
-      )
-    ) {
-      addAttachment({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        path: hit.path,
-        kind: "file",
-        name: hit.name,
-      })
+    if (hit.kind === "file" || hit.kind === "folder") {
+      const attachPath = hit.attachPath ?? hit.path
+      if (
+        !attachments.some(
+          (a) =>
+            (a.kind === "image" || a.kind === "file" || a.kind === "directory") &&
+            a.path === attachPath,
+        )
+      ) {
+        addAttachment({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          path: attachPath,
+          kind: hit.kind === "folder" ? "directory" : "file",
+          name: hit.name,
+        })
+      }
     }
 
     const nextCaret = before.length + insert.length
@@ -185,11 +182,14 @@ export const useComposerAutocomplete = ({
     setSlashHighlight,
     atOpen,
     atToken,
-    fileHits,
+    /** @deprecated alias — prefer `atHits`. */
+    fileHits: atHits,
+    atHits,
     atHighlight,
     setAtHighlight,
     setAtDismissed,
     handleInsertCommand,
-    handleInsertFile,
+    handleInsertFile: handleInsertMention,
+    handleInsertMention,
   }
 }

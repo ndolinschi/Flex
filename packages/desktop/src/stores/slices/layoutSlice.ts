@@ -9,6 +9,7 @@ import {
   clampSidebarWidth,
 } from "../layoutConstants"
 import { persistUiState } from "../persist"
+import { isRightPanelTabEnabled } from "../../lib/featureFlags"
 
 export const createLayoutSlice: StateCreator<
   AppState,
@@ -126,9 +127,27 @@ export const createLayoutSlice: StateCreator<
       get().setRightPanelCollapsed(false)
       return
     }
-    get().setRightPanelOpen(!state.rightPanelOpen)
+    const opening = !state.rightPanelOpen
+    get().setRightPanelOpen(opening)
+    // ⌘J into an empty strip used to show only "+" until a plan arrived
+    // (auto-reveal) or the user dug into the add menu. Seed the session's
+    // preferred / default tab so Plan (and any remembered tab) opens empty.
+    if (opening) {
+      const sessionId = get().activeSessionId
+      if (!sessionId) return
+      const key = sessionScopeKey(sessionId)
+      const openIds = (get().openTabsBySession[key] ?? []).filter(
+        isRightPanelTabEnabled,
+      )
+      if (openIds.length > 0) return
+      let preferred =
+        get().selectedTabBySession[key] ?? get().rightPanelTab ?? "plan"
+      if (!isRightPanelTabEnabled(preferred)) preferred = "plan"
+      get().setRightPanelTab(preferred)
+    }
   },
   setRightPanelTab: (tab) => {
+    if (!isRightPanelTabEnabled(tab)) return
     set({ rightPanelTab: tab })
     void persistUiState({ rightPanelTab: tab })
     // Switching to a tab always counts as "opening" it for the active

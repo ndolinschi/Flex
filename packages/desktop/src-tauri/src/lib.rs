@@ -2,6 +2,7 @@ mod browser;
 mod commands;
 mod compose;
 mod config;
+mod db_plugin;
 mod debug;
 mod error;
 mod secrets;
@@ -257,6 +258,9 @@ pub fn run() {
             commands::git_commit_and_push,
             commands::git_create_branch_and_commit,
             commands::git_create_pr,
+            commands::git_pr_status,
+            commands::git_create_pr_for_branch,
+            commands::git_pr_draft,
             commands::suggest_commit_message,
             // Review flow: per-file keep/undo + hunk-patch apply.
             commands::review_undo_file,
@@ -265,6 +269,17 @@ pub fn run() {
             commands::review_file_diff,
             commands::list_files,
             commands::list_commands,
+            db_plugin::db_list_connections,
+            db_plugin::db_upsert_connection,
+            db_plugin::db_remove_connection,
+            db_plugin::db_connect,
+            db_plugin::db_disconnect,
+            db_plugin::db_active_connection,
+            db_plugin::db_list_schemas,
+            db_plugin::db_list_tables,
+            db_plugin::db_preview_table,
+            db_plugin::db_query,
+            db_plugin::db_mention_tables,
             commands::is_isolated,
             commands::workspace_status,
             commands::integrate_session,

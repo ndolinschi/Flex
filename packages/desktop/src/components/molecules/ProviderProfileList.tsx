@@ -1,4 +1,4 @@
-import { Badge, Button } from "../atoms"
+import { Badge, Button, ProviderIcon } from "../atoms"
 import { SettingsSection } from "./SettingsSection"
 import type { ProviderProfileView } from "../../lib/types"
 import { cn } from "../../lib/utils"
@@ -36,7 +36,7 @@ export const ProviderProfileList = ({
       }
     >
       {profiles.length === 0 ? (
-        <div className="px-4 py-3 text-sm text-ink-muted">
+        <div className="px-3.5 py-3 text-sm text-ink-muted">
           No connections yet — fill out the form below and save to create one.
         </div>
       ) : (
@@ -50,12 +50,13 @@ export const ProviderProfileList = ({
               if (e.key === "Enter" || e.key === " ") onSelect(p)
             }}
             className={cn(
-              "flex cursor-pointer items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-muted",
-              editingId === p.id && "bg-surface-muted",
+              "flex cursor-pointer items-center justify-between gap-3 px-3.5 py-3 text-left transition-colors hover:bg-fill-4",
+              editingId === p.id && "bg-fill-2",
             )}
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
+                <ProviderIcon providerId={p.provider} size={16} />
                 <span className="truncate text-sm font-medium text-ink">
                   {p.label}
                 </span>

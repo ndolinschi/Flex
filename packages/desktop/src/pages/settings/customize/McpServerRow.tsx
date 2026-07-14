@@ -60,7 +60,7 @@ export const McpServerRow = ({ server }: { server: McpServerDto }) => {
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-start gap-3 p-3">
+      <div className="flex items-start gap-3 px-3.5 py-3">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-fill-3">
           <Plug className="h-4 w-4 text-icon-2" aria-hidden />
         </div>

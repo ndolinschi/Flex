@@ -37,23 +37,13 @@ export const MemoryContent = () => {
 
   return (
     <div>
-      <div className="mb-4">
-        <p className="text-xs text-ink-muted">
-          Durable notes the agent saves as it works — user preferences, project facts,
-          environment quirks. They load into every future session automatically. New
-          memories are always written to the global store; per-project notes shown
-          below are read-only from here for now. Set an expiry on any note to make it
-          short-term — it's purged automatically once it lapses.
-        </p>
-      </div>
-
       <section className="mb-6" data-settings-row="memory-global">
-        <div className="mb-2 flex items-center gap-2">
-          <h2 className="text-[13px] font-medium text-ink">Global</h2>
+        <div className="mb-2 flex items-center gap-2 pl-2">
+          <h2 className="text-[12px] leading-4 text-ink-secondary">Global</h2>
           <span className="text-[11px] text-ink-faint">{memories.length}</span>
         </div>
         {memoryQuery.isLoading ? (
-          <div className="flex items-center gap-2 py-8 text-xs text-ink-muted">
+          <div className="flex items-center justify-center gap-2 px-4 py-8 text-xs text-ink-muted">
             <Spinner size="sm" /> Loading memory…
           </div>
         ) : memoryQuery.isError ? (
@@ -65,7 +55,7 @@ export const MemoryContent = () => {
             description="The agent saves reusable knowledge here as it works."
           />
         ) : (
-          <div className="flex flex-col gap-1.5 pl-5">
+          <div className="flex flex-col gap-1.5">
             {memories.map((memory) => (
               <MemoryRow key={memory.id} memory={memory} scope={globalScope} />
             ))}

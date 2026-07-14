@@ -116,6 +116,11 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
               key={mode.id}
               onClick={() => {
                 onChange(mode.id)
+                // Plan mode should surface the Plan tab even when empty —
+                // previously the tab only appeared after ExitPlanMode.
+                if (mode.id === "plan") {
+                  useAppStore.getState().revealPlanPanel()
+                }
                 setOpen(false)
               }}
               className="items-start py-2"

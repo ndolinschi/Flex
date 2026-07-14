@@ -47,7 +47,7 @@ export const RoutineRow = ({ routine }: { routine: RoutineDto }) => {
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-start gap-3 p-3">
+      <div className="flex items-start gap-3 px-3.5 py-3">
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}

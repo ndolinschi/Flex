@@ -39,14 +39,14 @@ export const MemoryScopeSection = ({
           )}
           aria-hidden
         />
-        <h2 className="text-[13px] font-medium text-ink">{title}</h2>
+        <h2 className="text-[12px] leading-4 text-ink-secondary">{title}</h2>
         <span className="text-[11px] text-ink-faint">{memories.length}</span>
         {hint ? (
           <span className="truncate text-[11px] text-ink-faint">{hint}</span>
         ) : null}
       </button>
       <Collapsible open={open}>
-        <div className="flex flex-col gap-1.5 pl-5">
+        <div className="flex flex-col gap-1.5">
           {memories.map((memory) => (
             <MemoryRow key={memory.id} memory={memory} scope={scope} />
           ))}

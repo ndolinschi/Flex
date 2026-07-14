@@ -105,7 +105,7 @@ export const SettingsNav = ({
 
   return (
     <nav
-      className="sticky top-0 flex max-h-full shrink-0 flex-col gap-3 self-start pt-12"
+      className="sticky top-0 flex max-h-full shrink-0 flex-col gap-3 self-start pt-6"
       style={{ width: "clamp(100px, 25%, 200px)" }}
     >
       <div className="relative px-1">
@@ -148,7 +148,7 @@ export const SettingsNav = ({
                 onMouseEnter={() => onResultIndexChange(i)}
                 className={cn(
                   "flex flex-col gap-0 rounded-sm px-1.5 py-1 text-left transition-colors",
-                  i === resultIndex ? "bg-fill-4" : "hover:bg-fill-4",
+                  i === resultIndex ? "bg-fill-2 text-ink" : "hover:bg-fill-4",
                 )}
               >
                 <span className="truncate text-[12px] leading-4 text-ink-secondary">{entry.title}</span>
@@ -175,7 +175,7 @@ export const SettingsNav = ({
                 className={cn(
                   "flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-[12px] leading-4 transition-colors",
                   isActive
-                    ? "bg-fill-4 text-ink"
+                    ? "bg-fill-2 text-ink"
                     : "text-ink-secondary hover:bg-fill-4",
                 )}
               >

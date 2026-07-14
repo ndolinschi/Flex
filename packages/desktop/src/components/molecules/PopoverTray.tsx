@@ -157,12 +157,17 @@ export const PopoverSearch = ({
 
 type PopoverSectionProps = {
   label: string
+  /** Optional leading mark (e.g. provider brand icon). */
+  icon?: ReactNode
   children?: ReactNode
 }
 
-export const PopoverSection = ({ label, children }: PopoverSectionProps) => (
+export const PopoverSection = ({ label, icon, children }: PopoverSectionProps) => (
   <div className="py-1">
-    <p className="px-2.5 py-1 text-xs font-medium text-ink-faint">{label}</p>
+    <p className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-ink-faint">
+      {icon}
+      <span className="min-w-0 truncate">{label}</span>
+    </p>
     {children}
   </div>
 )

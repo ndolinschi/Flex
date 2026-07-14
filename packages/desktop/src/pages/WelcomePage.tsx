@@ -4,7 +4,9 @@ import { Button, Kbd, TextInput } from "../components/atoms"
 import {
   CopilotSignInDialog,
   ErrorBanner,
+  FormField,
   ModelSelect,
+  ProviderPicker,
 } from "../components/molecules"
 import { useCopilotAuth } from "../hooks/useCopilotAuth"
 import { useModels } from "../hooks/useModels"
@@ -162,9 +164,6 @@ export const WelcomePage = () => {
     }
   }
 
-  const selectClassName =
-    "h-8 w-full rounded-md border border-border bg-surface px-2.5 text-sm text-ink focus:border-accent focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-accent)]"
-
   return (
     <div className="flex h-full flex-col bg-bg">
       <div className="mx-auto flex w-full max-w-[var(--welcome-rail)] flex-1 flex-col justify-center px-4 py-8">
@@ -181,17 +180,17 @@ export const WelcomePage = () => {
                 className={cn(
                   "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
                   i < stepIndex
-                    ? "bg-accent/20 text-accent"
+                    ? "bg-fill-2 text-ink ring-1 ring-stroke-2"
                     : i === stepIndex
-                      ? "bg-accent text-white"
-                      : "bg-surface-muted text-ink-faint",
+                      ? "bg-accent text-accent-text"
+                      : "bg-fill-4 text-ink-faint",
                 )}
                 aria-current={i === stepIndex ? "step" : undefined}
               >
                 {i + 1}
               </span>
               {i < STEPS.length - 1 ? (
-                <span className="h-px w-6 bg-border" aria-hidden />
+                <span className="h-px w-6 bg-stroke-3" aria-hidden />
               ) : null}
             </li>
           ))}
@@ -204,24 +203,15 @@ export const WelcomePage = () => {
         ) : null}
 
         {step === "provider" ? (
-          <div className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1.5 text-sm text-ink">
-              <span className="text-xs font-medium text-ink-muted">Provider</span>
-              <select
-                className={selectClassName}
+          <div className="flex max-w-md flex-col gap-3">
+            <FormField label="Provider" htmlFor="welcome-provider">
+              <ProviderPicker
+                providers={builtinProviders}
                 value={provider}
-                onChange={(e) => handlePickProvider(e.target.value)}
-                aria-label="Provider"
+                onChange={handlePickProvider}
                 disabled={modelsLoading || busy}
-              >
-                <option value="">Select…</option>
-                {builtinProviders.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+              />
+            </FormField>
             {isCopilot ? (
               <div className="flex flex-col gap-2 rounded-md border border-border bg-surface px-3 py-3">
                 <p className="text-sm text-ink">
@@ -249,21 +239,24 @@ export const WelcomePage = () => {
                   </Button>
                 </div>
                 {showCopilotToken ? (
-                  <TextInput
-                    type="password"
-                    autoComplete="off"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="gho_…"
-                    aria-label="GitHub Copilot token"
-                    disabled={busy}
-                  />
+                  <FormField label="GitHub Copilot token" htmlFor="welcome-copilot-token">
+                    <TextInput
+                      id="welcome-copilot-token"
+                      type="password"
+                      autoComplete="off"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="gho_…"
+                      aria-label="GitHub Copilot token"
+                      disabled={busy}
+                    />
+                  </FormField>
                 ) : null}
               </div>
             ) : requiresKey ? (
-              <label className="flex flex-col gap-1.5 text-sm text-ink">
-                <span className="text-xs font-medium text-ink-muted">API key</span>
+              <FormField label="API key" htmlFor="welcome-api-key">
                 <TextInput
+                  id="welcome-api-key"
                   type="password"
                   autoComplete="off"
                   value={apiKey}
@@ -272,7 +265,7 @@ export const WelcomePage = () => {
                   aria-label="API key"
                   disabled={busy}
                 />
-              </label>
+              </FormField>
             ) : (
               <p className="text-xs text-ink-muted">
                 This provider does not need an API key.
@@ -291,7 +284,7 @@ export const WelcomePage = () => {
         ) : null}
 
         {step === "model" ? (
-          <div className="flex flex-col gap-3">
+          <div className="flex max-w-md flex-col gap-3">
             <ModelSelect
               id="onboarding-model"
               models={providerModels}
@@ -313,7 +306,7 @@ export const WelcomePage = () => {
         ) : null}
 
         {step === "project" ? (
-          <div className="flex flex-col gap-3">
+          <div className="flex max-w-md flex-col gap-3">
             <div className="rounded-md border border-border bg-surface px-3 py-3">
               <p className="text-sm text-ink">
                 {projectPath ? (

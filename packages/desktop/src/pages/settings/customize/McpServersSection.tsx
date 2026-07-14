@@ -30,6 +30,7 @@ export const McpServersSection = () => {
         title="MCP servers"
         description="Tools from stdio MCP servers. Restart sessions to pick up new or changed servers."
         rowId="tools-mcp-servers"
+        className="mb-0"
         actions={
           !creating ? (
             <Button size="sm" onClick={() => setCreating(true)}>
@@ -39,15 +40,15 @@ export const McpServersSection = () => {
         }
       >
         {serversQuery.isLoading ? (
-          <div className="flex items-center gap-2 p-3 text-sm text-ink-muted">
+          <div className="flex items-center gap-2 px-3.5 py-3 text-sm text-ink-muted">
             <Spinner size="sm" /> Loading MCP servers…
           </div>
         ) : serversQuery.isError ? (
-          <div className="p-3">
+          <div className="px-3.5 py-3">
             <ErrorBanner message={toInvokeError(serversQuery.error)} />
           </div>
         ) : servers.length === 0 ? (
-          <p className="p-3 text-sm text-ink-muted">No MCP servers configured yet.</p>
+          <p className="px-3.5 py-3 text-sm text-ink-muted">No MCP servers configured yet.</p>
         ) : (
           servers.map((server) => <McpServerRow key={server.id} server={server} />)
         )}

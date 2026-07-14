@@ -2,6 +2,7 @@ import { useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ChevronDown, GitBranch, GitMerge, GitPullRequest } from "lucide-react"
 import { Button, TextArea } from "../../atoms"
+import { CreatePrDialog } from "../../molecules/CreatePrDialog"
 import { PopoverItem, PopoverTray } from "../../molecules/PopoverTray"
 import {
   gitCommitAndPush,
@@ -11,6 +12,7 @@ import {
   gitHasRemote,
   toInvokeError,
 } from "../../../lib/tauri"
+import { toastPrOutcome } from "../../../lib/prOutcomeToast"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
@@ -53,6 +55,7 @@ export const CommitCenter = ({
   const [message, setMessage] = useState("")
   const [busy, setBusy] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [prDialogOpen, setPrDialogOpen] = useState(false)
   // null = use the remote-aware default until the user picks a mode.
   const [lastMode, setLastMode] = useState<CommitMode | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -83,9 +86,41 @@ export const CommitCenter = ({
     void queryClient.invalidateQueries({ queryKey: ["git-branch"] })
   }
 
+  const runCommitPr = async (title: string, body: string) => {
+    if (disabled || !hasRemote) return
+    setBusy(true)
+    setLastMode("commit-pr")
+    try {
+      const outcome = await gitCreatePr(
+        sessionId,
+        trimmed,
+        selectedPaths,
+        title,
+        body,
+      )
+      toastPrOutcome(pushToast, outcome, "Pull request created")
+      invalidate()
+      setMessage("")
+      setPrDialogOpen(false)
+    } catch (err) {
+      const msg = toInvokeError(err)
+      pushToast(`Commit failed: ${msg}`, "error")
+      onError(msg)
+    } finally {
+      setBusy(false)
+      setMenuOpen(false)
+    }
+  }
+
   const run = async (mode: CommitMode) => {
     if (disabled) return
     if (!hasRemote && PUSH_MODES.has(mode)) return
+    if (mode === "commit-pr") {
+      setLastMode(mode)
+      setMenuOpen(false)
+      setPrDialogOpen(true)
+      return
+    }
     setBusy(true)
     setLastMode(mode)
     try {
@@ -115,18 +150,6 @@ export const CommitCenter = ({
           pushToast(`Committed ${sha} on ${branch}`, "success")
           break
         }
-        case "commit-pr": {
-          const outcome = await gitCreatePr(sessionId, trimmed, selectedPaths)
-          if (outcome.degradedReason) {
-            pushToast(outcome.degradedReason, "error")
-          } else {
-            pushToast(
-              outcome.prUrl ? `PR created: ${outcome.prUrl}` : "PR created",
-              "success",
-            )
-          }
-          break
-        }
       }
       invalidate()
       setMessage("")
@@ -147,108 +170,123 @@ export const CommitCenter = ({
     : `${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"}`
 
   return (
-    <div className="flex shrink-0 flex-col gap-2.5 border-t border-stroke-3 bg-fill-5/40 px-3 py-3">
-      <TextArea
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        placeholder="Commit message"
-        aria-label="Commit message"
-        autoFocus
-        rows={2}
-        disabled={busy}
-        className="min-h-[2.75rem] resize-none text-sm"
-      />
-      <div ref={rootRef} className="relative flex items-center justify-between gap-3">
-        <span
-          className={cn(
-            "min-w-0 truncate text-xs",
-            nothingSelected ? "text-ink-faint" : "text-ink-muted",
-          )}
-        >
-          {selectionLabel}
-        </span>
-        <div className="flex shrink-0 items-center">
-          <Button
-            variant="primary"
-            size="sm"
-            className="rounded-r-none border-r border-r-accent-hover/40"
-            isLoading={busy}
-            disabled={disabled}
-            onClick={() => void run(effectivePrimary)}
+    <>
+      <div className="flex shrink-0 flex-col gap-2.5 border-t border-stroke-3 bg-fill-5/40 px-3 py-3">
+        <TextArea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Commit message"
+          aria-label="Commit message"
+          autoFocus
+          rows={2}
+          disabled={busy}
+          className="min-h-[2.75rem] resize-none text-sm"
+        />
+        <div ref={rootRef} className="relative flex items-center justify-between gap-3">
+          <span
+            className={cn(
+              "min-w-0 truncate text-xs",
+              nothingSelected ? "text-ink-faint" : "text-ink-muted",
+            )}
           >
-            <GitMerge className="h-3 w-3" aria-hidden />
-            {MODE_LABEL[effectivePrimary]}
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            aria-label="Commit options"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            className="w-7 rounded-l-none px-0"
-            disabled={disabled}
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            <ChevronDown
-              className={cn("h-3 w-3", menuOpen && "rotate-180")}
-              aria-hidden
-            />
-          </Button>
-        </div>
+            {selectionLabel}
+          </span>
+          <div className="flex shrink-0 items-center">
+            <Button
+              variant="primary"
+              size="sm"
+              className="rounded-r-none border-r border-r-accent-hover/40"
+              isLoading={busy}
+              disabled={disabled}
+              onClick={() => void run(effectivePrimary)}
+            >
+              <GitMerge className="h-3 w-3" aria-hidden />
+              {MODE_LABEL[effectivePrimary]}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              aria-label="Commit options"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              className="w-7 rounded-l-none px-0"
+              disabled={disabled}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <ChevronDown
+                className={cn("h-3 w-3", menuOpen && "rotate-180")}
+                aria-hidden
+              />
+            </Button>
+          </div>
 
-        <PopoverTray
-          open={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          anchorRef={rootRef}
-          placement="above"
-          role="menu"
-          aria-label="Commit options"
-          className="right-0 w-56"
-        >
-          <ul className="py-1">
-            <li>
-              <PopoverItem role="menuitem" onClick={() => void run("commit")}>
-                <GitMerge className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-                Commit
-              </PopoverItem>
-            </li>
-            {hasRemote ? (
+          <PopoverTray
+            open={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            anchorRef={rootRef}
+            placement="above"
+            role="menu"
+            aria-label="Commit options"
+            className="right-0 w-56"
+          >
+            <ul className="py-1">
               <li>
-                <PopoverItem
-                  role="menuitem"
-                  onClick={() => void run("commit-push")}
-                >
+                <PopoverItem role="menuitem" onClick={() => void run("commit")}>
                   <GitMerge className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-                  Commit &amp; Push
+                  Commit
                 </PopoverItem>
               </li>
-            ) : null}
-            <li>
-              <PopoverItem
-                role="menuitem"
-                onClick={() => void run("branch-commit")}
-              >
-                <GitBranch className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-                Create Branch &amp; Commit
-              </PopoverItem>
-            </li>
-            {hasRemote ? (
+              {hasRemote ? (
+                <li>
+                  <PopoverItem
+                    role="menuitem"
+                    onClick={() => void run("commit-push")}
+                  >
+                    <GitMerge className="h-3.5 w-3.5 text-icon-3" aria-hidden />
+                    Commit &amp; Push
+                  </PopoverItem>
+                </li>
+              ) : null}
               <li>
                 <PopoverItem
                   role="menuitem"
-                  onClick={() => void run("commit-pr")}
+                  onClick={() => void run("branch-commit")}
                 >
-                  <GitPullRequest
-                    className="h-3.5 w-3.5 text-icon-3"
-                    aria-hidden
-                  />
-                  Commit &amp; Create PR
+                  <GitBranch className="h-3.5 w-3.5 text-icon-3" aria-hidden />
+                  Create Branch &amp; Commit
                 </PopoverItem>
               </li>
-            ) : null}
-          </ul>
-        </PopoverTray>
+              {hasRemote ? (
+                <li>
+                  <PopoverItem
+                    role="menuitem"
+                    onClick={() => void run("commit-pr")}
+                  >
+                    <GitPullRequest
+                      className="h-3.5 w-3.5 text-icon-3"
+                      aria-hidden
+                    />
+                    Commit &amp; Create PR
+                  </PopoverItem>
+                </li>
+              ) : null}
+            </ul>
+          </PopoverTray>
+        </div>
       </div>
-    </div>
+
+      <CreatePrDialog
+        open={prDialogOpen}
+        initialTitle={trimmed}
+        initialBody=""
+        isLoading={busy}
+        onCancel={() => {
+          if (!busy) setPrDialogOpen(false)
+        }}
+        onConfirm={(title, body) => {
+          void runCommitPr(title, body)
+        }}
+      />
+    </>
   )
 }

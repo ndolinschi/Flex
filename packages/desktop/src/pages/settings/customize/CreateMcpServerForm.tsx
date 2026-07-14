@@ -60,7 +60,7 @@ export const CreateMcpServerForm = ({
   }
 
   return (
-    <SettingsSection title="New MCP server">
+    <SettingsSection title="New MCP server" className="mb-0">
       <FieldRow
         label="Id"
         htmlFor="mcp-id"
@@ -117,12 +117,12 @@ export const CreateMcpServerForm = ({
       </FieldRow>
 
       {error ? (
-        <div className="px-4 py-3">
+        <div className="px-3.5 py-3">
           <ErrorBanner message={error} onDismiss={() => setError(null)} />
         </div>
       ) : null}
 
-      <div className="flex justify-end gap-2 px-4 py-3">
+      <div className="flex justify-end gap-2 px-3.5 py-3">
         <Button variant="secondary" size="sm" onClick={onCancel}>
           Cancel
         </Button>

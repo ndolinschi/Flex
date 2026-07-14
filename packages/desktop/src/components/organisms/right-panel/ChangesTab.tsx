@@ -2,14 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { GitMerge, RefreshCw, XCircle } from "lucide-react"
 import { Button, DiffStat, IconButton, ScrollArea } from "../../atoms"
-import { ConfirmDialog } from "../../molecules"
+import { BranchPrStatusChip, ConfirmDialog, CreatePrDialog } from "../../molecules"
 import { useWorkspaceActions } from "../../../hooks/useWorkspaceActions"
 import { useIsGitRepo } from "../../../hooks/useIsGitRepo"
 import {
   gitBranch,
+  gitCreatePrForBranch,
+  gitHasRemote,
+  gitPrDraft,
+  gitPrStatus,
   gitStatusSinceBaseline,
   isIsolated,
+  toInvokeError,
 } from "../../../lib/tauri"
+import { toastPrOutcome } from "../../../lib/prOutcomeToast"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import type { SessionMeta } from "../../../lib/types"
 import { useAppStore } from "../../../stores/appStore"
@@ -90,6 +96,50 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     staleTime: 10_000,
   })
 
+  const { data: hasRemote = false } = useQuery({
+    queryKey: ["git-has-remote", cwd],
+    queryFn: () => gitHasRemote(cwd),
+    enabled: !!cwd && isRepo,
+    staleTime: 10_000,
+  })
+
+  const { data: prStatus } = useQuery({
+    queryKey: ["git-pr-status", cwd],
+    queryFn: () => gitPrStatus(cwd),
+    enabled: !!cwd && isRepo && hasRemote,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  })
+  const branchPr = prStatus?.pr ?? null
+  const [createPrOpen, setCreatePrOpen] = useState(false)
+  const [creatingPr, setCreatingPr] = useState(false)
+  const pushToast = useAppStore((s) => s.pushToast)
+
+  const { data: prDraft } = useQuery({
+    queryKey: ["git-pr-draft", cwd],
+    queryFn: () => gitPrDraft(cwd),
+    enabled: createPrOpen && !!cwd && isRepo,
+    staleTime: 5_000,
+  })
+
+  const handleCreatePr = async (title: string, body: string) => {
+    if (!cwd || creatingPr) return
+    setCreatingPr(true)
+    try {
+      const outcome = await gitCreatePrForBranch(cwd, title, body)
+      invalidateGitQueries(queryClient)
+      toastPrOutcome(pushToast, outcome)
+      setCreatePrOpen(false)
+    } catch (err) {
+      const msg = toInvokeError(err)
+      pushToast(`Couldn't create PR: ${msg}`, "error")
+      setError(msg)
+    } finally {
+      setCreatingPr(false)
+    }
+  }
+
   const { data: isolated = false } = useQuery({
     queryKey: ["is-isolated", sessionId],
     queryFn: () => isIsolated(sessionId!),
@@ -167,7 +217,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       {/* Single header: select-all + title/branch + diffstat + refresh.
           Previously a count bar and a separate select-all strip stacked and
           felt top-heavy; one row keeps the chrome balanced. */}
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-stroke-3 px-3 [font-variant-numeric:tabular-nums]">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 px-3 [font-variant-numeric:tabular-nums]">
         {showSelectAll ? (
           <input
             type="checkbox"
@@ -205,6 +255,18 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             </span>
           ) : null}
         </div>
+        {branchPr ? (
+          <BranchPrStatusChip pr={branchPr} />
+        ) : hasRemote && prStatus?.ghAvailable ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 shrink-0 px-1.5 text-xs"
+            onClick={() => setCreatePrOpen(true)}
+          >
+            Create PR
+          </Button>
+        ) : null}
         <DiffStat summary={totals} size="sm" />
         <IconButton
           label="Refresh changes"
@@ -327,6 +389,19 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
           setConfirmDiscard(false)
         }}
         onCancel={() => setConfirmDiscard(false)}
+      />
+
+      <CreatePrDialog
+        open={createPrOpen}
+        initialTitle={prDraft?.title ?? ""}
+        initialBody={prDraft?.body ?? ""}
+        isLoading={creatingPr}
+        onCancel={() => {
+          if (!creatingPr) setCreatePrOpen(false)
+        }}
+        onConfirm={(title, body) => {
+          void handleCreatePr(title, body)
+        }}
       />
     </>
   )

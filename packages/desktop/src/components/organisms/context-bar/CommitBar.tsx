@@ -1,16 +1,19 @@
 import { useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { GitMerge } from "lucide-react"
+import { GitMerge, GitPullRequest } from "lucide-react"
 import {
   gitCommit,
+  gitCreatePrForBranch,
   gitHasRemote,
   gitPush,
   gitStatusSinceBaseline,
   toInvokeError,
 } from "../../../lib/tauri"
+import { toastPrOutcome } from "../../../lib/prOutcomeToast"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
+import { CreatePrDialog } from "../../molecules/CreatePrDialog"
 import { PopoverTray } from "../../molecules/PopoverTray"
 import { Button, DiffStat, TextInput } from "../../atoms"
 
@@ -20,7 +23,7 @@ import { Button, DiffStat, TextInput } from "../../atoms"
  * Changes tab; the button opens an inline popover to compose the message.
  *
  * Label / actions depend on remotes: no remote → Commit only; with a
- * remote → Commit and Commit & Push. */
+ * remote → Commit, Commit & Push, and Commit & Create PR. */
 export const CommitBar = ({
   sessionId,
   cwd,
@@ -31,8 +34,9 @@ export const CommitBar = ({
   onError?: (message: string) => void
 }) => {
   const [open, setOpen] = useState(false)
+  const [prDialogOpen, setPrDialogOpen] = useState(false)
   const [message, setMessage] = useState("Update from agent session")
-  const [busy, setBusy] = useState<"commit" | "push" | null>(null)
+  const [busy, setBusy] = useState<"commit" | "push" | "pr" | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const pushToast = useAppStore((s) => s.pushToast)
@@ -65,6 +69,7 @@ export const CommitBar = ({
   }
 
   const primaryLabel = hasRemote ? "Commit & Push" : "Commit"
+  const trimmed = message.trim()
 
   const handleCommit = async (andPush: boolean) => {
     if (busy) return
@@ -75,7 +80,7 @@ export const CommitBar = ({
       // `git_commit` command) even though the count/list above is
       // session-scoped (gitStatusSinceBaseline). A session with 0 tracked
       // changes can still commit unrelated pre-existing dirty files repo-wide.
-      const sha = await gitCommit(sessionId, message.trim())
+      const sha = await gitCommit(sessionId, trimmed)
       invalidateGitQueries(queryClient)
       pushToast(`Committed ${sha}`, "success")
       if (andPush) {
@@ -89,6 +94,34 @@ export const CommitBar = ({
           onError?.(msg)
         }
       }
+      setOpen(false)
+    } catch (err) {
+      const msg = toInvokeError(err)
+      pushToast(`Commit failed: ${msg}`, "error")
+      onError?.(msg)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const handleCommitPr = async (title: string, body: string) => {
+    if (busy || !cwd || !hasRemote) return
+    setBusy("pr")
+    try {
+      const sha = await gitCommit(sessionId, trimmed)
+      invalidateGitQueries(queryClient)
+      try {
+        await gitPush(sessionId)
+      } catch (err) {
+        const msg = toInvokeError(err)
+        pushToast(`Committed ${sha}, but push failed: ${msg}`, "error")
+        onError?.(msg)
+        return
+      }
+      const outcome = await gitCreatePrForBranch(cwd, title, body)
+      invalidateGitQueries(queryClient)
+      toastPrOutcome(pushToast, outcome, "Pull request created")
+      setPrDialogOpen(false)
       setOpen(false)
     } catch (err) {
       const msg = toInvokeError(err)
@@ -151,26 +184,38 @@ export const CommitBar = ({
           aria-label="Commit message"
           autoFocus
         />
-        <div className="mt-2 flex items-center justify-end gap-1.5">
+        <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
           {hasRemote ? (
             <>
               <Button
                 variant="secondary"
                 size="sm"
                 isLoading={busy === "commit"}
-                disabled={busy !== null || !message.trim()}
+                disabled={busy !== null || !trimmed}
                 onClick={() => void handleCommit(false)}
               >
                 Commit
               </Button>
               <Button
-                variant="primary"
+                variant="secondary"
                 size="sm"
                 isLoading={busy === "push"}
-                disabled={busy !== null || !message.trim()}
+                disabled={busy !== null || !trimmed}
                 onClick={() => void handleCommit(true)}
               >
                 Commit & Push
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={busy !== null || !trimmed}
+                onClick={() => {
+                  setOpen(false)
+                  setPrDialogOpen(true)
+                }}
+              >
+                <GitPullRequest className="h-3 w-3" aria-hidden />
+                Create PR
               </Button>
             </>
           ) : (
@@ -178,7 +223,7 @@ export const CommitBar = ({
               variant="primary"
               size="sm"
               isLoading={busy === "commit"}
-              disabled={busy !== null || !message.trim()}
+              disabled={busy !== null || !trimmed}
               onClick={() => void handleCommit(false)}
             >
               Commit
@@ -186,6 +231,19 @@ export const CommitBar = ({
           )}
         </div>
       </PopoverTray>
+
+      <CreatePrDialog
+        open={prDialogOpen}
+        initialTitle={trimmed}
+        initialBody=""
+        isLoading={busy === "pr"}
+        onCancel={() => {
+          if (busy !== "pr") setPrDialogOpen(false)
+        }}
+        onConfirm={(title, body) => {
+          void handleCommitPr(title, body)
+        }}
+      />
     </div>
   )
 }

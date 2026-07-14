@@ -404,9 +404,10 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
             onPointerDown={handleSashDown}
             onDoubleClick={handleSashDoubleClick}
             className={cn(
-              "absolute -right-[5px] inset-y-0 z-10 w-2.5 cursor-col-resize",
+              "sash-line-transition absolute -right-[5px] inset-y-0 z-10 w-2.5 cursor-col-resize",
               "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent",
-              "after:transition-colors after:duration-[var(--duration-fast)] hover:after:bg-stroke-2",
+              // Sash hover = white-alpha focusBorder, never accent (Feel: Quiet chrome).
+              "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_15%,transparent)]",
               dragging && "after:bg-stroke-1",
             )}
           />
@@ -511,7 +512,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
           <div className="flex flex-col gap-2">
             {pinnedSessions.length > 0 ? (
               <section className="flex flex-col gap-px">
-                <div className="flex h-6 w-full items-center gap-1.5 px-1.5 text-xs text-ink-secondary">
+                <div className="flex h-6 w-full items-center gap-1.5 px-2 text-xs text-ink-secondary">
                   <span className="min-w-0 flex-1 truncate">Pinned</span>
                 </div>
                 {pinnedSessions.map((session) => (

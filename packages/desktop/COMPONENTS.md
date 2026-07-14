@@ -20,6 +20,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `HighlightedLabel` | Fuzzy-match accent spans in a label | `label`, `query` | FuzzySessionRow |
 | `Skeleton` | Placeholder shimmer | `className` | SessionSidebar, TurnTimeline |
 | `ScrollArea` | Scrollable region | `children`, `className` | SessionSidebar, TurnTimeline |
+| `ProviderIcon` | Brand mark from `public/providers/{id}.{svg,png,webp}` (letter fallback) | `providerId`, `size?` | ModelPicker, ProviderPicker, Welcome |
 
 ## Molecules
 
@@ -31,6 +32,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `FuzzySessionRow` | Search-modal session row with highlight + relative time | `index`, `active`, `label`, `query`, `updatedAtMs`, `onActivate`, `onHover` | SearchModal |
 | `ProviderProfileList` | Connections list (select / activate / delete) | `profiles`, `editingId`, `onSelect`, … | ProviderSettingsForm |
 | `ProviderConnectionForm` | Connection create/edit form + models + isolation; Copilot branch uses device-flow sign-in | form field props + `onValidate` / `onSave` / `onCopilotSignIn?` | ProviderSettingsForm |
+| `ProviderPicker` | Icon tile grid for choosing a builtin provider | `providers`, `value`, `onChange` | WelcomePage, ProviderConnectionForm |
 | `CopilotSignInDialog` | GitHub Copilot device-flow modal (user code + Open GitHub + poll) | `open`, `start` / `wait` / `cancel`, `onSuccess` | ProviderSettingsForm, WelcomePage |
 | `SecretStorageSection` | Security: secret-storage backend select | `secretStorage`, `isMac`, `onChange`, `error?` | ProviderSettingsForm |
 | `SessionListItem` | Agent row + rename/delete + running/unread via per-id store selectors | `session`, `isActive`, `memo` | SessionSidebar |
@@ -51,12 +53,15 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `PlanCommentList` | Annotations on the open plan | `comments`, `onFocus`, `onRemove` | RightPanel Plan tab (`PlanTab`) |
 | `PlusMenu` | Attach + mode shortcuts (Plan/Ask) | `onAttachFile`, `onAttachImage`, `onSetMode?` | Composer |
 | `ProjectPicker` | Recent cwds + Open Folder | `sessionId`, `cwd`, `onError?` | ContextBar |
-| `BranchPicker` | List/checkout local git branches | `cwd`, `onError?` | ContextBar |
+| `BranchPicker` | List/checkout local git branches; shows current-branch PR # + checks when present | `cwd`, `onError?` | ContextBar |
+| `BranchPrStatusChip` | Current-branch PR # + title + CI summary; opens PR in browser | `pr` | ChangesTab header |
+| `CreatePrDialog` | Editable title/body modal before `gh pr create` | `open`, `initialTitle?`, `initialBody?`, `onConfirm` | ChangesTab, CommitCenter, CommitBar |
 | `PopoverTray` | Shared Esc/click-outside/↑↓ tray | `open`, `onClose`, `placement`, `children` | Model/Mode/Plus/Project/Branch pickers |
-| `ConfirmDialog` | In-app modal (rename/delete) | `open`, `title`, `onConfirm`, `onCancel` | SessionMenu |
+| `ConfirmDialog` | In-app modal (rename/delete/create PR fields) | `open`, `title`, `onConfirm`, `onCancel`, `confirmDisabled?` | SessionMenu, CreatePrDialog |
 | `AttachmentChip` | Pending attachment pill (file/image/directory/dom) | `attachment`, `onRemove` | Composer |
 | `SendButton` | Circular send / stop / queue | `isStreaming`, `canQueue?`, `onSend`, `onStop` | Composer |
 | `MarkdownBody` | GFM + lazy highlight.js language pack; `live` plain pre-wrap fast-path | `content`, `live?` | TurnTimeline (`TimelineRowView`) |
+| `MentionText` | Plain text with `@mention` accent pills (composer-matching cue) | `text`, `knownNames?` | TurnTimeline user bubble |
 | `CompactionCard` | Settled context-compaction boundary (divider + expandable summary) | `summaryMarkdown`, `strategy`, `tokensBefore?`, `tokensAfter?` | TurnTimeline (`TimelineRowView`) |
 | `IndexingCard` | Settled code-index boundary (divider + file counts) | `added`, `changed`, `removed`, `unchanged` | TurnTimeline (`TimelineRowView`) |
 | `FilesChangedCard` | End-of-turn git diff headline; expand file list (click → Files/Monaco), Review opens Changes | `cwd?`, `sessionId?` | TurnTimeline |
@@ -85,7 +90,9 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `TurnTimeline` | Turns + tools + plans + streaming; `@tanstack/react-virtual` over `displayItems` + live tail; pieces under `organisms/timeline/` (`WorkGroupBody` owns stable `renderOther`) | `sessionId` | ChatShell |
 | `PermissionPrompt` | Tool permission HITL | `permission` | ChatPage |
 | `QuestionPrompt` | AskUserQuestion HITL | `question` | ChatPage |
-| `RightPanel` | Plan / Changes / Files / Terminal / Browser; tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`) | — | App shell |
+| `RightPanel` | Plan / Changes / Files / Terminal / Browser / Memory (flagged) / plugin tabs (Database); tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`) + `src/plugins/` registry. Plan opens empty via `+`, ⌘J, or Plan mode. Memory gated by `MEMORY_TAB_ENABLED` (default off). Database via UI plugin (`DATABASE_TAB_ENABLED`, default on). | — | App shell |
+| `MemoryTab` | Right-panel Memory surface; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | RightPanel |
+| `DatabaseTab` | UI plugin: SQLite / Postgres / MySQL connections, schemas, tables, SQL + result grid | `active`, `session` | RightPanel (plugin registry) |
 | `FilesTab` | Cursor-style open-file strip + Monaco editor; empty state shows `FileExplorer` (searchable `list_files`) | `active` | RightPanel |
 | `AppHeader` | Title + sole right-panel toggle (⌘J) + session menu | — | ChatShell |
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | RightPanel |
@@ -101,7 +108,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `organisms/timeline/` | `buildDisplayItems` (+ `estimateSizeForItem`), `TimelineRowView`, `WorkGroupBody`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
 | `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
 | `organisms/right-panel/` | `PlanTab`, `ChangesTab` (single header: select-all + count/branch + diffstat), `FilesTab` (Monaco), `FileExplorer`, `FileRow` (aligned +/- / status columns), `CommitCenter` (message + selection label + split commit), `RightPanelTabBar`, `tabs` |
-| `organisms/context-bar/` | `CommitBar` (changes chip + Commit / Commit & Push), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
+| `organisms/context-bar/` | `CommitBar` (changes chip + Commit / Commit & Push / Create PR), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
 | `organisms/browser/` | `BrowserToolbar` (Design Mode toggle), `BrowserOverflowMenu` — composed by `BrowserTab` |
 | `organisms/terminal/` | `TerminalTab`, `TerminalInstance`, `TerminalRow`, `AgentTerminalRow`, `time` helpers |
 
@@ -193,6 +200,8 @@ Keep this file in sync when adding or renaming components.
 |---|---|---|---|
 | `AUTOMATIONS_UI_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_AUTOMATIONS_UI=true` | Shows Automations in settings nav/search, sidebar, command palette, and the legacy `automations` route |
 | `FLEX_MODE_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_FLEX_MODE=true` | Shows composer Flex mode in the ModePicker (orchestrator across plan / review / workers) |
+| `MEMORY_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_MEMORY_TAB=true` | Shows Memory in the right-panel tab strip / `+` menu / command palette (Settings → Memory stays available either way) |
+| `DATABASE_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `true` | `VITE_DATABASE_TAB=false` | Shows Database UI plugin tab (connections / schemas / tables / query) |
 
 ## Perf notes (Wave 3)
 
@@ -210,6 +219,6 @@ Keep this file in sync when adding or renaming components.
 - **Session-event demux:** `lib/sessionEventBus` attaches one Tauri `session-event` listener; `useGlobalSessionEvents` and each `useSessionEvents` subscribe to the bus (SubagentViewer no longer triples wire delivery).
 - **Browser / terminal selectors:** `useBrowserSession` selects per-session primitives; `TerminalTab` mounts xterm only for the active session's terminals (+ that session's agent terminal). `useIsGitRepo` shares the 5s `git-is-repo` poll across ContextBar / FilesChangedCard / RightPanel / ChangesTab.
 - **MarkdownBody:** module-scoped `components` map so settled `react-markdown` trees keep stable element constructors across parent re-renders.
-- **Spacing balance (careful):** chat chrome/gutters converge on `px-4` — AppHeader matches the timeline/composer rail; loading/error/empty states drop `p-6`/`px-6` jumps; ContextBar loses inner `px-1`; composer toolbar aligns with textarea `px-3`; ChatShell/timeline bottom stack eased `pb-3`→`pb-2`; RightPanel tab bar `px-2` toward body headers.
+- **Spacing balance (careful):** chat chrome/gutters converge on `px-4` — AppHeader matches the timeline/composer rail; loading/error/empty states drop `p-6`/`px-6` jumps; ContextBar loses inner `px-1`; composer toolbar aligns with textarea `px-3`; ChatShell/timeline bottom stack eased `pb-3`→`pb-2`; RightPanel tab bar `px-2` toward body headers. Right-panel tab chrome rows share `--header-height` (no double `border-b` under the tab strip). Session sidebar section headers use `px-2` (aligned with rows); session-row status slot is a fixed `h-5 w-5`. Settings shell uses `px-4` / `pt-6` (not `pl-12`/`pt-12`); nav selected `bg-fill-2`; list rows `px-3.5 py-3`; Welcome onboarding uses `FormField` + `h-9` controls.
 - **Streaming visuals:** `StreamingCaret` renders inline inside live `MarkdownBody` (including mid-turn narration in work groups); live assistant rows reserve `MessageActions` height; highlight.js preloads while live; `TurnTimeline` uses per-session `streamingSessions[id]` (SubagentViewer-safe); bottom “Working” hides when live answer text is visible; double-rAF remeasure on stream settle.
 - **Files / Monaco:** `@monaco-editor/react` + Vite `?worker` locals (`lib/monacoEnv.ts`); editor/vendor split via `manualChunks.monaco`. Open buffers live in `openFilesBySession` under one right-panel `files` tab (keep-alive like Terminal).

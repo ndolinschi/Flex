@@ -435,14 +435,13 @@ export type GitStatusSummary = {
   truncated: boolean
 }
 
-/** A file match from `list_files`, used by composer @-mentions and Files browse.
- * Always a file under the session project cwd (dirs are not returned). */
+/** A file or folder match from `list_files`, used by composer @-mentions and Files browse. */
 export type FileHit = {
   /** Path relative to the session cwd, forward-slashed. */
   path: string
   /** Basename, shown as the primary label. */
   name: string
-  /** Legacy field — always false; directories are not returned. */
+  /** True for directories (folder icon in the @ tray). */
   is_dir?: boolean
 }
 

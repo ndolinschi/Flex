@@ -2,7 +2,7 @@ import { useRef, useState } from "react"
 import { Check, ChevronDown } from "lucide-react"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
-import { Label, Spinner } from "../atoms"
+import { Label, ProviderIcon, Spinner } from "../atoms"
 import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
 
@@ -68,6 +68,9 @@ export const ModelSelect = ({
             "disabled:cursor-not-allowed disabled:opacity-50",
           )}
         >
+          {selected ? (
+            <ProviderIcon providerId={selected.providerId} size={16} />
+          ) : null}
           <span
             className={cn(
               "min-w-0 flex-1 truncate text-left",
@@ -104,7 +107,11 @@ export const ModelSelect = ({
               </p>
             ) : (
               groups.map((group) => (
-                <PopoverSection key={group.providerId} label={group.label}>
+                <PopoverSection
+                  key={group.providerId}
+                  label={group.label}
+                  icon={<ProviderIcon providerId={group.providerId} size={12} />}
+                >
                   <ul>
                     {group.items.map((m) => {
                       const active = m.id === value
@@ -117,6 +124,7 @@ export const ModelSelect = ({
                               handleClose()
                             }}
                           >
+                            <ProviderIcon providerId={m.providerId} size={14} />
                             <span className="min-w-0 flex-1 truncate">
                               {m.displayName ?? m.id}
                             </span>
