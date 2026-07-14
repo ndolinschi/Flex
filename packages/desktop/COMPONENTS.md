@@ -25,6 +25,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 
 | Component | Purpose | Key props | Used by |
 |---|---|---|---|
+| `AccentColorPicker` | Appearance accent swatches + custom hex/color input | — | Settings Appearance |
 | `FormField` | Label + control + hint/error | `label`, `htmlFor`, `error?`, `hint?` | ProviderSettingsForm |
 | `CommandPaletteRow` | Palette list row (icon + label + hint) | `index`, `active`, `label`, `hint?`, `icon?`, `onActivate`, `onHover` | CommandPalette |
 | `FuzzySessionRow` | Search-modal session row with highlight + relative time | `index`, `active`, `label`, `query`, `updatedAtMs`, `onActivate`, `onHover` | SearchModal |
@@ -149,6 +150,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/lib/markdownHighlight.ts` | Lazy-loaded rehype-highlight + core language subset (dynamic import from `MarkdownBody`) |
 | `src/stores/appStore.ts` | Composes Zustand slices; public `useAppStore` API |
 | `src/stores/slices/` | `session` / `composer` / `layout` / `ui` / `panelExtras` slices |
+| `src/lib/accent.ts` | Accent presets + custom hex → `--color-accent*` DOM apply |
 | `src/stores/persist.ts` | `persistUiState` / `restoreUiState` |
 | `src/stores/layoutConstants.ts` | Sidebar / right-panel / chat width clamps |
 | `src/hooks/useUpdaterCheck.ts` | Post-bootstrap update toast |

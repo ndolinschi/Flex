@@ -61,6 +61,11 @@ export type PlanAnnotationsPersisted = {
 
 export type UiTheme = "dark" | "light"
 
+export type {
+  AccentId,
+} from "../lib/accent"
+
+
 /** Window-width classification (see hooks/useViewportWidth.ts):
  * "wide" ≥ 940px, "narrow" 680–939px (sidebar auto-collapses, right panel
  * overlays), "tight" < 680px (narrow behavior plus tighter chat gutters). */
@@ -332,6 +337,10 @@ export type UiSliceState = {
   route: AppRoute
   settingsSection: SettingsSectionId
   theme: UiTheme
+  /** Accent preset id (`neutral` default) or `custom` with `accentCustomHex`. */
+  accentId: import("../lib/accent").AccentId
+  /** Hex used when `accentId === "custom"` (also the last custom pick). */
+  accentCustomHex: string
   notificationsEnabled: boolean
   completionSoundEnabled: boolean
   /** Single app-wide debug-logging switch (design doc: "gated by a single
@@ -357,6 +366,8 @@ export type UiSliceState = {
   setSettingsSection: (section: SettingsSectionId) => void
   setTheme: (theme: UiTheme) => void
   toggleTheme: () => void
+  setAccentId: (id: import("../lib/accent").AccentId) => void
+  setAccentCustomHex: (hex: string) => void
   setNotificationsEnabled: (enabled: boolean) => void
   setCompletionSoundEnabled: (enabled: boolean) => void
   setDebugLoggingEnabled: (enabled: boolean) => void

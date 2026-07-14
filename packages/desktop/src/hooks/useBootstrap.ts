@@ -1,5 +1,11 @@
 import { useEffect } from "react"
 import { initGlobalErrorLogging, log } from "../lib/debug/log"
+import {
+  DEFAULT_ACCENT_ID,
+  DEFAULT_CUSTOM_ACCENT,
+  isAccentId,
+  normalizeAccentHex,
+} from "../lib/accent"
 import { isConfigured, resumeSession } from "../lib/tauri"
 import type { AppRoute } from "../lib/types/ui"
 import { restoreUiState, useAppStore } from "../stores/appStore"
@@ -41,6 +47,13 @@ export const useBootstrap = (
         }
 
         setTheme(ui.theme === "light" ? "light" : "dark")
+
+        const accentCustomHex =
+          normalizeAccentHex(ui.accentCustomHex ?? "") ?? DEFAULT_CUSTOM_ACCENT
+        const accentId = isAccentId(ui.accentId) ? ui.accentId : DEFAULT_ACCENT_ID
+        // Hydrate hex first so `setAccentId("custom")` resolves the right tokens.
+        useAppStore.setState({ accentCustomHex })
+        useAppStore.getState().setAccentId(accentId)
 
         if (!configured) {
           log.info("boot", "bootstrap: not configured, routing to welcome")
