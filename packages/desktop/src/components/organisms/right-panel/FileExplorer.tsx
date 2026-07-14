@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState, type MouseEvent } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  ChevronDown,
   FileCode2,
   FilePlus,
+  Folder,
+  FolderOpen,
   Pencil,
   Search,
   Trash2,
@@ -10,11 +13,14 @@ import {
 import {
   createTextFile,
   deletePath,
+  listDirChildren,
   listFiles,
   renamePath,
   toInvokeError,
 } from "../../../lib/tauri"
+import { sortFileHits } from "../../../lib/fileTree"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
+import type { FileHit } from "../../../lib/types"
 import { basename, cn, fileIconForPath } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
 import { IconButton, Spinner, TextInput } from "../../atoms"
@@ -29,7 +35,7 @@ type FileExplorerProps = {
 }
 
 type DialogState =
-  | { kind: "create" }
+  | { kind: "create"; prefix?: string }
   | { kind: "rename"; path: string }
   | { kind: "delete"; path: string }
   | null
@@ -55,10 +61,145 @@ const isValidBasename = (name: string): boolean => {
   return true
 }
 
-/** Lightweight workspace file browser for the Files right-panel tab.
- * Same `list_files` IPC as composer `@` — project files only, gitignore +
- * hard-skip of `node_modules` / build outputs. Supports create / rename /
- * delete via header button + right-click context menu. */
+const INDENT_PX = 12
+
+type TreeBranchProps = {
+  cwd: string
+  dirPath: string
+  depth: number
+  expanded: Set<string>
+  onToggle: (dirPath: string) => void
+  onOpenFile: (path: string) => void
+  onContextMenu: (e: MouseEvent, hit: FileHit) => void
+}
+
+/** One directory level — loads children on demand when expanded (or root). */
+const TreeBranch = ({
+  cwd,
+  dirPath,
+  depth,
+  expanded,
+  onToggle,
+  onOpenFile,
+  onContextMenu,
+}: TreeBranchProps) => {
+  const isRoot = dirPath === ""
+  const shouldLoad = isRoot || expanded.has(dirPath)
+
+  const { data: children = [], isLoading, isFetching } = useQuery({
+    queryKey: ["workspace-dir-children", cwd, dirPath],
+    queryFn: () => listDirChildren(cwd, dirPath),
+    enabled: !!cwd && shouldLoad,
+    staleTime: 15_000,
+  })
+
+  const sorted = useMemo(() => sortFileHits(children), [children])
+
+  if (!shouldLoad) return null
+
+  if (isLoading && sorted.length === 0) {
+    return (
+      <div
+        className="flex items-center gap-2 py-1 text-xs text-ink-muted"
+        style={{ paddingLeft: 8 + depth * INDENT_PX }}
+      >
+        <Spinner size="sm" />
+        Loading…
+      </div>
+    )
+  }
+
+  if (sorted.length === 0) {
+    if (isRoot) {
+      return (
+        <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
+          <Folder className="h-6 w-6 text-ink-faint" aria-hidden />
+          <p className="text-sm text-ink-secondary">This folder is empty</p>
+          <p className="text-xs text-ink-muted">Create a file to get started.</p>
+        </div>
+      )
+    }
+    return (
+      <div
+        className="py-1 text-xs text-ink-faint"
+        style={{ paddingLeft: 8 + (depth + 1) * INDENT_PX }}
+      >
+        Empty
+      </div>
+    )
+  }
+
+  return (
+    <ul className="flex flex-col" role="list">
+      {sorted.map((hit) => {
+        const isDir = !!hit.is_dir
+        const isOpen = isDir && expanded.has(hit.path)
+        const Glyph = isDir
+          ? isOpen
+            ? FolderOpen
+            : Folder
+          : fileIconForPath(hit.path)
+        return (
+          <li key={hit.path}>
+            <button
+              type="button"
+              onClick={() => {
+                if (isDir) onToggle(hit.path)
+                else onOpenFile(hit.path)
+              }}
+              onContextMenu={(e) => onContextMenu(e, hit)}
+              title={hit.path}
+              aria-expanded={isDir ? isOpen : undefined}
+              className={cn(
+                "flex h-7 w-full items-center gap-1 rounded-md pr-2 text-left text-sm",
+                "text-ink-secondary hover:bg-fill-4 hover:text-ink",
+              )}
+              style={{ paddingLeft: 4 + depth * INDENT_PX }}
+            >
+              <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                {isDir ? (
+                  <ChevronDown
+                    className={cn(
+                      "h-3 w-3 text-icon-3 opacity-70 transition-transform",
+                      !isOpen && "-rotate-90",
+                    )}
+                    aria-hidden
+                  />
+                ) : (
+                  <span className="w-3" />
+                )}
+              </span>
+              <Glyph
+                className="h-3.5 w-3.5 shrink-0 text-ink-faint"
+                aria-hidden
+              />
+              <span className="min-w-0 flex-1 truncate">{hit.name}</span>
+              {isDir && isFetching && isOpen ? (
+                <Spinner size="sm" />
+              ) : null}
+            </button>
+            {isDir && isOpen ? (
+              <TreeBranch
+                cwd={cwd}
+                dirPath={hit.path}
+                depth={depth + 1}
+                expanded={expanded}
+                onToggle={onToggle}
+                onOpenFile={onOpenFile}
+                onContextMenu={onContextMenu}
+              />
+            ) : null}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+/** VS Code–style workspace browser for the Files right-panel tab.
+ * Browse mode: expandable folder tree via `list_dir_children`.
+ * Search mode: flat `list_files` results (files + folders).
+ * Create / rename / delete via header button + right-click context menu. */
 export const FileExplorer = ({
   sessionId,
   sessionKey,
@@ -78,8 +219,16 @@ export const FileExplorer = ({
     return () => window.clearTimeout(handle)
   }, [trimmed])
 
+  const searching = debounced.length > 0
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+
+  // Fresh tree when the workspace root changes.
+  useEffect(() => {
+    setExpanded(new Set())
+  }, [cwd])
+
   const [menu, setMenu] = useState<{
-    path: string
+    hit: FileHit
     x: number
     y: number
   } | null>(null)
@@ -87,20 +236,26 @@ export const FileExplorer = ({
   const [draftPath, setDraftPath] = useState("")
   const [busy, setBusy] = useState(false)
 
-  const { data: hits = [], isLoading, isFetching, refetch } = useQuery({
+  const {
+    data: searchHits = [],
+    isLoading: searchLoading,
+    isFetching: searchFetching,
+  } = useQuery({
     queryKey: ["workspace-file-list", cwd, debounced],
     queryFn: () => listFiles(cwd, debounced),
-    enabled: !!cwd,
+    enabled: !!cwd && searching,
     staleTime: 15_000,
   })
 
-  const files = useMemo(
-    () => hits.filter((h) => !h.is_dir && !h.path.endsWith("/")),
-    [hits],
-  )
+  const searchRows = useMemo(() => sortFileHits(searchHits), [searchHits])
 
   const refreshLists = async (paths: string[] = []) => {
-    await refetch()
+    await queryClient.invalidateQueries({
+      queryKey: ["workspace-dir-children", cwd],
+    })
+    await queryClient.invalidateQueries({
+      queryKey: ["workspace-file-list", cwd],
+    })
     for (const p of paths) {
       void queryClient.invalidateQueries({
         queryKey: ["workspace-file", sessionId, p],
@@ -109,9 +264,18 @@ export const FileExplorer = ({
     invalidateGitQueries(queryClient)
   }
 
-  const openCreate = () => {
-    setDraftPath("")
-    setDialog({ kind: "create" })
+  const toggleDir = (dirPath: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(dirPath)) next.delete(dirPath)
+      else next.add(dirPath)
+      return next
+    })
+  }
+
+  const openCreate = (prefix = "") => {
+    setDraftPath(prefix)
+    setDialog({ kind: "create", prefix })
   }
 
   const openRename = (path: string) => {
@@ -123,34 +287,49 @@ export const FileExplorer = ({
     setDialog({ kind: "delete", path })
   }
 
-  const handleContextMenu = (e: MouseEvent, path: string) => {
+  const handleContextMenu = (e: MouseEvent, hit: FileHit) => {
     e.preventDefault()
     e.stopPropagation()
-    setMenu({ path, x: e.clientX, y: e.clientY })
+    setMenu({ hit, x: e.clientX, y: e.clientY })
   }
 
-  const contextMenuItems: ContextMenuItem[] = menu
-    ? [
-        {
-          type: "item",
-          label: "Open",
-          onSelect: () => onOpenFile(menu.path),
-        },
-        {
-          type: "item",
-          label: "Rename…",
-          icon: Pencil,
-          onSelect: () => openRename(menu.path),
-        },
-        { type: "separator" },
-        {
-          type: "item",
-          label: "Delete…",
-          icon: Trash2,
-          danger: true,
-          onSelect: () => openDelete(menu.path),
-        },
-      ]
+  const menuHit = menu?.hit
+  const contextMenuItems: ContextMenuItem[] = menuHit
+    ? menuHit.is_dir
+      ? [
+          {
+            type: "item",
+            label: expanded.has(menuHit.path) ? "Collapse" : "Expand",
+            onSelect: () => toggleDir(menuHit.path),
+          },
+          {
+            type: "item",
+            label: "New file here…",
+            icon: FilePlus,
+            onSelect: () => openCreate(`${menuHit.path}/`),
+          },
+        ]
+      : [
+          {
+            type: "item",
+            label: "Open",
+            onSelect: () => onOpenFile(menuHit.path),
+          },
+          {
+            type: "item",
+            label: "Rename…",
+            icon: Pencil,
+            onSelect: () => openRename(menuHit.path),
+          },
+          { type: "separator" },
+          {
+            type: "item",
+            label: "Delete…",
+            icon: Trash2,
+            danger: true,
+            onSelect: () => openDelete(menuHit.path),
+          },
+        ]
     : []
 
   const confirmDisabled =
@@ -168,6 +347,11 @@ export const FileExplorer = ({
         const path = draftPath.trim().replace(/\\/g, "/")
         const created = await createTextFile(sessionId, path)
         await refreshLists([created])
+        // Expand parent so the new file is visible in the tree.
+        const parent = dirPrefix(created).replace(/\/$/, "")
+        if (parent) {
+          setExpanded((prev) => new Set(prev).add(parent))
+        }
         onOpenFile(created)
         pushToast(`Created ${created}`, "success")
       } else if (dialog.kind === "rename") {
@@ -203,72 +387,77 @@ export const FileExplorer = ({
           className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
           aria-label="Search workspace files"
         />
-        {isFetching ? <Spinner size="sm" /> : null}
-        <IconButton label="New file" onClick={openCreate} className="h-6 w-6">
+        {searchFetching ? <Spinner size="sm" /> : null}
+        <IconButton label="New file" onClick={() => openCreate()} className="h-6 w-6">
           <FilePlus className="h-3.5 w-3.5" aria-hidden />
         </IconButton>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-1 py-1">
-        {isLoading && files.length === 0 ? (
-          <div className="flex items-center justify-center gap-2 py-8 text-sm text-ink-muted">
-            <Spinner size="sm" />
-            Loading…
-          </div>
-        ) : files.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-            <FileCode2 className="h-6 w-6 text-ink-faint" aria-hidden />
-            <p className="text-sm text-ink-secondary">
-              {trimmed ? "No matches" : "No files found"}
-            </p>
-            <p className="text-xs text-ink-muted">
-              {trimmed
-                ? "Try a different search."
-                : "Create a file or open a project folder to browse."}
-            </p>
-            {!trimmed ? (
-              <button
-                type="button"
-                onClick={openCreate}
-                className="mt-1 text-xs text-accent hover:underline"
-              >
-                New file…
-              </button>
-            ) : null}
-          </div>
-        ) : (
-          <ul className="flex flex-col" role="list">
-            {files.map((hit) => {
-              const Glyph = fileIconForPath(hit.path)
-              return (
-                <li key={hit.path}>
-                  <button
-                    type="button"
-                    onClick={() => onOpenFile(hit.path)}
-                    onContextMenu={(e) => handleContextMenu(e, hit.path)}
-                    title={hit.path}
-                    className={cn(
-                      "flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-sm",
-                      "text-ink-secondary hover:bg-fill-4 hover:text-ink",
-                    )}
-                  >
-                    <Glyph
-                      className="h-3.5 w-3.5 shrink-0 text-ink-faint"
-                      aria-hidden
-                    />
-                    <span className="min-w-0 flex-1 truncate">
-                      <span className="text-ink-faint">
-                        {hit.path.includes("/")
-                          ? hit.path.slice(0, hit.path.lastIndexOf("/") + 1)
-                          : ""}
+        {searching ? (
+          searchLoading && searchRows.length === 0 ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-ink-muted">
+              <Spinner size="sm" />
+              Searching…
+            </div>
+          ) : searchRows.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
+              <FileCode2 className="h-6 w-6 text-ink-faint" aria-hidden />
+              <p className="text-sm text-ink-secondary">No matches</p>
+              <p className="text-xs text-ink-muted">Try a different search.</p>
+            </div>
+          ) : (
+            <ul className="flex flex-col" role="list">
+              {searchRows.map((hit) => {
+                const isDir = !!hit.is_dir
+                const Glyph = isDir ? Folder : fileIconForPath(hit.path)
+                return (
+                  <li key={hit.path}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isDir) {
+                          setQuery("")
+                          setExpanded((prev) => new Set(prev).add(hit.path))
+                        } else {
+                          onOpenFile(hit.path)
+                        }
+                      }}
+                      onContextMenu={(e) => handleContextMenu(e, hit)}
+                      title={hit.path}
+                      className={cn(
+                        "flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-sm",
+                        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
+                      )}
+                    >
+                      <Glyph
+                        className="h-3.5 w-3.5 shrink-0 text-ink-faint"
+                        aria-hidden
+                      />
+                      <span className="min-w-0 flex-1 truncate">
+                        <span className="text-ink-faint">
+                          {hit.path.includes("/")
+                            ? hit.path.slice(0, hit.path.lastIndexOf("/") + 1)
+                            : ""}
+                        </span>
+                        {hit.name}
                       </span>
-                      {basename(hit.path)}
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )
+        ) : (
+          <TreeBranch
+            cwd={cwd}
+            dirPath=""
+            depth={0}
+            expanded={expanded}
+            onToggle={toggleDir}
+            onOpenFile={onOpenFile}
+            onContextMenu={handleContextMenu}
+          />
         )}
       </div>
 

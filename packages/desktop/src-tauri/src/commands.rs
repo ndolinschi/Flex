@@ -3340,6 +3340,96 @@ pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
     hits.into_iter().map(|(_, h)| h).collect()
 }
 
+/// Immediate children of `relative_dir` under `cwd` (empty = workspace root).
+/// VS Code–style Files tree browse: one level per expand, gitignore-aware,
+/// hard-skips heavy vendor dirs. Sorted dirs-first then name. Soft-capped.
+#[tracing::instrument(level = "debug", skip_all)]
+#[tauri::command]
+pub fn list_dir_children(cwd: String, relative_dir: String) -> Vec<FileHit> {
+    let root = PathBuf::from(&cwd);
+    if !root.is_dir() {
+        return Vec::new();
+    }
+
+    let rel = relative_dir.trim().trim_matches('/').replace('\\', "/");
+    if rel.contains("..") {
+        return Vec::new();
+    }
+    if !rel.is_empty() {
+        if let Err(_) = validate_repo_relative_path(&rel) {
+            return Vec::new();
+        }
+    }
+
+    let dir = if rel.is_empty() {
+        root.clone()
+    } else {
+        root.join(&rel)
+    };
+    if !dir.is_dir() {
+        return Vec::new();
+    }
+
+    const MAX_CHILDREN: usize = 1_000;
+    let mut hits: Vec<FileHit> = Vec::new();
+
+    let mut builder = ignore::WalkBuilder::new(&dir);
+    builder
+        .standard_filters(true)
+        .parents(true)
+        .follow_links(false)
+        .max_depth(Some(1))
+        .filter_entry(|entry| {
+            if entry.depth() > 0 && entry.file_type().is_some_and(|ft| ft.is_dir()) {
+                let name = entry.file_name().to_string_lossy();
+                if is_skipped_dir_name(&name) {
+                    return false;
+                }
+            }
+            true
+        });
+
+    for entry in builder.build().flatten() {
+        if entry.depth() == 0 {
+            continue;
+        }
+        let Some(ft) = entry.file_type() else {
+            continue;
+        };
+        let is_dir = ft.is_dir();
+        if !is_dir && !ft.is_file() {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().to_string();
+        if is_dir && is_skipped_dir_name(&name) {
+            continue;
+        }
+        let Ok(stripped) = entry.path().strip_prefix(&root) else {
+            continue;
+        };
+        let path = normalize_path_slashes(&stripped.to_string_lossy());
+        if path.is_empty() {
+            continue;
+        }
+        hits.push(FileHit {
+            path,
+            name,
+            is_dir,
+        });
+        if hits.len() >= MAX_CHILDREN {
+            break;
+        }
+    }
+
+    hits.sort_by(|a, b| {
+        b.is_dir
+            .cmp(&a.is_dir)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+            .then_with(|| a.path.cmp(&b.path))
+    });
+    hits
+}
+
 #[cfg(test)]
 mod list_files_ranking_tests {
     use super::{is_skipped_dir_name, score_file};

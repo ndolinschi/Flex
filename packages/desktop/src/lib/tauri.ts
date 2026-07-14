@@ -387,6 +387,13 @@ export const suggestCommitMessage = (
 export const listFiles = (cwd: string, query: string): Promise<FileHit[]> =>
   invoke("list_files", { cwd, query })
 
+/** Immediate children of `relativeDir` under `cwd` ("" = workspace root).
+ * Used by the Files tree explorer (one level per folder expand). */
+export const listDirChildren = (
+  cwd: string,
+  relativeDir: string,
+): Promise<FileHit[]> => invoke("list_dir_children", { cwd, relativeDir })
+
 export type DbEngine = "sqlite" | "postgres" | "mysql"
 
 export type DbConnectionSpec = {
