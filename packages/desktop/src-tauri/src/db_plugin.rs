@@ -716,26 +716,23 @@ async fn list_tables_mysql(url: &str, schema: Option<&str>) -> DesktopResult<Vec
          WHERE table_schema = DATABASE() ORDER BY table_name"
             .to_string()
     };
-    let rows: Vec<(String, String, String)> = conn
-        .query_map(sql, |schema: String, name: String, kind: String| {
-            (schema, name, kind)
+    let rows: Vec<DbTableInfo> = conn
+        .query_map(sql, |(schema, name, kind): (String, String, String)| {
+            DbTableInfo {
+                schema,
+                name,
+                kind: if kind.to_uppercase().contains("VIEW") {
+                    "view".into()
+                } else {
+                    "table".into()
+                },
+            }
         })
         .await
         .map_err(|e| DesktopError::Message(format!("mysql tables failed: {e}")))?;
     drop(conn);
     let _ = pool.disconnect().await;
-    Ok(rows
-        .into_iter()
-        .map(|(schema, name, kind)| DbTableInfo {
-            schema,
-            name,
-            kind: if kind.to_uppercase().contains("VIEW") {
-                "view".into()
-            } else {
-                "table".into()
-            },
-        })
-        .collect())
+    Ok(rows)
 }
 
 async fn run_mysql_query(url: &str, sql: &str) -> DesktopResult<DbQueryResult> {
@@ -746,8 +743,7 @@ async fn run_mysql_query(url: &str, sql: &str) -> DesktopResult<DbQueryResult> {
         .await
         .map_err(|e| DesktopError::Message(format!("mysql query failed: {e}")))?;
     let columns: Vec<String> = result
-        .columns()
-        .as_ref()
+        .columns_ref()
         .iter()
         .map(|c| c.name_str().to_string())
         .collect();
