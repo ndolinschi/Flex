@@ -2306,12 +2306,8 @@ pub async fn git_create_pr(
     let (cwd, sha) = commit_selected_paths(&state, &session_id, &message, &paths).await?;
     push_current_branch(&cwd)?;
 
-    let gh_check = crate::win_console::command("gh")
-        .args(["auth", "status"])
-        .current_dir(&cwd)
-        .output();
-    let gh_available = matches!(&gh_check, Ok(out) if out.status.success());
-    if !gh_available {
+    let available = gh_available(&cwd);
+    if !available {
         return Ok(CreatePrOutcome {
             commit_sha: sha,
             pr_url: None,
@@ -2369,6 +2365,226 @@ pub struct CreatePrOutcome {
     /// still succeeded (e.g. `gh` missing/unauthenticated) — the UI shows
     /// this as a non-fatal toast rather than treating the call as an error.
     pub degraded_reason: Option<String>,
+}
+
+/// Whether `gh` is installed and authenticated for this cwd.
+fn gh_available(cwd: &std::path::Path) -> bool {
+    let gh_check = crate::win_console::command("gh")
+        .args(["auth", "status"])
+        .current_dir(cwd)
+        .output();
+    matches!(&gh_check, Ok(out) if out.status.success())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchPrInfo {
+    pub number: u64,
+    pub title: String,
+    pub url: String,
+    /// OPEN / MERGED / CLOSED (from `gh pr view --json state`).
+    pub state: String,
+    /// Human summary derived from `statusCheckRollup`, e.g. "3/3 passing".
+    pub checks_summary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchPrStatus {
+    pub gh_available: bool,
+    pub pr: Option<BranchPrInfo>,
+}
+
+/// Summarize `gh pr view --json statusCheckRollup` into a short chip label.
+fn summarize_status_checks(rollup: &[serde_json::Value]) -> String {
+    if rollup.is_empty() {
+        return "No checks".into();
+    }
+    let mut passing = 0u32;
+    let mut failing = 0u32;
+    let mut pending = 0u32;
+    for item in rollup {
+        let conclusion = item
+            .get("conclusion")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_ascii_uppercase();
+        let status = item
+            .get("status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_ascii_uppercase();
+        // StatusContext nodes use `state` instead of conclusion/status.
+        let state = item
+            .get("state")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_ascii_uppercase();
+
+        if matches!(conclusion.as_str(), "SUCCESS" | "NEUTRAL" | "SKIPPED")
+            || state == "SUCCESS"
+        {
+            passing += 1;
+        } else if matches!(conclusion.as_str(), "FAILURE" | "TIMED_OUT" | "CANCELLED" | "ACTION_REQUIRED")
+            || matches!(state.as_str(), "FAILURE" | "ERROR")
+        {
+            failing += 1;
+        } else if status == "COMPLETED" && conclusion.is_empty() && state.is_empty() {
+            passing += 1;
+        } else {
+            pending += 1;
+        }
+    }
+    let total = passing + failing + pending;
+    if failing > 0 {
+        format!("{failing}/{total} failing")
+    } else if pending > 0 {
+        format!("{pending}/{total} pending")
+    } else {
+        format!("{passing}/{total} passing")
+    }
+}
+
+/// Look up the open PR for the current branch via `gh pr view`. Returns
+/// `pr: None` when there is no PR (or `gh` is unavailable) — never an error
+/// for the common "no PR yet" case, so the Changes UI can poll safely.
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub fn git_pr_status(cwd: String) -> DesktopResult<BranchPrStatus> {
+    let path = std::path::PathBuf::from(&cwd);
+    if !gh_available(&path) {
+        return Ok(BranchPrStatus {
+            gh_available: false,
+            pr: None,
+        });
+    }
+
+    let out = crate::win_console::command("gh")
+        .args([
+            "pr",
+            "view",
+            "--json",
+            "number,title,url,state,statusCheckRollup",
+        ])
+        .current_dir(&path)
+        .output()
+        .map_err(|e| DesktopError::Message(format!("gh pr view failed: {e}")))?;
+
+    if !out.status.success() {
+        // No PR for this branch (or other non-fatal gh exits) — treat as empty.
+        return Ok(BranchPrStatus {
+            gh_available: true,
+            pr: None,
+        });
+    }
+
+    let raw = String::from_utf8_lossy(&out.stdout);
+    let value: serde_json::Value = serde_json::from_str(raw.trim()).map_err(|e| {
+        DesktopError::Message(format!("gh pr view returned invalid JSON: {e}"))
+    })?;
+
+    let number = value
+        .get("number")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| DesktopError::Message("gh pr view missing number".into()))?;
+    let title = value
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let url = value
+        .get("url")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let state = value
+        .get("state")
+        .and_then(|v| v.as_str())
+        .unwrap_or("OPEN")
+        .to_string();
+    let rollup = value
+        .get("statusCheckRollup")
+        .and_then(|v| v.as_array())
+        .map(|a| a.as_slice())
+        .unwrap_or(&[]);
+
+    Ok(BranchPrStatus {
+        gh_available: true,
+        pr: Some(BranchPrInfo {
+            number,
+            title,
+            url,
+            state,
+            checks_summary: summarize_status_checks(rollup),
+        }),
+    })
+}
+
+/// Create a PR for the current branch via `gh pr create --fill` without a
+/// fresh commit (branch must already have commits to open against the base).
+/// Pushes first when a remote is configured so the head ref exists on the
+/// host. Same degradation as `git_create_pr` when `gh` is unavailable.
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub fn git_create_pr_for_branch(cwd: String) -> DesktopResult<CreatePrOutcome> {
+    let path = std::path::PathBuf::from(&cwd);
+    // Best-effort push so a local-only branch can still become a PR head.
+    let _ = push_current_branch(&path);
+
+    if !gh_available(&path) {
+        return Ok(CreatePrOutcome {
+            commit_sha: String::new(),
+            pr_url: None,
+            degraded_reason: Some(
+                "GitHub CLI not available — push the branch and create a PR from the host"
+                    .into(),
+            ),
+        });
+    }
+
+    let pr = crate::win_console::command("gh")
+        .args(["pr", "create", "--fill"])
+        .current_dir(&path)
+        .output()
+        .map_err(|e| DesktopError::Message(format!("gh pr create failed: {e}")))?;
+    if !pr.status.success() {
+        let stderr = String::from_utf8_lossy(&pr.stderr).trim().to_string();
+        // If a PR already exists, surface its URL instead of failing.
+        if let Ok(view) = crate::win_console::command("gh")
+            .args(["pr", "view", "--json", "url"])
+            .current_dir(&path)
+            .output()
+        {
+            if view.status.success() {
+                if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&view.stdout) {
+                    if let Some(url) = value.get("url").and_then(|v| v.as_str()) {
+                        if !url.is_empty() {
+                            return Ok(CreatePrOutcome {
+                                commit_sha: String::new(),
+                                pr_url: Some(url.to_string()),
+                                degraded_reason: None,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        return Ok(CreatePrOutcome {
+            commit_sha: String::new(),
+            pr_url: None,
+            degraded_reason: Some(if stderr.is_empty() {
+                "gh pr create failed".into()
+            } else {
+                format!("gh pr create failed ({stderr})")
+            }),
+        });
+    }
+    let url = String::from_utf8_lossy(&pr.stdout).trim().to_string();
+    Ok(CreatePrOutcome {
+        commit_sha: String::new(),
+        pr_url: (!url.is_empty()).then_some(url),
+        degraded_reason: None,
+    })
 }
 
 /// One-shot, tool-free commit-message suggestion from a diff summary —

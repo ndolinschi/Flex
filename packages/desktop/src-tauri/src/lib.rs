@@ -257,6 +257,8 @@ pub fn run() {
             commands::git_commit_and_push,
             commands::git_create_branch_and_commit,
             commands::git_create_pr,
+            commands::git_pr_status,
+            commands::git_create_pr_for_branch,
             commands::suggest_commit_message,
             // Review flow: per-file keep/undo + hunk-patch apply.
             commands::review_undo_file,

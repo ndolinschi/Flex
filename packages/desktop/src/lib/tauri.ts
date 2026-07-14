@@ -337,6 +337,29 @@ export const gitCreatePr = (
 ): Promise<CreatePrOutcome> =>
   invoke("git_create_pr", { sessionId, message, paths, title, body })
 
+export type BranchPrInfo = {
+  number: number
+  title: string
+  url: string
+  state: string
+  checksSummary: string
+}
+
+export type BranchPrStatus = {
+  ghAvailable: boolean
+  pr: BranchPrInfo | null
+}
+
+/** Current-branch PR + CI summary via `gh pr view`. Returns `pr: null` when
+ * there is no PR or `gh` is unavailable — safe to poll from the Changes UI. */
+export const gitPrStatus = (cwd: string): Promise<BranchPrStatus> =>
+  invoke("git_pr_status", { cwd })
+
+/** Create a PR for the current branch (`gh pr create --fill`) without a new
+ * commit. If a PR already exists, returns its URL. */
+export const gitCreatePrForBranch = (cwd: string): Promise<CreatePrOutcome> =>
+  invoke("git_create_pr_for_branch", { cwd })
+
 /** One-shot commit-message suggestion from a diff summary, via the
  * session's own model — see `commands::suggest_commit_message`. Callers
  * should treat any rejection as non-fatal and just leave the message box
