@@ -17,16 +17,20 @@
 
 mod loop_agent;
 pub mod mcp_store;
+mod role_tiers;
 pub mod routines;
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use agentloop_core::Plugin;
-use agentloop_providers::{ProviderOptions, native, native_all};
+use agentloop_providers::{
+    ProviderOptions, connect_bedrock, resolve_available_providers, resolve_real_providers,
+};
 
 pub use agentloop_engine::{
-    EngineConfig, EngineResult, EngineService, EngineServiceError, OutputVerbosity,
+    EngineConfig, EngineResult, EngineService, EngineServiceError, OutputVerbosity, RoleSpec,
+    RoleToolProfile,
 };
 #[cfg(feature = "index")]
 pub use agentloop_index::{self as index, IndexPlugin};
@@ -42,6 +46,7 @@ pub use agentloop_search::{self as search, SearchPlugin};
 #[cfg(feature = "verifier")]
 pub use agentloop_verifier::{self as verifier, VerifierPlugin};
 pub use loop_agent::{ClawBot, ClawBotBuilder, LoopAgent, PromptSource};
+pub use role_tiers::apply_research_model_tiers;
 
 /// Fluent builder that resolves providers, enables plugins, and composes a
 /// native [`EngineService`].
@@ -50,6 +55,10 @@ pub struct AgentBuilder {
     config: EngineConfig,
     plugins: Vec<Arc<dyn Plugin>>,
     all_providers: bool,
+    /// Deferred `enable_plugin("search")` so build-time tier routing can pin
+    /// the researcher role to a cheap model when one is available.
+    #[cfg(feature = "search")]
+    enable_search: bool,
 }
 
 impl AgentBuilder {
@@ -59,6 +68,8 @@ impl AgentBuilder {
             config: EngineConfig::default(),
             plugins: Vec::new(),
             all_providers: false,
+            #[cfg(feature = "search")]
+            enable_search: false,
         }
     }
 
@@ -132,7 +143,9 @@ impl AgentBuilder {
         let mut matched = false;
         #[cfg(feature = "search")]
         if id == "search" {
-            self.plugins.push(Arc::new(SearchPlugin::default()));
+            // Deferred until [`AgentBuilder::build`] so tier routing can pin
+            // the researcher role to a cheap model when one is registered.
+            self.enable_search = true;
             matched = true;
         }
         #[cfg(feature = "index")]
@@ -227,13 +240,70 @@ impl AgentBuilder {
     }
 
     /// Resolve providers, fold in enabled plugins, and build the service.
+    ///
+    /// When a known cheap/strong model pair is registered, pins `searcher`
+    /// to the cheap model and `worker` to the strong one (see
+    /// [`apply_research_model_tiers`]). Explicit `EngineConfig.roles` entries
+    /// for those names win. When search is enabled via
+    /// [`AgentBuilder::enable_plugin`], the `researcher` role is also pinned
+    /// to the cheap model (independent of searcher/worker overrides). Desktop
+    /// compose goes through this path automatically.
     pub fn build(mut self) -> EngineResult<EngineService> {
-        self.config.plugins.extend(self.plugins);
-        if self.all_providers {
-            native_all(self.provider_opts, self.config)
+        let (mut providers, mut default_model) = if self.all_providers {
+            resolve_available_providers(
+                self.provider_opts.provider.as_deref(),
+                self.provider_opts.model.clone(),
+                &self.provider_opts.custom,
+                &self.provider_opts.provider_keys,
+            )?
         } else {
-            native(self.provider_opts, self.config)
+            let (providers, model) = resolve_real_providers(
+                self.provider_opts.provider.as_deref(),
+                self.provider_opts.model.clone(),
+                &self.provider_opts.custom,
+                &self.provider_opts.provider_keys,
+            )?;
+            (providers, Some(model))
+        };
+        if let Some(bedrock_model) = connect_bedrock(
+            &mut providers,
+            &self.provider_opts.provider_keys,
+            &self.provider_opts.provider_regions,
+        ) {
+            if self.all_providers {
+                default_model = default_model.or(Some(bedrock_model));
+            }
         }
+
+        let cheap = apply_research_model_tiers(
+            &providers,
+            &mut self.config,
+            self.provider_opts.provider.as_deref(),
+        );
+
+        #[cfg(feature = "search")]
+        if self.enable_search {
+            let already_has_search = self
+                .plugins
+                .iter()
+                .chain(self.config.plugins.iter())
+                .any(|plugin| plugin.id() == "search");
+            if !already_has_search {
+                let mut plugin = SearchPlugin::default();
+                if let Some(model) = cheap {
+                    plugin = plugin.with_researcher_models(vec![model]);
+                }
+                self.plugins.push(Arc::new(plugin));
+            } else if cheap.is_some() {
+                tracing::warn!(
+                    "enable_plugin(\"search\") skipped: a search plugin is already registered; \
+                     call SearchPlugin::with_researcher_models yourself to pin the researcher role"
+                );
+            }
+        }
+
+        self.config.plugins.extend(self.plugins);
+        EngineService::native(providers, default_model, self.config)
     }
 }
 

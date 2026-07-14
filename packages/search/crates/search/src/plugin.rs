@@ -6,14 +6,12 @@
 
 use std::sync::Arc;
 
-use agentloop_contracts::IsolationPolicy;
+use agentloop_contracts::{IsolationPolicy, ModelRef};
 use agentloop_core::{Plugin, PluginRole, PluginRoleTools, Tool};
 
 use crate::rerank::KeywordReranker;
 use crate::scrape_page::ScrapePageTool;
-use crate::search_backend::{
-    default_search_backends, FallbackSearchBackend, SearchBackend,
-};
+use crate::search_backend::{FallbackSearchBackend, SearchBackend, default_search_backends};
 use crate::search_web::SearchWebTool;
 
 /// The deep-search plugin.
@@ -23,12 +21,25 @@ use crate::search_web::SearchWebTool;
 /// Brave / SearXNG via env) with keyword-based result re-ranking.
 pub struct SearchPlugin {
     backend: Arc<dyn SearchBackend>,
+    /// Ordered model preference for the `researcher` role; empty = inherit.
+    researcher_models: Vec<ModelRef>,
 }
 
 impl SearchPlugin {
     /// Create a plugin with the given search backend.
     pub fn new(backend: Arc<dyn SearchBackend>) -> Self {
-        Self { backend }
+        Self {
+            backend,
+            researcher_models: Vec::new(),
+        }
+    }
+
+    /// Pin the `researcher` role to an ordered model preference chain
+    /// (e.g. a cheap/fast model). Empty keeps the default inherit-session
+    /// behavior.
+    pub fn with_researcher_models(mut self, models: Vec<ModelRef>) -> Self {
+        self.researcher_models = models;
+        self
     }
 }
 
@@ -39,6 +50,7 @@ impl Default for SearchPlugin {
     fn default() -> Self {
         Self {
             backend: Arc::new(FallbackSearchBackend::new(default_search_backends())),
+            researcher_models: Vec::new(),
         }
     }
 }
@@ -65,7 +77,7 @@ impl Plugin for SearchPlugin {
     fn roles(&self) -> Vec<PluginRole> {
         vec![PluginRole {
             name: "researcher".to_owned(),
-            models: Vec::new(),
+            models: self.researcher_models.clone(),
             tools: PluginRoleTools::Allow(vec![
                 "search_web".to_owned(),
                 "scrape_page".to_owned(),
@@ -88,7 +100,7 @@ const RESEARCHER_PROMPT: &str = r#"You are an Autonomous Deep Search Agent. Your
 ### YOUR AVAILABLE TOOLS:
 1. `search_web(query, max_results?, depth?)`: Search the web. Set `max_results` (1-20, default 15) to control result count. Set `depth` to `"broad"` for exploratory overview searches or `"specific"` for narrowly targeted queries.
 2. `scrape_page(url, max_bytes?)`: Read the full content of a specific webpage.
-3. `Task(role="researcher", prompt="...")`: Spawn a parallel researcher sub-agent to investigate a sub-question independently.
+3. `Agent(role="researcher", prompt="...")`: Spawn a parallel researcher sub-agent to investigate a sub-question independently.
 
 ### YOUR WORKFLOW (THE LOOP):
 
@@ -104,7 +116,7 @@ Use a **layered search pattern**:
 2. **Deep-dive scrapes**: After identifying key sources, scrape them in full. Extract facts, data points, and arguments.
 3. **Verification searches** (2-3 rounds): Use `depth="specific"` queries to verify key claims. Search for counter-arguments and contradictory evidence.
 
-**Parallel fan-out for complex questions**: If the question has multiple independent angles (e.g., "analyze the economic and environmental impact of X"), use `Task(role="researcher", prompt="...")` to spawn parallel researcher sub-agents for each angle. Each sub-agent will return a synthesis of its findings.
+**Parallel fan-out for complex questions**: If the question has multiple independent angles (e.g., "analyze the economic and environmental impact of X"), use `Agent(role="researcher", prompt="...")` to spawn parallel researcher sub-agents for each angle. Each sub-agent will return a synthesis of its findings.
 
 **Incremental compaction**: After 3 search rounds, summarize what you have learned concisely before continuing. Discard raw search output that is no longer needed; keep only key facts, sources, and open questions.
 

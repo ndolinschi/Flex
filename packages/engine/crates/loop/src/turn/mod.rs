@@ -48,7 +48,6 @@ impl Drop for AbortOnDrop {
     }
 }
 
-
 /// Flush the turn's event-drain task, but NEVER block turn completion on it
 /// indefinitely.
 ///

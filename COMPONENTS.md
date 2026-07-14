@@ -28,16 +28,19 @@ Traits and registries; depends only on `contracts`. `agent.rs` (`Agent`:
 `event_sink.rs` (`EventSink`), `registry.rs` (`ToolRegistry`, `ProviderRegistry`).
 
 ### engine (`agentloop-engine`) — `crates/engine/src/`
-`EngineService` front door (`lib.rs`) — provider-agnostic composition over a prebuilt
+`EngineService` front door — provider-agnostic composition over a prebuilt
 `ProviderRegistry`; folds plugins into tools/prompt/roles; wires `RoleRegistry`,
-`CommandRegistry`, `SystemPromptAssembler`, `McpManager`, base tools. `options.rs`
-(`EngineConfig`, `OutputVerbosity`), `error.rs` (`EngineServiceError`).
+`CommandRegistry`, `SystemPromptAssembler`, `McpManager`, base tools.
+`lib.rs` (re-exports), `service.rs` (struct + constructors), `native/` (composition),
+`session.rs` / `workspace.rs` / `background.rs` / `turn_api.rs` / `replay.rs` /
+`goal.rs` / `verify.rs`, `options.rs` (`EngineConfig`, `OutputVerbosity`),
+`error.rs` (`EngineServiceError`), `paths.rs`.
 
 ### loop (`agentloop-loop`) — `crates/loop/src/`
 `NativeAgent`, the native agent loop. `agent.rs` (`NativeAgent`), `builder.rs`
-(`NativeAgentBuilder`, `LoopLimits`), `turn/mod.rs` + `turn/iteration.rs` (model
-streaming, retries, model failover) + `turn/tool_exec.rs` (`execute_one_call`,
-`run_subagent_call`) + `turn/hooks.rs`, `roles.rs` (`RoleRegistry`, `RoleSpec`),
+(`NativeAgentBuilder`, `LoopLimits`), `turn/mod.rs` + `turn/iteration/` (model
+streaming, retries, model failover) + `turn/tool_exec/` (`execute_tool_requests`,
+`execute_one_call`, intercept paths) + `turn/hooks.rs`, `roles.rs` (`RoleRegistry`, `RoleSpec`),
 `subagent.rs`, `permission.rs` (`PermissionPolicy`, `Verdict`), `rules.rs`, `pool.rs`
 (bounded tool worker pool), `compaction.rs`, `session_handle.rs` (`SessionHandle` —
 append-then-broadcast), `manager.rs` (`ToolCallManager`), `actor.rs`,
@@ -45,7 +48,8 @@ append-then-broadcast), `manager.rs` (`ToolCallManager`), `actor.rs`,
 
 ### executors (`agentloop-executors`) — `crates/executors/src/`
 `core::Executor` backends: `local.rs` (`/bin/sh`), `docker.rs`, `ssh.rs` (+rsync),
-`container_image.rs` (apptainer/singularity), `remote_fn.rs` (serverless stub), `run.rs`.
+`container_image.rs` (apptainer/singularity), `remote_fn.rs` (serverless stub),
+`run/` (shared process plumbing: foreground/demote/background/io/probe).
 
 ### hooks (`agentloop-hooks`) — `crates/hooks/src/`
 Built-in lifecycle hooks: `diagnostics.rs` (`DiagnosticsHook`, `CheckSpec`), `format.rs`
@@ -71,10 +75,10 @@ System-prompt assembly + slash commands: `assembler.rs` (`SystemPromptAssembler`
 append-only `.jsonl` per session, `LineRecord::{Meta,Event,Delete,Checkpoint}`).
 
 ### tools (`agentloop-tools`) — `crates/tools/src/`
-Base tool set: `bash.rs` (`BashTool`, takes `Arc<dyn Executor>`), `glob.rs`, `grep.rs`,
-`web_fetch.rs`, `agent.rs` (subagent-spawn tool, `SUBAGENT_TOOL_NAME`), `plan.rs` /
-`exit_plan_mode.rs`, `ask_question.rs`, `skill.rs`, `registry.rs` (`base_tools`,
-`base_tools_read_only`).
+Base tool set: `bash/` (`BashTool`, takes `Arc<dyn Executor>`), `fs/` (Read/Write/Edit
++ helpers/html), `glob.rs`, `grep.rs`, `web_fetch.rs`, `agent.rs` (subagent-spawn tool,
+`SUBAGENT_TOOL_NAME`), `plan.rs` / `exit_plan_mode.rs`, `ask_question.rs`, `skill.rs`,
+`registry.rs` (`base_tools`, `base_tools_read_only`).
 
 ### workspace (`agentloop-workspace`) — `crates/workspace/src/lib.rs`
 Sole `git` edge: `Workspaces` impl — worktree isolation, per-turn snapshots
@@ -122,10 +126,12 @@ External-agent `Agent` impls (connectors). `common`: `line_agent.rs`, `stream_ho
 ## packages/search
 
 ### search (`agentloop-search`) — `crates/search/src/`
-`SearchPlugin` (`core::Plugin`): `plugin.rs`, `search_web.rs` (default backends:
-DuckDuckGo Instant Answer + Wikipedia OpenSearch; optional Brave /
-`SEARXNG_BASE_URL`; swappable via `search_backend.rs::SearchBackend`),
-`scrape_page.rs` (reqwest + htmd), `rerank.rs`. Contributes the `researcher` role.
+`SearchPlugin` (`core::Plugin`): `plugin.rs` (optional
+`with_researcher_models` for cheap-model pinning), `search_web.rs`,
+`search_backend/` (`SearchBackend` trait + `chain`, `brave`, `ddg_instant`,
+`wikipedia`, `ddg_html`, `searxng` — default chain: Instant Answer + Wikipedia;
+optional Brave / `SEARXNG_BASE_URL`), `scrape_page/` (tool + `extract`
+heuristics; reqwest + htmd), `rerank.rs`. Contributes the `researcher` role.
 
 ## packages/index
 
@@ -145,7 +151,9 @@ CI: `cargo test -p agentloop-index --test retrieval_eval_gate`).
 
 ### sdk (`agentloop-sdk`) — `crates/sdk/src/`
 Composition root: `lib.rs` (`AgentBuilder`: `.provider()`, `.model()`, `.cwd()`,
-`.enable_plugin()`, `.executor()`, `.injection_scan()` …), `resolve.rs`,
+`.enable_plugin()`, `.executor()`, `.injection_scan()` …), `role_tiers.rs`
+(`apply_research_model_tiers`: searcher/researcher → cheap, worker → strong when
+a known provider is registered), `resolve.rs`,
 `loop_agent.rs` (`LoopAgent` trait + `ClawBot` turn-by-turn driver), `run.rs`, `cli.rs`,
 `eval_cmd.rs`, `main.rs` (the runner `[[bin]]`: NDJSON/stdio + doctor). Nothing depends
 on this crate.

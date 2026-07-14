@@ -6,17 +6,22 @@
 //! token-efficient markdown list with titles, URLs, and snippets. An optional
 //! [`SearchReranker`] re-orders results by relevance.
 
+mod execute;
+mod format;
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 
-use agentloop_contracts::{ToolOutput, ToolResultBlock};
+use agentloop_contracts::ToolOutput;
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
 use crate::rerank::SearchReranker;
-use crate::search_backend::{SearchBackend, SearchError};
+use crate::search_backend::SearchBackend;
+
+use format::schema_of;
 
 /// Maximum characters in the formatted output passed back to the model.
 const MAX_OUTPUT_CHARS: usize = 60_000;
@@ -114,103 +119,14 @@ impl Tool for SearchWebTool {
             .unwrap_or(DEFAULT_MAX_RESULTS)
             .clamp(1, HARD_MAX_RESULTS);
 
-        let results = tokio::select! {
-            _ = ctx.cancel.cancelled() => return Err(ToolError::Cancelled),
-            result = self.backend.search(&query) => match result {
-                Ok(r) => r,
-                Err(SearchError::RateLimited) => {
-                    return Err(ToolError::Execution(
-                        "All configured search backends are rate-limited right now. Wait a \
-                         moment and retry, or set `BRAVE_SEARCH_API_KEY` (Brave Search) / \
-                         `SEARXNG_BASE_URL` (your own SearXNG) for a more reliable backend."
-                            .to_owned(),
-                    ));
-                }
-                Err(SearchError::NoResults) => {
-                    return Ok(ToolOutput {
-                        content: vec![ToolResultBlock::markdown(format!(
-                            "## Search results for \"{query}\"\n\nNo results found. Try \
-                             refining your query with more specific keywords or different \
-                             phrasing."
-                        ))],
-                        is_error: false,
-                        structured: Some(serde_json::json!({
-                            "query": query,
-                            "results": [],
-                        })),
-                    });
-                }
-                Err(SearchError::Request(err)) => {
-                    return Err(ToolError::Execution(format!(
-                        "Search request failed: {err}. Check your network connection and retry."
-                    )));
-                }
-                Err(SearchError::ParseError(msg)) => {
-                    return Err(ToolError::Execution(format!(
-                        "Search backend returned unparseable response: {msg}. Try a different query."
-                    )));
-                }
-            },
-        };
-
-        // Apply re-ranker if configured.
-        let reranked = if let Some(ref reranker) = self.reranker {
-            reranker.rerank(&query, &results)
-        } else {
-            results
-        };
-
-        let truncated: Vec<_> = reranked.into_iter().take(max_results).collect();
-        let result_count = truncated.len();
-        let rendered = format_search_results(&query, &truncated);
-
-        let (rendered, output_truncated) = truncate_chars(&rendered, MAX_OUTPUT_CHARS);
-
-        Ok(ToolOutput {
-            content: vec![ToolResultBlock::markdown(rendered)],
-            is_error: false,
-            structured: Some(serde_json::json!({
-                "query": query,
-                "result_count": result_count,
-                "truncated": output_truncated,
-                "results": truncated.iter().map(|r| serde_json::json!({
-                    "title": r.title,
-                    "url": r.url,
-                    "snippet": r.snippet,
-                })).collect::<Vec<_>>(),
-            })),
-        })
+        execute::execute(
+            &self.backend,
+            &self.reranker,
+            ctx,
+            query,
+            max_results,
+            MAX_OUTPUT_CHARS,
+        )
+        .await
     }
-}
-
-fn format_search_results(query: &str, results: &[crate::search_backend::SearchResult]) -> String {
-    let mut out = String::new();
-    out.push_str("## Search results for \"");
-    out.push_str(query);
-    out.push_str("\"\n\n");
-    for (i, result) in results.iter().enumerate() {
-        out.push_str(&(i + 1).to_string());
-        out.push_str(". [");
-        out.push_str(&result.title);
-        out.push_str("](");
-        out.push_str(&result.url);
-        out.push_str(")\n   ");
-        out.push_str(&result.snippet);
-        out.push('\n');
-    }
-    out
-}
-
-fn schema_of<I: JsonSchema>() -> serde_json::Value {
-    serde_json::to_value(schemars::schema_for!(I))
-        .unwrap_or_else(|_| serde_json::json!({"type": "object"}))
-}
-
-fn truncate_chars(text: &str, max_chars: usize) -> (String, bool) {
-    if text.chars().count() <= max_chars {
-        return (text.to_owned(), false);
-    }
-    let mut out: String = text.chars().take(max_chars).collect();
-    out.push_str("\n\n[... output truncated ...]");
-    (out, true)
 }
