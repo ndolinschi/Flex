@@ -202,10 +202,7 @@ export const SessionListItem = memo(function SessionListItem({
       <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
         <span className="flex items-center gap-1.5">
           <span
-            className={cn(
-              "flex shrink-0 items-center justify-center",
-              isRunning ? "h-5 w-5" : "h-3.5 w-3.5",
-            )}
+            className="flex h-5 w-5 shrink-0 items-center justify-center"
           >
             {isRunning ? (
               <RunningDot />
@@ -275,9 +272,12 @@ export const SessionListItem = memo(function SessionListItem({
         <span
           aria-hidden
           className={cn(
-            "pointer-events-none absolute inset-y-0 right-0 z-[1] w-[5.75rem] rounded-r-sm bg-panel",
+            "pointer-events-none absolute inset-y-0 right-0 z-[1] w-[5.75rem] rounded-r-sm",
             "opacity-0 transition-opacity duration-[100ms] ease-[var(--easing-default)]",
             "group-hover:opacity-100 group-focus-within:opacity-100",
+            // Match the row fill (not solid panel) so the scrub doesn't flash a
+            // different slab over hover/selected translucent fills.
+            isActive ? "bg-fill-2" : "bg-fill-4",
             // Soft left edge so the title fades into shadow toward the buttons.
             "[mask-image:linear-gradient(to_left,black_0%,black_42%,transparent_100%)]",
           )}

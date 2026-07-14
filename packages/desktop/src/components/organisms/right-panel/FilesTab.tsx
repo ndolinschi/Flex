@@ -191,7 +191,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
     return (
       <div className="flex h-full min-h-0 flex-col">
         {openFiles.length > 0 ? (
-          <div className="flex h-8 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-stroke-3 px-1">
+          <div className="flex h-[var(--header-height)] shrink-0 items-center gap-0.5 overflow-x-auto px-1">
             {openFiles.map((p) => {
               const isActive = p === path && !browseMode
               const isDirty = drafts[p] !== undefined
@@ -236,7 +236,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
             onOpenFile={(p) => openWorkspaceFile(sessionKey, p)}
           />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
             <FolderTree className="h-7 w-7 text-ink-faint" aria-hidden />
             <p className="text-sm text-ink-secondary">No project folder</p>
             <p className="text-xs text-ink-muted">
@@ -252,7 +252,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-8 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-stroke-3 px-1">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-0.5 overflow-x-auto px-1">
         <IconButton
           label="Browse files"
           onClick={() => setBrowseMode(true)}
