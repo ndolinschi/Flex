@@ -407,6 +407,8 @@ export type DbConnectionSpec = {
   name: string
   engine: DbEngine
   target: string
+  /** Normalized project cwd; required on save. Legacy entries may be "". */
+  projectKey?: string
 }
 
 export type DbSchemaInfo = { name: string }
@@ -430,8 +432,10 @@ export type DbMentionHit = {
   insertText: string
 }
 
-export const dbListConnections = (): Promise<DbConnectionSpec[]> =>
-  invoke("db_list_connections")
+export const dbListConnections = (
+  projectKey: string,
+): Promise<DbConnectionSpec[]> =>
+  invoke("db_list_connections", { projectKey })
 
 export const dbUpsertConnection = (
   spec: DbConnectionSpec,
@@ -446,8 +450,10 @@ export const dbConnect = (id: string): Promise<DbConnectionSpec> =>
 export const dbDisconnect = (id: string): Promise<void> =>
   invoke("db_disconnect", { id })
 
-export const dbActiveConnection = (): Promise<DbConnectionSpec | null> =>
-  invoke("db_active_connection")
+export const dbActiveConnection = (
+  projectKey: string,
+): Promise<DbConnectionSpec | null> =>
+  invoke("db_active_connection", { projectKey })
 
 export const dbListSchemas = (id: string): Promise<DbSchemaInfo[]> =>
   invoke("db_list_schemas", { id })
@@ -469,8 +475,11 @@ export const dbPreviewTable = (
 export const dbQuery = (id: string, sql: string): Promise<DbQueryResult> =>
   invoke("db_query", { id, sql })
 
-export const dbMentionTables = (query: string): Promise<DbMentionHit[]> =>
-  invoke("db_mention_tables", { query })
+export const dbMentionTables = (
+  query: string,
+  projectKey: string,
+): Promise<DbMentionHit[]> =>
+  invoke("db_mention_tables", { query, projectKey })
 
 export const isIsolated = (sessionId: string): Promise<boolean> =>
   invoke("is_isolated", { sessionId })

@@ -4,6 +4,7 @@ import {
   estimateSizeForItem,
   hasOpenWorkGroup,
   lastItemIsOpenWorkGroup,
+  mergeShortThinkingRows,
   resumeLineForRows,
   shouldSkipCv,
   type DisplayItem,
@@ -618,5 +619,175 @@ describe("thinking sits at the end of the work group", () => {
       kind: "row",
       row: { type: "assistant" },
     })
+  })
+})
+
+describe("mergeShortThinkingRows", () => {
+  const think = (
+    id: string,
+    messageId: string,
+    text: string,
+  ): TimelineRow => ({
+    type: "thinking",
+    id,
+    messageId,
+    text,
+    tsMs: 0,
+  })
+
+  it("merges consecutive thoughts under 500ms into one row with summed duration", () => {
+    const rows: TimelineRow[] = [
+      think("t1", "m1", "First"),
+      think("t2", "m2", "Second"),
+      think("t3", "m3", "Third"),
+    ]
+    const durations = { m1: 200, m2: 300, m3: 400 }
+    const merged = mergeShortThinkingRows(rows, durations)
+    expect(merged).toHaveLength(1)
+    expect(merged[0]).toMatchObject({
+      type: "thinking",
+      id: "t1",
+      messageId: "m1",
+      text: "First\n\nSecond\n\nThird",
+      durationMs: 900,
+    })
+  })
+
+  it("leaves thoughts at or above 500ms as their own rows (breaks the run)", () => {
+    const rows: TimelineRow[] = [
+      think("t1", "m1", "Short a"),
+      think("t2", "m2", "Long"),
+      think("t3", "m3", "Short b"),
+      think("t4", "m4", "Short c"),
+    ]
+    const durations = { m1: 200, m2: 500, m3: 100, m4: 200 }
+    const merged = mergeShortThinkingRows(rows, durations)
+    expect(merged).toHaveLength(3)
+    expect(merged[0]).toMatchObject({ type: "thinking", messageId: "m1", text: "Short a" })
+    expect(merged[1]).toMatchObject({ type: "thinking", messageId: "m2", text: "Long" })
+    expect(merged[2]).toMatchObject({
+      type: "thinking",
+      messageId: "m3",
+      text: "Short b\n\nShort c",
+      durationMs: 300,
+    })
+  })
+
+  it("does not merge live streaming thoughts into settled neighbors", () => {
+    const rows: TimelineRow[] = [
+      think("t1", "m1", "Short"),
+      { type: "thinking", id: "live-thinking:m2", messageId: "m2", text: "Live…", tsMs: 0 },
+      think("t3", "m3", "After"),
+    ]
+    const durations = { m1: 200, m2: 100, m3: 200 }
+    const merged = mergeShortThinkingRows(rows, durations)
+    expect(merged.map((r) => (r.type === "thinking" ? r.id : r.type))).toEqual([
+      "t1",
+      "live-thinking:m2",
+      "t3",
+    ])
+  })
+
+  it("merges consecutive untimed thoughts (replay / missing spans)", () => {
+    const rows: TimelineRow[] = [
+      think("t1", "m1", "One"),
+      think("t2", "m2", "Two"),
+      think("t3", "m3", "Three"),
+    ]
+    const merged = mergeShortThinkingRows(rows)
+    expect(merged).toHaveLength(1)
+    expect(merged[0]).toMatchObject({
+      type: "thinking",
+      messageId: "m1",
+      text: "One\n\nTwo\n\nThree",
+    })
+    expect(
+      merged[0].type === "thinking" ? merged[0].durationMs : undefined,
+    ).toBeUndefined()
+  })
+
+  it("drops empty / whitespace-only thoughts and folds them into neighbors", () => {
+    const rows: TimelineRow[] = [
+      think("t1", "m1", "   "),
+      think("t2", "m2", "Real"),
+      think("t3", "m3", ""),
+      think("t4", "m4", "More"),
+      think("t5", "m5", "\n\t"),
+    ]
+    const durations = { m2: 100, m4: 200 }
+    const merged = mergeShortThinkingRows(rows, durations)
+    expect(merged).toHaveLength(1)
+    expect(merged[0]).toMatchObject({
+      type: "thinking",
+      text: "Real\n\nMore",
+      durationMs: 300,
+    })
+  })
+
+  it("drops a run of only empty thoughts entirely", () => {
+    const rows: TimelineRow[] = [
+      think("t1", "m1", ""),
+      think("t2", "m2", "  "),
+      {
+        type: "tool",
+        id: "tool-1",
+        call: {
+          id: "c-1",
+          session_id: "s",
+          turn_id: "t",
+          message_id: "m",
+          tool_name: "Bash",
+          input: {},
+          read_only: false,
+          origin: { origin: "model" },
+          status: { state: "completed" },
+          timing: { queued_at_ms: 0 },
+          result: { content: [{ type: "markdown", text: "" }], is_error: false },
+        },
+        tsMs: 0,
+      },
+    ]
+    const merged = mergeShortThinkingRows(rows, { m1: 50, m2: 50 })
+    expect(merged).toHaveLength(1)
+    expect(merged[0]?.type).toBe("tool")
+  })
+
+  it("coalesces short thoughts inside a settled work group via buildDisplayItems", () => {
+    const rows: TimelineRow[] = [
+      userRow("Go"),
+      turnStarted("turn-1"),
+      think("t1", "m1", "Step one"),
+      think("t2", "m2", "Step two"),
+      toolRow(bashCall("ls"), 20),
+      assistantRow("Done."),
+      turnCompleted("turn-1", 100, summary),
+    ]
+    const items = buildDisplayItems(rows, false, { m1: 200, m2: 300 })
+    const group = items.find((i) => i.kind === "group")
+    expect(group?.kind).toBe("group")
+    if (group?.kind !== "group") throw new Error("expected group")
+    const thinking = group.rows.filter((r) => r.type === "thinking")
+    expect(thinking).toHaveLength(1)
+    expect(thinking[0]).toMatchObject({
+      text: "Step one\n\nStep two",
+      durationMs: 500,
+    })
+  })
+
+  it("drops empty thoughts from a settled work group", () => {
+    const rows: TimelineRow[] = [
+      userRow("Go"),
+      turnStarted("turn-1"),
+      think("t1", "m1", ""),
+      think("t2", "m2", "   "),
+      toolRow(bashCall("ls"), 20),
+      assistantRow("Done."),
+      turnCompleted("turn-1", 100, summary),
+    ]
+    const items = buildDisplayItems(rows, false, { m1: 100, m2: 100 })
+    const group = items.find((i) => i.kind === "group")
+    expect(group?.kind).toBe("group")
+    if (group?.kind !== "group") throw new Error("expected group")
+    expect(group.rows.some((r) => r.type === "thinking")).toBe(false)
   })
 })

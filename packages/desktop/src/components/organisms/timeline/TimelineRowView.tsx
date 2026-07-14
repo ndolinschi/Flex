@@ -20,9 +20,6 @@ import { MessageActions } from "./MessageActions"
 import { CheckpointChip } from "./CheckpointChip"
 import { TurnFooter } from "./TurnFooter"
 import type { TurnFooterInfo } from "./buildDisplayItems"
-import {
-  subagentDisplayChildren,
-} from "./buildDisplayItems"
 
 export const TimelineRowView = memo(({
   row,
@@ -114,12 +111,13 @@ export const TimelineRowView = memo(({
     case "thinking":
       // Show even without a measurable duration ("Thought") — deltas aren't
       // persisted on replay, and some providers emit a thinking block with
-      // no span. Only skip empty shells.
+      // no span. Only skip empty shells. `row.durationMs` is set when
+      // consecutive short thoughts were merged in `buildDisplayItems`.
       if (!row.text.trim()) return null
       return (
         <ThinkingBlock
           text={row.text}
-          durationMs={thinkingDurations?.[row.messageId]}
+          durationMs={row.durationMs ?? thinkingDurations?.[row.messageId]}
           streaming={row.id.startsWith("live-thinking:")}
           suppressStatusLabel={suppressThinkingStatusLabel}
         />
@@ -167,12 +165,17 @@ export const TimelineRowView = memo(({
         />
       )
     case "subagent":
+      // Standalone subagent (not clustered by ToolStepList into WorkersGroup)
+      // — enriched card with activity + viewer click-through.
       return (
         <SubagentGroup
           task={row.task}
           role={row.role}
           phase={row.phase}
           durationMs={row.summary?.duration_ms}
+          summary={row.summary}
+          nestedRows={row.children}
+          compact
           onOpenViewer={
             row.childSession
               ? () =>
@@ -180,23 +183,11 @@ export const TimelineRowView = memo(({
                     .getState()
                     .openSubagentViewer(
                       row.childSession,
-                      `${row.role ? `${row.role} — ` : ""}${row.task}`,
+                      `${row.role ? `${row.role} — ` : ""}${row.task.split("\n", 1)[0]}`,
                     )
               : undefined
           }
-        >
-          {/* The subagent's own opening `user` message IS its task prompt —
-           * `SubagentGroup` already renders that via the "Task prompt" detail
-           * row (from `row.task`), so skip it here rather than also dumping
-           * the whole prompt as a giant chat-bubble child. */}
-          {subagentDisplayChildren(row.children).map((child) => (
-            <TimelineRowView
-              key={child.id}
-              row={child}
-              thinkingDurations={thinkingDurations}
-            />
-          ))}
-        </SubagentGroup>
+        />
       )
     case "turn":
       // Turn markers are consumed by the work-group builder.
@@ -246,6 +237,13 @@ export const TimelineRowView = memo(({
   }
   if (prev.thinkingDurations === next.thinkingDurations) return true
   if (next.row.type === "thinking") {
+    // Merged shorts bake `durationMs` on the row — ignore map churn.
+    const prevMs =
+      prev.row.type === "thinking" ? prev.row.durationMs : undefined
+    const nextMs = next.row.durationMs
+    if (prevMs !== undefined || nextMs !== undefined) {
+      return prevMs === nextMs
+    }
     return (
       prev.thinkingDurations?.[next.row.messageId] ===
       next.thinkingDurations?.[next.row.messageId]

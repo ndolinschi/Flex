@@ -1,5 +1,6 @@
 //! Local backend: runs the session's shell directly in the session cwd — the
-//! historical default. Unix uses `/bin/sh -c`; Windows uses `cmd /C` (see
+//! historical default. Unix uses `/bin/sh -lc`; Windows uses PowerShell
+//! (`powershell.exe -NoProfile -NonInteractive -Command`, see
 //! [`shell_command`] for why).
 
 use async_trait::async_trait;
@@ -16,18 +17,25 @@ use crate::run::{run_command_demotable, run_command_with_sink, spawn_background}
 /// Build a [`Command`] that runs `script` as a single-line shell command.
 ///
 /// Unix: `/bin/sh -lc <script>` (login shell, matching the historical
-/// behavior so `PATH`/profile-sourced env stays intact). Windows: `cmd /C
-/// <script>` rather than PowerShell — `cmd /C` takes the trailing argument as
-/// one already-quoted command line with predictable, POSIX-`sh`-like
-/// quoting for the single-line scripts this executor runs, whereas
-/// PowerShell's parameter binding and quoting rules differ enough (e.g.
-/// `-Command` re-tokenizing, different escaping for `"`/`$`) to risk subtly
-/// mis-parsing scripts written against `sh` semantics.
+/// behavior so `PATH`/profile-sourced env stays intact).
+///
+/// Windows: `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass
+/// -Command <script>`. Models on Windows emit PowerShell (`Get-ChildItem`,
+/// `> $null`, …); running those under `cmd /C` fails the cmdlets and can
+/// create a literal `$null` file from the redirect. The script is passed as
+/// one argv element so PowerShell parses it as code (not re-tokenized by an
+/// outer shell).
 fn shell_command(script: &str) -> Command {
     #[cfg(windows)]
     {
-        let mut command = Command::new("cmd");
-        command.arg("/C").arg(script);
+        let mut command = Command::new("powershell.exe");
+        command
+            .arg("-NoProfile")
+            .arg("-NonInteractive")
+            .arg("-ExecutionPolicy")
+            .arg("Bypass")
+            .arg("-Command")
+            .arg(script);
         // GUI parents (desktop) must not flash a conhost for every Bash call.
         crate::win_console::hide_console(&mut command);
         command
@@ -65,7 +73,7 @@ impl Executor for LocalExecutor {
         ExecutorHealth {
             available: true,
             #[cfg(windows)]
-            detail: "cmd /C on the host".to_owned(),
+            detail: "powershell.exe -Command on the host".to_owned(),
             #[cfg(not(windows))]
             detail: "/bin/sh on the host".to_owned(),
         }
@@ -155,10 +163,57 @@ mod tests {
         }
     }
 
+    /// Platform-native one-liners so the same assertions hold under `/bin/sh`
+    /// and Windows PowerShell 5.1 (`Write-Output -NoNewline` is pwsh-only).
+    #[cfg(windows)]
+    fn echo_hello() -> &'static str {
+        "[Console]::Out.Write('hello')"
+    }
+    #[cfg(not(windows))]
+    fn echo_hello() -> &'static str {
+        "printf hello"
+    }
+
+    #[cfg(windows)]
+    fn sleep_cmd(secs: u32) -> String {
+        format!("Start-Sleep -Seconds {secs}")
+    }
+    #[cfg(not(windows))]
+    fn sleep_cmd(secs: u32) -> String {
+        format!("sleep {secs}")
+    }
+
+    #[cfg(windows)]
+    fn echo_ready_then_sleep() -> &'static str {
+        "[Console]::Out.WriteLine('ready'); Start-Sleep -Seconds 5"
+    }
+    #[cfg(not(windows))]
+    fn echo_ready_then_sleep() -> &'static str {
+        "echo ready; sleep 5"
+    }
+
+    #[cfg(windows)]
+    fn stream_both() -> &'static str {
+        "[Console]::Out.Write(\"a`nb`n\"); [Console]::Error.Write(\"oops`n\")"
+    }
+    #[cfg(not(windows))]
+    fn stream_both() -> &'static str {
+        "printf 'a\\nb\\n'; printf 'oops\\n' 1>&2"
+    }
+
+    #[cfg(windows)]
+    fn echo_out_err() -> &'static str {
+        "[Console]::Out.Write('out'); [Console]::Error.Write('err')"
+    }
+    #[cfg(not(windows))]
+    fn echo_out_err() -> &'static str {
+        "printf out; printf err 1>&2"
+    }
+
     #[tokio::test]
     async fn runs_a_command_and_captures_output() {
         let outcome = LocalExecutor
-            .exec(spec("printf hello"), CancellationToken::new())
+            .exec(spec(echo_hello()), CancellationToken::new())
             .await
             .expect("exec ok");
         assert_eq!(outcome.exit_code, Some(0));
@@ -176,7 +231,7 @@ mod tests {
 
     #[tokio::test]
     async fn times_out() {
-        let mut s = spec("sleep 5");
+        let mut s = spec(&sleep_cmd(5));
         s.timeout_ms = 100;
         let err = LocalExecutor
             .exec(s, CancellationToken::new())
@@ -190,7 +245,7 @@ mod tests {
         let cancel = CancellationToken::new();
         cancel.cancel();
         let err = LocalExecutor
-            .exec(spec("sleep 5"), cancel)
+            .exec(spec(&sleep_cmd(5)), cancel)
             .await
             .unwrap_err();
         assert!(matches!(err, ExecError::Cancelled));
@@ -198,7 +253,7 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_network_denial() {
-        let mut s = spec("true");
+        let mut s = spec(echo_hello());
         s.network = NetworkPolicy::Denied;
         let err = LocalExecutor
             .exec(s, CancellationToken::new())
@@ -222,7 +277,7 @@ mod tests {
                 .push((stream, text.to_owned()));
         });
 
-        let mut s = spec("printf 'a\\nb\\n'; printf 'oops\\n' 1>&2");
+        let mut s = spec(stream_both());
         s.chunk_sink = Some(sink);
         let outcome = LocalExecutor
             .exec(s, CancellationToken::new())
@@ -254,7 +309,7 @@ mod tests {
         // must still return (proving it doesn't wait for exit) with the
         // banner it printed before sleeping, and `status()` must report it
         // as still running.
-        let s = spec("echo ready; sleep 5");
+        let s = spec(echo_ready_then_sleep());
         let spawn = LocalExecutor
             .exec_background(s)
             .await
@@ -270,7 +325,7 @@ mod tests {
 
     #[tokio::test]
     async fn background_kill_stops_the_process() {
-        let s = spec("sleep 30");
+        let s = spec(&sleep_cmd(30));
         let spawn = LocalExecutor
             .exec_background(s)
             .await
@@ -317,7 +372,7 @@ mod tests {
         // Non-background behavior stays byte-identical: same call, same
         // path, regardless of `exec_background` existing on the trait.
         let outcome = LocalExecutor
-            .exec(spec("printf hello"), CancellationToken::new())
+            .exec(spec(echo_hello()), CancellationToken::new())
             .await
             .expect("exec ok");
         assert_eq!(outcome.exit_code, Some(0));
@@ -328,7 +383,7 @@ mod tests {
     async fn exec_demotable_without_a_demote_token_behaves_like_exec() {
         use agentloop_core::ExecOrDemoted;
 
-        let mut s = spec("printf hello");
+        let mut s = spec(echo_hello());
         s.demote = None;
         let result = LocalExecutor
             .exec_demotable(s, CancellationToken::new())
@@ -348,7 +403,7 @@ mod tests {
         use agentloop_core::ExecOrDemoted;
 
         let demote = CancellationToken::new();
-        let mut s = spec("echo ready; sleep 5");
+        let mut s = spec(echo_ready_then_sleep());
         s.demote = Some(demote.clone());
 
         let call = tokio::spawn(async move {
@@ -358,6 +413,10 @@ mod tests {
         });
 
         // Give the process a moment to print its banner, then demote.
+        // PowerShell cold-start on Windows is slower than `/bin/sh`.
+        #[cfg(windows)]
+        tokio::time::sleep(Duration::from_millis(1_500)).await;
+        #[cfg(not(windows))]
         tokio::time::sleep(Duration::from_millis(200)).await;
         demote.cancel();
 
@@ -381,7 +440,7 @@ mod tests {
     async fn exec_demotable_completes_normally_when_demote_never_fires() {
         use agentloop_core::ExecOrDemoted;
 
-        let mut s = spec("printf out; printf err 1>&2");
+        let mut s = spec(echo_out_err());
         s.demote = Some(CancellationToken::new());
         let result = LocalExecutor
             .exec_demotable(s, CancellationToken::new())

@@ -21,7 +21,7 @@ pub(crate) fn configure(command: &mut tokio::process::Command) {
 #[cfg(not(unix))]
 pub(crate) fn configure(_command: &mut tokio::process::Command) {
     // Windows has no equivalent of POSIX process groups on `Command`; a
-    // `cmd /C` child's own subprocesses are killed via `taskkill /T` where it
+    // PowerShell child's own subprocesses are killed via `taskkill /T` where it
     // matters (see `kill_group` below). Nothing to configure at spawn time.
 }
 

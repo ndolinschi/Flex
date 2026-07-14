@@ -23,6 +23,10 @@ export const ThinkingBlock = ({
 }) => {
   const [collapsed, setCollapsed] = useState(true)
 
+  // Empty shells are dropped in `mergeShortThinkingRows`; keep this guard so a
+  // stray whitespace-only row never paints a bare "Thought" chevron.
+  if (!text.trim()) return null
+
   // Parent WorkGroup already shows "Thinking" — don't render a chevron-only
   // header (no label left), which floats under the last tool detail.
   if (streaming && suppressStatusLabel) {

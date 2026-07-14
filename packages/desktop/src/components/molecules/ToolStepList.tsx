@@ -1,10 +1,15 @@
 import { useMemo, type ReactNode } from "react"
 import { ToolStepGroup } from "./ToolStepGroup"
 import {
-  clusterToolRows,
   isRunning,
   type TimelineToolRowLike,
 } from "../../lib/toolPresentation"
+import {
+  clusterWorkRows,
+  type SubagentTimelineRow,
+} from "../../lib/workerPresentation"
+import { WorkersGroup } from "./WorkersGroup"
+import { useAppStore } from "../../stores/appStore"
 
 export const ToolStepList = ({
   rows,
@@ -22,31 +27,47 @@ export const ToolStepList = ({
    */
   forceOpenDetails?: boolean
 }) => {
-  const clusters = useMemo(() => clusterToolRows(rows), [rows])
+  const openSubagentViewer = useAppStore((s) => s.openSubagentViewer)
+  const clusters = useMemo(() => clusterWorkRows(rows), [rows])
   return (
     <>
-      {clusters.map((cluster, i) =>
-        cluster.kind === "tools" ? (
-          <ToolStepGroup
-            // Stable across the cluster's lifetime: keyed on the FIRST call's
-            // id only, not the full (growing) id list. Keying on the joined
-            // list meant every new call appended to a running cluster changed
-            // the key, forcing a full unmount/remount (expanded state reset,
-            // DOM subtree replaced) instead of an in-place update.
-            key={`tools:${cluster.calls[0].id}`}
-            calls={cluster.calls}
-            forceOpen={cluster.calls.some(isRunning)}
-            progress={progress}
-          />
-        ) : (
+      {clusters.map((cluster, i) => {
+        if (cluster.kind === "tools") {
+          return (
+            <ToolStepGroup
+              // Stable across the cluster's lifetime: keyed on the FIRST call's
+              // id only, not the full (growing) id list.
+              key={`tools:${cluster.calls[0].id}`}
+              calls={cluster.calls}
+              forceOpen={cluster.calls.some(isRunning)}
+              progress={progress}
+            />
+          )
+        }
+        if (cluster.kind === "workers") {
+          const workers = cluster.workers as SubagentTimelineRow[]
+          return (
+            <WorkersGroup
+              key={`workers:${workers[0]?.childSession ?? i}`}
+              workers={workers}
+              anchorId={
+                workers.some((w) => w.phase === "started")
+                  ? "active-workers-group"
+                  : undefined
+              }
+              onOpenViewer={openSubagentViewer}
+            />
+          )
+        }
+        return (
           <div
             key={cluster.row.id || `other-${i}`}
             className="animate-tool-step-in"
           >
             {renderOther(cluster.row)}
           </div>
-        ),
-      )}
+        )
+      })}
     </>
   )
 }

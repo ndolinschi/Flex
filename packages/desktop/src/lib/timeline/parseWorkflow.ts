@@ -19,6 +19,11 @@ export const WORKFLOW_TOOL_NAME = "RunWorkflow"
  * content, once the call settles to `Completed`. */
 export const VERIFIER_TOOL_NAME = "Verify"
 
+/** The engine-side tool name for spawning a subagent (`SUBAGENT_TOOL_NAME` in
+ * `agentloop_core::tool`). Descriptor-only on the tool side — the loop
+ * intercepts and emits `subagent_started` / `subagent_*` with `call_id`. */
+export const SUBAGENT_TOOL_NAME = "Agent"
+
 const VERDICT_OUTCOMES: ReadonlySet<string> = new Set([
   "pass",
   "fail",

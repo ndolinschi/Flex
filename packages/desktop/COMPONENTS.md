@@ -57,7 +57,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `BranchPicker` | List/checkout local git branches; shows current-branch PR # + checks when present | `cwd`, `onError?` | ContextBar |
 | `BranchPrStatusChip` | Current-branch PR # + title + CI summary; opens PR in browser | `pr` | ChangesTab header |
 | `CreatePrDialog` | Editable title/body modal before `gh pr create` | `open`, `initialTitle?`, `initialBody?`, `onConfirm` | ChangesTab, CommitCenter, CommitBar |
-| `PopoverTray` | Shared Esc/click-outside/↑↓ tray | `open`, `onClose`, `placement`, `children` | Model/Mode/Plus/Project/Branch pickers |
+| `PopoverTray` | Shared Esc/click-outside/↑↓ tray; `onClose` via ref so stream re-renders don't rebind listeners | `open`, `onClose`, `placement`, `children` | Model/Mode/Plus/Project/Branch pickers |
+| `ContextMenu` | Portal menu; ignores timeline scroll + webview-induced `window.blur` so it stays open mid-stream | `position`, `items`, `onClose` | RightPanel `+`, SessionListItem, FileExplorer, PlanToolbar |
 | `ConfirmDialog` | In-app modal (rename/delete/create PR fields) | `open`, `title`, `onConfirm`, `onCancel`, `confirmDisabled?` | SessionMenu, CreatePrDialog |
 | `AttachmentChip` | Pending attachment pill (file/image/directory/dom) | `attachment`, `onRemove` | Composer |
 | `SendButton` | Circular send / stop / queue | `isStreaming`, `canQueue?`, `onSend`, `onStop` | Composer |
@@ -73,9 +74,11 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `ToolStepList` | Clusters consecutive same-kind tool rows | `rows`, `renderOther` | TurnTimeline |
 | `DetailRow` / `BackgroundBashRow` / `ExecTail` | Tool-step detail / background bash / exec tail; Open file → Files tab when path known | — | ToolStepGroup |
 | `StreamingCaret` | Streaming caret | — | TurnTimeline |
-| `SubagentGroup` | Nested subagent work block | `task`, `role?`, `phase` | TurnTimeline |
+| `SubagentGroup` | Nested subagent work block — status glyph, live activity, tool-count · duration; click opens `SubagentViewer` | `task`, `role?`, `phase`, `nestedRows?`, `compact?`, `onOpenViewer?` | TurnTimeline, WorkersGroup, WorkflowGroup |
+| `WorkersGroup` | Parallel Agent fan-out card ("Working with N agents") expanding to enriched worker rows | `workers`, `onOpenViewer`, `anchorId?` | TurnTimeline (via ToolStepList) |
+| `WorkingAgentsPill` | Composer-adjacent "N Working" glance — menu of running worker titles + jump to group | `rows`, `onScrollToWorkers?` | ChatPage → Composer `workersSlot` |
 | `WorkGroup` | "Worked for Xs" / live "Working" XOR "Thinking" XOR "Compacting context…"; `memo` | `isOpen`, `liveStatus?`, `durationMs?` | TurnTimeline |
-| `WorkflowGroup` | Multi-step workflow block (steps + nested subagents); organism-scale (261 lines) but kept in `molecules/` since it nests inside `TimelineRowView` like `SubagentGroup`/`WorkGroup` | `steps`, `subagents`, `status` | TurnTimeline (via `TimelineRowView`) |
+| `WorkflowGroup` | Multi-step workflow block (steps + nested subagents); organism-scale but kept in `molecules/` since it nests inside `TimelineRowView` like `SubagentGroup`/`WorkGroup` | `steps`, `subagents`, `status` | TurnTimeline (via `TimelineRowView`) |
 | `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?` | SessionSidebar |
 | `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle` | SessionSidebar |
 | `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions | `title`, `status`, `onBuild`, `onAddComment?` | RightPanel Plan tab (`PlanTab`) |
@@ -89,15 +92,15 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|---|---|
 | `SessionSidebar` | New Agent + Search + Agents list; groups via `useSessionSidebarGroups`; footer/resume/archive molecules | (hooks) | App shell |
 | `ProviderSettingsForm` | Provider / key / model; pieces: `ProviderProfileList`, `ProviderConnectionForm`, `SecretStorageSection` | — | SettingsPage, WelcomePage |
-| `Composer` | Prompt + ContextBar; draft in `ComposerInput`; trays/queue under `organisms/composer/`; optional `dockedOverlay` stacks Permission/Question flush above the bubble | `isHero?`, `dockedOverlay?` | ChatShell |
+| `Composer` | Prompt + ContextBar; draft in `ComposerInput`; trays/queue under `organisms/composer/`; optional `dockedOverlay` stacks Permission/Question flush above the bubble; optional `workersSlot` for WorkingAgentsPill | `isHero?`, `dockedOverlay?`, `workersSlot?` | ChatShell |
 | `ContextBar` | Project · branch · context % | `cwd`, `sessionId` | Composer |
-| `TurnTimeline` | Turns + tools + plans + streaming; `@tanstack/react-virtual` over `displayItems` + live tail; pieces under `organisms/timeline/` (`WorkGroupBody` owns stable `renderOther`) | `sessionId` | ChatShell |
+| `TurnTimeline` | Turns + tools + plans + streaming; `@tanstack/react-virtual` over `displayItems` + live tail; pieces under `organisms/timeline/` (`WorkGroupBody` owns stable `renderOther`; `ToolStepList` clusters tools + parallel workers via `clusterWorkRows`) | `sessionId`, `onLiveRows?` | ChatShell |
 | `PermissionPrompt` | Tool permission HITL header docked above composer bubble; actions in `PermissionActions` | `permission` | ChatPage → `Composer.dockedOverlay` |
 | `QuestionPrompt` | AskUserQuestion HITL (same dock seam as PermissionPrompt) | `question` | ChatPage → `Composer.dockedOverlay` |
 | `RightPanel` | Plan / Changes / Files / Terminal / Browser / Memory (flagged) / plugin tabs (Database); tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`) + `src/plugins/` registry. Closed by default on app start and New Agent (`setActiveSessionId(…, { panel: "closed" })`); opens via `+`, ⌘J, Plan mode, or session switch restore. Memory gated by `MEMORY_TAB_ENABLED` (default off). Database via UI plugin (`DATABASE_TAB_ENABLED`, default on). | — | App shell |
 | `MemoryTab` | Right-panel Memory surface; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | RightPanel |
-| `DatabaseTab` | UI plugin (Terminal-style 2-col): 180px sidebar (connections + tables) + SQL/results main pane. Empty state has no duplicate chrome (Add CTA only); with connections, slim count + refresh/add. Result grid paginates (50/page; table preview via `limit`/`offset`, query results client-side). | `active`, `session` | RightPanel (plugin registry) |
-| `FilesTab` | Open-file strip (close-on-hover like panel tabs) + Monaco editor; `.md`/`.mdx` default to `MarkdownBody` preview (Code/Eye toggle); empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children`, search with `includeIgnored`) | `active` | RightPanel |
+| `DatabaseTab` | UI plugin (Terminal-style 2-col): 180px sidebar (connections + tables) + SQL/results main pane. **Connections are scoped per project cwd** (`projectKey` on each saved spec in `db_connections.json`; list/upsert/connect/mention/active filter by the active session's cwd). Switching sessions clears selection and restores that project's last active connection. Legacy unscoped entries (`projectKey: ""`) stay in the store but are hidden until re-saved under a project. Empty state has no duplicate chrome (Add CTA only); with connections, slim count + refresh/add. Result grid paginates (50/page; table preview via `limit`/`offset`, query results client-side). | `active`, `session` | RightPanel (plugin registry) |
+| `FilesTab` | Open-file strip (close-on-hover like panel tabs) + Monaco editor; `.md`/`.mdx` default to `MarkdownBody` preview (Code/Eye toggle); empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children`, search with `includeIgnored`). Dir/file queries invalidate on turn settle, FS-mutating tool completion (Write/Edit/Bash/…), and project cwd change (`invalidateWorkspaceQueries`, same pattern as `invalidateGitQueries`). | `active` | RightPanel |
 | `WindowTitleBar` | Compact custom window chrome (`decorations: false`, 30px): traffic lights / caption buttons + File/Edit/View/Help + drag region | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
 | `AppHeader` | Compact chat chrome (30px): quiet `h-6` sidebar/panel toggles + `text-sm` title + session menu | — | ChatShell |
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | RightPanel |
@@ -146,6 +149,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/lib/types/` | Wire + timeline + UI types (`wire.ts`, `timeline.ts`, `ui.ts`, barrel `index.ts`) |
 | `src/lib/timeline/` | Pure timeline fold: `applyEvent`, `applyStreaming`, `parseWorkflow`, `thinkingSpans`, `rowIds` |
 | `src/lib/toolPresentation.ts` | Pure tool classify/summarize/cluster helpers |
+| `src/lib/workerPresentation.ts` | Pure worker/subagent helpers: strip matched Agent tools, `clusterWorkRows`, activity summary, running-worker collect |
 | `src/lib/sessionSideEffects/` | Global-event side effects (`applyGlobalEvent`, `agentTerminal`, `devServerToast`) |
 | `src/lib/browserPreview.ts` | Tiny `isBrowserPreview` + `NATIVE_APP_REQUIRED` gate (no mock backend) |
 | `src/lib/browserDesign.ts` | Design Mode DOM payload + markdown serializer for composer chips |
@@ -176,6 +180,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/components/organisms/timeline/mergeLiveRows.ts` | Pure live+materialized row merge with O(1) id Sets |
 | `src/hooks/useComposerSend.ts` | Subscribe-wait + send/queue constants |
 | `src/hooks/useStickToBottom.ts` | Timeline stick-to-bottom scroll (narrow `streamContentKey` dep) |
+| `src/lib/programmaticScroll.ts` | Latch + `isTimelineScrollEvent` so ContextMenu/Tooltip ignore stream-driven timeline scrolls |
 | `src/hooks/useGroupedModels.ts` | Model picker grouping |
 | `src/hooks/useKeyboardShortcuts.ts` | Enter / ⌘N / ⌘K / ⌘L / Esc |
 | `src/hooks/useProviderConfig.ts` | Provider + plugin + fallback prefs |
@@ -212,14 +217,14 @@ Keep this file in sync when adding or renaming components.
 
 - **Timeline virtualization:** `TurnTimeline` uses `@tanstack/react-virtual` over `displayItems`. Live tail (Working / reconnect / FilesChangedCard / bottom sentinel) stays outside the virtual window so stick-to-bottom remains correct. Virtualized rows do **not** use `content-visibility: auto` — cv on the mounted overscan window races with WebView2 measurement during scroll (Windows overlap). Off-screen work is already skipped by unmounting. Item spacing uses padding (`pt-*`) so virtual `measureElement` includes gaps; `translateY` offsets are rounded to integer px for fractional DPI. Never call `virtualizer.measure()` on stream/scroll — it clears `itemSizeCache` and absolute rows overlap on stale `estimateSize`; use `remeasureMountedVirtualItems` (in-place `resizeItem`) instead. `estimateSizeForItem` is content-aware; `anchorTo: "end"` + `followOnAppend` keep growth smooth while pinned to bottom.
 - **Windows consoles:** Release builds are GUI-subsystem. Ordinary children (`git`/`gh`/`cmd`) use `CREATE_NO_WINDOW` via `src-tauri/src/win_console.rs` and the engine `executors` helpers. The Terminal tab's ConPTY PowerShell must **not** use that flag (breaks pipe I/O); instead `ensure_hidden_parent_console` allocates a hidden parent console at startup so ConPTY children do not pop a visible window. Terminal cwd uses `dirs::home_dir` / USERPROFILE (not `$HOME`→`/`) and collapses doubled `\` path escapes.
-- **Windows generation stability:** While streaming, timeline remasure is coalesced (~120ms) with reduced virtualizer overscan; child-browser bounds watchdog slows to 2s; `exec_chunk` opens the Terminal tab in the strip but does not force-switch mid-turn; gap resync preserves streaming when JSONL still shows an open turn; `git_status_since_baseline` runs on `spawn_blocking`.
+- **Windows generation stability:** While streaming, timeline remasure is coalesced (~120ms) with reduced virtualizer overscan; child-browser bounds watchdog slows to 2s; `exec_chunk` opens the Terminal tab in the strip but does not force-switch mid-turn; gap resync preserves streaming when JSONL still shows an open turn; `git_status_since_baseline` runs on `spawn_blocking`. ContextMenu (right-panel `+` → Browser, etc.) must not dismiss on timeline `followOnAppend` scrolls or webview suppress blur — see `programmaticScroll` + `data-timeline-scroll`.
 - **React Compiler:** Enabled in `vite.config.ts` via `babel-plugin-react-compiler` (React 19 target). Verified with `tsc --noEmit`, `vitest run`, and `vite build`.
 - **Markdown highlight:** Core language pack loads as a separate chunk (`lib/markdownHighlight.ts`); GFM renders immediately, highlight upgrades after the dynamic import.
 
 ## Perf notes (Wave 4)
 
 - **Streaming liveRows:** `mergeLiveRows` builds message/tool id Sets once per rows change so streaming buffer lookups are O(1) instead of `rows.some` per key each rAF.
-- **WorkGroup props:** `buildDisplayItems` precomputes `verdict` / `resumeLine` / `hasLiveThinking` on each `WorkGroupItem` so the virtualizer map does not re-scan `item.rows` every parent render. Compacting/indexing cues still override at render time from session status.
+- **WorkGroup props:** `buildDisplayItems` precomputes `verdict` / `resumeLine` / `hasLiveThinking` on each `WorkGroupItem` so the virtualizer map does not re-scan `item.rows` every parent render. Compacting/indexing cues still override at render time from session status. `mergeShortThinkingRows` coalesces consecutive short (&lt;0.5s), empty, or untimed settled thoughts into one `ThinkingBlock` (live + timed ≥0.5s with content stay separate; empty runs are dropped).
 - **Tool / workflow memo:** `ToolStepList` memos `clusterToolRows`; `WorkflowGroup` memos `resolveSteps`.
 - **Session-event demux:** `lib/sessionEventBus` attaches one Tauri `session-event` listener; `useGlobalSessionEvents` and each `useSessionEvents` subscribe to the bus (SubagentViewer no longer triples wire delivery).
 - **Browser / terminal selectors:** `useBrowserSession` selects per-session primitives; `TerminalTab` mounts xterm only for the active session's terminals (+ that session's agent terminal). `useIsGitRepo` shares the 5s `git-is-repo` poll across ContextBar / FilesChangedCard / RightPanel / ChangesTab.

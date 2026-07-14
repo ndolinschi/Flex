@@ -1,5 +1,6 @@
 import type { ToolCall } from "./types"
 import { basename } from "./utils"
+import { SUBAGENT_TOOL_NAME } from "./timeline/parseWorkflow"
 
 export type ToolKind = "explore" | "edit" | "shell" | "plan" | "generic"
 
@@ -543,10 +544,16 @@ export const summarizeToolCalls = (calls: ToolCall[]): ToolStepSummary => {
   }
 
   const title = running
-    ? `Running ${calls[0]?.tool_name ?? "tool"}…`
+    ? calls[0]?.tool_name === SUBAGENT_TOOL_NAME
+      ? calls.length === 1
+        ? "Starting agent…"
+        : `Starting ${calls.length} agents…`
+      : `Running ${calls[0]?.tool_name ?? "tool"}…`
     : calls.length === 1
       ? (calls[0]?.tool_name ?? "Tool")
-      : `${calls.length} tool calls`
+      : calls[0]?.tool_name === SUBAGENT_TOOL_NAME
+        ? `${calls.length} agents`
+        : `${calls.length} tool calls`
 
   return { kind, title, running, failed, details }
 }

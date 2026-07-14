@@ -93,7 +93,12 @@ const TreeBranch = ({
     staleTime: 15_000,
   })
 
-  const sorted = useMemo(() => sortFileHits(children), [children])
+  // Hide cmd.exe artifacts like a literal `$null` file created when a
+  // PowerShell redirect (`> $null`) was run under `cmd /C`.
+  const sorted = useMemo(
+    () => sortFileHits(children.filter((h) => h.name !== "$null")),
+    [children],
+  )
 
   if (!shouldLoad) return null
 
@@ -247,7 +252,10 @@ export const FileExplorer = ({
     staleTime: 15_000,
   })
 
-  const searchRows = useMemo(() => sortFileHits(searchHits), [searchHits])
+  const searchRows = useMemo(
+    () => sortFileHits(searchHits.filter((h) => h.name !== "$null")),
+    [searchHits],
+  )
 
   const refreshLists = async (paths: string[] = []) => {
     await queryClient.invalidateQueries({

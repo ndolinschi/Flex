@@ -65,7 +65,15 @@ export type WorkflowSubagentSlot = {
 export type TimelineRow =
   | { type: "user"; id: string; messageId: MessageId; text: string; tsMs: number }
   | { type: "assistant"; id: string; messageId: MessageId; text: string; model?: string; tsMs: number }
-  | { type: "thinking"; id: string; messageId: MessageId; text: string; tsMs: number }
+  | {
+      type: "thinking"
+      id: string
+      messageId: MessageId
+      text: string
+      tsMs: number
+      /** Display-only: set when short consecutive thoughts are merged. */
+      durationMs?: number
+    }
   | { type: "tool"; id: string; call: ToolCall; tsMs: number }
   | { type: "plan"; id: string; entries: PlanEntry[]; tsMs: number }
   | { type: "turn"; id: string; turnId: TurnId; phase: "started" | "completed"; summary?: TurnSummary; tsMs: number }

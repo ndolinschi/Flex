@@ -8,6 +8,7 @@ import type {
   WorkflowSubagentSlot,
 } from "../../lib/types"
 import { cn } from "../../lib/utils"
+import { useAppStore } from "../../stores/appStore"
 import { Collapsible } from "./Collapsible"
 import { PlanStatusIcon } from "./PlanCard"
 import { SubagentGroup } from "./SubagentGroup"
@@ -142,6 +143,20 @@ const StepRow = ({ step }: { step: ResolvedStep }) => {
               role={slot.role}
               phase={slot.phase}
               durationMs={slot.summary?.duration_ms}
+              summary={slot.summary}
+              nestedRows={slot.children}
+              compact
+              onOpenViewer={
+                slot.childSession
+                  ? () =>
+                      useAppStore
+                        .getState()
+                        .openSubagentViewer(
+                          slot.childSession,
+                          `${slot.role ? `${slot.role} — ` : ""}${slot.task.split("\n", 1)[0]}`,
+                        )
+                  : undefined
+              }
             >
               {slot.children.map((child) => (
                 <WorkflowChildRow key={child.id} row={child} />

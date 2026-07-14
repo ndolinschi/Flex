@@ -33,6 +33,8 @@ import { WorkGroupBody } from "./timeline/WorkGroupBody"
 type TurnTimelineProps = {
   sessionId: string | null
   onConversationEmpty?: (empty: boolean) => void
+  /** Live merged rows — used by the composer WorkingAgentsPill. */
+  onLiveRows?: (rows: import("../../lib/types").TimelineRow[]) => void
 }
 
 const displayItemKey = (item: DisplayItem): string => {
@@ -49,6 +51,7 @@ const displayItemKey = (item: DisplayItem): string => {
 export const TurnTimeline = ({
   sessionId,
   onConversationEmpty,
+  onLiveRows,
 }: TurnTimelineProps) => {
   const { rows, streaming, isLoading, error, thinkingDurations, reconnectStatus, compactingStatus, indexingStatus } =
     useSessionEvents(sessionId)
@@ -82,9 +85,18 @@ export const TurnTimeline = ({
     [rows, streaming, sessionLogRows],
   )
 
+  useEffect(() => {
+    onLiveRows?.(liveRows)
+  }, [liveRows, onLiveRows])
+
   const displayItems = useMemo(
-    () => buildDisplayItems(collapseConsecutiveCheckpoints(liveRows), isStreaming),
-    [liveRows, isStreaming],
+    () =>
+      buildDisplayItems(
+        collapseConsecutiveCheckpoints(liveRows),
+        isStreaming,
+        thinkingDurations,
+      ),
+    [liveRows, isStreaming, thinkingDurations],
   )
 
   // Bottom Working backstop while streaming — skip whenever ANY open
@@ -328,6 +340,7 @@ export const TurnTimeline = ({
     <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <div
         ref={scrollRef}
+        data-timeline-scroll=""
         onScroll={handleScrollAndRemeasure}
         className={cn(
           "min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3",

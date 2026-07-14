@@ -1,7 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import type { LucideIcon } from "lucide-react"
-import { isProgrammaticScroll } from "../../lib/programmaticScroll"
+import {
+  isProgrammaticScroll,
+  isTimelineScrollEvent,
+} from "../../lib/programmaticScroll"
 import { cn } from "../../lib/utils"
 
 export type ContextMenuItem =
@@ -53,26 +56,34 @@ export const ContextMenu = ({ position, items, onClose }: ContextMenuProps) => {
     setCoords({ x, y })
   }, [position])
 
+  // Stable close — parents often pass an inline `() => setPos(null)` that
+  // changes every stream-driven re-render; rebinding listeners is fine, but
+  // blur/scroll handlers must always call the latest closer.
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   useEffect(() => {
     if (!position) return
+
+    const close = () => onCloseRef.current()
 
     const handlePointerDown = (e: PointerEvent) => {
       const target = e.target as Node
       if (menuRef.current?.contains(target)) return
-      onClose()
+      close()
     }
 
     const handleContextMenu = (e: MouseEvent) => {
       // A right-click elsewhere opens its own menu — close this one first.
       const target = e.target as Node
       if (menuRef.current?.contains(target)) return
-      onClose()
+      close()
     }
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault()
-        onClose()
+        close()
         return
       }
 
@@ -106,14 +117,21 @@ export const ContextMenu = ({ position, items, onClose }: ContextMenuProps) => {
       rows[next]?.focus()
     }
 
-    const handleBlur = () => onClose()
-    const handleScroll = () => {
-      // Timeline stick-to-bottom scrolls on every stream tick — ignore those
-      // so open menus don't dismiss while the agent is generating.
-      if (isProgrammaticScroll()) return
-      onClose()
+    const handleBlur = () => {
+      // Native webview show/hide (data-suppress-native-webview gate) can
+      // fire window.blur on Windows WebView2 without the user leaving —
+      // only dismiss when the app window actually lost focus.
+      requestAnimationFrame(() => {
+        if (!document.hasFocus()) close()
+      })
     }
-    const handleResize = () => onClose()
+    const handleScroll = (e: Event) => {
+      // Stick-to-bottom + virtualizer followOnAppend scroll the timeline on
+      // every stream tick. Ignore those so "+" / Browser stays usable mid-turn.
+      if (isProgrammaticScroll() || isTimelineScrollEvent(e)) return
+      close()
+    }
+    const handleResize = () => close()
 
     // Capture phase so this fires before the click/contextmenu that opened a
     // *different* menu is done bubbling, and so any scroll (not just window) closes us.
@@ -131,7 +149,7 @@ export const ContextMenu = ({ position, items, onClose }: ContextMenuProps) => {
       window.removeEventListener("scroll", handleScroll, true)
       window.removeEventListener("resize", handleResize)
     }
-  }, [position, onClose])
+  }, [position])
 
   useEffect(() => {
     if (!position) return

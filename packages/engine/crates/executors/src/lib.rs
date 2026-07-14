@@ -6,7 +6,7 @@
 //! invocation keeps heavyweight client libraries out of the tree.
 //!
 //! [`LocalExecutor`] is the default and is byte-compatible with the historical
-//! in-tool spawn path: `/bin/sh -lc` in the session cwd.
+//! in-tool spawn path: `/bin/sh -lc` on Unix, PowerShell `-Command` on Windows.
 
 mod container_image;
 mod docker;

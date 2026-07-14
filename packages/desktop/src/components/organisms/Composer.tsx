@@ -28,6 +28,8 @@ type ComposerProps = {
   isHero?: boolean
   /** Permission / question card stacked flush above the bubble (same rail). */
   dockedOverlay?: ReactNode
+  /** Optional "N Working" workers pill above the bubble. */
+  workersSlot?: ReactNode
 }
 
 /** Send control that narrow-selects draft emptiness so the parent Composer
@@ -76,6 +78,7 @@ const DOCKED_BUBBLE_SHADOW_FOCUS =
 export const Composer = ({
   isHero = false,
   dockedOverlay = null,
+  workersSlot = null,
 }: ComposerProps) => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   // Docked Permission/Question sits as a sibling above this bubble — squash
@@ -278,6 +281,7 @@ export const Composer = ({
       {/* Overlay + bubble share one rail column so they sit flush (no page-bg
        * gap from ChatShell's old absolute `bottom-full` dock). */}
       <div className="relative mx-auto flex w-full max-w-[var(--content-rail)] flex-col">
+        {workersSlot}
         {dockedOverlay}
         <div
           ref={slashRootRef}

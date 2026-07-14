@@ -29,7 +29,9 @@ type PopoverTrayProps = {
 const ITEM_SELECTOR =
   '[role="option"]:not([disabled]), [role="menuitem"]:not([disabled])'
 
-/** Shared reference glass tray — Esc + click-outside + arrow keys, tray-in motion. */
+/** Shared Esc/click-outside/↑↓ tray — Esc + click-outside + arrow keys, tray-in motion.
+ * `onClose` is read via ref so stream-driven parent re-renders (inline closers)
+ * do not tear down / rebind document listeners mid-open. */
 export const PopoverTray = ({
   open,
   onClose,
@@ -42,21 +44,25 @@ export const PopoverTray = ({
   autoFocus = true,
 }: PopoverTrayProps) => {
   const trayRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     if (!open) return
+
+    const close = () => onCloseRef.current()
 
     const handlePointer = (e: MouseEvent) => {
       const target = e.target as Node
       if (trayRef.current?.contains(target)) return
       if (anchorRef?.current?.contains(target)) return
-      onClose()
+      close()
     }
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault()
-        onClose()
+        close()
         return
       }
 
@@ -101,7 +107,7 @@ export const PopoverTray = ({
       document.removeEventListener("mousedown", handlePointer)
       document.removeEventListener("keydown", handleKey)
     }
-  }, [open, onClose, anchorRef, autoFocus])
+  }, [open, anchorRef, autoFocus])
 
   useEffect(() => {
     if (!open || !autoFocus) return

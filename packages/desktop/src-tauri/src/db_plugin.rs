@@ -29,6 +29,10 @@ pub struct DbConnectionSpec {
     pub engine: DbEngine,
     /// SQLite file path, or postgres/mysql URL (`postgres://…`, `mysql://…`).
     pub target: String,
+    /// Normalized project cwd this connection belongs to. Empty string = legacy
+    /// unscoped entry (hidden from project-scoped lists until re-saved).
+    #[serde(default)]
+    pub project_key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,7 +75,9 @@ enum LiveConn {
 #[derive(Default)]
 pub struct DbPluginState {
     specs: HashMap<String, DbConnectionSpec>,
-    active: Option<String>,
+    /// Active connection id per `project_key` so switching projects never
+    /// leaves another project's selection selected.
+    active_by_project: HashMap<String, String>,
     live: HashMap<String, LiveConn>,
 }
 
@@ -114,13 +120,44 @@ fn db_state(state: &AppState) -> &Mutex<DbPluginState> {
     &state.db_plugin
 }
 
+/// Normalize a session cwd into a stable project key for connection scoping.
+/// Empty input → empty key (legacy / no project). Separators → `/`, trailing
+/// slashes stripped; on Windows the key is lowercased so drive-letter case
+/// does not split the same folder.
+pub fn normalize_project_key(cwd: &str) -> String {
+    let trimmed = cwd.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let mut key = trimmed.replace('\\', "/");
+    while key.len() > 1 && key.ends_with('/') {
+        key.pop();
+    }
+    #[cfg(windows)]
+    {
+        key = key.to_ascii_lowercase();
+    }
+    key
+}
+
+fn matches_project(spec: &DbConnectionSpec, project_key: &str) -> bool {
+    !project_key.is_empty() && spec.project_key == project_key
+}
+
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip_all, err)]
 pub async fn db_list_connections(
     state: State<'_, AppState>,
+    project_key: String,
 ) -> DesktopResult<Vec<DbConnectionSpec>> {
+    let key = normalize_project_key(&project_key);
     let guard = db_state(&state).lock().await;
-    let mut list: Vec<_> = guard.specs.values().cloned().collect();
+    let mut list: Vec<_> = guard
+        .specs
+        .values()
+        .filter(|s| matches_project(s, &key))
+        .cloned()
+        .collect();
     list.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     Ok(list)
 }
@@ -139,6 +176,12 @@ pub async fn db_upsert_connection(
     if target.is_empty() {
         return Err(DesktopError::Message("connection target is required".into()));
     }
+    let project_key = normalize_project_key(&spec.project_key);
+    if project_key.is_empty() {
+        return Err(DesktopError::Message(
+            "project folder is required to save a database connection".into(),
+        ));
+    }
     let target = normalize_db_target(spec.engine, &target)?;
     let id = if spec.id.trim().is_empty() {
         new_id()
@@ -150,6 +193,7 @@ pub async fn db_upsert_connection(
         name,
         engine: spec.engine,
         target,
+        project_key,
     };
     let mut guard = db_state(&state).lock().await;
     guard.specs.insert(id, saved.clone());
@@ -161,10 +205,15 @@ pub async fn db_upsert_connection(
 #[tracing::instrument(level = "debug", skip_all, err)]
 pub async fn db_remove_connection(state: State<'_, AppState>, id: String) -> DesktopResult<()> {
     let mut guard = db_state(&state).lock().await;
+    let project_key = guard
+        .specs
+        .get(&id)
+        .map(|s| s.project_key.clone())
+        .unwrap_or_default();
     guard.specs.remove(&id);
     guard.live.remove(&id);
-    if guard.active.as_deref() == Some(id.as_str()) {
-        guard.active = None;
+    if guard.active_by_project.get(&project_key).map(String::as_str) == Some(id.as_str()) {
+        guard.active_by_project.remove(&project_key);
     }
     guard.save();
     Ok(())
@@ -204,7 +253,11 @@ pub async fn db_connect(
     };
     let mut guard = db_state(&state).lock().await;
     guard.live.insert(id.clone(), live);
-    guard.active = Some(id);
+    if !spec.project_key.is_empty() {
+        guard
+            .active_by_project
+            .insert(spec.project_key.clone(), id);
+    }
     Ok(spec)
 }
 
@@ -212,9 +265,14 @@ pub async fn db_connect(
 #[tracing::instrument(level = "debug", skip_all, err)]
 pub async fn db_disconnect(state: State<'_, AppState>, id: String) -> DesktopResult<()> {
     let mut guard = db_state(&state).lock().await;
+    let project_key = guard
+        .specs
+        .get(&id)
+        .map(|s| s.project_key.clone())
+        .unwrap_or_default();
     guard.live.remove(&id);
-    if guard.active.as_deref() == Some(id.as_str()) {
-        guard.active = None;
+    if guard.active_by_project.get(&project_key).map(String::as_str) == Some(id.as_str()) {
+        guard.active_by_project.remove(&project_key);
     }
     Ok(())
 }
@@ -223,12 +281,16 @@ pub async fn db_disconnect(state: State<'_, AppState>, id: String) -> DesktopRes
 #[tracing::instrument(level = "debug", skip_all, err)]
 pub async fn db_active_connection(
     state: State<'_, AppState>,
+    project_key: String,
 ) -> DesktopResult<Option<DbConnectionSpec>> {
+    let key = normalize_project_key(&project_key);
     let guard = db_state(&state).lock().await;
     Ok(guard
-        .active
-        .as_ref()
-        .and_then(|id| guard.specs.get(id).cloned()))
+        .active_by_project
+        .get(&key)
+        .and_then(|id| guard.specs.get(id))
+        .filter(|s| matches_project(s, &key))
+        .cloned())
 }
 
 #[tauri::command]
@@ -332,14 +394,15 @@ pub async fn db_query(
     }
 }
 
-/// Table names from every live connection — for composer `@` suggestions.
+/// Table names from live connections for this project — for composer `@` suggestions.
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip_all, err)]
 pub async fn db_mention_tables(
     state: State<'_, AppState>,
     query: String,
+    project_key: String,
 ) -> DesktopResult<Vec<DbMentionHit>> {
-    collect_mentions(&state, query.trim()).await
+    collect_mentions(&state, query.trim(), &normalize_project_key(&project_key)).await
 }
 
 enum LiveSnap {
@@ -367,19 +430,22 @@ async fn snapshot_live(state: &AppState, id: &str) -> DesktopResult<LiveSnap> {
         .ok_or_else(|| DesktopError::Message("not connected — open the connection first".into()))
 }
 
-async fn collect_mentions(state: &AppState, needle: &str) -> DesktopResult<Vec<DbMentionHit>> {
+async fn collect_mentions(
+    state: &AppState,
+    needle: &str,
+    project_key: &str,
+) -> DesktopResult<Vec<DbMentionHit>> {
     let needle = needle.to_lowercase();
     let guard = db_state(state).lock().await;
     let live_ids: Vec<(String, LiveSnap)> = guard
         .live
         .iter()
-        .map(|(id, live)| {
-            let name = guard
-                .specs
-                .get(id)
-                .map(|s| s.name.clone())
-                .unwrap_or_else(|| id.clone());
-            (name, LiveSnap::from(live))
+        .filter_map(|(id, live)| {
+            let spec = guard.specs.get(id)?;
+            if !matches_project(spec, project_key) {
+                return None;
+            }
+            Some((spec.name.clone(), LiveSnap::from(live)))
         })
         .collect();
     drop(guard);
@@ -833,5 +899,23 @@ fn mysql_value_to_json(v: Option<mysql_async::Value>) -> serde_json::Value {
         Some(mysql_async::Value::Float(f)) => serde_json::json!(f),
         Some(mysql_async::Value::Double(f)) => serde_json::json!(f),
         Some(other) => serde_json::Value::String(format!("{other:?}")),
+    }
+}
+
+#[cfg(test)]
+mod project_key_tests {
+    use super::normalize_project_key;
+
+    #[test]
+    fn empty_stays_empty() {
+        assert_eq!(normalize_project_key(""), "");
+        assert_eq!(normalize_project_key("   "), "");
+    }
+
+    #[test]
+    fn strips_trailing_slashes_and_normalizes_separators() {
+        let key = normalize_project_key(r"C:\Users\me\proj\");
+        assert!(!key.ends_with('/'));
+        assert!(!key.contains('\\'));
     }
 }

@@ -16,6 +16,10 @@ import {
 import { maybeToastDevServerUrl } from "./devServerToast"
 import { maybeAutoTitleSession } from "./autoTitle"
 import { invalidateGitQueries } from "../invalidateGitQueries"
+import {
+  invalidateWorkspaceQueries,
+  isFsMutatingTool,
+} from "../invalidateWorkspaceQueries"
 import { log } from "../debug/log"
 
 const RUNNING_VERDICT_STATES: ReadonlySet<ToolCallStatus["state"]> = new Set([
@@ -293,8 +297,32 @@ export const applyGlobalSessionEvent = (
   // fix for the "No changes" regression: the query itself was always
   // correct, it just never got told to refetch for consumers that weren't
   // mounted at turn-settle time.
+  //
+  // Same pattern for Files: `workspace-dir-children` / `workspace-file-list`
+  // stay warm across Write/Edit/Bash unless we bust them here.
   if (payload.kind === "turn_completed" || payload.kind === "session_error") {
-    if (opts?.queryClient) invalidateGitQueries(opts.queryClient)
+    if (opts?.queryClient) {
+      invalidateGitQueries(opts.queryClient)
+      invalidateWorkspaceQueries(opts.queryClient)
+    }
+  }
+
+  // Mid-turn FS mutations: refresh the explorer as soon as Write/Edit/Bash
+  // (etc.) settles, so new files appear without waiting for turn_completed.
+  if (
+    !opts?.ignoreStreaming &&
+    opts?.queryClient &&
+    payload.kind === "tool_call_updated" &&
+    isFsMutatingTool(payload.call.tool_name)
+  ) {
+    const state = payload.call.status.state
+    if (
+      state === "completed" ||
+      state === "failed" ||
+      state === "cancelled"
+    ) {
+      invalidateWorkspaceQueries(opts.queryClient)
+    }
   }
 
   // Background-completion notification + unread dot: only for live events

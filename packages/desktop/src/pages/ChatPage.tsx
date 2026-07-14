@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { ChatShell } from "../components/templates"
 import {
   Composer,
@@ -7,6 +7,8 @@ import {
   SubagentViewer,
   TurnTimeline,
 } from "../components/organisms"
+import { WorkingAgentsPill } from "../components/molecules"
+import type { TimelineRow } from "../lib/types"
 import { sessionLabel } from "../lib/types"
 import { useSessions } from "../hooks/useSessions"
 import { useAppStore } from "../stores/appStore"
@@ -21,10 +23,25 @@ export const ChatPage = ({ embedded = false }: ChatPageProps) => {
   const pendingPermission = useAppStore((s) => s.pendingPermission)
   const pendingQuestion = useAppStore((s) => s.pendingQuestion)
   const [conversationEmpty, setConversationEmpty] = useState(false)
+  const [liveRows, setLiveRows] = useState<TimelineRow[]>([])
   const { sessions } = useSessions()
+
+  useEffect(() => {
+    setLiveRows([])
+  }, [activeSessionId])
 
   const handleConversationEmpty = useCallback((empty: boolean) => {
     setConversationEmpty(empty)
+  }, [])
+
+  const handleLiveRows = useCallback((rows: TimelineRow[]) => {
+    setLiveRows(rows)
+  }, [])
+
+  const handleScrollToWorkers = useCallback(() => {
+    document
+      .getElementById("active-workers-group")
+      ?.scrollIntoView({ behavior: "smooth", block: "center" })
   }, [])
 
   const composerHero = !!activeSessionId && conversationEmpty
@@ -61,6 +78,7 @@ export const ChatPage = ({ embedded = false }: ChatPageProps) => {
           <TurnTimeline
             sessionId={activeSessionId}
             onConversationEmpty={handleConversationEmpty}
+            onLiveRows={handleLiveRows}
           />
           {/* Anchors to ChatShell's relative <main>; the timeline wrapper is
            * not positioned, so the tray overlays the whole conversation. */}
@@ -68,7 +86,16 @@ export const ChatPage = ({ embedded = false }: ChatPageProps) => {
         </>
       }
       composer={
-        <Composer isHero={composerHero} dockedOverlay={dockedOverlay} />
+        <Composer
+          isHero={composerHero}
+          dockedOverlay={dockedOverlay}
+          workersSlot={
+            <WorkingAgentsPill
+              rows={liveRows}
+              onScrollToWorkers={handleScrollToWorkers}
+            />
+          }
+        />
       }
       composerHero={composerHero}
       heroTitle={heroTitle}

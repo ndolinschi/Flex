@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   ChevronLeft,
@@ -13,6 +13,7 @@ import {
 import { Button, IconButton, ScrollArea, TextArea, TextInput } from "../../components/atoms"
 import { ConfirmDialog, EmptyState, FormField } from "../../components/molecules"
 import {
+  dbActiveConnection,
   dbConnect,
   dbDisconnect,
   dbListConnections,
@@ -85,9 +86,11 @@ const isUrlLikeTarget = (engine: DbEngine, target: string): boolean => {
   return target.trim().length > 0
 }
 
-/** Right-panel Database plugin — connections, schemas/tables, tabular data. */
+/** Right-panel Database plugin — connections, schemas/tables, tabular data.
+ * Connections are scoped to the active session's project cwd. */
 export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
   const queryClient = useQueryClient()
+  const projectKey = session?.cwd?.trim() ?? ""
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [schema, setSchema] = useState<string | null>(null)
   const [selectedTable, setSelectedTable] = useState<DbTableInfo | null>(null)
@@ -108,6 +111,17 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
     target: session?.cwd ? `${session.cwd}/data.db` : "",
   })
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+
+  // Drop selection when the project cwd changes so another project's
+  // connection never stays highlighted.
+  useEffect(() => {
+    setSelectedId(null)
+    setSchema(null)
+    setSelectedTable(null)
+    setResult(null)
+    setPage(0)
+    setError(null)
+  }, [projectKey])
 
   const openAddForm = () => {
     setForm({
@@ -131,11 +145,24 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
   }
 
   const { data: connections = [], isFetching } = useQuery({
-    queryKey: ["db-connections"],
-    queryFn: dbListConnections,
-    enabled: active,
+    queryKey: ["db-connections", projectKey],
+    queryFn: () => dbListConnections(projectKey),
+    enabled: active && !!projectKey,
     staleTime: 10_000,
   })
+
+  // Restore this project's last active connection after a session/cwd switch.
+  useEffect(() => {
+    if (!active || !projectKey) return
+    let cancelled = false
+    void dbActiveConnection(projectKey).then((spec) => {
+      if (cancelled || !spec) return
+      setSelectedId(spec.id)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [active, projectKey])
 
   const { data: schemas = [] } = useQuery({
     queryKey: ["db-schemas", selectedId],
@@ -172,10 +199,13 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
         name: form.name,
         engine: form.engine,
         target: form.target,
+        projectKey,
       }),
     onSuccess: (spec) => {
       setFormOpen(false)
-      void queryClient.invalidateQueries({ queryKey: ["db-connections"] })
+      void queryClient.invalidateQueries({
+        queryKey: ["db-connections", projectKey],
+      })
       connectMut.mutate(spec.id)
     },
     onError: (err) => setError(toInvokeError(err)),
@@ -190,7 +220,9 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
         setResult(null)
         setPage(0)
       }
-      void queryClient.invalidateQueries({ queryKey: ["db-connections"] })
+      void queryClient.invalidateQueries({
+        queryKey: ["db-connections", projectKey],
+      })
     },
     onError: (err) => setError(toInvokeError(err)),
   })
@@ -316,11 +348,17 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
         </div>
       ) : null}
 
-      {connections.length === 0 ? (
+      { !projectKey ? (
+        <EmptyState
+          className="min-h-0 flex-1"
+          title="No project folder"
+          description="Pick a working directory for this session to manage database connections for that project."
+        />
+      ) : connections.length === 0 ? (
         <EmptyState
           className="min-h-0 flex-1"
           title="No database connections"
-          description="Connect SQLite, PostgreSQL, or MySQL to browse schemas, tables, and rows."
+          description="Connect SQLite, PostgreSQL, or MySQL to browse schemas, tables, and rows. Connections are saved per project."
           actionLabel="Add connection"
           onAction={openAddForm}
         />

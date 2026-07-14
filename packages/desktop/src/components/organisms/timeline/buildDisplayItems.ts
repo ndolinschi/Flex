@@ -230,9 +230,135 @@ export const moveThinkingToEnd = (rows: TimelineRow[]): TimelineRow[] => {
   return [...rest, ...thinking]
 }
 
+/** Consecutive settled thoughts shorter than this are coalesced into one row. */
+export const SHORT_THINKING_MS = 500
+
+type ThinkingRow = Extract<TimelineRow, { type: "thinking" }>
+
+const isLiveThinking = (row: ThinkingRow): boolean =>
+  row.id.startsWith("live-thinking:")
+
+const thinkingHasContent = (row: ThinkingRow): boolean =>
+  row.text.trim().length > 0
+
+const thinkingSpanMs = (
+  row: ThinkingRow,
+  durations: Record<string, number> | undefined,
+): number | undefined => {
+  if (typeof row.durationMs === "number") return row.durationMs
+  const fromMap = durations?.[row.messageId]
+  return typeof fromMap === "number" ? fromMap : undefined
+}
+
+/**
+ * Settled thoughts that should fold into one ThinkingBlock:
+ * - empty / whitespace-only (always — hide or glue into neighbors)
+ * - known duration &lt; {@link SHORT_THINKING_MS}
+ * - no measurable duration (replay / missing spans — otherwise bare "Thought"
+ *   stacks spam the feed)
+ *
+ * Live streaming and timed thoughts ≥ threshold with content stay separate.
+ */
+const isCoalesceableSettledThinking = (
+  row: ThinkingRow,
+  durations: Record<string, number> | undefined,
+): boolean => {
+  if (isLiveThinking(row)) return false
+  if (!thinkingHasContent(row)) return true
+  const ms = thinkingSpanMs(row, durations)
+  if (typeof ms === "number") return ms < SHORT_THINKING_MS
+  return true
+}
+
+const emitMergedThinking = (
+  run: ThinkingRow[],
+  durations: Record<string, number> | undefined,
+): ThinkingRow | null => {
+  const text = run
+    .map((r) => r.text.trim())
+    .filter((t) => t.length > 0)
+    .join("\n\n")
+  // Contentless run → drop entirely (no bare "Thought" chevron row).
+  if (!text) return null
+  if (run.length === 1) {
+    const only = run[0]
+    // Preserve identity when nothing was coalesced.
+    return only.text === text ? only : { ...only, text }
+  }
+  let durationSum = 0
+  let anyDuration = false
+  for (const r of run) {
+    const ms = thinkingSpanMs(r, durations)
+    if (typeof ms === "number") {
+      durationSum += ms
+      anyDuration = true
+    }
+  }
+  return {
+    type: "thinking",
+    id: run[0].id,
+    messageId: run[0].messageId,
+    text,
+    tsMs: run[0].tsMs,
+    ...(anyDuration ? { durationMs: durationSum } : {}),
+  }
+}
+
+/**
+ * Coalesce consecutive short / empty / untimed settled thinking rows into one
+ * ThinkingBlock. A timed thought ≥ {@link SHORT_THINKING_MS} with content, a
+ * live stream row, or a non-thinking row breaks the run. Empty thoughts are
+ * dropped when they cannot fold into a contentful neighbor.
+ */
+export const mergeShortThinkingRows = (
+  rows: TimelineRow[],
+  durations?: Record<string, number>,
+): TimelineRow[] => {
+  const out: TimelineRow[] = []
+  let i = 0
+  while (i < rows.length) {
+    const row = rows[i]
+    if (row.type !== "thinking") {
+      out.push(row)
+      i += 1
+      continue
+    }
+    if (isLiveThinking(row)) {
+      // Still skip empty live shells — shimmer with nothing to show is noise.
+      if (thinkingHasContent(row)) out.push(row)
+      i += 1
+      continue
+    }
+    if (!isCoalesceableSettledThinking(row, durations)) {
+      // Long timed thought — keep, but drop nothing (it has content by def).
+      out.push(row)
+      i += 1
+      continue
+    }
+    const run: ThinkingRow[] = [row]
+    let j = i + 1
+    while (j < rows.length) {
+      const next = rows[j]
+      if (
+        next.type !== "thinking" ||
+        !isCoalesceableSettledThinking(next, durations)
+      ) {
+        break
+      }
+      run.push(next)
+      j += 1
+    }
+    const merged = emitMergedThinking(run, durations)
+    if (merged) out.push(merged)
+    i = j
+  }
+  return out
+}
+
 export const buildDisplayItems = (
   liveRows: TimelineRow[],
   isStreaming: boolean,
+  thinkingDurations?: Record<string, number>,
 ): DisplayItem[] => {
   const items: DisplayItem[] = []
   let pending: {
@@ -272,8 +398,9 @@ export const buildDisplayItems = (
     // until the turn actually settles.
     const lastRow = all[all.length - 1]
     const hasTrailingAnswer = !!lastRow && lastRow.type === "assistant"
-    const work = moveThinkingToEnd(
-      hasTrailingAnswer ? all.slice(0, -1) : all,
+    const work = mergeShortThinkingRows(
+      moveThinkingToEnd(hasTrailingAnswer ? all.slice(0, -1) : all),
+      thinkingDurations,
     )
     const tail = hasTrailingAnswer ? [lastRow] : []
 
@@ -330,6 +457,16 @@ export const buildDisplayItems = (
       continue
     }
     if (!pending) {
+      // Drop contentless settled thinking so ToolStepList / flat rows never
+      // reserve a chevron-only "Thought" slot (renderOther → null still wraps
+      // an empty div in the work-group path; filtering here covers flat too).
+      if (
+        row.type === "thinking" &&
+        !row.text.trim() &&
+        !row.id.startsWith("live-thinking:")
+      ) {
+        continue
+      }
       items.push({ kind: "row", row })
       continue
     }

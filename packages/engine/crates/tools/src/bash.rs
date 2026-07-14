@@ -170,9 +170,11 @@ impl Tool for BashTool {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
             name: "Bash".to_owned(),
-            description: "Run a shell command in the session working directory using \
-                          `/bin/sh -lc`. This is for verification, build/test commands, and \
-                          carefully scoped automation. Quote paths with spaces. Long-running \
+            description: "Run a shell command in the session working directory. \
+                          On Unix this uses `/bin/sh -lc`; on Windows it uses \
+                          PowerShell (`powershell.exe -Command`). This is for \
+                          verification, build/test commands, and carefully scoped \
+                          automation. Quote paths with spaces. Long-running \
                           commands must set `timeout_ms`; output is captured and explicitly \
                           truncated when large. For long-running processes (dev servers, \
                           watchers), set `run_in_background: true` instead of `timeout_ms`: the \

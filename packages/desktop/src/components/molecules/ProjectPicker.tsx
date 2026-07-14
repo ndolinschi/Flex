@@ -4,6 +4,7 @@ import { Check, Folder, FolderOpen } from "lucide-react"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
 import { createSession, toInvokeError, updateSession } from "../../lib/tauri"
 import { isBrowserPreview, NATIVE_APP_REQUIRED } from "../../lib/browserPreview"
+import { invalidateWorkspaceQueries } from "../../lib/invalidateWorkspaceQueries"
 import { DEFAULT_SESSION_TITLE } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
 import { basename, parentPathPrefix } from "../../lib/utils"
@@ -99,6 +100,7 @@ export const ProjectPicker = ({
         await queryClient.invalidateQueries({
           queryKey: ["git-has-remote", nextCwd],
         })
+        invalidateWorkspaceQueries(queryClient)
       } else {
         const meta = await createSession({
           title: DEFAULT_SESSION_TITLE,
