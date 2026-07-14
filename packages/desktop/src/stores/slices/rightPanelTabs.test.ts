@@ -122,6 +122,18 @@ describe("right panel per-session tab state (BUG #37)", () => {
     expect(useAppStore.getState().rightPanelOpen).toBe(false)
   })
 
+  it("panel: closed keeps the strip shut even when the session has tabs (boot / New Agent)", () => {
+    useAppStore.getState().setActiveSessionId(A)
+    useAppStore.getState().setRightPanelOpen(true)
+    useAppStore.getState().setRightPanelTab("changes")
+    useAppStore.getState().setRightPanelOpen(false)
+
+    useAppStore.getState().setActiveSessionId(A, { panel: "closed" })
+    expect(useAppStore.getState().rightPanelOpen).toBe(false)
+    // Tab preference is still synced so ⌘J shows the right strip.
+    expect(useAppStore.getState().rightPanelTab).toBe("changes")
+  })
+
   it("opening the panel from closed clears a persisted collapsed strip", () => {
     useAppStore.setState({
       rightPanelOpen: false,

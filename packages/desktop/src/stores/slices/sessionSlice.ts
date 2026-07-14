@@ -101,7 +101,7 @@ export const createSessionSlice: StateCreator<
   latestVerdictBySession: {},
   messageQueueBySession: {},
   restoredPlanAnnotations: {},
-  setActiveSessionId: (id) => {
+  setActiveSessionId: (id, opts) => {
     set({ activeSessionId: id, subagentViewer: null })
     void persistUiState({ activeSessionId: id })
     // Focusing a session clears its unread flag (design: dot disappears on view).
@@ -124,10 +124,14 @@ export const createSessionSlice: StateCreator<
     // both from the target session's own remembered state on every switch:
     // open + restore its last-selected tab if it has any open tabs, closed
     // otherwise (matches the "new session: panel closed" default).
+    //
+    // `opts.panel: "closed"` forces closed (app boot + New Agent) while still
+    // syncing `rightPanelTab` so ⌘J later shows the right strip.
     const key = sessionScopeKey(id)
     const openIds = (get().openTabsBySession[key] ?? []).filter(
       isRightPanelTabEnabled,
     )
+    const forceClosed = opts?.panel === "closed"
     if (openIds.length > 0) {
       const remembered = get().selectedTabBySession[key]
       const tab =
@@ -143,7 +147,7 @@ export const createSessionSlice: StateCreator<
       // switching anyway.
       set({ rightPanelTab: tab })
       void persistUiState({ rightPanelTab: tab })
-      get().setRightPanelOpen(true)
+      get().setRightPanelOpen(!forceClosed)
     } else {
       get().setRightPanelOpen(false)
     }

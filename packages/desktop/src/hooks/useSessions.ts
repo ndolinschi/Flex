@@ -39,7 +39,7 @@ export const useSessions = () => {
     mutationFn: (input: CreateSessionInput) => createSession(input),
     onSuccess: (meta: SessionMeta) => {
       void queryClient.invalidateQueries({ queryKey: SESSIONS_KEY })
-      setActiveSessionId(meta.id)
+      setActiveSessionId(meta.id, { panel: "closed" })
       setRoute("chat")
     },
   })
@@ -127,7 +127,7 @@ export const useSessions = () => {
       } catch {
         // Still select locally if resume fails (session already warm).
       }
-      setActiveSessionId(draft.id)
+      setActiveSessionId(draft.id, { panel: "closed" })
       setRoute("chat")
       return draft
     }
