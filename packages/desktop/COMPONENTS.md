@@ -95,16 +95,10 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `QuestionPrompt` | AskUserQuestion HITL | `question` | ChatPage |
 | `RightPanel` | Plan / Changes / Files / Terminal / Browser / Memory (flagged) / plugin tabs (Database); tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`) + `src/plugins/` registry. Closed by default on app start and New Agent (`setActiveSessionId(…, { panel: "closed" })`); opens via `+`, ⌘J, Plan mode, or session switch restore. Memory gated by `MEMORY_TAB_ENABLED` (default off). Database via UI plugin (`DATABASE_TAB_ENABLED`, default on). | — | App shell |
 | `MemoryTab` | Right-panel Memory surface; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | RightPanel |
-| `DatabaseTab` | UI plugin: SQLite / Postgres / MySQL connections, schemas, tables, SQL + result grid | `active`, `session` | RightPanel (plugin registry) |
-<<<<<<< HEAD
+| `DatabaseTab` | UI plugin: SQLite file path or Postgres/MySQL connection URL (engine-specific form; Docker Compose → `127.0.0.1:publishedPort`); schemas, tables, SQL + result grid | `active`, `session` | RightPanel (plugin registry) |
 | `FilesTab` | Cursor-style open-file strip + Monaco editor; empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children` showing hidden/gitignored paths like `.env`; search via `list_files` with `includeIgnored`; create / rename / delete) | `active` | RightPanel |
-| `AppHeader` | Title + sole right-panel toggle (⌘J) + session menu | — | ChatShell |
-| `WindowTitleBar` | Cursor-style custom window chrome (`decorations: false`): traffic lights / caption buttons + File/Edit/View/Help + drag region | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
-=======
-| `FilesTab` | Cursor-style open-file strip + Monaco editor; empty/browse shows `FileExplorer` (create / rename / delete + searchable `list_files`) | `active` | RightPanel |
 | `WindowTitleBar` | Compact custom window chrome (`decorations: false`, 30px): traffic lights / caption buttons + File/Edit/View/Help + drag region | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
 | `AppHeader` | Compact chat chrome (30px): quiet `h-6` sidebar/panel toggles + `text-sm` title + session menu | — | ChatShell |
->>>>>>> 9d9dd43 (desktop: compact and rebalance window + chat headers)
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | RightPanel |
 | `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/`. Opening the tab with zero workspace PTYs auto-creates one shell. | — | RightPanel |
 | `CommandPalette` | ⌘K-style action palette (nav, theme, new agent); rows via `CommandPaletteRow`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell |
