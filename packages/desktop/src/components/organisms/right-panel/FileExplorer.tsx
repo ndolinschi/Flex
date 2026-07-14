@@ -242,7 +242,7 @@ export const FileExplorer = ({
     isFetching: searchFetching,
   } = useQuery({
     queryKey: ["workspace-file-list", cwd, debounced],
-    queryFn: () => listFiles(cwd, debounced),
+    queryFn: () => listFiles(cwd, debounced, true),
     enabled: !!cwd && searching,
     staleTime: 15_000,
   })

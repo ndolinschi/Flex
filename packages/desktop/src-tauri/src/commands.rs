@@ -3226,18 +3226,27 @@ fn score_file(rel_path: &str, name: &str, needle: &str) -> Option<i32> {
 }
 
 /// Read-only fuzzy file **and folder** search under `cwd` for composer
-/// @-mentions and the Files explorer. Scoped to the session project folder:
-/// respects `.gitignore` / `.ignore` / `.git/exclude`, never descends into
-/// `node_modules` (and other heavy dirs). Folders are included so the
+/// @-mentions and the Files explorer search box. Folders are included so the
 /// suggestion tray can show distinct file/folder icons.
+///
+/// By default (`include_ignored = false` / omitted): respects `.gitignore` /
+/// `.ignore` / `.git/exclude` and skips hidden files — correct for agent
+/// @-mentions. Pass `include_ignored = true` for the human Files search so
+/// `.env` and other gitignored paths are findable (heavy vendor dirs are still
+/// pruned so typing stays snappy).
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
-pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
+pub fn list_files(
+    cwd: String,
+    query: String,
+    include_ignored: Option<bool>,
+) -> Vec<FileHit> {
     let root = PathBuf::from(&cwd);
     if !root.is_dir() {
         return Vec::new();
     }
     let needle = query.trim().to_lowercase();
+    let include_ignored = include_ignored.unwrap_or(false);
 
     // Bound the walk so huge repos can't stall an interactive keystroke.
     // Empty query is browse-only (shallow); typed queries may go deeper but
@@ -3256,21 +3265,35 @@ pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
     let mut strong_hits = 0usize; // basename prefix/contains
 
     let mut builder = ignore::WalkBuilder::new(&root);
-    builder
-        .standard_filters(true) // hidden + gitignore + .ignore + exclude
-        .parents(true)
-        .follow_links(false)
-        .filter_entry(|entry| {
-            // Prune before descending — gitignore alone still lets a missing
-            // ignore rule walk tens of thousands of node_modules files.
-            if entry.depth() > 0 && entry.file_type().is_some_and(|ft| ft.is_dir()) {
-                let name = entry.file_name().to_string_lossy();
-                if is_skipped_dir_name(&name) {
-                    return false;
-                }
+    if include_ignored {
+        // Human Files search: show hidden + gitignored (e.g. `.env`).
+        builder
+            .standard_filters(false)
+            .hidden(false)
+            .git_ignore(false)
+            .git_global(false)
+            .git_exclude(false)
+            .ignore(false)
+            .parents(false)
+            .follow_links(false);
+    } else {
+        builder
+            .standard_filters(true) // hidden + gitignore + .ignore + exclude
+            .parents(true)
+            .follow_links(false);
+    }
+    builder.filter_entry(|entry| {
+        // Always prune heavy vendor dirs before descending — otherwise a
+        // missing ignore rule (or include_ignored) walks tens of thousands
+        // of node_modules files on every keystroke.
+        if entry.depth() > 0 && entry.file_type().is_some_and(|ft| ft.is_dir()) {
+            let name = entry.file_name().to_string_lossy();
+            if is_skipped_dir_name(&name) {
+                return false;
             }
-            true
-        });
+        }
+        true
+    });
     // Bare `@` / empty Files search: only shallow entries so we don't walk the
     // whole tree just to show a browse list.
     if needle.is_empty() {
@@ -3341,8 +3364,10 @@ pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
 }
 
 /// Immediate children of `relative_dir` under `cwd` (empty = workspace root).
-/// VS Code–style Files tree browse: one level per expand, gitignore-aware,
-/// hard-skips heavy vendor dirs. Sorted dirs-first then name. Soft-capped.
+/// Human Files tree: shows **everything** at this level — including `.env`,
+/// gitignored paths, and heavy dirs like `node_modules` — so the panel matches
+/// what a person sees in Explorer/Finder. (Composer `@` still uses
+/// gitignore-aware [`list_files`].) Soft-capped; dirs-first then name.
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
 pub fn list_dir_children(cwd: String, relative_dir: String) -> Vec<FileHit> {
@@ -3373,35 +3398,19 @@ pub fn list_dir_children(cwd: String, relative_dir: String) -> Vec<FileHit> {
     const MAX_CHILDREN: usize = 1_000;
     let mut hits: Vec<FileHit> = Vec::new();
 
-    let mut builder = ignore::WalkBuilder::new(&dir);
-    builder
-        .standard_filters(true)
-        .parents(true)
-        .follow_links(false)
-        .max_depth(Some(1))
-        .filter_entry(|entry| {
-            if entry.depth() > 0 && entry.file_type().is_some_and(|ft| ft.is_dir()) {
-                let name = entry.file_name().to_string_lossy();
-                if is_skipped_dir_name(&name) {
-                    return false;
-                }
-            }
-            true
-        });
-
-    for entry in builder.build().flatten() {
-        if entry.depth() == 0 {
-            continue;
-        }
-        let Some(ft) = entry.file_type() else {
+    let Ok(read) = std::fs::read_dir(&dir) else {
+        return Vec::new();
+    };
+    for entry in read.flatten() {
+        let Ok(meta) = entry.metadata() else {
             continue;
         };
-        let is_dir = ft.is_dir();
-        if !is_dir && !ft.is_file() {
+        let is_dir = meta.is_dir();
+        if !is_dir && !meta.is_file() {
             continue;
         }
         let name = entry.file_name().to_string_lossy().to_string();
-        if is_dir && is_skipped_dir_name(&name) {
+        if name == "." || name == ".." {
             continue;
         }
         let Ok(stripped) = entry.path().strip_prefix(&root) else {

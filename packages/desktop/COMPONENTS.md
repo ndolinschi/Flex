@@ -96,7 +96,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `RightPanel` | Plan / Changes / Files / Terminal / Browser / Memory (flagged) / plugin tabs (Database); tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`) + `src/plugins/` registry. Plan opens empty via `+`, ⌘J, or Plan mode. Memory gated by `MEMORY_TAB_ENABLED` (default off). Database via UI plugin (`DATABASE_TAB_ENABLED`, default on). | — | App shell |
 | `MemoryTab` | Right-panel Memory surface; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | RightPanel |
 | `DatabaseTab` | UI plugin: SQLite / Postgres / MySQL connections, schemas, tables, SQL + result grid | `active`, `session` | RightPanel (plugin registry) |
-| `FilesTab` | Cursor-style open-file strip + Monaco editor; empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children`, search via `list_files`, create / rename / delete) | `active` | RightPanel |
+| `FilesTab` | Cursor-style open-file strip + Monaco editor; empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children` showing hidden/gitignored paths like `.env`; search via `list_files` with `includeIgnored`; create / rename / delete) | `active` | RightPanel |
 | `AppHeader` | Title + sole right-panel toggle (⌘J) + session menu | — | ChatShell |
 | `WindowTitleBar` | Cursor-style custom window chrome (`decorations: false`): traffic lights / caption buttons + File/Edit/View/Help + drag region | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | RightPanel |
