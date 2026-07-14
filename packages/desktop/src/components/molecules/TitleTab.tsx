@@ -12,7 +12,7 @@ export const TitleTab = ({ title, className }: TitleTabProps) => {
     <div
       className={cn(
         "flex min-w-0 items-center rounded-sm px-1.5 py-0.5",
-        "text-sm text-ink-secondary opacity-70",
+        "text-sm text-ink-muted",
         className,
       )}
     >

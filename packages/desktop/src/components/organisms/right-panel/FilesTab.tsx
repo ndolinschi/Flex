@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Editor from "@monaco-editor/react"
-import { Code2, Eye, FolderTree, Save, X } from "lucide-react"
-import { IconButton, ScrollArea, Spinner } from "../../atoms"
+import { Code2, Eye, FolderTree, Save } from "lucide-react"
+import { IconButton, ScrollArea, Spinner, Tab } from "../../atoms"
 import { ConfirmDialog, MarkdownBody } from "../../molecules"
 import { ensureMonaco, languageForPath } from "../../../lib/monacoEnv"
 import {
@@ -32,45 +32,20 @@ type FileChipProps = {
   onClose: () => void
 }
 
-/** Open-buffer chip — close collapses to zero width at rest and expands on
- * hover/focus, matching `RightPanelTabBar`. */
+/** Open-buffer chip — composes shared `Tab` (sm / chip) from panel tab chrome. */
 const FileChip = ({ path, active, dirty, onSelect, onClose }: FileChipProps) => (
-  <div
-    className={cn(
-      "group flex h-6 max-w-[160px] items-center rounded-md pl-1.5 pr-0.5 text-xs",
-      active
-        ? "bg-fill-2 text-ink"
-        : "text-ink-muted hover:bg-fill-4 hover:text-ink-secondary",
-    )}
+  <Tab
+    selected={active}
+    size="sm"
+    variant="chip"
+    title={path}
+    onSelect={onSelect}
+    onClose={onClose}
+    closeLabel={`Close ${basename(path)}`}
   >
-    <button
-      type="button"
-      className="min-w-0 flex-1 truncate py-0.5 text-left"
-      title={path}
-      onClick={onSelect}
-    >
-      {dirty ? "● " : ""}
-      {basename(path)}
-    </button>
-    <span
-      role="button"
-      aria-label={`Close ${basename(path)}`}
-      tabIndex={-1}
-      onClick={(e) => {
-        e.stopPropagation()
-        onClose()
-      }}
-      className={cn(
-        "ml-0 max-w-0 shrink-0 overflow-hidden rounded-sm p-0 opacity-0",
-        "transition-[max-width,margin,padding,opacity] duration-[140ms] ease-[var(--easing-default)]",
-        "hover:bg-fill-1",
-        "group-hover:ml-0.5 group-hover:max-w-[1rem] group-hover:p-0.5 group-hover:opacity-100",
-        "group-focus-within:ml-0.5 group-focus-within:max-w-[1rem] group-focus-within:p-0.5 group-focus-within:opacity-100",
-      )}
-    >
-      <X className="h-3 w-3" aria-hidden />
-    </span>
-  </div>
+    {dirty ? "● " : ""}
+    {basename(path)}
+  </Tab>
 )
 
 /** Cursor-style file strip + Monaco editor inside the right panel.
@@ -391,7 +366,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
           </div>
         ) : path && previewMode ? (
           <ScrollArea className="h-full">
-            <div className="px-4 py-3">
+            <div className="px-2 py-2">
               {value.trim().length === 0 ? (
                 <p className="text-sm text-ink-muted">Empty file</p>
               ) : (

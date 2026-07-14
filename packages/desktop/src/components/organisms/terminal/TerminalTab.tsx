@@ -122,7 +122,7 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
     <div className="flex h-full min-h-0 flex-col">
       {/* Header — fixed chrome height so tab switches don't jump; agent
           subtitle lives on a separate non-chrome row below. */}
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 px-2">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2">
         <span className="min-w-0 flex-1 truncate text-sm text-ink">
           {isAgentSelected
             ? "Agent terminal"

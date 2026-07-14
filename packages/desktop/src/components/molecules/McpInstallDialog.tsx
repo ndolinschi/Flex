@@ -113,14 +113,14 @@ export const McpInstallDialog = ({
         </h2>
         <p className="mt-1 text-sm text-ink-muted">{entry.description}</p>
         {entry.setupHint ? (
-          <p className="mt-2 text-[13px] leading-snug text-ink-secondary">{entry.setupHint}</p>
+          <p className="mt-2 text-base leading-snug text-ink-secondary">{entry.setupHint}</p>
         ) : null}
         {entry.docsUrl ? (
           <a
             href={entry.docsUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-1 inline-block text-[12px] text-accent hover:underline"
+            className="mt-1 inline-block text-sm text-accent hover:underline"
           >
             Docs
           </a>

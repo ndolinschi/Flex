@@ -273,7 +273,7 @@ export const SessionListItem = memo(function SessionListItem({
           aria-hidden
           className={cn(
             "pointer-events-none absolute inset-y-0 right-0 z-[1] w-[5.75rem] rounded-r-sm",
-            "opacity-0 transition-opacity duration-[100ms] ease-[var(--easing-default)]",
+            "opacity-0 transition-opacity duration-[var(--duration-fast)] ease-[var(--easing-default)]",
             "group-hover:opacity-100 group-focus-within:opacity-100",
             // Match the row fill (not solid panel) so the scrub doesn't flash a
             // different slab over hover/selected translucent fills.

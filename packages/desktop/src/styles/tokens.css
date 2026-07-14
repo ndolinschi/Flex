@@ -199,6 +199,7 @@
   --radius-bubble: 14px; /* conversation-surface-border-radius = radius-xl */
   --radius-full: 9999px;
   --radius-composer: 14px;
+  --radius-card: 12px; /* settings cards / grouped panels */
 
   /* Shadows — reference glass: stroke ring + theme-aware elevation.
      Colors come from per-theme --shadow-color / --shadow-ambient so they read

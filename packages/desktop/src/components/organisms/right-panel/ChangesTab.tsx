@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { GitMerge, RefreshCw, XCircle } from "lucide-react"
-import { Button, DiffStat, IconButton, ScrollArea } from "../../atoms"
+import { Button, Checkbox, DiffStat, IconButton, ScrollArea } from "../../atoms"
 import { BranchPrStatusChip, ConfirmDialog, CreatePrDialog } from "../../molecules"
 import { useWorkspaceActions } from "../../../hooks/useWorkspaceActions"
 import { useIsGitRepo } from "../../../hooks/useIsGitRepo"
@@ -207,6 +207,8 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
   }
 
   const showSelectAll = !isolated && files.length > 0
+  const allSelected = showSelectAll && selected.size === files.length
+  const someSelected = showSelectAll && selected.size > 0 && selected.size < files.length
   const headline =
     totalCount === 0
       ? "No changes"
@@ -214,45 +216,14 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
 
   return (
     <>
-      {/* Single header: select-all + title/branch + diffstat + refresh.
-          Previously a count bar and a separate select-all strip stacked and
-          felt top-heavy; one row keeps the chrome balanced. */}
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 px-2 [font-variant-numeric:tabular-nums]">
-        {showSelectAll ? (
-          <input
-            type="checkbox"
-            checked={selected.size === files.length}
-            ref={(el) => {
-              if (el) {
-                el.indeterminate =
-                  selected.size > 0 && selected.size < files.length
-              }
-            }}
-            onChange={() =>
-              setSelected((prev) =>
-                prev.size === files.length
-                  ? new Set()
-                  : new Set(files.map((f) => f.path)),
-              )
-            }
-            aria-label={
-              selected.size === files.length
-                ? "Deselect all files"
-                : `Select all ${files.length} files`
-            }
-            className="h-3.5 w-3.5 shrink-0 accent-accent"
-          />
-        ) : null}
+      {/* Quiet chrome row — title / branch / PR / diffstat / refresh.
+          Selection lives on a dedicated toolbar below so the header stays
+          balanced with Plan / Files / Terminal. */}
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2 [font-variant-numeric:tabular-nums]">
         <div className="min-w-0 flex-1 truncate">
           <span className="text-sm text-ink">{headline}</span>
           {branch ? (
             <span className="text-sm text-ink-faint"> · {branch}</span>
-          ) : null}
-          {showSelectAll && selected.size !== files.length ? (
-            <span className="text-xs text-ink-muted">
-              {" "}
-              · {selected.size} selected
-            </span>
           ) : null}
         </div>
         {branchPr ? (
@@ -267,7 +238,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             Create PR
           </Button>
         ) : null}
-        <DiffStat summary={totals} size="sm" />
+        {totalCount > 0 ? <DiffStat summary={totals} size="sm" /> : null}
         <IconButton
           label="Refresh changes"
           onClick={handleRefresh}
@@ -275,13 +246,41 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
         >
           <RefreshCw
             className={cn(
-              "h-3 w-3",
+              "h-3.5 w-3.5",
               (isFetching || isRepoFetching) && "animate-spin",
             )}
             aria-hidden
           />
         </IconButton>
       </div>
+
+      {showSelectAll ? (
+        <div className="flex h-7 shrink-0 items-center gap-2 border-b border-stroke-3 px-2">
+          <Checkbox
+            checked={allSelected}
+            indeterminate={someSelected}
+            onChange={() =>
+              setSelected(
+                allSelected
+                  ? new Set()
+                  : new Set(files.map((f) => f.path)),
+              )
+            }
+            label={
+              allSelected
+                ? "Deselect all files"
+                : `Select all ${files.length} files`
+            }
+          />
+          <span className="min-w-0 flex-1 truncate text-xs text-ink-muted">
+            {allSelected
+              ? "All selected"
+              : someSelected
+                ? `${selected.size} of ${files.length} selected`
+                : "Select files to commit"}
+          </span>
+        </div>
+      ) : null}
 
       {error ? (
         <p className="border-b border-stroke-3 bg-danger-subtle px-2 py-1.5 text-xs text-danger">
@@ -304,7 +303,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             </p>
           </div>
         ) : (
-          <ul className="px-1 py-1">
+          <ul className="flex flex-col gap-px px-1 py-1.5">
             {files.map((file) => (
               <FileRow
                 key={file.path}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { ScrollArea } from "../../atoms"
 import {
+  EmptyState,
   MarkdownBody,
   PlanCommentButton,
   PlanCommentList,
@@ -245,11 +246,11 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
 
   if (!active || (sessionPlans.length === 0 && entries.length === 0)) {
     return (
-      <div className="flex flex-1 items-center justify-center px-4 text-center">
-        <p className="text-sm leading-relaxed text-ink-muted">
-          No plan yet — switch the composer to Plan mode and ask for a plan.
-        </p>
-      </div>
+      <EmptyState
+        className="flex-1"
+        title="No plan yet"
+        description="Switch the composer to Plan mode and ask for a plan."
+      />
     )
   }
 

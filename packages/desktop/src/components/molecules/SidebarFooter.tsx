@@ -22,6 +22,7 @@ export const SidebarFooter = ({
           quiet
           label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
           onClick={onToggleTheme}
+          className="h-6 w-6"
         >
           {theme === "dark" ? (
             <Sun className="h-3.5 w-3.5" aria-hidden />
@@ -29,7 +30,7 @@ export const SidebarFooter = ({
             <Moon className="h-3.5 w-3.5" aria-hidden />
           )}
         </IconButton>
-        <IconButton quiet label="Settings" onClick={onOpenSettings}>
+        <IconButton quiet label="Settings" onClick={onOpenSettings} className="h-6 w-6">
           <Settings className="h-3.5 w-3.5" aria-hidden />
         </IconButton>
       </div>

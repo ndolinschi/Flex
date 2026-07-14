@@ -7,7 +7,7 @@ export const ExpiryPill = ({ expiresAtMs }: { expiresAtMs: number }) => {
   return (
     <span
       className={cn(
-        "shrink-0 whitespace-nowrap text-[11px]",
+        "shrink-0 whitespace-nowrap text-xs",
         urgent ? "text-red" : "text-ink-faint",
       )}
     >

@@ -109,7 +109,7 @@ export const SettingsShell = ({
                 {titleFor(activeSection)}
               </h1>
               {descriptionFor?.(activeSection) ? (
-                <p className="mt-1 text-[13px] leading-[18px] text-ink-secondary">
+                <p className="mt-1 text-base leading-[18px] text-ink-secondary">
                   {descriptionFor(activeSection)}
                 </p>
               ) : null}

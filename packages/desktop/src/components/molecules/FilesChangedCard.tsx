@@ -70,7 +70,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
 
   return (
     <div className="overflow-hidden rounded-[var(--radius-lg)] border border-stroke-3 bg-transparent">
-      <div className="flex h-9 items-center gap-2 px-2">
+      <div className="flex h-[var(--end-of-turn-reserved-height)] items-center gap-2 px-2">
         <button
           type="button"
           onClick={handleToggle}
@@ -82,7 +82,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
           }
           className={cn(
             "flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-1",
-            "text-left transition-colors hover:bg-fill-3",
+            "text-left transition-colors duration-[var(--duration-fast)] hover:bg-fill-3",
           )}
         >
           {expanded ? (
@@ -90,7 +90,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
           ) : (
             <ChevronRight className="h-3.5 w-3.5 shrink-0 text-icon-3" aria-hidden />
           )}
-          <span className="truncate text-[13px] text-ink">
+          <span className="truncate text-base text-ink">
             {totalCount} file{totalCount === 1 ? "" : "s"} changed
           </span>
         </button>
@@ -106,7 +106,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
       </div>
 
       {expanded ? (
-        <ul className="border-t border-stroke-3 px-1.5 py-1.5" role="list">
+        <ul className="border-t border-stroke-3 px-2 py-1.5" role="list">
           {files.map((file) => {
             const isDir = file.path.endsWith("/")
             const name = isDir ? file.path : basename(file.path)
@@ -127,7 +127,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
                     handleOpenFile(file.path, file.status, isDir)
                   }
                   className={cn(
-                    "flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-[13px]",
+                    "flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-base",
                     canOpen
                       ? "hover:bg-fill-3"
                       : "cursor-default opacity-70",
@@ -155,7 +155,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
                     ) : (
                       <span
                         className={cn(
-                          "font-mono text-[11px]",
+                          "font-mono text-xs",
                           statusClass,
                         )}
                       >

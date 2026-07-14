@@ -15,7 +15,7 @@ export const PlanList = ({ plans, onSelect, className }: PlanListProps) => {
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
-      <div className="flex h-[var(--header-height)] shrink-0 items-center px-4">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center px-2">
         <h2 className="min-w-0 truncate text-sm font-medium text-ink">
           Review plans
           <span className="ml-2 font-normal text-ink-muted">
@@ -33,7 +33,7 @@ export const PlanList = ({ plans, onSelect, className }: PlanListProps) => {
                 onClick={() => onSelect(plan.id)}
                 className={cn(
                   "flex w-full items-start gap-3 rounded-md px-2.5 py-2.5 text-left",
-                  "transition-colors hover:bg-fill-3",
+                  "transition-colors duration-[var(--duration-fast)] hover:bg-fill-3",
                 )}
               >
                 <div className="min-w-0 flex-1">

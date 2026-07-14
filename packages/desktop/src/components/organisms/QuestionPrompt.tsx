@@ -19,7 +19,7 @@ type DraftAnswer = {
 const emptyDraft = (): DraftAnswer => ({ selected: [], custom: "" })
 
 /** Shared vertical rhythm for the docked quiz card (8px / 12px steps). */
-const CARD_PAD = "px-3.5 pt-3 pb-3"
+const CARD_PAD = "px-3 pt-3 pb-3"
 const SECTION_GAP = "mt-2.5"
 const STACK_GAP = "gap-2"
 const OPTION_PAD = "px-3 py-2"

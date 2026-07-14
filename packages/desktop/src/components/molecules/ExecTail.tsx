@@ -43,7 +43,7 @@ export const ExecTail = ({ callId, muted }: { callId: string; muted?: boolean })
         muted && "opacity-60",
       )}
     >
-      <pre className="whitespace-pre-wrap break-all font-mono text-[11px] leading-[1.4] text-ink-faint">
+      <pre className="whitespace-pre-wrap break-all font-mono text-xs leading-[1.4] text-ink-faint">
         {lastLines.join("\n")}
       </pre>
     </div>
@@ -95,7 +95,7 @@ export const ExecErrorAction = ({
       <button
         type="button"
         onClick={handleAskAgent}
-        className="text-[12px] text-accent hover:underline focus-visible:outline-none focus-visible:underline"
+        className="text-sm text-accent hover:underline focus-visible:outline-none focus-visible:underline"
       >
         Ask Agent to fix
       </button>

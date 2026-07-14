@@ -428,8 +428,9 @@ describe("REAL trace regression: turn_started before its own user_message", () =
     expect(group.isOpen).toBe(false)
     // Every thinking/tool row AND the mid-turn narration assistant row is
     // inside the group — tools/narration keep arrival order, thinking is
-    // moved to the end of the work body (see `moveThinkingToEnd`). Only the
-    // FINAL assistant answer is pulled out below the group.
+    // moved to the end of the work body (see `moveThinkingToEnd`) then
+    // coalesced by `mergeShortThinkingRows`. Only the FINAL assistant
+    // answer is pulled out below the group.
     expect(group.rows.map((r) => (r.type === "tool" ? r.call.tool_name : r.type))).toEqual([
       "Bash",
       "Glob",
@@ -438,9 +439,6 @@ describe("REAL trace regression: turn_started before its own user_message", () =
       "Read",
       "assistant",
       "Bash",
-      "thinking",
-      "thinking",
-      "thinking",
       "thinking",
     ])
 

@@ -49,7 +49,7 @@ const ToastRow = ({ id, text, kind, action, onDismiss }: ToastRowProps) => {
             action.onAction()
             onDismiss(id)
           }}
-          className="shrink-0 rounded-sm bg-accent px-2 py-1 text-xs font-medium text-accent-text transition-colors hover:bg-accent-hover"
+          className="shrink-0 rounded-sm bg-accent px-2 py-1 text-xs font-medium text-accent-text transition-colors duration-[var(--duration-fast)] hover:bg-accent-hover"
         >
           {action.label}
         </button>
@@ -70,7 +70,7 @@ export const ToastHost = () => {
   return (
     <div
       data-suppress-native-webview=""
-      className="pointer-events-none fixed bottom-6 right-3 z-[1000] flex flex-col gap-2"
+      className="pointer-events-none fixed bottom-4 right-4 z-[1000] flex flex-col gap-2"
     >
       {toasts.map((t) => (
         <div key={t.id} className="pointer-events-auto">

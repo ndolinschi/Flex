@@ -25,12 +25,12 @@ export const MemoryScopeSection = ({
   const [open, setOpen] = useState(defaultOpen)
 
   return (
-    <section className="mb-6">
+    <section>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="mb-2 flex w-full items-center gap-2 text-left"
+        className="mb-2 flex w-full items-center gap-2 px-3.5 text-left"
       >
         <ChevronDown
           className={cn(
@@ -39,10 +39,10 @@ export const MemoryScopeSection = ({
           )}
           aria-hidden
         />
-        <h2 className="text-[12px] leading-4 text-ink-secondary">{title}</h2>
-        <span className="text-[11px] text-ink-faint">{memories.length}</span>
+        <h2 className="text-sm leading-4 text-ink-secondary">{title}</h2>
+        <span className="text-xs text-ink-faint">{memories.length}</span>
         {hint ? (
-          <span className="truncate text-[11px] text-ink-faint">{hint}</span>
+          <span className="truncate text-xs text-ink-faint">{hint}</span>
         ) : null}
       </button>
       <Collapsible open={open}>

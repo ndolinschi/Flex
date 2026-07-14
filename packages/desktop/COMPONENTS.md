@@ -8,11 +8,15 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | Component | Purpose | Key props | Used by |
 |---|---|---|---|
 | `Button` | Primary action control | `variant`, `size`, `disabled`, `onClick`, `children` | Composer, ProviderSettingsForm, PermissionPrompt, QuestionPrompt, WelcomePage, ConfirmDialog |
+| `Checkbox` | Round selection control (filled accent circle + check) | `checked`, `indeterminate?`, `onChange`, `label` | ChangesTab select-all, FileRow |
 | `IconButton` | Compact icon-only action; optional `quiet` opacity .5→.8 | `label`, `quiet?`, `onClick`, `children` | SessionListItem, SessionSidebar, PlusMenu, ErrorBanner, SettingsShell, SessionMenu |
 | `TextInput` | Single-line text field (forwardRef) | standard input props | FormField, SessionListItem, SessionSidebar search, QuestionPrompt, ConfirmDialog |
 | `TextArea` | Multi-line text field | standard textarea props | Composer |
 | `Label` | Accessible form label | `htmlFor`, `children` | FormField, ModelSelect |
 | `Spinner` | Indeterminate loading | `size` | SessionSidebar, ProviderSettingsForm |
+| `Tab` | Pill tab / open-buffer chip (primary right-panel chrome) | `selected`, `size?`, `variant?`, `icon?`, `badge?`, `onSelect`, `onClose?` | RightPanelTabBar, FilesTab (`FileChip`) |
+| `TabClose` | Hover-collapse close control for tabs/chips | `label`, `onClose`, `revealOnFocusWithin?` | `Tab` |
+| `TabStrip` | Horizontal open-tabs strip (`role="tablist"`) | `children`, `className?` | RightPanelTabBar |
 | `Badge` | Status / meta chip | `tone`, `children` | ToolCallChip |
 | `BypassPermissionsButton` | Session bypass-permissions shield | `composerMode`, `sessionBypass`, `onToggle` | Composer |
 | `Kbd` | Keyboard shortcut hint | `children` | WelcomePage |
@@ -79,7 +83,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `WorkingAgentsPill` | Composer-adjacent "N Working" glance — menu of running worker titles + jump to group | `rows`, `onScrollToWorkers?` | ChatPage → Composer `workersSlot` |
 | `WorkGroup` | "Worked for Xs" / live "Working" XOR "Thinking" XOR "Compacting context…"; `memo` | `isOpen`, `liveStatus?`, `durationMs?` | TurnTimeline |
 | `WorkflowGroup` | Multi-step workflow block (steps + nested subagents); organism-scale but kept in `molecules/` since it nests inside `TimelineRowView` like `SubagentGroup`/`WorkGroup` | `steps`, `subagents`, `status` | TurnTimeline (via `TimelineRowView`) |
-| `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?` | SessionSidebar |
+| `SidebarSkeleton` | Sidebar loading placeholder (headers + rows) | — | SessionSidebar |
+| `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?`, `disabled?` | SessionSidebar |
 | `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle` | SessionSidebar |
 | `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions | `title`, `status`, `onBuild`, `onAddComment?` | RightPanel Plan tab (`PlanTab`) |
 | `AppMark` / `TitleBarMenus` | Wireframe mark + File/Edit/View/Help for custom window chrome; Help → **Submit Bug…** opens `BugReportDialog` | `onOpenCommandPalette?`, `onOpenSearch?` | WindowTitleBar |
@@ -115,7 +120,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|
 | `organisms/timeline/` | `buildDisplayItems` (+ `estimateSizeForItem`), `TimelineRowView`, `WorkGroupBody`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
 | `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
-| `organisms/right-panel/` | `PlanTab`, `ChangesTab` (single header: select-all + count/branch + diffstat), `FilesTab` (Monaco + MD preview, hover-close chips), `FileExplorer` (VS Code–style expandable tree + search; New file + right-click Open/Rename/Delete), `FileRow` (aligned +/- / status columns), `CommitCenter` (message + selection label + split commit), `RightPanelTabBar`, `tabs` |
+| `organisms/right-panel/` | `PlanTab`, `ChangesTab` (quiet header + select toolbar + DiffStat rows), `FilesTab` (Monaco + MD preview, hover-close chips), `FileExplorer` (VS Code–style expandable tree + search; New file + right-click Open/Rename/Delete), `FileRow` (round `Checkbox`, DiffStat, hover-overlay actions), `CommitCenter` (message + selection label + split commit), `RightPanelTabBar`, `tabs` |
 | `organisms/context-bar/` | `CommitBar` (changes chip + Commit / Commit & Push / Create PR), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
 | `organisms/browser/` | `BrowserToolbar` (Design Mode toggle), `BrowserOverflowMenu` — composed by `BrowserTab` |
 | `organisms/terminal/` | `TerminalTab`, `TerminalInstance`, `TerminalRow`, `AgentTerminalRow`, `time` helpers |
@@ -191,11 +196,12 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 - Themes: `data-theme="dark"|"light"` on `<html>` (Cursor-tight premium palettes — neutral charcoal / clean white, close surface steps, whisper fills, neutral monochrome accent by default; colored accents via Settings → Appearance).
 - Feel principles (local `design-map/README.md`): compact density, quiet chrome, whisper fills, opacity hover, micro-motion, alpha hierarchy, keyboard focus, weight 590 + micro tracking, alpha borders, radius-by-role, neutral interactive chrome, thin scrollbars. Interactive chrome leans solid-pill (AI Studio–inspired) without a full layout redesign.
 - Motion: hover 100ms ease; trays `animate-tray-in`; pane swaps `animate-pane-fade`; timeline rows `animate-row-fade`; end-of-turn `animate-end-turn-in` (160ms); HITL cards `animate-modal-in` (scale .97→1); overlays `animate-backdrop-in`.
-- Composer: `--radius-composer` 14px, soft elevation + stroke focus (no accent glow), compact auto-grow (~28–160px) + denser toolbar (`text-sm` input, `h-5` mode/model/plus); quiet toolbar opacity (0.5→0.8); mode/model pills neutral fill + stroke.
+- Composer: `--radius-composer` 14px, soft elevation + stroke focus (no accent glow), compact auto-grow (~28–160px) + unified toolbar (`text-sm` input; Plus / Bypass / Send `h-6` circles with `h-3.5` icons; Mode/Model `h-6` pills; left cluster `gap-1`, Bypass↔Send `gap-1.5`); quiet toolbar opacity (0.5→0.8); mode/model pills neutral fill + stroke.
 - Content rail: `--content-rail` 840px (`52.5rem`).
 - ContextBar sits above the composer (project / branch / context %) — Flex Canon.
 - Sidebar footer = theme + settings (Flex Canon); rows use fill-4 hover / fill-2 selected.
-- Right panel tabs = Plan / Changes / Terminal / Browser (Flex Canon); pill tabs; sash hover white-alpha.
+- Right panel tabs = Plan / Changes / Terminal / Browser (Flex Canon); pill tabs via shared `Tab`/`TabStrip`/`TabClose` atoms (Files open-buffer chips compose the same `Tab` at `size="sm"`); sash hover white-alpha.
+- Focus policy: interactive chrome uses the global neutral `stroke-2` outline; form fields and chrome search inputs use a matching neutral stroke ring (never accent glow).
 - Prior user bubbles dim to 50% (hover restores); hairline stroke-2; message actions reveal on row hover.
 - Sessions: default title `New Agent`; one draft per project; first prompt renames the session.
 - Engine settings: plugin toggles (search/index/learning/verifier), Indexing section
@@ -229,6 +235,6 @@ Keep this file in sync when adding or renaming components.
 - **Session-event demux:** `lib/sessionEventBus` attaches one Tauri `session-event` listener; `useGlobalSessionEvents` and each `useSessionEvents` subscribe to the bus (SubagentViewer no longer triples wire delivery).
 - **Browser / terminal selectors:** `useBrowserSession` selects per-session primitives; `TerminalTab` mounts xterm only for the active session's terminals (+ that session's agent terminal). `useIsGitRepo` shares the 5s `git-is-repo` poll across ContextBar / FilesChangedCard / RightPanel / ChangesTab.
 - **MarkdownBody:** module-scoped `components` map so settled `react-markdown` trees keep stable element constructors across parent re-renders.
-- **Spacing balance (careful):** chat chrome/gutters converge on `px-4` — AppHeader matches the timeline/composer rail; compact 30px header/titlebar with quiet `h-6` controls; loading/error/empty states drop `p-6`/`px-6` jumps; ContextBar loses inner `px-1`; composer toolbar aligns with textarea; ChatShell/timeline bottom stack eased `pb-3`→`pb-2`; RightPanel tab bar + every tab chrome row (`PlanToolbar`, Changes/Files/Terminal/Database/Browser headers, CommitCenter, error banners) share `px-2` / `--header-height` (no double `border-b` under the tab strip). Session sidebar section headers use `px-2` (aligned with rows); session-row status slot is a fixed `h-5 w-5`. Settings shell uses `px-4` / `pt-6` (not `pl-12`/`pt-12`); nav selected `bg-fill-2`; list rows `px-3.5 py-3`; Welcome onboarding uses `FormField` + `h-9` controls.
+- **Spacing balance (careful):** chat chrome/gutters converge on `px-4` — AppHeader matches the timeline/composer rail (`border-b` + `gap-0.5` control cluster); compact 30px header/titlebar with quiet `h-6` controls; loading/error/empty states drop `p-6`/`px-6` jumps; ContextBar loses inner `px-1`; composer toolbar aligns with textarea (`px-2.5`, Mode/Model shared pill chrome); ChatShell/timeline bottom stack eased `pb-3`→`pb-2`; RightPanel tab bar + every tab chrome row (`PlanToolbar`, Changes/Files/Terminal/Database/Browser headers, CommitCenter, error banners) share `px-2` / `--header-height`; Terminal/Database 180px sidebars share full-bleed `px-2 py-1.5 text-xs` rows; Settings section headers `px-3.5` with `before:inset-x-3.5` row dividers and `gap-3` between cards; Welcome primary inputs `h-9`. Session sidebar section headers use `px-2` (aligned with rows); session-row status slot is a fixed `h-5 w-5`. Settings shell uses `px-4` / `pt-6` (not `pl-12`/`pt-12`); nav selected `bg-fill-2`; list rows `px-3.5 py-3`; Welcome onboarding uses `FormField` + `h-9` controls.
 - **Streaming visuals:** `StreamingCaret` renders inline inside live `MarkdownBody` (including mid-turn narration in work groups); live assistant rows reserve `MessageActions` height; highlight.js preloads while live; `TurnTimeline` uses per-session `streamingSessions[id]` (SubagentViewer-safe); bottom “Working” hides when live answer text is visible; double-rAF remeasure on stream settle.
 - **Files / Monaco:** `@monaco-editor/react` + Vite `?worker` locals (`lib/monacoEnv.ts`); editor/vendor split via `manualChunks.monaco`. Open buffers live in `openFilesBySession` under one right-panel `files` tab (keep-alive like Terminal).

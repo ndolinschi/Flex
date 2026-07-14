@@ -314,10 +314,17 @@ export const TurnTimeline = ({
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-3 px-4 py-3">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-16 w-full" />
-        ))}
+      <div className="flex flex-1 flex-col px-4 py-3">
+        <div
+          className="mx-auto flex w-full max-w-[var(--content-rail)] flex-col gap-3"
+          role="status"
+          aria-label="Loading conversation"
+        >
+          <Skeleton className="ml-auto h-12 w-3/5 rounded-[var(--radius-bubble)]" />
+          <Skeleton className="h-20 w-full rounded-[var(--radius-bubble)]" />
+          <Skeleton className="ml-auto h-10 w-2/5 rounded-[var(--radius-bubble)]" />
+          <Skeleton className="h-16 w-4/5 rounded-[var(--radius-bubble)]" />
+        </div>
       </div>
     )
   }

@@ -9,8 +9,12 @@ type PermissionActionsProps = {
   className?: string
 }
 
+const COMPACT =
+  "h-6 px-2.5 text-xs gap-1"
+
 /** Composer-footer Allow once / Always allow / Deny — replaces Send while a
- * tool permission is pending (Claude Code–style inline HITL). */
+ * tool permission is pending (Claude Code–style inline HITL). Compact `h-6`
+ * keeps the footer row aligned with Plus / Mode / Model / Send controls. */
 export const PermissionActions = ({
   permission,
   className,
@@ -18,20 +22,21 @@ export const PermissionActions = ({
   const { isSubmitting, respond, error } = usePermissionRespond(permission)
 
   return (
-    <div className={cn("flex min-w-0 flex-col items-end gap-1.5", className)}>
+    <div className={cn("flex min-w-0 flex-col items-end gap-1", className)}>
       {error ? (
         <div className="w-full max-w-sm">
           <ErrorBanner message={error} />
         </div>
       ) : null}
       <div
-        className="flex flex-wrap items-center justify-end gap-1.5"
+        className="flex flex-wrap items-center justify-end gap-1"
         role="group"
         aria-label="Permission decision"
       >
         {permission.options.includes("allow_once") ? (
           <Button
             size="sm"
+            className={COMPACT}
             isLoading={isSubmitting}
             onClick={() => void respond("allow_once")}
           >
@@ -42,6 +47,7 @@ export const PermissionActions = ({
           <Button
             size="sm"
             variant="secondary"
+            className={COMPACT}
             isLoading={isSubmitting}
             onClick={() => void respond("allow_always")}
           >
@@ -54,7 +60,7 @@ export const PermissionActions = ({
             variant="ghost"
             isLoading={isSubmitting}
             onClick={() => void respond("deny")}
-            className="text-danger hover:bg-danger/10"
+            className={cn(COMPACT, "text-danger hover:bg-danger/10")}
           >
             Deny
           </Button>

@@ -78,7 +78,7 @@ describe("QuestionPrompt layout", () => {
       <QuestionPrompt question={baseQuestion()} />,
     )
     expect(html).toContain("data-question-prompt")
-    expect(html).toContain("px-3.5")
+    expect(html).toContain("px-3")
     expect(html).toContain("pt-3")
     expect(html).toContain("pb-3")
     expect(html).toContain("gap-2")

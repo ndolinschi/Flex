@@ -44,7 +44,7 @@ export const IsolationBadge = ({
         aria-expanded={open}
         className={cn(
           "ml-1 flex h-6 items-center rounded-full bg-fill-3 px-2 text-xs text-ink-muted",
-          "transition-colors hover:bg-fill-2 hover:text-ink-secondary",
+          "transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink-secondary",
           open && "bg-fill-2 text-ink-secondary",
         )}
       >

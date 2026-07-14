@@ -19,6 +19,7 @@ import {
   WindowTitleBar,
 } from "./components/organisms"
 import { ToastHost } from "./components/molecules"
+import { Spinner } from "./components/atoms"
 import { ChatPage } from "./pages/ChatPage"
 import { WelcomePage } from "./pages/WelcomePage"
 import { sessionScopeKey, useAppStore } from "./stores/appStore"
@@ -42,7 +43,7 @@ const NativeAppRequired = () => (
     <p className="text-[18px] font-medium text-ink">Desktop app required</p>
     <p className="max-w-[420px] text-center text-sm text-ink-muted">
       Browser preview has no backend. Run{" "}
-      <code className="rounded bg-fill-3 px-1.5 py-0.5 text-[12px] text-ink">
+      <code className="rounded bg-fill-3 px-1.5 py-0.5 text-sm text-ink">
         pnpm tauri dev
       </code>{" "}
       or open the installed app.
@@ -268,10 +269,11 @@ const AppRoutes = () => {
       <div className="flex h-full flex-col bg-bg">
         {titleBar}
         <div
-          className="flex min-h-0 flex-1 items-center justify-center text-sm text-ink-muted"
+          className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-ink-muted"
           role="status"
           aria-live="polite"
         >
+          <Spinner size="md" />
           Loading…
         </div>
       </div>
@@ -328,7 +330,8 @@ const AppRoutes = () => {
               <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
                 <Suspense
                   fallback={
-                    <div className="flex h-full items-center justify-center text-sm text-ink-muted">
+                    <div className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted">
+                      <Spinner size="md" />
                       Loading…
                     </div>
                   }

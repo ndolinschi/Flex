@@ -59,7 +59,7 @@ export const ThinkingBlock = ({
           type="button"
           onClick={() => setCollapsed((v) => !v)}
           aria-expanded={!collapsed}
-          className="group flex min-h-5 w-full items-center gap-1.5 text-left text-base text-ink-muted transition-colors hover:text-ink-secondary"
+          className="group flex min-h-5 w-full items-center gap-1.5 text-left text-base text-ink-muted transition-colors duration-[var(--duration-fast)] hover:text-ink-secondary"
         >
           {statusLabel}
           <ChevronRight

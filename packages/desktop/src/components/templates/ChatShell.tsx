@@ -96,7 +96,7 @@ export const ChatShell = ({
                     key={suggestion}
                     type="button"
                     onClick={() => handleQuickstart(suggestion)}
-                    className="rounded-full border border-stroke-3 px-3 py-1 text-sm text-ink-secondary transition-colors hover:border-stroke-2 hover:bg-fill-4"
+                    className="rounded-full border border-stroke-3 px-3 py-1 text-sm text-ink-secondary transition-colors duration-[var(--duration-fast)] hover:border-stroke-2 hover:bg-fill-4"
                   >
                     {suggestion}
                   </button>

@@ -107,7 +107,7 @@ export const WorkingAgentsPill = ({
                   <span className="min-w-0 truncate">{title}</span>
                 </span>
                 {activity.latestLabel ? (
-                  <span className="truncate pl-5 text-[12px] text-ink-faint">
+                  <span className="truncate pl-5 text-sm text-ink-faint">
                     {activity.latestLabel}
                   </span>
                 ) : null}

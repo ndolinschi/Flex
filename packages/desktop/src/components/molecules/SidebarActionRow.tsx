@@ -9,6 +9,7 @@ type SidebarActionRowProps = {
    * — rendered right-aligned in place of the `kbd` slot. */
   trailingIcon?: ComponentType<{ className?: string; "aria-hidden"?: boolean }>
   onClick?: () => void
+  disabled?: boolean
 }
 
 /** 28px sidebar action row: icon + label + trailing shortcut. */
@@ -18,16 +19,19 @@ export const SidebarActionRow = ({
   kbd,
   trailingIcon: TrailingIcon,
   onClick,
+  disabled = false,
 }: SidebarActionRowProps) => {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={cn(
         "group flex min-h-7 w-full items-center gap-3 rounded-sm px-2 py-1.5",
         "text-left text-sm text-ink-secondary",
         "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
         "hover:bg-fill-4 hover:text-ink",
+        "disabled:pointer-events-none disabled:opacity-50",
       )}
     >
       <span className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -37,7 +41,7 @@ export const SidebarActionRow = ({
       {TrailingIcon ? (
         <TrailingIcon className="h-3 w-3 shrink-0 text-ink-faint" aria-hidden />
       ) : kbd ? (
-        <kbd className="shrink-0 font-sans text-xs tracking-[var(--tracking-caption)] text-text-4">
+        <kbd className="shrink-0 font-sans text-xs tracking-[var(--tracking-caption)] text-ink-faint">
           {kbd}
         </kbd>
       ) : null}

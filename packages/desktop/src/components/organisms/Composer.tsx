@@ -249,7 +249,7 @@ export const Composer = ({
   }
 
   return (
-    <div className="px-3 pt-1.5 pb-0.5">
+    <div className="px-4 pt-1.5 pb-0.5">
       {error ? (
         <div className="mx-auto mb-1.5 max-w-[var(--content-rail)]">
           <ErrorBanner
@@ -327,8 +327,8 @@ export const Composer = ({
             textareaRefOut={textareaRef}
           />
 
-          <div className="flex items-center justify-between gap-2 px-2 pb-1.5 pt-0">
-            <div className="flex min-w-0 items-center gap-0.5">
+          <div className="flex items-center justify-between gap-2 px-2.5 pb-1.5 pt-1">
+            <div className="flex min-w-0 items-center gap-1">
               {!pendingPermission ? (
                 <>
                   <PlusMenu
@@ -355,7 +355,7 @@ export const Composer = ({
                 </span>
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-0.5">
+            <div className="flex shrink-0 items-center gap-1.5">
               {pendingPermission ? (
                 <PermissionActions permission={pendingPermission} />
               ) : (

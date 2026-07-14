@@ -109,7 +109,7 @@ export const DetailRow = ({ detail, note }: DetailRowProps) => {
             : undefined
         }
         className={cn(
-          "group/detail flex min-h-6 items-center gap-1 text-[13px] leading-[1.5] text-ink-muted",
+          "group/detail flex min-h-6 items-center gap-1 text-base leading-[1.5] text-ink-muted",
           canExpand && "cursor-pointer",
         )}
       >
@@ -129,7 +129,7 @@ export const DetailRow = ({ detail, note }: DetailRowProps) => {
             />
           ) : null}
         </span>
-        <span className="min-w-0 shrink truncate text-[12px] [font-variant-numeric:tabular-nums] text-ink-secondary">
+        <span className="min-w-0 shrink truncate text-sm [font-variant-numeric:tabular-nums] text-ink-secondary">
           {detail.label}
         </span>
         {note ? (
@@ -161,17 +161,17 @@ export const DetailRow = ({ detail, note }: DetailRowProps) => {
         <Collapsible open={expanded}>
           <div className="ml-3.5 max-h-[300px] overflow-auto rounded-md border border-stroke-3 bg-panel py-1">
             {loading ? (
-              <div className="px-3 py-1 text-[12px] text-ink-faint">
+              <div className="px-3 py-1 text-sm text-ink-faint">
                 Loading diff…
               </div>
             ) : error ? (
-              <div className="px-3 py-1 text-[12px] text-ink-faint">
+              <div className="px-3 py-1 text-sm text-ink-faint">
                 Diff unavailable — {error}
               </div>
             ) : diff ? (
               <DiffView diff={diff} />
             ) : (
-              <div className="px-3 py-1 text-[12px] text-ink-faint">
+              <div className="px-3 py-1 text-sm text-ink-faint">
                 No changes vs HEAD
               </div>
             )}

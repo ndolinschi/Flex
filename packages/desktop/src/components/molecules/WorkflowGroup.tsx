@@ -103,7 +103,7 @@ const StepRow = ({ step }: { step: ResolvedStep }) => {
         aria-expanded={expanded}
         disabled={!canExpand}
         className={cn(
-          "group flex min-h-6 w-full items-center gap-1.5 text-left text-[13px] leading-[1.5]",
+          "group flex min-h-6 w-full items-center gap-1.5 text-left text-base leading-[1.5]",
           canExpand && "cursor-pointer",
         )}
       >
@@ -175,11 +175,11 @@ const StepRow = ({ step }: { step: ResolvedStep }) => {
 const WorkflowChildRow = ({ row }: { row: WorkflowSubagentSlot["children"][number] }): ReactNode => {
   if (row.type === "assistant") {
     if (!row.text.trim()) return null
-    return <p className="text-[13px] leading-[1.5] text-ink-muted">{row.text}</p>
+    return <p className="text-base leading-[1.5] text-ink-muted">{row.text}</p>
   }
   if (row.type === "tool") {
     return (
-      <p className="truncate text-[13px] leading-[1.5] text-ink-faint">
+      <p className="truncate text-base leading-[1.5] text-ink-faint">
         {row.call.tool_name}
       </p>
     )

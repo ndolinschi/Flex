@@ -23,7 +23,7 @@ export const AttachmentChip = ({ attachment, onRemove }: AttachmentChipProps) =>
       className={cn(
         "group/chip inline-flex h-5 max-w-[12rem] items-center gap-1 rounded-[4px]",
         "border border-stroke-3 bg-fill-3 px-1 text-sm text-ink-secondary",
-        "transition-colors hover:border-stroke-2 hover:bg-fill-2",
+        "transition-colors duration-[var(--duration-fast)] hover:border-stroke-2 hover:bg-fill-2",
       )}
     >
       <Icon className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
@@ -34,7 +34,7 @@ export const AttachmentChip = ({ attachment, onRemove }: AttachmentChipProps) =>
         onClick={() => onRemove(attachment.id)}
         className={cn(
           "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded",
-          "text-icon-3 transition-colors hover:bg-fill-2 hover:text-ink",
+          "text-icon-3 transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink",
         )}
       >
         <X className="h-2.5 w-2.5" aria-hidden />

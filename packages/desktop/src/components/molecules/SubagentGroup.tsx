@@ -63,7 +63,7 @@ const TaskPromptDetail = ({ task }: { task: string }) => {
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        className="group/prompt flex min-h-5 w-full items-center gap-1 text-left text-[13px] leading-[1.5] text-ink-muted"
+        className="group/prompt flex min-h-5 w-full items-center gap-1 text-left text-base leading-[1.5] text-ink-muted"
       >
         <ChevronRight
           className={cn(
@@ -79,7 +79,7 @@ const TaskPromptDetail = ({ task }: { task: string }) => {
       </button>
       <Collapsible open={expanded}>
         <div className="ml-3.5 max-h-[300px] overflow-auto rounded-md border border-stroke-3 bg-panel px-3 py-2">
-          <p className="whitespace-pre-wrap text-[13px] leading-[1.5] text-ink-muted">
+          <p className="whitespace-pre-wrap text-base leading-[1.5] text-ink-muted">
             {task}
           </p>
         </div>
@@ -179,7 +179,7 @@ export const SubagentGroup = memo(function SubagentGroup({
               {title}
             </span>
             {metaParts.length > 0 ? (
-              <span className="shrink-0 text-[13px] text-ink-faint [font-variant-numeric:tabular-nums]">
+              <span className="shrink-0 text-base text-ink-faint [font-variant-numeric:tabular-nums]">
                 {metaParts.join(" · ")}
               </span>
             ) : null}
@@ -196,7 +196,7 @@ export const SubagentGroup = memo(function SubagentGroup({
           {activityLine ? (
             <span
               className={cn(
-                "min-w-0 truncate pl-5 text-[13px] leading-[1.4] text-ink-faint",
+                "min-w-0 truncate pl-5 text-base leading-[1.4] text-ink-faint",
                 status === "running" && "animate-shimmer-text",
               )}
             >
@@ -236,7 +236,7 @@ export const SubagentGroup = memo(function SubagentGroup({
                   return (
                     <p
                       key={row.id}
-                      className="truncate text-[13px] leading-[1.5] text-ink-faint"
+                      className="truncate text-base leading-[1.5] text-ink-faint"
                     >
                       {label}
                     </p>
@@ -246,7 +246,7 @@ export const SubagentGroup = memo(function SubagentGroup({
                   return (
                     <p
                       key={row.id}
-                      className="line-clamp-2 text-[13px] leading-[1.5] text-ink-muted"
+                      className="line-clamp-2 text-base leading-[1.5] text-ink-muted"
                     >
                       {row.text.trim()}
                     </p>

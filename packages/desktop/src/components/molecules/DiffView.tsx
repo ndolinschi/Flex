@@ -46,7 +46,7 @@ const PlainDiff = ({ diff }: { diff: string }) => {
         <div
           key={i}
           className={cn(
-            "whitespace-pre px-3 py-px font-mono text-[12px] leading-[1.45]",
+            "whitespace-pre px-3 py-px font-mono text-sm leading-[1.45]",
             lineClass(line),
           )}
         >
@@ -71,7 +71,7 @@ const HunkBlock = ({
   return (
     <div className="group/hunk">
       <div className="flex items-center gap-2 border-b border-stroke-4/60 bg-fill-4/50 px-3 py-0.5">
-        <span className="min-w-0 flex-1 truncate whitespace-pre font-mono text-[11px] text-cyan">
+        <span className="min-w-0 flex-1 truncate whitespace-pre font-mono text-xs text-cyan">
           {hunk.header}
         </span>
         <span className="flex shrink-0 items-center gap-2 opacity-0 transition-opacity duration-[var(--duration-fast)] group-hover/hunk:opacity-100">
@@ -80,7 +80,7 @@ const HunkBlock = ({
               type="button"
               title="Keep"
               onClick={() => onKeepHunk(hunk, file)}
-              className="text-[11px] text-ink-muted hover:text-ink"
+              className="text-xs text-ink-muted hover:text-ink"
             >
               Keep
             </button>
@@ -90,7 +90,7 @@ const HunkBlock = ({
               type="button"
               title="Undo"
               onClick={() => onUndoHunk(hunk, file)}
-              className="text-[11px] text-ink-muted hover:text-ink"
+              className="text-xs text-ink-muted hover:text-ink"
             >
               Undo
             </button>
@@ -101,7 +101,7 @@ const HunkBlock = ({
         <div
           key={i}
           className={cn(
-            "whitespace-pre px-3 py-px font-mono text-[12px] leading-[1.45]",
+            "whitespace-pre px-3 py-px font-mono text-sm leading-[1.45]",
             lineClass(line),
           )}
         >
@@ -143,7 +143,7 @@ export const DiffView = ({
   return (
     <pre
       className={cn(
-        "overflow-x-auto font-mono text-[12px] leading-[18px]",
+        "overflow-x-auto font-mono text-sm leading-[18px]",
         className,
       )}
     >

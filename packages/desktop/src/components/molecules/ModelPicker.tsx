@@ -224,7 +224,7 @@ export const ModelPicker = ({
               }}
               className={cn(
                 "flex w-8 shrink-0 cursor-pointer items-center justify-end gap-0.5 rounded px-0.5 py-0.5",
-                "text-xs text-ink-faint transition-colors hover:bg-fill-2 hover:text-ink",
+                "text-xs text-ink-faint transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink",
                 effortMenuFor?.modelId === m.id && "bg-fill-2 text-ink",
               )}
             >
@@ -259,11 +259,11 @@ export const ModelPicker = ({
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          "inline-flex h-5 max-w-[12rem] items-center gap-0.5 rounded-full px-1.5",
-          "text-xs tracking-[var(--tracking-caption)] text-ink-secondary opacity-80",
-          "transition-[color,opacity] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-          "hover:text-ink hover:opacity-100 disabled:opacity-50",
-          open && "opacity-100",
+          "inline-flex h-6 max-w-[12rem] items-center gap-1 rounded-full border border-stroke-3 bg-fill-4 px-2",
+          "text-xs tracking-[var(--tracking-caption)] text-ink-secondary",
+          "transition-[color,opacity,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+          "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink disabled:opacity-50",
+          open && "border-stroke-2 bg-fill-2 text-ink",
         )}
       >
         <span className="min-w-0 flex-1 truncate">{label}</span>

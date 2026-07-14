@@ -105,7 +105,7 @@ export const PluginCatalog = () => {
   )
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}
 
       <SettingsSection
@@ -134,8 +134,8 @@ export const PluginCatalog = () => {
                   <Icon className="h-4 w-4 text-icon-2" aria-hidden />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] text-ink-secondary">{plugin.name}</p>
-                  <p className="mt-0.5 truncate text-[13px] text-ink-muted">
+                  <p className="truncate text-base text-ink-secondary">{plugin.name}</p>
+                  <p className="mt-0.5 truncate text-base text-ink-muted">
                     {plugin.description}
                   </p>
                 </div>

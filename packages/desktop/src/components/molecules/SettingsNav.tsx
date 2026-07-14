@@ -147,13 +147,13 @@ export const SettingsNav = ({
                 onClick={() => onResultSelect(entry)}
                 onMouseEnter={() => onResultIndexChange(i)}
                 className={cn(
-                  "flex flex-col gap-0 rounded-sm px-1.5 py-1 text-left transition-colors",
+                  "flex flex-col gap-0 rounded-sm px-1.5 py-1 text-left transition-colors duration-[var(--duration-fast)]",
                   i === resultIndex ? "bg-fill-2 text-ink" : "hover:bg-fill-4",
                 )}
               >
-                <span className="truncate text-[12px] leading-4 text-ink-secondary">{entry.title}</span>
+                <span className="truncate text-sm leading-4 text-ink-secondary">{entry.title}</span>
                 {entry.description ? (
-                  <span className="truncate text-[11px] text-ink-faint">
+                  <span className="truncate text-xs text-ink-faint">
                     {entry.description}
                   </span>
                 ) : null}
@@ -173,7 +173,8 @@ export const SettingsNav = ({
                 onClick={() => onSelect(item.id)}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-[12px] leading-4 transition-colors",
+                  "flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-sm leading-4",
+                  "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                   isActive
                     ? "bg-fill-2 text-ink"
                     : "text-ink-secondary hover:bg-fill-4",

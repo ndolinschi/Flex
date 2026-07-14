@@ -135,7 +135,7 @@ export const SearchModal = ({ open, onClose }: SearchModalProps) => {
     >
       <div
         className={cn(
-          "mt-[10vh] flex h-fit w-[600px] max-w-[90vw] flex-col overflow-hidden",
+          "mt-[10vh] flex h-fit w-[560px] max-w-[90vw] flex-col overflow-hidden",
           "rounded-lg bg-panel shadow-[var(--shadow-popover)] animate-tray-in",
         )}
         role="dialog"
@@ -150,19 +150,19 @@ export const SearchModal = ({ open, onClose }: SearchModalProps) => {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search Agents…"
             aria-label="Search agents input"
-            className="w-full bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-faint"
+            className="w-full bg-transparent text-base text-ink outline-none placeholder:text-ink-faint focus-visible:[box-shadow:inset_0_0_0_1px_var(--color-stroke-2)]"
           />
         </div>
 
         <div ref={listRef} className="max-h-[320px] overflow-y-auto py-1">
           {groups.length === 0 ? (
-            <p className="px-3 py-6 text-center text-xs text-ink-faint">
+            <p className="px-3 py-6 text-center text-sm text-ink-faint">
               No agents found
             </p>
           ) : (
             groups.map((group) => (
               <div key={group.cwd} className="py-1">
-                <p className="px-3 py-1 text-[11px] font-medium text-ink-faint">
+                <p className="px-3 py-1 text-xs font-medium text-ink-faint">
                   {group.label}
                 </p>
                 {group.sessions.map((session) => {

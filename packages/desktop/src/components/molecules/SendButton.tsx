@@ -10,7 +10,7 @@ type SendButtonProps = {
   onStop: () => void
 }
 
-/** 24px circle send / stop / queue — uses theme send tokens. */
+/** 24px circle send / stop / queue — matches Plus / Bypass composer controls. */
 export const SendButton = ({
   isStreaming,
   canQueue = false,
@@ -19,7 +19,7 @@ export const SendButton = ({
   onStop,
 }: SendButtonProps) => {
   const circleClass = cn(
-    "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
+    "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full",
     "bg-send text-send-fg opacity-80",
     "transition-opacity duration-[var(--duration-fast)] ease-[var(--easing-default)]",
     "hover:opacity-100",
@@ -27,14 +27,14 @@ export const SendButton = ({
 
   if (isStreaming && canQueue) {
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <button
           type="button"
           onClick={onStop}
           aria-label="Stop generation"
           className={circleClass}
         >
-          <Square className="h-2 w-2 fill-current" aria-hidden />
+          <Square className="h-2.5 w-2.5 fill-current" aria-hidden />
         </button>
         <button
           type="button"
@@ -56,7 +56,7 @@ export const SendButton = ({
         aria-label="Stop generation"
         className={circleClass}
       >
-        <Square className="h-2 w-2 fill-current" aria-hidden />
+        <Square className="h-2.5 w-2.5 fill-current" aria-hidden />
       </button>
     )
   }

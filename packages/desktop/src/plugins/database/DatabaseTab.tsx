@@ -298,7 +298,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
           Empty state owns the Add CTA; chrome only appears once there are
           connections (count + refresh/add), so stacked headers stay balanced. */}
       {connections.length > 0 ? (
-        <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-4">
+        <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2">
           <span className="min-w-0 flex-1 truncate text-sm text-ink-muted">
             {connectionCountLabel}
           </span>
@@ -307,7 +307,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
             className="h-6 w-6"
             onClick={() => void refetchTables()}
           >
-            <RefreshCw className={cn("h-3 w-3", isFetching && "animate-spin")} />
+            <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
           </IconButton>
           <IconButton
             label="Add connection"
@@ -320,13 +320,13 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
       ) : null}
 
       {error ? (
-        <p className="border-b border-stroke-3 bg-danger-subtle px-3 py-1.5 text-xs text-danger">
+        <p className="border-b border-stroke-3 bg-danger-subtle px-2 py-1.5 text-xs text-danger">
           {error}
         </p>
       ) : null}
 
       {selectedId && schemas.length > 1 ? (
-        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-stroke-3 px-3 py-1">
+        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-stroke-3 px-2 py-1">
           {schemas.map((s) => (
             <button
               key={s.name}
@@ -338,8 +338,8 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
               className={cn(
                 "rounded-md px-2 py-0.5 text-xs",
                 activeSchema === s.name
-                  ? "bg-fill-3 text-ink"
-                  : "text-ink-muted hover:bg-fill-3/60 hover:text-ink",
+                  ? "bg-fill-2 text-ink"
+                  : "text-ink-muted hover:bg-fill-4 hover:text-ink",
               )}
             >
               {s.name}
@@ -404,8 +404,8 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
                               className={cn(
                                 "flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-xs",
                                 isActive
-                                  ? "bg-fill-3 text-ink"
-                                  : "text-ink-secondary hover:bg-fill-3/60 hover:text-ink",
+                                  ? "bg-fill-2 text-ink"
+                                  : "text-ink-secondary hover:bg-fill-4 hover:text-ink",
                               )}
                             >
                               <Table2
@@ -590,7 +590,7 @@ const ConnectionRow = ({
       onClick={onOpen}
       className={cn(
         "flex w-full flex-col gap-0.5 px-2 py-1.5 text-left",
-        active ? "bg-fill-3" : "hover:bg-fill-3/60",
+        active ? "bg-fill-2" : "hover:bg-fill-4",
       )}
     >
       <span className="truncate text-xs font-medium text-ink">{spec.name}</span>

@@ -26,8 +26,8 @@ export const McpCatalogCard = ({
   return (
     <div className="flex items-center gap-3 px-3.5 py-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] text-ink-secondary">{entry.name}</p>
-        <p className="mt-0.5 truncate text-[13px] text-ink-muted">{entry.description}</p>
+        <p className="truncate text-base text-ink-secondary">{entry.name}</p>
+        <p className="mt-0.5 truncate text-base text-ink-muted">{entry.description}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {installed ? (

@@ -25,7 +25,7 @@ export const McpServersSection = () => {
   const servers = serversQuery.data ?? EMPTY_MCP_SERVERS
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <SettingsSection
         title="MCP servers"
         description="Tools from stdio MCP servers. Restart sessions to pick up new or changed servers."
