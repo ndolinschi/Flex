@@ -79,7 +79,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?` | SessionSidebar |
 | `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle` | SessionSidebar |
 | `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions | `title`, `status`, `onBuild`, `onAddComment?` | RightPanel Plan tab (`PlanTab`) |
-| `AppMark` / `TitleBarMenus` | Wireframe mark + File/Edit/View/Help for custom window chrome | `onOpenCommandPalette?`, `onOpenSearch?` | WindowTitleBar |
+| `AppMark` / `TitleBarMenus` | Wireframe mark + File/Edit/View/Help for custom window chrome; Help → **Submit Bug…** opens `BugReportDialog` | `onOpenCommandPalette?`, `onOpenSearch?` | WindowTitleBar |
+| `BugReportDialog` | Google-style Submit Bug modal: disclosure (app id + session/task ids), Terms/Privacy links, “Tell us what went wrong”, opens GitHub issue form | `open`, `onClose` | TitleBarMenus |
 | `WindowControls` / `TrafficLights` / `CaptionButtons` | Platform window controls (macOS traffic lights · Windows/Linux caption buttons) | `host?` | WindowTitleBar |
 
 ## Organisms

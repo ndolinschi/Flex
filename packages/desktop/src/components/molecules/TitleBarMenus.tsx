@@ -7,6 +7,7 @@ import { newAgentCreateInput } from "../../lib/sessions"
 import { createSession, toInvokeError } from "../../lib/tauri"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
+import { BugReportDialog } from "./BugReportDialog"
 import { PopoverItem, PopoverTray } from "./PopoverTray"
 
 type MenuId = "file" | "edit" | "view" | "help"
@@ -34,6 +35,7 @@ export const TitleBarMenus = ({
   onOpenSearch,
 }: TitleBarMenusProps) => {
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null)
+  const [bugOpen, setBugOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const { newAgent } = useSessions()
   const setRoute = useAppStore((s) => s.setRoute)
@@ -164,8 +166,13 @@ export const TitleBarMenus = ({
             ),
         },
         {
+          id: "submit-bug",
+          label: "Submit Bug…",
+          run: () => setBugOpen(true),
+        },
+        {
           id: "issues",
-          label: "Report Issue",
+          label: "Open Issues on GitHub",
           run: () =>
             void openUrl("https://github.com/ndolinschi/Flex/issues").catch(
               () => undefined,
@@ -176,6 +183,7 @@ export const TitleBarMenus = ({
   }
 
   return (
+    <>
     <div ref={rootRef} className="flex h-full items-center gap-px px-0.5">
       {(Object.keys(menus) as MenuId[]).map((id) => {
         const menu = menus[id]
@@ -231,6 +239,8 @@ export const TitleBarMenus = ({
         )
       })}
     </div>
+    <BugReportDialog open={bugOpen} onClose={() => setBugOpen(false)} />
+    </>
   )
 }
 
