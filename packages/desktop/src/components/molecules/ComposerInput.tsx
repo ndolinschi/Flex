@@ -212,7 +212,7 @@ export const ComposerInput = ({
       />
 
       {attachments.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5 px-3 pt-3">
+        <div className="flex flex-wrap gap-1 px-2.5 pt-2">
           {attachments.map((att) => (
             <AttachmentChip
               key={att.id}
@@ -232,7 +232,7 @@ export const ComposerInput = ({
           className={cn(
             "pointer-events-none absolute inset-0 overflow-hidden",
             "min-h-[var(--composer-min-height)] max-h-[var(--composer-max-height)]",
-            "whitespace-pre-wrap break-words px-3 py-2 text-base leading-normal text-ink",
+            "whitespace-pre-wrap break-words px-2.5 pt-2 pb-1 text-sm leading-snug text-ink",
             "[overflow-wrap:break-word] [word-break:normal]",
           )}
         >
@@ -283,7 +283,7 @@ export const ComposerInput = ({
             "relative min-h-[var(--composer-min-height)] max-h-[var(--composer-max-height)]",
             "w-full resize-none overflow-y-auto border-0 bg-transparent text-transparent caret-ink",
             "[overflow-wrap:break-word] [word-break:normal]",
-            "px-3 py-2 text-base leading-normal outline-none transition-none",
+            "px-2.5 pt-2 pb-1 text-sm leading-snug outline-none transition-none",
             "placeholder:text-ink-muted",
           )}
         />
