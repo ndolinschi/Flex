@@ -33,7 +33,7 @@ export const BypassPermissionsButton = ({
         aria-pressed={sessionBypass}
         onClick={onToggle}
         className={cn(
-          "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
+          "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full",
           "transition-[opacity,background-color,color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
           "disabled:opacity-30 disabled:pointer-events-none",
           sessionBypass && composerMode === "agent"
@@ -41,7 +41,7 @@ export const BypassPermissionsButton = ({
             : "text-icon-2 opacity-50 hover:bg-fill-3 hover:opacity-80",
         )}
       >
-        <Shield className="h-3 w-3" aria-hidden />
+        <Shield className="h-3.5 w-3.5" aria-hidden />
       </button>
     </Tooltip>
   )

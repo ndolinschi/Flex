@@ -195,7 +195,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 - Themes: `data-theme="dark"|"light"` on `<html>` (Cursor-tight premium palettes — neutral charcoal / clean white, close surface steps, whisper fills, neutral monochrome accent by default; colored accents via Settings → Appearance).
 - Feel principles (local `design-map/README.md`): compact density, quiet chrome, whisper fills, opacity hover, micro-motion, alpha hierarchy, keyboard focus, weight 590 + micro tracking, alpha borders, radius-by-role, neutral interactive chrome, thin scrollbars. Interactive chrome leans solid-pill (AI Studio–inspired) without a full layout redesign.
 - Motion: hover 100ms ease; trays `animate-tray-in`; pane swaps `animate-pane-fade`; timeline rows `animate-row-fade`; end-of-turn `animate-end-turn-in` (160ms); HITL cards `animate-modal-in` (scale .97→1); overlays `animate-backdrop-in`.
-- Composer: `--radius-composer` 14px, soft elevation + stroke focus (no accent glow), compact auto-grow (~28–160px) + denser toolbar (`text-sm` input, `h-5` mode/model/plus); quiet toolbar opacity (0.5→0.8); mode/model pills neutral fill + stroke.
+- Composer: `--radius-composer` 14px, soft elevation + stroke focus (no accent glow), compact auto-grow (~28–160px) + unified toolbar (`text-sm` input; Plus / Bypass / Send `h-6` circles with `h-3.5` icons; Mode/Model `h-6` pills; left cluster `gap-1`, Bypass↔Send `gap-1.5`); quiet toolbar opacity (0.5→0.8); mode/model pills neutral fill + stroke.
 - Content rail: `--content-rail` 840px (`52.5rem`).
 - ContextBar sits above the composer (project / branch / context %) — Flex Canon.
 - Sidebar footer = theme + settings (Flex Canon); rows use fill-4 hover / fill-2 selected.

@@ -10,11 +10,11 @@ type PermissionActionsProps = {
 }
 
 const COMPACT =
-  "h-5 px-2 text-xs gap-1"
+  "h-6 px-2.5 text-xs gap-1"
 
 /** Composer-footer Allow once / Always allow / Deny — replaces Send while a
- * tool permission is pending (Claude Code–style inline HITL). Compact `h-5`
- * keeps the footer row aligned with Mode/Model/Send controls. */
+ * tool permission is pending (Claude Code–style inline HITL). Compact `h-6`
+ * keeps the footer row aligned with Plus / Mode / Model / Send controls. */
 export const PermissionActions = ({
   permission,
   className,

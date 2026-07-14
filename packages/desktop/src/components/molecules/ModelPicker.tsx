@@ -259,7 +259,7 @@ export const ModelPicker = ({
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          "inline-flex h-5 max-w-[12rem] items-center gap-0.5 rounded-full border border-stroke-3 bg-fill-4 px-1.5",
+          "inline-flex h-6 max-w-[12rem] items-center gap-1 rounded-full border border-stroke-3 bg-fill-4 px-2",
           "text-xs tracking-[var(--tracking-caption)] text-ink-secondary",
           "transition-[color,opacity,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
           "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink disabled:opacity-50",

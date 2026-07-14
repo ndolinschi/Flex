@@ -328,7 +328,7 @@ export const Composer = ({
           />
 
           <div className="flex items-center justify-between gap-2 px-2.5 pb-1.5 pt-1">
-            <div className="flex min-w-0 items-center gap-0.5">
+            <div className="flex min-w-0 items-center gap-1">
               {!pendingPermission ? (
                 <>
                   <PlusMenu
@@ -355,7 +355,7 @@ export const Composer = ({
                 </span>
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-0.5">
+            <div className="flex shrink-0 items-center gap-1.5">
               {pendingPermission ? (
                 <PermissionActions permission={pendingPermission} />
               ) : (
