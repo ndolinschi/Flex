@@ -1,3 +1,5 @@
+import { useEffect } from "react"
+import { getCurrentWindow } from "@tauri-apps/api/window"
 import { AppMark, TitleBarMenus } from "../molecules/TitleBarMenus"
 import {
   CaptionButtons,
@@ -15,7 +17,7 @@ type WindowTitleBarProps = {
 /**
  * Cursor-style custom window chrome: traffic lights (macOS) or caption
  * buttons (Windows/Linux), app mark + File/Edit/View/Help, and a drag region.
- * Requires `decorations: false` on the Tauri window.
+ * Requires an undecorated Tauri window (`decorations: false`).
  */
 export const WindowTitleBar = ({
   onOpenCommandPalette,
@@ -24,6 +26,14 @@ export const WindowTitleBar = ({
 }: WindowTitleBarProps) => {
   const host = detectWindowHost()
   const isMac = host === "macos"
+
+  // Frontend belt-and-suspenders: if window-state (or a stale launch path)
+  // left the native frame on, strip it once the title bar mounts.
+  useEffect(() => {
+    void getCurrentWindow()
+      .setDecorations(false)
+      .catch(() => undefined)
+  }, [])
 
   return (
     <header
