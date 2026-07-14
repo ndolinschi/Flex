@@ -219,7 +219,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       {/* Quiet chrome row — title / branch / PR / diffstat / refresh.
           Selection lives on a dedicated toolbar below so the header stays
           balanced with Plan / Files / Terminal. */}
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2 [font-variant-numeric:tabular-nums]">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5 [font-variant-numeric:tabular-nums]">
         <div className="min-w-0 flex-1 truncate">
           <span className="text-sm text-ink">{headline}</span>
           {branch ? (
@@ -255,7 +255,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       </div>
 
       {showSelectAll ? (
-        <div className="flex h-7 shrink-0 items-center gap-2 border-b border-stroke-3 px-2">
+        <div className="flex h-7 shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5">
           <Checkbox
             checked={allSelected}
             indeterminate={someSelected}
@@ -283,7 +283,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       ) : null}
 
       {error ? (
-        <p className="border-b border-stroke-3 bg-danger-subtle px-2 py-1.5 text-xs text-danger">
+        <p className="border-b border-stroke-3 bg-danger-subtle px-2.5 py-1.5 text-xs text-danger">
           {error}
         </p>
       ) : null}
@@ -303,7 +303,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             </p>
           </div>
         ) : (
-          <ul className="flex flex-col gap-px px-1 py-1.5">
+          <ul className="flex flex-col gap-0.5 px-2 py-1.5">
             {files.map((file) => (
               <FileRow
                 key={file.path}
@@ -352,7 +352,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       ) : null}
 
       {isolated && files.length > 0 ? (
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-stroke-3 px-2 py-2.5">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-stroke-3 px-2.5 py-2.5">
           <Button
             variant="ghost"
             size="sm"

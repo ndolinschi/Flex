@@ -298,7 +298,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
           Empty state owns the Add CTA; chrome only appears once there are
           connections (count + refresh/add), so stacked headers stay balanced. */}
       {connections.length > 0 ? (
-        <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2">
+        <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5">
           <span className="min-w-0 flex-1 truncate text-sm text-ink-muted">
             {connectionCountLabel}
           </span>
@@ -320,13 +320,13 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
       ) : null}
 
       {error ? (
-        <p className="border-b border-stroke-3 bg-danger-subtle px-2 py-1.5 text-xs text-danger">
+        <p className="border-b border-stroke-3 bg-danger-subtle px-2.5 py-1.5 text-xs text-danger">
           {error}
         </p>
       ) : null}
 
       {selectedId && schemas.length > 1 ? (
-        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-stroke-3 px-2 py-1">
+        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-stroke-3 px-2.5 py-1.5">
           {schemas.map((s) => (
             <button
               key={s.name}
@@ -339,7 +339,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
                 "rounded-md px-2 py-0.5 text-xs",
                 activeSchema === s.name
                   ? "bg-fill-2 text-ink"
-                  : "text-ink-muted hover:bg-fill-4 hover:text-ink",
+                  : "text-ink-muted hover:bg-fill-3 hover:text-ink",
               )}
             >
               {s.name}
@@ -383,12 +383,12 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
 
               {selectedId ? (
                 <>
-                  <div className="mx-2 my-1.5 border-t border-stroke-3" />
-                  <div className="flex h-6 shrink-0 items-center px-2 text-xs text-ink-muted">
+                  <div className="mx-2.5 my-1.5 border-t border-stroke-3" />
+                  <div className="flex h-6 shrink-0 items-center px-2.5 text-xs text-ink-muted">
                     <span>{tableCountLabel}</span>
                   </div>
                   {tables.length === 0 ? (
-                    <p className="px-2 py-2 text-xs text-ink-faint">No tables</p>
+                    <p className="px-2.5 py-2 text-xs text-ink-faint">No tables</p>
                   ) : (
                     <ul>
                       {tables.map((t) => {
@@ -402,7 +402,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
                               type="button"
                               onClick={() => void runPreview(t)}
                               className={cn(
-                                "flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-xs",
+                                "flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-xs",
                                 isActive
                                   ? "bg-fill-2 text-ink"
                                   : "text-ink-secondary hover:bg-fill-4 hover:text-ink",
@@ -427,7 +427,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
             {selectedId ? (
               <button
                 type="button"
-                className="flex items-center gap-1.5 border-t border-stroke-3 px-2 py-2 text-xs text-ink-muted hover:text-ink"
+                className="flex items-center gap-1.5 border-t border-stroke-3 px-2.5 py-2 text-xs text-ink-muted hover:text-ink"
                 onClick={() => {
                   void dbDisconnect(selectedId)
                   setSelectedId(null)
@@ -589,7 +589,7 @@ const ConnectionRow = ({
       disabled={busy}
       onClick={onOpen}
       className={cn(
-        "flex w-full flex-col gap-0.5 px-2 py-1.5 text-left",
+        "flex w-full flex-col gap-0.5 px-2.5 py-1.5 text-left",
         active ? "bg-fill-2" : "hover:bg-fill-4",
       )}
     >
@@ -690,7 +690,7 @@ const ResultGrid = ({
           </tbody>
         </table>
       </ScrollArea>
-      <div className="flex shrink-0 items-center gap-1 border-t border-stroke-3 px-2 py-1">
+      <div className="flex shrink-0 items-center gap-1 border-t border-stroke-3 px-2.5 py-1.5">
         <span className="min-w-0 flex-1 truncate text-[10px] text-ink-faint">
           {totalFetched === 0
             ? "0 rows"

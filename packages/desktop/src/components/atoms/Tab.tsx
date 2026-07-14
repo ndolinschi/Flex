@@ -7,7 +7,9 @@ export type TabVariant = "tab" | "chip"
 
 type TabProps = {
   selected: boolean
-  /** Panel tabs: md (h-7, text-sm, rounded-lg). File chips: sm (h-6, text-xs, rounded-md). */
+  /** Panel tabs: md (h-6, text-sm). File chips: sm (h-6, text-xs, tighter pad).
+   * Both stay under `--header-height` (30px) so selected pills clear the strip
+   * edges — h-7 in a 30px bar left ~1px and read as flush against the border. */
   size?: TabSize
   /** "tab" = ARIA tab button; "chip" = editor-buffer shell with inner select button. */
   variant?: TabVariant
@@ -22,7 +24,7 @@ type TabProps = {
 }
 
 const sizeClasses: Record<TabSize, string> = {
-  md: "h-7 rounded-lg px-2 text-sm",
+  md: "h-6 rounded-md px-2 text-sm",
   sm: "h-6 max-w-[160px] rounded-md pl-1.5 pr-0.5 text-xs",
 }
 

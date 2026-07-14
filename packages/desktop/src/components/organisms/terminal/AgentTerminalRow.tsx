@@ -20,7 +20,7 @@ export const AgentTerminalRow = ({
         }
       }}
       className={cn(
-        "group flex w-full cursor-pointer items-center gap-1.5 px-2 py-1.5 text-xs",
+        "group flex w-full cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-xs",
         selected ? "bg-fill-2 text-ink" : "hover:bg-fill-4",
       )}
     >

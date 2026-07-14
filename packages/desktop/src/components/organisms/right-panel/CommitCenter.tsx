@@ -171,7 +171,7 @@ export const CommitCenter = ({
 
   return (
     <>
-      <div className="flex shrink-0 flex-col gap-2 border-t border-stroke-3 bg-fill-5/40 px-2 py-2">
+      <div className="flex shrink-0 flex-col gap-2 border-t border-stroke-3 bg-fill-5/40 px-2.5 py-2.5">
         <TextArea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
