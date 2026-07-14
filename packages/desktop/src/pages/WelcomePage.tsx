@@ -184,7 +184,7 @@ export const WelcomePage = () => {
                   i < stepIndex
                     ? "bg-fill-2 text-ink ring-1 ring-stroke-2"
                     : i === stepIndex
-                      ? "bg-accent text-accent-fg"
+                      ? "bg-accent text-accent-text"
                       : "bg-fill-4 text-ink-faint",
                 )}
                 aria-current={i === stepIndex ? "step" : undefined}
