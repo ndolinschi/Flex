@@ -42,7 +42,7 @@ export const CheckpointChip = ({
         disabled={disabled}
         onClick={() => setOpen(true)}
         className={cn(
-          "group/checkpoint flex h-3 items-center gap-1 text-[12px] leading-none text-ink-muted",
+          "group/checkpoint flex h-3 items-center gap-1 text-sm leading-none text-ink-muted",
           "transition-colors duration-[var(--duration-fast)]",
           disabled
             ? "cursor-not-allowed opacity-40"

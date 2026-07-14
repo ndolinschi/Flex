@@ -99,7 +99,7 @@ export const ModelMultiSelect = ({
                   aria-label={`Move ${displayFor(modelId, models)} up`}
                   disabled={disabled || index === 0}
                   onClick={() => moveUp(index)}
-                  className="inline-flex h-5 w-5 items-center justify-center rounded text-icon-3 transition-colors hover:bg-fill-2 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+                  className="inline-flex h-5 w-5 items-center justify-center rounded text-icon-3 transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
                 >
                   <ChevronUp className="h-3 w-3" aria-hidden />
                 </button>
@@ -108,7 +108,7 @@ export const ModelMultiSelect = ({
                   aria-label={`Move ${displayFor(modelId, models)} down`}
                   disabled={disabled || index === value.length - 1}
                   onClick={() => moveDown(index)}
-                  className="inline-flex h-5 w-5 items-center justify-center rounded text-icon-3 transition-colors hover:bg-fill-2 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+                  className="inline-flex h-5 w-5 items-center justify-center rounded text-icon-3 transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
                 >
                   <ChevronDown className="h-3 w-3" aria-hidden />
                 </button>
@@ -117,7 +117,7 @@ export const ModelMultiSelect = ({
                   aria-label={`Remove ${displayFor(modelId, models)}`}
                   disabled={disabled}
                   onClick={() => removeAt(index)}
-                  className="inline-flex h-5 w-5 items-center justify-center rounded text-icon-3 transition-colors hover:bg-fill-2 hover:text-danger disabled:pointer-events-none disabled:opacity-30"
+                  className="inline-flex h-5 w-5 items-center justify-center rounded text-icon-3 transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-danger disabled:pointer-events-none disabled:opacity-30"
                 >
                   <X className="h-3 w-3" aria-hidden />
                 </button>
@@ -138,7 +138,7 @@ export const ModelMultiSelect = ({
           aria-expanded={open}
           className={cn(
             "flex h-7 items-center gap-1 rounded-md border border-dashed border-stroke-2 px-2",
-            "text-xs text-ink-muted transition-colors hover:border-stroke-1 hover:text-ink-secondary",
+            "text-xs text-ink-muted transition-colors duration-[var(--duration-fast)] hover:border-stroke-1 hover:text-ink-secondary",
             "disabled:pointer-events-none disabled:opacity-40",
           )}
         >

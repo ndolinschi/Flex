@@ -43,7 +43,7 @@ export const VerdictBadge = ({
 
   if (running || !verdict) {
     return (
-      <div className={cn("flex min-h-6 items-center gap-1.5 text-[13px]", className)}>
+      <div className={cn("flex min-h-6 items-center gap-1.5 text-base", className)}>
         <LoaderCircle className="h-3 w-3 shrink-0 animate-spin text-ink-faint" aria-hidden />
         <span className="animate-shimmer-text text-ink-muted">Verifying…</span>
       </div>
@@ -62,7 +62,7 @@ export const VerdictBadge = ({
         disabled={!canExpand}
         title={reason}
         className={cn(
-          "group flex min-h-6 w-full items-center gap-1.5 text-left text-[13px]",
+          "group flex min-h-6 w-full items-center gap-1.5 text-left text-base",
           canExpand && "cursor-pointer",
         )}
       >
@@ -93,7 +93,7 @@ export const VerdictBadge = ({
           {verdict.findings.map((finding, i) => (
             <li
               key={i}
-              className="text-[13px] leading-[1.5] text-ink-muted"
+              className="text-base leading-[1.5] text-ink-muted"
             >
               {finding}
             </li>

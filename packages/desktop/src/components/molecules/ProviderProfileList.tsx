@@ -50,7 +50,7 @@ export const ProviderProfileList = ({
               if (e.key === "Enter" || e.key === " ") onSelect(p)
             }}
             className={cn(
-              "flex cursor-pointer items-center justify-between gap-3 px-3.5 py-3 text-left transition-colors hover:bg-fill-4",
+              "flex cursor-pointer items-center justify-between gap-3 px-3.5 py-3 text-left transition-colors duration-[var(--duration-fast)] hover:bg-fill-4",
               editingId === p.id && "bg-fill-2",
             )}
           >

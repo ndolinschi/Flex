@@ -125,7 +125,7 @@ export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
         </div>
 
         <div className="flex flex-col gap-3 px-5 pb-5 pt-2">
-          <div className="rounded-lg bg-fill-4/80 px-3.5 py-3 text-[13px] leading-relaxed text-ink-secondary">
+          <div className="rounded-lg bg-fill-4/80 px-3.5 py-3 text-base leading-relaxed text-ink-secondary">
             <p className="text-ink">
               Submitting this feedback report will send the following
               information to the maintainers:
@@ -134,7 +134,7 @@ export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
               <li>The ID of your app</li>
               <li>The IDs of tasks you executed in this session</li>
             </ul>
-            <p className="mt-2.5 text-[12px] text-ink-muted">
+            <p className="mt-2.5 text-sm text-ink-muted">
               Your response is Feedback under the{" "}
               <a
                 href={BUG_REPORT_TERMS_URL}
@@ -166,7 +166,7 @@ export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
           </div>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-ink">
+            <span className="text-base font-medium text-ink">
               Tell us what went wrong
             </span>
             <TextArea

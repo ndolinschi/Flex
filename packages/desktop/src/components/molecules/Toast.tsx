@@ -49,7 +49,7 @@ const ToastRow = ({ id, text, kind, action, onDismiss }: ToastRowProps) => {
             action.onAction()
             onDismiss(id)
           }}
-          className="shrink-0 rounded-sm bg-accent px-2 py-1 text-xs font-medium text-accent-text transition-colors hover:bg-accent-hover"
+          className="shrink-0 rounded-sm bg-accent px-2 py-1 text-xs font-medium text-accent-text transition-colors duration-[var(--duration-fast)] hover:bg-accent-hover"
         >
           {action.label}
         </button>

@@ -189,7 +189,7 @@ export const BrowserToolbar = ({
             defaultValue={browserUrl}
             onKeyDown={handleInputKeyDown}
             onBlur={() => setEditing(false)}
-            className="w-full rounded-sm bg-fill-4 px-2 py-1 text-sm text-ink outline-none"
+            className="w-full rounded-sm bg-fill-4 px-2 py-1 text-sm text-ink outline-none focus-visible:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
           />
         ) : (
           <button
@@ -197,7 +197,7 @@ export const BrowserToolbar = ({
             onClick={() => setEditing(true)}
             className={cn(
               "flex w-full items-center truncate rounded-sm px-2 py-1 text-left text-sm",
-              "cursor-text transition-colors hover:bg-fill-4",
+              "cursor-text transition-colors duration-[var(--duration-fast)] hover:bg-fill-4",
             )}
           >
             {browserStarted ? (

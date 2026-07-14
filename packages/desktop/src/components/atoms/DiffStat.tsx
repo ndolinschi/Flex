@@ -17,9 +17,9 @@ export type DiffStatSize = "xs" | "sm"
 
 const SIZE_CLASS: Record<DiffStatSize, string> = {
   // Sidebar subtitle / composer pill context — 11px.
-  xs: "text-[11px]",
+  xs: "text-xs",
   // In-chat card / tab-strip badge context — 13px.
-  sm: "text-[13px]",
+  sm: "text-base",
 }
 
 /** Pure formatting core shared by the component and its tests — kept free of

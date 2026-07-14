@@ -42,7 +42,7 @@ const NativeAppRequired = () => (
     <p className="text-[18px] font-medium text-ink">Desktop app required</p>
     <p className="max-w-[420px] text-center text-sm text-ink-muted">
       Browser preview has no backend. Run{" "}
-      <code className="rounded bg-fill-3 px-1.5 py-0.5 text-[12px] text-ink">
+      <code className="rounded bg-fill-3 px-1.5 py-0.5 text-sm text-ink">
         pnpm tauri dev
       </code>{" "}
       or open the installed app.

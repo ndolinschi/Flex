@@ -43,7 +43,8 @@ export const Button = ({
       type="button"
       disabled={disabled || isLoading}
       className={cn(
-        "inline-flex items-center justify-center rounded-md font-medium transition-colors",
+        "inline-flex items-center justify-center rounded-md font-medium",
+        "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
         "disabled:opacity-50 disabled:pointer-events-none",
         variantClasses[variant],
         sizeClasses[size],

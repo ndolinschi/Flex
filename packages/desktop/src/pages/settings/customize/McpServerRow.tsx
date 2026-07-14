@@ -67,7 +67,7 @@ export const McpServerRow = ({ server }: { server: McpServerDto }) => {
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-[13px] text-ink">{server.id}</p>
+            <p className="truncate text-base text-ink">{server.id}</p>
             <Badge variant={server.enabled ? "success" : "muted"}>
               {server.enabled ? "Enabled" : "Disabled"}
             </Badge>
@@ -79,7 +79,7 @@ export const McpServerRow = ({ server }: { server: McpServerDto }) => {
               </Badge>
             ) : null}
           </div>
-          <p className="mt-0.5 truncate font-mono text-[11px] text-ink-muted">
+          <p className="mt-0.5 truncate font-mono text-xs text-ink-muted">
             {server.command}
             {server.args.length ? ` ${server.args.join(" ")}` : ""}
             {server.hasSecretArgs ? " …" : ""}

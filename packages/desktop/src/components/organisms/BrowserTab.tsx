@@ -117,7 +117,7 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
             {preview ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 px-4">
                 <Globe className="h-8 w-8 text-ink-faint opacity-60" aria-hidden />
-                <p className="text-[14px] font-medium text-ink">Browser</p>
+                <p className="text-lg font-medium text-ink">Browser</p>
                 <p className="max-w-[320px] text-center text-sm text-ink-muted">
                   {NATIVE_APP_REQUIRED}
                 </p>
@@ -125,7 +125,7 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
             ) : !browserStarted ? (
               <div className="flex h-full flex-col items-center justify-center gap-2">
                 <Globe className="h-8 w-8 text-ink-faint opacity-60" aria-hidden />
-                <p className="text-[14px] font-medium text-ink">Browser</p>
+                <p className="text-lg font-medium text-ink">Browser</p>
                 <p className="max-w-[300px] text-center text-sm text-ink-muted">
                   Enter a URL above, or instruct the Agent to navigate and use the
                   browser
@@ -143,7 +143,7 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
             ) : showLiveContent && loadError ? (
               <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
                 <AlertTriangle className="h-8 w-8 text-danger opacity-80" aria-hidden />
-                <p className="text-[14px] font-medium text-ink">
+                <p className="text-lg font-medium text-ink">
                   Can't connect to server
                 </p>
                 <p className="max-w-[320px] text-center text-sm text-ink-muted">

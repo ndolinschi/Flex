@@ -31,7 +31,7 @@ export const RepoSectionHeader = ({
       className={cn(
         "group flex h-6 w-full cursor-default items-center gap-1.5 rounded-sm px-2",
         "text-xs tracking-[var(--tracking-caption)] text-ink-muted",
-        "transition-colors hover:bg-fill-4 hover:text-ink-secondary",
+        "transition-colors duration-[var(--duration-fast)] hover:bg-fill-4 hover:text-ink-secondary",
       )}
     >
       <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">

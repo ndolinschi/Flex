@@ -37,7 +37,7 @@ export const SidebarActionRow = ({
       {TrailingIcon ? (
         <TrailingIcon className="h-3 w-3 shrink-0 text-ink-faint" aria-hidden />
       ) : kbd ? (
-        <kbd className="shrink-0 font-sans text-xs tracking-[var(--tracking-caption)] text-text-4">
+        <kbd className="shrink-0 font-sans text-xs tracking-[var(--tracking-caption)] text-ink-faint">
           {kbd}
         </kbd>
       ) : null}

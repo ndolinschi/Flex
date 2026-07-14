@@ -30,7 +30,7 @@ export const AppHeader = () => {
           quiet
           className="h-6 w-6"
         >
-          <PanelLeft className="h-3 w-3" aria-hidden />
+          <PanelLeft className="h-3.5 w-3.5" aria-hidden />
         </IconButton>
         <TitleTab title={title} />
       </div>
@@ -42,7 +42,7 @@ export const AppHeader = () => {
           quiet
           className={cn("h-6 w-6", rightPanelOpen ? undefined : "opacity-60")}
         >
-          <PanelRight className="h-3 w-3" aria-hidden />
+          <PanelRight className="h-3.5 w-3.5" aria-hidden />
         </IconButton>
         {active ? (
           <SessionMenu

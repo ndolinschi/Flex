@@ -133,8 +133,8 @@ export const AccentColorPicker = () => {
             className={cn(
               "h-7 w-[6.5rem] rounded-md border border-border bg-surface px-2",
               "font-mono text-xs text-ink",
-              "focus:border-accent focus:outline-none",
-              "focus:[box-shadow:0_0_0_1px_var(--color-accent)]",
+              "focus:border-stroke-2 focus:outline-none",
+              "focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]",
             )}
           />
         </label>

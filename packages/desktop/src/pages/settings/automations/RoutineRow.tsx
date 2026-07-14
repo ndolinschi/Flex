@@ -55,8 +55,8 @@ export const RoutineRow = ({ routine }: { routine: RoutineDto }) => {
           aria-label={expanded ? "Collapse run history" : "Expand run history"}
           aria-expanded={expanded}
         >
-          <p className="truncate text-[13px] text-ink">{routine.title ?? routine.id}</p>
-          <p className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-ink-muted">
+          <p className="truncate text-base text-ink">{routine.title ?? routine.id}</p>
+          <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-ink-muted">
             <TriggerSummary trigger={routine.trigger} />
             <span aria-hidden>·</span>
             <span className="truncate">{routine.prompt}</span>

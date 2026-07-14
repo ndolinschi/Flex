@@ -99,7 +99,7 @@ export const UsageRing = ({ sessionId }: { sessionId?: string | null }) => {
       <button
         type="button"
         className={cn(
-          "flex h-6 items-center gap-1 rounded-md px-1.5 text-sm transition-colors hover:text-ink-secondary",
+          "flex h-6 items-center gap-1 rounded-md px-1.5 text-sm transition-colors duration-[var(--duration-fast)] hover:text-ink-secondary",
           nearLimitClass,
         )}
         aria-label="Context usage"

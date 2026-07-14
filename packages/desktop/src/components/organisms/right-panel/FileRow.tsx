@@ -227,14 +227,14 @@ export const FileRow = memo(function FileRow({
           />
           <span className="flex min-w-0 flex-1 items-center gap-0">
             <PathPrefix dir={dir} />
-            <span className="min-w-0 truncate text-[13px] text-ink">
+            <span className="min-w-0 truncate text-base text-ink">
               {name}
             </span>
           </span>
         </button>
         {/* Fixed-width stat columns so +/− and status letters line up down
             the list instead of jittering with digit width. */}
-        <span className="flex w-[4.75rem] shrink-0 items-center justify-end gap-1 font-mono text-[11px] [font-variant-numeric:tabular-nums]">
+        <span className="flex w-[4.75rem] shrink-0 items-center justify-end gap-1 font-mono text-xs [font-variant-numeric:tabular-nums]">
           {typeof file.added === "number" && file.added > 0 ? (
             <span className="text-green">+{file.added}</span>
           ) : null}
@@ -244,7 +244,7 @@ export const FileRow = memo(function FileRow({
         </span>
         <span
           className={cn(
-            "w-3.5 shrink-0 text-center font-mono text-[11px] font-medium",
+            "w-3.5 shrink-0 text-center font-mono text-xs font-medium",
             STATUS_COLOR[file.status] ?? "text-ink-muted",
           )}
           title={statusTitle}

@@ -8,7 +8,7 @@ import { ProviderPicker } from "./ProviderPicker"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 
 const selectClassName =
-  "h-8 w-full rounded-md border border-border bg-surface px-2.5 text-sm text-ink focus:border-accent focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-accent)]"
+  "h-8 w-full rounded-md border border-border bg-surface px-2.5 text-sm text-ink focus:border-stroke-2 focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
 
 type ProviderConnectionFormProps = {
   editingId: string | null

@@ -18,7 +18,7 @@ export const ComposerQueue = ({ items, onSendNow, onRemove }: ComposerQueueProps
           <button
             type="button"
             onClick={() => onSendNow(index)}
-            className="shrink-0 text-xs text-accent transition-colors hover:text-accent-hover"
+            className="shrink-0 text-xs text-accent transition-colors duration-[var(--duration-fast)] hover:text-accent-hover"
           >
             Send now
           </button>
@@ -26,7 +26,7 @@ export const ComposerQueue = ({ items, onSendNow, onRemove }: ComposerQueueProps
             type="button"
             onClick={() => onRemove(index)}
             aria-label="Remove queued message"
-            className="shrink-0 text-ink-faint transition-colors hover:text-ink"
+            className="shrink-0 text-ink-faint transition-colors duration-[var(--duration-fast)] hover:text-ink"
           >
             ×
           </button>

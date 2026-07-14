@@ -199,7 +199,8 @@ export const TitleBarMenus = ({
                 if (openMenu && openMenu !== id) setOpenMenu(id)
               }}
               className={cn(
-                "flex h-[22px] items-center rounded-sm px-1.5 text-[11px] leading-none text-ink-secondary transition-colors",
+                "flex h-[22px] items-center rounded-sm px-1.5 text-xs leading-none text-ink-secondary",
+                "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                 "hover:bg-fill-3 hover:text-ink",
                 open && "bg-fill-3 text-ink",
               )}
@@ -259,11 +260,11 @@ const MenuRow = ({
     role="menuitem"
     disabled={disabled}
     onClick={onClick}
-    className="justify-between gap-6 px-3 py-1.5 text-[12px]"
+    className="justify-between gap-6 px-3 py-1.5 text-sm"
   >
     <span>{label}</span>
     {hint ? (
-      <span className="text-[11px] text-ink-muted [font-variant-numeric:tabular-nums]">
+      <span className="text-xs text-ink-muted [font-variant-numeric:tabular-nums]">
         {hint}
       </span>
     ) : null}

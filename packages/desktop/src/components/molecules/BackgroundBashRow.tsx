@@ -48,7 +48,7 @@ export const BackgroundBashRow = ({ detail }: { detail: ToolStepDetail }) => {
 
   return (
     <li className="flex flex-col">
-      <div className="flex min-h-6 items-center gap-1.5 text-[13px] leading-[1.5] text-ink-muted">
+      <div className="flex min-h-6 items-center gap-1.5 text-base leading-[1.5] text-ink-muted">
         <span className="flex h-3 w-3 shrink-0 items-center justify-center">
           <ListEnd className="h-3 w-3 text-ink-faint" aria-hidden />
         </span>
@@ -58,7 +58,7 @@ export const BackgroundBashRow = ({ detail }: { detail: ToolStepDetail }) => {
             aria-hidden
           />
         ) : null}
-        <span className="min-w-0 shrink truncate text-[12px] [font-variant-numeric:tabular-nums] text-ink-secondary">
+        <span className="min-w-0 shrink truncate text-sm [font-variant-numeric:tabular-nums] text-ink-secondary">
           {detail.label}
         </span>
         <span className="shrink-0 text-ink-faint">
@@ -82,7 +82,7 @@ export const BackgroundBashRow = ({ detail }: { detail: ToolStepDetail }) => {
         ) : null}
       </div>
       {stopError ? (
-        <div className="ml-3.5 mt-0.5 text-[11px] text-danger">{stopError}</div>
+        <div className="ml-3.5 mt-0.5 text-xs text-danger">{stopError}</div>
       ) : null}
       <ExecTail callId={detail.id} muted={!running} />
       {exited ? (

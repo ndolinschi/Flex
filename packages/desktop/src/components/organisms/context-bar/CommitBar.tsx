@@ -145,7 +145,7 @@ export const CommitBar = ({
         className={cn(
           "flex h-6 max-w-[12rem] shrink items-center gap-1.5 truncate rounded-md",
           "bg-fill-3 px-2 text-xs text-ink-muted whitespace-nowrap",
-          "transition-colors hover:bg-fill-2 hover:text-ink-secondary",
+          "transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink-secondary",
         )}
       >
         <span className="truncate">
@@ -161,7 +161,7 @@ export const CommitBar = ({
         className={cn(
           "flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md",
           "bg-accent px-2 text-xs text-accent-text",
-          "transition-colors hover:bg-accent-hover",
+          "transition-colors duration-[var(--duration-fast)] hover:bg-accent-hover",
         )}
       >
         <GitMerge className="h-3 w-3 shrink-0" aria-hidden />

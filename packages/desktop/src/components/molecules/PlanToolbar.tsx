@@ -103,7 +103,7 @@ const PlanModelPill = ({
         aria-expanded={open}
         className={cn(
           "inline-flex h-6 max-w-[12rem] items-center gap-1 rounded-full border border-stroke-3 px-2",
-          "text-xs text-ink-secondary transition-colors",
+          "text-xs text-ink-secondary transition-colors duration-[var(--duration-fast)]",
           "hover:border-stroke-2 hover:text-ink disabled:opacity-50",
           open && "border-stroke-2 text-ink",
         )}
@@ -263,7 +263,7 @@ export const PlanToolbar = ({
           <button
             type="button"
             onClick={onBackToPlans}
-            className="text-ink-muted transition-colors hover:text-ink"
+            className="text-ink-muted transition-colors duration-[var(--duration-fast)] hover:text-ink"
           >
             Plans
           </button>
@@ -349,7 +349,7 @@ export const PlanToolbar = ({
             }}
             placeholder="Find in plan"
             aria-label="Find in plan"
-            className="h-6 min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-ink-faint focus:outline-none"
+            className="h-6 min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-ink-faint focus:outline-none focus-visible:[box-shadow:inset_0_0_0_1px_var(--color-stroke-2)]"
           />
           <span className="shrink-0 text-xs tabular-nums text-ink-faint">
             {find.matchCount > 0 ? `${find.activeIndex + 1}/${find.matchCount}` : "0/0"}

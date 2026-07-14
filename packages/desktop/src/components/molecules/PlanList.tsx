@@ -33,7 +33,7 @@ export const PlanList = ({ plans, onSelect, className }: PlanListProps) => {
                 onClick={() => onSelect(plan.id)}
                 className={cn(
                   "flex w-full items-start gap-3 rounded-md px-2.5 py-2.5 text-left",
-                  "transition-colors hover:bg-fill-3",
+                  "transition-colors duration-[var(--duration-fast)] hover:bg-fill-3",
                 )}
               >
                 <div className="min-w-0 flex-1">

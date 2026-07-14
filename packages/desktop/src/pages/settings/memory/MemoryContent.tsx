@@ -39,8 +39,8 @@ export const MemoryContent = () => {
     <div>
       <section className="mb-6" data-settings-row="memory-global">
         <div className="mb-2 flex items-center gap-2 pl-2">
-          <h2 className="text-[12px] leading-4 text-ink-secondary">Global</h2>
-          <span className="text-[11px] text-ink-faint">{memories.length}</span>
+          <h2 className="text-sm leading-4 text-ink-secondary">Global</h2>
+          <span className="text-xs text-ink-faint">{memories.length}</span>
         </div>
         {memoryQuery.isLoading ? (
           <div className="flex items-center justify-center gap-2 px-4 py-8 text-xs text-ink-muted">

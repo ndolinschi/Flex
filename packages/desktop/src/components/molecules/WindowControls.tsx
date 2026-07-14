@@ -146,7 +146,7 @@ export const CaptionButtons = ({ className }: { className?: string }) => {
         aria-label="Minimize"
         title="Minimize"
         onClick={() => void minimizeWindow()}
-        className="flex h-full w-10 items-center justify-center text-ink-secondary transition-colors hover:bg-fill-3 hover:text-ink"
+        className="flex h-full w-10 items-center justify-center text-ink-secondary transition-colors duration-[var(--duration-fast)] hover:bg-fill-3 hover:text-ink"
       >
         <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
           <path d="M1 5h8" stroke="currentColor" strokeWidth="1" />
@@ -157,7 +157,7 @@ export const CaptionButtons = ({ className }: { className?: string }) => {
         aria-label={maximized ? "Restore" : "Maximize"}
         title={maximized ? "Restore" : "Maximize"}
         onClick={() => void toggleMaximizeWindow().then(() => isWindowMaximized().then(setMaximized))}
-        className="flex h-full w-10 items-center justify-center text-ink-secondary transition-colors hover:bg-fill-3 hover:text-ink"
+        className="flex h-full w-10 items-center justify-center text-ink-secondary transition-colors duration-[var(--duration-fast)] hover:bg-fill-3 hover:text-ink"
       >
         {maximized ? (
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
@@ -187,7 +187,7 @@ export const CaptionButtons = ({ className }: { className?: string }) => {
         aria-label="Close"
         title="Close"
         onClick={() => void closeWindow()}
-        className="flex h-full w-10 items-center justify-center text-ink-secondary transition-colors hover:bg-[#c42b1c] hover:text-white"
+        className="flex h-full w-10 items-center justify-center text-ink-secondary transition-colors duration-[var(--duration-fast)] hover:bg-[#c42b1c] hover:text-white"
       >
         <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
           <path

@@ -249,7 +249,7 @@ export const Composer = ({
   }
 
   return (
-    <div className="px-3 pt-1.5 pb-0.5">
+    <div className="px-4 pt-1.5 pb-0.5">
       {error ? (
         <div className="mx-auto mb-1.5 max-w-[var(--content-rail)]">
           <ErrorBanner

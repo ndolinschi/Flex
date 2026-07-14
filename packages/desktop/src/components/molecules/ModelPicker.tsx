@@ -224,7 +224,7 @@ export const ModelPicker = ({
               }}
               className={cn(
                 "flex w-8 shrink-0 cursor-pointer items-center justify-end gap-0.5 rounded px-0.5 py-0.5",
-                "text-xs text-ink-faint transition-colors hover:bg-fill-2 hover:text-ink",
+                "text-xs text-ink-faint transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink",
                 effortMenuFor?.modelId === m.id && "bg-fill-2 text-ink",
               )}
             >

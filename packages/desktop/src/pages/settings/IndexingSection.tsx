@@ -254,7 +254,7 @@ export const IndexingContent = () => {
             >
               <div className="flex items-center gap-2">
                 {row.status?.ready ? (
-                  <span className="text-[11px] text-green">indexed</span>
+                  <span className="text-xs text-green">indexed</span>
                 ) : null}
                 <Button
                   variant="secondary"

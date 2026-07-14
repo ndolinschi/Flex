@@ -64,7 +64,7 @@ export const ModelSelect = ({
           className={cn(
             "flex h-9 w-full items-center gap-2 rounded-md border border-border bg-surface",
             "px-3 text-sm text-ink",
-            "focus:border-accent focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-accent)]",
+            "focus:border-stroke-2 focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]",
             "disabled:cursor-not-allowed disabled:opacity-50",
           )}
         >

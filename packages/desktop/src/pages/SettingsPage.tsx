@@ -153,7 +153,7 @@ const BehaviorContent = () => {
             setDefaultPermissionMode(e.target.value as PermissionMode)
           }
           aria-label="Default permission mode"
-          className="h-8 rounded-md border border-border bg-surface px-2.5 text-sm text-ink focus:border-accent focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-accent)]"
+          className="h-8 rounded-md border border-border bg-surface px-2.5 text-sm text-ink focus:border-stroke-2 focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
         >
           {PERMISSION_MODE_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>

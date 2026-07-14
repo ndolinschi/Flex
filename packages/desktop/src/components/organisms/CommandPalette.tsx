@@ -369,7 +369,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Type a command or search sessions…"
             aria-label="Command palette input"
-            className="w-full bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-faint"
+            className="w-full bg-transparent text-base text-ink outline-none placeholder:text-ink-faint focus-visible:[box-shadow:inset_0_0_0_1px_var(--color-stroke-2)]"
           />
         </div>
 

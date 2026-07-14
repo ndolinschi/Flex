@@ -1,7 +1,6 @@
 import type { MouseEvent as ReactMouseEvent } from "react"
 import { Plus, X } from "lucide-react"
-import { DiffStat, IconButton } from "../../atoms"
-import { cn } from "../../../lib/utils"
+import { DiffStat, IconButton, Tab, TabStrip } from "../../atoms"
 import type { RightPanelTab } from "../../../stores/appStore"
 import { TABS } from "./tabs"
 
@@ -37,54 +36,23 @@ export const RightPanelTabBar = ({
   onClosePanel,
 }: RightPanelTabBarProps) => {
   return (
-    <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1 border-b border-stroke-3 px-2" data-browser-chrome="tabs">
+    <TabStrip data-browser-chrome="tabs">
       {openTabDefs.map((t) => (
-        <button
+        <Tab
           key={t.id}
-          type="button"
-          onClick={() => onSelectTab(t.id)}
-          aria-selected={tab === t.id}
-          role="tab"
-          className={cn(
-            "group flex h-7 items-center rounded-lg px-2 text-sm",
-            "tracking-[var(--tracking-caption)]",
-            "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-            tab === t.id
-              ? "bg-fill-2 text-ink"
-              : "text-ink-muted hover:bg-fill-3 hover:text-ink-secondary",
-          )}
-        >
-          {/* Icon + label share gap; close is outside so a collapsed max-w-0
-           * control does not leave a trailing gap that unbalances the pill. */}
-          <span className="flex min-w-0 items-center gap-1.5">
-            {t.icon ? <t.icon className="h-3.5 w-3.5 shrink-0" aria-hidden /> : null}
-            <span className="truncate">{t.label}</span>
-            {t.id === "changes" && changesCount ? (
+          selected={tab === t.id}
+          icon={t.icon ? <t.icon aria-hidden /> : undefined}
+          badge={
+            t.id === "changes" && changesCount ? (
               <DiffStat summary={changesTotals} />
-            ) : null}
-          </span>
-          {/* Close-on-hover — never destroys the underlying
-           * terminal PTY / browser webview, only hides the tab (see
-           * handleCloseTab). Collapses to zero width at rest (no reserved
-           * gap) and expands + fades in only while the tab is hovered,
-           * matching the SessionListItem hover-actions idiom. */}
-          <span
-            role="button"
-            aria-label={`Close ${t.label}`}
-            tabIndex={-1}
-            onClick={(e) => {
-              e.stopPropagation()
-              onCloseTab(t.id)
-            }}
-            className={cn(
-              "ml-0 max-w-0 shrink-0 overflow-hidden rounded-sm p-0 opacity-0",
-              "transition-[max-width,margin,padding,opacity] duration-[140ms] ease-[var(--easing-default)]",
-              "hover:bg-fill-1 group-hover:ml-0.5 group-hover:max-w-[1rem] group-hover:p-0.5 group-hover:opacity-100",
-            )}
-          >
-            <X className="h-3 w-3" aria-hidden />
-          </span>
-        </button>
+            ) : undefined
+          }
+          onSelect={() => onSelectTab(t.id)}
+          onClose={() => onCloseTab(t.id)}
+          closeLabel={`Close ${t.label}`}
+        >
+          {t.label}
+        </Tab>
       ))}
 
       {closableTabDefs.length > 0 ? (
@@ -106,6 +74,6 @@ export const RightPanelTabBar = ({
           <X className="h-3.5 w-3.5" aria-hidden />
         </IconButton>
       ) : null}
-    </div>
+    </TabStrip>
   )
 }

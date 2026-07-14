@@ -9,7 +9,7 @@ import { cn } from "../../../lib/utils"
 
 const menuItemClass = cn(
   "flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm",
-  "text-ink-secondary transition-colors hover:bg-fill-3 hover:text-ink",
+  "text-ink-secondary transition-colors duration-[var(--duration-fast)] hover:bg-fill-3 hover:text-ink",
   "disabled:pointer-events-none disabled:opacity-40",
 )
 

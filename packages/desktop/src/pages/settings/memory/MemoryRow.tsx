@@ -66,7 +66,7 @@ export const MemoryRow = ({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="flex shrink-0 items-center gap-1.5 rounded-sm p-0.5 text-ink-muted transition-colors hover:text-ink"
+          className="flex shrink-0 items-center gap-1.5 rounded-sm p-0.5 text-ink-muted transition-colors duration-[var(--duration-fast)] hover:text-ink"
           aria-label={expanded ? "Collapse memory" : "Expand memory"}
           aria-expanded={expanded}
         >
@@ -81,7 +81,7 @@ export const MemoryRow = ({
         </button>
 
         <Tooltip label={memory.title}>
-          <p className="min-w-0 flex-1 truncate text-[13px] text-ink">{memory.title}</p>
+          <p className="min-w-0 flex-1 truncate text-base text-ink">{memory.title}</p>
         </Tooltip>
 
         <span className="flex shrink-0 items-center gap-2 pl-2">
@@ -89,7 +89,7 @@ export const MemoryRow = ({
           {memory.updatedAtMs ? (
             <span
               className={cn(
-                "whitespace-nowrap text-[11px] text-ink-faint",
+                "whitespace-nowrap text-xs text-ink-faint",
                 "group-hover/row:hidden group-focus-within/row:hidden",
               )}
             >
@@ -103,7 +103,7 @@ export const MemoryRow = ({
         <span
           className={cn(
             "absolute right-2 top-1/2 flex max-w-0 -translate-y-1/2 items-center gap-0.5 overflow-hidden opacity-0",
-            "pointer-events-none bg-panel transition-[max-width,opacity] duration-[100ms] ease-[var(--easing-default)]",
+            "pointer-events-none bg-panel transition-[max-width,opacity] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
             "group-hover/row:pointer-events-auto group-hover/row:max-w-[76px] group-hover/row:opacity-100",
             "group-focus-within/row:pointer-events-auto group-focus-within/row:max-w-[76px] group-focus-within/row:opacity-100",
           )}
