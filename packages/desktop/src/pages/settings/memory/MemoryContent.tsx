@@ -36,9 +36,9 @@ export const MemoryContent = () => {
   const isEmpty = !memoryQuery.isLoading && !memoryQuery.isError && memories.length === 0
 
   return (
-    <div>
-      <section className="mb-6" data-settings-row="memory-global">
-        <div className="mb-2 flex items-center gap-2 pl-2">
+    <div className="flex flex-col gap-3">
+      <section data-settings-row="memory-global">
+        <div className="mb-2 flex items-center gap-2 px-3.5">
           <h2 className="text-sm leading-4 text-ink-secondary">Global</h2>
           <span className="text-xs text-ink-faint">{memories.length}</span>
         </div>

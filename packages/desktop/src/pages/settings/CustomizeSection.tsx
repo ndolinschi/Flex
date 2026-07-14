@@ -13,7 +13,7 @@ import { PluginCatalog } from "./customize/PluginCatalog"
  * the catalog install DTO assembler) live in `../../lib/mcp.ts`. */
 export const CustomizeContent = () => {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <PluginCatalog />
       <McpCatalogSection />
       <McpServersSection />

@@ -70,7 +70,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
 
   return (
     <div className="overflow-hidden rounded-[var(--radius-lg)] border border-stroke-3 bg-transparent">
-      <div className="flex h-9 items-center gap-2 px-2">
+      <div className="flex h-[var(--end-of-turn-reserved-height)] items-center gap-2 px-2">
         <button
           type="button"
           onClick={handleToggle}
@@ -106,7 +106,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
       </div>
 
       {expanded ? (
-        <ul className="border-t border-stroke-3 px-1.5 py-1.5" role="list">
+        <ul className="border-t border-stroke-3 px-2 py-1.5" role="list">
           {files.map((file) => {
             const isDir = file.path.endsWith("/")
             const name = isDir ? file.path : basename(file.path)

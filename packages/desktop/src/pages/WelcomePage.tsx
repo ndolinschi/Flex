@@ -213,7 +213,7 @@ export const WelcomePage = () => {
               />
             </FormField>
             {isCopilot ? (
-              <div className="flex flex-col gap-2 rounded-md border border-border bg-surface px-3 py-3">
+              <div className="flex flex-col gap-2 rounded-[var(--radius-card)] border border-border bg-surface px-3.5 py-3">
                 <p className="text-sm text-ink">
                   {copilotSignedIn ? (
                     <span className="text-success">Signed in to GitHub Copilot</span>
@@ -249,6 +249,7 @@ export const WelcomePage = () => {
                       placeholder="gho_…"
                       aria-label="GitHub Copilot token"
                       disabled={busy}
+                      className="h-9"
                     />
                   </FormField>
                 ) : null}
@@ -264,6 +265,7 @@ export const WelcomePage = () => {
                   placeholder="sk-…"
                   aria-label="API key"
                   disabled={busy}
+                  className="h-9"
                 />
               </FormField>
             ) : (
@@ -271,7 +273,7 @@ export const WelcomePage = () => {
                 This provider does not need an API key.
               </p>
             )}
-            <div className="mt-2 flex justify-end">
+            <div className="flex justify-end">
               <Button
                 onClick={() => void handleProviderNext()}
                 isLoading={busy || isUpserting}
@@ -285,16 +287,18 @@ export const WelcomePage = () => {
 
         {step === "model" ? (
           <div className="flex max-w-md flex-col gap-3">
-            <ModelSelect
-              id="onboarding-model"
-              models={providerModels}
-              value={modelId}
-              onChange={setModelId}
-              isLoading={modelsLoading}
-              disabled={busy}
-              builtinProviders={builtinProviders}
-            />
-            <div className="mt-2 flex justify-between gap-2">
+            <FormField label="Model" htmlFor="onboarding-model">
+              <ModelSelect
+                id="onboarding-model"
+                models={providerModels}
+                value={modelId}
+                onChange={setModelId}
+                isLoading={modelsLoading}
+                disabled={busy}
+                builtinProviders={builtinProviders}
+              />
+            </FormField>
+            <div className="flex justify-between gap-2">
               <Button variant="ghost" onClick={() => setStep("provider")} disabled={busy}>
                 Back
               </Button>
@@ -307,7 +311,7 @@ export const WelcomePage = () => {
 
         {step === "project" ? (
           <div className="flex max-w-md flex-col gap-3">
-            <div className="rounded-md border border-border bg-surface px-3 py-3">
+            <div className="rounded-[var(--radius-card)] border border-border bg-surface px-3.5 py-3">
               <p className="text-sm text-ink">
                 {projectPath ? (
                   <>
@@ -331,7 +335,7 @@ export const WelcomePage = () => {
                 </Button>
               </div>
             </div>
-            <div className="mt-2 flex flex-wrap justify-between gap-2">
+            <div className="flex flex-wrap justify-between gap-2">
               <Button variant="ghost" onClick={() => setStep("model")} disabled={busy}>
                 Back
               </Button>

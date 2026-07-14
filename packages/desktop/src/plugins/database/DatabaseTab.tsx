@@ -326,7 +326,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
       ) : null}
 
       {selectedId && schemas.length > 1 ? (
-        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-stroke-3 px-3 py-1">
+        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-stroke-3 px-2 py-1">
           {schemas.map((s) => (
             <button
               key={s.name}

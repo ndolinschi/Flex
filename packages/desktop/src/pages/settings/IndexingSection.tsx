@@ -165,7 +165,7 @@ export const IndexingContent = () => {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {saveError ? (
         <ErrorBanner message={saveError} onDismiss={() => setSaveError(null)} />
       ) : null}

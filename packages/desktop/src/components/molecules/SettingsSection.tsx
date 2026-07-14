@@ -28,7 +28,7 @@ export const SettingsCard = ({
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       {label ? (
-        <div className="flex flex-col gap-0.5 pl-2 pr-1">
+        <div className="flex flex-col gap-0.5 pl-3.5 pr-3.5">
           <h3 className="text-sm leading-4 text-ink-secondary">{label}</h3>
           {description ? (
             <p className="text-sm leading-4 text-ink-muted">{description}</p>
@@ -70,9 +70,9 @@ export const SettingRow = ({
     <div
       data-settings-row={rowId}
       className={cn(
-        "relative flex gap-5 px-3.5 py-3",
+        "relative flex gap-4 px-3.5 py-3",
         stacked ? "flex-col items-stretch" : "items-center",
-        !first && "before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-stroke-4 before:content-['']",
+        !first && "before:absolute before:inset-x-3.5 before:top-0 before:h-px before:bg-stroke-4 before:content-['']",
         className,
       )}
     >
@@ -121,7 +121,7 @@ export const SettingsSection = ({
 }: SettingsSectionProps) => {
   return (
     <section data-settings-row={rowId} className={cn("mb-8", className)}>
-      <div className="mb-2 flex items-start justify-between gap-4 pl-2 pr-1">
+      <div className="mb-2 flex items-start justify-between gap-4 px-3.5">
         <div className="min-w-0">
           <h2 className="text-sm leading-4 text-ink-secondary">{title}</h2>
           {description ? (
@@ -137,7 +137,7 @@ export const SettingsSection = ({
           "@container/settings rounded-[var(--radius-card)] bg-settings-card",
           // Inset dividers between rows (12px inset, absolute — not
           // full-width borders), per design-map/07-settings.md §4.
-          "[&>*+*]:relative [&>*+*]:before:absolute [&>*+*]:before:inset-x-3 [&>*+*]:before:top-0 [&>*+*]:before:h-px [&>*+*]:before:bg-stroke-4 [&>*+*]:before:content-['']",
+          "[&>*+*]:relative [&>*+*]:before:absolute [&>*+*]:before:inset-x-3.5 [&>*+*]:before:top-0 [&>*+*]:before:h-px [&>*+*]:before:bg-stroke-4 [&>*+*]:before:content-['']",
         )}
       >
         {children}

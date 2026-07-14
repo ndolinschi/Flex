@@ -30,7 +30,7 @@ export const AutomationsContent = () => {
   )
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <SettingsSection
         title="Routines"
         description="Run on a schedule or webhook and start a new session automatically"

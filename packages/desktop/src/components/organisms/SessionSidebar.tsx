@@ -418,7 +418,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         // (backdrop click is enough at side-by-side width; discoverability
         // requires an explicit close control once the sidebar fills the
         // chat area).
-        <div className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b border-stroke-3 px-3">
+        <div className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b border-stroke-3 px-2">
           <span className="text-sm text-ink-secondary">Sessions</span>
           <IconButton label="Close sidebar" onClick={() => setSidebarCollapsed(true)}>
             <X className="h-3.5 w-3.5" aria-hidden />
@@ -426,7 +426,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-px px-2 pt-2 pb-3">
+      <div className="flex flex-col gap-0.5 px-2 pt-2 pb-3">
         <SidebarActionRow
           icon={SquarePen}
           label="New Agent"
@@ -473,7 +473,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
       </div>
 
       <div className="group/label flex items-center gap-1 px-2 pb-1">
-        <span className="min-w-0 flex-1 truncate px-2 text-sm text-ink-muted">
+        <span className="min-w-0 flex-1 truncate text-xs tracking-[var(--tracking-caption)] text-ink-muted">
           Repositories
         </span>
         <IconButton

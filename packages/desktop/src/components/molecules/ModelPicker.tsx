@@ -259,11 +259,11 @@ export const ModelPicker = ({
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          "inline-flex h-5 max-w-[12rem] items-center gap-0.5 rounded-full px-1.5",
-          "text-xs tracking-[var(--tracking-caption)] text-ink-secondary opacity-80",
-          "transition-[color,opacity] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-          "hover:text-ink hover:opacity-100 disabled:opacity-50",
-          open && "opacity-100",
+          "inline-flex h-5 max-w-[12rem] items-center gap-0.5 rounded-full border border-stroke-3 bg-fill-4 px-1.5",
+          "text-xs tracking-[var(--tracking-caption)] text-ink-secondary",
+          "transition-[color,opacity,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+          "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink disabled:opacity-50",
+          open && "border-stroke-2 bg-fill-2 text-ink",
         )}
       >
         <span className="min-w-0 flex-1 truncate">{label}</span>

@@ -257,23 +257,25 @@ export const PlanToolbar = ({
   return (
     <div className={cn("flex shrink-0 flex-col", className)}>
       <div className="flex h-[var(--header-height)] items-center gap-1.5 px-2 text-sm">
-        <span className="min-w-0 truncate text-ink-muted">{repo}</span>
-        <span className="text-ink-faint">›</span>
-        {showPlansListCrumb && onBackToPlans ? (
-          <button
-            type="button"
-            onClick={onBackToPlans}
-            className="text-ink-muted transition-colors duration-[var(--duration-fast)] hover:text-ink"
-          >
-            Plans
-          </button>
-        ) : (
-          <span className="text-ink-muted">Plans</span>
-        )}
-        <span className="text-ink-faint">›</span>
-        <span className="min-w-0 truncate text-ink-secondary">{title}</span>
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+          <span className="min-w-0 truncate text-ink-muted">{repo}</span>
+          <span className="shrink-0 text-ink-faint">›</span>
+          {showPlansListCrumb && onBackToPlans ? (
+            <button
+              type="button"
+              onClick={onBackToPlans}
+              className="shrink-0 text-ink-muted transition-colors duration-[var(--duration-fast)] hover:text-ink"
+            >
+              Plans
+            </button>
+          ) : (
+            <span className="shrink-0 text-ink-muted">Plans</span>
+          )}
+          <span className="shrink-0 text-ink-faint">›</span>
+          <span className="min-w-0 truncate text-ink-secondary">{title}</span>
+        </div>
 
-        <span className="ml-auto flex shrink-0 items-center gap-1.5">
+        <span className="flex shrink-0 items-center gap-1.5">
           <PlanModelPill
             models={models}
             builtinProviders={builtinProviders}

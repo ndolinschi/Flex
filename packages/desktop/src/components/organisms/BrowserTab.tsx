@@ -108,24 +108,24 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
         <div
           ref={contentRef}
           data-browser-webview-slot=""
-          className="pointer-events-none absolute inset-0 mt-10"
+          className="pointer-events-none absolute inset-0"
           aria-hidden
         />
 
         {showOverlay ? (
           <div className="absolute inset-0 z-10 bg-bg">
             {preview ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 px-4">
-                <Globe className="h-8 w-8 text-ink-faint opacity-60" aria-hidden />
-                <p className="text-lg font-medium text-ink">Browser</p>
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
+                <Globe className="h-6 w-6 text-ink-faint opacity-60" aria-hidden />
+                <p className="text-sm font-medium text-ink">Browser</p>
                 <p className="max-w-[320px] text-center text-sm text-ink-muted">
                   {NATIVE_APP_REQUIRED}
                 </p>
               </div>
             ) : !browserStarted ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2">
-                <Globe className="h-8 w-8 text-ink-faint opacity-60" aria-hidden />
-                <p className="text-lg font-medium text-ink">Browser</p>
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
+                <Globe className="h-6 w-6 text-ink-faint opacity-60" aria-hidden />
+                <p className="text-sm font-medium text-ink">Browser</p>
                 <p className="max-w-[300px] text-center text-sm text-ink-muted">
                   Enter a URL above, or instruct the Agent to navigate and use the
                   browser
@@ -142,8 +142,8 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
               </div>
             ) : showLiveContent && loadError ? (
               <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
-                <AlertTriangle className="h-8 w-8 text-danger opacity-80" aria-hidden />
-                <p className="text-lg font-medium text-ink">
+                <AlertTriangle className="h-6 w-6 text-danger opacity-80" aria-hidden />
+                <p className="text-sm font-medium text-ink">
                   Can't connect to server
                 </p>
                 <p className="max-w-[320px] text-center text-sm text-ink-muted">

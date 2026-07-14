@@ -59,7 +59,7 @@ export const ConfirmDialog = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/20 pt-[100px] animate-backdrop-in"
+      className="fixed inset-0 z-[300] flex items-start justify-center bg-black/20 pt-[10vh] animate-backdrop-in"
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel()
@@ -85,7 +85,7 @@ export const ConfirmDialog = ({
           <p className="mt-1 text-sm text-ink-muted">{description}</p>
         ) : null}
         {children ? <div className="mt-3">{children}</div> : null}
-        <div className="mt-4 flex justify-end gap-1.5">
+        <div className="mt-4 flex justify-end gap-2">
           <Button
             size="sm"
             variant="secondary"

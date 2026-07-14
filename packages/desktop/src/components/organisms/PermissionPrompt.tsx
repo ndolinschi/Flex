@@ -63,7 +63,7 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
           {titleParts ? (
             <>
               {titleParts.prefix}
-              <span className="rounded-md bg-stroke-3/40 px-1.5 py-0.5 font-mono text-base font-medium text-ink-secondary">
+              <span className="rounded-md bg-stroke-3/40 px-1.5 py-0.5 font-mono text-sm font-medium text-ink-secondary">
                 {titleParts.tool}
               </span>
               {titleParts.suffix}
@@ -74,7 +74,7 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
         </h3>
         {detail ? (
           <pre
-            className="mt-2.5 max-h-28 overflow-auto rounded-md border border-stroke-3 bg-bg px-3 py-2 font-mono text-sm leading-relaxed text-ink-secondary [overflow-wrap:anywhere] whitespace-pre-wrap"
+            className="mt-2.5 max-h-28 overflow-auto rounded-md border border-stroke-3 bg-fill-5 px-3 py-2 font-mono text-sm leading-relaxed text-ink-secondary [overflow-wrap:anywhere] whitespace-pre-wrap"
             tabIndex={-1}
             aria-label="Command details"
           >

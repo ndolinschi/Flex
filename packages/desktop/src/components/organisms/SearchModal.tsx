@@ -156,7 +156,7 @@ export const SearchModal = ({ open, onClose }: SearchModalProps) => {
 
         <div ref={listRef} className="max-h-[320px] overflow-y-auto py-1">
           {groups.length === 0 ? (
-            <p className="px-3 py-6 text-center text-xs text-ink-faint">
+            <p className="px-3 py-6 text-center text-sm text-ink-faint">
               No agents found
             </p>
           ) : (

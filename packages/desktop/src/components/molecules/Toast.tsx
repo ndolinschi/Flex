@@ -70,7 +70,7 @@ export const ToastHost = () => {
   return (
     <div
       data-suppress-native-webview=""
-      className="pointer-events-none fixed bottom-6 right-3 z-[1000] flex flex-col gap-2"
+      className="pointer-events-none fixed bottom-4 right-4 z-[1000] flex flex-col gap-2"
     >
       {toasts.map((t) => (
         <div key={t.id} className="pointer-events-auto">

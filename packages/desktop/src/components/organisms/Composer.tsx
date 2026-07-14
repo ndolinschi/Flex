@@ -327,7 +327,7 @@ export const Composer = ({
             textareaRefOut={textareaRef}
           />
 
-          <div className="flex items-center justify-between gap-2 px-2 pb-1.5 pt-0">
+          <div className="flex items-center justify-between gap-2 px-2.5 pb-1.5 pt-1">
             <div className="flex min-w-0 items-center gap-0.5">
               {!pendingPermission ? (
                 <>

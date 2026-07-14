@@ -105,7 +105,7 @@ export const PluginCatalog = () => {
   )
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}
 
       <SettingsSection

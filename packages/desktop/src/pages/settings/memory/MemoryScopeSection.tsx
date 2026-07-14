@@ -25,12 +25,12 @@ export const MemoryScopeSection = ({
   const [open, setOpen] = useState(defaultOpen)
 
   return (
-    <section className="mb-6">
+    <section>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="mb-2 flex w-full items-center gap-2 text-left"
+        className="mb-2 flex w-full items-center gap-2 px-3.5 text-left"
       >
         <ChevronDown
           className={cn(

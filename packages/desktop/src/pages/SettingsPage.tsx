@@ -86,7 +86,7 @@ const AppearanceContent = () => {
   const toggleTheme = useAppStore((s) => s.toggleTheme)
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <SettingsCard label="Theme">
         <SettingRow
           rowId="appearance-theme"
