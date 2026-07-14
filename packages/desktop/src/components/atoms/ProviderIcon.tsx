@@ -11,6 +11,9 @@ type ProviderIconProps = {
   className?: string
   /** Pixel box — defaults to 16 (h-4 w-4). */
   size?: number
+  /** When true (default), sit the mark on a neutral chip so light/dark
+   * brand fills stay readable on both themes. */
+  chip?: boolean
 }
 
 const LetterMark = ({
@@ -45,11 +48,14 @@ export const ProviderIcon = ({
   label,
   className,
   size = 16,
+  chip = true,
 }: ProviderIconProps) => {
   const candidates = providerIconCandidates(providerId)
   const [index, setIndex] = useState(0)
   const src = candidates[index]
   const title = label ?? providerId
+  // Inner glyph is slightly inset when chipped so brand fills don't touch the edge.
+  const glyph = Math.max(10, size - (chip ? 4 : 0))
 
   if (!src) {
     return (
@@ -62,19 +68,35 @@ export const ProviderIcon = ({
     )
   }
 
-  return (
+  const img = (
     <img
       src={src}
       alt=""
       title={title}
-      width={size}
-      height={size}
+      width={glyph}
+      height={glyph}
       draggable={false}
-      className={cn("shrink-0 object-contain", className)}
-      style={{ width: size, height: size }}
+      className={cn("shrink-0 object-contain", !chip && className)}
+      style={{ width: glyph, height: glyph }}
       onError={() => {
         setIndex((i) => i + 1)
       }}
     />
+  )
+
+  if (!chip) return img
+
+  return (
+    <span
+      aria-hidden
+      title={title}
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center rounded-sm bg-fill-3",
+        className,
+      )}
+      style={{ width: size, height: size }}
+    >
+      {img}
+    </span>
   )
 }
