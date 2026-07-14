@@ -36,7 +36,7 @@ export const ProviderPicker = ({
               disabled={disabled}
               onClick={() => onChange(p.id)}
               className={cn(
-                "flex w-full items-center gap-2 rounded-md border px-2.5 py-2 text-left",
+                "flex h-9 w-full items-center gap-2 rounded-md border px-2.5 text-left",
                 "transition-colors duration-[var(--duration-fast)]",
                 "disabled:pointer-events-none disabled:opacity-50",
                 active

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
-import { Button, Kbd, TextInput } from "../components/atoms"
+import { Button, Kbd, Skeleton, TextInput } from "../components/atoms"
 import {
   CopilotSignInDialog,
   ErrorBanner,
@@ -167,18 +167,20 @@ export const WelcomePage = () => {
   return (
     <div className="flex h-full flex-col bg-bg">
       <div className="mx-auto flex w-full max-w-[var(--welcome-rail)] flex-1 flex-col justify-center px-4 py-8">
-        <p className="mb-1.5 text-xs font-medium uppercase tracking-widest text-ink-faint">
+        <p className="mb-2 text-xs font-medium uppercase tracking-widest text-ink-faint">
           Agent Desktop
         </p>
-        <h1 className="mb-2 text-xl font-semibold text-ink">{stepTitle[step]}</h1>
-        <p className="mb-4 text-sm text-ink-muted">{stepHint[step]}</p>
+        <h1 className="mb-2 text-2xl font-semibold tracking-tight text-ink">
+          {stepTitle[step]}
+        </h1>
+        <p className="mb-6 text-sm leading-relaxed text-ink-muted">{stepHint[step]}</p>
 
-        <ol className="mb-6 flex items-center gap-2" aria-label="Setup steps">
+        <ol className="mb-8 flex items-center gap-2.5" aria-label="Setup steps">
           {STEPS.map((s, i) => (
-            <li key={s} className="flex items-center gap-2">
+            <li key={s} className="flex items-center gap-2.5">
               <span
                 className={cn(
-                  "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
+                  "flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium",
                   i < stepIndex
                     ? "bg-fill-2 text-ink ring-1 ring-stroke-2"
                     : i === stepIndex
@@ -190,7 +192,7 @@ export const WelcomePage = () => {
                 {i + 1}
               </span>
               {i < STEPS.length - 1 ? (
-                <span className="h-px w-6 bg-stroke-3" aria-hidden />
+                <span className="h-px w-8 bg-stroke-3" aria-hidden />
               ) : null}
             </li>
           ))}
@@ -205,12 +207,24 @@ export const WelcomePage = () => {
         {step === "provider" ? (
           <div className="flex max-w-md flex-col gap-3">
             <FormField label="Provider" htmlFor="welcome-provider">
-              <ProviderPicker
-                providers={builtinProviders}
-                value={provider}
-                onChange={handlePickProvider}
-                disabled={modelsLoading || busy}
-              />
+              {modelsLoading && builtinProviders.length === 0 ? (
+                <div
+                  className="grid grid-cols-2 gap-1.5 sm:grid-cols-3"
+                  role="status"
+                  aria-label="Loading providers"
+                >
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-9 w-full rounded-md" />
+                  ))}
+                </div>
+              ) : (
+                <ProviderPicker
+                  providers={builtinProviders}
+                  value={provider}
+                  onChange={handlePickProvider}
+                  disabled={modelsLoading || busy}
+                />
+              )}
             </FormField>
             {isCopilot ? (
               <div className="flex flex-col gap-2 rounded-[var(--radius-card)] border border-border bg-surface px-3.5 py-3">
@@ -223,7 +237,6 @@ export const WelcomePage = () => {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button
-                    size="sm"
                     onClick={() => setCopilotSignInOpen(true)}
                     disabled={busy}
                   >
@@ -231,7 +244,6 @@ export const WelcomePage = () => {
                   </Button>
                   <Button
                     variant="ghost"
-                    size="sm"
                     onClick={() => setShowCopilotToken((v) => !v)}
                     disabled={busy}
                   >
@@ -275,6 +287,7 @@ export const WelcomePage = () => {
             )}
             <div className="flex justify-end">
               <Button
+                size="lg"
                 onClick={() => void handleProviderNext()}
                 isLoading={busy || isUpserting}
                 disabled={!provider}
@@ -299,10 +312,10 @@ export const WelcomePage = () => {
               />
             </FormField>
             <div className="flex justify-between gap-2">
-              <Button variant="ghost" onClick={() => setStep("provider")} disabled={busy}>
+              <Button variant="ghost" size="lg" onClick={() => setStep("provider")} disabled={busy}>
                 Back
               </Button>
-              <Button onClick={handleModelNext} disabled={!modelId || busy}>
+              <Button size="lg" onClick={handleModelNext} disabled={!modelId || busy}>
                 Continue
               </Button>
             </div>
@@ -327,7 +340,6 @@ export const WelcomePage = () => {
               <div className="mt-3">
                 <Button
                   variant="secondary"
-                  size="sm"
                   onClick={() => void handlePickFolder()}
                   disabled={busy}
                 >
@@ -336,12 +348,13 @@ export const WelcomePage = () => {
               </div>
             </div>
             <div className="flex flex-wrap justify-between gap-2">
-              <Button variant="ghost" onClick={() => setStep("model")} disabled={busy}>
+              <Button variant="ghost" size="lg" onClick={() => setStep("model")} disabled={busy}>
                 Back
               </Button>
               <div className="flex flex-wrap gap-2">
                 <Button
                   variant="secondary"
+                  size="lg"
                   onClick={() => void handleFinish(false)}
                   isLoading={busy && !projectPath}
                   disabled={busy}
@@ -349,6 +362,7 @@ export const WelcomePage = () => {
                   Skip & start chatting
                 </Button>
                 <Button
+                  size="lg"
                   onClick={() => void handleFinish(true)}
                   isLoading={busy && !!projectPath}
                   disabled={busy || !projectPath}
@@ -360,7 +374,7 @@ export const WelcomePage = () => {
           </div>
         ) : null}
 
-        <div className="mt-8 flex flex-wrap gap-3 text-xs text-ink-faint">
+        <div className="mt-8 flex flex-wrap gap-3 border-t border-stroke-3 pt-4 text-xs text-ink-faint">
           <span>
             <Kbd>Enter</Kbd> send
           </span>

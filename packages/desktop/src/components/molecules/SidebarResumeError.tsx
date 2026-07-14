@@ -18,7 +18,7 @@ export const SidebarResumeError = ({
     <div
       role="alert"
       className={cn(
-        "flex items-start gap-2 border-t border-stroke-3 bg-danger-subtle px-3 py-2",
+        "flex items-start gap-2 border-t border-stroke-3 bg-danger-subtle px-2 py-2",
       )}
     >
       <p className="flex-1 text-xs text-danger">{message}</p>

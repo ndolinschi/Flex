@@ -83,7 +83,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `WorkingAgentsPill` | Composer-adjacent "N Working" glance — menu of running worker titles + jump to group | `rows`, `onScrollToWorkers?` | ChatPage → Composer `workersSlot` |
 | `WorkGroup` | "Worked for Xs" / live "Working" XOR "Thinking" XOR "Compacting context…"; `memo` | `isOpen`, `liveStatus?`, `durationMs?` | TurnTimeline |
 | `WorkflowGroup` | Multi-step workflow block (steps + nested subagents); organism-scale but kept in `molecules/` since it nests inside `TimelineRowView` like `SubagentGroup`/`WorkGroup` | `steps`, `subagents`, `status` | TurnTimeline (via `TimelineRowView`) |
-| `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?` | SessionSidebar |
+| `SidebarSkeleton` | Sidebar loading placeholder (headers + rows) | — | SessionSidebar |
+| `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?`, `disabled?` | SessionSidebar |
 | `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle` | SessionSidebar |
 | `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions | `title`, `status`, `onBuild`, `onAddComment?` | RightPanel Plan tab (`PlanTab`) |
 | `AppMark` / `TitleBarMenus` | Wireframe mark + File/Edit/View/Help for custom window chrome; Help → **Submit Bug…** opens `BugReportDialog` | `onOpenCommandPalette?`, `onOpenSearch?` | WindowTitleBar |

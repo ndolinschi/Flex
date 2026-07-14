@@ -6,6 +6,7 @@ import {
   ProviderProfileList,
   SecretStorageSection,
 } from "../molecules"
+import { Spinner } from "../atoms"
 import { useCopilotAuth } from "../../hooks/useCopilotAuth"
 import { useProviderProfiles } from "../../hooks/useProviderProfiles"
 import { useProviderConfig } from "../../hooks/useProviderConfig"
@@ -258,7 +259,8 @@ export const ProviderSettingsForm = () => {
 
   if (profilesLoading) {
     return (
-      <div className="flex items-center justify-center py-8 text-sm text-ink-muted">
+      <div className="flex items-center justify-center gap-2 py-8 text-sm text-ink-muted">
+        <Spinner size="sm" />
         Loading configuration…
       </div>
     )
