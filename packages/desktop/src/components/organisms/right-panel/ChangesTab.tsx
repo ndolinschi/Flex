@@ -2,14 +2,19 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { GitMerge, RefreshCw, XCircle } from "lucide-react"
 import { Button, DiffStat, IconButton, ScrollArea } from "../../atoms"
-import { ConfirmDialog } from "../../molecules"
+import { BranchPrStatusChip, ConfirmDialog } from "../../molecules"
 import { useWorkspaceActions } from "../../../hooks/useWorkspaceActions"
 import { useIsGitRepo } from "../../../hooks/useIsGitRepo"
 import {
   gitBranch,
+  gitCreatePrForBranch,
+  gitHasRemote,
+  gitPrStatus,
   gitStatusSinceBaseline,
   isIsolated,
+  toInvokeError,
 } from "../../../lib/tauri"
+import { openExternalUrl } from "../../../lib/openExternalUrl"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import type { SessionMeta } from "../../../lib/types"
 import { useAppStore } from "../../../stores/appStore"
@@ -89,6 +94,53 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     enabled: !!cwd && isRepo,
     staleTime: 10_000,
   })
+
+  const { data: hasRemote = false } = useQuery({
+    queryKey: ["git-has-remote", cwd],
+    queryFn: () => gitHasRemote(cwd),
+    enabled: !!cwd && isRepo,
+    staleTime: 10_000,
+  })
+
+  const { data: prStatus } = useQuery({
+    queryKey: ["git-pr-status", cwd],
+    queryFn: () => gitPrStatus(cwd),
+    enabled: !!cwd && isRepo && hasRemote,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  })
+  const branchPr = prStatus?.pr ?? null
+  const [creatingPr, setCreatingPr] = useState(false)
+  const pushToast = useAppStore((s) => s.pushToast)
+
+  const handleCreatePr = async () => {
+    if (!cwd || creatingPr) return
+    setCreatingPr(true)
+    try {
+      const outcome = await gitCreatePrForBranch(cwd)
+      invalidateGitQueries(queryClient)
+      if (outcome.degradedReason) {
+        pushToast(outcome.degradedReason, "success")
+      } else if (outcome.prUrl) {
+        const url = outcome.prUrl
+        pushToast("Pull request ready", "success", {
+          label: "Open PR",
+          onAction: () => {
+            void openExternalUrl(url)
+          },
+        })
+      } else {
+        pushToast("Pull request ready", "success")
+      }
+    } catch (err) {
+      const msg = toInvokeError(err)
+      pushToast(`Couldn't create PR: ${msg}`, "error")
+      setError(msg)
+    } finally {
+      setCreatingPr(false)
+    }
+  }
 
   const { data: isolated = false } = useQuery({
     queryKey: ["is-isolated", sessionId],
@@ -205,6 +257,19 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             </span>
           ) : null}
         </div>
+        {branchPr ? (
+          <BranchPrStatusChip pr={branchPr} />
+        ) : hasRemote && prStatus?.ghAvailable ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 shrink-0 px-1.5 text-xs"
+            isLoading={creatingPr}
+            onClick={() => void handleCreatePr()}
+          >
+            Create PR
+          </Button>
+        ) : null}
         <DiffStat summary={totals} size="sm" />
         <IconButton
           label="Refresh changes"

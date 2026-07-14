@@ -1,0 +1,44 @@
+import { GitPullRequest } from "lucide-react"
+import type { BranchPrInfo } from "../../lib/tauri"
+import { openExternalUrl } from "../../lib/openExternalUrl"
+import { cn } from "../../lib/utils"
+
+type BranchPrStatusChipProps = {
+  pr: BranchPrInfo
+  className?: string
+}
+
+/** Compact current-branch PR chip for the Changes header — number, title,
+ * and CI summary. Opens the PR in the system browser on click. */
+export const BranchPrStatusChip = ({ pr, className }: BranchPrStatusChipProps) => {
+  const failing = pr.checksSummary.includes("failing")
+  const pending = pr.checksSummary.includes("pending")
+
+  return (
+    <button
+      type="button"
+      onClick={() => void openExternalUrl(pr.url)}
+      title={`${pr.title} — ${pr.checksSummary}`}
+      aria-label={`Open pull request #${pr.number}`}
+      className={cn(
+        "flex max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md px-1.5 py-0.5",
+        "text-xs tracking-[var(--tracking-caption)] text-ink-secondary",
+        "transition-colors duration-[var(--duration-fast)]",
+        "hover:bg-fill-3 hover:text-ink",
+        className,
+      )}
+    >
+      <GitPullRequest className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
+      <span className="shrink-0 font-medium text-ink">#{pr.number}</span>
+      <span className="min-w-0 truncate">{pr.title}</span>
+      <span
+        className={cn(
+          "shrink-0",
+          failing ? "text-danger" : pending ? "text-ink-muted" : "text-success",
+        )}
+      >
+        {pr.checksSummary}
+      </span>
+    </button>
+  )
+}

@@ -11,6 +11,7 @@ import {
   gitHasRemote,
   toInvokeError,
 } from "../../../lib/tauri"
+import { openExternalUrl } from "../../../lib/openExternalUrl"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
@@ -116,14 +117,25 @@ export const CommitCenter = ({
           break
         }
         case "commit-pr": {
-          const outcome = await gitCreatePr(sessionId, trimmed, selectedPaths)
+          const outcome = await gitCreatePr(
+            sessionId,
+            trimmed,
+            selectedPaths,
+            trimmed,
+          )
           if (outcome.degradedReason) {
-            pushToast(outcome.degradedReason, "error")
+            // Commit+push still landed — non-fatal for the user.
+            pushToast(outcome.degradedReason, "success")
+          } else if (outcome.prUrl) {
+            const url = outcome.prUrl
+            pushToast("Pull request created", "success", {
+              label: "Open PR",
+              onAction: () => {
+                void openExternalUrl(url)
+              },
+            })
           } else {
-            pushToast(
-              outcome.prUrl ? `PR created: ${outcome.prUrl}` : "PR created",
-              "success",
-            )
+            pushToast("Pull request created", "success")
           }
           break
         }
