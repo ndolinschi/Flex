@@ -238,9 +238,9 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
   }
 
   return (
-    <div className="px-4 pt-2">
+    <div className="px-3 pt-1.5 pb-0.5">
       {error ? (
-        <div className="mx-auto mb-2 max-w-[var(--content-rail)]">
+        <div className="mx-auto mb-1.5 max-w-[var(--content-rail)]">
           <ErrorBanner
             message={error}
             onDismiss={() => {
@@ -251,7 +251,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
         </div>
       ) : null}
 
-      <div className="mx-auto mb-1.5 w-full max-w-[var(--content-rail)]">
+      <div className="mx-auto mb-1 w-full max-w-[var(--content-rail)]">
         <ContextBar
           cwd={active?.cwd}
           projectCwd={active ? active.base_cwd || active.cwd : undefined}
@@ -273,7 +273,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
           // w-full is required: without a fixed width the pill sizes to content,
           // and the textarea's w-full creates a circular dependency that collapses
           // width (→ placeholder wraps → scrollHeight inflates → height locks at max).
-          "relative mx-auto flex w-full max-w-[var(--content-rail)] flex-col gap-1.5",
+          "relative mx-auto flex w-full max-w-[var(--content-rail)] flex-col",
           "bg-user-bubble shadow-[var(--shadow-composer)]",
           hasDockedOverlay
             ? "rounded-b-[var(--radius-composer)] rounded-t-none"
@@ -301,7 +301,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
           textareaRefOut={textareaRef}
         />
 
-        <div className="flex items-center justify-between gap-1.5 px-3 pb-2.5 pt-2">
+        <div className="flex items-center justify-between gap-2 px-2 pb-1.5 pt-0">
           <div className="flex min-w-0 items-center gap-0.5">
             {!pendingPermission ? (
               <>
@@ -329,7 +329,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
               </span>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-0.5">
             {pendingPermission ? (
               <PermissionActions permission={pendingPermission} />
             ) : (

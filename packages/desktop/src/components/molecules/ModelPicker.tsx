@@ -259,8 +259,8 @@ export const ModelPicker = ({
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          "inline-flex h-6 max-w-[16rem] items-center gap-1 rounded-full px-1.5",
-          "text-sm tracking-[var(--tracking-caption)] text-ink-secondary opacity-80",
+          "inline-flex h-5 max-w-[12rem] items-center gap-0.5 rounded-full px-1.5",
+          "text-xs tracking-[var(--tracking-caption)] text-ink-secondary opacity-80",
           "transition-[color,opacity] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
           "hover:text-ink hover:opacity-100 disabled:opacity-50",
           open && "opacity-100",

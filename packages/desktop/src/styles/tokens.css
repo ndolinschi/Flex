@@ -253,8 +253,8 @@
   /* Custom window chrome (Cursor-style title bar above app content). */
   --titlebar-height: 36px;
   --header-height: 34px;
-  --composer-min-height: 2.25rem;
-  --composer-max-height: 12.5rem;
+  --composer-min-height: 1.75rem;
+  --composer-max-height: 10rem;
   --timeline-row-min-height: 1.25rem;
   --status-bar-height: 1.75rem;
   --content-rail: 52.5rem;

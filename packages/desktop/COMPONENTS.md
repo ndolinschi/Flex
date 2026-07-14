@@ -185,7 +185,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 - Themes: `data-theme="dark"|"light"` on `<html>` (Cursor-tight premium palettes — neutral charcoal / clean white, close surface steps, whisper fills, soft product blue accent).
 - Feel principles (local `design-map/README.md`): compact density, quiet chrome, whisper fills, opacity hover, micro-motion, alpha hierarchy, keyboard focus, weight 590 + micro tracking, alpha borders, radius-by-role, neutral interactive chrome, thin scrollbars.
 - Motion: hover 100ms ease; trays `animate-tray-in`; pane swaps `animate-pane-fade`; timeline rows `animate-row-fade`; end-of-turn `animate-end-turn-in` (160ms); HITL cards `animate-modal-in` (scale .97→1); overlays `animate-backdrop-in`.
-- Composer: `--radius-composer` 14px, soft elevation + stroke focus (no accent glow), auto-grow 36–200px; quiet toolbar opacity (0.5→0.8); mode/model pills neutral fill + stroke.
+- Composer: `--radius-composer` 14px, soft elevation + stroke focus (no accent glow), compact auto-grow (~28–160px) + denser toolbar (`text-sm` input, `h-5` mode/model/plus); quiet toolbar opacity (0.5→0.8); mode/model pills neutral fill + stroke.
 - Content rail: `--content-rail` 840px (`52.5rem`).
 - ContextBar sits above the composer (project / branch / context %) — Flex Canon.
 - Sidebar footer = theme + settings (Flex Canon); rows use fill-4 hover / fill-2 selected.
