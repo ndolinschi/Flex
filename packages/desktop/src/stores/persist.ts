@@ -17,6 +17,9 @@ export type UiPersisted = {
   composerMode?: ComposerMode
   defaultPermissionMode?: PermissionMode
   theme?: UiTheme
+  /** Accent preset (`neutral` default) or `custom`. */
+  accentId?: import("../lib/accent").AccentId
+  accentCustomHex?: string
   notificationsEnabled?: boolean
   completionSoundEnabled?: boolean
   /** Single app-wide debug-logging switch — see `lib/debug/log.ts`. */

@@ -1,6 +1,6 @@
 import { Moon, Sun } from "lucide-react"
 import { SettingsShell } from "../components/templates"
-import { SettingsCard, SettingRow, SETTINGS_NAV_ITEMS } from "../components/molecules"
+import { SettingsCard, SettingRow, SETTINGS_NAV_ITEMS, AccentColorPicker } from "../components/molecules"
 import { Toggle } from "../components/atoms"
 import { ProviderSettingsForm } from "../components/organisms"
 import { AUTOMATIONS_UI_ENABLED } from "../lib/featureFlags"
@@ -79,33 +79,57 @@ const GeneralContent = () => {
 /** Appearance section — theme toggle moved here from the sidebar footer
  * icon-button (design-map/07-settings.md build brief §3/§1: "theme toggle
  * moved here"). The sidebar's quick-access icon stays as a convenience
- * shortcut; this is now the canonical settings location. */
+ * shortcut; this is now the canonical settings location. Accent color
+ * (neutral by default, or a hue / custom hex) lives here too. */
 const AppearanceContent = () => {
   const theme = useAppStore((s) => s.theme)
   const toggleTheme = useAppStore((s) => s.toggleTheme)
 
   return (
-    <SettingsCard label="Theme">
-      <SettingRow
-        rowId="appearance-theme"
-        title="Theme"
-        description="Switch between dark and light"
-        first
+    <div className="flex flex-col gap-4">
+      <SettingsCard label="Theme">
+        <SettingRow
+          rowId="appearance-theme"
+          title="Theme"
+          description="Switch between dark and light"
+          first
+        >
+          <div className="flex items-center gap-2 text-ink-muted">
+            {theme === "dark" ? (
+              <Moon className="h-3.5 w-3.5" aria-hidden />
+            ) : (
+              <Sun className="h-3.5 w-3.5" aria-hidden />
+            )}
+            <Toggle
+              checked={theme === "light"}
+              onChange={() => toggleTheme()}
+              label={
+                theme === "dark" ? "Switch to light theme" : "Switch to dark theme"
+              }
+            />
+          </div>
+        </SettingRow>
+      </SettingsCard>
+
+      <SettingsCard
+        label="Accent"
+        description="Primary buttons, links, and focus rings. Neutral is white or black; pick a hue or any custom color."
       >
-        <div className="flex items-center gap-2 text-ink-muted">
-          {theme === "dark" ? (
-            <Moon className="h-3.5 w-3.5" aria-hidden />
-          ) : (
-            <Sun className="h-3.5 w-3.5" aria-hidden />
-          )}
-          <Toggle
-            checked={theme === "light"}
-            onChange={() => toggleTheme()}
-            label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-          />
+        <div
+          data-settings-row="appearance-accent"
+          className="flex flex-col gap-3 px-3.5 py-3"
+        >
+          <div className="min-w-0">
+            <p className="text-[13px] leading-[18px] text-ink">Accent color</p>
+            <p className="mt-0.5 text-[13px] leading-[18px] text-ink-secondary">
+              Default is neutral (high-contrast). Choose blue, green, orange,
+              burgundy, and more — or pick any shade from the palette.
+            </p>
+          </div>
+          <AccentColorPicker />
         </div>
-      </SettingRow>
-    </SettingsCard>
+      </SettingsCard>
+    </div>
   )
 }
 
