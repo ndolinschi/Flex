@@ -120,39 +120,38 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Header */}
-      <div className="flex min-h-[var(--header-height)] shrink-0 flex-col justify-center gap-0.5 border-b border-stroke-3 px-3 py-1.5">
-        <div className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-base text-ink">
-            {isAgentSelected
-              ? "Agent terminal"
-              : activeTerminal
-                ? basename(activeTerminal.cwd) || "Terminal"
-                : "Terminal"}
-          </span>
-          <div className="flex shrink-0 items-center gap-0.5">
-            <IconButton
-              label="New Terminal"
-              onClick={() => void handleNewTerminal()}
-              className="h-6 w-6"
-            >
-              <Plus className="h-3.5 w-3.5" aria-hidden />
-            </IconButton>
-            <IconButton
-              label={terminalListVisible ? "Hide Terminal List" : "Show Terminal List"}
-              onClick={toggleTerminalListVisible}
-              className="h-6 w-6"
-            >
-              <List className="h-3.5 w-3.5" aria-hidden />
-            </IconButton>
-          </div>
+      {/* Header — fixed chrome height so tab switches don't jump; agent
+          subtitle lives on a separate non-chrome row below. */}
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 px-3">
+        <span className="min-w-0 flex-1 truncate text-base text-ink">
+          {isAgentSelected
+            ? "Agent terminal"
+            : activeTerminal
+              ? basename(activeTerminal.cwd) || "Terminal"
+              : "Terminal"}
+        </span>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <IconButton
+            label="New Terminal"
+            onClick={() => void handleNewTerminal()}
+            className="h-6 w-6"
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden />
+          </IconButton>
+          <IconButton
+            label={terminalListVisible ? "Hide Terminal List" : "Show Terminal List"}
+            onClick={toggleTerminalListVisible}
+            className="h-6 w-6"
+          >
+            <List className="h-3.5 w-3.5" aria-hidden />
+          </IconButton>
         </div>
-        {isAgentSelected ? (
-          <p className="truncate text-sm text-ink-muted">
-            Agent is using this terminal. It&apos;s read-only.
-          </p>
-        ) : null}
       </div>
+      {isAgentSelected ? (
+        <p className="shrink-0 truncate border-b border-stroke-3 px-3 py-1 text-sm text-ink-muted">
+          Agent is using this terminal. It&apos;s read-only.
+        </p>
+      ) : null}
 
       {/* Body */}
       <div className="flex min-h-0 flex-1">

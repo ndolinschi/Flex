@@ -23,7 +23,7 @@ export const ArchivedSectionHeader = ({
         if (e.key === "Enter") onToggle()
       }}
       className={cn(
-        "group flex h-6 w-full cursor-default items-center gap-1.5 rounded-sm px-1.5",
+        "group flex h-6 w-full cursor-default items-center gap-1.5 rounded-sm px-2",
         "text-xs text-ink-secondary transition-colors hover:bg-fill-4 hover:text-ink",
       )}
     >

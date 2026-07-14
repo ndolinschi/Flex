@@ -245,7 +245,7 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
 
   if (!active || (sessionPlans.length === 0 && entries.length === 0)) {
     return (
-      <div className="flex flex-1 items-center justify-center px-6 text-center">
+      <div className="flex flex-1 items-center justify-center px-4 text-center">
         <p className="text-sm leading-relaxed text-ink-muted">
           No plan yet — switch the composer to Plan mode and ask for a plan.
         </p>
@@ -351,7 +351,7 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
       />
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="mx-auto w-full max-w-[800px] px-6 pb-16 pt-8">
+        <div className="mx-auto w-full max-w-[800px] px-4 pb-16 pt-8">
           <h1 className="text-[22px] font-semibold leading-7 text-ink">
             {sessionLabel(active)}
           </h1>

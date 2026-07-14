@@ -50,7 +50,7 @@ export const RightPanelTabBar = ({
             "tracking-[var(--tracking-caption)]",
             "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
             tab === t.id
-              ? "bg-fill-3 text-ink"
+              ? "bg-fill-2 text-ink"
               : "text-ink-muted hover:bg-fill-3 hover:text-ink-secondary",
           )}
         >

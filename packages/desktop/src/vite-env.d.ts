@@ -5,6 +5,8 @@ interface ImportMetaEnv {
   readonly VITE_AUTOMATIONS_UI?: string
   /** When `"true"` / `"1"`, show composer Flex mode. Default: off. */
   readonly VITE_FLEX_MODE?: string
+  /** When `"true"` / `"1"`, show right-panel Memory tab. Default: off. */
+  readonly VITE_MEMORY_TAB?: string
 }
 
 interface ImportMeta {

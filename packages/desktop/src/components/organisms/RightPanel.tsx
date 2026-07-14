@@ -19,10 +19,11 @@ import { TerminalTab } from "./TerminalTab"
 import { PlanTab } from "./right-panel/PlanTab"
 import { ChangesTab } from "./right-panel/ChangesTab"
 import { FilesTab } from "./right-panel/FilesTab"
+import { MemoryTab } from "./right-panel/MemoryTab"
 import { RightPanelTabBar } from "./right-panel/RightPanelTabBar"
-import { TABS } from "./right-panel/tabs"
+import { visibleRightPanelTabs } from "./right-panel/tabs"
 
-export { TABS } from "./right-panel/tabs"
+export { TABS, visibleRightPanelTabs } from "./right-panel/tabs"
 
 /** Stable empty list — inline `?? []` in a Zustand selector re-renders forever. */
 export const RightPanel = () => {
@@ -67,16 +68,14 @@ export const RightPanel = () => {
 
   // Tabs are on-demand ("Open Tabs") — only render the tabs the
   // session has actually opened (via a trigger or the "+" menu below), never
-  // the full static TABS list.
-  const openIds = openTabsBySession[sessionKey] ?? []
-  const openTabDefs = useMemo(
-    () => TABS.filter((t) => openIds.includes(t.id)),
-    [openIds],
+  // the full static TABS list. Flag-gated tabs (Memory) are omitted when off.
+  const openIdsRaw = openTabsBySession[sessionKey] ?? []
+  const catalog = visibleRightPanelTabs()
+  const openIds = openIdsRaw.filter((id) =>
+    catalog.some((t) => t.id === id),
   )
-  const closableTabDefs = useMemo(
-    () => TABS.filter((t) => !openIds.includes(t.id)),
-    [openIds],
-  )
+  const openTabDefs = catalog.filter((t) => openIds.includes(t.id))
+  const closableTabDefs = catalog.filter((t) => !openIds.includes(t.id))
 
   // If the currently-selected tab just got closed, fall back to whatever's
   // still open so the header never shows a highlighted tab with no button.
@@ -255,6 +254,10 @@ export const RightPanel = () => {
           ) : tab === "changes" && openIds.includes("changes") ? (
             <div className="absolute inset-0 flex flex-col">
               <ChangesTab active={active} />
+            </div>
+          ) : tab === "memory" && openIds.includes("memory") ? (
+            <div className="absolute inset-0 flex flex-col">
+              <MemoryTab />
             </div>
           ) : null}
           <div

@@ -21,6 +21,7 @@ import { useSessions } from "../../hooks/useSessions"
 import {
   AUTOMATIONS_UI_ENABLED,
   FLEX_MODE_ENABLED,
+  MEMORY_TAB_ENABLED,
 } from "../../lib/featureFlags"
 import { fuzzyScore } from "../../lib/fuzzySearch"
 import { resumeSession, toInvokeError } from "../../lib/tauri"
@@ -140,6 +141,17 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
         group: "Commands",
         run: () => openRightPanelTab("browser"),
       },
+      ...(MEMORY_TAB_ENABLED
+        ? [
+            {
+              id: "tab-memory",
+              label: "Switch to Memory tab",
+              icon: Brain,
+              group: "Commands" as const,
+              run: () => openRightPanelTab("memory"),
+            },
+          ]
+        : []),
       {
         id: "new-terminal",
         label: "New Terminal",
@@ -207,6 +219,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
         run: () => {
           setRoute("chat")
           setComposerMode("plan")
+          useAppStore.getState().revealPlanPanel()
         },
       },
       {

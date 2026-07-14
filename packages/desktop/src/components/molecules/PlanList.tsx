@@ -15,12 +15,13 @@ export const PlanList = ({ plans, onSelect, className }: PlanListProps) => {
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
-      <div className="shrink-0 border-b border-stroke-3 px-4 py-3">
-        <h2 className="text-sm font-medium text-ink">Review plans</h2>
-        <p className="mt-0.5 text-xs text-ink-muted">
-          {ordered.length} plans in this session — open one to read, rewrite, or
-          comment.
-        </p>
+      <div className="flex h-[var(--header-height)] shrink-0 items-center px-4">
+        <h2 className="min-w-0 truncate text-sm font-medium text-ink">
+          Review plans
+          <span className="ml-2 font-normal text-ink-muted">
+            {ordered.length} in this session
+          </span>
+        </h2>
       </div>
       <ul className="min-h-0 flex-1 overflow-y-auto px-2 py-2" role="list">
         {ordered.map((plan) => {

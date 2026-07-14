@@ -145,6 +145,50 @@ describe("right panel per-session tab state (BUG #37)", () => {
     expect(useAppStore.getState().rightPanelOpen).toBe(false)
   })
 
+  it("toggleRightPanel seeds Plan when the session has no open tabs", () => {
+    useAppStore.getState().setActiveSessionId(A)
+    expect(useAppStore.getState().rightPanelOpen).toBe(false)
+    expect(useAppStore.getState().openTabsBySession[sessionScopeKey(A)] ?? []).toEqual(
+      [],
+    )
+
+    useAppStore.getState().toggleRightPanel()
+
+    expect(useAppStore.getState().rightPanelOpen).toBe(true)
+    expect(useAppStore.getState().rightPanelTab).toBe("plan")
+    expect(useAppStore.getState().openTabsBySession[sessionScopeKey(A)]).toEqual([
+      "plan",
+    ])
+  })
+
+  it("toggleRightPanel reseeds the last-selected tab after the strip was emptied", () => {
+    useAppStore.getState().setActiveSessionId(A)
+    useAppStore.getState().setRightPanelOpen(true)
+    useAppStore.getState().setRightPanelTab("changes")
+    useAppStore.getState().closeTab(sessionScopeKey(A), "changes")
+    useAppStore.getState().setRightPanelOpen(false)
+
+    useAppStore.getState().toggleRightPanel()
+
+    expect(useAppStore.getState().rightPanelOpen).toBe(true)
+    expect(useAppStore.getState().rightPanelTab).toBe("changes")
+    expect(useAppStore.getState().openTabsBySession[sessionScopeKey(A)]).toEqual([
+      "changes",
+    ])
+  })
+
+  it("setRightPanelTab plan registers an empty Plan tab without requiring a plan", () => {
+    useAppStore.getState().setActiveSessionId(A)
+    useAppStore.getState().setRightPanelOpen(true)
+    useAppStore.getState().setRightPanelTab("plan")
+
+    expect(useAppStore.getState().rightPanelTab).toBe("plan")
+    expect(useAppStore.getState().openTabsBySession[sessionScopeKey(A)]).toEqual([
+      "plan",
+    ])
+    expect(useAppStore.getState().sessionPlansBySession[A] ?? []).toEqual([])
+  })
+
   it("setPendingPlanApproval registers the plan tab in openTabsBySession", () => {
     useAppStore.getState().setActiveSessionId(A)
     useAppStore.getState().setPendingPlanApproval({
