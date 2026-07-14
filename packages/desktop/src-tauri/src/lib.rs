@@ -133,7 +133,18 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // Persist size/position/maximized — but never decorations. Restoring a
+        // pre-custom-chrome `decorations: true` from `.window-state.json`
+        // would stack the native Windows title bar on top of WindowTitleBar
+        // (double header). Config + setup both force undecorated.
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::all()
+                        & !tauri_plugin_window_state::StateFlags::DECORATIONS,
+                )
+                .build(),
+        )
         .plugin(tauri_plugin_os::init())
         // Auto-update + relaunch. Signing key / Apple notarization still
         // gated on secrets (see release.yml TODOs) — the plugin is safe to
@@ -152,7 +163,11 @@ pub fn run() {
             // stale sub-minimum size from `.window-state.json` (see constants
             // above). Re-apply the min constraint and, if the size restored by
             // the plugin already violates it, snap back up to the minimum.
+            // Also re-assert undecorated chrome: older window-state files (and
+            // any future plugin flag slip) must not bring the native title bar
+            // back over WindowTitleBar.
             if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_decorations(false);
                 let min_size = LogicalSize::new(MAIN_WINDOW_MIN_WIDTH, MAIN_WINDOW_MIN_HEIGHT);
                 let _ = window.set_min_size(Some(min_size));
 
