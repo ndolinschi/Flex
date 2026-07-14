@@ -150,6 +150,24 @@ body {
     color var(--duration-normal) var(--easing-default);
 }
 
+/* Custom title bar: mark drag regions for Tauri + Chromium app-region. */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+button,
+a,
+input,
+textarea,
+select,
+[role="button"],
+[role="menuitem"],
+[role="menu"] {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
 /* Keyboard-first focus — thin neutral ring, never accent glow (Feel: Keyboard-first focus). */
 :focus-visible:not(input):not(textarea):not(select) {
   outline: 1px solid var(--color-stroke-2);

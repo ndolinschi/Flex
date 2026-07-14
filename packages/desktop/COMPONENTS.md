@@ -78,6 +78,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?` | SessionSidebar |
 | `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle` | SessionSidebar |
 | `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions | `title`, `status`, `onBuild`, `onAddComment?` | RightPanel Plan tab (`PlanTab`) |
+| `AppMark` / `TitleBarMenus` | Wireframe mark + File/Edit/View/Help for custom window chrome | `onOpenCommandPalette?`, `onOpenSearch?` | WindowTitleBar |
+| `WindowControls` / `TrafficLights` / `CaptionButtons` | Platform window controls (macOS traffic lights · Windows/Linux caption buttons) | `host?` | WindowTitleBar |
 
 ## Organisms
 
@@ -95,6 +97,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `DatabaseTab` | UI plugin: SQLite / Postgres / MySQL connections, schemas, tables, SQL + result grid | `active`, `session` | RightPanel (plugin registry) |
 | `FilesTab` | Cursor-style open-file strip + Monaco editor; empty state shows `FileExplorer` (searchable `list_files`) | `active` | RightPanel |
 | `AppHeader` | Title + sole right-panel toggle (⌘J) + session menu | — | ChatShell |
+| `WindowTitleBar` | Cursor-style custom window chrome (`decorations: false`): traffic lights / caption buttons + File/Edit/View/Help + drag region | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | RightPanel |
 | `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/`. Opening the tab with zero workspace PTYs auto-creates one shell. | — | RightPanel |
 | `CommandPalette` | ⌘K-style action palette (nav, theme, new agent); rows via `CommandPaletteRow`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell |
