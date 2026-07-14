@@ -15,7 +15,7 @@ import { ProjectMemorySection } from "./ProjectMemorySection"
 import { useProjectCwds } from "./useProjectCwds"
 
 /** Memory content — mounted inside the Settings shell's "Memory" section
- * (design-map/07-settings.md build brief §3). No `SettingsShell` wrapper
+ * (DESIGN.md Settings). No `SettingsShell` wrapper
  * here anymore; the shell owns nav+header+page title. */
 export const MemoryContent = () => {
   const memoryQuery = useQuery({

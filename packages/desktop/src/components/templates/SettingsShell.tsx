@@ -11,7 +11,7 @@ import { cn } from "../../lib/utils"
 type SettingsShellProps = {
   /** Section content keyed by id — the shell renders whichever one is
    * active, so the header title/description below are per-section, not a
-   * single title for the whole surface (design-map/07-settings.md §1). */
+   * single title for the whole surface (DESIGN.md Settings). */
   sections: Partial<Record<SettingsSectionId, ReactNode>>
   /** Page title shown above the active section's content. */
   titleFor: (section: SettingsSectionId) => string
@@ -20,8 +20,8 @@ type SettingsShellProps = {
   embedded?: boolean
 }
 
-/** Settings shell — persistent left nav + content pane (design-map/07-
- * settings.md §1-3). Replaces the old single-page "Back to chat" header
+/** Settings shell — persistent left nav + content pane (see DESIGN.md
+ * Settings shell / nav). Replaces the old single-page "Back to chat" header
  * shell: this is now the one surface that houses General / Appearance /
  * Models & Connections / Behavior / Memory / Tools & MCP / Automations, with
  * a Search Settings box at the top of the nav that navigates to (and

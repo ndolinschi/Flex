@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import { cn } from "../../lib/utils"
 
-/* ── New Settings shell primitives (design-map/07-settings.md §4) ──────────
+/* ── Settings shell primitives (see DESIGN.md Settings) ──────────
  * `SettingsCard` + `SettingRow` implement the reference's group-card/row
  * anatomy for the new SettingsShell nav+content layout. The legacy
  * `SettingsSection`/`FieldRow` pair below (bordered card, label+hint layout)
@@ -56,7 +56,7 @@ type SettingRowProps = {
 
 /** Toggle-row anatomy: title+description (both 13px, differ only by color)
  * on the left, a right-aligned control slot, and an absolute inset divider
- * between rows (design-map/07-settings.md §4, `.cursor-settings-cell`). */
+ * between rows (see DESIGN.md Settings rows). */
 export const SettingRow = ({
   rowId,
   title,
@@ -136,7 +136,7 @@ export const SettingsSection = ({
         className={cn(
           "@container/settings rounded-[var(--radius-card)] bg-settings-card",
           // Inset dividers between rows (12px inset, absolute — not
-          // full-width borders), per design-map/07-settings.md §4.
+          // full-width borders), per DESIGN.md Settings.
           "[&>*+*]:relative [&>*+*]:before:absolute [&>*+*]:before:inset-x-3.5 [&>*+*]:before:top-0 [&>*+*]:before:h-px [&>*+*]:before:bg-stroke-4 [&>*+*]:before:content-['']",
         )}
       >

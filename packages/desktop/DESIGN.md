@@ -9,6 +9,9 @@ Tokens live in `src/styles/tokens.css`. Width clamps live in
 `src/stores/layoutConstants.ts`. Feel: compact density, quiet chrome,
 whisper fills — never inflate gutters without updating this doc.
 
+Agents: use the **design-audit** skill (`.claude/skills/design-audit`) to
+audit and fix UI against this file.
+
 ---
 
 ## Feel principles
@@ -253,7 +256,7 @@ FilesChangedCard) sits **outside** the virtual window. Scroll-down FAB:
 | Tab | Header notes |
 |---|---|
 | Plan | `PlanToolbar` breadcrumbs + Build (`h-6` controls) |
-| Changes | Quiet title row; select toolbar `h-7`; file list `px-2` |
+| Changes | Quiet title row; select toolbar `h-7` (dedicated row, not `--header-height`); file list `px-2` / rows `px-2.5` |
 | Files | Open-buffer chips (`Tab` sm) + Monaco / explorer |
 | Terminal | Title + New / List; agent subtitle separate bordered row |
 | Browser | Toolbar `z-20` over webview slot |
@@ -301,6 +304,25 @@ Tailwind `p-*` / `gap-*` map through `@theme` in `src/index.css`.
 
 ---
 
+## Do / Don’t (from design-system audits)
+
+| Do | Don’t |
+|---|---|
+| Reuse `Tab` / `TabStrip` / `TabClose` for panel tabs + file chips | Duplicate pill markup per surface |
+| Keep panel chrome at `px-2.5`; chat at `px-4` | Mix gutters under the same strip |
+| Put only **`h-6`** controls in 30px header rows | `h-7` pills inside `--header-height` (reads flush) |
+| Give TabStrip the bottom border; content headers title the body | Stack two `border-b` with no content between |
+| Neutral `stroke-2` focus rings on chrome inputs | Accent glow focus |
+| `fill-2` selected / `fill-4` list hover | One-off active fills (`fill-3` as selected) |
+| Quiet sash hover (white-alpha) | Accent-colored resize lines |
+| Timeline gaps via **padding** | Margin between virtualized rows |
+| Keep Chat mounted under settings overlays | Remount ChatPage on settings round-trips |
+| Update this file when gutters change | Leave docs stale after a spacing PR |
+
+**Agent skill:** `.claude/skills/design-audit/SKILL.md` — run that procedure for spacing / layout audits.
+
+---
+
 ## Checklist for UI changes
 
 1. Pick the surface gutter from **Spacing canon** (chat `px-4`, panel `px-2.5`, sidebar `px-2`).
@@ -309,3 +331,4 @@ Tailwind `p-*` / `gap-*` map through `@theme` in `src/index.css`.
 4. Prefer tokens / shared atoms (`Tab`, `TabStrip`, `IconButton`) over one-off heights.
 5. Update this file when introducing a new page, gutter, or chrome height.
 6. Component add/rename → also update [COMPONENTS.md](./COMPONENTS.md).
+7. For a full pass, follow the **design-audit** skill checklist and report violations → fixes → exceptions.

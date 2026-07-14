@@ -10,7 +10,7 @@ import { RoutineRow } from "./RoutineRow"
 
 /** Automations content — scheduled/webhook-triggered routines (cron/webhook
  * run_goal). Mounted inside the Settings shell's "Automations" section
- * (design-map/07-settings.md build brief §3); no `SettingsShell` wrapper
+ * (DESIGN.md Settings); no `SettingsShell` wrapper
  * here anymore since the shell owns nav+header+page title. */
 export const AutomationsContent = () => {
   const [creating, setCreating] = useState(false)

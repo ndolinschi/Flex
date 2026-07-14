@@ -36,8 +36,8 @@ const DESCRIPTIONS: Partial<Record<SettingsSectionId, string>> = {
   diagnostics: "Debug logging, local crash capture, diagnostics export, and updates.",
 }
 
-/** General section — notification preferences (design-map/07-settings.md
- * build brief §3). "System notifications" gates the native OS notification
+/** General section — notification preferences (see DESIGN.md Settings).
+ * "System notifications" gates the native OS notification
  * entirely (`notifyTurnCompleted`, background-session completions only);
  * "Completion sound" plays a short WebAudio chime on ANY turn completion
  * (active session included) when enabled — see `useGlobalSessionEvents`. */
@@ -77,8 +77,7 @@ const GeneralContent = () => {
 }
 
 /** Appearance section — theme toggle moved here from the sidebar footer
- * icon-button (design-map/07-settings.md build brief §3/§1: "theme toggle
- * moved here"). The sidebar's quick-access icon stays as a convenience
+ * icon-button (see DESIGN.md Settings). The sidebar's quick-access icon stays as a convenience
  * shortcut; this is now the canonical settings location. Accent color
  * (neutral by default, or a hue / custom hex) lives here too. */
 const AppearanceContent = () => {
@@ -192,8 +191,8 @@ const BehaviorContent = () => {
   )
 }
 
-/** Settings shell composition root — assembles all sections (design-map/07-
- * settings.md build brief §3) and mounts the persistent-nav `SettingsShell`.
+/** Settings shell composition root — assembles all sections (see DESIGN.md
+ * Settings) and mounts the persistent-nav `SettingsShell`.
  * This one component now backs all four legacy routes (settings / customize
  * / automations / memory); `App.tsx` renders it for each and `appStore`
  * preselects the matching nav section (see `setRoute`). */

@@ -8,7 +8,7 @@ type ToggleProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onChange"> & {
   small?: boolean
 }
 
-/** Settings switch (design-map/07-settings.md §5, `.solid-switch`). Track
+/** Settings switch (see DESIGN.md Settings). Track
  * 30x18 / radius 9, knob 14x14 inset 2px, .2s ease on both — ON is GREEN
  * (`--color-switch-on`), not the accent blue used elsewhere in the app. */
 export const Toggle = ({
