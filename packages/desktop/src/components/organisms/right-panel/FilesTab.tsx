@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Editor from "@monaco-editor/react"
-import { FolderTree, Save, X } from "lucide-react"
-import { IconButton, Spinner } from "../../atoms"
-import { ConfirmDialog } from "../../molecules"
+import { Code2, Eye, FolderTree, Save, X } from "lucide-react"
+import { IconButton, ScrollArea, Spinner } from "../../atoms"
+import { ConfirmDialog, MarkdownBody } from "../../molecules"
 import { ensureMonaco, languageForPath } from "../../../lib/monacoEnv"
 import {
   readTextFile,
@@ -24,10 +24,60 @@ type FilesTabProps = {
   active: boolean
 }
 
+type FileChipProps = {
+  path: string
+  active: boolean
+  dirty: boolean
+  onSelect: () => void
+  onClose: () => void
+}
+
+/** Open-buffer chip — close collapses to zero width at rest and expands on
+ * hover/focus, matching `RightPanelTabBar`. */
+const FileChip = ({ path, active, dirty, onSelect, onClose }: FileChipProps) => (
+  <div
+    className={cn(
+      "group flex h-6 max-w-[160px] items-center rounded-md pl-1.5 pr-0.5 text-xs",
+      active
+        ? "bg-fill-2 text-ink"
+        : "text-ink-muted hover:bg-fill-4 hover:text-ink-secondary",
+    )}
+  >
+    <button
+      type="button"
+      className="min-w-0 flex-1 truncate py-0.5 text-left"
+      title={path}
+      onClick={onSelect}
+    >
+      {dirty ? "● " : ""}
+      {basename(path)}
+    </button>
+    <span
+      role="button"
+      aria-label={`Close ${basename(path)}`}
+      tabIndex={-1}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClose()
+      }}
+      className={cn(
+        "ml-0 max-w-0 shrink-0 overflow-hidden rounded-sm p-0 opacity-0",
+        "transition-[max-width,margin,padding,opacity] duration-[140ms] ease-[var(--easing-default)]",
+        "hover:bg-fill-1",
+        "group-hover:ml-0.5 group-hover:max-w-[1rem] group-hover:p-0.5 group-hover:opacity-100",
+        "group-focus-within:ml-0.5 group-focus-within:max-w-[1rem] group-focus-within:p-0.5 group-focus-within:opacity-100",
+      )}
+    >
+      <X className="h-3 w-3" aria-hidden />
+    </span>
+  </div>
+)
+
 /** Cursor-style file strip + Monaco editor inside the right panel.
  * Keep mounted (hidden) while the Files tab stays in openTabs so buffers
  * and dirty drafts survive switching to Changes/Terminal. Empty Files tab
- * shows a workspace file browser (not auto-closed). */
+ * shows a workspace file browser (not auto-closed). Markdown files can
+ * toggle a rendered preview via `MarkdownBody`. */
 export const FilesTab = ({ active }: FilesTabProps) => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const sessionKey = sessionScopeKey(activeSessionId)
@@ -59,6 +109,10 @@ export const FilesTab = ({ active }: FilesTabProps) => {
   const [saving, setSaving] = useState(false)
   const [confirmClosePath, setConfirmClosePath] = useState<string | null>(null)
   const [browseMode, setBrowseMode] = useState(false)
+  /** Per-path edit vs preview for markdown buffers. */
+  const [previewByPath, setPreviewByPath] = useState<Record<string, boolean>>(
+    {},
+  )
   const hadOpenFilesRef = useRef(openFiles.length > 0)
 
   useEffect(() => {
@@ -128,6 +182,20 @@ export const FilesTab = ({ active }: FilesTabProps) => {
     () => (path ? languageForPath(path) : "plaintext"),
     [path],
   )
+  const isMarkdown = language === "markdown"
+  // Markdown opens in preview by default; Eye/Code toggles edit.
+  const previewMode =
+    !!path &&
+    isMarkdown &&
+    (path in previewByPath ? !!previewByPath[path] : true)
+
+  const toggleMarkdownPreview = useCallback(() => {
+    if (!path || !isMarkdown) return
+    setPreviewByPath((prev) => {
+      const currentlyPreview = path in prev ? !!prev[path] : true
+      return { ...prev, [path]: !currentlyPreview }
+    })
+  }, [path, isMarkdown])
 
   const handleChange = useCallback(
     (next: string | undefined) => {
@@ -179,6 +247,25 @@ export const FilesTab = ({ active }: FilesTabProps) => {
     return () => window.removeEventListener("keydown", onKey)
   }, [active, handleSave])
 
+  const closeConfirm = (
+    <ConfirmDialog
+      open={confirmClosePath !== null}
+      title="Discard unsaved changes?"
+      description={
+        confirmClosePath
+          ? `${basename(confirmClosePath)} has unsaved edits. Close anyway?`
+          : undefined
+      }
+      confirmLabel="Discard"
+      danger
+      onConfirm={() => {
+        if (confirmClosePath) closeFile(sessionKey, confirmClosePath)
+        setConfirmClosePath(null)
+      }}
+      onCancel={() => setConfirmClosePath(null)}
+    />
+  )
+
   if (!activeSessionId) {
     return (
       <div className="flex h-full items-center justify-center px-4 text-center text-sm text-ink-muted">
@@ -189,47 +276,31 @@ export const FilesTab = ({ active }: FilesTabProps) => {
 
   const showExplorer = browseMode || openFiles.length === 0 || !path
 
+  const fileChips =
+    openFiles.length > 0 ? (
+      <>
+        {openFiles.map((p) => (
+          <FileChip
+            key={p}
+            path={p}
+            active={p === path && !browseMode}
+            dirty={drafts[p] !== undefined}
+            onSelect={() => {
+              setBrowseMode(false)
+              setActive(sessionKey, p)
+            }}
+            onClose={() => requestCloseFile(p)}
+          />
+        ))}
+      </>
+    ) : null
+
   if (showExplorer) {
     return (
       <div className="flex h-full min-h-0 flex-col">
         {openFiles.length > 0 ? (
           <div className="flex h-[var(--header-height)] shrink-0 items-center gap-0.5 overflow-x-auto px-1">
-            {openFiles.map((p) => {
-              const isActive = p === path && !browseMode
-              const isDirty = drafts[p] !== undefined
-              return (
-                <div
-                  key={p}
-                  className={cn(
-                    "group flex h-6 max-w-[160px] items-center gap-1 rounded-md px-1.5 text-xs",
-                    isActive
-                      ? "bg-fill-2 text-ink"
-                      : "text-ink-muted hover:bg-fill-4 hover:text-ink-secondary",
-                  )}
-                >
-                  <button
-                    type="button"
-                    className="min-w-0 flex-1 truncate text-left"
-                    title={p}
-                    onClick={() => {
-                      setBrowseMode(false)
-                      setActive(sessionKey, p)
-                    }}
-                  >
-                    {isDirty ? "● " : ""}
-                    {basename(p)}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Close ${basename(p)}`}
-                    className="rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-fill-3"
-                    onClick={() => requestCloseFile(p)}
-                  >
-                    <X className="h-3 w-3" aria-hidden />
-                  </button>
-                </div>
-              )
-            })}
+            {fileChips}
           </div>
         ) : null}
         {cwd ? (
@@ -254,6 +325,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
             </p>
           </div>
         )}
+        {closeConfirm}
       </div>
     )
   }
@@ -270,40 +342,21 @@ export const FilesTab = ({ active }: FilesTabProps) => {
         >
           <FolderTree className="h-3.5 w-3.5" aria-hidden />
         </IconButton>
-        {openFiles.map((p) => {
-          const isActive = p === path
-          const isDirty = drafts[p] !== undefined
-          return (
-            <div
-              key={p}
-              className={cn(
-                "group flex h-6 max-w-[160px] items-center gap-1 rounded-md px-1.5 text-xs",
-                isActive
-                  ? "bg-fill-2 text-ink"
-                  : "text-ink-muted hover:bg-fill-4 hover:text-ink-secondary",
-              )}
-            >
-              <button
-                type="button"
-                className="min-w-0 flex-1 truncate text-left"
-                title={p}
-                onClick={() => setActive(sessionKey, p)}
-              >
-                {isDirty ? "● " : ""}
-                {basename(p)}
-              </button>
-              <button
-                type="button"
-                aria-label={`Close ${basename(p)}`}
-                className="rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-fill-3"
-                onClick={() => requestCloseFile(p)}
-              >
-                <X className="h-3 w-3" aria-hidden />
-              </button>
-            </div>
-          )
-        })}
+        {fileChips}
         <div className="ml-auto flex shrink-0 items-center gap-0.5 pr-1">
+          {isMarkdown && path ? (
+            <IconButton
+              label={previewMode ? "Edit markdown" : "Preview markdown"}
+              onClick={toggleMarkdownPreview}
+              className={cn("h-6 w-6", previewMode && "bg-fill-3 text-ink")}
+            >
+              {previewMode ? (
+                <Code2 className="h-3 w-3" aria-hidden />
+              ) : (
+                <Eye className="h-3 w-3" aria-hidden />
+              )}
+            </IconButton>
+          ) : null}
           <IconButton
             label={dirty ? "Save" : "Save (no changes)"}
             disabled={!dirty || saving || !path}
@@ -336,6 +389,16 @@ export const FilesTab = ({ active }: FilesTabProps) => {
               Retry
             </button>
           </div>
+        ) : path && previewMode ? (
+          <ScrollArea className="h-full">
+            <div className="px-4 py-3">
+              {value.trim().length === 0 ? (
+                <p className="text-sm text-ink-muted">Empty file</p>
+              ) : (
+                <MarkdownBody content={value} />
+              )}
+            </div>
+          </ScrollArea>
         ) : path ? (
           <Editor
             height="100%"
@@ -365,22 +428,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
         ) : null}
       </div>
 
-      <ConfirmDialog
-        open={confirmClosePath !== null}
-        title="Discard unsaved changes?"
-        description={
-          confirmClosePath
-            ? `${basename(confirmClosePath)} has unsaved edits. Close anyway?`
-            : undefined
-        }
-        confirmLabel="Discard"
-        danger
-        onConfirm={() => {
-          if (confirmClosePath) closeFile(sessionKey, confirmClosePath)
-          setConfirmClosePath(null)
-        }}
-        onCancel={() => setConfirmClosePath(null)}
-      />
+      {closeConfirm}
     </div>
   )
 }
