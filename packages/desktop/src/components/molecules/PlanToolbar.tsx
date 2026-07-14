@@ -256,7 +256,7 @@ export const PlanToolbar = ({
 
   return (
     <div className={cn("flex shrink-0 flex-col", className)}>
-      <div className="flex h-[var(--header-height)] items-center gap-1.5 px-2 text-sm">
+      <div className="flex h-[var(--header-height)] items-center gap-1.5 px-2.5 text-sm">
         <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
           <span className="min-w-0 truncate text-ink-muted">{repo}</span>
           <span className="shrink-0 text-ink-faint">›</span>
@@ -285,21 +285,26 @@ export const PlanToolbar = ({
           />
 
           {showKeepPlanning && onKeepPlanning ? (
-            <Button variant="ghost" size="sm" onClick={onKeepPlanning}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6"
+              onClick={onKeepPlanning}
+            >
               Keep planning
             </Button>
           ) : null}
 
           {status === "built" ? (
             <span
-              className="flex h-7 items-center gap-1 rounded-md px-2 text-sm text-yellow"
+              className="flex h-6 items-center gap-1 rounded-md px-2 text-sm text-yellow"
               data-testid="plan-build-status"
             >
               <Check className="h-3 w-3" aria-hidden /> Built
             </span>
           ) : status === "building" ? (
             <span
-              className="flex h-7 items-center gap-1.5 rounded-md px-2 text-sm text-ink-secondary"
+              className="flex h-6 items-center gap-1.5 rounded-md px-2 text-sm text-ink-secondary"
               data-testid="plan-build-status"
             >
               <RunningDot className="h-4 w-4" /> Building…
@@ -308,6 +313,7 @@ export const PlanToolbar = ({
             <Button
               variant="primary"
               size="sm"
+              className="h-6"
               disabled={status === "draft"}
               onClick={onBuild}
               aria-label="Build plan"
@@ -321,7 +327,7 @@ export const PlanToolbar = ({
             <IconButton
               label="More plan actions"
               onClick={openMenu}
-              className={cn(menuPos && "bg-fill-3 text-ink")}
+              className={cn("h-6 w-6", menuPos && "bg-fill-3 text-ink")}
             >
               <MoreHorizontal className="h-3.5 w-3.5" aria-hidden />
             </IconButton>
@@ -330,7 +336,7 @@ export const PlanToolbar = ({
       </div>
 
       {find?.open ? (
-        <div className="flex h-8 items-center gap-1.5 border-t border-stroke-3 px-2">
+        <div className="flex h-8 items-center gap-1.5 border-t border-stroke-3 px-2.5">
           <Search className="h-3.5 w-3.5 shrink-0 text-icon-3" aria-hidden />
           <input
             ref={findInputRef}

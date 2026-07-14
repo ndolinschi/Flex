@@ -3,6 +3,9 @@
 Atomic Design catalog for `packages/desktop`. Presentation components are dumb;
 data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 
+**Layout, spacing, gutters, viewports, and positioning** live in
+[DESIGN.md](./DESIGN.md) — read that before changing padding or chrome heights.
+
 ## Atoms
 
 | Component | Purpose | Key props | Used by |
@@ -14,7 +17,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `TextArea` | Multi-line text field | standard textarea props | Composer |
 | `Label` | Accessible form label | `htmlFor`, `children` | FormField, ModelSelect |
 | `Spinner` | Indeterminate loading | `size` | SessionSidebar, ProviderSettingsForm |
-| `Tab` | Pill tab / open-buffer chip (primary right-panel chrome) | `selected`, `size?`, `variant?`, `icon?`, `badge?`, `onSelect`, `onClose?` | RightPanelTabBar, FilesTab (`FileChip`) |
+| `Tab` | Pill tab / open-buffer chip (primary right-panel chrome) | `selected`, `size?` (md/sm both `h-6`), `variant?`, `icon?`, `badge?`, `onSelect`, `onClose?` | RightPanelTabBar, FilesTab (`FileChip`) |
 | `TabClose` | Hover-collapse close control for tabs/chips | `label`, `onClose`, `revealOnFocusWithin?` | `Tab` |
 | `TabStrip` | Horizontal open-tabs strip (`role="tablist"`) | `children`, `className?` | RightPanelTabBar |
 | `Badge` | Status / meta chip | `tone`, `children` | ToolCallChip |
@@ -194,13 +197,13 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 ## Theme & motion
 
 - Themes: `data-theme="dark"|"light"` on `<html>` (Cursor-tight premium palettes — neutral charcoal / clean white, close surface steps, whisper fills, neutral monochrome accent by default; colored accents via Settings → Appearance).
-- Feel principles (local `design-map/README.md`): compact density, quiet chrome, whisper fills, opacity hover, micro-motion, alpha hierarchy, keyboard focus, weight 590 + micro tracking, alpha borders, radius-by-role, neutral interactive chrome, thin scrollbars. Interactive chrome leans solid-pill (AI Studio–inspired) without a full layout redesign.
+- Feel principles ([DESIGN.md](./DESIGN.md)): compact density, quiet chrome, whisper fills, opacity hover, micro-motion, alpha hierarchy, keyboard focus, weight 590 + micro tracking, alpha borders, radius-by-role, neutral interactive chrome, thin scrollbars. Interactive chrome leans solid-pill (AI Studio–inspired) without a full layout redesign.
 - Motion: hover 100ms ease; trays `animate-tray-in`; pane swaps `animate-pane-fade`; timeline rows `animate-row-fade`; end-of-turn `animate-end-turn-in` (160ms); HITL cards `animate-modal-in` (scale .97→1); overlays `animate-backdrop-in`.
 - Composer: `--radius-composer` 14px, soft elevation + stroke focus (no accent glow), compact auto-grow (~28–160px) + unified toolbar (`text-sm` input; Plus / Bypass / Send `h-6` circles with `h-3.5` icons; Mode/Model `h-6` pills; left cluster `gap-1`, Bypass↔Send `gap-1.5`); quiet toolbar opacity (0.5→0.8); mode/model pills neutral fill + stroke.
 - Content rail: `--content-rail` 840px (`52.5rem`).
 - ContextBar sits above the composer (project / branch / context %) — Flex Canon.
 - Sidebar footer = theme + settings (Flex Canon); rows use fill-4 hover / fill-2 selected.
-- Right panel tabs = Plan / Changes / Terminal / Browser (Flex Canon); pill tabs via shared `Tab`/`TabStrip`/`TabClose` atoms (Files open-buffer chips compose the same `Tab` at `size="sm"`); sash hover white-alpha.
+- Right panel tabs = Plan / Changes / Terminal / Browser (Flex Canon); pill tabs via shared `Tab`/`TabStrip`/`TabClose` atoms (`TabStrip` `px-2.5`/`gap-1.5`; `Tab` md/sm both `h-6` so selected fills clear the 30px strip edges; Files open-buffer chips compose the same `Tab` at `size="sm"`); sash hover white-alpha.
 - Focus policy: interactive chrome uses the global neutral `stroke-2` outline; form fields and chrome search inputs use a matching neutral stroke ring (never accent glow).
 - Prior user bubbles dim to 50% (hover restores); hairline stroke-2; message actions reveal on row hover.
 - Sessions: default title `New Agent`; one draft per project; first prompt renames the session.
@@ -208,7 +211,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
   (status/rebuild/auto-update-on-search/auto-context), fallback models, default isolation.
 - Composer `/` opens slash-command tray; SessionMenu supports undo/redo files + integrate/discard when isolated.
 
-Keep this file in sync when adding or renaming components.
+Keep this file in sync when adding or renaming components. For layout and
+spacing changes, update [DESIGN.md](./DESIGN.md).
 
 ## Feature flags
 
@@ -235,6 +239,6 @@ Keep this file in sync when adding or renaming components.
 - **Session-event demux:** `lib/sessionEventBus` attaches one Tauri `session-event` listener; `useGlobalSessionEvents` and each `useSessionEvents` subscribe to the bus (SubagentViewer no longer triples wire delivery).
 - **Browser / terminal selectors:** `useBrowserSession` selects per-session primitives; `TerminalTab` mounts xterm only for the active session's terminals (+ that session's agent terminal). `useIsGitRepo` shares the 5s `git-is-repo` poll across ContextBar / FilesChangedCard / RightPanel / ChangesTab.
 - **MarkdownBody:** module-scoped `components` map so settled `react-markdown` trees keep stable element constructors across parent re-renders.
-- **Spacing balance (careful):** chat chrome/gutters converge on `px-4` — AppHeader matches the timeline/composer rail (`border-b` + `gap-0.5` control cluster); compact 30px header/titlebar with quiet `h-6` controls; loading/error/empty states drop `p-6`/`px-6` jumps; ContextBar loses inner `px-1`; composer toolbar aligns with textarea (`px-2.5`, Mode/Model shared pill chrome); ChatShell/timeline bottom stack eased `pb-3`→`pb-2`; RightPanel tab bar + every tab chrome row (`PlanToolbar`, Changes/Files/Terminal/Database/Browser headers, CommitCenter, error banners) share `px-2` / `--header-height`; Terminal/Database 180px sidebars share full-bleed `px-2 py-1.5 text-xs` rows; Settings section headers `px-3.5` with `before:inset-x-3.5` row dividers and `gap-3` between cards; Welcome primary inputs `h-9`. Session sidebar section headers use `px-2` (aligned with rows); session-row status slot is a fixed `h-5 w-5`. Settings shell uses `px-4` / `pt-6` (not `pl-12`/`pt-12`); nav selected `bg-fill-2`; list rows `px-3.5 py-3`; Welcome onboarding uses `FormField` + `h-9` controls.
+- **Spacing balance (careful):** see [DESIGN.md](./DESIGN.md) for the full gutter/height canon. Short form: chat chrome `px-4`; RightPanel `TabStrip` + tab chrome `px-2.5` / `--header-height` with `Tab` at `h-6`; Terminal/Database side lists `px-2.5 py-1.5 text-xs`; Settings `px-3.5` rows / `gap-3` cards; Welcome `h-9` inputs; session sidebar list `px-2`.
 - **Streaming visuals:** `StreamingCaret` renders inline inside live `MarkdownBody` (including mid-turn narration in work groups); live assistant rows reserve `MessageActions` height; highlight.js preloads while live; `TurnTimeline` uses per-session `streamingSessions[id]` (SubagentViewer-safe); bottom “Working” hides when live answer text is visible; double-rAF remeasure on stream settle.
 - **Files / Monaco:** `@monaco-editor/react` + Vite `?worker` locals (`lib/monacoEnv.ts`); editor/vendor split via `manualChunks.monaco`. Open buffers live in `openFilesBySession` under one right-panel `files` tab (keep-alive like Terminal).

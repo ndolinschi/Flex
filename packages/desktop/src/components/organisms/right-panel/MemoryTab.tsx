@@ -6,7 +6,7 @@ import { MemoryContent } from "../../../pages/settings/memory/MemoryContent"
  * only mounts when the tab is open. Works empty (no memories yet). */
 export const MemoryTab = () => {
   return (
-    <ScrollArea className="min-h-0 flex-1 px-3 py-3">
+    <ScrollArea className="min-h-0 flex-1 px-2.5 py-3">
       <MemoryContent />
     </ScrollArea>
   )

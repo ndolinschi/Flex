@@ -34,7 +34,8 @@ plus a Tauri desktop UI:
   Discord) and the session router are deliberately not implemented yet — they build on this
   trait later.
 - **`packages/desktop`** — Tauri 2 + React UI; second composition root via `AgentBuilder`
-  (native providers only). Atomic Design catalog in `packages/desktop/COMPONENTS.md`.
+  (native providers only). Atomic Design catalog in `packages/desktop/COMPONENTS.md`;
+  layout/spacing in `packages/desktop/DESIGN.md`.
 
 One `Agent` interface with two families of implementations: a **native loop** that calls LLM
 provider APIs directly, and **connectors** that drive external coding agents behind the same
@@ -178,7 +179,8 @@ at the composition root (`AgentBuilder::enable_plugin("search")`).
    `ARCHITECTURE.md` / `TECHSTACK.md` / `COMPONENTS.md` (agent navigation docs — keep
    them in sync when architecture, crates, or tooling change),
    `packages/engine/prompts/**/*.md` (data), and
-   `packages/desktop/{README,COMPONENTS}.md` (desktop UI). Do not add others.
+   `packages/desktop/{README,COMPONENTS,DESIGN}.md` (desktop UI — component catalog +
+   layout/spacing). Do not add others.
 4. **No `unwrap`/`expect` in library crates.** thiserror enums per crate, `#[non_exhaustive]`
    on public enums. `anyhow` only in `runner` and tests.
 5. **tracing, not println.** Libraries never install subscribers; `runner` does.

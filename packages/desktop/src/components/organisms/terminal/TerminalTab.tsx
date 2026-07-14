@@ -122,7 +122,7 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
     <div className="flex h-full min-h-0 flex-col">
       {/* Header — fixed chrome height so tab switches don't jump; agent
           subtitle lives on a separate non-chrome row below. */}
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5">
         <span className="min-w-0 flex-1 truncate text-sm text-ink">
           {isAgentSelected
             ? "Agent terminal"
@@ -130,7 +130,7 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
               ? basename(activeTerminal.cwd) || "Terminal"
               : "Terminal"}
         </span>
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="flex shrink-0 items-center gap-1">
           <IconButton
             label="New Terminal"
             onClick={() => void handleNewTerminal()}
@@ -148,7 +148,7 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
         </div>
       </div>
       {isAgentSelected ? (
-        <p className="shrink-0 truncate border-b border-stroke-3 px-2 py-1 text-sm text-ink-muted">
+        <p className="shrink-0 truncate border-b border-stroke-3 px-2.5 py-1.5 text-sm text-ink-muted">
           Agent is using this terminal. It&apos;s read-only.
         </p>
       ) : null}
@@ -157,7 +157,7 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
       <div className="flex min-h-0 flex-1">
         {terminalListVisible && (terminals.length > 0 || hasAgentStream) ? (
           <div className="flex w-[180px] shrink-0 flex-col border-r border-stroke-3">
-            <div className="flex h-6 shrink-0 items-center px-2 text-xs text-ink-muted">
+            <div className="flex h-6 shrink-0 items-center px-2.5 text-xs text-ink-muted">
               <span>
                 {terminals.length === 0
                   ? "Terminals"
@@ -169,7 +169,7 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
             <ScrollArea className="min-h-0 flex-1 py-1.5">
               {hasAgentStream && agentId ? (
                 <>
-                  <p className="px-2 pb-1.5 text-xs text-ink-faint">Agent</p>
+                  <p className="px-2.5 pb-1.5 text-xs text-ink-faint">Agent</p>
                   <AgentTerminalRow
                     selected={activeTerminalId === agentId}
                     onSelect={() => setActiveTerminalId(sessionKey, agentId)}
@@ -183,7 +183,7 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
                 <>
                   <p
                     className={cn(
-                      "px-2 pb-1.5 text-xs text-ink-faint",
+                      "px-2.5 pb-1.5 text-xs text-ink-faint",
                       hasAgentStream && agentId ? "pt-1.5" : undefined,
                     )}
                   >

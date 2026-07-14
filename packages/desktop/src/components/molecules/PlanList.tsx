@@ -15,7 +15,7 @@ export const PlanList = ({ plans, onSelect, className }: PlanListProps) => {
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
-      <div className="flex h-[var(--header-height)] shrink-0 items-center px-2">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center px-2.5">
         <h2 className="min-w-0 truncate text-sm font-medium text-ink">
           Review plans
           <span className="ml-2 font-normal text-ink-muted">
@@ -23,7 +23,7 @@ export const PlanList = ({ plans, onSelect, className }: PlanListProps) => {
           </span>
         </h2>
       </div>
-      <ul className="min-h-0 flex-1 overflow-y-auto px-2 py-2" role="list">
+      <ul className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2" role="list">
         {ordered.map((plan) => {
           const commentCount = plan.comments.length
           return (
