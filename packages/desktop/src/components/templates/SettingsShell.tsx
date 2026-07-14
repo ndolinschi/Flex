@@ -83,12 +83,12 @@ export const SettingsShell = ({
 
   const body = (
     <>
-      <header className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2">
+      <header className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-4">
         <IconButton label="Back to chat" onClick={() => setRoute("chat")}>
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
         </IconButton>
       </header>
-      <main className="flex flex-1 items-stretch gap-12 overflow-y-auto pl-12">
+      <main className="flex flex-1 items-stretch gap-6 overflow-y-auto px-4">
         <SettingsNav
           active={activeSection}
           onSelect={(id) => {
@@ -102,8 +102,8 @@ export const SettingsShell = ({
           onResultIndexChange={setResultIndex}
           onResultSelect={navigateToResult}
         />
-        <div className="min-w-0 flex-1 pr-12">
-          <div className="mb-5 flex items-start gap-5 pt-12">
+        <div className="min-w-0 flex-1">
+          <div className="mb-5 flex items-start gap-5 pt-6">
             <div className="min-w-0">
               <h1 className="text-[17px] font-medium leading-[21px] text-ink">
                 {titleFor(activeSection)}

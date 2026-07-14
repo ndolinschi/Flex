@@ -93,6 +93,7 @@ export const McpCatalogSection = () => {
         title="Browse catalog"
         description="One-click install for popular MCP servers. Tokens and connection strings are stored in the encrypted secrets store."
         rowId="tools-mcp-catalog"
+        className="mb-0"
         actions={
           <TextInput
             value={query}
@@ -104,7 +105,7 @@ export const McpCatalogSection = () => {
         }
       >
         {visible.length === 0 ? (
-          <p className="p-8 text-center text-sm text-ink-muted">
+          <p className="px-4 py-8 text-center text-sm text-ink-muted">
             No catalog servers match “{query}”.
           </p>
         ) : (

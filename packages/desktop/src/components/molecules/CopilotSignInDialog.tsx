@@ -139,7 +139,7 @@ export const CopilotSignInDialog = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/20 pt-[100px] animate-backdrop-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 p-4 animate-backdrop-in"
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) void handleClose()

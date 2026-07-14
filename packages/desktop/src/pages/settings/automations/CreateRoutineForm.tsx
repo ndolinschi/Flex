@@ -110,7 +110,7 @@ export const CreateRoutineForm = ({
   }
 
   return (
-    <SettingsSection title="New automation">
+    <SettingsSection title="New automation" className="mb-0">
       <FieldRow label="Id" htmlFor="routine-id" hint='Kebab-case, e.g. "nightly-review"'>
         <TextInput
           id="routine-id"
@@ -207,12 +207,12 @@ export const CreateRoutineForm = ({
       </FieldRow>
 
       {error ? (
-        <div className="px-4 py-3">
+        <div className="px-3.5 py-3">
           <ErrorBanner message={error} onDismiss={() => setError(null)} />
         </div>
       ) : null}
 
-      <div className="flex justify-end gap-2 px-4 py-3">
+      <div className="flex justify-end gap-2 px-3.5 py-3">
         <Button variant="secondary" size="sm" onClick={onCancel}>
           Cancel
         </Button>

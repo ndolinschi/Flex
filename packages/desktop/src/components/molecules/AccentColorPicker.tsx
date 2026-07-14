@@ -8,7 +8,6 @@ import {
 } from "../../lib/accent"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
-import { Button } from "../atoms"
 
 /** Accent swatch grid + custom hex/color picker for Appearance settings. */
 export const AccentColorPicker = () => {
@@ -139,19 +138,11 @@ export const AccentColorPicker = () => {
             )}
           />
         </label>
-        <Button
-          variant="primary"
-          size="sm"
-          className="pointer-events-none"
-          tabIndex={-1}
-          aria-hidden
-        >
-          Preview
-        </Button>
         <span
           className="h-2 w-2 rounded-full"
           style={{ backgroundColor: preview.accent }}
-          aria-hidden
+          title="Preview"
+          aria-label="Accent preview"
         />
       </div>
     </div>
