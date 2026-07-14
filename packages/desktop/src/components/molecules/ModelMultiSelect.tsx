@@ -2,7 +2,7 @@ import { useRef, useState } from "react"
 import { ChevronDown, ChevronUp, Plus, X } from "lucide-react"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
-import { Label, ProviderIcon } from "../atoms"
+import { Label } from "../atoms"
 import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
 
@@ -167,16 +167,11 @@ export const ModelMultiSelect = ({
               </p>
             ) : (
               groups.map((group) => (
-                <PopoverSection
-                  key={group.providerId}
-                  label={group.label}
-                  icon={<ProviderIcon providerId={group.providerId} size={12} />}
-                >
+                <PopoverSection key={group.providerId} label={group.label}>
                   <ul>
                     {group.items.map((m) => (
                       <li key={m.id}>
                         <PopoverItem onClick={() => add(m.id)}>
-                          <ProviderIcon providerId={m.providerId} size={14} />
                           <span className="min-w-0 flex-1 truncate">
                             {m.displayName ?? m.id}
                           </span>

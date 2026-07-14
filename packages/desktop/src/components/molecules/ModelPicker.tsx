@@ -4,7 +4,6 @@ import { Check, ChevronDown, ChevronRight, Gauge } from "lucide-react"
 import { EFFORT_LEVELS, effortLabel } from "../../lib/types"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
-import { ProviderIcon } from "../atoms"
 import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
 
@@ -167,6 +166,13 @@ export const ModelPicker = ({
     setEffortMenuFor(null)
   }
 
+  const openEffortMenu = (modelId: string, el: HTMLElement) => {
+    const rect = el.getBoundingClientRect()
+    setEffortMenuFor((cur) =>
+      cur?.modelId === modelId ? null : { modelId, rect },
+    )
+  }
+
   const renderRow = (m: ModelInfoDto) => {
     const active = m.id === value
     const modelEffort = effortFor ? effortFor(m.id) : null
@@ -178,22 +184,28 @@ export const ModelPicker = ({
             onChange(m.id)
             handleClose()
           }}
+          className="gap-1.5"
         >
-          <ProviderIcon providerId={m.providerId} size={14} />
-          <span className="min-w-0 flex-1 truncate">
+          <span className="min-w-0 flex-1 truncate text-left">
             {m.displayName ?? m.id}
           </span>
           {modelEffort ? (
-            <span className="shrink-0 truncate text-xs text-ink-muted">
+            <span className="max-w-[4.5rem] shrink-0 truncate text-xs text-ink-muted">
               {effortLabel(modelEffort)}
             </span>
           ) : null}
+          {/* Fixed trailing slots so rows don't jump: check, then effort. */}
+          <span className="flex w-3 shrink-0 items-center justify-center">
+            {active ? (
+              <Check className="h-3 w-3 text-accent" aria-hidden />
+            ) : null}
+          </span>
           {onEffortChange ? (
             // Not a nested <button> — PopoverItem's row is itself a
             // <button>, and HTML forbids button-in-button. A role="button"
             // span keeps the same a11y/interaction contract without the
-            // invalid nesting. Available on every row (not just the active
-            // model) — reference design lets you set effort for any model.
+            // invalid nesting. Sits AFTER the check so selection stays
+            // stable and effort is the rightmost affordance.
             <span
               role="button"
               tabIndex={0}
@@ -202,34 +214,24 @@ export const ModelPicker = ({
               aria-expanded={effortMenuFor?.modelId === m.id}
               onClick={(e) => {
                 e.stopPropagation()
-                const rect = e.currentTarget.getBoundingClientRect()
-                setEffortMenuFor((cur) =>
-                  cur?.modelId === m.id ? null : { modelId: m.id, rect },
-                )
+                openEffortMenu(m.id, e.currentTarget)
               }}
               onKeyDown={(e) => {
                 if (e.key !== "Enter" && e.key !== " ") return
                 e.preventDefault()
                 e.stopPropagation()
-                const rect = e.currentTarget.getBoundingClientRect()
-                setEffortMenuFor((cur) =>
-                  cur?.modelId === m.id ? null : { modelId: m.id, rect },
-                )
+                openEffortMenu(m.id, e.currentTarget)
               }}
               className={cn(
-                "flex shrink-0 cursor-pointer items-center gap-0.5 rounded px-1 py-0.5",
+                "flex w-8 shrink-0 cursor-pointer items-center justify-end gap-0.5 rounded px-0.5 py-0.5",
                 "text-xs text-ink-faint transition-colors hover:bg-fill-2 hover:text-ink",
+                effortMenuFor?.modelId === m.id && "bg-fill-2 text-ink",
               )}
             >
               <Gauge className="h-3 w-3" aria-hidden />
               <ChevronRight className="h-2.5 w-2.5" aria-hidden />
             </span>
           ) : null}
-          {active ? (
-            <Check className="ml-2 h-3 w-3 shrink-0 text-accent" aria-hidden />
-          ) : (
-            <span className="ml-2 w-3 shrink-0" />
-          )}
         </PopoverItem>
         {effortMenuFor?.modelId === m.id && onEffortChange ? (
           <EffortSubmenu
@@ -264,9 +266,6 @@ export const ModelPicker = ({
           open && "opacity-100",
         )}
       >
-        {selected ? (
-          <ProviderIcon providerId={selected.providerId} size={14} />
-        ) : null}
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {selectedEffort ? (
           <span className="shrink-0 truncate text-ink-muted">
@@ -301,11 +300,7 @@ export const ModelPicker = ({
             </p>
           ) : (
             groups.map((group) => (
-              <PopoverSection
-                key={group.providerId}
-                label={group.label}
-                icon={<ProviderIcon providerId={group.providerId} size={12} />}
-              >
+              <PopoverSection key={group.providerId} label={group.label}>
                 <ul>{group.items.map(renderRow)}</ul>
               </PopoverSection>
             ))
