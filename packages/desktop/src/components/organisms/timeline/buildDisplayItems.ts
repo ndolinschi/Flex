@@ -8,6 +8,9 @@ export type TurnFooterInfo = {
   tsMs: number
   durationMs?: number
   copyText: string
+  /** When the turn ended via Stop / cancel, the footer reads "Stopped"
+   * instead of "Worked for". */
+  stopped?: boolean
 }
 
 /** Presentational grouping of a turn's work rows under a "Worked" header. */
@@ -277,9 +280,15 @@ export const buildDisplayItems = (
     // A footer only makes sense for a settled (non-streaming) turn — attach
     // it to whichever item renders LAST for this turn: the trailing answer
     // row if there is one, otherwise the group itself.
+    const stopped = summary?.stop_reason === "cancelled"
     const footer: TurnFooterInfo | undefined =
       !keepOpen && typeof tsMs === "number"
-        ? { tsMs, durationMs: summary?.duration_ms, copyText: buildTurnCopyText(all) }
+        ? {
+            tsMs,
+            durationMs: summary?.duration_ms,
+            copyText: buildTurnCopyText(all),
+            stopped,
+          }
         : undefined
 
     if (work.length > 0 || keepOpen) {
@@ -291,7 +300,11 @@ export const buildDisplayItems = (
         rows: work,
         footer: tail.length === 0 ? footer : undefined,
         verdict: latestVerdictInRows(work),
-        resumeLine: keepOpen ? null : resumeLineForRows(work),
+        resumeLine: keepOpen
+          ? null
+          : stopped
+            ? null
+            : resumeLineForRows(work),
         hasLiveThinking: keepOpen
           ? work.some(
               (r) =>

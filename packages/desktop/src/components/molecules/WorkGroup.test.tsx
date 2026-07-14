@@ -133,4 +133,14 @@ describe("WorkGroup", () => {
     expect(html.match(/>Working</g)?.length ?? 0).toBe(0)
     expect(html.match(/animate-shimmer-text/g)?.length ?? 0).toBe(0)
   })
+
+  it("renders Stopped (not Worked) when the turn was cancelled", () => {
+    const html = renderToStaticMarkup(
+      <WorkGroup isOpen={false} stopped durationMs={2500}>
+        <div>tool row</div>
+      </WorkGroup>,
+    )
+    expect(html).toContain("Stopped")
+    expect(html).not.toContain("Worked")
+  })
 })

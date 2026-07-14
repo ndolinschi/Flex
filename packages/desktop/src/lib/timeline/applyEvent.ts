@@ -236,7 +236,11 @@ export const applyEventToTimeline = (
       // for that case, so the feed would render blank with no explanation
       // once isStreaming clears. Detect it by scanning back to the matching
       // `turn_started` for any assistant/tool/error content in between.
-      if (payload.summary.stop_reason === "end_turn") {
+      // Cancelled (Stop) turns get the same treatment with a "Stopped" cue.
+      if (
+        payload.summary.stop_reason === "end_turn" ||
+        payload.summary.stop_reason === "cancelled"
+      ) {
         let startIdx = -1
         for (let i = next.length - 1; i >= 0; i--) {
           const r = next[i]
@@ -254,13 +258,23 @@ export const applyEventToTimeline = (
             r.type === "fallback" ||
             r.type === "subagent" ||
             r.type === "workflow" ||
-            r.type === "verdict",
+            r.type === "verdict" ||
+            r.type === "thinking",
         )
         if (!hadContent) {
           next.push({
             type: "meta",
-            id: rowId("empty-turn", payload.turn_id, seq),
-            text: "No response received",
+            id: rowId(
+              payload.summary.stop_reason === "cancelled"
+                ? "stopped"
+                : "empty-turn",
+              payload.turn_id,
+              seq,
+            ),
+            text:
+              payload.summary.stop_reason === "cancelled"
+                ? "Stopped"
+                : "No response received",
             tsMs,
           })
         }
