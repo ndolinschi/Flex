@@ -8,6 +8,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | Component | Purpose | Key props | Used by |
 |---|---|---|---|
 | `Button` | Primary action control | `variant`, `size`, `disabled`, `onClick`, `children` | Composer, ProviderSettingsForm, PermissionPrompt, QuestionPrompt, WelcomePage, ConfirmDialog |
+| `Checkbox` | Round selection control (filled accent circle + check) | `checked`, `indeterminate?`, `onChange`, `label` | ChangesTab select-all, FileRow |
 | `IconButton` | Compact icon-only action; optional `quiet` opacity .5→.8 | `label`, `quiet?`, `onClick`, `children` | SessionListItem, SessionSidebar, PlusMenu, ErrorBanner, SettingsShell, SessionMenu |
 | `TextInput` | Single-line text field (forwardRef) | standard input props | FormField, SessionListItem, SessionSidebar search, QuestionPrompt, ConfirmDialog |
 | `TextArea` | Multi-line text field | standard textarea props | Composer |
@@ -118,7 +119,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|
 | `organisms/timeline/` | `buildDisplayItems` (+ `estimateSizeForItem`), `TimelineRowView`, `WorkGroupBody`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
 | `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
-| `organisms/right-panel/` | `PlanTab`, `ChangesTab` (single header: select-all + count/branch + diffstat), `FilesTab` (Monaco + MD preview, hover-close chips), `FileExplorer` (VS Code–style expandable tree + search; New file + right-click Open/Rename/Delete), `FileRow` (aligned +/- / status columns), `CommitCenter` (message + selection label + split commit), `RightPanelTabBar`, `tabs` |
+| `organisms/right-panel/` | `PlanTab`, `ChangesTab` (quiet header + select toolbar + DiffStat rows), `FilesTab` (Monaco + MD preview, hover-close chips), `FileExplorer` (VS Code–style expandable tree + search; New file + right-click Open/Rename/Delete), `FileRow` (round `Checkbox`, DiffStat, hover-overlay actions), `CommitCenter` (message + selection label + split commit), `RightPanelTabBar`, `tabs` |
 | `organisms/context-bar/` | `CommitBar` (changes chip + Commit / Commit & Push / Create PR), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
 | `organisms/browser/` | `BrowserToolbar` (Design Mode toggle), `BrowserOverflowMenu` — composed by `BrowserTab` |
 | `organisms/terminal/` | `TerminalTab`, `TerminalInstance`, `TerminalRow`, `AgentTerminalRow`, `time` helpers |

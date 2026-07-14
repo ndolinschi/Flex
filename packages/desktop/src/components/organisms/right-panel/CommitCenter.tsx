@@ -171,7 +171,7 @@ export const CommitCenter = ({
 
   return (
     <>
-      <div className="flex shrink-0 flex-col gap-2 border-t border-stroke-3 bg-fill-5/40 px-2 py-2.5">
+      <div className="flex shrink-0 flex-col gap-2 border-t border-stroke-3 bg-fill-5/40 px-2 py-2">
         <TextArea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
@@ -180,9 +180,9 @@ export const CommitCenter = ({
           autoFocus
           rows={2}
           disabled={busy}
-          className="min-h-[2.75rem] resize-none text-sm"
+          className="min-h-[2.5rem] resize-none rounded-[var(--radius-md)] text-sm"
         />
-        <div ref={rootRef} className="relative flex items-center justify-between gap-3">
+        <div ref={rootRef} className="relative flex items-center justify-between gap-2">
           <span
             className={cn(
               "min-w-0 truncate text-xs",
@@ -191,11 +191,11 @@ export const CommitCenter = ({
           >
             {selectionLabel}
           </span>
-          <div className="flex shrink-0 items-center">
+          <div className="flex shrink-0 items-center overflow-hidden rounded-md">
             <Button
               variant="primary"
               size="sm"
-              className="rounded-r-none border-r border-r-accent-hover/40"
+              className="rounded-none border-r border-r-accent-hover/40"
               isLoading={busy}
               disabled={disabled}
               onClick={() => void run(effectivePrimary)}
@@ -209,7 +209,7 @@ export const CommitCenter = ({
               aria-label="Commit options"
               aria-haspopup="menu"
               aria-expanded={menuOpen}
-              className="w-7 rounded-l-none px-0"
+              className="w-7 rounded-none px-0"
               disabled={disabled}
               onClick={() => setMenuOpen((v) => !v)}
             >

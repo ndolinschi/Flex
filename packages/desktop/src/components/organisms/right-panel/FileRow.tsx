@@ -1,7 +1,7 @@
 import { memo, useState, type MouseEvent as ReactMouseEvent } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, ChevronRight, FileCode2, Undo2 } from "lucide-react"
-import { IconButton, Spinner } from "../../atoms"
+import { Checkbox, DiffStat, IconButton, Spinner } from "../../atoms"
 import { Collapsible, ConfirmDialog, DiffView } from "../../molecules"
 import { invalidateReviewQueries } from "../../../hooks/useWorkspaceActions"
 import { buildPatch, type Hunk, type ParsedDiffFile } from "../../../lib/diff"
@@ -195,22 +195,21 @@ export const FileRow = memo(function FileRow({
     <li>
       <div
         className={cn(
-          "group flex h-8 w-full items-center gap-2 rounded-[var(--radius-sm)] px-2",
+          "group relative flex h-8 w-full items-center gap-2 rounded-[var(--radius-sm)] px-2",
           "transition-colors duration-[var(--duration-fast)] hover:bg-fill-4",
           expanded && "bg-fill-5",
+          selectable && selected && "bg-fill-4/60",
         )}
       >
         {/* Reserve checkbox column so selectable + non-selectable rows share
             the same path/stat alignment when the list mixes modes. */}
         <span className="flex w-3.5 shrink-0 items-center justify-center">
           {selectable ? (
-            <input
-              type="checkbox"
+            <Checkbox
               checked={selected}
               onChange={() => onToggleSelected?.()}
               onClick={(e) => e.stopPropagation()}
-              aria-label={`Include ${name} in commit`}
-              className="h-3.5 w-3.5 accent-accent"
+              label={`Include ${name} in commit`}
             />
           ) : null}
         </span>
@@ -227,21 +226,27 @@ export const FileRow = memo(function FileRow({
           />
           <span className="flex min-w-0 flex-1 items-center gap-0">
             <PathPrefix dir={dir} />
-            <span className="min-w-0 truncate text-base text-ink">
-              {name}
-            </span>
+            <span className="min-w-0 truncate text-sm text-ink">{name}</span>
           </span>
+          <ChevronRight
+            className={cn(
+              "h-3 w-3 shrink-0 text-icon-3",
+              "transition-[transform,opacity] duration-[var(--duration-fast)]",
+              expanded
+                ? "rotate-90 opacity-100"
+                : "opacity-40 group-hover:opacity-100",
+            )}
+            aria-hidden
+          />
         </button>
-        {/* Fixed-width stat columns so +/− and status letters line up down
-            the list instead of jittering with digit width. */}
-        <span className="flex w-[4.75rem] shrink-0 items-center justify-end gap-1 font-mono text-xs [font-variant-numeric:tabular-nums]">
-          {typeof file.added === "number" && file.added > 0 ? (
-            <span className="text-green">+{file.added}</span>
-          ) : null}
-          {typeof file.removed === "number" && file.removed > 0 ? (
-            <span className="text-red">−{file.removed}</span>
-          ) : null}
-        </span>
+        <DiffStat
+          summary={{
+            added: file.added ?? 0,
+            removed: file.removed ?? 0,
+          }}
+          size="xs"
+          className="w-[4.5rem] justify-end"
+        />
         <span
           className={cn(
             "w-3.5 shrink-0 text-center font-mono text-xs font-medium",
@@ -251,14 +256,14 @@ export const FileRow = memo(function FileRow({
         >
           {file.status === "?" ? "U" : file.status}
         </span>
-        {/* Per-file quick actions — fade in on hover; fixed width so revealing
-            them does not shove the chevron. Keep is isolated-only. */}
+        {/* Hover actions overlay the trailing stats so revealing them does
+            not shove the row layout. */}
         <span
           className={cn(
-            "flex w-[4.5rem] shrink-0 items-center justify-end gap-0.5",
-            "opacity-0 transition-opacity duration-[var(--duration-fast)]",
+            "absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5",
+            "rounded-md bg-panel/90 px-0.5 opacity-0 shadow-sm backdrop-blur-[2px]",
+            "transition-opacity duration-[var(--duration-fast)]",
             "group-hover:opacity-100 focus-within:opacity-100",
-            isolated && "w-[6.75rem]",
           )}
         >
           {!isDir && file.status !== "D" ? (
@@ -300,17 +305,6 @@ export const FileRow = memo(function FileRow({
             )}
           </IconButton>
         </span>
-        <ChevronRight
-          className={cn(
-            "h-3 w-3 shrink-0 text-icon-3",
-            "transition-[transform,opacity] duration-[var(--duration-fast)]",
-            expanded
-              ? "rotate-90 opacity-100"
-              : "opacity-40 group-hover:opacity-100",
-          )}
-          aria-hidden
-          onClick={onToggle}
-        />
       </div>
       <Collapsible open={expanded}>
         <div className="mx-1 mb-1 overflow-hidden rounded-[var(--radius-sm)] border border-stroke-4 bg-fill-5">
