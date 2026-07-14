@@ -433,6 +433,8 @@ export type PanelExtrasSliceState = {
   fileDraftsBySession: Record<string, Record<string, string>>
   openWorkspaceFile: (sessionKey: string, path: string) => void
   closeWorkspaceFile: (sessionKey: string, path: string) => void
+  /** Retarget open buffers / drafts / active path after a filesystem rename. */
+  renameWorkspaceFile: (sessionKey: string, from: string, to: string) => void
   setActiveWorkspaceFile: (sessionKey: string, path: string | null) => void
   setWorkspaceFileDraft: (
     sessionKey: string,

@@ -4573,6 +4573,180 @@ pub async fn save_text_file(
     Ok(target.display().to_string())
 }
 
+/// Creates an empty UTF-8 text file at `relative_path` inside `session_id`'s
+/// cwd (creating parent dirs as needed). Fails if the target already exists —
+/// use [`save_text_file`] to overwrite. Returns the repo-relative path.
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn create_text_file(
+    state: State<'_, AppState>,
+    session_id: String,
+    relative_path: String,
+) -> DesktopResult<String> {
+    let service = require_service(&state).await?;
+    let id = SessionId::from(session_id);
+    let meta = service.session_meta(&id).await?;
+
+    let relative = resolve_review_path(&relative_path, &meta.cwd)?;
+    let cwd = meta.cwd.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let canonical_cwd = cwd
+            .canonicalize()
+            .map_err(|e| DesktopError::Message(format!("invalid session cwd: {e}")))?;
+        let target = canonical_cwd.join(&relative);
+
+        if target.exists() {
+            return Err(DesktopError::Message(format!(
+                "`{relative}` already exists"
+            )));
+        }
+
+        let parent = target
+            .parent()
+            .ok_or_else(|| DesktopError::Message("path has no parent directory".into()))?;
+        std::fs::create_dir_all(parent).map_err(|e| {
+            DesktopError::Message(format!("cannot create `{}`: {e}", parent.display()))
+        })?;
+
+        let canonical_parent = parent.canonicalize().map_err(|e| {
+            DesktopError::Message(format!("invalid target directory: {e}"))
+        })?;
+        if !canonical_parent.starts_with(&canonical_cwd) {
+            return Err(DesktopError::Message(
+                "resolved path escapes the session's working directory".into(),
+            ));
+        }
+
+        std::fs::write(&target, "").map_err(|e| {
+            DesktopError::Message(format!("cannot create `{}`: {e}", target.display()))
+        })?;
+        Ok(relative)
+    })
+    .await
+    .map_err(|e| DesktopError::Message(format!("create join: {e}")))?
+}
+
+/// Renames a file under `session_id`'s cwd from `from_path` to `to_path`
+/// (both repo-relative). Fails if the destination already exists, if the
+/// source is missing, or if either path escapes the session cwd. Returns the
+/// new repo-relative path.
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn rename_path(
+    state: State<'_, AppState>,
+    session_id: String,
+    from_path: String,
+    to_path: String,
+) -> DesktopResult<String> {
+    let service = require_service(&state).await?;
+    let id = SessionId::from(session_id);
+    let meta = service.session_meta(&id).await?;
+
+    let from_rel = resolve_review_path(&from_path, &meta.cwd)?;
+    let to_rel = resolve_review_path(&to_path, &meta.cwd)?;
+    if from_rel == to_rel {
+        return Ok(to_rel);
+    }
+    let cwd = meta.cwd.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let canonical_cwd = cwd
+            .canonicalize()
+            .map_err(|e| DesktopError::Message(format!("invalid session cwd: {e}")))?;
+        let from = canonical_cwd.join(&from_rel);
+        let to = canonical_cwd.join(&to_rel);
+
+        let canonical_from = from.canonicalize().map_err(|e| {
+            DesktopError::Message(format!("cannot rename `{}`: {e}", from_rel))
+        })?;
+        if !canonical_from.starts_with(&canonical_cwd) {
+            return Err(DesktopError::Message(
+                "source path escapes the session's working directory".into(),
+            ));
+        }
+        if !canonical_from.is_file() {
+            return Err(DesktopError::Message(format!(
+                "`{from_rel}` is not a file"
+            )));
+        }
+
+        if to.exists() {
+            return Err(DesktopError::Message(format!(
+                "`{to_rel}` already exists"
+            )));
+        }
+
+        if let Some(parent) = to.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                DesktopError::Message(format!("cannot create `{}`: {e}", parent.display()))
+            })?;
+            let canonical_parent = parent.canonicalize().map_err(|e| {
+                DesktopError::Message(format!("invalid target directory: {e}"))
+            })?;
+            if !canonical_parent.starts_with(&canonical_cwd) {
+                return Err(DesktopError::Message(
+                    "destination path escapes the session's working directory".into(),
+                ));
+            }
+        }
+
+        std::fs::rename(&canonical_from, &to).map_err(|e| {
+            DesktopError::Message(format!(
+                "cannot rename `{from_rel}` → `{to_rel}`: {e}"
+            ))
+        })?;
+        Ok(to_rel)
+    })
+    .await
+    .map_err(|e| DesktopError::Message(format!("rename join: {e}")))?
+}
+
+/// Deletes a file under `session_id`'s cwd. Refuses directories (explorer is
+/// file-scoped). Returns the deleted repo-relative path.
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn delete_path(
+    state: State<'_, AppState>,
+    session_id: String,
+    relative_path: String,
+) -> DesktopResult<String> {
+    let service = require_service(&state).await?;
+    let id = SessionId::from(session_id);
+    let meta = service.session_meta(&id).await?;
+
+    let relative = resolve_review_path(&relative_path, &meta.cwd)?;
+    let cwd = meta.cwd.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let canonical_cwd = cwd
+            .canonicalize()
+            .map_err(|e| DesktopError::Message(format!("invalid session cwd: {e}")))?;
+        let target = canonical_cwd.join(&relative);
+
+        let canonical_target = target.canonicalize().map_err(|e| {
+            DesktopError::Message(format!("cannot delete `{}`: {e}", relative))
+        })?;
+        if !canonical_target.starts_with(&canonical_cwd) {
+            return Err(DesktopError::Message(
+                "resolved path escapes the session's working directory".into(),
+            ));
+        }
+        if !canonical_target.is_file() {
+            return Err(DesktopError::Message(format!(
+                "`{relative}` is not a file"
+            )));
+        }
+
+        std::fs::remove_file(&canonical_target).map_err(|e| {
+            DesktopError::Message(format!("cannot delete `{relative}`: {e}"))
+        })?;
+        Ok(relative)
+    })
+    .await
+    .map_err(|e| DesktopError::Message(format!("delete join: {e}")))?
+}
+
 /// Extensions accepted by `write_temp_blob` — kept in sync with the
 /// composer's paste/drop image filter (`composerAttachments.ts`'s
 /// `extForMimeType`) and the file-picker's image filter (`Composer.tsx`'s

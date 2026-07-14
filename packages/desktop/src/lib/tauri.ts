@@ -733,6 +733,28 @@ export const readTextFile = (
 ): Promise<string> =>
   invoke("read_text_file", { sessionId, relativePath })
 
+/** Creates an empty text file under `sessionId`'s cwd. Fails if it exists. */
+export const createTextFile = (
+  sessionId: string,
+  relativePath: string,
+): Promise<string> =>
+  invoke("create_text_file", { sessionId, relativePath })
+
+/** Renames a file under `sessionId`'s cwd. Both paths are repo-relative. */
+export const renamePath = (
+  sessionId: string,
+  fromPath: string,
+  toPath: string,
+): Promise<string> =>
+  invoke("rename_path", { sessionId, fromPath, toPath })
+
+/** Deletes a file under `sessionId`'s cwd (files only, not directories). */
+export const deletePath = (
+  sessionId: string,
+  relativePath: string,
+): Promise<string> =>
+  invoke("delete_path", { sessionId, relativePath })
+
 /** Writes a diagnostics bundle (frontend payload + backend log tail) into
  * the app log directory — no active session required. */
 export const exportDiagnosticsBundle = (

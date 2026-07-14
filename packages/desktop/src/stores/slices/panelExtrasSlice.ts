@@ -88,6 +88,39 @@ export const createPanelExtrasSlice: StateCreator<
       },
     })
   },
+  renameWorkspaceFile: (sessionKey, from, to) => {
+    const trimmedFrom = from.trim()
+    const trimmedTo = to.trim()
+    if (!trimmedFrom || !trimmedTo || trimmedFrom === trimmedTo) return
+    if (trimmedTo.endsWith("/")) return
+
+    const prev = get().openFilesBySession[sessionKey] ?? []
+    const openFiles = prev.includes(trimmedFrom)
+      ? prev.map((p) => (p === trimmedFrom ? trimmedTo : p))
+      : prev
+
+    const drafts = { ...(get().fileDraftsBySession[sessionKey] ?? {}) }
+    if (trimmedFrom in drafts) {
+      drafts[trimmedTo] = drafts[trimmedFrom]
+      delete drafts[trimmedFrom]
+    }
+
+    const active = get().activeFileBySession[sessionKey]
+    set({
+      openFilesBySession: {
+        ...get().openFilesBySession,
+        [sessionKey]: openFiles,
+      },
+      activeFileBySession: {
+        ...get().activeFileBySession,
+        [sessionKey]: active === trimmedFrom ? trimmedTo : active,
+      },
+      fileDraftsBySession: {
+        ...get().fileDraftsBySession,
+        [sessionKey]: drafts,
+      },
+    })
+  },
   setActiveWorkspaceFile: (sessionKey, path) =>
     set((state) => ({
       activeFileBySession: {
