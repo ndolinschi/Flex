@@ -5,6 +5,7 @@ import {
   ErrorBanner,
   IndexingCard,
   MarkdownBody,
+  MentionText,
   SubagentGroup,
   ToolCallChip,
   VerdictBadge,
@@ -81,8 +82,8 @@ export const TimelineRowView = memo(({
               </span>
             ) : null}
             {displayText.trim() ? (
-              <p className="whitespace-pre-wrap text-base leading-snug text-ink">
-                {displayText}
+              <p className="text-base leading-snug text-ink">
+                <MentionText text={displayText} />
               </p>
             ) : null}
           </div>
