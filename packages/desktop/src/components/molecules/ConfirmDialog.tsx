@@ -11,6 +11,8 @@ type ConfirmDialogProps = {
   cancelLabel?: string
   danger?: boolean
   isLoading?: boolean
+  /** Extra disable for confirm (e.g. empty required fields). */
+  confirmDisabled?: boolean
   onConfirm: () => void
   onCancel: () => void
   children?: ReactNode
@@ -27,6 +29,7 @@ export const ConfirmDialog = ({
   cancelLabel = "Cancel",
   danger = false,
   isLoading = false,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
   children,
@@ -95,6 +98,7 @@ export const ConfirmDialog = ({
             size="sm"
             variant={danger ? "danger" : "primary"}
             isLoading={isLoading}
+            disabled={confirmDisabled || isLoading}
             onClick={onConfirm}
           >
             {confirmLabel}

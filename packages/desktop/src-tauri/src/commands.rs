@@ -2315,23 +2315,7 @@ pub async fn git_create_pr(
         });
     }
 
-    let mut pr_cmd = crate::win_console::command("gh");
-    pr_cmd.arg("pr").arg("create");
-    match (&title, &body) {
-        (Some(t), Some(b)) if !t.trim().is_empty() => {
-            pr_cmd.arg("--title").arg(t).arg("--body").arg(b);
-        }
-        (Some(t), None) if !t.trim().is_empty() => {
-            pr_cmd.arg("--title").arg(t).arg("--body").arg("");
-        }
-        _ => {
-            pr_cmd.arg("--fill");
-        }
-    }
-    let pr = pr_cmd
-        .current_dir(&cwd)
-        .output()
-        .map_err(|e| DesktopError::Message(format!("gh pr create failed: {e}")))?;
+    let pr = run_gh_pr_create(&cwd, title.as_deref(), body.as_deref())?;
     if !pr.status.success() {
         let stderr = String::from_utf8_lossy(&pr.stderr).trim().to_string();
         // The push already succeeded above, so degrade rather than error —
@@ -2354,6 +2338,31 @@ pub async fn git_create_pr(
         pr_url: (!url.is_empty()).then_some(url),
         degraded_reason: None,
     })
+}
+
+/// Build `gh pr create` with either an explicit title/body or `--fill`.
+fn run_gh_pr_create(
+    cwd: &std::path::Path,
+    title: Option<&str>,
+    body: Option<&str>,
+) -> DesktopResult<std::process::Output> {
+    let mut pr_cmd = crate::win_console::command("gh");
+    pr_cmd.arg("pr").arg("create");
+    match (title, body) {
+        (Some(t), Some(b)) if !t.trim().is_empty() => {
+            pr_cmd.arg("--title").arg(t).arg("--body").arg(b);
+        }
+        (Some(t), None) if !t.trim().is_empty() => {
+            pr_cmd.arg("--title").arg(t).arg("--body").arg("");
+        }
+        _ => {
+            pr_cmd.arg("--fill");
+        }
+    }
+    pr_cmd
+        .current_dir(cwd)
+        .output()
+        .map_err(|e| DesktopError::Message(format!("gh pr create failed: {e}")))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2520,13 +2529,84 @@ pub fn git_pr_status(cwd: String) -> DesktopResult<BranchPrStatus> {
     })
 }
 
-/// Create a PR for the current branch via `gh pr create --fill` without a
-/// fresh commit (branch must already have commits to open against the base).
-/// Pushes first when a remote is configured so the head ref exists on the
-/// host. Same degradation as `git_create_pr` when `gh` is unavailable.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrDraft {
+    pub title: String,
+    pub body: String,
+}
+
+/// Prefill title/body for the Create PR dialog — latest commit subject as
+/// title, and bullet subjects for any additional commits ahead of the
+/// upstream (or the repo's default branch when no upstream is set). Empty
+/// strings when git can't resolve a suggestion; the UI still opens.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
-pub fn git_create_pr_for_branch(cwd: String) -> DesktopResult<CreatePrOutcome> {
+pub fn git_pr_draft(cwd: String) -> DesktopResult<PrDraft> {
+    let path = std::path::PathBuf::from(&cwd);
+    let title = crate::win_console::command("git")
+        .args(["log", "-1", "--pretty=%s"])
+        .current_dir(&path)
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default();
+
+    // Prefer commits not yet on the upstream tracking branch; fall back to
+    // the remote HEAD / origin/main so a freshly pushed feature branch still
+    // gets a useful multi-commit body.
+    let range_candidates = [
+        "@{upstream}..HEAD",
+        "origin/HEAD..HEAD",
+        "origin/main..HEAD",
+        "origin/master..HEAD",
+    ];
+    let mut body = String::new();
+    for range in range_candidates {
+        let out = crate::win_console::command("git")
+            .args(["log", range, "--pretty=format:- %s"])
+            .current_dir(&path)
+            .output();
+        let Ok(out) = out else { continue };
+        if !out.status.success() {
+            continue;
+        }
+        let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if text.is_empty() {
+            continue;
+        }
+        // Skip a single-bullet body that just repeats the title — leave the
+        // description empty so the dialog doesn't look redundant.
+        let lines: Vec<&str> = text.lines().collect();
+        if lines.len() == 1 {
+            let subject = lines[0].trim_start_matches("- ").trim();
+            if subject == title.trim() {
+                body.clear();
+            } else {
+                body = text;
+            }
+        } else {
+            body = text;
+        }
+        break;
+    }
+
+    Ok(PrDraft { title, body })
+}
+
+/// Create a PR for the current branch without a fresh commit (branch must
+/// already have commits to open against the base). Optional `title`/`body`
+/// override `gh`'s `--fill`; omit both (or pass empty title) to fill from
+/// commits. Pushes first when a remote is configured so the head ref exists
+/// on the host. Same degradation as `git_create_pr` when `gh` is unavailable.
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub fn git_create_pr_for_branch(
+    cwd: String,
+    title: Option<String>,
+    body: Option<String>,
+) -> DesktopResult<CreatePrOutcome> {
     let path = std::path::PathBuf::from(&cwd);
     // Best-effort push so a local-only branch can still become a PR head.
     let _ = push_current_branch(&path);
@@ -2542,11 +2622,7 @@ pub fn git_create_pr_for_branch(cwd: String) -> DesktopResult<CreatePrOutcome> {
         });
     }
 
-    let pr = crate::win_console::command("gh")
-        .args(["pr", "create", "--fill"])
-        .current_dir(&path)
-        .output()
-        .map_err(|e| DesktopError::Message(format!("gh pr create failed: {e}")))?;
+    let pr = run_gh_pr_create(&path, title.as_deref(), body.as_deref())?;
     if !pr.status.success() {
         let stderr = String::from_utf8_lossy(&pr.stderr).trim().to_string();
         // If a PR already exists, surface its URL instead of failing.
