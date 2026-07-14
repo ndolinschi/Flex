@@ -136,7 +136,8 @@ Isolated). Type `/` in the composer for slash-command autocomplete.
 | `agentloop-sdk` | `AgentBuilder` → `EngineService` (sole composition path) |
 | `agentloop-engine` | Sessions, prompt, cancel, subscribe |
 
-See [COMPONENTS.md](./COMPONENTS.md) for the Atomic component catalog.
+See [COMPONENTS.md](./COMPONENTS.md) for the Atomic component catalog and
+[DESIGN.md](./DESIGN.md) for layout, spacing, and positioning.
 
 ## Keyboard shortcuts
 

@@ -159,7 +159,9 @@ index scoring needs no `EngineService`.)
 ## packages/desktop
 
 Tauri 2 + React desktop shell. Atomic Design UI catalog:
-[`packages/desktop/COMPONENTS.md`](packages/desktop/COMPONENTS.md). Rust side
+[`packages/desktop/COMPONENTS.md`](packages/desktop/COMPONENTS.md); layout /
+spacing / positioning: [`packages/desktop/DESIGN.md`](packages/desktop/DESIGN.md).
+Rust side
 (`src-tauri`) is a thin command layer over `agentloop-sdk::AgentBuilder` (native
 providers only; no delegators). Sessions persist via `JsonlStore`; secrets via OS
 keychain. GitHub Copilot uses device-flow commands (`copilot_auth_*`) that call
