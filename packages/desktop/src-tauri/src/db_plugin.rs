@@ -139,6 +139,7 @@ pub async fn db_upsert_connection(
     if target.is_empty() {
         return Err(DesktopError::Message("connection target is required".into()));
     }
+    let target = normalize_db_target(spec.engine, &target)?;
     let id = if spec.id.trim().is_empty() {
         new_id()
     } else {
@@ -183,21 +184,22 @@ pub async fn db_connect(
             .cloned()
             .ok_or_else(|| DesktopError::Message("connection not found".into()))?
     };
+    let target = normalize_db_target(spec.engine, &spec.target)?;
     let live = match spec.engine {
         DbEngine::Sqlite => {
-            let path = PathBuf::from(&spec.target);
+            let path = PathBuf::from(&target);
             let conn = rusqlite::Connection::open(&path)
                 .map_err(|e| DesktopError::Message(format!("sqlite open failed: {e}")))?;
             drop(conn);
             LiveConn::Sqlite(path)
         }
         DbEngine::Postgres => {
-            probe_postgres(&spec.target).await?;
-            LiveConn::Postgres(spec.target.clone())
+            probe_postgres(&target).await?;
+            LiveConn::Postgres(target)
         }
         DbEngine::Mysql => {
-            probe_mysql(&spec.target).await?;
-            LiveConn::Mysql(spec.target.clone())
+            probe_mysql(&target).await?;
+            LiveConn::Mysql(target)
         }
     };
     let mut guard = db_state(&state).lock().await;
@@ -420,6 +422,42 @@ fn new_id() -> String {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     format!("db-{nanos:x}")
+}
+
+/// Validate + normalize connection targets so a leftover SQLite path can't be
+/// saved under MySQL/Postgres. `mysql2://` is rewritten to `mysql://`.
+fn normalize_db_target(engine: DbEngine, target: &str) -> DesktopResult<String> {
+    let t = target.trim();
+    match engine {
+        DbEngine::Sqlite => Ok(t.to_string()),
+        DbEngine::Postgres => {
+            let lower = t.to_ascii_lowercase();
+            if !(lower.starts_with("postgres://") || lower.starts_with("postgresql://")) {
+                return Err(DesktopError::Message(
+                    "PostgreSQL target must be a URL like \
+                     postgres://user:pass@127.0.0.1:5432/dbname"
+                        .into(),
+                ));
+            }
+            Ok(t.to_string())
+        }
+        DbEngine::Mysql => {
+            let lower = t.to_ascii_lowercase();
+            if lower.starts_with("mysql2://") {
+                return Ok(format!("mysql://{}", &t[8..]));
+            }
+            if !lower.starts_with("mysql://") {
+                return Err(DesktopError::Message(
+                    "MySQL target must be a URL like \
+                     mysql://user:pass@127.0.0.1:3306/dbname \
+                     (for Docker Compose use 127.0.0.1 and the published host port, \
+                     not the compose service name)"
+                        .into(),
+                ));
+            }
+            Ok(t.to_string())
+        }
+    }
 }
 
 fn quote_ident_sqlite(name: &str) -> String {

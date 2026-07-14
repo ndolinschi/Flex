@@ -283,6 +283,7 @@ pub fn run() {
             commands::review_apply_patch,
             commands::review_file_diff,
             commands::list_files,
+            commands::list_dir_children,
             commands::list_commands,
             db_plugin::db_list_connections,
             db_plugin::db_upsert_connection,

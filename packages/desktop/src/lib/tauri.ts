@@ -384,8 +384,21 @@ export const suggestCommitMessage = (
 ): Promise<string> =>
   invoke("suggest_commit_message", { sessionId, diffSummary })
 
-export const listFiles = (cwd: string, query: string): Promise<FileHit[]> =>
-  invoke("list_files", { cwd, query })
+/** Fuzzy file/folder search. Pass `includeIgnored` for the human Files search
+ * so `.env` and other gitignored paths appear; omit for composer `@` (default). */
+export const listFiles = (
+  cwd: string,
+  query: string,
+  includeIgnored = false,
+): Promise<FileHit[]> =>
+  invoke("list_files", { cwd, query, includeIgnored })
+
+/** Immediate children of `relativeDir` under `cwd` ("" = workspace root).
+ * Human Files tree: shows hidden + gitignored entries (e.g. `.env`). */
+export const listDirChildren = (
+  cwd: string,
+  relativeDir: string,
+): Promise<FileHit[]> => invoke("list_dir_children", { cwd, relativeDir })
 
 export type DbEngine = "sqlite" | "postgres" | "mysql"
 

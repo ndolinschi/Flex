@@ -35,19 +35,54 @@ type DatabaseTabProps = {
   session: SessionMeta | undefined
 }
 
-const ENGINE_OPTIONS: Array<{ id: DbEngine; label: string; hint: string }> = [
-  { id: "sqlite", label: "SQLite", hint: "Absolute path to a .db / .sqlite file" },
+const ENGINE_OPTIONS: Array<{
+  id: DbEngine
+  label: string
+  /** Short placeholder shown in the Target input. */
+  hint: string
+  /** Default target when switching to this engine (empty = clear). */
+  defaultTarget: (cwd: string | undefined) => string
+  /** Dialog blurb for this engine. */
+  description: string
+}> = [
+  {
+    id: "sqlite",
+    label: "SQLite",
+    hint: "C:\\path\\to\\data.db  or  /path/to/data.db",
+    defaultTarget: (cwd) => (cwd ? `${cwd}/data.db` : ""),
+    description: "Absolute path to a .db / .sqlite file on disk.",
+  },
   {
     id: "postgres",
     label: "PostgreSQL",
-    hint: "postgres://user:pass@host:5432/dbname",
+    hint: "postgres://user:pass@127.0.0.1:5432/dbname",
+    defaultTarget: () => "postgres://user:pass@127.0.0.1:5432/dbname",
+    description:
+      "Connection URL. For Docker Compose Postgres on localhost use host 127.0.0.1 and the published port.",
   },
   {
     id: "mysql",
     label: "MySQL",
-    hint: "mysql://user:pass@host:3306/dbname",
+    hint: "mysql://flexuser:pass@127.0.0.1:3306/flexdb",
+    defaultTarget: () => "mysql://flexuser:pass@127.0.0.1:3306/flexdb",
+    description:
+      "Connection URL. For Docker Compose MySQL on localhost: mysql://USER:PASSWORD@127.0.0.1:PORT/DATABASE (use 127.0.0.1, not the container name).",
   },
 ]
+
+const isUrlLikeTarget = (engine: DbEngine, target: string): boolean => {
+  const t = target.trim().toLowerCase()
+  if (engine === "postgres") {
+    return (
+      t.startsWith("postgres://") ||
+      t.startsWith("postgresql://")
+    )
+  }
+  if (engine === "mysql") {
+    return t.startsWith("mysql://") || t.startsWith("mysql2://")
+  }
+  return target.trim().length > 0
+}
 
 /** Right-panel Database plugin — connections, schemas/tables, tabular data. */
 export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
@@ -69,6 +104,27 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
     target: session?.cwd ? `${session.cwd}/data.db` : "",
   })
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+
+  const openAddForm = () => {
+    setForm({
+      name: "",
+      engine: "sqlite",
+      target: ENGINE_OPTIONS[0].defaultTarget(session?.cwd),
+    })
+    setFormOpen(true)
+  }
+
+  const setEngine = (engine: DbEngine) => {
+    const opt = ENGINE_OPTIONS.find((e) => e.id === engine)
+    setForm((f) => ({
+      ...f,
+      engine,
+      // Always swap the target when the engine changes so a leftover SQLite
+      // path never sits under MySQL/Postgres (the bug that made docker-compose
+      // URLs look "broken" in the form).
+      target: opt?.defaultTarget(session?.cwd) ?? "",
+    }))
+  }
 
   const { data: connections = [], isFetching } = useQuery({
     queryKey: ["db-connections"],
@@ -162,10 +218,14 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
     }
   }
 
-  const engineHint = useMemo(
-    () => ENGINE_OPTIONS.find((e) => e.id === form.engine)?.hint ?? "",
+  const engineMeta = useMemo(
+    () => ENGINE_OPTIONS.find((e) => e.id === form.engine) ?? ENGINE_OPTIONS[0],
     [form.engine],
   )
+
+  const targetOk = isUrlLikeTarget(form.engine, form.target)
+  const canConnect =
+    form.name.trim().length > 0 && form.target.trim().length > 0 && targetOk
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -182,7 +242,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
         <IconButton
           label="Add connection"
           className="h-6 w-6"
-          onClick={() => setFormOpen(true)}
+          onClick={openAddForm}
         >
           <Plus className="h-3.5 w-3.5" />
         </IconButton>
@@ -199,7 +259,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
           title="No database connections"
           description="Connect SQLite, PostgreSQL, or MySQL to browse schemas, tables, and rows."
           actionLabel="Add connection"
-          onAction={() => setFormOpen(true)}
+          onAction={openAddForm}
         />
       ) : (
         <div className="flex min-h-0 flex-1">
@@ -336,10 +396,10 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
       <ConfirmDialog
         open={formOpen}
         title="Add database connection"
-        description="SQLite uses a file path; Postgres and MySQL use a connection URL."
+        description={engineMeta.description}
         confirmLabel="Connect"
         isLoading={saveMut.isPending}
-        confirmDisabled={!form.name.trim() || !form.target.trim()}
+        confirmDisabled={!canConnect}
         onCancel={() => setFormOpen(false)}
         onConfirm={() => saveMut.mutate()}
       >
@@ -356,12 +416,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
             <select
               id="db-engine"
               value={form.engine}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  engine: e.target.value as DbEngine,
-                }))
-              }
+              onChange={(e) => setEngine(e.target.value as DbEngine)}
               className="h-9 w-full rounded-md border border-stroke-2 bg-bg px-2 text-sm text-ink"
             >
               {ENGINE_OPTIONS.map((o) => (
@@ -371,17 +426,28 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
               ))}
             </select>
           </FormField>
-          <FormField label="Target" htmlFor="db-target" hint={engineHint}>
+          <FormField
+            label={form.engine === "sqlite" ? "File path" : "Connection URL"}
+            htmlFor="db-target"
+            hint={engineMeta.hint}
+          >
             <TextInput
               id="db-target"
               value={form.target}
               onChange={(e) =>
                 setForm((f) => ({ ...f, target: e.target.value }))
               }
-              placeholder={engineHint}
+              placeholder={engineMeta.hint}
               className="font-mono text-xs"
             />
           </FormField>
+          {form.target.trim() && !targetOk ? (
+            <p className="text-xs text-danger">
+              {form.engine === "mysql"
+                ? "MySQL target must be a URL like mysql://user:pass@127.0.0.1:3306/dbname"
+                : "PostgreSQL target must be a URL like postgres://user:pass@127.0.0.1:5432/dbname"}
+            </p>
+          ) : null}
         </div>
       </ConfirmDialog>
 
