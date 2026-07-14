@@ -51,10 +51,11 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `PlanCommentList` | Annotations on the open plan | `comments`, `onFocus`, `onRemove` | RightPanel Plan tab (`PlanTab`) |
 | `PlusMenu` | Attach + mode shortcuts (Plan/Ask) | `onAttachFile`, `onAttachImage`, `onSetMode?` | Composer |
 | `ProjectPicker` | Recent cwds + Open Folder | `sessionId`, `cwd`, `onError?` | ContextBar |
-| `BranchPicker` | List/checkout local git branches | `cwd`, `onError?` | ContextBar |
+| `BranchPicker` | List/checkout local git branches; shows current-branch PR # + checks when present | `cwd`, `onError?` | ContextBar |
 | `BranchPrStatusChip` | Current-branch PR # + title + CI summary; opens PR in browser | `pr` | ChangesTab header |
+| `CreatePrDialog` | Editable title/body modal before `gh pr create` | `open`, `initialTitle?`, `initialBody?`, `onConfirm` | ChangesTab, CommitCenter, CommitBar |
 | `PopoverTray` | Shared Esc/click-outside/↑↓ tray | `open`, `onClose`, `placement`, `children` | Model/Mode/Plus/Project/Branch pickers |
-| `ConfirmDialog` | In-app modal (rename/delete) | `open`, `title`, `onConfirm`, `onCancel` | SessionMenu |
+| `ConfirmDialog` | In-app modal (rename/delete/create PR fields) | `open`, `title`, `onConfirm`, `onCancel`, `confirmDisabled?` | SessionMenu, CreatePrDialog |
 | `AttachmentChip` | Pending attachment pill (file/image/directory/dom) | `attachment`, `onRemove` | Composer |
 | `SendButton` | Circular send / stop / queue | `isStreaming`, `canQueue?`, `onSend`, `onStop` | Composer |
 | `MarkdownBody` | GFM + lazy highlight.js language pack; `live` plain pre-wrap fast-path | `content`, `live?` | TurnTimeline (`TimelineRowView`) |
@@ -104,7 +105,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `organisms/timeline/` | `buildDisplayItems` (+ `estimateSizeForItem`), `TimelineRowView`, `WorkGroupBody`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
 | `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
 | `organisms/right-panel/` | `PlanTab`, `ChangesTab` (single header: select-all + count/branch + diffstat), `FilesTab` (Monaco), `FileExplorer`, `FileRow` (aligned +/- / status columns), `CommitCenter` (message + selection label + split commit), `RightPanelTabBar`, `tabs` |
-| `organisms/context-bar/` | `CommitBar` (changes chip + Commit / Commit & Push), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
+| `organisms/context-bar/` | `CommitBar` (changes chip + Commit / Commit & Push / Create PR), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
 | `organisms/browser/` | `BrowserToolbar` (Design Mode toggle), `BrowserOverflowMenu` — composed by `BrowserTab` |
 | `organisms/terminal/` | `TerminalTab`, `TerminalInstance`, `TerminalRow`, `AgentTerminalRow`, `time` helpers |
 

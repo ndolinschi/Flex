@@ -1,14 +1,18 @@
 import { useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, GitBranch } from "lucide-react"
+import { Check, GitBranch, GitPullRequest } from "lucide-react"
 import {
   gitBranch,
   gitCheckout,
+  gitHasRemote,
   gitListBranches,
+  gitPrStatus,
   toInvokeError,
 } from "../../lib/tauri"
+import { openExternalUrl } from "../../lib/openExternalUrl"
 import { PickerTrigger } from "../atoms"
 import { PopoverItem, PopoverSearch, PopoverTray } from "./PopoverTray"
+import { cn } from "../../lib/utils"
 
 type BranchPickerProps = {
   cwd?: string
@@ -43,6 +47,23 @@ export const BranchPicker = ({
     retry: false,
   })
 
+  const { data: hasRemote = false } = useQuery({
+    queryKey: ["git-has-remote", cwd],
+    queryFn: () => gitHasRemote(cwd!),
+    enabled: !!cwd,
+    staleTime: 10_000,
+  })
+
+  const { data: prStatus } = useQuery({
+    queryKey: ["git-pr-status", cwd],
+    queryFn: () => gitPrStatus(cwd!),
+    enabled: !!cwd && hasRemote,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  })
+  const branchPr = prStatus?.pr ?? null
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return branches
@@ -67,6 +88,7 @@ export const BranchPicker = ({
       await gitCheckout(cwd, branch)
       await queryClient.invalidateQueries({ queryKey: ["git-branch", cwd] })
       await queryClient.invalidateQueries({ queryKey: ["git-branches", cwd] })
+      await queryClient.invalidateQueries({ queryKey: ["git-pr-status", cwd] })
       handleClose()
     } catch (err) {
       onError?.(toInvokeError(err))
@@ -76,7 +98,7 @@ export const BranchPicker = ({
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative flex items-center gap-1">
       <PickerTrigger
         leadingIcon={<GitBranch className="h-3 w-3 shrink-0" aria-hidden />}
         label={label}
@@ -86,6 +108,36 @@ export const BranchPicker = ({
         ariaLabel={`Branch: ${label}`}
         className="max-w-[12rem]"
       />
+
+      {branchPr ? (
+        <button
+          type="button"
+          onClick={() => void openExternalUrl(branchPr.url)}
+          title={`${branchPr.title} — ${branchPr.checksSummary}`}
+          aria-label={`Open pull request #${branchPr.number}`}
+          className={cn(
+            "flex h-6 max-w-[7.5rem] items-center gap-1 rounded-md px-1.5",
+            "text-xs text-ink-secondary",
+            "transition-colors duration-[var(--duration-fast)]",
+            "hover:bg-fill-3 hover:text-ink",
+          )}
+        >
+          <GitPullRequest className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
+          <span className="shrink-0 font-medium text-ink">#{branchPr.number}</span>
+          <span
+            className={cn(
+              "min-w-0 truncate",
+              branchPr.checksSummary.includes("failing")
+                ? "text-danger"
+                : branchPr.checksSummary.includes("pending")
+                  ? "text-ink-muted"
+                  : "text-success",
+            )}
+          >
+            {branchPr.checksSummary}
+          </span>
+        </button>
+      ) : null}
 
       <PopoverTray
         open={open}

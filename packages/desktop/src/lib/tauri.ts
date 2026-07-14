@@ -355,10 +355,24 @@ export type BranchPrStatus = {
 export const gitPrStatus = (cwd: string): Promise<BranchPrStatus> =>
   invoke("git_pr_status", { cwd })
 
-/** Create a PR for the current branch (`gh pr create --fill`) without a new
- * commit. If a PR already exists, returns its URL. */
-export const gitCreatePrForBranch = (cwd: string): Promise<CreatePrOutcome> =>
-  invoke("git_create_pr_for_branch", { cwd })
+export type PrDraft = {
+  title: string
+  body: string
+}
+
+/** Prefill title/body for the Create PR dialog (latest commit + ahead range). */
+export const gitPrDraft = (cwd: string): Promise<PrDraft> =>
+  invoke("git_pr_draft", { cwd })
+
+/** Create a PR for the current branch without a new commit. Pass title/body
+ * to override `gh --fill`; omit both to fill from commits. If a PR already
+ * exists, returns its URL. */
+export const gitCreatePrForBranch = (
+  cwd: string,
+  title?: string,
+  body?: string,
+): Promise<CreatePrOutcome> =>
+  invoke("git_create_pr_for_branch", { cwd, title, body })
 
 /** One-shot commit-message suggestion from a diff summary, via the
  * session's own model — see `commands::suggest_commit_message`. Callers

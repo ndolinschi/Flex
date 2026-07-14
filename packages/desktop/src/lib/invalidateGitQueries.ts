@@ -12,4 +12,5 @@ export const invalidateGitQueries = (queryClient: QueryClient): void => {
   void queryClient.invalidateQueries({ queryKey: ["git-is-repo"] })
   void queryClient.invalidateQueries({ queryKey: ["git-has-remote"] })
   void queryClient.invalidateQueries({ queryKey: ["git-pr-status"] })
+  void queryClient.invalidateQueries({ queryKey: ["git-pr-draft"] })
 }

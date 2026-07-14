@@ -2,19 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { GitMerge, RefreshCw, XCircle } from "lucide-react"
 import { Button, DiffStat, IconButton, ScrollArea } from "../../atoms"
-import { BranchPrStatusChip, ConfirmDialog } from "../../molecules"
+import { BranchPrStatusChip, ConfirmDialog, CreatePrDialog } from "../../molecules"
 import { useWorkspaceActions } from "../../../hooks/useWorkspaceActions"
 import { useIsGitRepo } from "../../../hooks/useIsGitRepo"
 import {
   gitBranch,
   gitCreatePrForBranch,
   gitHasRemote,
+  gitPrDraft,
   gitPrStatus,
   gitStatusSinceBaseline,
   isIsolated,
   toInvokeError,
 } from "../../../lib/tauri"
-import { openExternalUrl } from "../../../lib/openExternalUrl"
+import { toastPrOutcome } from "../../../lib/prOutcomeToast"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import type { SessionMeta } from "../../../lib/types"
 import { useAppStore } from "../../../stores/appStore"
@@ -111,28 +112,25 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     refetchOnWindowFocus: true,
   })
   const branchPr = prStatus?.pr ?? null
+  const [createPrOpen, setCreatePrOpen] = useState(false)
   const [creatingPr, setCreatingPr] = useState(false)
   const pushToast = useAppStore((s) => s.pushToast)
 
-  const handleCreatePr = async () => {
+  const { data: prDraft } = useQuery({
+    queryKey: ["git-pr-draft", cwd],
+    queryFn: () => gitPrDraft(cwd),
+    enabled: createPrOpen && !!cwd && isRepo,
+    staleTime: 5_000,
+  })
+
+  const handleCreatePr = async (title: string, body: string) => {
     if (!cwd || creatingPr) return
     setCreatingPr(true)
     try {
-      const outcome = await gitCreatePrForBranch(cwd)
+      const outcome = await gitCreatePrForBranch(cwd, title, body)
       invalidateGitQueries(queryClient)
-      if (outcome.degradedReason) {
-        pushToast(outcome.degradedReason, "success")
-      } else if (outcome.prUrl) {
-        const url = outcome.prUrl
-        pushToast("Pull request ready", "success", {
-          label: "Open PR",
-          onAction: () => {
-            void openExternalUrl(url)
-          },
-        })
-      } else {
-        pushToast("Pull request ready", "success")
-      }
+      toastPrOutcome(pushToast, outcome)
+      setCreatePrOpen(false)
     } catch (err) {
       const msg = toInvokeError(err)
       pushToast(`Couldn't create PR: ${msg}`, "error")
@@ -264,8 +262,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             variant="ghost"
             size="sm"
             className="h-6 shrink-0 px-1.5 text-xs"
-            isLoading={creatingPr}
-            onClick={() => void handleCreatePr()}
+            onClick={() => setCreatePrOpen(true)}
           >
             Create PR
           </Button>
@@ -392,6 +389,19 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
           setConfirmDiscard(false)
         }}
         onCancel={() => setConfirmDiscard(false)}
+      />
+
+      <CreatePrDialog
+        open={createPrOpen}
+        initialTitle={prDraft?.title ?? ""}
+        initialBody={prDraft?.body ?? ""}
+        isLoading={creatingPr}
+        onCancel={() => {
+          if (!creatingPr) setCreatePrOpen(false)
+        }}
+        onConfirm={(title, body) => {
+          void handleCreatePr(title, body)
+        }}
       />
     </>
   )
