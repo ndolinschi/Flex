@@ -78,6 +78,9 @@ export type RightPanelTab =
   | "browser"
   | "files"
   | "memory"
+  | "database"
+  /** Plugin-contributed tab ids (string & {} keeps autocomplete for builtins). */
+  | (string & {})
 
 export type TerminalMeta = {
   id: string

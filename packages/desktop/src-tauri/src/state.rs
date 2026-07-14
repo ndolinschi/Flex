@@ -147,6 +147,8 @@ pub struct AppState {
     pub session_baselines: Mutex<HashMap<String, SessionBaseline>>,
     /// Pending Copilot device-flow sessions keyed by opaque session id.
     pub pending_copilot_auth: Mutex<HashMap<String, PendingCopilotAuth>>,
+    /// Database UI plugin — saved connection specs + live handles.
+    pub db_plugin: Mutex<crate::db_plugin::DbPluginState>,
 }
 
 impl AppState {
@@ -168,6 +170,7 @@ impl AppState {
             browser_design_mode: SyncMutex::new(false),
             session_baselines: Mutex::new(load_session_baselines()),
             pending_copilot_auth: Mutex::new(HashMap::new()),
+            db_plugin: Mutex::new(crate::db_plugin::DbPluginState::load()),
         }
     }
 }

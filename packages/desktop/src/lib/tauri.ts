@@ -387,6 +387,77 @@ export const suggestCommitMessage = (
 export const listFiles = (cwd: string, query: string): Promise<FileHit[]> =>
   invoke("list_files", { cwd, query })
 
+export type DbEngine = "sqlite" | "postgres" | "mysql"
+
+export type DbConnectionSpec = {
+  id: string
+  name: string
+  engine: DbEngine
+  target: string
+}
+
+export type DbSchemaInfo = { name: string }
+
+export type DbTableInfo = {
+  schema: string
+  name: string
+  kind: string
+}
+
+export type DbQueryResult = {
+  columns: string[]
+  rows: unknown[][]
+  truncated: boolean
+  rowCount: number
+}
+
+export type DbMentionHit = {
+  name: string
+  path: string
+  insertText: string
+}
+
+export const dbListConnections = (): Promise<DbConnectionSpec[]> =>
+  invoke("db_list_connections")
+
+export const dbUpsertConnection = (
+  spec: DbConnectionSpec,
+): Promise<DbConnectionSpec> => invoke("db_upsert_connection", { spec })
+
+export const dbRemoveConnection = (id: string): Promise<void> =>
+  invoke("db_remove_connection", { id })
+
+export const dbConnect = (id: string): Promise<DbConnectionSpec> =>
+  invoke("db_connect", { id })
+
+export const dbDisconnect = (id: string): Promise<void> =>
+  invoke("db_disconnect", { id })
+
+export const dbActiveConnection = (): Promise<DbConnectionSpec | null> =>
+  invoke("db_active_connection")
+
+export const dbListSchemas = (id: string): Promise<DbSchemaInfo[]> =>
+  invoke("db_list_schemas", { id })
+
+export const dbListTables = (
+  id: string,
+  schema?: string,
+): Promise<DbTableInfo[]> => invoke("db_list_tables", { id, schema })
+
+export const dbPreviewTable = (
+  id: string,
+  schema: string,
+  table: string,
+  limit?: number,
+): Promise<DbQueryResult> =>
+  invoke("db_preview_table", { id, schema, table, limit })
+
+export const dbQuery = (id: string, sql: string): Promise<DbQueryResult> =>
+  invoke("db_query", { id, sql })
+
+export const dbMentionTables = (query: string): Promise<DbMentionHit[]> =>
+  invoke("db_mention_tables", { query })
+
 export const isIsolated = (sessionId: string): Promise<boolean> =>
   invoke("is_isolated", { sessionId })
 

@@ -24,7 +24,14 @@ export const FLEX_MODE_ENABLED = envBool("VITE_FLEX_MODE", false)
  * stays available either way. */
 export const MEMORY_TAB_ENABLED = envBool("VITE_MEMORY_TAB", false)
 
-/** Flag-gated right-panel tabs — Memory is offerable only when enabled. */
-export const isRightPanelTabEnabled = (
-  tab: "plan" | "changes" | "terminal" | "browser" | "files" | "memory",
-): boolean => tab !== "memory" || MEMORY_TAB_ENABLED
+/** Right-panel Database UI plugin. Default on — first-party plugin tab.
+ * Disable with `VITE_DATABASE_TAB=false`. */
+export const DATABASE_TAB_ENABLED = envBool("VITE_DATABASE_TAB", true)
+
+/** Flag-gated built-in right-panel tabs. Plugin tabs use their own
+ * `enabled` bit on the UI plugin registry. */
+export const isRightPanelTabEnabled = (tab: string): boolean => {
+  if (tab === "memory") return MEMORY_TAB_ENABLED
+  if (tab === "database") return DATABASE_TAB_ENABLED
+  return true
+}

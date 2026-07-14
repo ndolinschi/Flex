@@ -22,6 +22,7 @@ import { FilesTab } from "./right-panel/FilesTab"
 import { MemoryTab } from "./right-panel/MemoryTab"
 import { RightPanelTabBar } from "./right-panel/RightPanelTabBar"
 import { visibleRightPanelTabs } from "./right-panel/tabs"
+import { findPluginTab } from "../../plugins/registry"
 
 export { TABS, visibleRightPanelTabs } from "./right-panel/tabs"
 
@@ -260,6 +261,30 @@ export const RightPanel = () => {
               <MemoryTab />
             </div>
           ) : null}
+          {/* Plugin-contributed tabs (e.g. Database) — no per-tab hardcoding. */}
+          {(() => {
+            const pluginTab = findPluginTab(tab)
+            if (!pluginTab || !openIds.includes(tab)) return null
+            // Built-ins above already handle plan/changes/memory; plugins own the rest.
+            if (
+              tab === "plan" ||
+              tab === "changes" ||
+              tab === "memory" ||
+              tab === "files" ||
+              tab === "terminal" ||
+              tab === "browser"
+            ) {
+              return null
+            }
+            return (
+              <div className="absolute inset-0 flex flex-col">
+                {pluginTab.render({
+                  active: open && tab === pluginTab.id,
+                  session: active,
+                })}
+              </div>
+            )
+          })()}
           <div
             className={cn(
               "absolute inset-0 flex flex-col",
