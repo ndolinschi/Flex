@@ -3317,7 +3317,8 @@ pub fn list_files(
         if entry.depth() == 0 {
             continue;
         }
-        let Ok(rel) = entry.path().strip_prefix(&root) else {
+        let entry_path = entry.path();
+        let Ok(rel) = entry_path.strip_prefix(&root) else {
             continue;
         };
         let rel_str = rel.to_string_lossy().replace('\\', "/");
@@ -3413,7 +3414,8 @@ pub fn list_dir_children(cwd: String, relative_dir: String) -> Vec<FileHit> {
         if name == "." || name == ".." {
             continue;
         }
-        let Ok(stripped) = entry.path().strip_prefix(&root) else {
+        let entry_path = entry.path();
+        let Ok(stripped) = entry_path.strip_prefix(&root) else {
             continue;
         };
         let path = normalize_path_slashes(&stripped.to_string_lossy());
@@ -5103,6 +5105,10 @@ mod resolve_review_path_tests {
         assert!(resolve_review_path("../secret", &root).is_err());
     }
 }
+
+#[cfg(test)]
+mod git_status_tests {
+    use super::*;
 
     /// `summarize` must cap rendered rows at `MAX_STATUS_FILES` while keeping
     /// totals (count/added/removed) computed over the *full*, untruncated
