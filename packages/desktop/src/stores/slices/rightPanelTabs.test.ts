@@ -221,6 +221,19 @@ describe("right panel per-session tab state (BUG #37)", () => {
     expect(state.activeFileBySession[sessionScopeKey(A)]).toBe("src/App.tsx")
   })
 
+  it("reopening an already-open file focuses that buffer without duplicating", () => {
+    const key = sessionScopeKey(A)
+    useAppStore.getState().setActiveSessionId(A)
+    useAppStore.getState().openWorkspaceFile(key, "a.ts")
+    useAppStore.getState().openWorkspaceFile(key, "b.ts")
+    expect(useAppStore.getState().activeFileBySession[key]).toBe("b.ts")
+    expect(useAppStore.getState().openFilesBySession[key]).toEqual(["a.ts", "b.ts"])
+
+    useAppStore.getState().openWorkspaceFile(key, "a.ts")
+    expect(useAppStore.getState().activeFileBySession[key]).toBe("a.ts")
+    expect(useAppStore.getState().openFilesBySession[key]).toEqual(["a.ts", "b.ts"])
+  })
+
   it("clearSessionPanelState drops Files buffers and open tabs for that session", () => {
     useAppStore.getState().setActiveSessionId(A)
     useAppStore.getState().openWorkspaceFile(sessionScopeKey(A), "a.ts")
