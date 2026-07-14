@@ -49,6 +49,8 @@ type SettingRowProps = {
   children?: ReactNode
   /** Suppress the top inset divider — pass for the first row in a card. */
   first?: boolean
+  /** Stack title above a full-width control (tall pickers, grids). */
+  stacked?: boolean
   className?: string
 }
 
@@ -61,13 +63,15 @@ export const SettingRow = ({
   description,
   children,
   first = false,
+  stacked = false,
   className,
 }: SettingRowProps) => {
   return (
     <div
       data-settings-row={rowId}
       className={cn(
-        "relative flex items-center gap-5 px-3.5 py-3",
+        "relative flex gap-5 px-3.5 py-3",
+        stacked ? "flex-col items-stretch" : "items-center",
         !first && "before:absolute before:inset-x-3 before:top-0 before:h-px before:bg-stroke-4 before:content-['']",
         className,
       )}
@@ -81,7 +85,12 @@ export const SettingRow = ({
         ) : null}
       </div>
       {children ? (
-        <div className="flex shrink-0 items-center justify-end gap-2">
+        <div
+          className={cn(
+            "flex items-center gap-2",
+            stacked ? "w-full justify-start" : "shrink-0 justify-end",
+          )}
+        >
           {children}
         </div>
       ) : null}

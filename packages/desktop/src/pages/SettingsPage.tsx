@@ -111,23 +111,16 @@ const AppearanceContent = () => {
         </SettingRow>
       </SettingsCard>
 
-      <SettingsCard
-        label="Accent"
-        description="Primary buttons, links, and focus rings. Neutral is white or black; pick a hue or any custom color."
-      >
-        <div
-          data-settings-row="appearance-accent"
-          className="flex flex-col gap-3 px-3.5 py-3"
+      <SettingsCard label="Accent">
+        <SettingRow
+          rowId="appearance-accent"
+          title="Accent color"
+          description="Default is neutral (high-contrast). Choose a hue or any custom shade."
+          first
+          stacked
         >
-          <div className="min-w-0">
-            <p className="text-[13px] leading-[18px] text-ink">Accent color</p>
-            <p className="mt-0.5 text-[13px] leading-[18px] text-ink-secondary">
-              Default is neutral (high-contrast). Choose blue, green, orange,
-              burgundy, and more — or pick any shade from the palette.
-            </p>
-          </div>
           <AccentColorPicker />
-        </div>
+        </SettingRow>
       </SettingsCard>
     </div>
   )

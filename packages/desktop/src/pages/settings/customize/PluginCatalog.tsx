@@ -113,13 +113,14 @@ export const PluginCatalog = () => {
         description="Native tool bundles the engine can load into a session."
         rowId="tools-plugins"
         actions={searchInput}
+        className="mb-0"
       >
         {isLoading || !plugins ? (
-          <div className="flex items-center gap-2 p-3 text-sm text-ink-muted">
+          <div className="flex items-center gap-2 px-3.5 py-3 text-sm text-ink-muted">
             <Spinner size="sm" /> Loading configuration…
           </div>
         ) : visible.length === 0 ? (
-          <p className="p-8 text-center text-sm text-ink-muted">
+          <p className="px-4 py-8 text-center text-sm text-ink-muted">
             No plugins match “{query}”.
           </p>
         ) : (
