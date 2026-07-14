@@ -178,24 +178,42 @@ export const FileRow = memo(function FileRow({
     }
   }
 
+  const statusTitle =
+    file.status === "?"
+      ? "Untracked"
+      : file.status === "M"
+        ? "Modified"
+        : file.status === "A"
+          ? "Added"
+          : file.status === "D"
+            ? "Deleted"
+            : file.status === "R"
+              ? "Renamed"
+              : file.status
+
   return (
     <li>
       <div
         className={cn(
-          "group flex h-7 w-full items-center gap-1.5 rounded-[4px] px-3",
+          "group flex h-8 w-full items-center gap-2 rounded-[var(--radius-sm)] px-2",
           "transition-colors duration-[var(--duration-fast)] hover:bg-fill-4",
+          expanded && "bg-fill-5",
         )}
       >
-        {selectable ? (
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={() => onToggleSelected?.()}
-            onClick={(e) => e.stopPropagation()}
-            aria-label={`Include ${name} in commit`}
-            className="h-3.5 w-3.5 shrink-0 accent-accent"
-          />
-        ) : null}
+        {/* Reserve checkbox column so selectable + non-selectable rows share
+            the same path/stat alignment when the list mixes modes. */}
+        <span className="flex w-3.5 shrink-0 items-center justify-center">
+          {selectable ? (
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={() => onToggleSelected?.()}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Include ${name} in commit`}
+              className="h-3.5 w-3.5 accent-accent"
+            />
+          ) : null}
+        </span>
         <button
           type="button"
           onClick={onToggle}
@@ -209,44 +227,40 @@ export const FileRow = memo(function FileRow({
           />
           <span className="flex min-w-0 flex-1 items-center gap-0">
             <PathPrefix dir={dir} />
-            <span className="shrink-0 truncate text-sm text-ink-secondary">
+            <span className="min-w-0 truncate text-[13px] text-ink">
               {name}
             </span>
           </span>
         </button>
-        <span className="flex shrink-0 items-center gap-1 text-sm [font-variant-numeric:tabular-nums]">
-          {typeof file.added === "number" ? (
+        {/* Fixed-width stat columns so +/− and status letters line up down
+            the list instead of jittering with digit width. */}
+        <span className="flex w-[4.75rem] shrink-0 items-center justify-end gap-1 font-mono text-[11px] [font-variant-numeric:tabular-nums]">
+          {typeof file.added === "number" && file.added > 0 ? (
             <span className="text-green">+{file.added}</span>
           ) : null}
           {typeof file.removed === "number" && file.removed > 0 ? (
-            <span className="text-red">-{file.removed}</span>
+            <span className="text-red">−{file.removed}</span>
           ) : null}
-          <span
-            className={cn(
-              "w-3 text-center font-mono text-[11px]",
-              STATUS_COLOR[file.status] ?? "text-ink-muted",
-            )}
-            title={
-              file.status === "?"
-                ? "Untracked"
-                : file.status === "M"
-                  ? "Modified"
-                  : file.status === "A"
-                    ? "Added"
-                    : file.status === "D"
-                      ? "Deleted"
-                      : file.status === "R"
-                        ? "Renamed"
-                        : file.status
-            }
-          >
-            {file.status === "?" ? "U" : file.status}
-          </span>
         </span>
-        {/* Per-file quick actions — hidden until row hover, gap 4px per spec.
-            Keep is meaningless without a base repo (non-isolated sessions
-            have nowhere to "keep" into), so it's isolated-only. */}
-        <span className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-[var(--duration-fast)] group-hover:opacity-100">
+        <span
+          className={cn(
+            "w-3.5 shrink-0 text-center font-mono text-[11px] font-medium",
+            STATUS_COLOR[file.status] ?? "text-ink-muted",
+          )}
+          title={statusTitle}
+        >
+          {file.status === "?" ? "U" : file.status}
+        </span>
+        {/* Per-file quick actions — fade in on hover; fixed width so revealing
+            them does not shove the chevron. Keep is isolated-only. */}
+        <span
+          className={cn(
+            "flex w-[4.5rem] shrink-0 items-center justify-end gap-0.5",
+            "opacity-0 transition-opacity duration-[var(--duration-fast)]",
+            "group-hover:opacity-100 focus-within:opacity-100",
+            isolated && "w-[6.75rem]",
+          )}
+        >
           {!isDir && file.status !== "D" ? (
             <IconButton
               label="Open file"
@@ -288,20 +302,20 @@ export const FileRow = memo(function FileRow({
         </span>
         <ChevronRight
           className={cn(
-            "h-2.5 w-2.5 shrink-0 text-icon-3",
+            "h-3 w-3 shrink-0 text-icon-3",
             "transition-[transform,opacity] duration-[var(--duration-fast)]",
             expanded
               ? "rotate-90 opacity-100"
-              : "opacity-0 group-hover:opacity-100",
+              : "opacity-40 group-hover:opacity-100",
           )}
           aria-hidden
           onClick={onToggle}
         />
       </div>
       <Collapsible open={expanded}>
-        <div className="border-y border-stroke-4 bg-fill-5 py-1">
+        <div className="mx-1 mb-1 overflow-hidden rounded-[var(--radius-sm)] border border-stroke-4 bg-fill-5">
           {isLoading ? (
-            <div className="flex items-center gap-2 px-3 py-2 text-sm text-ink-muted">
+            <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-ink-muted">
               <Spinner size="sm" /> Loading diff…
             </div>
           ) : (
