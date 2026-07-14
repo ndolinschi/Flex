@@ -335,7 +335,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             hundreds of changed files still only mounts `files.length` rows;
             this tells the user more exist without rendering them. */}
         {truncated ? (
-          <p className="px-2 py-2 text-center text-xs text-ink-faint">
+          <p className="px-2.5 py-2 text-center text-xs text-ink-faint">
             +{totalCount - files.length} more files not shown
           </p>
         ) : null}

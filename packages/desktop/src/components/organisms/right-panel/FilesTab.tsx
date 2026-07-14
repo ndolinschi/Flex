@@ -366,7 +366,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
           </div>
         ) : path && previewMode ? (
           <ScrollArea className="h-full">
-            <div className="px-2 py-2">
+            <div className="px-2.5 py-2">
               {value.trim().length === 0 ? (
                 <p className="text-sm text-ink-muted">Empty file</p>
               ) : (

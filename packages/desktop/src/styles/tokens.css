@@ -154,7 +154,7 @@
     sans-serif;
   --font-mono: Menlo, Monaco, ui-monospace, "SF Mono", "Courier New", monospace;
 
-  /* reference canon (design-map/00-foundations.md: "Semibold canonical weight
+  /* reference canon (DESIGN.md Feel principles: "Semibold canonical weight
      = 590; 600 only in 3 minor, apparently-stale spots"). Needs the matching
      `--font-weight-semibold: var(--font-weight-semibold);` line added to the
      `@theme` block in src/index.css for Tailwind's `font-semibold` utility to

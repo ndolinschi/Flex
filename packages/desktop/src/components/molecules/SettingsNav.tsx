@@ -21,9 +21,7 @@ export type SettingsNavItem = {
   label: string
 }
 
-/** Nav order + labels for our section set (design-map/07-settings.md §7's
- * `Aml` order / `kci` labels, narrowed to the sections this build actually
- * houses — see report for the full Customize-redistribution mapping). */
+/** Nav order + labels for our section set (see DESIGN.md Settings nav). */
 const ALL_SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { id: "general", label: "General" },
   { id: "appearance", label: "Appearance" },
@@ -66,7 +64,7 @@ type SettingsNavProps = {
   onResultSelect: (entry: SettingsSearchEntry) => void
 }
 
-/** Persistent left nav (design-map/07-settings.md §1-3): width
+/** Persistent left nav (see DESIGN.md Settings shell / nav): width
  * clamp(100px,25%,200px), search-at-top that swaps the whole nav list for a
  * flat result list once the query is non-empty (navigate-to-result, not
  * inline filtering). */

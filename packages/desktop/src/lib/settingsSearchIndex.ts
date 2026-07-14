@@ -1,4 +1,4 @@
-/** Searchable registry for the Settings shell (design-map/07-settings.md §3).
+/** Searchable registry for the Settings shell (DESIGN.md Settings).
  *
  * Sections register their rows here (title/description only — no live
  * values) so `Search Settings` can do a flat, cross-section text search

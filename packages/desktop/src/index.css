@@ -4,7 +4,7 @@
 @import "./styles/highlight.css";
 
 @theme {
-  /* reference canon: semibold = 590 (see design-map/00-foundations.md) */
+  /* reference canon: semibold = 590 (see DESIGN.md Feel principles) */
   --font-weight-semibold: 590;
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
@@ -499,7 +499,7 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   animation: toast-in 300ms var(--easing-out) both;
 }
 
-/* Settings search "jump to result" pulse (design-map/07-settings.md §9) —
+/* Settings search "jump to result" pulse (DESIGN.md Settings) —
  * ring grows 2px→4px then fades to transparent, once, over the row the
  * search result navigated to. */
 @keyframes settings-row-highlight {

@@ -4,8 +4,8 @@ type NewBadgeProps = {
   className?: string
 }
 
-/** "NEW" chip for nav items / settings rows (design-map/07-settings.md §2,
- * `.cursor-settings-new-badge`) — sparingly used, cyan-on-tinted-badge. */
+/** "NEW" chip for nav items / settings rows (see DESIGN.md Settings) —
+ * sparingly used, cyan-on-tinted-badge. */
 export const NewBadge = ({ className }: NewBadgeProps) => {
   return (
     <span
