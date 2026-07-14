@@ -68,7 +68,7 @@ export const TitleBarMenus = ({
       if (!path || Array.isArray(path)) return
       pushRecentCwd(path)
       const meta = await createSession(newAgentCreateInput(path))
-      setActiveSessionId(meta.id)
+      setActiveSessionId(meta.id, { panel: "closed" })
       setRoute("chat")
     } catch (err) {
       pushToast(`Could not open folder: ${toInvokeError(err)}`, "error")

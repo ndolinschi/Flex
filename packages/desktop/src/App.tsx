@@ -85,7 +85,7 @@ const AppRoutes = () => {
           try {
             const meta = await createSession(newAgentCreateInput())
             if (cancelled) return
-            store.setActiveSessionId(meta.id)
+            store.setActiveSessionId(meta.id, { panel: "closed" })
             sessionId = meta.id
           } catch {
             return

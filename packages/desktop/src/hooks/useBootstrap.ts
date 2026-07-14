@@ -61,11 +61,10 @@ export const useBootstrap = (
           return
         }
 
-        // Restore per-session open tabs BEFORE focusing a session —
-        // `setActiveSessionId` re-derives `rightPanelOpen`/`rightPanelTab`
-        // from `openTabsBySession`. Hydrating tabs after that (or after
-        // `setRightPanelTab`) wiped the just-registered tab and could leave
-        // the panel open+collapsed with an empty strip and no "+".
+        // Restore per-session open tabs BEFORE focusing a session so
+        // `setActiveSessionId` can sync `rightPanelTab` from
+        // `openTabsBySession`. The panel itself is forced closed after boot
+        // (see below) — tabs are remembered for when the user opens it.
         if (ui.openTabsBySession) {
           useAppStore.getState().setOpenTabsBySession(ui.openTabsBySession)
         }
@@ -73,7 +72,9 @@ export const useBootstrap = (
         if (ui.activeSessionId) {
           try {
             await resumeSession(ui.activeSessionId)
-            useAppStore.getState().setActiveSessionId(ui.activeSessionId)
+            useAppStore
+              .getState()
+              .setActiveSessionId(ui.activeSessionId, { panel: "closed" })
           } catch {
             useAppStore.getState().setActiveSessionId(null)
           }
@@ -135,27 +136,9 @@ export const useBootstrap = (
           useAppStore.getState().setSidebarCollapsed(true)
         }
 
-        // With an active session, open/tab already came from
-        // `setActiveSessionId` + restored `openTabsBySession`. Don't re-apply
-        // the global `rightPanelOpen`/`rightPanelTab` flags — that used to
-        // reopen an empty collapsed strip after tabs were wiped by the old
-        // hydration order. Only restore the collapse preference when the
-        // panel actually ended up open (session has remembered tabs).
-        const afterSession = useAppStore.getState()
-        if (
-          !afterSession.activeSessionId &&
-          ui.rightPanelOpen &&
-          ui.rightPanelTab
-        ) {
-          afterSession.setRightPanelOpen(true)
-          afterSession.setRightPanelTab(ui.rightPanelTab)
-        }
-        if (
-          typeof ui.rightPanelCollapsed === "boolean" &&
-          useAppStore.getState().rightPanelOpen
-        ) {
-          useAppStore.getState().setRightPanelCollapsed(ui.rightPanelCollapsed)
-        }
+        // Right panel stays closed on app start (`setActiveSessionId(…,
+        // { panel: "closed" })` above). Still hydrate width/tabs so ⌘J and
+        // later session switches restore the strip the user left behind.
         if (ui.planAnnotationsBySession) {
           useAppStore
             .getState()

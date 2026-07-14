@@ -107,7 +107,7 @@ export const ProjectPicker = ({
           ...(selectedIsolation ? { isolation: selectedIsolation } : {}),
         })
         await queryClient.invalidateQueries({ queryKey: ["sessions"] })
-        setActiveSessionId(meta.id)
+        setActiveSessionId(meta.id, { panel: "closed" })
         setRoute("chat")
       }
       handleClose()

@@ -207,7 +207,10 @@ export type SessionSliceState = {
    * as ExitPlanMode events replay. Cleared per plan once merged.
    */
   restoredPlanAnnotations: Record<SessionId, PlanAnnotationsPersisted>
-  setActiveSessionId: (id: SessionId | null) => void
+  setActiveSessionId: (
+    id: SessionId | null,
+    opts?: { panel?: "restore" | "closed" },
+  ) => void
   setIsStreaming: (streaming: boolean) => void
   setSessionStreaming: (sessionId: SessionId, streaming: boolean) => void
   /** Record that a session's turn reached a terminal event (see
