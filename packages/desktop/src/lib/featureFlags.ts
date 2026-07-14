@@ -18,3 +18,13 @@ export const AUTOMATIONS_UI_ENABLED = envBool("VITE_AUTOMATIONS_UI", false)
 /** Composer "Flex" mode (orchestrator across planning / review / workers).
  * Default off until ready to ship. Enable with `VITE_FLEX_MODE=true`. */
 export const FLEX_MODE_ENABLED = envBool("VITE_FLEX_MODE", false)
+
+/** Right-panel Memory tab (same notes UI as Settings → Memory). Default off
+ * until ready to ship. Enable with `VITE_MEMORY_TAB=true`. Settings Memory
+ * stays available either way. */
+export const MEMORY_TAB_ENABLED = envBool("VITE_MEMORY_TAB", false)
+
+/** Flag-gated right-panel tabs — Memory is offerable only when enabled. */
+export const isRightPanelTabEnabled = (
+  tab: "plan" | "changes" | "terminal" | "browser" | "files" | "memory",
+): boolean => tab !== "memory" || MEMORY_TAB_ENABLED

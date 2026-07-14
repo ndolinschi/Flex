@@ -9,6 +9,7 @@ import {
   clampSidebarWidth,
 } from "../layoutConstants"
 import { persistUiState } from "../persist"
+import { isRightPanelTabEnabled } from "../../lib/featureFlags"
 
 export const createLayoutSlice: StateCreator<
   AppState,
@@ -135,14 +136,18 @@ export const createLayoutSlice: StateCreator<
       const sessionId = get().activeSessionId
       if (!sessionId) return
       const key = sessionScopeKey(sessionId)
-      const openIds = get().openTabsBySession[key] ?? []
+      const openIds = (get().openTabsBySession[key] ?? []).filter(
+        isRightPanelTabEnabled,
+      )
       if (openIds.length > 0) return
-      const preferred =
+      let preferred =
         get().selectedTabBySession[key] ?? get().rightPanelTab ?? "plan"
+      if (!isRightPanelTabEnabled(preferred)) preferred = "plan"
       get().setRightPanelTab(preferred)
     }
   },
   setRightPanelTab: (tab) => {
+    if (!isRightPanelTabEnabled(tab)) return
     set({ rightPanelTab: tab })
     void persistUiState({ rightPanelTab: tab })
     // Switching to a tab always counts as "opening" it for the active

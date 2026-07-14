@@ -9,6 +9,7 @@ import type {
 import { emptyStreaming, sessionScopeKey } from "../types"
 import { persistUiState } from "../persist"
 import { firstPlanHeading } from "../../lib/planTitle"
+import { isRightPanelTabEnabled } from "../../lib/featureFlags"
 import { log } from "../../lib/debug/log"
 import type { PlanEntry, SessionId } from "../../lib/types"
 
@@ -124,11 +125,15 @@ export const createSessionSlice: StateCreator<
     // open + restore its last-selected tab if it has any open tabs, closed
     // otherwise (matches the "new session: panel closed" default).
     const key = sessionScopeKey(id)
-    const openIds = get().openTabsBySession[key] ?? []
+    const openIds = (get().openTabsBySession[key] ?? []).filter(
+      isRightPanelTabEnabled,
+    )
     if (openIds.length > 0) {
       const remembered = get().selectedTabBySession[key]
       const tab =
-        remembered && openIds.includes(remembered)
+        remembered &&
+        openIds.includes(remembered) &&
+        isRightPanelTabEnabled(remembered)
           ? remembered
           : openIds[openIds.length - 1]
       // set() directly for the tab (not setRightPanelTab) — that action

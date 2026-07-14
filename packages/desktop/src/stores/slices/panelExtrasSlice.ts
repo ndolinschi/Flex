@@ -2,6 +2,7 @@ import type { StateCreator } from "zustand"
 import type { AppState, PanelExtrasSliceState } from "../types"
 import { emptyBrowserSessionState, sessionScopeKey } from "../types"
 import { persistUiState } from "../persist"
+import { isRightPanelTabEnabled } from "../../lib/featureFlags"
 
 export const createPanelExtrasSlice: StateCreator<
   AppState,
@@ -25,6 +26,7 @@ export const createPanelExtrasSlice: StateCreator<
   activeFileBySession: {},
   fileDraftsBySession: {},
   openTab: (sessionKey, tab) => {
+    if (!isRightPanelTabEnabled(tab)) return
     const prev = get().openTabsBySession[sessionKey] ?? []
     if (prev.includes(tab)) return
     const next = { ...get().openTabsBySession, [sessionKey]: [...prev, tab] }
