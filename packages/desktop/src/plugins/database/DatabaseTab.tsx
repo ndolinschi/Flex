@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  Database,
   Play,
   Plus,
   RefreshCw,
@@ -229,33 +228,40 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 px-3">
-        <Database className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-        <span className="min-w-0 flex-1 truncate text-sm text-ink">Database</span>
-        <IconButton
-          label="Refresh tables"
-          className="h-6 w-6"
-          onClick={() => void refetchTables()}
-        >
-          <RefreshCw className={cn("h-3 w-3", isFetching && "animate-spin")} />
-        </IconButton>
-        <IconButton
-          label="Add connection"
-          className="h-6 w-6"
-          onClick={openAddForm}
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </IconButton>
-      </div>
+      {/* Tab strip already labels the panel — don't repeat "Database" here.
+          Empty state owns the Add CTA; chrome only appears once there are
+          connections (count + refresh/add), so stacked headers stay balanced. */}
+      {connections.length > 0 ? (
+        <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 px-2">
+          <span className="min-w-0 flex-1 truncate text-sm text-ink-muted">
+            {`${connections.length} connection${connections.length === 1 ? "" : "s"}`}
+          </span>
+          <IconButton
+            label="Refresh tables"
+            className="h-6 w-6"
+            onClick={() => void refetchTables()}
+          >
+            <RefreshCw className={cn("h-3 w-3", isFetching && "animate-spin")} />
+          </IconButton>
+          <IconButton
+            label="Add connection"
+            className="h-6 w-6"
+            onClick={openAddForm}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </IconButton>
+        </div>
+      ) : null}
 
       {error ? (
-        <p className="border-b border-stroke-3 bg-danger-subtle px-3 py-1.5 text-xs text-danger">
+        <p className="border-b border-stroke-3 bg-danger-subtle px-2 py-1.5 text-xs text-danger">
           {error}
         </p>
       ) : null}
 
-      {connections.length === 0 && !formOpen ? (
+      {connections.length === 0 ? (
         <EmptyState
+          className="min-h-0 flex-1"
           title="No database connections"
           description="Connect SQLite, PostgreSQL, or MySQL to browse schemas, tables, and rows."
           actionLabel="Add connection"
@@ -281,7 +287,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
             {selectedId ? (
               <button
                 type="button"
-                className="flex items-center gap-1.5 border-t border-stroke-3 px-2.5 py-2 text-xs text-ink-muted hover:text-ink"
+                className="flex items-center gap-1.5 border-t border-stroke-3 px-2 py-2 text-xs text-ink-muted hover:text-ink"
                 onClick={() => {
                   void dbDisconnect(selectedId)
                   setSelectedId(null)
@@ -328,7 +334,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
                   <ScrollArea className="w-40 shrink-0 border-r border-stroke-3">
                     <ul className="py-1">
                       {tables.length === 0 ? (
-                        <li className="px-2.5 py-3 text-xs text-ink-faint">
+                        <li className="px-2 py-3 text-xs text-ink-faint">
                           No tables
                         </li>
                       ) : (
@@ -343,7 +349,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
                                 type="button"
                                 onClick={() => void runPreview(t)}
                                 className={cn(
-                                  "flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-xs",
+                                  "flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-xs",
                                   isActive
                                     ? "bg-fill-3 text-ink"
                                     : "text-ink-secondary hover:bg-fill-3/60 hover:text-ink",
@@ -489,7 +495,7 @@ const ConnectionRow = ({
       disabled={busy}
       onClick={onOpen}
       className={cn(
-        "flex w-full flex-col gap-0.5 px-2.5 py-1.5 text-left",
+        "flex w-full flex-col gap-0.5 px-2 py-1.5 text-left",
         active ? "bg-fill-3" : "hover:bg-fill-3/60",
       )}
     >

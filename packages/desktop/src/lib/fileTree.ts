@@ -3,8 +3,8 @@ import type { FileHit } from "./types"
 /** Sort dirs first, then case-insensitive name (VS Code explorer order). */
 export const sortFileHits = (hits: FileHit[]): FileHit[] =>
   [...hits].sort((a, b) => {
-    const aDir = !!a.is_dir
-    const bDir = !!b.is_dir
+    const aDir = !!a.isDir
+    const bDir = !!b.isDir
     if (aDir !== bDir) return aDir ? -1 : 1
     const byName = a.name.localeCompare(b.name, undefined, {
       sensitivity: "base",

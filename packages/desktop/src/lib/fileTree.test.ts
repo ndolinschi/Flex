@@ -5,10 +5,10 @@ import type { FileHit } from "./types"
 describe("sortFileHits", () => {
   it("puts directories before files, then sorts by name", () => {
     const hits: FileHit[] = [
-      { path: "z.ts", name: "z.ts", is_dir: false },
-      { path: "src", name: "src", is_dir: true },
-      { path: "a.ts", name: "a.ts", is_dir: false },
-      { path: "lib", name: "lib", is_dir: true },
+      { path: "z.ts", name: "z.ts", isDir: false },
+      { path: "src", name: "src", isDir: true },
+      { path: "a.ts", name: "a.ts", isDir: false },
+      { path: "lib", name: "lib", isDir: true },
     ]
     expect(sortFileHits(hits).map((h) => h.path)).toEqual([
       "lib",

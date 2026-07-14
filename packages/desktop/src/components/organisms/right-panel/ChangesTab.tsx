@@ -217,7 +217,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       {/* Single header: select-all + title/branch + diffstat + refresh.
           Previously a count bar and a separate select-all strip stacked and
           felt top-heavy; one row keeps the chrome balanced. */}
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 px-3 [font-variant-numeric:tabular-nums]">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 px-2 [font-variant-numeric:tabular-nums]">
         {showSelectAll ? (
           <input
             type="checkbox"
@@ -284,7 +284,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       </div>
 
       {error ? (
-        <p className="border-b border-stroke-3 bg-danger-subtle px-3 py-1.5 text-xs text-danger">
+        <p className="border-b border-stroke-3 bg-danger-subtle px-2 py-1.5 text-xs text-danger">
           {error}
         </p>
       ) : null}
@@ -336,7 +336,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             hundreds of changed files still only mounts `files.length` rows;
             this tells the user more exist without rendering them. */}
         {truncated ? (
-          <p className="px-3 py-2 text-center text-xs text-ink-faint">
+          <p className="px-2 py-2 text-center text-xs text-ink-faint">
             +{totalCount - files.length} more files not shown
           </p>
         ) : null}
@@ -353,7 +353,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       ) : null}
 
       {isolated && files.length > 0 ? (
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-stroke-3 px-3 py-2.5">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-stroke-3 px-2 py-2.5">
           <Button
             variant="ghost"
             size="sm"

@@ -441,8 +441,8 @@ export type FileHit = {
   path: string
   /** Basename, shown as the primary label. */
   name: string
-  /** True for directories (folder icon in the @ tray). */
-  is_dir?: boolean
+  /** True for directories (folder icon in the @ tray / Files tree). */
+  isDir?: boolean
 }
 
 export type PromptAttachment = {

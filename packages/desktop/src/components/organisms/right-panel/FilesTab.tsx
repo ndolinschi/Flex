@@ -299,7 +299,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
     return (
       <div className="flex h-full min-h-0 flex-col">
         {openFiles.length > 0 ? (
-          <div className="flex h-[var(--header-height)] shrink-0 items-center gap-0.5 overflow-x-auto px-1">
+          <div className="flex h-[var(--header-height)] shrink-0 items-center gap-0.5 overflow-x-auto px-2">
             {fileChips}
           </div>
         ) : null}
@@ -334,7 +334,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-0.5 overflow-x-auto px-1">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-0.5 overflow-x-auto px-2">
         <IconButton
           label="Browse files"
           onClick={() => setBrowseMode(true)}
@@ -343,7 +343,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
           <FolderTree className="h-3.5 w-3.5" aria-hidden />
         </IconButton>
         {fileChips}
-        <div className="ml-auto flex shrink-0 items-center gap-0.5 pr-1">
+        <div className="ml-auto flex shrink-0 items-center gap-0.5">
           {isMarkdown && path ? (
             <IconButton
               label={previewMode ? "Edit markdown" : "Preview markdown"}

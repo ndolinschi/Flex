@@ -132,7 +132,7 @@ const TreeBranch = ({
   return (
     <ul className="flex flex-col" role="list">
       {sorted.map((hit) => {
-        const isDir = !!hit.is_dir
+        const isDir = !!hit.isDir
         const isOpen = isDir && expanded.has(hit.path)
         const Glyph = isDir
           ? isOpen
@@ -295,7 +295,7 @@ export const FileExplorer = ({
 
   const menuHit = menu?.hit
   const contextMenuItems: ContextMenuItem[] = menuHit
-    ? menuHit.is_dir
+    ? menuHit.isDir
       ? [
           {
             type: "item",
@@ -409,7 +409,7 @@ export const FileExplorer = ({
           ) : (
             <ul className="flex flex-col" role="list">
               {searchRows.map((hit) => {
-                const isDir = !!hit.is_dir
+                const isDir = !!hit.isDir
                 const Glyph = isDir ? Folder : fileIconForPath(hit.path)
                 return (
                   <li key={hit.path}>

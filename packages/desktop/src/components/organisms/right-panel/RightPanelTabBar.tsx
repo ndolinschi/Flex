@@ -46,7 +46,7 @@ export const RightPanelTabBar = ({
           aria-selected={tab === t.id}
           role="tab"
           className={cn(
-            "group flex h-7 items-center gap-1.5 rounded-lg px-2 text-sm",
+            "group flex h-7 items-center rounded-lg px-2 text-sm",
             "tracking-[var(--tracking-caption)]",
             "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
             tab === t.id
@@ -54,11 +54,15 @@ export const RightPanelTabBar = ({
               : "text-ink-muted hover:bg-fill-3 hover:text-ink-secondary",
           )}
         >
-          {t.icon ? <t.icon className="h-3.5 w-3.5" aria-hidden /> : null}
-          {t.label}
-          {t.id === "changes" && changesCount ? (
-            <DiffStat summary={changesTotals} />
-          ) : null}
+          {/* Icon + label share gap; close is outside so a collapsed max-w-0
+           * control does not leave a trailing gap that unbalances the pill. */}
+          <span className="flex min-w-0 items-center gap-1.5">
+            {t.icon ? <t.icon className="h-3.5 w-3.5 shrink-0" aria-hidden /> : null}
+            <span className="truncate">{t.label}</span>
+            {t.id === "changes" && changesCount ? (
+              <DiffStat summary={changesTotals} />
+            ) : null}
+          </span>
           {/* Close-on-hover — never destroys the underlying
            * terminal PTY / browser webview, only hides the tab (see
            * handleCloseTab). Collapses to zero width at rest (no reserved

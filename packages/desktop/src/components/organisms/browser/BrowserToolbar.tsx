@@ -143,7 +143,7 @@ export const BrowserToolbar = ({
   return (
     <div
       ref={toolbarRef}
-      className="relative z-20 flex h-[var(--header-height)] min-h-[var(--header-height)] shrink-0 items-center gap-1 overflow-hidden bg-bg px-1.5"
+      className="relative z-20 flex h-[var(--header-height)] min-h-[var(--header-height)] shrink-0 items-center gap-1 overflow-hidden bg-bg px-2"
       data-browser-chrome="toolbar"
     >
       <div className="flex items-center gap-px">

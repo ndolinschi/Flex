@@ -14,9 +14,9 @@ export type AtMentionHit = {
 export const fileHitToAtMention = (hit: {
   name: string
   path: string
-  is_dir?: boolean
+  isDir?: boolean
 }): AtMentionHit => ({
-  kind: hit.is_dir ? "folder" : "file",
+  kind: hit.isDir ? "folder" : "file",
   name: hit.name,
   path: hit.path,
   insertText: hit.name,

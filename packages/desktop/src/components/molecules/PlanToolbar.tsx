@@ -256,7 +256,7 @@ export const PlanToolbar = ({
 
   return (
     <div className={cn("flex shrink-0 flex-col", className)}>
-      <div className="flex h-[var(--header-height)] items-center gap-1.5 px-3 text-sm">
+      <div className="flex h-[var(--header-height)] items-center gap-1.5 px-2 text-sm">
         <span className="min-w-0 truncate text-ink-muted">{repo}</span>
         <span className="text-ink-faint">›</span>
         {showPlansListCrumb && onBackToPlans ? (
@@ -328,7 +328,7 @@ export const PlanToolbar = ({
       </div>
 
       {find?.open ? (
-        <div className="flex h-8 items-center gap-1.5 border-t border-stroke-3 px-3">
+        <div className="flex h-8 items-center gap-1.5 border-t border-stroke-3 px-2">
           <Search className="h-3.5 w-3.5 shrink-0 text-icon-3" aria-hidden />
           <input
             ref={findInputRef}
