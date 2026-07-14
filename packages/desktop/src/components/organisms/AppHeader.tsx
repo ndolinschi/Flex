@@ -22,7 +22,7 @@ export const AppHeader = () => {
   const title = active ? sessionLabel(active) : "Agent"
 
   return (
-    <header className="flex h-[var(--header-height)] shrink-0 items-center justify-between gap-2 bg-bg px-2.5">
+    <header className="flex h-[var(--header-height)] shrink-0 items-center justify-between gap-2 bg-bg px-4">
       <div className="flex min-w-0 flex-1 items-center gap-0.5">
         <IconButton
           label={`${collapsed ? "Show" : "Hide"} sidebar (${isMac ? "⌘B" : "Ctrl+B"})`}
