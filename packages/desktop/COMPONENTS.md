@@ -96,17 +96,10 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `QuestionPrompt` | AskUserQuestion HITL | `question` | ChatPage |
 | `RightPanel` | Plan / Changes / Files / Terminal / Browser / Memory (flagged) / plugin tabs (Database); tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`) + `src/plugins/` registry. Closed by default on app start and New Agent (`setActiveSessionId(…, { panel: "closed" })`); opens via `+`, ⌘J, Plan mode, or session switch restore. Memory gated by `MEMORY_TAB_ENABLED` (default off). Database via UI plugin (`DATABASE_TAB_ENABLED`, default on). | — | App shell |
 | `MemoryTab` | Right-panel Memory surface; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | RightPanel |
-<<<<<<< HEAD
 | `DatabaseTab` | UI plugin: SQLite file path or Postgres/MySQL connection URL (engine-specific form; Docker Compose → `127.0.0.1:publishedPort`); schemas, tables, SQL + result grid | `active`, `session` | RightPanel (plugin registry) |
-| `FilesTab` | Cursor-style open-file strip + Monaco editor; empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children` showing hidden/gitignored paths like `.env`; search via `list_files` with `includeIgnored`; create / rename / delete) | `active` | RightPanel |
+| `FilesTab` | Open-file strip (close-on-hover like panel tabs) + Monaco editor; `.md`/`.mdx` default to `MarkdownBody` preview (Code/Eye toggle); empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children`, search with `includeIgnored`) | `active` | RightPanel |
 | `WindowTitleBar` | Compact custom window chrome (`decorations: false`, 30px): traffic lights / caption buttons + File/Edit/View/Help + drag region | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
 | `AppHeader` | Compact chat chrome (30px): quiet `h-6` sidebar/panel toggles + `text-sm` title + session menu | — | ChatShell |
-=======
-| `DatabaseTab` | UI plugin: SQLite / Postgres / MySQL connections, schemas, tables, SQL + result grid | `active`, `session` | RightPanel (plugin registry) |
-| `FilesTab` | Open-file strip (close-on-hover like panel tabs) + Monaco editor; `.md`/`.mdx` default to `MarkdownBody` preview (Code/Eye toggle); empty/browse shows `FileExplorer` | `active` | RightPanel |
-| `AppHeader` | Title + sole right-panel toggle (⌘J) + session menu | — | ChatShell |
-| `WindowTitleBar` | Cursor-style custom window chrome (`decorations: false`): traffic lights / caption buttons + File/Edit/View/Help + drag region | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
->>>>>>> 4e954c3 (desktop: markdown preview and hover-close file chips)
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | RightPanel |
 | `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/`. Opening the tab with zero workspace PTYs auto-creates one shell. | — | RightPanel |
 | `CommandPalette` | ⌘K-style action palette (nav, theme, new agent); rows via `CommandPaletteRow`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell |
@@ -119,11 +112,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|
 | `organisms/timeline/` | `buildDisplayItems` (+ `estimateSizeForItem`), `TimelineRowView`, `WorkGroupBody`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
 | `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
-<<<<<<< HEAD
-| `organisms/right-panel/` | `PlanTab`, `ChangesTab` (single header: select-all + count/branch + diffstat), `FilesTab` (Monaco), `FileExplorer` (VS Code–style expandable tree + search; New file + right-click Open/Rename/Delete), `FileRow` (aligned +/- / status columns), `CommitCenter` (message + selection label + split commit), `RightPanelTabBar`, `tabs` |
-=======
-| `organisms/right-panel/` | `PlanTab`, `ChangesTab` (single header: select-all + count/branch + diffstat), `FilesTab` (Monaco + MD preview, hover-close chips), `FileExplorer` (browse + New file + right-click Open/Rename/Delete), `FileRow` (aligned +/- / status columns), `CommitCenter` (message + selection label + split commit), `RightPanelTabBar`, `tabs` |
->>>>>>> 4e954c3 (desktop: markdown preview and hover-close file chips)
+| `organisms/right-panel/` | `PlanTab`, `ChangesTab` (single header: select-all + count/branch + diffstat), `FilesTab` (Monaco + MD preview, hover-close chips), `FileExplorer` (VS Code–style expandable tree + search; New file + right-click Open/Rename/Delete), `FileRow` (aligned +/- / status columns), `CommitCenter` (message + selection label + split commit), `RightPanelTabBar`, `tabs` |
 | `organisms/context-bar/` | `CommitBar` (changes chip + Commit / Commit & Push / Create PR), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
 | `organisms/browser/` | `BrowserToolbar` (Design Mode toggle), `BrowserOverflowMenu` — composed by `BrowserTab` |
 | `organisms/terminal/` | `TerminalTab`, `TerminalInstance`, `TerminalRow`, `AgentTerminalRow`, `time` helpers |
