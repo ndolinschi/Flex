@@ -55,6 +55,13 @@ const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     title: "Theme",
     description: "Switch between dark and light",
   },
+  {
+    section: "appearance",
+    rowId: "appearance-accent",
+    title: "Accent color",
+    description:
+      "Primary buttons and focus rings — neutral by default, or blue, green, orange, burgundy, custom hex",
+  },
   // Models & Connections
   {
     section: "models",

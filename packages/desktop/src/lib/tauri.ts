@@ -225,6 +225,13 @@ export const backgroundDemote = (
 export const respondPermission = (input: RespondPermissionInput): Promise<void> =>
   invoke("respond_permission", { input })
 
+/** Push a permission-mode change into an in-flight turn (e.g. composer
+ * bypass shield mid-run). Pass `null`/empty to clear. */
+export const setTurnPermissionMode = (
+  sessionId: string,
+  mode: string | null,
+): Promise<void> => invoke("set_turn_permission_mode", { sessionId, mode })
+
 export const respondQuestion = (input: RespondQuestionInput): Promise<void> =>
   invoke("respond_question", { input })
 

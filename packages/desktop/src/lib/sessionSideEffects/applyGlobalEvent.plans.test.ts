@@ -122,13 +122,35 @@ describe("applyGlobalSessionEvent — ExitPlanMode multi-plan history", () => {
     ])
   })
 
-  it("ignores empty Plan updates that would wipe a non-empty checklist", () => {
-    useAppStore.getState().setPlanEntries(SID, [
-      { content: "Keep me", status: "pending" },
-    ])
-    useAppStore.getState().setPlanEntries(SID, [])
-    expect(useAppStore.getState().plansBySession[SID]).toEqual([
-      { content: "Keep me", status: "pending" },
-    ])
+  it("opens the Plan tab when ExitPlanMode creates a plan while the panel is closed", () => {
+    useAppStore.setState({
+      rightPanelOpen: false,
+      rightPanelCollapsed: true,
+      rightPanelTab: "changes",
+      openTabsBySession: {},
+    })
+    applyGlobalSessionEvent(
+      ev(exitPlan("p1", "# Fresh\n\nDo it", "running"), 1000),
+    )
+
+    const state = useAppStore.getState()
+    expect(state.rightPanelOpen).toBe(true)
+    expect(state.rightPanelCollapsed).toBe(false)
+    expect(state.rightPanelTab).toBe("plan")
+    expect(state.openTabsBySession[SID]).toEqual(["plan"])
+  })
+
+  it("does not steal the panel for a background session's ExitPlanMode", () => {
+    useAppStore.setState({
+      activeSessionId: "other",
+      rightPanelOpen: false,
+      rightPanelTab: "changes",
+    })
+    applyGlobalSessionEvent(ev(exitPlan("p1", "# BG\n\nPlan", "completed"), 1000))
+
+    const state = useAppStore.getState()
+    expect(state.pendingPlanApproval?.planId).toBe("p1")
+    expect(state.rightPanelOpen).toBe(false)
+    expect(state.rightPanelTab).toBe("changes")
   })
 })

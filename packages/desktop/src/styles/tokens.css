@@ -32,10 +32,11 @@
   --color-stroke-3: rgb(255 255 255 / 0.07);
   --color-stroke-4: rgb(255 255 255 / 0.04);
 
-  /* Soft product blue — premium, not neon / not Nord gray-blue. */
-  --color-accent: #6b9eff;
-  --color-accent-hover: #82adff;
-  --color-accent-subtle: color-mix(in srgb, #6b9eff 14%, transparent);
+  /* Neutral high-contrast accent (white) — factory default. Colored accents
+     are applied from Settings → Appearance via `--color-accent*` overrides. */
+  --color-accent: #f2f2f2;
+  --color-accent-hover: #ffffff;
+  --color-accent-subtle: color-mix(in srgb, #f2f2f2 14%, transparent);
   --color-accent-text: #0a0a0a;
   --color-red: #f07178;
   --color-yellow: #e6b450;
@@ -95,9 +96,10 @@
   --color-stroke-3: rgb(20 20 20 / 0.06);
   --color-stroke-4: rgb(20 20 20 / 0.03);
 
-  --color-accent: #2f6fed;
-  --color-accent-hover: #245fda;
-  --color-accent-subtle: color-mix(in srgb, #2f6fed 12%, transparent);
+  /* Neutral high-contrast accent (black) — factory default. */
+  --color-accent: #1a1a1a;
+  --color-accent-hover: #000000;
+  --color-accent-subtle: color-mix(in srgb, #1a1a1a 12%, transparent);
   --color-accent-text: #ffffff;
   --color-red: #d94a5b;
   --color-yellow: #9a6700;

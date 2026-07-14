@@ -28,17 +28,16 @@ export const mergeLiveRows = (
 
   const extra: TimelineRow[] = []
 
-  for (const [messageId, text] of Object.entries(streaming.thinking)) {
-    if (!text) continue
-    // Skip once either a materialized thinking row OR the assistant
-    // message for this id exists — otherwise a thinking-only
-    // assistant_message (no markdown) would duplicate the live row.
-    if (thinkingOrAssistantIds.has(messageId)) continue
+  for (const call of Object.values(streaming.toolCalls)) {
+    // RunWorkflow calls materialize as a `workflow` row and Verify calls as
+    // a `verdict` row (both in useSessionEvents) — never a plain `tool`
+    // row — skip the generic live-tool fallback here for both.
+    if (call.tool_name === "RunWorkflow" || call.tool_name === "Verify") continue
+    if (toolIds.has(call.id)) continue
     extra.push({
-      type: "thinking",
-      id: `live-thinking:${messageId}`,
-      messageId,
-      text,
+      type: "tool",
+      id: `live-tool:${call.id}`,
+      call,
       tsMs: nowMs,
     })
   }
@@ -55,16 +54,20 @@ export const mergeLiveRows = (
     })
   }
 
-  for (const call of Object.values(streaming.toolCalls)) {
-    // RunWorkflow calls materialize as a `workflow` row and Verify calls as
-    // a `verdict` row (both in useSessionEvents) — never a plain `tool`
-    // row — skip the generic live-tool fallback here for both.
-    if (call.tool_name === "RunWorkflow" || call.tool_name === "Verify") continue
-    if (toolIds.has(call.id)) continue
+  // Thinking last among live-only extras so in-flight reasoning sits under
+  // tools / provisional narration (buildDisplayItems also reorders
+  // materialized thinking to the end of each work group).
+  for (const [messageId, text] of Object.entries(streaming.thinking)) {
+    if (!text) continue
+    // Skip once either a materialized thinking row OR the assistant
+    // message for this id exists — otherwise a thinking-only
+    // assistant_message (no markdown) would duplicate the live row.
+    if (thinkingOrAssistantIds.has(messageId)) continue
     extra.push({
-      type: "tool",
-      id: `live-tool:${call.id}`,
-      call,
+      type: "thinking",
+      id: `live-thinking:${messageId}`,
+      messageId,
+      text,
       tsMs: nowMs,
     })
   }

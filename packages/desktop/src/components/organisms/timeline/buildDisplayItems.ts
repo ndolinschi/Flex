@@ -8,6 +8,9 @@ export type TurnFooterInfo = {
   tsMs: number
   durationMs?: number
   copyText: string
+  /** When the turn ended via Stop / cancel, the footer reads "Stopped"
+   * instead of "Worked for". */
+  stopped?: boolean
 }
 
 /** Presentational grouping of a turn's work rows under a "Worked" header. */
@@ -210,6 +213,23 @@ export const buildTurnCopyText = (rows: TimelineRow[]): string => {
   return parts.join("\n\n").trim()
 }
 
+/** Move thinking rows to the end of a work-group body while preserving
+ * relative order among thinking rows and among everything else. Providers
+ * emit thinking first, which pinned "Thought for …" above tools / narration
+ * for the whole live turn — Cursor-style keeps reasoning at the bottom of
+ * the working turn until it finishes (trailing final answer still sits
+ * outside the group via `flush`). */
+export const moveThinkingToEnd = (rows: TimelineRow[]): TimelineRow[] => {
+  const thinking: TimelineRow[] = []
+  const rest: TimelineRow[] = []
+  for (const row of rows) {
+    if (row.type === "thinking") thinking.push(row)
+    else rest.push(row)
+  }
+  if (thinking.length === 0) return rows
+  return [...rest, ...thinking]
+}
+
 export const buildDisplayItems = (
   liveRows: TimelineRow[],
   isStreaming: boolean,
@@ -217,15 +237,13 @@ export const buildDisplayItems = (
   const items: DisplayItem[] = []
   let pending: {
     id: string
-    /** Every non-turn row seen so far for this turn, in ORIGINAL arrival
-     * order — tool rows and mid-turn assistant narration interleaved exactly
-     * as they happened. Splitting this into separate `work`/`answers` lists
-     * (the old shape) lost that interleaving: a folded-back narration row got
-     * appended to the END of `work` regardless of where it actually occurred,
-     * so it could render after tool calls that happened AFTER it chronologically.
-     * Keeping one ordered array and slicing off only the trailing answer (see
-     * `flush`) preserves position — narration renders inside the group
-     * between the tool clusters it actually sat between. */
+    /** Every non-turn row seen so far for this turn. Tool rows and mid-turn
+     * assistant narration stay in arrival order; thinking is moved to the
+     * end of the work body in `flush` (see `moveThinkingToEnd`) so live
+     * "Thought for …" / streaming reasoning sits under the work, not above
+     * it. Splitting into separate `work`/`answers` lists (the old shape)
+     * lost narration interleaving: a folded-back narration row got appended
+     * to the END of `work` regardless of where it actually occurred. */
     all: TimelineRow[]
   } | null = null
 
@@ -254,15 +272,23 @@ export const buildDisplayItems = (
     // until the turn actually settles.
     const lastRow = all[all.length - 1]
     const hasTrailingAnswer = !!lastRow && lastRow.type === "assistant"
-    const work = hasTrailingAnswer ? all.slice(0, -1) : all
+    const work = moveThinkingToEnd(
+      hasTrailingAnswer ? all.slice(0, -1) : all,
+    )
     const tail = hasTrailingAnswer ? [lastRow] : []
 
     // A footer only makes sense for a settled (non-streaming) turn — attach
     // it to whichever item renders LAST for this turn: the trailing answer
     // row if there is one, otherwise the group itself.
+    const stopped = summary?.stop_reason === "cancelled"
     const footer: TurnFooterInfo | undefined =
       !keepOpen && typeof tsMs === "number"
-        ? { tsMs, durationMs: summary?.duration_ms, copyText: buildTurnCopyText(all) }
+        ? {
+            tsMs,
+            durationMs: summary?.duration_ms,
+            copyText: buildTurnCopyText(all),
+            stopped,
+          }
         : undefined
 
     if (work.length > 0 || keepOpen) {
@@ -274,7 +300,11 @@ export const buildDisplayItems = (
         rows: work,
         footer: tail.length === 0 ? footer : undefined,
         verdict: latestVerdictInRows(work),
-        resumeLine: keepOpen ? null : resumeLineForRows(work),
+        resumeLine: keepOpen
+          ? null
+          : stopped
+            ? null
+            : resumeLineForRows(work),
         hasLiveThinking: keepOpen
           ? work.some(
               (r) =>

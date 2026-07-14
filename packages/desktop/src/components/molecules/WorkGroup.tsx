@@ -45,6 +45,9 @@ type WorkGroupProps = {
   /** Reference-style resume when collapsed, e.g. "Edited 3 files · Explored 2
    * files · Ran 1 command". Falls back to "Worked for Xs" when absent. */
   resumeLine?: string | null
+  /** True when the turn ended via Stop / cancel — collapsed header reads
+   * "Stopped" instead of the usual resume / "Worked for" line. */
+  stopped?: boolean
   children: ReactNode
   /** Fired when expansion changes so the timeline can re-stick to bottom. */
   onLayoutChange?: () => void
@@ -66,6 +69,7 @@ export const WorkGroup = memo(({
   totalTokens,
   verdict,
   resumeLine,
+  stopped = false,
   children,
   onLayoutChange,
   className,
@@ -92,6 +96,9 @@ export const WorkGroup = memo(({
     typeof durationMs === "number" ? formatDuration(durationMs) : null
 
   const collapsedPrimary = (() => {
+    if (stopped) {
+      return durationLabel ? `Stopped · ${durationLabel}` : "Stopped"
+    }
     if (resumeLine) {
       return durationLabel ? `${resumeLine} · ${durationLabel}` : resumeLine
     }

@@ -59,8 +59,11 @@ export const applyGlobalSessionEvent = (
   // history can contain a request whose engine-side pending entry no longer
   // exists (in-memory only), which would hard-block the app with a stale
   // modal that can never be resolved (see PermissionPrompt "no pending
-  // permission request" handling). *_resolved clearing, by contrast, is safe
-  // to apply during replay — it can only ever remove state, never wedge it.
+  // permission request" handling).
+  //
+  // *_resolved must ALSO be live-only when clearing UI state: during gap
+  // resync we skip *_requested (ignoreStreaming) but used to still apply
+  // *_resolved, which dismissed a live Allow/Ask modal mid-generation.
   if (payload.kind === "permission_requested" && !opts?.ignoreStreaming) {
     log.info("session", "permission requested", {
       sessionId: event.session_id,
@@ -77,7 +80,7 @@ export const applyGlobalSessionEvent = (
       callId: payload.call_id,
     })
   }
-  if (payload.kind === "permission_resolved") {
+  if (payload.kind === "permission_resolved" && !opts?.ignoreStreaming) {
     log.debug("session", "permission resolved", {
       sessionId: event.session_id,
       requestId: payload.id,
@@ -99,7 +102,7 @@ export const applyGlobalSessionEvent = (
       questions: payload.questions,
     })
   }
-  if (payload.kind === "question_resolved") {
+  if (payload.kind === "question_resolved" && !opts?.ignoreStreaming) {
     log.debug("session", "question resolved", {
       sessionId: event.session_id,
       requestId: payload.id,
@@ -199,6 +202,10 @@ export const applyGlobalSessionEvent = (
     const plan = (payload.call.input as { plan?: unknown } | null)?.plan
     if (typeof plan === "string" && plan.trim()) {
       const liveEntries = store.plansBySession[event.session_id] ?? []
+      const existing =
+        store.sessionPlansBySession[event.session_id]?.some(
+          (p) => p.id === payload.call.id,
+        ) ?? false
       store.upsertSessionPlan({
         sessionId: event.session_id,
         planId: payload.call.id,
@@ -206,6 +213,16 @@ export const applyGlobalSessionEvent = (
         createdAtMs: event.ts_ms,
         ...(liveEntries.length > 0 ? { entries: liveEntries } : {}),
       })
+      // Live turns only: as soon as plan markdown exists for the active
+      // session, surface the Plan tab — even before ExitPlanMode completes
+      // (and even if the right panel was fully closed).
+      if (
+        !opts?.ignoreStreaming &&
+        store.activeSessionId === event.session_id &&
+        (!existing || payload.call.status.state === "completed")
+      ) {
+        store.revealPlanPanel()
+      }
       if (payload.call.status.state === "completed") {
         store.setPendingPlanApproval({
           sessionId: event.session_id,

@@ -140,7 +140,8 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
   if (!isRepo) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 text-center">
-        <p className="text-sm text-ink-muted">Not a git repository.</p>
+        <GitMerge className="h-7 w-7 text-ink-faint opacity-70" aria-hidden />
+        <p className="text-sm text-ink-secondary">Not a git repository</p>
         <IconButton
           label="Refresh changes"
           onClick={handleRefresh}
@@ -155,43 +156,19 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     )
   }
 
+  const showSelectAll = !isolated && files.length > 0
+  const headline =
+    totalCount === 0
+      ? "No changes"
+      : `${totalCount} file${totalCount === 1 ? "" : "s"} changed`
+
   return (
     <>
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-stroke-3 px-3 text-sm [font-variant-numeric:tabular-nums]">
-        <span className="min-w-0 truncate text-ink-secondary">
-          {totalCount === 0
-            ? "No changes"
-            : `${totalCount} file${totalCount === 1 ? "" : "s"} changed`}
-        </span>
-        <span className="ml-auto flex shrink-0 items-center gap-1.5">
-          <DiffStat summary={totals} size="sm" />
-          <IconButton
-            label="Refresh changes"
-            onClick={handleRefresh}
-            className="h-6 w-6"
-          >
-            <RefreshCw
-              className={cn(
-                "h-3 w-3",
-                (isFetching || isRepoFetching) && "animate-spin",
-              )}
-              aria-hidden
-            />
-          </IconButton>
-        </span>
-      </div>
-
-      {error ? (
-        <p className="border-b border-stroke-3 bg-danger-subtle px-3 py-1.5 text-xs text-danger">
-          {error}
-        </p>
-      ) : null}
-
-      {/* Select-all header — commit center is non-isolated only (isolated
-          sessions commit via integrate instead), so the checkbox column
-          only appears there. */}
-      {!isolated && files.length > 0 ? (
-        <div className="flex h-7 shrink-0 items-center gap-2 border-b border-stroke-3 px-3 text-xs text-ink-muted">
+      {/* Single header: select-all + title/branch + diffstat + refresh.
+          Previously a count bar and a separate select-all strip stacked and
+          felt top-heavy; one row keeps the chrome balanced. */}
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-stroke-3 px-3 [font-variant-numeric:tabular-nums]">
+        {showSelectAll ? (
           <input
             type="checkbox"
             checked={selected.size === files.length}
@@ -208,22 +185,64 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
                   : new Set(files.map((f) => f.path)),
               )
             }
-            aria-label="Select all files"
+            aria-label={
+              selected.size === files.length
+                ? "Deselect all files"
+                : `Select all ${files.length} files`
+            }
             className="h-3.5 w-3.5 shrink-0 accent-accent"
           />
-          <span>
-            {selected.size} of {files.length} selected
-          </span>
+        ) : null}
+        <div className="min-w-0 flex-1 truncate">
+          <span className="text-sm text-ink">{headline}</span>
+          {branch ? (
+            <span className="text-sm text-ink-faint"> · {branch}</span>
+          ) : null}
+          {showSelectAll && selected.size !== files.length ? (
+            <span className="text-xs text-ink-muted">
+              {" "}
+              · {selected.size} selected
+            </span>
+          ) : null}
         </div>
+        <DiffStat summary={totals} size="sm" />
+        <IconButton
+          label="Refresh changes"
+          onClick={handleRefresh}
+          className="h-6 w-6"
+        >
+          <RefreshCw
+            className={cn(
+              "h-3 w-3",
+              (isFetching || isRepoFetching) && "animate-spin",
+            )}
+            aria-hidden
+          />
+        </IconButton>
+      </div>
+
+      {error ? (
+        <p className="border-b border-stroke-3 bg-danger-subtle px-3 py-1.5 text-xs text-danger">
+          {error}
+        </p>
       ) : null}
 
       <ScrollArea className="min-h-0 flex-1">
         {totalCount === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-ink-muted">
-            No changes{branch ? ` in ${branch}` : ""}.
-          </p>
+          <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center">
+            <GitMerge
+              className="h-7 w-7 text-ink-faint opacity-70"
+              aria-hidden
+            />
+            <p className="text-sm text-ink-secondary">
+              Working tree clean
+              {branch ? (
+                <span className="text-ink-faint"> on {branch}</span>
+              ) : null}
+            </p>
+          </div>
         ) : (
-          <ul className="py-1">
+          <ul className="px-1 py-1">
             {files.map((file) => (
               <FileRow
                 key={file.path}
@@ -272,15 +291,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       ) : null}
 
       {isolated && files.length > 0 ? (
-        <div className="flex shrink-0 items-center gap-1.5 border-t border-stroke-3 px-3 py-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            isLoading={workspace.busy}
-            onClick={() => void workspace.integrate()}
-          >
-            <GitMerge className="h-3 w-3" aria-hidden /> Keep{aggregateSuffix}
-          </Button>
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-stroke-3 px-3 py-2.5">
           <Button
             variant="ghost"
             size="sm"
@@ -288,6 +299,14 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             onClick={() => setConfirmDiscard(true)}
           >
             <XCircle className="h-3 w-3" aria-hidden /> Undo{aggregateSuffix}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            isLoading={workspace.busy}
+            onClick={() => void workspace.integrate()}
+          >
+            <GitMerge className="h-3 w-3" aria-hidden /> Keep{aggregateSuffix}
           </Button>
         </div>
       ) : null}

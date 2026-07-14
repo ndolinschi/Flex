@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { ChevronRight, Workflow } from "lucide-react"
 import type {
   PlanStatus,
@@ -215,6 +215,16 @@ export const WorkflowGroup = ({
 
   const [expanded, setExpanded] = useState(state === "in_progress")
   const open = state === "in_progress" || expanded
+  const prevState = useRef(state)
+  useEffect(() => {
+    // Auto-open while running; collapse when the workflow settles so the
+    // header can be expanded again manually (same contract as ToolStepGroup).
+    if (prevState.current !== state) {
+      if (state === "in_progress") setExpanded(true)
+      else if (prevState.current === "in_progress") setExpanded(false)
+      prevState.current = state
+    }
+  }, [state])
 
   return (
     <div className="flex flex-col pl-1">

@@ -1,8 +1,13 @@
 import { useState } from "react"
+import { createPortal } from "react-dom"
 import { X } from "lucide-react"
 import { Button, IconButton } from "../atoms"
 import { ErrorBanner } from "../molecules"
-import { respondPermission, toInvokeError } from "../../lib/tauri"
+import {
+  respondPermission,
+  setTurnPermissionMode,
+  toInvokeError,
+} from "../../lib/tauri"
 import type { PendingPermission } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
 import { log } from "../../lib/debug/log"
@@ -54,6 +59,7 @@ const formatDetail = (detail?: string): string | null => {
 
 export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
   const setPendingPermission = useAppStore((s) => s.setPendingPermission)
+  const setSessionBypass = useAppStore((s) => s.setSessionBypass)
   const pushToast = useAppStore((s) => s.pushToast)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -64,6 +70,26 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
     setError(null)
     setIsSubmitting(true)
     try {
+      // Always allow → also arm session + live-turn bypass so subsequent
+      // tools in this run (and later turns) stop asking. The engine's
+      // allow_always rule alone used to only match a first-word Bash
+      // prefix (e.g. `cd *`), so `cd X && npm i` still re-prompted.
+      if (decision === "allow_always") {
+        setSessionBypass(permission.sessionId, true)
+        try {
+          await setTurnPermissionMode(
+            permission.sessionId,
+            "bypass_permissions",
+          )
+        } catch (err) {
+          // No in-flight turn (already settled) — session flag still covers
+          // the next prompt(); don't block resolving this request.
+          log.warn("session", "set_turn_permission_mode during allow_always", {
+            sessionId: permission.sessionId,
+            error: toInvokeError(err),
+          })
+        }
+      }
       await respondPermission({
         sessionId: permission.sessionId,
         requestId: permission.requestId,
@@ -102,17 +128,19 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
     setPendingPermission(null)
   }
 
-  return (
+  return createPortal(
     <div
       role="dialog"
+      aria-modal="true"
       aria-labelledby="permission-title"
-      className="w-full max-w-[640px] animate-modal-in"
+      className="pointer-events-none fixed inset-0 z-[90] flex items-end justify-center px-4 pb-28 sm:items-center sm:pb-0"
     >
-      <div className="relative rounded-xl border border-stroke-3 bg-panel p-3 shadow-lg">
+      <div className="pointer-events-auto w-full max-w-[640px] animate-modal-in">
+        <div className="relative rounded-xl border border-stroke-3 bg-panel p-3 shadow-lg">
         <IconButton
           label="Dismiss"
           onClick={handleDismiss}
-          className="absolute right-2 top-2 h-6 w-6"
+          className="absolute right-2 top-2 z-10 h-6 w-6"
         >
           <X className="h-3.5 w-3.5" aria-hidden />
         </IconButton>
@@ -120,9 +148,9 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
           {titleParts ? (
             <>
               {titleParts.prefix}
-              <code className="rounded bg-fill-4 px-1 py-0.5 font-mono text-sm">
+              <span className="rounded-md bg-stroke-3/40 px-1.5 py-0.5 font-mono text-[13px] font-medium text-ink-secondary">
                 {titleParts.tool}
-              </code>
+              </span>
               {titleParts.suffix}
             </>
           ) : (
@@ -130,15 +158,15 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
           )}
         </h3>
         {detail ? (
-          <div className="relative mt-1.5 max-h-24 overflow-hidden rounded-md bg-fill-4">
-            <p className="whitespace-pre-wrap break-words px-2.5 py-1.5 font-mono text-sm text-ink-secondary">
-              {detail}
-            </p>
-            <div
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-fill-4 to-transparent"
-              aria-hidden
-            />
-          </div>
+          // Read-only command/path readout — never an <input>/<textarea>
+          // (WebView2 autofill painted a strange red cue over those).
+          <pre
+            className="mt-2 max-h-28 overflow-auto rounded-lg border border-stroke-3 bg-bg px-3 py-2 font-mono text-[12px] leading-relaxed text-ink-secondary [overflow-wrap:anywhere] whitespace-pre-wrap"
+            tabIndex={-1}
+            aria-label="Command details"
+          >
+            {detail}
+          </pre>
         ) : null}
 
         {error ? (
@@ -179,7 +207,9 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
             </Button>
           ) : null}
         </div>
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

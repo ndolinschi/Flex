@@ -25,6 +25,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 
 | Component | Purpose | Key props | Used by |
 |---|---|---|---|
+| `AccentColorPicker` | Appearance accent swatches + custom hex/color input | — | Settings Appearance |
 | `FormField` | Label + control + hint/error | `label`, `htmlFor`, `error?`, `hint?` | ProviderSettingsForm |
 | `CommandPaletteRow` | Palette list row (icon + label + hint) | `index`, `active`, `label`, `hint?`, `icon?`, `onActivate`, `onHover` | CommandPalette |
 | `FuzzySessionRow` | Search-modal session row with highlight + relative time | `index`, `active`, `label`, `query`, `updatedAtMs`, `onActivate`, `onHover` | SearchModal |
@@ -85,8 +86,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `PermissionPrompt` | Tool permission HITL | `permission` | ChatPage |
 | `QuestionPrompt` | AskUserQuestion HITL | `question` | ChatPage |
 | `RightPanel` | Plan / Changes / Files / Terminal / Browser; tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`) | — | App shell |
-| `FilesTab` | Cursor-style open-file strip + Monaco editor (`@monaco-editor/react`); open from Changes (`FileRow` Open / double-click) | `active` | RightPanel |
-| `AppHeader` | Title + session menu | — | ChatShell |
+| `FilesTab` | Cursor-style open-file strip + Monaco editor; empty state shows `FileExplorer` (searchable `list_files`) | `active` | RightPanel |
+| `AppHeader` | Title + sole right-panel toggle (⌘J) + session menu | — | ChatShell |
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | RightPanel |
 | `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/`. Opening the tab with zero workspace PTYs auto-creates one shell. | — | RightPanel |
 | `CommandPalette` | ⌘K-style action palette (nav, theme, new agent); rows via `CommandPaletteRow`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell |
@@ -99,8 +100,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|
 | `organisms/timeline/` | `buildDisplayItems` (+ `estimateSizeForItem`), `TimelineRowView`, `WorkGroupBody`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
 | `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
-| `organisms/right-panel/` | `PlanTab`, `ChangesTab`, `FilesTab` (Monaco), `FileRow`, `CommitCenter` (remote-aware Commit vs Commit & Push), `RightPanelTabBar`, `tabs` |
-| `organisms/context-bar/` | `CommitBar` (remote-aware Commit vs Commit & Push), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
+| `organisms/right-panel/` | `PlanTab`, `ChangesTab` (single header: select-all + count/branch + diffstat), `FilesTab` (Monaco), `FileExplorer`, `FileRow` (aligned +/- / status columns), `CommitCenter` (message + selection label + split commit), `RightPanelTabBar`, `tabs` |
+| `organisms/context-bar/` | `CommitBar` (changes chip + Commit / Commit & Push), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
 | `organisms/browser/` | `BrowserToolbar` (Design Mode toggle), `BrowserOverflowMenu` — composed by `BrowserTab` |
 | `organisms/terminal/` | `TerminalTab`, `TerminalInstance`, `TerminalRow`, `AgentTerminalRow`, `time` helpers |
 
@@ -149,6 +150,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/lib/markdownHighlight.ts` | Lazy-loaded rehype-highlight + core language subset (dynamic import from `MarkdownBody`) |
 | `src/stores/appStore.ts` | Composes Zustand slices; public `useAppStore` API |
 | `src/stores/slices/` | `session` / `composer` / `layout` / `ui` / `panelExtras` slices |
+| `src/lib/accent.ts` | Accent presets + custom hex → `--color-accent*` DOM apply |
 | `src/stores/persist.ts` | `persistUiState` / `restoreUiState` |
 | `src/stores/layoutConstants.ts` | Sidebar / right-panel / chat width clamps |
 | `src/hooks/useUpdaterCheck.ts` | Post-bootstrap update toast |

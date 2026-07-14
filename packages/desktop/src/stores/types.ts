@@ -61,6 +61,11 @@ export type PlanAnnotationsPersisted = {
 
 export type UiTheme = "dark" | "light"
 
+export type {
+  AccentId,
+} from "../lib/accent"
+
+
 /** Window-width classification (see hooks/useViewportWidth.ts):
  * "wide" ≥ 940px, "narrow" 680–939px (sidebar auto-collapses, right panel
  * overlays), "tight" < 680px (narrow behavior plus tighter chat gutters). */
@@ -230,6 +235,8 @@ export type SessionSliceState = {
   setPendingPlanApproval: (
     approval: { sessionId: SessionId; planId: string; plan: string } | null,
   ) => void
+  /** Open + expand the right panel on the Plan tab for the active session. */
+  revealPlanPanel: () => void
   setPlanEntries: (sessionId: SessionId, entries: PlanEntry[]) => void
   /** Upsert an ExitPlanMode plan into the session history and make it active.
    * `entries` (optional) snapshots the Plan-tool checklist at handoff time. */
@@ -300,11 +307,9 @@ export type LayoutSliceState = {
   rightPanelOpen: boolean
   rightPanelTab: RightPanelTab
   rightPanelWidth: number
-  /** Slim-strip collapsed variant of the right panel — distinct from
-   * `rightPanelOpen` (open/closed). Collapsed keeps the panel "open"
-   * architecturally (terminals/webview alive) but renders a narrow strip
-   * instead of the full-width tab content. Persisted globally, same as
-   * `rightPanelOpen`. */
+  /** Legacy slim-strip flag — UI no longer offers collapse-to-strip (one
+   * PanelRight toggle only, Cursor-style). Kept for persist/bootstrap compat;
+   * RightPanel clears it on mount if set. */
   rightPanelCollapsed: boolean
   /** True while the right-panel resize sash is being dragged — hides the
    * native browser child webview so the sash stays clickable. */
@@ -332,6 +337,10 @@ export type UiSliceState = {
   route: AppRoute
   settingsSection: SettingsSectionId
   theme: UiTheme
+  /** Accent preset id (`neutral` default) or `custom` with `accentCustomHex`. */
+  accentId: import("../lib/accent").AccentId
+  /** Hex used when `accentId === "custom"` (also the last custom pick). */
+  accentCustomHex: string
   notificationsEnabled: boolean
   completionSoundEnabled: boolean
   /** Single app-wide debug-logging switch (design doc: "gated by a single
@@ -357,6 +366,8 @@ export type UiSliceState = {
   setSettingsSection: (section: SettingsSectionId) => void
   setTheme: (theme: UiTheme) => void
   toggleTheme: () => void
+  setAccentId: (id: import("../lib/accent").AccentId) => void
+  setAccentCustomHex: (hex: string) => void
   setNotificationsEnabled: (enabled: boolean) => void
   setCompletionSoundEnabled: (enabled: boolean) => void
   setDebugLoggingEnabled: (enabled: boolean) => void

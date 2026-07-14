@@ -1,5 +1,12 @@
 import type { StateCreator } from "zustand"
 import type { AppState, UiSliceState, UiTheme } from "../types"
+import type { AccentId } from "../../lib/accent"
+import {
+  applyAccentToDom,
+  DEFAULT_ACCENT_ID,
+  DEFAULT_CUSTOM_ACCENT,
+  normalizeAccentHex,
+} from "../../lib/accent"
 import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import { persistUiState } from "../persist"
 import { syncCrashReportingFlag, syncDebugFlag } from "../../lib/debug/log"
@@ -7,6 +14,14 @@ import { syncCrashReportingFlag, syncDebugFlag } from "../../lib/debug/log"
 const applyThemeToDom = (theme: UiTheme) => {
   if (typeof document === "undefined") return
   document.documentElement.setAttribute("data-theme", theme)
+}
+
+const syncAccentToDom = (state: {
+  accentId: AccentId
+  accentCustomHex: string
+  theme: UiTheme
+}) => {
+  applyAccentToDom(state.accentId, state.accentCustomHex, state.theme)
 }
 
 let toastCounter = 0
@@ -20,6 +35,8 @@ export const createUiSlice: StateCreator<
   route: "welcome",
   settingsSection: "general",
   theme: "dark",
+  accentId: DEFAULT_ACCENT_ID,
+  accentCustomHex: DEFAULT_CUSTOM_ACCENT,
   notificationsEnabled: true,
   completionSoundEnabled: false,
   debugLoggingEnabled: false,
@@ -72,10 +89,29 @@ export const createUiSlice: StateCreator<
     applyThemeToDom(theme)
     set({ theme })
     void persistUiState({ theme })
+    const { accentId, accentCustomHex } = get()
+    syncAccentToDom({ accentId, accentCustomHex, theme })
   },
   toggleTheme: () => {
     const next = get().theme === "dark" ? "light" : "dark"
     get().setTheme(next)
+  },
+  setAccentId: (id) => {
+    set({ accentId: id })
+    void persistUiState({ accentId: id })
+    const { accentCustomHex, theme } = get()
+    syncAccentToDom({ accentId: id, accentCustomHex, theme })
+  },
+  setAccentCustomHex: (hex) => {
+    const normalized = normalizeAccentHex(hex)
+    if (!normalized) return
+    set({ accentId: "custom", accentCustomHex: normalized })
+    void persistUiState({ accentId: "custom", accentCustomHex: normalized })
+    syncAccentToDom({
+      accentId: "custom",
+      accentCustomHex: normalized,
+      theme: get().theme,
+    })
   },
   setNotificationsEnabled: (enabled) => {
     set({ notificationsEnabled: enabled })

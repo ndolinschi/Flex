@@ -21,7 +21,7 @@ export type BrowserOverflowMenuProps = {
   onScreenshot: () => void | Promise<void>
   onHardReload: () => void
   onCopyUrl: () => void | Promise<void>
-  onClearHistory: () => void
+  onClearHistory: () => void | Promise<void>
   onClearData: () => void | Promise<void>
 }
 
@@ -49,7 +49,7 @@ export const BrowserOverflowMenu = ({
       <button
         type="button"
         role="menuitem"
-        disabled={!browserStarted}
+        disabled={!showLiveContent}
         className={menuItemClass}
         onClick={() => {
           onClose()
@@ -93,7 +93,7 @@ export const BrowserOverflowMenu = ({
         className={menuItemClass}
         onClick={() => {
           onClose()
-          onClearHistory()
+          void onClearHistory()
         }}
       >
         <History className="h-3.5 w-3.5 text-icon-3" aria-hidden />
@@ -102,6 +102,7 @@ export const BrowserOverflowMenu = ({
       <button
         type="button"
         role="menuitem"
+        disabled={!showLiveContent}
         className={menuItemClass}
         onClick={() => {
           onClose()

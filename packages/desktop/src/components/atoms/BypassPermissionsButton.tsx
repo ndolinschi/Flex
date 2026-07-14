@@ -21,8 +21,8 @@ export const BypassPermissionsButton = ({
     composerMode !== "agent"
       ? "Bypass applies in Agent mode"
       : sessionBypass
-        ? "agent won't ask"
-        : "Bypass permissions for this session"
+        ? "Bypass on — agent won't ask (this session + current run)"
+        : "Bypass permissions for this session (also covers the current run)"
 
   return (
     <Tooltip label={shieldLabel}>

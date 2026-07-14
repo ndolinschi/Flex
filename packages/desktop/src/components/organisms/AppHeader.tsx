@@ -9,7 +9,7 @@ const isMac =
   typeof navigator !== "undefined" &&
   /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
 
-/** Compact agent panel header — sidebar toggle + title + session menu. */
+/** Chat header — left-sidebar toggle, title, sole right-panel toggle (⌘J), session menu. */
 export const AppHeader = () => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const collapsed = useAppStore((s) => s.sidebarCollapsed)

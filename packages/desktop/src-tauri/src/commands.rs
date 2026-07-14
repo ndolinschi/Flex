@@ -1302,6 +1302,24 @@ pub struct RespondPermissionInput {
 
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
+pub async fn set_turn_permission_mode(
+    state: State<'_, AppState>,
+    session_id: String,
+    mode: Option<String>,
+) -> DesktopResult<()> {
+    let service = require_service(&state).await?;
+    let id = SessionId::from(session_id);
+    let parsed = match mode.as_deref() {
+        None | Some("") => None,
+        Some(raw) => Some(parse_permission_mode(Some(raw)).ok_or_else(|| {
+            DesktopError::Message(format!("unknown permission mode: {raw}"))
+        })?),
+    };
+    Ok(service.set_turn_permission_mode(&id, parsed)?)
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
 pub async fn respond_permission(
     state: State<'_, AppState>,
     input: RespondPermissionInput,
@@ -2447,6 +2465,90 @@ fn validate_repo_relative_path(path: &str) -> DesktopResult<&str> {
     Ok(trimmed)
 }
 
+fn normalize_path_slashes(s: &str) -> String {
+    s.replace('\\', "/")
+}
+
+/// Strip `worktree` from an absolute `path`, returning a forward-slashed
+/// relative path. Lexical first (so deleted files still resolve), then
+/// canonicalize when both sides exist (symlinks / Windows drive casing).
+fn strip_worktree_prefix(path: &std::path::Path, worktree: &std::path::Path) -> DesktopResult<PathBuf> {
+    if let Ok(rel) = path.strip_prefix(worktree) {
+        return Ok(rel.to_path_buf());
+    }
+
+    let path_s = normalize_path_slashes(&path.to_string_lossy());
+    let mut root_s = normalize_path_slashes(&worktree.to_string_lossy());
+    while root_s.ends_with('/') {
+        root_s.pop();
+    }
+    if path_s == root_s {
+        return Ok(PathBuf::new());
+    }
+    let prefix = format!("{root_s}/");
+    if let Some(rest) = path_s.strip_prefix(&prefix) {
+        return Ok(PathBuf::from(rest));
+    }
+    // Windows FS is case-insensitive — tool `file_path`s and SessionMeta.cwd
+    // often disagree on drive-letter casing (`C:\` vs `c:\`).
+    #[cfg(windows)]
+    {
+        let path_l = path_s.to_ascii_lowercase();
+        let root_l = root_s.to_ascii_lowercase();
+        if path_l == root_l {
+            return Ok(PathBuf::new());
+        }
+        let prefix_l = format!("{root_l}/");
+        if let Some(rest) = path_l.strip_prefix(&prefix_l) {
+            // Preserve the caller's casing from the original path suffix.
+            return Ok(PathBuf::from(&path_s[path_s.len() - rest.len()..]));
+        }
+    }
+
+    if let (Ok(c_path), Ok(c_root)) = (path.canonicalize(), worktree.canonicalize()) {
+        if let Ok(rel) = c_path.strip_prefix(&c_root) {
+            return Ok(rel.to_path_buf());
+        }
+    }
+
+    Err(DesktopError::Message(format!(
+        "file is outside the session workspace (`{}`)",
+        worktree.display()
+    )))
+}
+
+/// Accept a repo-relative path *or* an absolute path under `worktree`
+/// (Write/Edit tool inputs are always absolute). Returns a forward-slashed
+/// relative path for `git … -- <path>`. Isolation is irrelevant — non-isolated
+/// sessions still have absolute tool paths that must strip against `cwd`.
+fn resolve_review_path(path: &str, worktree: &std::path::Path) -> DesktopResult<String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err(DesktopError::Message("path is required".into()));
+    }
+    let as_path = std::path::Path::new(trimmed);
+    let relative = if as_path.is_absolute() {
+        strip_worktree_prefix(as_path, worktree)?
+    } else {
+        validate_repo_relative_path(trimmed)?;
+        PathBuf::from(trimmed)
+    };
+    if relative.as_os_str().is_empty() {
+        return Err(DesktopError::Message(
+            "path must be a file inside the session workspace, not the workspace root".into(),
+        ));
+    }
+    if relative
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return Err(DesktopError::Message(format!(
+            "path must not contain '..': {trimmed}"
+        )));
+    }
+    Ok(normalize_path_slashes(&relative.to_string_lossy()))
+}
+
 /// Two-letter `git status --porcelain` code for a single path (e.g. `"??"`,
 /// `" M"`, `"D "`), or `None` if the path has no pending changes.
 fn porcelain_code(dir: &std::path::Path, path: &str) -> DesktopResult<Option<String>> {
@@ -2539,12 +2641,12 @@ pub async fn review_undo_file(
     session_id: String,
     path: String,
 ) -> DesktopResult<()> {
-    let path = validate_repo_relative_path(&path)?;
     let (dir, base_cwd) = review_dirs(&state, &session_id).await?;
+    let path = resolve_review_path(&path, &dir)?;
 
-    if let Some(code) = porcelain_code(&dir, path)? {
+    if let Some(code) = porcelain_code(&dir, &path)? {
         if code == "??" {
-            let full = dir.join(path);
+            let full = dir.join(&path);
             return std::fs::remove_file(&full).map_err(|e| {
                 DesktopError::Message(format!(
                     "failed to delete untracked file `{}`: {e}",
@@ -2558,7 +2660,7 @@ pub async fn review_undo_file(
         crate::win_console::command("git")
             .args(["-C"])
             .arg(&dir)
-            .args(["checkout", rev, "--", path])
+            .args(["checkout", rev, "--", &path])
             .output()
             .map_err(|e| {
                 DesktopError::Message(format!(
@@ -2625,14 +2727,14 @@ pub async fn review_keep_file(
     session_id: String,
     path: String,
 ) -> DesktopResult<()> {
-    let path = validate_repo_relative_path(&path)?;
     let (worktree, base_cwd) = review_dirs(&state, &session_id).await?;
+    let path = resolve_review_path(&path, &worktree)?;
     let Some(base_dir) = base_cwd else {
         return Err(DesktopError::Message("session is not isolated".into()));
     };
 
-    let src = worktree.join(path);
-    let dst = base_dir.join(path);
+    let src = worktree.join(&path);
+    let dst = base_dir.join(&path);
 
     if src.exists() {
         if let Some(parent) = dst.parent() {
@@ -2753,14 +2855,14 @@ pub async fn review_file_diff(
     session_id: String,
     path: String,
 ) -> DesktopResult<String> {
-    let path = validate_repo_relative_path(&path)?;
     let (worktree, base_cwd) = review_dirs(&state, &session_id).await?;
+    let path = resolve_review_path(&path, &worktree)?;
 
     let base_head = match &base_cwd {
         Some(base_dir) => base_head_sha(base_dir)?,
         None => "HEAD".to_string(),
     };
-    diff_against_rev(&worktree, &base_head, path)
+    diff_against_rev(&worktree, &base_head, &path)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2770,12 +2872,50 @@ pub struct FileHit {
     pub path: String,
     /// Basename, shown as the primary label.
     pub name: String,
-    /// True when the hit is a directory (selectable as an @-mention).
+    /// True when the hit is a directory. Always `false` for `list_files`
+    /// (files only — dirs are not @-mentionable and inflate walk cost).
     #[serde(default)]
     pub is_dir: bool,
 }
 
+/// Directory basenames we never descend into, even if a project forgot to
+/// gitignore them — walking `node_modules` / build outputs is what made
+/// composer `@` feel multi-second on ordinary apps.
+const SKIP_DIR_NAMES: &[&str] = &[
+    "node_modules",
+    ".git",
+    "target",
+    "dist",
+    "build",
+    "out",
+    ".next",
+    ".nuxt",
+    ".output",
+    ".turbo",
+    ".cache",
+    ".parcel-cache",
+    "coverage",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "vendor",
+    "Pods",
+    ".svelte-kit",
+    ".vercel",
+    ".idea",
+    ".vscode",
+];
+
+fn is_skipped_dir_name(name: &str) -> bool {
+    SKIP_DIR_NAMES
+        .iter()
+        .any(|skip| name.eq_ignore_ascii_case(skip))
+}
+
 /// Rank a path against a lowercase needle. Lower is better; `None` = no match.
+/// Basename prefix/contains beat full-path contains. Subsequence matching is
+/// intentionally omitted — it matched almost everything and made ranking +
+/// result lists feel random/laggy.
 fn score_file(rel_path: &str, name: &str, needle: &str) -> Option<i32> {
     if needle.is_empty() {
         return Some(100); // browse mode — rank by path length afterwards
@@ -2791,19 +2931,13 @@ fn score_file(rel_path: &str, name: &str, needle: &str) -> Option<i32> {
     if path_l.contains(needle) {
         return Some(2);
     }
-    if is_subsequence(needle, &path_l) {
-        return Some(3);
-    }
     None
 }
 
-fn is_subsequence(needle: &str, hay: &str) -> bool {
-    let mut chars = hay.chars();
-    needle.chars().all(|nc| chars.by_ref().any(|hc| hc == nc))
-}
-
-/// Read-only fuzzy file/directory search under `cwd` for composer @-mentions.
-/// Respects `.gitignore`/`.git/exclude` (via the `ignore` crate) and caps results.
+/// Read-only fuzzy **file** search under `cwd` for composer @-mentions and
+/// the Files explorer. Scoped to the session project folder only: respects
+/// `.gitignore` / `.ignore` / `.git/exclude`, never descends into
+/// `node_modules` (and other heavy dirs), returns files only (no folders).
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
 pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
@@ -2814,56 +2948,86 @@ pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
     let needle = query.trim().to_lowercase();
 
     // Bound the walk so huge repos can't stall an interactive keystroke.
-    const MAX_WALK: usize = 20_000;
+    // Empty query is browse-only (shallow); typed queries may go deeper but
+    // still stop early once we have enough strong hits.
+    const MAX_HITS: usize = 40;
+    const MAX_WALK_BROWSE: usize = 2_000;
+    const MAX_WALK_SEARCH: usize = 8_000;
+    let max_walk = if needle.is_empty() {
+        MAX_WALK_BROWSE
+    } else {
+        MAX_WALK_SEARCH
+    };
+
     let mut hits: Vec<(i32, FileHit)> = Vec::new();
+    let mut walked = 0usize;
+    let mut strong_hits = 0usize; // basename prefix/contains
 
-    let walker = ignore::WalkBuilder::new(&root)
-        .hidden(false)
-        .git_ignore(true)
-        .git_exclude(true)
-        .ignore(true)
+    let mut builder = ignore::WalkBuilder::new(&root);
+    builder
+        .standard_filters(true) // hidden + gitignore + .ignore + exclude
         .parents(true)
-        .build();
+        .follow_links(false)
+        .filter_entry(|entry| {
+            // Prune before descending — gitignore alone still lets a missing
+            // ignore rule walk tens of thousands of node_modules files.
+            if entry.depth() > 0 && entry.file_type().is_some_and(|ft| ft.is_dir()) {
+                let name = entry.file_name().to_string_lossy();
+                if is_skipped_dir_name(&name) {
+                    return false;
+                }
+            }
+            true
+        });
+    // Bare `@` / empty Files search: only shallow files so we don't walk the
+    // whole tree just to show a browse list.
+    if needle.is_empty() {
+        builder.max_depth(Some(3));
+    }
 
-    for (walked, entry) in walker.flatten().enumerate() {
-        if walked >= MAX_WALK {
+    for entry in builder.build().flatten() {
+        walked += 1;
+        if walked > max_walk {
             break;
         }
         let Some(ft) = entry.file_type() else {
             continue;
         };
-        let is_dir = ft.is_dir();
-        let is_file = ft.is_file();
-        if !is_dir && !is_file {
+        if !ft.is_file() {
             continue;
         }
         let Ok(rel) = entry.path().strip_prefix(&root) else {
             continue;
         };
-        let mut rel_str = rel.to_string_lossy().replace('\\', "/");
-        if rel_str.is_empty() || rel_str.starts_with(".git/") || rel_str == ".git" {
+        let rel_str = rel.to_string_lossy().replace('\\', "/");
+        if rel_str.is_empty() {
             continue;
-        }
-        if is_dir && !rel_str.ends_with('/') {
-            rel_str.push('/');
         }
         let name = rel
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| rel_str.trim_end_matches('/').to_owned());
+            .unwrap_or_else(|| rel_str.clone());
         let Some(score) = score_file(&rel_str, &name, &needle) else {
             continue;
         };
-        // Prefer directories slightly when scores tie (browse / equal match).
-        let rank = if is_dir { score.saturating_sub(1) } else { score };
+        if score <= 1 {
+            strong_hits += 1;
+        }
         hits.push((
-            rank,
+            score,
             FileHit {
                 path: rel_str,
                 name,
-                is_dir,
+                is_dir: false,
             },
         ));
+        // Enough good basename matches — don't keep walking for weak path hits.
+        if !needle.is_empty() && strong_hits >= MAX_HITS {
+            break;
+        }
+        if hits.len() >= MAX_HITS * 4 {
+            break;
+        }
     }
 
     hits.sort_by(|a, b| {
@@ -2871,8 +3035,35 @@ pub fn list_files(cwd: String, query: String) -> Vec<FileHit> {
             .then_with(|| a.1.path.len().cmp(&b.1.path.len()))
             .then_with(|| a.1.path.cmp(&b.1.path))
     });
-    hits.truncate(50);
+    hits.truncate(MAX_HITS);
     hits.into_iter().map(|(_, h)| h).collect()
+}
+
+#[cfg(test)]
+mod list_files_ranking_tests {
+    use super::{is_skipped_dir_name, score_file};
+
+    #[test]
+    fn skips_heavy_vendor_dirs() {
+        assert!(is_skipped_dir_name("node_modules"));
+        assert!(is_skipped_dir_name("NODE_MODULES"));
+        assert!(is_skipped_dir_name(".git"));
+        assert!(is_skipped_dir_name("target"));
+        assert!(!is_skipped_dir_name("src"));
+    }
+
+    #[test]
+    fn scores_basename_prefix_best() {
+        assert_eq!(score_file("pkg/App.tsx", "App.tsx", "app"), Some(0));
+        assert_eq!(score_file("pkg/MyApp.tsx", "MyApp.tsx", "app"), Some(1));
+        assert_eq!(score_file("app/page.tsx", "page.tsx", "app"), Some(2));
+        assert_eq!(score_file("pkg/page.tsx", "page.tsx", "zzz"), None);
+    }
+
+    #[test]
+    fn empty_needle_is_browse_mode() {
+        assert_eq!(score_file("a.ts", "a.ts", ""), Some(100));
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -3955,42 +4146,11 @@ pub async fn user_identity(_state: State<'_, AppState>) -> DesktopResult<UserIde
 
 // ---------------------------------------------------------------------------
 // Plan tab: Save to Workspace — writes the rendered plan markdown to a file
-// inside the session's cwd. Traversal-hardened the same way as
-// `project_memory_dir`/`validate_repo_relative_path` above: canonicalize the
-// cwd, join the caller-supplied relative path, then verify the WRITTEN
-// file's parent directory canonicalizes to somewhere still inside the
-// canonical cwd — this catches `..` segments that a components() scan alone
-// could miss once symlinks are involved (a plain "reject any ParentDir
-// component" check, as `validate_repo_relative_path` does for git paths, is
-// enough there because git resolves those paths itself; a raw filesystem
-// write needs the stronger belt-and-suspenders canonicalize-and-prefix-check
-// since we do the join ourselves).
+// inside the session's cwd. Traversal-hardened: canonicalize the cwd, join
+// the (resolved) relative path, then verify the written file's parent still
+// sits inside the canonical cwd. Absolute Write/Edit-style paths are
+// accepted via [`resolve_review_path`] and stripped to repo-relative first.
 // ---------------------------------------------------------------------------
-
-/// Rejects absolute paths and any `..` path component before it's ever
-/// joined onto a base directory — first line of defense, mirrors
-/// `validate_repo_relative_path`'s component scan.
-fn validate_relative_write_path(path: &str) -> DesktopResult<&str> {
-    let trimmed = path.trim();
-    if trimmed.is_empty() {
-        return Err(DesktopError::Message("path is required".into()));
-    }
-    let as_path = std::path::Path::new(trimmed);
-    if as_path.is_absolute() {
-        return Err(DesktopError::Message(format!(
-            "path must be relative to the session cwd, got absolute path: {trimmed}"
-        )));
-    }
-    if as_path
-        .components()
-        .any(|c| matches!(c, std::path::Component::ParentDir))
-    {
-        return Err(DesktopError::Message(format!(
-            "path must not contain '..': {trimmed}"
-        )));
-    }
-    Ok(trimmed)
-}
 
 /// Hard cap for the Files (Monaco) editor — keeps the UI responsive and
 /// rejects accidental binary dumps. Matches ~ Cursor's soft ceiling for
@@ -4011,7 +4171,7 @@ pub async fn read_text_file(
     let id = SessionId::from(session_id);
     let meta = service.session_meta(&id).await?;
 
-    let relative = validate_relative_write_path(&relative_path)?.to_string();
+    let relative = resolve_review_path(&relative_path, &meta.cwd)?;
     let cwd = meta.cwd.clone();
 
     tokio::task::spawn_blocking(move || {
@@ -4079,14 +4239,14 @@ pub async fn save_text_file(
     let id = SessionId::from(session_id);
     let meta = service.session_meta(&id).await?;
 
-    let relative = validate_relative_write_path(&relative_path)?;
+    let relative = resolve_review_path(&relative_path, &meta.cwd)?;
 
     let canonical_cwd = meta
         .cwd
         .canonicalize()
         .map_err(|e| DesktopError::Message(format!("invalid session cwd: {e}")))?;
 
-    let target = canonical_cwd.join(relative);
+    let target = canonical_cwd.join(&relative);
     let parent = target
         .parent()
         .ok_or_else(|| DesktopError::Message("path has no parent directory".into()))?;
@@ -4330,8 +4490,45 @@ pub async fn respawn_cron_loop(state: &AppState) {
 }
 
 #[cfg(test)]
-mod git_status_tests {
+mod resolve_review_path_tests {
     use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn keeps_repo_relative_paths() {
+        let root = PathBuf::from("/repo");
+        assert_eq!(
+            resolve_review_path("packages/desktop/src/App.tsx", &root).unwrap(),
+            "packages/desktop/src/App.tsx"
+        );
+    }
+
+    #[test]
+    fn strips_absolute_path_under_worktree() {
+        let root = PathBuf::from("/repo");
+        assert_eq!(
+            resolve_review_path("/repo/packages/desktop/src/App.tsx", &root).unwrap(),
+            "packages/desktop/src/App.tsx"
+        );
+    }
+
+    #[test]
+    fn rejects_absolute_path_outside_worktree() {
+        let root = PathBuf::from("/repo");
+        let err = resolve_review_path("/other/file.rs", &root).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("outside the session workspace"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn rejects_parent_dir_segments() {
+        let root = PathBuf::from("/repo");
+        assert!(resolve_review_path("../secret", &root).is_err());
+    }
+}
 
     /// `summarize` must cap rendered rows at `MAX_STATUS_FILES` while keeping
     /// totals (count/added/removed) computed over the *full*, untruncated

@@ -27,7 +27,8 @@ pub use plugin::SearchPlugin;
 pub use rerank::{KeywordReranker, SearchReranker};
 pub use scrape_page::ScrapePageTool;
 pub use search_backend::{
-    DuckDuckGoBackend, FallbackSearchBackend, SearchBackend, SearchError, SearchResult,
-    SearxNGBackend,
+    default_search_backends, BraveSearchBackend, DuckDuckGoBackend, DuckDuckGoInstantBackend,
+    FallbackSearchBackend, SearchBackend, SearchError, SearchResult, SearxNGBackend,
+    WikipediaBackend,
 };
 pub use search_web::SearchWebTool;
