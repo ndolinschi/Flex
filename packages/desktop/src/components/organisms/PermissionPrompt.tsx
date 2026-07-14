@@ -54,10 +54,10 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
       <div
         className={cn(
           "rounded-t-[var(--radius-composer)] border border-b-0 border-stroke-3",
-          "bg-user-bubble px-4 pt-3 pb-3.5 shadow-[0_-4px_16px_-4px_var(--shadow-color)]",
+          "bg-user-bubble px-3.5 pt-3 pb-3 shadow-[0_-4px_16px_-4px_var(--shadow-color)]",
         )}
       >
-        <h3 id="permission-title" className="text-sm font-semibold text-ink">
+        <h3 id="permission-title" className="text-sm font-semibold leading-snug text-ink">
           {titleParts ? (
             <>
               {titleParts.prefix}
@@ -72,7 +72,7 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
         </h3>
         {detail ? (
           <pre
-            className="mt-2 max-h-28 overflow-auto rounded-lg border border-stroke-3 bg-bg px-3 py-2 font-mono text-[12px] leading-relaxed text-ink-secondary [overflow-wrap:anywhere] whitespace-pre-wrap"
+            className="mt-2.5 max-h-28 overflow-auto rounded-md border border-stroke-3 bg-bg px-3 py-2 font-mono text-[12px] leading-relaxed text-ink-secondary [overflow-wrap:anywhere] whitespace-pre-wrap"
             tabIndex={-1}
             aria-label="Command details"
           >

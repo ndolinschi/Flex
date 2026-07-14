@@ -18,6 +18,12 @@ type DraftAnswer = {
 
 const emptyDraft = (): DraftAnswer => ({ selected: [], custom: "" })
 
+/** Shared vertical rhythm for the docked quiz card (8px / 12px steps). */
+const CARD_PAD = "px-3.5 pt-3 pb-3"
+const SECTION_GAP = "mt-2.5"
+const STACK_GAP = "gap-2"
+const OPTION_PAD = "px-3 py-2"
+
 const StepBody = ({
   q,
   draft,
@@ -50,16 +56,16 @@ const StepBody = ({
   }
 
   return (
-    <fieldset className="flex min-w-0 flex-col gap-2.5">
-      <legend className="mb-0.5 flex w-full min-w-0 flex-col gap-1.5">
+    <fieldset className={cn("flex min-w-0 flex-col", STACK_GAP)}>
+      <legend className="flex w-full min-w-0 flex-col gap-1">
         <span className="w-fit rounded-md bg-fill-3 px-1.5 py-0.5 text-xs font-medium tracking-[var(--tracking-caption)] text-ink-secondary">
           {q.header}
         </span>
-        <span className="text-base font-medium leading-snug text-ink">
+        <span className="text-sm font-medium leading-snug text-ink">
           {q.question}
         </span>
       </legend>
-      <div className="flex flex-col gap-1.5">
+      <div className={cn("flex flex-col", STACK_GAP)}>
         {q.options.map((opt) => {
           const active = draft.selected.includes(opt.label)
           return (
@@ -69,16 +75,17 @@ const StepBody = ({
               aria-pressed={active}
               onClick={() => handleToggle(opt.label)}
               className={cn(
-                "w-full rounded-md border px-3 py-2 text-left text-base leading-snug",
+                "w-full rounded-md border text-left text-sm leading-snug",
+                OPTION_PAD,
                 "transition-colors duration-[var(--duration-fast)]",
                 active
                   ? "border-accent bg-accent-subtle text-ink"
                   : "border-stroke-3 bg-fill-5 text-ink-secondary hover:border-stroke-2 hover:bg-fill-4",
               )}
             >
-              <span className="block font-medium">{opt.label}</span>
+              <span className="block font-medium leading-snug">{opt.label}</span>
               {opt.description ? (
-                <span className="mt-0.5 block text-sm text-ink-muted">
+                <span className="mt-1 block text-xs leading-snug text-ink-muted">
                   {opt.description}
                 </span>
               ) : null}
@@ -91,7 +98,7 @@ const StepBody = ({
             onChange={(e) => onChange({ selected: [], custom: e.target.value })}
             placeholder="Or type a custom answer…"
             aria-label={`Custom answer for ${q.header}`}
-            className="h-9 w-full text-base"
+            className="h-9 w-full text-sm"
           />
         ) : null}
       </div>
@@ -195,37 +202,36 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
       // continuous stacked unit, reference-design style, rather
       // than a floating modal overlapping the feed.
       className="w-full max-w-[var(--content-rail)] animate-modal-in"
+      data-question-prompt
     >
       <div
         className={cn(
           // Match the composer bubble's surface/radius/shadow language, but
           // round only the top corners and drop the bottom shadow layer so
           // the seam where this card meets the composer reads as one solid
-          // panel, not two stacked cards. bg-user-bubble is an opaque fill
-          // (not the translucent panel token), so nothing behind it — feed
-          // content included — can show through the header.
+          // panel, not two stacked cards.
           "rounded-t-[var(--radius-composer)] border border-b-0 border-stroke-3",
-          "bg-user-bubble px-4 pt-3 shadow-[0_-4px_16px_-4px_var(--shadow-color)]",
-          showFooter ? "pb-3" : "pb-3.5",
+          "bg-user-bubble shadow-[0_-4px_16px_-4px_var(--shadow-color)]",
+          CARD_PAD,
         )}
       >
-        <div className="flex items-baseline justify-between gap-3">
-          <div className="min-w-0">
-            <h3 id="question-title" className="text-sm font-semibold text-ink">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex flex-col gap-0.5">
+            <h3 id="question-title" className="text-sm font-semibold leading-snug text-ink">
               Agent needs your input
             </h3>
-            <p className="mt-0.5 text-sm text-ink-muted">
+            <p className="text-xs leading-snug text-ink-muted">
               Answer to continue the turn.
             </p>
           </div>
           {total > 1 ? (
-            <span className="shrink-0 text-xs tabular-nums text-ink-faint">
+            <span className="shrink-0 pt-0.5 text-xs tabular-nums text-ink-faint">
               {stepIndex + 1} of {total}
             </span>
           ) : null}
         </div>
 
-        <div key={stepKey} className="mt-3 animate-wizard-step-in">
+        <div key={stepKey} className={cn(SECTION_GAP, "animate-wizard-step-in")}>
           <StepBody
             q={currentQuestion}
             draft={currentDraft}
@@ -246,13 +252,24 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
         </div>
 
         {error ? (
-          <div className="mt-2.5">
+          <div className={SECTION_GAP}>
             <ErrorBanner message={error} />
           </div>
         ) : null}
 
         {showFooter ? (
-          <div className="mt-3 flex items-center justify-between gap-1.5 border-t border-stroke-4 pt-2.5">
+          <div
+            className={cn(
+              SECTION_GAP,
+              "flex items-center gap-1.5",
+              // Full action row (Back + Next/Submit): hairline separator.
+              // Back-only mid-step: no border — avoids a hollow footer band
+              // between the options and a lone Back control.
+              showAdvance
+                ? "justify-between border-t border-stroke-4 pt-2"
+                : "justify-start",
+            )}
+          >
             {showBack ? (
               <Button size="sm" variant="ghost" onClick={handleBack}>
                 Back

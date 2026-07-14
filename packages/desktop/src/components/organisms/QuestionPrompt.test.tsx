@@ -72,4 +72,16 @@ describe("QuestionPrompt layout", () => {
     expect(html).toContain(">Submit<")
     expect(html).not.toContain("1 of")
   })
+
+  it("uses a stable padding/spacing scale on the docked card", () => {
+    const html = renderToStaticMarkup(
+      <QuestionPrompt question={baseQuestion()} />,
+    )
+    expect(html).toContain("data-question-prompt")
+    expect(html).toContain("px-3.5")
+    expect(html).toContain("pt-3")
+    expect(html).toContain("pb-3")
+    expect(html).toContain("gap-2")
+    expect(html).toContain("mt-2.5")
+  })
 })
