@@ -42,6 +42,7 @@ export {
   PopoverSection,
   PopoverTray,
 } from "./PopoverTray"
+export { PermissionActions } from "./PermissionActions"
 export { PlusMenu } from "./PlusMenu"
 export { ProjectPicker } from "./ProjectPicker"
 export { ProviderConnectionForm } from "./ProviderConnectionForm"
