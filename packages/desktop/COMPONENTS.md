@@ -20,7 +20,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `HighlightedLabel` | Fuzzy-match accent spans in a label | `label`, `query` | FuzzySessionRow |
 | `Skeleton` | Placeholder shimmer | `className` | SessionSidebar, TurnTimeline |
 | `ScrollArea` | Scrollable region | `children`, `className` | SessionSidebar, TurnTimeline |
-| `ProviderIcon` | Brand mark from `public/providers/{id}.{svg,png,webp}` (letter fallback) | `providerId`, `size?` | ModelPicker, ProviderPicker, Welcome |
+| `ProviderIcon` | Brand mark from `public/providers/{id}.{svg,png,webp}` (letter fallback); omitted from model pickers until assets are reliable | `providerId`, `size?` | ProviderPicker, Welcome, Connections |
 
 ## Molecules
 
