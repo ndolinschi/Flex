@@ -45,6 +45,7 @@ export {
 export { PlusMenu } from "./PlusMenu"
 export { ProjectPicker } from "./ProjectPicker"
 export { ProviderConnectionForm } from "./ProviderConnectionForm"
+export { ProviderPicker } from "./ProviderPicker"
 export { ProviderProfileList } from "./ProviderProfileList"
 export { RepoSectionHeader } from "./RepoSectionHeader"
 export { SecretStorageSection } from "./SecretStorageSection"

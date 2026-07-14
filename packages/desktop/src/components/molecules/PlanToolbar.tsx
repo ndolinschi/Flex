@@ -14,7 +14,7 @@ import {
 } from "lucide-react"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
-import { Button, IconButton, RunningDot } from "../atoms"
+import { Button, IconButton, ProviderIcon, RunningDot } from "../atoms"
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu"
 import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
@@ -129,7 +129,11 @@ const PlanModelPill = ({
             </p>
           ) : (
             groups.map((group) => (
-              <PopoverSection key={group.providerId} label={group.label}>
+              <PopoverSection
+                key={group.providerId}
+                label={group.label}
+                icon={<ProviderIcon providerId={group.providerId} size={12} />}
+              >
                 <ul>
                   {group.items.map((m) => {
                     const active = m.id === value
@@ -142,6 +146,7 @@ const PlanModelPill = ({
                             handleClose()
                           }}
                         >
+                          <ProviderIcon providerId={m.providerId} size={14} />
                           <span className="min-w-0 flex-1 truncate">
                             {m.displayName ?? m.id}
                           </span>
