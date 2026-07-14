@@ -110,6 +110,12 @@ const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
   },
   {
     section: "indexing",
+    rowId: "indexing-auto-update",
+    title: "Update index on search",
+    description: "Rescan before SearchCode / FindSymbol / RepoMap; off reuses warm index",
+  },
+  {
+    section: "indexing",
     rowId: "indexing-auto-context",
     title: "Auto-context",
     description: "Inject top indexed snippets into each turn's first model call",

@@ -9,7 +9,7 @@ use agentloop_contracts::{ToolOutput, ToolResultBlock};
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
 use crate::repomap::build_repo_map;
-use crate::tools::shared::open_and_build_with_events;
+use crate::tools::shared::{IndexOpenMode, open_and_build_with_events_mode};
 
 const DEFAULT_BUDGET: usize = 2_000;
 const MIN_BUDGET: usize = 200;
@@ -24,8 +24,22 @@ struct RepoMapInput {
 }
 
 /// Compact orientation map of the working directory's indexed code.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct RepoMapTool;
+#[derive(Debug, Clone, Copy)]
+pub struct RepoMapTool {
+    open_mode: IndexOpenMode,
+}
+
+impl Default for RepoMapTool {
+    fn default() -> Self {
+        Self::new(IndexOpenMode::default())
+    }
+}
+
+impl RepoMapTool {
+    pub fn new(open_mode: IndexOpenMode) -> Self {
+        Self { open_mode }
+    }
+}
 
 #[async_trait]
 impl Tool for RepoMapTool {
@@ -65,8 +79,9 @@ impl Tool for RepoMapTool {
         let events = ctx.events.clone();
         let call_id = ctx.call_id.clone();
         let cancel = ctx.cancel.clone();
+        let open_mode = self.open_mode;
         let handle =
-            tokio::task::spawn_blocking(move || run_map(&cwd, budget, &events, &call_id));
+            tokio::task::spawn_blocking(move || run_map(&cwd, budget, &events, &call_id, open_mode));
         let rendered = tokio::select! {
             _ = cancel.cancelled() => return Err(ToolError::Cancelled),
             result = handle => result.map_err(|err| {
@@ -90,8 +105,9 @@ fn run_map(
     budget: usize,
     events: &agentloop_core::EventSink,
     call_id: &agentloop_contracts::ToolCallId,
+    open_mode: IndexOpenMode,
 ) -> Result<String, ToolError> {
-    let store = open_and_build_with_events(cwd, events, Some(call_id))?;
+    let store = open_and_build_with_events_mode(cwd, events, Some(call_id), open_mode)?;
     Ok(build_repo_map(&store, budget))
 }
 
@@ -155,7 +171,7 @@ mod tests {
 
         let _gate = lock_index_root_override();
         set_index_root_override(Some(index_root.path().to_path_buf()));
-        let output = RepoMapTool
+        let output = RepoMapTool::default()
             .run(tool_ctx(repo.path()), serde_json::json!({}))
             .await;
         set_index_root_override(None);

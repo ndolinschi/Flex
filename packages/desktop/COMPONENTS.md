@@ -89,14 +89,14 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|---|---|
 | `SessionSidebar` | New Agent + Search + Agents list; groups via `useSessionSidebarGroups`; footer/resume/archive molecules | (hooks) | App shell |
 | `ProviderSettingsForm` | Provider / key / model; pieces: `ProviderProfileList`, `ProviderConnectionForm`, `SecretStorageSection` | — | SettingsPage, WelcomePage |
-| `Composer` | Prompt + ContextBar; draft in `ComposerInput`; trays/queue under `organisms/composer/` | `isHero?` | ChatShell |
+| `Composer` | Prompt + ContextBar; draft in `ComposerInput`; trays/queue under `organisms/composer/`; optional `dockedOverlay` stacks Permission/Question flush above the bubble | `isHero?`, `dockedOverlay?` | ChatShell |
 | `ContextBar` | Project · branch · context % | `cwd`, `sessionId` | Composer |
 | `TurnTimeline` | Turns + tools + plans + streaming; `@tanstack/react-virtual` over `displayItems` + live tail; pieces under `organisms/timeline/` (`WorkGroupBody` owns stable `renderOther`) | `sessionId` | ChatShell |
-| `PermissionPrompt` | Tool permission HITL header docked above composer; actions in `PermissionActions` | `permission` | ChatPage (`ChatShell` overlay) |
-| `QuestionPrompt` | AskUserQuestion HITL | `question` | ChatPage |
+| `PermissionPrompt` | Tool permission HITL header docked above composer bubble; actions in `PermissionActions` | `permission` | ChatPage → `Composer.dockedOverlay` |
+| `QuestionPrompt` | AskUserQuestion HITL (same dock seam as PermissionPrompt) | `question` | ChatPage → `Composer.dockedOverlay` |
 | `RightPanel` | Plan / Changes / Files / Terminal / Browser / Memory (flagged) / plugin tabs (Database); tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`) + `src/plugins/` registry. Closed by default on app start and New Agent (`setActiveSessionId(…, { panel: "closed" })`); opens via `+`, ⌘J, Plan mode, or session switch restore. Memory gated by `MEMORY_TAB_ENABLED` (default off). Database via UI plugin (`DATABASE_TAB_ENABLED`, default on). | — | App shell |
 | `MemoryTab` | Right-panel Memory surface; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | RightPanel |
-| `DatabaseTab` | UI plugin: SQLite / Postgres / MySQL; empty state has no duplicate chrome under the tab strip (Add CTA only); with connections, slim count + refresh/add row | `active`, `session` | RightPanel (plugin registry) |
+| `DatabaseTab` | UI plugin (Terminal-style 2-col): 180px sidebar (connections + tables) + SQL/results main pane. Empty state has no duplicate chrome (Add CTA only); with connections, slim count + refresh/add. Result grid paginates (50/page; table preview via `limit`/`offset`, query results client-side). | `active`, `session` | RightPanel (plugin registry) |
 | `FilesTab` | Open-file strip (close-on-hover like panel tabs) + Monaco editor; `.md`/`.mdx` default to `MarkdownBody` preview (Code/Eye toggle); empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children`, search with `includeIgnored`) | `active` | RightPanel |
 | `WindowTitleBar` | Compact custom window chrome (`decorations: false`, 30px): traffic lights / caption buttons + File/Edit/View/Help + drag region | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
 | `AppHeader` | Compact chat chrome (30px): quiet `h-6` sidebar/panel toggles + `text-sm` title + session menu | — | ChatShell |
@@ -149,7 +149,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/lib/sessionSideEffects/` | Global-event side effects (`applyGlobalEvent`, `agentTerminal`, `devServerToast`) |
 | `src/lib/browserPreview.ts` | Tiny `isBrowserPreview` + `NATIVE_APP_REQUIRED` gate (no mock backend) |
 | `src/lib/browserDesign.ts` | Design Mode DOM payload + markdown serializer for composer chips |
-| `src/lib/nativeWebviewGate.ts` | Hide native browser webview only when an `aria-modal` / `data-suppress-native-webview` surface intersects the webview slot (center modals stay clear of the Browser panel) |
+| `src/lib/nativeWebviewGate.ts` | Hide native browser webview only when an `aria-modal` / `data-suppress-native-webview` surface intersects the webview slot (center modals stay clear of the Browser panel). ToastHost uses the same marker — DOM z-index cannot stack above a Tauri child webview. |
 | `e2e/` + `playwright.config.ts` | Asserts Vite preview shows native-app-required (no IPC mock) |
 | `scripts/soak.mjs` | Soak skeleton — exits unless real Tauri is available |
 | `scripts/preview-verify.mjs` | Manual screenshot walk (requires native app) |
@@ -194,7 +194,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 - Prior user bubbles dim to 50% (hover restores); hairline stroke-2; message actions reveal on row hover.
 - Sessions: default title `New Agent`; one draft per project; first prompt renames the session.
 - Engine settings: plugin toggles (search/index/learning/verifier), Indexing section
-  (status/rebuild/auto-context), fallback models, default isolation.
+  (status/rebuild/auto-update-on-search/auto-context), fallback models, default isolation.
 - Composer `/` opens slash-command tray; SessionMenu supports undo/redo files + integrate/discard when isolated.
 
 Keep this file in sync when adding or renaming components.

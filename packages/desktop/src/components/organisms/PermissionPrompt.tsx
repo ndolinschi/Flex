@@ -39,7 +39,7 @@ export const formatPermissionDetail = (detail?: string): string | null => {
   return trimmed
 }
 
-/** Docked permission header above the composer (QuestionPrompt seam).
+/** Docked permission header above the composer bubble (QuestionPrompt seam).
  * Allow / Deny actions live in the composer footer via `PermissionActions`. */
 export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
   const detail = formatPermissionDetail(permission.detail)
@@ -49,7 +49,9 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
     <div
       role="dialog"
       aria-labelledby="permission-title"
-      className="w-full max-w-[var(--content-rail)] animate-modal-in"
+      // Width comes from Composer's content-rail column; no max-w here so the
+      // card and bubble share the exact same edge.
+      className="w-full animate-modal-in"
     >
       <div
         className={cn(

@@ -9,7 +9,7 @@ use agentloop_contracts::{ToolOutput, ToolResultBlock};
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
 use crate::symbols::{Symbol, SymbolKind};
-use crate::tools::shared::open_and_build_with_events;
+use crate::tools::shared::{IndexOpenMode, open_and_build_with_events_mode};
 
 const MAX_OUTPUT_CHARS: usize = 8_000;
 const MAX_MATCHES: usize = 50;
@@ -28,8 +28,22 @@ struct FindSymbolInput {
 
 /// Find where a symbol (function, struct, class, const, method, interface,
 /// enum, or markdown heading) is defined.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct FindSymbolTool;
+#[derive(Debug, Clone, Copy)]
+pub struct FindSymbolTool {
+    open_mode: IndexOpenMode,
+}
+
+impl Default for FindSymbolTool {
+    fn default() -> Self {
+        Self::new(IndexOpenMode::default())
+    }
+}
+
+impl FindSymbolTool {
+    pub fn new(open_mode: IndexOpenMode) -> Self {
+        Self { open_mode }
+    }
+}
 
 #[async_trait]
 impl Tool for FindSymbolTool {
@@ -78,8 +92,9 @@ impl Tool for FindSymbolTool {
         let events = ctx.events.clone();
         let call_id = ctx.call_id.clone();
         let cancel = ctx.cancel.clone();
+        let open_mode = self.open_mode;
         let handle = tokio::task::spawn_blocking(move || {
-            find_matches(&cwd, &name_owned, kind_filter, &events, &call_id)
+            find_matches(&cwd, &name_owned, kind_filter, &events, &call_id, open_mode)
         });
         let matches = tokio::select! {
             _ = cancel.cancelled() => return Err(ToolError::Cancelled),
@@ -133,8 +148,9 @@ fn find_matches(
     kind_filter: Option<SymbolKind>,
     events: &agentloop_core::EventSink,
     call_id: &agentloop_contracts::ToolCallId,
+    open_mode: IndexOpenMode,
 ) -> Result<Vec<Symbol>, ToolError> {
-    let store = open_and_build_with_events(cwd, events, Some(call_id))?;
+    let store = open_and_build_with_events_mode(cwd, events, Some(call_id), open_mode)?;
     Ok(query_matches(&store, name, kind_filter))
 }
 
@@ -292,7 +308,7 @@ mod tests {
             events,
         };
 
-        let tool = FindSymbolTool;
+        let tool = FindSymbolTool::default();
         let output = tool
             .run(
                 ctx,

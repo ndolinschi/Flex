@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { BypassPermissionsButton } from "../atoms"
 import {
   ComposerInput,
@@ -23,8 +23,11 @@ import {
 import { log } from "../../lib/debug/log"
 import { ContextBar } from "./ContextBar"
 import { ComposerQueue } from "./composer/ComposerQueue"
+
 type ComposerProps = {
   isHero?: boolean
+  /** Permission / question card stacked flush above the bubble (same rail). */
+  dockedOverlay?: ReactNode
 }
 
 /** Send control that narrow-selects draft emptiness so the parent Composer
@@ -59,20 +62,25 @@ const ComposerSendButton = ({
   )
 }
 
+/** Drop-shadow only — no 1px ring — so a docked Permission/Question card can
+ * share a continuous surface without a hairline at the seam. Side/bottom
+ * stroke is painted with real borders instead. */
+const DOCKED_BUBBLE_SHADOW =
+  "shadow-[0_1px_2px_var(--shadow-ambient),0_8px_24px_-6px_var(--shadow-color)]"
+const DOCKED_BUBBLE_SHADOW_FOCUS =
+  "focus-within:shadow-[0_1px_2px_var(--shadow-ambient),0_10px_28px_-6px_var(--shadow-color)]"
+
 /** reference glass expanded prompt — fill surface, soft elevation, no harsh outline.
  * Draft subscription lives in `ComposerInput` / `ComposerSendButton` so
  * ContextBar + ModelPicker stay stable across keystrokes. */
-export const Composer = ({ isHero = false }: ComposerProps) => {
+export const Composer = ({
+  isHero = false,
+  dockedOverlay = null,
+}: ComposerProps) => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
-  // QuestionPrompt / PermissionPrompt dock flush above this bubble (see
-  // ChatShell's `overlayDocked`) — squash top corners so the seam reads as
-  // one continuous panel.
-  const hasDockedOverlay = useAppStore(
-    (s) =>
-      (!!s.pendingQuestion && s.pendingQuestion.sessionId === activeSessionId) ||
-      (!!s.pendingPermission &&
-        s.pendingPermission.sessionId === activeSessionId),
-  )
+  // Docked Permission/Question sits as a sibling above this bubble — squash
+  // top corners and drop the top shadow-ring so the seam reads as one panel.
+  const hasDockedOverlay = !!dockedOverlay
   const pendingPermission = useAppStore((s) =>
     s.pendingPermission && s.pendingPermission.sessionId === activeSessionId
       ? s.pendingPermission
@@ -267,87 +275,102 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
         onRemove={handleRemoveQueued}
       />
 
-      <div
-        ref={slashRootRef}
-        className={cn(
-          // w-full is required: without a fixed width the pill sizes to content,
-          // and the textarea's w-full creates a circular dependency that collapses
-          // width (→ placeholder wraps → scrollHeight inflates → height locks at max).
-          "relative mx-auto flex w-full max-w-[var(--content-rail)] flex-col",
-          "bg-user-bubble shadow-[var(--shadow-composer)]",
-          hasDockedOverlay
-            ? "rounded-b-[var(--radius-composer)] rounded-t-none"
-            : "rounded-[var(--radius-composer)]",
-          "transition-[box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-          "hover:bg-[color-mix(in_srgb,var(--color-user-bubble)_97%,white)]",
-          "focus-within:shadow-[var(--shadow-composer-focus)]",
-          "focus-within:hover:bg-user-bubble",
-        )}
-      >
-        <ComposerInput
-          composerMode={composerMode}
-          isHero={isHero}
-          cwd={active?.cwd}
-          enabled={
-            isBootstrapped && route !== "welcome" && !pendingPermission
-          }
-          anchorRef={slashRootRef}
-          attachments={attachments}
-          removeAttachment={removeAttachment}
-          addAttachment={addAttachment}
-          handlePaste={handlePaste}
-          handleDrop={handleDrop}
-          onSend={() => void handleSend()}
-          textareaRefOut={textareaRef}
-        />
+      {/* Overlay + bubble share one rail column so they sit flush (no page-bg
+       * gap from ChatShell's old absolute `bottom-full` dock). */}
+      <div className="relative mx-auto flex w-full max-w-[var(--content-rail)] flex-col">
+        {dockedOverlay}
+        <div
+          ref={slashRootRef}
+          className={cn(
+            // w-full is required: without a fixed width the pill sizes to content,
+            // and the textarea's w-full creates a circular dependency that collapses
+            // width (→ placeholder wraps → scrollHeight inflates → height locks at max).
+            "relative flex w-full flex-col",
+            "bg-user-bubble",
+            hasDockedOverlay
+              ? cn(
+                  "rounded-b-[var(--radius-composer)] rounded-t-none",
+                  // Continue the docked card's side/bottom stroke; omit the top
+                  // ring from --shadow-composer so the seam stays clean.
+                  "border-x border-b border-stroke-3",
+                  DOCKED_BUBBLE_SHADOW,
+                  DOCKED_BUBBLE_SHADOW_FOCUS,
+                )
+              : cn(
+                  "rounded-[var(--radius-composer)]",
+                  "shadow-[var(--shadow-composer)]",
+                  "focus-within:shadow-[var(--shadow-composer-focus)]",
+                ),
+            "transition-[box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+            "hover:bg-[color-mix(in_srgb,var(--color-user-bubble)_97%,white)]",
+            "focus-within:hover:bg-user-bubble",
+          )}
+        >
+          <ComposerInput
+            composerMode={composerMode}
+            isHero={isHero}
+            cwd={active?.cwd}
+            enabled={
+              isBootstrapped && route !== "welcome" && !pendingPermission
+            }
+            anchorRef={slashRootRef}
+            attachments={attachments}
+            removeAttachment={removeAttachment}
+            addAttachment={addAttachment}
+            handlePaste={handlePaste}
+            handleDrop={handleDrop}
+            onSend={() => void handleSend()}
+            textareaRefOut={textareaRef}
+          />
 
-        <div className="flex items-center justify-between gap-2 px-2 pb-1.5 pt-0">
-          <div className="flex min-w-0 items-center gap-0.5">
-            {!pendingPermission ? (
-              <>
-                <PlusMenu
-                  onAttachFile={() => void handlePick("file")}
-                  onAttachImage={() => void handlePick("image")}
-                />
-                <ModePicker
-                  value={composerMode}
-                  onChange={setComposerMode}
-                />
-                <ModelPicker
-                  models={models}
-                  value={selectedModelId}
-                  onChange={(id) => void handleModelChange(id)}
-                  isLoading={modelsLoading}
-                  effortFor={(modelId) => effortByModel[modelId] ?? null}
-                  onEffortChange={setEffortForModel}
-                  builtinProviders={builtinProviders}
-                />
-              </>
-            ) : (
-              <span className="px-1 text-xs text-ink-muted">
-                Waiting for permission…
-              </span>
-            )}
-          </div>
-          <div className="flex shrink-0 items-center gap-0.5">
-            {pendingPermission ? (
-              <PermissionActions permission={pendingPermission} />
-            ) : (
-              <>
-                <BypassPermissionsButton
-                  composerMode={composerMode}
-                  sessionBypass={sessionBypass}
-                  disabled={!activeSessionId}
-                  onToggle={handleToggleBypass}
-                />
-                <ComposerSendButton
-                  isStreaming={isStreaming}
-                  hasAttachments={attachments.length > 0}
-                  onSend={() => void handleSend()}
-                  onStop={() => void handleStop()}
-                />
-              </>
-            )}
+          <div className="flex items-center justify-between gap-2 px-2 pb-1.5 pt-0">
+            <div className="flex min-w-0 items-center gap-0.5">
+              {!pendingPermission ? (
+                <>
+                  <PlusMenu
+                    onAttachFile={() => void handlePick("file")}
+                    onAttachImage={() => void handlePick("image")}
+                  />
+                  <ModePicker
+                    value={composerMode}
+                    onChange={setComposerMode}
+                  />
+                  <ModelPicker
+                    models={models}
+                    value={selectedModelId}
+                    onChange={(id) => void handleModelChange(id)}
+                    isLoading={modelsLoading}
+                    effortFor={(modelId) => effortByModel[modelId] ?? null}
+                    onEffortChange={setEffortForModel}
+                    builtinProviders={builtinProviders}
+                  />
+                </>
+              ) : (
+                <span className="px-1 text-xs text-ink-muted">
+                  Waiting for permission…
+                </span>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-0.5">
+              {pendingPermission ? (
+                <PermissionActions permission={pendingPermission} />
+              ) : (
+                <>
+                  <BypassPermissionsButton
+                    composerMode={composerMode}
+                    sessionBypass={sessionBypass}
+                    disabled={!activeSessionId}
+                    onToggle={handleToggleBypass}
+                  />
+                  <ComposerSendButton
+                    isStreaming={isStreaming}
+                    hasAttachments={attachments.length > 0}
+                    onSend={() => void handleSend()}
+                    onStop={() => void handleStop()}
+                  />
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>

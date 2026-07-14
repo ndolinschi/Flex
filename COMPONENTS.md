@@ -133,7 +133,9 @@ DuckDuckGo Instant Answer + Wikipedia OpenSearch; optional Brave /
 `IndexPlugin` (`core::Plugin`): `scanner` + `chunker` + BM25 `lexical` + `symbols` +
 optional `embed`/`vector_store` (RRF hybrid in `retrieve`), `repomap` (PageRank over
 imports), tools `SearchCode` / `FindSymbol` / `RepoMap`, optional `AutoContextHook`
-(`AGENTLOOP_AUTO_CONTEXT` / prefs `autoContext`, default off). On-disk index under
+(`AGENTLOOP_AUTO_CONTEXT` / prefs `autoContext`, default off). Index refresh on tool
+use is opt-in (`AGENTLOOP_INDEX_AUTO_UPDATE` / prefs `autoUpdateIndex`, default off —
+reuse warm on-disk index; Settings Rebuild forces a refresh). On-disk index under
 app-data `agentloop/index/<repo-hash>` (never inside the repo). Status via
 `status_for` / `rebuild_with_stats` (desktop polls; no AgentEvent). Offline
 retrieval eval gate in `eval` (golden query→file set, MockEmbedder, recall@10 ≥ 0.8;

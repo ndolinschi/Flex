@@ -462,8 +462,9 @@ export const dbPreviewTable = (
   schema: string,
   table: string,
   limit?: number,
+  offset?: number,
 ): Promise<DbQueryResult> =>
-  invoke("db_preview_table", { id, schema, table, limit })
+  invoke("db_preview_table", { id, schema, table, limit, offset })
 
 export const dbQuery = (id: string, sql: string): Promise<DbQueryResult> =>
   invoke("db_query", { id, sql })

@@ -14,6 +14,8 @@
 //! [`repomap`] builds a PageRank/import-graph compact map for agent
 //! orientation. [`auto_context`] optionally injects top-k chunks into the
 //! first user message of a turn (`AGENTLOOP_AUTO_CONTEXT`, default off).
+//! Index refresh on tool use is opt-in (`AGENTLOOP_INDEX_AUTO_UPDATE` /
+//! desktop prefs `autoUpdateIndex`, default off — reuse a warm index).
 //!
 //! ## Embeddings (architecture)
 //!
@@ -42,7 +44,7 @@
 //! ```no_run
 //! use agentloop_index::IndexPlugin;
 //!
-//! let plugin = IndexPlugin::new().with_auto_context(false);
+//! let plugin = IndexPlugin::new().with_auto_context(false).with_auto_update(false);
 //! ```
 
 pub mod auto_context;
@@ -75,6 +77,10 @@ pub use plugin::IndexPlugin;
 pub use repomap::build_repo_map;
 pub use retrieve::{Hit, HybridSearchError, search, search_hybrid};
 pub use store::{IndexStore, StoreError, UpdateStats};
-pub use tools::shared::{index_dir_for, index_root_base, open_and_build, open_and_build_with_events};
+pub use tools::shared::{
+    AUTO_UPDATE_ENV, IndexOpenMode, env_auto_update_enabled, index_dir_for, index_root_base,
+    open_and_build, open_and_build_with_events, open_and_build_with_events_mode,
+    open_and_build_with_mode,
+};
 pub use tools::{FindSymbolTool, RepoMapTool, SearchCodeTool};
 pub use vector_store::{VectorHit, VectorStore, VectorStoreError};

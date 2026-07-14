@@ -30,7 +30,7 @@ const DESCRIPTIONS: Partial<Record<SettingsSectionId, string>> = {
   models: "Configure the preferred native provider for the agent loop.",
   behavior: "Session defaults and where secrets are stored.",
   memory: "Durable notes the agent saves as it works.",
-  indexing: "Local code index status, rebuild, and auto-context.",
+  indexing: "Local code index status, rebuild, auto-update, and auto-context.",
   "tools-mcp": "Native plugins and MCP servers the engine can load.",
   automations: "Run a prompt on a schedule or webhook.",
   diagnostics: "Debug logging, local crash capture, diagnostics export, and updates.",

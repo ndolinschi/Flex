@@ -58,7 +58,9 @@ const ToastRow = ({ id, text, kind, action, onDismiss }: ToastRowProps) => {
   )
 }
 
-/** in-app toast host — bottom-right, stacked, auto-dismissing. */
+/** in-app toast host — bottom-right, stacked, auto-dismissing.
+ * Marks `data-suppress-native-webview` so the Browser child webview hides
+ * when a toast intersects its slot (native webviews paint above all DOM). */
 export const ToastHost = () => {
   const toasts = useAppStore((s) => s.toasts)
   const dismissToast = useAppStore((s) => s.dismissToast)
@@ -66,7 +68,10 @@ export const ToastHost = () => {
   if (toasts.length === 0) return null
 
   return (
-    <div className="pointer-events-none fixed bottom-6 right-3 z-[1000] flex flex-col gap-2">
+    <div
+      data-suppress-native-webview=""
+      className="pointer-events-none fixed bottom-6 right-3 z-[1000] flex flex-col gap-2"
+    >
       {toasts.map((t) => (
         <div key={t.id} className="pointer-events-auto">
           <ToastRow

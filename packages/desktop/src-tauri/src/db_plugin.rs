@@ -272,18 +272,23 @@ pub async fn db_preview_table(
     schema: String,
     table: String,
     limit: Option<u32>,
+    offset: Option<u32>,
 ) -> DesktopResult<DbQueryResult> {
     let lim = limit.unwrap_or(100).clamp(1, 500);
+    let off = offset.unwrap_or(0);
     match snapshot_live(&state, &id).await? {
         LiveSnap::Sqlite(path) => {
-            let sql = format!("SELECT * FROM {} LIMIT {lim}", quote_ident_sqlite(&table));
+            let sql = format!(
+                "SELECT * FROM {} LIMIT {lim} OFFSET {off}",
+                quote_ident_sqlite(&table)
+            );
             tokio::task::spawn_blocking(move || run_sqlite_query(&path, &sql))
                 .await
                 .map_err(|e| DesktopError::Message(format!("sqlite join: {e}")))?
         }
         LiveSnap::Postgres(url) => {
             let sql = format!(
-                "SELECT * FROM {}.{} LIMIT {lim}",
+                "SELECT * FROM {}.{} LIMIT {lim} OFFSET {off}",
                 quote_ident_pg(&schema),
                 quote_ident_pg(&table)
             );
@@ -299,7 +304,7 @@ pub async fn db_preview_table(
                     quote_ident_mysql(&table)
                 )
             };
-            let sql = format!("SELECT * FROM {qualified} LIMIT {lim}");
+            let sql = format!("SELECT * FROM {qualified} LIMIT {lim} OFFSET {off}");
             run_mysql_query(&url, &sql).await
         }
     }

@@ -72,6 +72,13 @@ pub struct PluginPrefs {
     /// `AGENTLOOP_AUTO_CONTEXT=1`.
     #[serde(default)]
     pub auto_context: bool,
+    /// When the index plugin is enabled, rescans/updates the on-disk index
+    /// on every SearchCode / FindSymbol / RepoMap call. Default **off** —
+    /// reuse a warm index across chats; use Settings → Rebuild (or turn
+    /// this on) when you want a refresh. Also
+    /// `AGENTLOOP_INDEX_AUTO_UPDATE=1`.
+    #[serde(default)]
+    pub auto_update_index: bool,
     #[serde(default)]
     pub learning: bool,
     #[serde(default)]
@@ -88,6 +95,7 @@ impl Default for PluginPrefs {
             search: true,
             index: true,
             auto_context: false,
+            auto_update_index: false,
             learning: false,
             verifier: false,
         }
@@ -876,6 +884,10 @@ mod tests {
         assert!(
             !prefs.auto_context,
             "auto-context must default off (opt-in via Settings or AGENTLOOP_AUTO_CONTEXT)"
+        );
+        assert!(
+            !prefs.auto_update_index,
+            "auto-update index must default off so warm indexes are reused across chats"
         );
     }
 

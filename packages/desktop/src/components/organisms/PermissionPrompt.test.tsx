@@ -35,8 +35,8 @@ describe("PermissionPrompt layout", () => {
     expect(html).toContain("Allow")
     expect(html).toContain("Bash")
     expect(html).toContain("ls -la")
-    expect(html).toContain("max-w-[var(--content-rail)]")
     expect(html).toContain("rounded-t-[var(--radius-composer)]")
+    expect(html).toContain("border-b-0")
     // No centered modal chrome / portal wrapper.
     expect(html).not.toContain("fixed inset-0")
     expect(html).not.toContain("sm:items-center")

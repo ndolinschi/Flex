@@ -271,6 +271,11 @@ export type PluginPrefs = {
   index: boolean
   /** Inject top-k indexed snippets into each turn's first user message. Default off. */
   autoContext: boolean
+  /**
+   * Rescan/update the on-disk index on every SearchCode / FindSymbol / RepoMap.
+   * Default off — reuse a warm index across chats; Rebuild from Settings to refresh.
+   */
+  autoUpdateIndex: boolean
   learning: boolean
   verifier: boolean
 }

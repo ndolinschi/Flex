@@ -15,9 +15,9 @@ type ChatShellProps = {
   timeline: ReactNode
   composer: ReactNode
   overlay?: ReactNode
-  /** True for overlays meant to read as part of the composer stack (e.g. the
-   * question wizard) rather than a floating card above it: drops the gap so
-   * the overlay sits flush against the composer's top edge. */
+  /** True for floating overlays that should sit flush above the composer
+   * section. Prefer `Composer.dockedOverlay` for Permission/Question cards
+   * that must merge with the bubble (avoids a page-bg gap at the seam). */
   overlayDocked?: boolean
   composerHero?: boolean
   heroTitle?: string

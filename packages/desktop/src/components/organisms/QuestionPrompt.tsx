@@ -196,12 +196,10 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
     <div
       role="dialog"
       aria-labelledby="question-title"
-      // Same rail width as the composer pill below it (see Composer.tsx's
-      // slashRootRef container) and no bottom margin of its own — ChatShell
-      // docks this flush above the composer so the two read as one
-      // continuous stacked unit, reference-design style, rather
-      // than a floating modal overlapping the feed.
-      className="w-full max-w-[var(--content-rail)] animate-modal-in"
+      // Same rail width as the composer pill below it (Composer docks this
+      // as a sibling above the bubble) and no bottom margin — the two read
+      // as one continuous stacked unit rather than a floating modal.
+      className="w-full animate-modal-in"
       data-question-prompt
     >
       <div

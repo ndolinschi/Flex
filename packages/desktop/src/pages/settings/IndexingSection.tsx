@@ -21,9 +21,9 @@ type RowState = {
 export const IndexingContent = () => {
   const { config, isLoading, save } = useProviderConfig()
   const { sessions } = useSessions()
-  const [busyToggle, setBusyToggle] = useState<"index" | "autoContext" | null>(
-    null,
-  )
+  const [busyToggle, setBusyToggle] = useState<
+    "index" | "autoContext" | "autoUpdateIndex" | null
+  >(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [rows, setRows] = useState<RowState[]>([])
 
@@ -92,8 +92,12 @@ export const IndexingContent = () => {
   }, [plugins?.index, repos])
 
   const handleSavePlugins = async (
-    patch: Partial<{ index: boolean; autoContext: boolean }>,
-    key: "index" | "autoContext",
+    patch: Partial<{
+      index: boolean
+      autoContext: boolean
+      autoUpdateIndex: boolean
+    }>,
+    key: "index" | "autoContext" | "autoUpdateIndex",
   ) => {
     if (!config || !plugins || busyToggle) return
     setSaveError(null)
@@ -111,6 +115,7 @@ export const IndexingContent = () => {
         plugins: {
           ...plugins,
           autoContext: plugins.autoContext ?? false,
+          autoUpdateIndex: plugins.autoUpdateIndex ?? false,
           ...patch,
         },
       })
@@ -180,6 +185,24 @@ export const IndexingContent = () => {
               onChange={(on) => void handleSavePlugins({ index: on }, "index")}
               label="Toggle code index plugin"
               disabled={busyToggle !== null}
+            />
+          )}
+        </SettingRow>
+        <SettingRow
+          rowId="indexing-auto-update"
+          title="Update index on search"
+          description="Rescan the repo before SearchCode, FindSymbol, or RepoMap. Off by default so a warm index is reused across chats; use Rebuild below when you want a refresh. Requires the code index plugin."
+        >
+          {isLoading || !plugins ? (
+            <Spinner size="sm" />
+          ) : (
+            <Toggle
+              checked={!!plugins.autoUpdateIndex && plugins.index}
+              onChange={(on) =>
+                void handleSavePlugins({ autoUpdateIndex: on }, "autoUpdateIndex")
+              }
+              label="Toggle update index on search"
+              disabled={busyToggle !== null || !plugins.index}
             />
           )}
         </SettingRow>

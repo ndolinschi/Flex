@@ -45,7 +45,9 @@ export const ChatPage = ({ embedded = false }: ChatPageProps) => {
       ? pendingPermission
       : null
   // Question wins if both were somehow pending; engine normally won't overlap.
-  const overlay = questionForActive ? (
+  // Docked into Composer (not ChatShell's absolute overlay) so the card and
+  // bubble share one rail column with no page-bg gap at the seam.
+  const dockedOverlay = questionForActive ? (
     <QuestionPrompt question={questionForActive} />
   ) : permissionForActive ? (
     <PermissionPrompt permission={permissionForActive} />
@@ -65,12 +67,12 @@ export const ChatPage = ({ embedded = false }: ChatPageProps) => {
           <SubagentViewer />
         </>
       }
-      composer={<Composer isHero={composerHero} />}
+      composer={
+        <Composer isHero={composerHero} dockedOverlay={dockedOverlay} />
+      }
       composerHero={composerHero}
       heroTitle={heroTitle}
       heroHint="Describe a task to start the native agent loop."
-      overlay={overlay}
-      overlayDocked={!!questionForActive || !!permissionForActive}
     />
   )
 }

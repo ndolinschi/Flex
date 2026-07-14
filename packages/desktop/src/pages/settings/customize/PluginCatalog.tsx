@@ -6,7 +6,7 @@ import { useProviderConfig } from "../../../hooks/useProviderConfig"
 import type { PluginPrefs } from "../../../lib/types"
 import { cn } from "../../../lib/utils"
 
-type PluginKey = Exclude<keyof PluginPrefs, "autoContext">
+type PluginKey = Exclude<keyof PluginPrefs, "autoContext" | "autoUpdateIndex">
 
 type PluginCardSpec = {
   key: PluginKey

@@ -300,8 +300,11 @@ pub fn build_service(cfg: &ProviderConfig, store: Arc<JsonlStore>) -> DesktopRes
                 builder = builder.enable_plugin("search");
             }
             if cfg.prefs.plugins.index {
-                builder = builder
-                    .plugin(IndexPlugin::new().with_auto_context(cfg.prefs.plugins.auto_context));
+                builder = builder.plugin(
+                    IndexPlugin::new()
+                        .with_auto_context(cfg.prefs.plugins.auto_context)
+                        .with_auto_update(cfg.prefs.plugins.auto_update_index),
+                );
             }
             if cfg.prefs.plugins.learning {
                 builder = builder.enable_plugin("learning");

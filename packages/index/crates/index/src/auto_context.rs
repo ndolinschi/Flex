@@ -15,7 +15,10 @@ use agentloop_core::{Hook, HookContext, HookData, HookError, HookOutcome};
 
 use crate::retrieve::{Hit, search_hybrid};
 use crate::store::{IndexStore, StoreError as IndexStoreError, UpdateStats};
-use crate::tools::shared::{index_dir_for, index_root_base, open_and_build_with_events};
+use crate::tools::shared::{
+    IndexOpenMode, index_dir_for, index_root_base, open_and_build_with_events_mode,
+    open_and_build_with_mode,
+};
 
 /// Env var that enables auto-context when set to a truthy value
 /// (`1`/`true`/`on`/`yes`, case-insensitive). Used by
@@ -31,6 +34,7 @@ const MAX_SNIPPET_CHARS: usize = 240;
 pub struct AutoContextHook {
     enabled: bool,
     k: usize,
+    open_mode: IndexOpenMode,
 }
 
 impl AutoContextHook {
@@ -38,11 +42,17 @@ impl AutoContextHook {
         Self {
             enabled,
             k: DEFAULT_K,
+            open_mode: IndexOpenMode::default(),
         }
     }
 
     pub fn with_k(mut self, k: usize) -> Self {
         self.k = k.clamp(1, 20);
+        self
+    }
+
+    pub fn with_open_mode(mut self, mode: IndexOpenMode) -> Self {
+        self.open_mode = mode;
         self
     }
 
@@ -92,8 +102,9 @@ impl Hook for AutoContextHook {
         let query = trimmed.to_owned();
         let cwd_owned = cwd;
         let events = ctx.events.clone();
+        let open_mode = self.open_mode;
         let hits = match tokio::task::spawn_blocking(move || {
-            fetch_hits(&cwd_owned, &query, k, events.as_ref())
+            fetch_hits(&cwd_owned, &query, k, events.as_ref(), open_mode)
         })
         .await
         {
@@ -124,10 +135,13 @@ fn fetch_hits(
     query: &str,
     k: usize,
     events: Option<&agentloop_core::EventSink>,
+    open_mode: IndexOpenMode,
 ) -> Result<Vec<Hit>, String> {
     let store = match events {
-        Some(sink) => open_and_build_with_events(cwd, sink, None).map_err(|e| e.to_string())?,
-        None => crate::tools::shared::open_and_build(cwd).map_err(|e| e.to_string())?,
+        Some(sink) => {
+            open_and_build_with_events_mode(cwd, sink, None, open_mode).map_err(|e| e.to_string())?
+        }
+        None => open_and_build_with_mode(cwd, open_mode).map_err(|e| e.to_string())?,
     };
     search_hybrid(&store, query, k).map_err(|e| e.to_string())
 }

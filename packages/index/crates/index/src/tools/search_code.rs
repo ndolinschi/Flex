@@ -10,7 +10,7 @@ use agentloop_contracts::{ToolOutput, ToolResultBlock};
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
 use crate::retrieve::{Hit, search_hybrid};
-use crate::tools::shared::open_and_build_with_events;
+use crate::tools::shared::{IndexOpenMode, open_and_build_with_events_mode};
 
 /// Cap on total rendered output, chosen to stay well under ~2k tokens
 /// (roughly 4 chars/token, so ~8000 chars is a comfortable ceiling).
@@ -31,11 +31,25 @@ struct SearchCodeInput {
 
 /// Lexical + symbol code search over the session's working directory.
 ///
-/// Builds (or incrementally updates) a per-repo BM25 index on first use,
-/// then returns a compact ranked list of `path:start-end — symbol —
-/// snippet` lines.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct SearchCodeTool;
+/// Builds (or incrementally updates) a per-repo BM25 index on first use
+/// according to [`IndexOpenMode`], then returns a compact ranked list of
+/// `path:start-end — symbol — snippet` lines.
+#[derive(Debug, Clone, Copy)]
+pub struct SearchCodeTool {
+    open_mode: IndexOpenMode,
+}
+
+impl Default for SearchCodeTool {
+    fn default() -> Self {
+        Self::new(IndexOpenMode::default())
+    }
+}
+
+impl SearchCodeTool {
+    pub fn new(open_mode: IndexOpenMode) -> Self {
+        Self { open_mode }
+    }
+}
 
 #[async_trait]
 impl Tool for SearchCodeTool {
@@ -47,7 +61,8 @@ impl Tool for SearchCodeTool {
                  provider requests\". Returns a compact ranked list of \
                  `path:start-end — symbol — snippet` results, best matches first. Builds a \
                  lexical + symbol index of the repo on first use (a one-time cost); later calls \
-                 in the same repo reuse and incrementally update it. Prefer this over `Grep` \
+                 reuse the on-disk index (and incrementally update it when auto-update is on). \
+                 Prefer this over `Grep` \
                  when you don't know the exact identifier or string to search for — `Grep` is \
                  better once you know precisely what text to match. Set `k` to control how many \
                  results come back (default 8, max 30)."
@@ -84,8 +99,9 @@ impl Tool for SearchCodeTool {
         let call_id = ctx.call_id.clone();
 
         let cancel = ctx.cancel.clone();
+        let open_mode = self.open_mode;
         let handle = tokio::task::spawn_blocking(move || {
-            run_search(&cwd, &query_owned, k, &events, &call_id)
+            run_search(&cwd, &query_owned, k, &events, &call_id, open_mode)
         });
         let hits = tokio::select! {
             _ = cancel.cancelled() => return Err(ToolError::Cancelled),
@@ -122,8 +138,9 @@ fn run_search(
     k: usize,
     events: &agentloop_core::EventSink,
     call_id: &agentloop_contracts::ToolCallId,
+    open_mode: IndexOpenMode,
 ) -> Result<Vec<Hit>, ToolError> {
-    let store = open_and_build_with_events(cwd, events, Some(call_id))?;
+    let store = open_and_build_with_events_mode(cwd, events, Some(call_id), open_mode)?;
     search_hybrid(&store, query, k)
         .map_err(|err| ToolError::Execution(format!("SearchCode retrieval failed: {err}.")))
 }
@@ -289,7 +306,7 @@ pub fn generate_session_title(first_message: &str) -> String {
         let _gate = lock_index_root_override();
         set_index_root_override(Some(index_root.path().to_path_buf()));
         let live_index = index_dir_for(repo.path(), &index_root_base());
-        let tool = SearchCodeTool;
+        let tool = SearchCodeTool::default();
         assert_eq!(tool.descriptor().name, "SearchCode");
         assert!(tool.descriptor().read_only);
 
