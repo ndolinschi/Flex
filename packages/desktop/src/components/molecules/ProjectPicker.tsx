@@ -6,7 +6,7 @@ import { createSession, toInvokeError, updateSession } from "../../lib/tauri"
 import { isBrowserPreview, NATIVE_APP_REQUIRED } from "../../lib/browserPreview"
 import { DEFAULT_SESSION_TITLE } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
-import { basename } from "../../lib/utils"
+import { basename, parentPathPrefix } from "../../lib/utils"
 import { PickerTrigger } from "../atoms"
 import {
   PopoverItem,
@@ -167,6 +167,8 @@ export const ProjectPicker = ({
             <ul className="max-h-48 overflow-y-auto">
               {filtered.map((path) => {
                 const active = path === cwd
+                const parent = parentPathPrefix(path)
+                const name = basename(path)
                 return (
                   <li key={path}>
                     <PopoverItem
@@ -178,11 +180,11 @@ export const ProjectPicker = ({
                         className="h-3.5 w-3.5 shrink-0 text-icon-3"
                         aria-hidden
                       />
-                      <span className="min-w-0 flex-1 truncate">
-                        <span className="text-ink-faint">
-                          {path.replace(/\/[^/]+\/?$/, "/")}
-                        </span>
-                        <span className="text-ink">{basename(path)}</span>
+                      <span className="min-w-0 flex-1 truncate" title={path}>
+                        {parent ? (
+                          <span className="text-ink-faint">{parent}</span>
+                        ) : null}
+                        <span className="text-ink">{name}</span>
                       </span>
                       {active ? (
                         <Check

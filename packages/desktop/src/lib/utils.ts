@@ -58,6 +58,15 @@ export const basename = (path: string): string => {
   return segment || trimmed || path
 }
 
+/** Parent path including the trailing separator, or "" when there is none.
+ *  Tolerant of trailing slashes and Windows separators — pair with
+ *  {@link basename} for muted-prefix + bright-name list rows. */
+export const parentPathPrefix = (path: string): string => {
+  const trimmed = path.replace(/[/\\]+$/, "")
+  const i = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"))
+  return i >= 0 ? trimmed.slice(0, i + 1) : ""
+}
+
 const hasDriveLetter = (path: string): boolean => /^[a-zA-Z]:\//.test(path)
 
 /** True when `path` looks absolute (POSIX `/…` or Windows `C:/…`). */

@@ -1,5 +1,31 @@
 import { describe, expect, it } from "vitest"
-import { isAbsolutePath, toSessionRelativePath } from "./utils"
+import {
+  basename,
+  isAbsolutePath,
+  parentPathPrefix,
+  toSessionRelativePath,
+} from "./utils"
+
+describe("basename", () => {
+  it("handles posix and windows separators", () => {
+    expect(basename("/Users/me/Apps")).toBe("Apps")
+    expect(basename("C:\\Users\\me\\Projects")).toBe("Projects")
+    expect(basename("C:\\Users\\me\\Apps\\")).toBe("Apps")
+  })
+})
+
+describe("parentPathPrefix", () => {
+  it("keeps the trailing separator for muted-prefix rows", () => {
+    expect(parentPathPrefix("/Users/me/Apps")).toBe("/Users/me/")
+    expect(parentPathPrefix("C:\\Users\\me\\Projects")).toBe("C:\\Users\\me\\")
+    expect(parentPathPrefix("C:\\Users\\me\\Apps\\")).toBe("C:\\Users\\me\\")
+  })
+
+  it("returns empty when there is no parent segment", () => {
+    expect(parentPathPrefix("Apps")).toBe("")
+    expect(parentPathPrefix("Projects\\")).toBe("")
+  })
+})
 
 describe("toSessionRelativePath", () => {
   it("keeps already-relative paths", () => {
