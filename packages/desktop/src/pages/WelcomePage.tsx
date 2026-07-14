@@ -6,6 +6,7 @@ import {
   ErrorBanner,
   FormField,
   ModelSelect,
+  ProviderPicker,
 } from "../components/molecules"
 import { useCopilotAuth } from "../hooks/useCopilotAuth"
 import { useModels } from "../hooks/useModels"
@@ -163,9 +164,6 @@ export const WelcomePage = () => {
     }
   }
 
-  const selectClassName =
-    "h-9 w-full rounded-md border border-border bg-surface px-2.5 text-sm text-ink focus:border-accent focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-accent)]"
-
   return (
     <div className="flex h-full flex-col bg-bg">
       <div className="mx-auto flex w-full max-w-[var(--welcome-rail)] flex-1 flex-col justify-center px-4 py-8">
@@ -207,21 +205,12 @@ export const WelcomePage = () => {
         {step === "provider" ? (
           <div className="flex max-w-md flex-col gap-3">
             <FormField label="Provider" htmlFor="welcome-provider">
-              <select
-                id="welcome-provider"
-                className={selectClassName}
+              <ProviderPicker
+                providers={builtinProviders}
                 value={provider}
-                onChange={(e) => handlePickProvider(e.target.value)}
-                aria-label="Provider"
+                onChange={handlePickProvider}
                 disabled={modelsLoading || busy}
-              >
-                <option value="">Select…</option>
-                {builtinProviders.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
+              />
             </FormField>
             {isCopilot ? (
               <div className="flex flex-col gap-2 rounded-md border border-border bg-surface px-3 py-3">

@@ -4,6 +4,7 @@ import { ErrorBanner } from "./ErrorBanner"
 import { FieldRow, SettingsSection } from "./SettingsSection"
 import { ModelMultiSelect } from "./ModelMultiSelect"
 import { ModelSelect } from "./ModelSelect"
+import { ProviderPicker } from "./ProviderPicker"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 
 const selectClassName =
@@ -110,19 +111,11 @@ export const ProviderConnectionForm = ({
         </FieldRow>
 
         <FieldRow label="Provider" htmlFor="provider">
-          <select
-            id="provider"
+          <ProviderPicker
+            providers={builtinProviders}
             value={provider}
-            onChange={(e) => onProviderChange(e.target.value)}
-            className={selectClassName}
-          >
-            <option value="">Select provider</option>
-            {builtinProviders.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+            onChange={onProviderChange}
+          />
         </FieldRow>
 
         {isCopilot ? (

@@ -1,4 +1,4 @@
-import { Badge, Button } from "../atoms"
+import { Badge, Button, ProviderIcon } from "../atoms"
 import { SettingsSection } from "./SettingsSection"
 import type { ProviderProfileView } from "../../lib/types"
 import { cn } from "../../lib/utils"
@@ -56,6 +56,7 @@ export const ProviderProfileList = ({
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
+                <ProviderIcon providerId={p.provider} size={16} />
                 <span className="truncate text-sm font-medium text-ink">
                   {p.label}
                 </span>

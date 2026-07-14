@@ -4,6 +4,7 @@ import { Check, ChevronDown, ChevronRight, Gauge } from "lucide-react"
 import { EFFORT_LEVELS, effortLabel } from "../../lib/types"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
+import { ProviderIcon } from "../atoms"
 import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
 
@@ -178,10 +179,7 @@ export const ModelPicker = ({
             handleClose()
           }}
         >
-          {/* name truncates first — provider/effort/check keep their own
-              shrink-0 slots so they never get eaten by a long model name,
-              and each has an explicit gap so the effort badge and the check
-              never visually collide. */}
+          <ProviderIcon providerId={m.providerId} size={14} />
           <span className="min-w-0 flex-1 truncate">
             {m.displayName ?? m.id}
           </span>
@@ -266,6 +264,9 @@ export const ModelPicker = ({
           open && "opacity-100",
         )}
       >
+        {selected ? (
+          <ProviderIcon providerId={selected.providerId} size={14} />
+        ) : null}
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {selectedEffort ? (
           <span className="shrink-0 truncate text-ink-muted">
@@ -300,7 +301,11 @@ export const ModelPicker = ({
             </p>
           ) : (
             groups.map((group) => (
-              <PopoverSection key={group.providerId} label={group.label}>
+              <PopoverSection
+                key={group.providerId}
+                label={group.label}
+                icon={<ProviderIcon providerId={group.providerId} size={12} />}
+              >
                 <ul>{group.items.map(renderRow)}</ul>
               </PopoverSection>
             ))

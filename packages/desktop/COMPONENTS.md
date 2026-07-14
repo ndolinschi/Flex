@@ -20,6 +20,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `HighlightedLabel` | Fuzzy-match accent spans in a label | `label`, `query` | FuzzySessionRow |
 | `Skeleton` | Placeholder shimmer | `className` | SessionSidebar, TurnTimeline |
 | `ScrollArea` | Scrollable region | `children`, `className` | SessionSidebar, TurnTimeline |
+| `ProviderIcon` | Brand mark from `public/providers/{id}.{svg,png,webp}` (letter fallback) | `providerId`, `size?` | ModelPicker, ProviderPicker, Welcome |
 
 ## Molecules
 
@@ -31,6 +32,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `FuzzySessionRow` | Search-modal session row with highlight + relative time | `index`, `active`, `label`, `query`, `updatedAtMs`, `onActivate`, `onHover` | SearchModal |
 | `ProviderProfileList` | Connections list (select / activate / delete) | `profiles`, `editingId`, `onSelect`, … | ProviderSettingsForm |
 | `ProviderConnectionForm` | Connection create/edit form + models + isolation; Copilot branch uses device-flow sign-in | form field props + `onValidate` / `onSave` / `onCopilotSignIn?` | ProviderSettingsForm |
+| `ProviderPicker` | Icon tile grid for choosing a builtin provider | `providers`, `value`, `onChange` | WelcomePage, ProviderConnectionForm |
 | `CopilotSignInDialog` | GitHub Copilot device-flow modal (user code + Open GitHub + poll) | `open`, `start` / `wait` / `cancel`, `onSuccess` | ProviderSettingsForm, WelcomePage |
 | `SecretStorageSection` | Security: secret-storage backend select | `secretStorage`, `isMac`, `onChange`, `error?` | ProviderSettingsForm |
 | `SessionListItem` | Agent row + rename/delete + running/unread via per-id store selectors | `session`, `isActive`, `memo` | SessionSidebar |
