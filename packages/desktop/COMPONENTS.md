@@ -85,7 +85,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `TurnTimeline` | Turns + tools + plans + streaming; `@tanstack/react-virtual` over `displayItems` + live tail; pieces under `organisms/timeline/` (`WorkGroupBody` owns stable `renderOther`) | `sessionId` | ChatShell |
 | `PermissionPrompt` | Tool permission HITL | `permission` | ChatPage |
 | `QuestionPrompt` | AskUserQuestion HITL | `question` | ChatPage |
-| `RightPanel` | Plan / Changes / Files / Terminal / Browser; tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`) | — | App shell |
+| `RightPanel` | Plan / Changes / Files / Terminal / Browser; tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`). Plan opens empty via `+`, ⌘J (seeds preferred/default tab), or switching composer to Plan mode — not only after a plan exists. | — | App shell |
 | `FilesTab` | Cursor-style open-file strip + Monaco editor; empty state shows `FileExplorer` (searchable `list_files`) | `active` | RightPanel |
 | `AppHeader` | Title + sole right-panel toggle (⌘J) + session menu | — | ChatShell |
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | RightPanel |

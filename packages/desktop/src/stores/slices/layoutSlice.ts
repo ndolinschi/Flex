@@ -126,7 +126,21 @@ export const createLayoutSlice: StateCreator<
       get().setRightPanelCollapsed(false)
       return
     }
-    get().setRightPanelOpen(!state.rightPanelOpen)
+    const opening = !state.rightPanelOpen
+    get().setRightPanelOpen(opening)
+    // ⌘J into an empty strip used to show only "+" until a plan arrived
+    // (auto-reveal) or the user dug into the add menu. Seed the session's
+    // preferred / default tab so Plan (and any remembered tab) opens empty.
+    if (opening) {
+      const sessionId = get().activeSessionId
+      if (!sessionId) return
+      const key = sessionScopeKey(sessionId)
+      const openIds = get().openTabsBySession[key] ?? []
+      if (openIds.length > 0) return
+      const preferred =
+        get().selectedTabBySession[key] ?? get().rightPanelTab ?? "plan"
+      get().setRightPanelTab(preferred)
+    }
   },
   setRightPanelTab: (tab) => {
     set({ rightPanelTab: tab })

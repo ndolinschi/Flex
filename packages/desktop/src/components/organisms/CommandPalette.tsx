@@ -207,6 +207,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
         run: () => {
           setRoute("chat")
           setComposerMode("plan")
+          useAppStore.getState().revealPlanPanel()
         },
       },
       {
