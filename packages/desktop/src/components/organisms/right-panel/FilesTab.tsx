@@ -90,7 +90,9 @@ export const FilesTab = ({ active }: FilesTabProps) => {
     setRightPanelOpen,
   ])
 
-  // Opening a file leaves browse mode so the editor is visible.
+  // Opening a file leaves browse mode so the editor is visible. Depend only
+  // on length: reopening an already-open path must not rely on this effect
+  // (length is unchanged) — `onOpenFile` clears browseMode explicitly.
   useEffect(() => {
     if (openFiles.length > 0) setBrowseMode(false)
   }, [openFiles.length])
@@ -235,7 +237,13 @@ export const FilesTab = ({ active }: FilesTabProps) => {
             sessionId={activeSessionId!}
             sessionKey={sessionKey}
             cwd={cwd}
-            onOpenFile={(p) => openWorkspaceFile(sessionKey, p)}
+            onOpenFile={(p) => {
+              // Always leave browse mode — openWorkspaceFile is a no-op on
+              // openFiles when `p` is already open, so the length-based effect
+              // above would not clear browseMode on its own.
+              setBrowseMode(false)
+              openWorkspaceFile(sessionKey, p)
+            }}
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
