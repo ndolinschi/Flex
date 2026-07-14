@@ -16,6 +16,7 @@ import {
   RightPanel,
   SearchModal,
   SessionSidebar,
+  WindowTitleBar,
 } from "./components/organisms"
 import { ToastHost } from "./components/molecules"
 import { ChatPage } from "./pages/ChatPage"
@@ -255,73 +256,100 @@ const AppRoutes = () => {
   useBootstrap(setRoute, setTheme)
   useUpdaterCheck(isBootstrapped && route !== "welcome")
 
+  const titleBar = (
+    <WindowTitleBar
+      onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+      onOpenSearch={() => setSearchModalOpen(true)}
+    />
+  )
+
   if (!isBootstrapped) {
     return (
-      <div
-        className="flex h-full items-center justify-center bg-bg text-sm text-ink-muted"
-        role="status"
-        aria-live="polite"
-      >
-        Loading…
+      <div className="flex h-full flex-col bg-bg">
+        {titleBar}
+        <div
+          className="flex min-h-0 flex-1 items-center justify-center text-sm text-ink-muted"
+          role="status"
+          aria-live="polite"
+        >
+          Loading…
+        </div>
       </div>
     )
   }
 
-  if (route === "welcome") return <WelcomePage />
+  if (route === "welcome") {
+    return (
+      <div className="flex h-full flex-col bg-bg">
+        {titleBar}
+        <div className="min-h-0 flex-1 overflow-auto">
+          <WelcomePage />
+        </div>
+        <CommandPalette
+          open={commandPaletteOpen}
+          onClose={() => setCommandPaletteOpen(false)}
+        />
+        <ToastHost />
+      </div>
+    )
+  }
 
   // Persistent sidebar + keep Chat mounted so timeline/subscriptions survive
   // settings round-trips (reference glass: content swap, not full remount).
   return (
-    <div className="relative flex h-full bg-bg">
-      {/* Root is `relative` so SessionSidebar's mobile overlay (absolute,
-       * anchored to this container's left edge — see SessionSidebar.tsx's
-       * `narrow` handling) spans the full app width, not just the chat area. */}
-      <SessionSidebar onOpenSearch={() => setSearchModalOpen(true)} />
-      {/* Relative + flex-row: at "wide" the right panel lays out as a normal
-       * side-by-side column (unchanged from before); at "narrow"/"tight" it
-       * switches to an absolute overlay anchored to this container's right
-       * edge, so the overlay + backdrop cover only the chat area, not the
-       * sidebar (see RightPanel.tsx's `narrow` handling). */}
-      <div className="relative flex min-h-0 min-w-0 flex-1">
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-          <div
-            className={cn(
-              "flex h-full min-h-0 flex-1 flex-col",
-              "transition-opacity duration-[var(--duration-normal)] ease-[var(--easing-default)]",
-              route !== "chat" && "pointer-events-none opacity-0",
-            )}
-            aria-hidden={route !== "chat"}
-          >
-            <ChatPage embedded />
-          </div>
-          {route === "settings" ||
-          route === "customize" ||
-          (AUTOMATIONS_UI_ENABLED && route === "automations") ||
-          route === "memory" ? (
-            <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
-              <Suspense
-                fallback={
-                  <div className="flex h-full items-center justify-center text-sm text-ink-muted">
-                    Loading…
-                  </div>
-                }
-              >
-                <SettingsPage embedded />
-              </Suspense>
+    <div className="flex h-full flex-col bg-bg">
+      {titleBar}
+      <div className="relative flex min-h-0 flex-1">
+        {/* Root is `relative` so SessionSidebar's mobile overlay (absolute,
+         * anchored to this container's left edge — see SessionSidebar.tsx's
+         * `narrow` handling) spans the full app width, not just the chat area. */}
+        <SessionSidebar onOpenSearch={() => setSearchModalOpen(true)} />
+        {/* Relative + flex-row: at "wide" the right panel lays out as a normal
+         * side-by-side column (unchanged from before); at "narrow"/"tight" it
+         * switches to an absolute overlay anchored to this container's right
+         * edge, so the overlay + backdrop cover only the chat area, not the
+         * sidebar (see RightPanel.tsx's `narrow` handling). */}
+        <div className="relative flex min-h-0 min-w-0 flex-1">
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+            <div
+              className={cn(
+                "flex h-full min-h-0 flex-1 flex-col",
+                "transition-opacity duration-[var(--duration-normal)] ease-[var(--easing-default)]",
+                route !== "chat" && "pointer-events-none opacity-0",
+              )}
+              aria-hidden={route !== "chat"}
+            >
+              <ChatPage embedded />
             </div>
-          ) : null}
+            {route === "settings" ||
+            route === "customize" ||
+            (AUTOMATIONS_UI_ENABLED && route === "automations") ||
+            route === "memory" ? (
+              <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
+                <Suspense
+                  fallback={
+                    <div className="flex h-full items-center justify-center text-sm text-ink-muted">
+                      Loading…
+                    </div>
+                  }
+                >
+                  <SettingsPage embedded />
+                </Suspense>
+              </div>
+            ) : null}
+          </div>
+          <RightPanel />
         </div>
-        <RightPanel />
+        <CommandPalette
+          open={commandPaletteOpen}
+          onClose={() => setCommandPaletteOpen(false)}
+        />
+        <SearchModal
+          open={searchModalOpen}
+          onClose={() => setSearchModalOpen(false)}
+        />
+        <ToastHost />
       </div>
-      <CommandPalette
-        open={commandPaletteOpen}
-        onClose={() => setCommandPaletteOpen(false)}
-      />
-      <SearchModal
-        open={searchModalOpen}
-        onClose={() => setSearchModalOpen(false)}
-      />
-      <ToastHost />
     </div>
   )
 }
