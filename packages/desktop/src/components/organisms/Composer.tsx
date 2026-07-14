@@ -5,6 +5,7 @@ import {
   ErrorBanner,
   ModePicker,
   ModelPicker,
+  PermissionActions,
   PlusMenu,
   SendButton,
 } from "../molecules"
@@ -63,12 +64,19 @@ const ComposerSendButton = ({
  * ContextBar + ModelPicker stay stable across keystrokes. */
 export const Composer = ({ isHero = false }: ComposerProps) => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
-  // QuestionPrompt docks flush above this bubble (see ChatShell's
-  // `overlayDocked`) when the active session has a pending question — squash
-  // this bubble's top corners so the seam between the two reads as one
-  // continuous panel instead of a double-rounded notch.
-  const hasDockedQuestion = useAppStore(
-    (s) => !!s.pendingQuestion && s.pendingQuestion.sessionId === activeSessionId,
+  // QuestionPrompt / PermissionPrompt dock flush above this bubble (see
+  // ChatShell's `overlayDocked`) — squash top corners so the seam reads as
+  // one continuous panel.
+  const hasDockedOverlay = useAppStore(
+    (s) =>
+      (!!s.pendingQuestion && s.pendingQuestion.sessionId === activeSessionId) ||
+      (!!s.pendingPermission &&
+        s.pendingPermission.sessionId === activeSessionId),
+  )
+  const pendingPermission = useAppStore((s) =>
+    s.pendingPermission && s.pendingPermission.sessionId === activeSessionId
+      ? s.pendingPermission
+      : null,
   )
   const setComposerDraft = useAppStore((s) => s.setComposerDraft)
   const composerMode = useAppStore((s) => s.composerMode)
@@ -267,7 +275,7 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
           // width (→ placeholder wraps → scrollHeight inflates → height locks at max).
           "relative mx-auto flex w-full max-w-[var(--content-rail)] flex-col gap-1.5",
           "bg-user-bubble shadow-[var(--shadow-composer)]",
-          hasDockedQuestion
+          hasDockedOverlay
             ? "rounded-b-[var(--radius-composer)] rounded-t-none"
             : "rounded-[var(--radius-composer)]",
           "transition-[box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
@@ -280,7 +288,9 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
           composerMode={composerMode}
           isHero={isHero}
           cwd={active?.cwd}
-          enabled={isBootstrapped && route !== "welcome"}
+          enabled={
+            isBootstrapped && route !== "welcome" && !pendingPermission
+          }
           anchorRef={slashRootRef}
           attachments={attachments}
           removeAttachment={removeAttachment}
@@ -293,37 +303,51 @@ export const Composer = ({ isHero = false }: ComposerProps) => {
 
         <div className="flex items-center justify-between gap-1.5 px-3 pb-2.5 pt-2">
           <div className="flex min-w-0 items-center gap-0.5">
-            <PlusMenu
-              onAttachFile={() => void handlePick("file")}
-              onAttachImage={() => void handlePick("image")}
-            />
-            <ModePicker
-              value={composerMode}
-              onChange={setComposerMode}
-            />
-            <ModelPicker
-              models={models}
-              value={selectedModelId}
-              onChange={(id) => void handleModelChange(id)}
-              isLoading={modelsLoading}
-              effortFor={(modelId) => effortByModel[modelId] ?? null}
-              onEffortChange={setEffortForModel}
-              builtinProviders={builtinProviders}
-            />
+            {!pendingPermission ? (
+              <>
+                <PlusMenu
+                  onAttachFile={() => void handlePick("file")}
+                  onAttachImage={() => void handlePick("image")}
+                />
+                <ModePicker
+                  value={composerMode}
+                  onChange={setComposerMode}
+                />
+                <ModelPicker
+                  models={models}
+                  value={selectedModelId}
+                  onChange={(id) => void handleModelChange(id)}
+                  isLoading={modelsLoading}
+                  effortFor={(modelId) => effortByModel[modelId] ?? null}
+                  onEffortChange={setEffortForModel}
+                  builtinProviders={builtinProviders}
+                />
+              </>
+            ) : (
+              <span className="px-1 text-xs text-ink-muted">
+                Waiting for permission…
+              </span>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <BypassPermissionsButton
-              composerMode={composerMode}
-              sessionBypass={sessionBypass}
-              disabled={!activeSessionId}
-              onToggle={handleToggleBypass}
-            />
-            <ComposerSendButton
-              isStreaming={isStreaming}
-              hasAttachments={attachments.length > 0}
-              onSend={() => void handleSend()}
-              onStop={() => void handleStop()}
-            />
+            {pendingPermission ? (
+              <PermissionActions permission={pendingPermission} />
+            ) : (
+              <>
+                <BypassPermissionsButton
+                  composerMode={composerMode}
+                  sessionBypass={sessionBypass}
+                  disabled={!activeSessionId}
+                  onToggle={handleToggleBypass}
+                />
+                <ComposerSendButton
+                  isStreaming={isStreaming}
+                  hasAttachments={attachments.length > 0}
+                  onSend={() => void handleSend()}
+                  onStop={() => void handleStop()}
+                />
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -51,6 +51,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `PlanCommentButton` | Floating Comment control on plan text selection | `selection`, `onComment` | RightPanel Plan tab (`PlanTab`) |
 | `PlanCommentPopover` | Selection → comment form (Save / Save & send) | `draft`, `onSave`, `onSaveAndSend` | RightPanel Plan tab (`PlanTab`) |
 | `PlanCommentList` | Annotations on the open plan | `comments`, `onFocus`, `onRemove` | RightPanel Plan tab (`PlanTab`) |
+| `PermissionActions` | Composer-footer Allow once / Always allow / Deny (replaces Send) | `permission` | Composer |
 | `PlusMenu` | Attach + mode shortcuts (Plan/Ask) | `onAttachFile`, `onAttachImage`, `onSetMode?` | Composer |
 | `ProjectPicker` | Recent cwds + Open Folder | `sessionId`, `cwd`, `onError?` | ContextBar |
 | `BranchPicker` | List/checkout local git branches; shows current-branch PR # + checks when present | `cwd`, `onError?` | ContextBar |
@@ -90,7 +91,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `Composer` | Prompt + ContextBar; draft in `ComposerInput`; trays/queue under `organisms/composer/` | `isHero?` | ChatShell |
 | `ContextBar` | Project · branch · context % | `cwd`, `sessionId` | Composer |
 | `TurnTimeline` | Turns + tools + plans + streaming; `@tanstack/react-virtual` over `displayItems` + live tail; pieces under `organisms/timeline/` (`WorkGroupBody` owns stable `renderOther`) | `sessionId` | ChatShell |
-| `PermissionPrompt` | Tool permission HITL | `permission` | ChatPage |
+| `PermissionPrompt` | Tool permission HITL header docked above composer; actions in `PermissionActions` | `permission` | ChatPage (`ChatShell` overlay) |
 | `QuestionPrompt` | AskUserQuestion HITL | `question` | ChatPage |
 | `RightPanel` | Plan / Changes / Files / Terminal / Browser / Memory (flagged) / plugin tabs (Database); tabs under `organisms/right-panel/` (`RightPanelTabBar`, `tabs`) + `src/plugins/` registry. Plan opens empty via `+`, ⌘J, or Plan mode. Memory gated by `MEMORY_TAB_ENABLED` (default off). Database via UI plugin (`DATABASE_TAB_ENABLED`, default on). | — | App shell |
 | `MemoryTab` | Right-panel Memory surface; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | RightPanel |
