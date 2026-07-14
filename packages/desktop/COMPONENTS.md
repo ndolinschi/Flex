@@ -200,7 +200,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 - Content rail: `--content-rail` 840px (`52.5rem`).
 - ContextBar sits above the composer (project / branch / context %) — Flex Canon.
 - Sidebar footer = theme + settings (Flex Canon); rows use fill-4 hover / fill-2 selected.
-- Right panel tabs = Plan / Changes / Terminal / Browser (Flex Canon); pill tabs via shared `Tab`/`TabStrip`/`TabClose` atoms (Files open-buffer chips compose the same `Tab` at `size="sm"`); sash hover white-alpha.
+- Right panel tabs = Plan / Changes / Terminal / Browser (Flex Canon); pill tabs via shared `Tab`/`TabStrip`/`TabClose` atoms (`TabStrip` `px-2.5`/`gap-1.5`; `Tab` md/sm both `h-6` so selected fills clear the 30px strip edges; Files open-buffer chips compose the same `Tab` at `size="sm"`); sash hover white-alpha.
 - Focus policy: interactive chrome uses the global neutral `stroke-2` outline; form fields and chrome search inputs use a matching neutral stroke ring (never accent glow).
 - Prior user bubbles dim to 50% (hover restores); hairline stroke-2; message actions reveal on row hover.
 - Sessions: default title `New Agent`; one draft per project; first prompt renames the session.
