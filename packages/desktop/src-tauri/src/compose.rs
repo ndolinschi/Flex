@@ -361,9 +361,11 @@ pub fn build_service(cfg: &ProviderConfig, store: Arc<JsonlStore>) -> DesktopRes
 
 /// Roles backing the Flex composer mode: orchestrated planning, an
 /// independent plan review, and isolated implementation workers. All three
-/// leave `models` empty (inherit / per-call override) so tier routing stays a
-/// composer-side decision. Inert until a turn's system prompt instructs the
-/// model to spawn them.
+/// leave `models` empty (inherit / per-call override) so composer-specific
+/// tier picks stay a prompt-side decision. Built-in `searcher`/`worker` (and
+/// the search plugin's `researcher`) still get cheap/strong pinning from
+/// [`agentloop_sdk::apply_research_model_tiers`] inside `AgentBuilder::build`.
+/// Inert until a turn's system prompt instructs the model to spawn them.
 fn flex_composer_roles() -> Vec<RoleSpec> {
     let planner = RoleSpec {
         prompt: Some(

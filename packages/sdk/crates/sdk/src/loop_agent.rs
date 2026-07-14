@@ -35,7 +35,11 @@ use futures::future::BoxFuture;
 use agentloop_contracts::{NewSessionParams, PromptInput, SessionId, TurnOptions, TurnSummary};
 use agentloop_core::Plugin;
 use agentloop_engine::{EngineConfig, EngineResult, EngineService, RoleSpec, RoleToolProfile};
-use agentloop_providers::{ProviderOptions, native, native_all};
+use agentloop_providers::{
+    ProviderOptions, connect_bedrock, resolve_available_providers, resolve_real_providers,
+};
+
+use crate::role_tiers::apply_research_model_tiers;
 
 /// Yields the next prompt for a loop iteration, given the summaries of the
 /// turns completed so far this `run_loop` call. Return `None` to stop.
@@ -209,11 +213,38 @@ impl ClawBotBuilder {
         }
 
         self.config.plugins.extend(self.plugins);
-        let service = if self.all_providers {
-            native_all(self.provider_opts, self.config)?
+
+        let (mut providers, mut default_model) = if self.all_providers {
+            resolve_available_providers(
+                self.provider_opts.provider.as_deref(),
+                self.provider_opts.model.clone(),
+                &self.provider_opts.custom,
+                &self.provider_opts.provider_keys,
+            )?
         } else {
-            native(self.provider_opts, self.config)?
+            let (providers, model) = resolve_real_providers(
+                self.provider_opts.provider.as_deref(),
+                self.provider_opts.model.clone(),
+                &self.provider_opts.custom,
+                &self.provider_opts.provider_keys,
+            )?;
+            (providers, Some(model))
         };
+        if let Some(bedrock_model) = connect_bedrock(
+            &mut providers,
+            &self.provider_opts.provider_keys,
+            &self.provider_opts.provider_regions,
+        ) {
+            if self.all_providers {
+                default_model = default_model.or(Some(bedrock_model));
+            }
+        }
+        let _ = apply_research_model_tiers(
+            &providers,
+            &mut self.config,
+            self.provider_opts.provider.as_deref(),
+        );
+        let service = EngineService::native(providers, default_model, self.config)?;
 
         let session = service
             .create_session(NewSessionParams {

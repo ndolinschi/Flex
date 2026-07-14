@@ -106,6 +106,35 @@ impl RoleRegistry {
             if !seen.insert(spec.name.clone()) {
                 return Err(RoleError::Duplicate(spec.name));
             }
+            // Models-only overlays (e.g. composition-root tier routing) keep
+            // builtin prompt / knobs when the overlay left those fields at
+            // [`RoleSpec::new`] defaults.
+            if let Some(existing) = registry.roles.get(&spec.name) {
+                let defaults = RoleSpec::new(&spec.name);
+                if spec.models.is_empty() {
+                    spec.models = existing.models.clone();
+                }
+                if spec.prompt.is_none() {
+                    spec.prompt = existing.prompt.clone();
+                }
+                if matches!(spec.tools, RoleToolProfile::ReadOnly)
+                    && !matches!(existing.tools, RoleToolProfile::ReadOnly)
+                {
+                    spec.tools = existing.tools.clone();
+                }
+                if spec.max_parallel == defaults.max_parallel {
+                    spec.max_parallel = existing.max_parallel;
+                }
+                if spec.max_depth == defaults.max_depth {
+                    spec.max_depth = existing.max_depth;
+                }
+                if spec.split == defaults.split {
+                    spec.split = existing.split;
+                }
+                if spec.isolation == defaults.isolation {
+                    spec.isolation = existing.isolation;
+                }
+            }
             spec.max_parallel = spec.max_parallel.clamp(1, 8);
             spec.max_depth = spec.max_depth.min(3);
             registry.roles.insert(spec.name.clone(), spec);
@@ -374,6 +403,24 @@ mod tests {
             RoleRegistry::with_defaults(vec![RoleSpec::new("dup"), RoleSpec::new("dup")]),
             Err(RoleError::Duplicate(_))
         ));
+    }
+
+    #[test]
+    fn models_only_overlay_keeps_builtin_prompt() {
+        let user = vec![RoleSpec {
+            models: vec![ModelRef::from("deepseek/deepseek-v4-flash")],
+            ..RoleSpec::new("searcher")
+        }];
+        let registry = RoleRegistry::with_defaults(user).expect("builds");
+        let searcher = registry.get("searcher").expect("searcher");
+        assert_eq!(searcher.models[0].0, "deepseek/deepseek-v4-flash");
+        assert!(
+            searcher
+                .prompt
+                .as_deref()
+                .is_some_and(|p| p.contains("read-only research")),
+            "builtin searcher prompt must survive a models-only overlay"
+        );
     }
 
     #[test]
