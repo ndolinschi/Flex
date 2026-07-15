@@ -144,7 +144,11 @@ impl AssistantDraft {
                     }
                 }
                 DraftBlock::Thinking { text, signature } => {
-                    content.push(ContentBlock::Thinking { text, signature });
+                    // Match Markdown: drop empty shells. Keep signature-only
+                    // blocks so provider thinking round-trip still works.
+                    if !text.is_empty() || signature.is_some() {
+                        content.push(ContentBlock::Thinking { text, signature });
+                    }
                 }
                 DraftBlock::Tool { id, name, args } => {
                     let input = if args.trim().is_empty() {
@@ -286,5 +290,42 @@ mod tests {
             calls[0].input,
             serde_json::Value::String("{not json".to_owned())
         );
+    }
+
+    #[test]
+    fn drops_empty_thinking_without_signature() {
+        let mut draft = AssistantDraft::new();
+        draft.apply(ProviderStreamEvent::ThinkingDelta {
+            text: String::new(),
+        });
+        draft.apply(ProviderStreamEvent::MarkdownDelta {
+            text: "hi".to_owned(),
+        });
+        let (content, _) = draft.finish();
+        assert_eq!(content.len(), 1);
+        assert!(matches!(
+            &content[0],
+            ContentBlock::Markdown { text } if text == "hi"
+        ));
+    }
+
+    #[test]
+    fn keeps_signature_only_thinking_for_round_trip() {
+        let mut draft = AssistantDraft::new();
+        draft.apply(ProviderStreamEvent::ThinkingDelta {
+            text: String::new(),
+        });
+        draft.apply(ProviderStreamEvent::ThinkingSignature {
+            signature: "sig".to_owned(),
+        });
+        let (content, _) = draft.finish();
+        assert_eq!(content.len(), 1);
+        assert!(matches!(
+            &content[0],
+            ContentBlock::Thinking {
+                text,
+                signature: Some(sig)
+            } if text.is_empty() && sig == "sig"
+        ));
     }
 }

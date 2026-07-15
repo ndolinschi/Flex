@@ -37,6 +37,14 @@ export const BUILTIN_TABS: RightPanelTabDef[] = [
  * import `TABS` as the full static catalog of builtins. */
 export const TABS = BUILTIN_TABS
 
+/** Pinned workspace rows for the closed-panel mini list (Cursor order). */
+export const PROJECT_PINNED_TABS: readonly RightPanelTab[] = [
+  "changes",
+  "browser",
+  "terminal",
+  "files",
+] as const
+
 /** Tabs shown in the strip / "+" menu — builtins + registered UI plugins. */
 export const visibleRightPanelTabs = (): RightPanelTabDef[] => {
   const builtins = BUILTIN_TABS.filter((tab) => isRightPanelTabEnabled(tab.id))

@@ -41,6 +41,7 @@ audit and fix UI against this file.
 │ │ session list   │ │ Composer             │ │            │ │
 │ │ footer         │ │                      │ │            │ │
 │ └────────────────┘ └──────────────────────┘ └────────────┘ │
+│   When RightPanel closed: RightPanelMiniTabs flyout (right)  │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -52,6 +53,7 @@ Composition root: `src/App.tsx`.
 | `SessionSidebar` | Agents list; left column (wide) or full overlay (narrow/tight) |
 | Chat column | `ChatPage` kept mounted; settings routes overlay it |
 | `RightPanel` | Details pane; sibling of chat column |
+| `RightPanelMiniTabs` | Closed-panel mini rows (chat only); no section chrome |
 | Overlays | CommandPalette, SearchModal, ToastHost — app-level |
 
 **Chat stays mounted** when opening Settings / Customize / Memory /
@@ -132,6 +134,13 @@ Sashes never shrink chat below `CHAT_MIN_WIDTH` when both side panes are open.
 
 **Right panel body:** tab content uses `absolute inset-0` under the strip so
 Browser / Terminal always fill remaining height.
+
+**Closed-panel mini tabs:** when `rightPanelOpen` is false on the chat route
+(with an active session), `RightPanelMiniTabs` anchors to the right edge of
+the chat+panel row (`absolute right-2`, below `--header-height`). Borderless
+row stack (`w-[200px]`, no shadow/section labels/expand control); rows use
+`fill-2` selected / `fill-4` hover. Not a third panel state — ⌘J / PanelRight
+still owns open/close; the flyout only appears while closed.
 
 ---
 

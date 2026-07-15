@@ -635,7 +635,7 @@ describe("mergeShortThinkingRows", () => {
     tsMs: 0,
   })
 
-  it("merges consecutive thoughts under 500ms into one row with summed duration", () => {
+  it("merges consecutive thoughts into one row with summed duration", () => {
     const rows: TimelineRow[] = [
       think("t1", "m1", "First"),
       think("t2", "m2", "Second"),
@@ -653,7 +653,7 @@ describe("mergeShortThinkingRows", () => {
     })
   })
 
-  it("leaves thoughts at or above 500ms as their own rows (breaks the run)", () => {
+  it("merges long timed thoughts too (one longest Thought, not a stack)", () => {
     const rows: TimelineRow[] = [
       think("t1", "m1", "Short a"),
       think("t2", "m2", "Long"),
@@ -662,14 +662,12 @@ describe("mergeShortThinkingRows", () => {
     ]
     const durations = { m1: 200, m2: 500, m3: 100, m4: 200 }
     const merged = mergeShortThinkingRows(rows, durations)
-    expect(merged).toHaveLength(3)
-    expect(merged[0]).toMatchObject({ type: "thinking", messageId: "m1", text: "Short a" })
-    expect(merged[1]).toMatchObject({ type: "thinking", messageId: "m2", text: "Long" })
-    expect(merged[2]).toMatchObject({
+    expect(merged).toHaveLength(1)
+    expect(merged[0]).toMatchObject({
       type: "thinking",
-      messageId: "m3",
-      text: "Short b\n\nShort c",
-      durationMs: 300,
+      messageId: "m1",
+      text: "Short a\n\nLong\n\nShort b\n\nShort c",
+      durationMs: 1000,
     })
   })
 
@@ -752,7 +750,7 @@ describe("mergeShortThinkingRows", () => {
     expect(merged[0]?.type).toBe("tool")
   })
 
-  it("coalesces short thoughts inside a settled work group via buildDisplayItems", () => {
+  it("coalesces all settled thoughts inside a work group via buildDisplayItems", () => {
     const rows: TimelineRow[] = [
       userRow("Go"),
       turnStarted("turn-1"),
@@ -762,7 +760,7 @@ describe("mergeShortThinkingRows", () => {
       assistantRow("Done."),
       turnCompleted("turn-1", 100, summary),
     ]
-    const items = buildDisplayItems(rows, false, { m1: 200, m2: 300 })
+    const items = buildDisplayItems(rows, false, { m1: 200, m2: 800 })
     const group = items.find((i) => i.kind === "group")
     expect(group?.kind).toBe("group")
     if (group?.kind !== "group") throw new Error("expected group")
@@ -770,7 +768,7 @@ describe("mergeShortThinkingRows", () => {
     expect(thinking).toHaveLength(1)
     expect(thinking[0]).toMatchObject({
       text: "Step one\n\nStep two",
-      durationMs: 500,
+      durationMs: 1000,
     })
   })
 

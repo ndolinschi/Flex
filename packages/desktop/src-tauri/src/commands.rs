@@ -449,6 +449,35 @@ fn parse_isolation(raw: Option<&str>) -> Option<IsolationPolicy> {
     }
 }
 
+/// True when `provider_id` already has usable credentials — legacy
+/// `cfg.keys`, an active/matching profile key, or oauth/ollama discovery.
+/// Used by [`apply_save_input`] so plugins-only saves (Learning/Verifier
+/// toggles) do not falsely demand a pasted API key when profiles hold it.
+fn provider_credentials_present(cfg: &ProviderConfig, provider_id: &str) -> bool {
+    if provider_id == "ollama" {
+        return true;
+    }
+    if provider_id == "copilot"
+        && agentloop_sdk::providers::copilot::CopilotConfig::discoverable()
+    {
+        return true;
+    }
+    if provider_id == "chatgpt" && chatgpt_oauth_discoverable() {
+        return true;
+    }
+    if cfg.keys.contains_key(provider_id) {
+        return true;
+    }
+    if let Some(profile) = cfg.active_profile() {
+        if profile.provider == provider_id && cfg.profile_keys.contains_key(&profile.id) {
+            return true;
+        }
+    }
+    cfg.prefs.profiles.iter().any(|p| {
+        p.provider == provider_id && cfg.profile_keys.contains_key(&p.id)
+    })
+}
+
 fn apply_save_input(
     cfg: &mut ProviderConfig,
     input: &SaveProviderConfigInput,
@@ -506,16 +535,94 @@ fn apply_save_input(
         .filter(|s| !s.is_empty())
     {
         cfg.keys.insert(id.to_owned(), key.to_owned());
-    } else if id != "ollama"
-        && !(id == "copilot" && agentloop_sdk::providers::copilot::CopilotConfig::discoverable())
-        && !(id == "chatgpt" && chatgpt_oauth_discoverable())
-        && !cfg.keys.contains_key(id)
-    {
+    } else if !provider_credentials_present(cfg, id) {
         return Err(DesktopError::Message(
             "API key is required for this provider".into(),
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod apply_save_input_tests {
+    use super::*;
+    use crate::config::{PluginPrefs, ProviderConfig, ProviderPrefs, ProviderProfile};
+
+    fn cfg_with_profile_key(provider: &str, key: &str) -> ProviderConfig {
+        let mut cfg = ProviderConfig {
+            prefs: ProviderPrefs {
+                preferred_provider: Some(provider.to_owned()),
+                active_profile_id: Some("p1".into()),
+                profiles: vec![ProviderProfile {
+                    id: "p1".into(),
+                    label: "Test".into(),
+                    provider: provider.to_owned(),
+                    base_url: None,
+                    region: None,
+                    default_model: None,
+                    fallback_models: None,
+                    default_isolation: None,
+                }],
+                ..ProviderPrefs::default()
+            },
+            keys: Default::default(),
+            profile_keys: Default::default(),
+        };
+        cfg.profile_keys.insert("p1".into(), key.to_owned());
+        cfg
+    }
+
+    #[test]
+    fn plugins_toggle_ok_when_only_profile_key_present() {
+        let mut cfg = cfg_with_profile_key("anthropic", "sk-test");
+        let input = SaveProviderConfigInput {
+            preferred_provider: "anthropic".into(),
+            api_key: None,
+            base_url: None,
+            region: None,
+            default_model: None,
+            cwd: None,
+            plugins: Some(PluginPrefs {
+                learning: true,
+                ..PluginPrefs::default()
+            }),
+            fallback_models: None,
+            default_isolation: None,
+        };
+        apply_save_input(&mut cfg, &input).expect("profile key should satisfy gate");
+        assert!(cfg.prefs.plugins.learning);
+    }
+
+    #[test]
+    fn plugins_toggle_err_without_any_credentials() {
+        let mut cfg = ProviderConfig {
+            prefs: ProviderPrefs {
+                preferred_provider: Some("anthropic".into()),
+                ..ProviderPrefs::default()
+            },
+            keys: Default::default(),
+            profile_keys: Default::default(),
+        };
+        let input = SaveProviderConfigInput {
+            preferred_provider: "anthropic".into(),
+            api_key: None,
+            base_url: None,
+            region: None,
+            default_model: None,
+            cwd: None,
+            plugins: Some(PluginPrefs {
+                verifier: true,
+                ..PluginPrefs::default()
+            }),
+            fallback_models: None,
+            default_isolation: None,
+        };
+        let err = apply_save_input(&mut cfg, &input).unwrap_err();
+        assert!(
+            err.to_string().contains("API key is required"),
+            "unexpected: {err}"
+        );
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

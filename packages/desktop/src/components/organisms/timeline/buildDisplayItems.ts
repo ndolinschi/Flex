@@ -230,9 +230,6 @@ export const moveThinkingToEnd = (rows: TimelineRow[]): TimelineRow[] => {
   return [...rest, ...thinking]
 }
 
-/** Consecutive settled thoughts shorter than this are coalesced into one row. */
-export const SHORT_THINKING_MS = 500
-
 type ThinkingRow = Extract<TimelineRow, { type: "thinking" }>
 
 const isLiveThinking = (row: ThinkingRow): boolean =>
@@ -248,26 +245,6 @@ const thinkingSpanMs = (
   if (typeof row.durationMs === "number") return row.durationMs
   const fromMap = durations?.[row.messageId]
   return typeof fromMap === "number" ? fromMap : undefined
-}
-
-/**
- * Settled thoughts that should fold into one ThinkingBlock:
- * - empty / whitespace-only (always — hide or glue into neighbors)
- * - known duration &lt; {@link SHORT_THINKING_MS}
- * - no measurable duration (replay / missing spans — otherwise bare "Thought"
- *   stacks spam the feed)
- *
- * Live streaming and timed thoughts ≥ threshold with content stay separate.
- */
-const isCoalesceableSettledThinking = (
-  row: ThinkingRow,
-  durations: Record<string, number> | undefined,
-): boolean => {
-  if (isLiveThinking(row)) return false
-  if (!thinkingHasContent(row)) return true
-  const ms = thinkingSpanMs(row, durations)
-  if (typeof ms === "number") return ms < SHORT_THINKING_MS
-  return true
 }
 
 const emitMergedThinking = (
@@ -305,12 +282,13 @@ const emitMergedThinking = (
 }
 
 /**
- * Coalesce consecutive short / empty / untimed settled thinking rows into one
- * ThinkingBlock. A timed thought ≥ {@link SHORT_THINKING_MS} with content, a
- * live stream row, or a non-thinking row breaks the run. Empty thoughts are
- * dropped when they cannot fold into a contentful neighbor.
+ * Coalesce consecutive settled thinking rows into one ThinkingBlock — one long
+ * "Thought for …" instead of a stack of per-iteration scraps. Each model round
+ * emits its own thinking block; after `moveThinkingToEnd` they sit consecutive
+ * and fold here. Live stream rows break the run (keep in-flight "Thinking"
+ * UX). Empty / whitespace-only thoughts fold into neighbors or drop entirely.
  */
-export const mergeShortThinkingRows = (
+export const mergeSettledThinkingRows = (
   rows: TimelineRow[],
   durations?: Record<string, number>,
 ): TimelineRow[] => {
@@ -329,22 +307,11 @@ export const mergeShortThinkingRows = (
       i += 1
       continue
     }
-    if (!isCoalesceableSettledThinking(row, durations)) {
-      // Long timed thought — keep, but drop nothing (it has content by def).
-      out.push(row)
-      i += 1
-      continue
-    }
     const run: ThinkingRow[] = [row]
     let j = i + 1
     while (j < rows.length) {
       const next = rows[j]
-      if (
-        next.type !== "thinking" ||
-        !isCoalesceableSettledThinking(next, durations)
-      ) {
-        break
-      }
+      if (next.type !== "thinking" || isLiveThinking(next)) break
       run.push(next)
       j += 1
     }
@@ -354,6 +321,9 @@ export const mergeShortThinkingRows = (
   }
   return out
 }
+
+/** Alias — older call sites / tests. */
+export const mergeShortThinkingRows = mergeSettledThinkingRows
 
 export const buildDisplayItems = (
   liveRows: TimelineRow[],
@@ -398,7 +368,7 @@ export const buildDisplayItems = (
     // until the turn actually settles.
     const lastRow = all[all.length - 1]
     const hasTrailingAnswer = !!lastRow && lastRow.type === "assistant"
-    const work = mergeShortThinkingRows(
+    const work = mergeSettledThinkingRows(
       moveThinkingToEnd(hasTrailingAnswer ? all.slice(0, -1) : all),
       thinkingDurations,
     )

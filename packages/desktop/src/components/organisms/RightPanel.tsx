@@ -9,7 +9,12 @@ import {
 import { useQuery } from "@tanstack/react-query"
 import { ContextMenu, type ContextMenuItem } from "../molecules"
 import { gitStatusSinceBaseline } from "../../lib/tauri"
-import { useAppStore, sessionScopeKey, type RightPanelTab } from "../../stores/appStore"
+import {
+  useAppStore,
+  sessionScopeKey,
+  type RightPanelTab,
+  type TerminalMeta,
+} from "../../stores/appStore"
 import { RIGHT_PANEL_DEFAULT_WIDTH } from "../../stores/layoutConstants"
 import { useSessions } from "../../hooks/useSessions"
 import { useIsGitRepo } from "../../hooks/useIsGitRepo"
@@ -20,6 +25,7 @@ import { PlanTab } from "./right-panel/PlanTab"
 import { ChangesTab } from "./right-panel/ChangesTab"
 import { FilesTab } from "./right-panel/FilesTab"
 import { MemoryTab } from "./right-panel/MemoryTab"
+import { RightPanelMiniTabs } from "./right-panel/RightPanelMiniTabs"
 import { RightPanelTabBar } from "./right-panel/RightPanelTabBar"
 import { visibleRightPanelTabs } from "./right-panel/tabs"
 import { findPluginTab } from "../../plugins/registry"
@@ -27,6 +33,8 @@ import { findPluginTab } from "../../plugins/registry"
 export { TABS, visibleRightPanelTabs } from "./right-panel/tabs"
 
 /** Stable empty list — inline `?? []` in a Zustand selector re-renders forever. */
+const EMPTY_TERMINALS: TerminalMeta[] = []
+
 export const RightPanel = () => {
   const rightPanelOpen = useAppStore((s) => s.rightPanelOpen)
   const route = useAppStore((s) => s.route)
@@ -56,9 +64,15 @@ export const RightPanel = () => {
   const closeTab = useAppStore((s) => s.closeTab)
   const collapsed = useAppStore((s) => s.rightPanelCollapsed)
   const setCollapsed = useAppStore((s) => s.setRightPanelCollapsed)
+  const terminals = useAppStore(
+    (s) => s.terminalsBySession[sessionKey] ?? EMPTY_TERMINALS,
+  )
+  const terminalCount = terminals.length
   const [addMenuPos, setAddMenuPos] = useState<{ x: number; y: number } | null>(
     null,
   )
+  // Cursor-style mini-tabs flyout when the details panel is closed on chat.
+  const showMiniTabs = route === "chat" && !rightPanelOpen && !!activeSessionId
 
   // Slim "collapsed strip" was a second right-panel control alongside
   // AppHeader's PanelRight — Cursor-style is one toggle. Clear any
@@ -98,6 +112,12 @@ export const RightPanel = () => {
       const remaining = openIds.filter((t) => t !== id)
       setTab(remaining[remaining.length - 1])
     }
+  }
+
+  const selectTabAndOpen = (id: RightPanelTab) => {
+    openTab(sessionKey, id)
+    setTab(id)
+    setRightPanelOpen(true)
   }
 
   const addMenuItems: ContextMenuItem[] = closableTabDefs.map((t) => ({
@@ -146,7 +166,12 @@ export const RightPanel = () => {
   const changesSummary = useQuery({
     queryKey: ["git-status", active?.cwd ?? "", active?.id ?? null],
     queryFn: () => gitStatusSinceBaseline(active!.id),
-    enabled: !!active?.cwd && !!active?.id && open && isRepoForBadge !== false,
+    // Badge for the open TabStrip *and* the closed-panel mini-tabs flyout.
+    enabled:
+      !!active?.cwd &&
+      !!active?.id &&
+      (open || showMiniTabs) &&
+      isRepoForBadge !== false,
     refetchInterval: 10_000,
   }).data
   // `totalCount`/totals come from the summary (not the capped `files` row
@@ -195,6 +220,16 @@ export const RightPanel = () => {
           className="absolute inset-0 z-20 bg-black/30 animate-backdrop-in"
           aria-hidden
           onClick={() => setRightPanelOpen(false)}
+        />
+      ) : null}
+      {showMiniTabs ? (
+        <RightPanelMiniTabs
+          openTabDefs={openTabDefs}
+          selectedTab={tab}
+          changesTotals={changesTotals}
+          terminalCount={terminalCount}
+          catalog={catalog}
+          onSelectTab={selectTabAndOpen}
         />
       ) : null}
       <aside

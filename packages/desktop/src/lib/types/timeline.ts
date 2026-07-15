@@ -71,7 +71,7 @@ export type TimelineRow =
       messageId: MessageId
       text: string
       tsMs: number
-      /** Display-only: set when short consecutive thoughts are merged. */
+      /** Display-only: set when consecutive settled thoughts are merged. */
       durationMs?: number
     }
   | { type: "tool"; id: string; call: ToolCall; tsMs: number }

@@ -81,6 +81,15 @@ pub struct PluginPrefs {
     pub auto_update_index: bool,
     #[serde(default)]
     pub learning: bool,
+    /// When Learning is on: force-ask a human on every `SkillSave` /
+    /// `MemoryWrite` (survives DontAsk / BypassPermissions). Default off.
+    #[serde(default)]
+    pub learning_require_human_approval: bool,
+    /// When Learning is on: block `SkillSave` / `MemoryWrite` until this
+    /// session has a passing `Verify` verdict. Default off; pair with
+    /// `verifier` enabled or the gate never clears.
+    #[serde(default)]
+    pub learning_require_verified_memory: bool,
     #[serde(default)]
     pub verifier: bool,
 }
@@ -97,6 +106,8 @@ impl Default for PluginPrefs {
             auto_context: false,
             auto_update_index: false,
             learning: false,
+            learning_require_human_approval: false,
+            learning_require_verified_memory: false,
             verifier: false,
         }
     }
@@ -901,6 +912,10 @@ mod tests {
             !prefs.auto_update_index,
             "auto-update index must default off so warm indexes are reused across chats"
         );
+        assert!(!prefs.learning);
+        assert!(!prefs.learning_require_human_approval);
+        assert!(!prefs.learning_require_verified_memory);
+        assert!(!prefs.verifier);
     }
 
     #[test]

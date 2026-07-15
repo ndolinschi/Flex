@@ -112,7 +112,7 @@ export const TimelineRowView = memo(({
       // Show even without a measurable duration ("Thought") — deltas aren't
       // persisted on replay, and some providers emit a thinking block with
       // no span. Only skip empty shells. `row.durationMs` is set when
-      // consecutive short thoughts were merged in `buildDisplayItems`.
+      // consecutive settled thoughts were merged in `buildDisplayItems`.
       if (!row.text.trim()) return null
       return (
         <ThinkingBlock

@@ -277,6 +277,13 @@ export type PluginPrefs = {
    */
   autoUpdateIndex: boolean
   learning: boolean
+  /** When Learning is on: force-ask on SkillSave / MemoryWrite. Default off. */
+  learningRequireHumanApproval: boolean
+  /**
+   * When Learning is on: require a passing Verify before memory writes.
+   * Default off; pair with Verifier enabled.
+   */
+  learningRequireVerifiedMemory: boolean
   verifier: boolean
 }
 

@@ -6,7 +6,9 @@ use std::sync::Arc;
 use agentloop_contracts::IsolationPolicy;
 use agentloop_engine::{RoleSpec, RoleToolProfile};
 use agentloop_sdk::mcp_store::default_mcp_dir;
-use agentloop_sdk::{AgentBuilder, EngineService, IndexPlugin, McpBridgeConfig, McpServerConfig};
+use agentloop_sdk::{
+    AgentBuilder, EngineService, IndexPlugin, LearningPlugin, McpBridgeConfig, McpServerConfig,
+};
 use agentloop_session::JsonlStore;
 use agentloop_workspace::GitWorktrees;
 
@@ -307,7 +309,18 @@ pub fn build_service(cfg: &ProviderConfig, store: Arc<JsonlStore>) -> DesktopRes
                 );
             }
             if cfg.prefs.plugins.learning {
-                builder = builder.enable_plugin("learning");
+                if let Some(plugin) = LearningPlugin::with_default_dir() {
+                    let plugin = plugin
+                        .require_human_approval(cfg.prefs.plugins.learning_require_human_approval)
+                        .require_verified_memory(
+                            cfg.prefs.plugins.learning_require_verified_memory,
+                        );
+                    builder = builder.plugin(plugin);
+                } else {
+                    tracing::warn!(
+                        "learning plugin enabled but home dir unresolved; skipping"
+                    );
+                }
             }
             if cfg.prefs.plugins.verifier {
                 builder = builder.enable_plugin("verifier");
