@@ -67,7 +67,7 @@ export const marginForItem = (item: DisplayItem, isFirst: boolean): string => {
  * sync with `text-base` / `leading-relaxed` on timeline markdown. Slightly
  * under real wrap height so estimates stay conservative. */
 const ESTIMATE_LINE_PX = 18
-/** Rough characters per wrapped line at the content-rail width. */
+/** Rough characters per wrapped line at the content-rail width (~52.5rem). */
 const ESTIMATE_CHARS_PER_LINE = 100
 /** Collapsed ThinkingBlock / WorkGroup header — matches `min-h-5` + chrome. */
 const ESTIMATE_COLLAPSED_ROW_PX = 24

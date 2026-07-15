@@ -56,6 +56,14 @@ export const PopoverTray = ({
       const target = e.target as Node
       if (trayRef.current?.contains(target)) return
       if (anchorRef?.current?.contains(target)) return
+      // Portaled submenus (e.g. ModelPicker effort) render under document.body
+      // and must not count as outside clicks or the tray unmounts before pick.
+      if (
+        target instanceof Element &&
+        target.closest("[data-popover-outside-ignore]")
+      ) {
+        return
+      }
       close()
     }
 

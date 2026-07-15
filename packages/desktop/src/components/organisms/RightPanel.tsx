@@ -8,7 +8,7 @@ import {
 } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { ContextMenu, type ContextMenuItem } from "../molecules"
-import { gitStatusSinceBaseline } from "../../lib/tauri"
+import { gitPrStatus, gitStatusSinceBaseline } from "../../lib/tauri"
 import {
   useAppStore,
   sessionScopeKey,
@@ -18,13 +18,14 @@ import {
 import { RIGHT_PANEL_DEFAULT_WIDTH } from "../../stores/layoutConstants"
 import { useSessions } from "../../hooks/useSessions"
 import { useIsGitRepo } from "../../hooks/useIsGitRepo"
-import { cn } from "../../lib/utils"
+import { basename, cn } from "../../lib/utils"
 import { BrowserTab } from "./BrowserTab"
 import { TerminalTab } from "./TerminalTab"
 import { PlanTab } from "./right-panel/PlanTab"
 import { ChangesTab } from "./right-panel/ChangesTab"
 import { FilesTab } from "./right-panel/FilesTab"
 import { MemoryTab } from "./right-panel/MemoryTab"
+import { PrTab } from "./right-panel/PrTab"
 import { RightPanelMiniTabs } from "./right-panel/RightPanelMiniTabs"
 import { RightPanelTabBar } from "./right-panel/RightPanelTabBar"
 import { visibleRightPanelTabs } from "./right-panel/tabs"
@@ -71,8 +72,13 @@ export const RightPanel = () => {
   const [addMenuPos, setAddMenuPos] = useState<{ x: number; y: number } | null>(
     null,
   )
-  // Cursor-style mini-tabs flyout when the details panel is closed on chat.
-  const showMiniTabs = route === "chat" && !rightPanelOpen && !!activeSessionId
+  // Cursor-style mini-tabs flyout — wide chat only (hidden on narrow/tight
+  // overlays where it would collide with the chat rail).
+  const showMiniTabs =
+    route === "chat" &&
+    !rightPanelOpen &&
+    !!activeSessionId &&
+    viewport === "wide"
 
   // Slim "collapsed strip" was a second right-panel control alongside
   // AppHeader's PanelRight — Cursor-style is one toggle. Clear any
@@ -81,11 +87,26 @@ export const RightPanel = () => {
     if (collapsed) setCollapsed(false)
   }, [collapsed, setCollapsed])
 
+  // PR tab is catalog-gated on current-branch PR presence (see lifecycle
+  // effect below). Poll even when the panel is closed so an agent-created PR
+  // can surface the tab without the user opening Changes first.
+  const prStatusQuery = useQuery({
+    queryKey: ["git-pr-status", active?.cwd ?? ""],
+    queryFn: () => gitPrStatus(active!.cwd),
+    enabled: !!active?.cwd && route === "chat",
+    refetchInterval: 15_000,
+  })
+  const hasBranchPr = !!prStatusQuery.data?.pr
+
   // Tabs are on-demand ("Open Tabs") — only render the tabs the
   // session has actually opened (via a trigger or the "+" menu below), never
-  // the full static TABS list. Flag-gated tabs (Memory) are omitted when off.
+  // the full static TABS list. Flag-gated tabs (Memory) are omitted when off;
+  // Pull Request only when `hasBranchPr`.
   const openIdsRaw = openTabsBySession[sessionKey] ?? []
-  const catalog = visibleRightPanelTabs()
+  const catalog = useMemo(
+    () => visibleRightPanelTabs({ hasBranchPr }),
+    [hasBranchPr],
+  )
   const openIds = openIdsRaw.filter((id) =>
     catalog.some((t) => t.id === id),
   )
@@ -159,6 +180,43 @@ export const RightPanel = () => {
     }
   }, [awaitingApprovalForActive, awaitingPlanId, setRightPanelOpen, setTab])
 
+  // Pull Request tab: open when a PR appears for this branch; remove when gone.
+  // Cold boot / session switch with an existing PR registers the tab in the
+  // strip but does not force the panel open — only a null→PR transition does
+  // (agent just created a PR).
+  const prevHadPrRef = useRef<boolean | null>(null)
+  useEffect(() => {
+    prevHadPrRef.current = null
+  }, [sessionKey, active?.cwd])
+  useEffect(() => {
+    if (!activeSessionId || !active?.cwd) return
+    if (prStatusQuery.data === undefined) return
+    const has = !!prStatusQuery.data.pr
+    const prev = prevHadPrRef.current
+    if (prev === null) {
+      if (has) openTab(sessionKey, "pr")
+      prevHadPrRef.current = has
+      return
+    }
+    if (!prev && has) {
+      openTab(sessionKey, "pr")
+      setTab("pr")
+      setRightPanelOpen(true)
+    } else if (prev && !has) {
+      closeTab(sessionKey, "pr")
+    }
+    prevHadPrRef.current = has
+  }, [
+    activeSessionId,
+    active?.cwd,
+    prStatusQuery.data,
+    sessionKey,
+    openTab,
+    closeTab,
+    setTab,
+    setRightPanelOpen,
+  ])
+
   // Gate the tab's changes-count badge on the cwd being a git repo — see
   // ChangesTab's own `isRepo` gating for the full rationale.
   const isRepoForBadge = useIsGitRepo(active?.cwd).data
@@ -229,6 +287,7 @@ export const RightPanel = () => {
           changesTotals={changesTotals}
           terminalCount={terminalCount}
           catalog={catalog}
+          projectLabel={basename(active?.base_cwd || active?.cwd || "project")}
           onSelectTab={selectTabAndOpen}
         />
       ) : null}
@@ -291,6 +350,10 @@ export const RightPanel = () => {
             <div className="absolute inset-0 flex flex-col">
               <ChangesTab active={active} />
             </div>
+          ) : tab === "pr" && openIds.includes("pr") ? (
+            <div className="absolute inset-0 flex flex-col">
+              <PrTab active={active} />
+            </div>
           ) : tab === "memory" && openIds.includes("memory") ? (
             <div className="absolute inset-0 flex flex-col">
               <MemoryTab />
@@ -300,10 +363,11 @@ export const RightPanel = () => {
           {(() => {
             const pluginTab = findPluginTab(tab)
             if (!pluginTab || !openIds.includes(tab)) return null
-            // Built-ins above already handle plan/changes/memory; plugins own the rest.
+            // Built-ins above already handle plan/changes/pr/memory; plugins own the rest.
             if (
               tab === "plan" ||
               tab === "changes" ||
+              tab === "pr" ||
               tab === "memory" ||
               tab === "files" ||
               tab === "terminal" ||

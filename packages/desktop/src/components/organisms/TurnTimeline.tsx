@@ -314,7 +314,7 @@ export const TurnTimeline = ({
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 flex-col px-4 py-3">
+      <div className="flex flex-1 flex-col px-3 py-3">
         <div
           className="mx-auto flex w-full max-w-[var(--content-rail)] flex-col gap-3"
           role="status"
@@ -331,7 +331,7 @@ export const TurnTimeline = ({
 
   if (error) {
     return (
-      <div className="px-4 py-3">
+      <div className="px-3 py-3">
         <ErrorBanner message={error} />
       </div>
     )
@@ -350,7 +350,7 @@ export const TurnTimeline = ({
         data-timeline-scroll=""
         onScroll={handleScrollAndRemeasure}
         className={cn(
-          "min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3",
+          "min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3",
           "[scrollbar-width:thin] [scrollbar-color:var(--color-stroke-3)_transparent]",
         )}
       >

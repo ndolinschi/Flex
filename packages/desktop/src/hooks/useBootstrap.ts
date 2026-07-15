@@ -68,6 +68,11 @@ export const useBootstrap = (
         if (ui.openTabsBySession) {
           useAppStore.getState().setOpenTabsBySession(ui.openTabsBySession)
         }
+        // Center-pane chat tabs before focus so we don't wipe MRU with a
+        // single-id list from `openChatTab` alone.
+        if (ui.openChatSessionIds?.length) {
+          useAppStore.getState().setOpenChatSessionIds(ui.openChatSessionIds)
+        }
 
         if (ui.activeSessionId) {
           try {

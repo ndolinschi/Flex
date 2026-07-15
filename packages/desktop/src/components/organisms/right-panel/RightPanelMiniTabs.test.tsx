@@ -28,7 +28,7 @@ describe("PROJECT_PINNED_TABS", () => {
 })
 
 describe("RightPanelMiniTabs", () => {
-  it("renders rows with DiffStat and terminal count, without section chrome", () => {
+  it("renders Cursor-style Open Tabs + On {project} sections", () => {
     const html = renderToStaticMarkup(
       <RightPanelMiniTabs
         openTabDefs={[catalog[2]!]}
@@ -36,11 +36,12 @@ describe("RightPanelMiniTabs", () => {
         changesTotals={{ added: 66, removed: 57 }}
         terminalCount={1}
         catalog={catalog}
+        projectLabel="Flex"
         onSelectTab={() => undefined}
       />,
     )
-    expect(html).not.toContain("Open Tabs")
-    expect(html).not.toContain("On ")
+    expect(html).toContain("Open Tabs")
+    expect(html).toContain("On Flex")
     expect(html).not.toContain("Show panel")
     expect(html).not.toContain("border-stroke-3")
     expect(html).toContain("1 Terminal")
@@ -58,6 +59,7 @@ describe("RightPanelMiniTabs", () => {
         changesTotals={{ added: 1, removed: 0 }}
         terminalCount={0}
         catalog={catalog}
+        projectLabel="Flex"
         onSelectTab={() => undefined}
       />,
     )
@@ -74,10 +76,12 @@ describe("RightPanelMiniTabs", () => {
         changesTotals={{ added: 0, removed: 0 }}
         terminalCount={0}
         catalog={catalog}
+        projectLabel="Flex"
         onSelectTab={onSelectTab}
       />,
     )
     expect(html).toContain("Details panel shortcuts")
+    expect(html).toContain("On Flex")
     expect(html).not.toContain('aria-label="Show panel"')
     expect(onSelectTab).not.toHaveBeenCalled()
   })

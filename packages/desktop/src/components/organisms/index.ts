@@ -1,5 +1,6 @@
 export { AppHeader } from "./AppHeader"
 export { BrowserTab } from "./BrowserTab"
+export { ChatSessionTabBar } from "./ChatSessionTabBar"
 export { CommandPalette } from "./CommandPalette"
 export { WindowTitleBar } from "./WindowTitleBar"
 export { Composer } from "./Composer"

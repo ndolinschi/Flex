@@ -2744,6 +2744,37 @@ pub fn git_pr_status(cwd: String) -> DesktopResult<BranchPrStatus> {
     })
 }
 
+/// Unified diff for the current branch's PR via `gh pr diff`. Empty string
+/// when there is no PR / `gh` unavailable — callers poll alongside
+/// `git_pr_status` and should treat empty as "nothing to review".
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub fn git_pr_diff(cwd: String) -> DesktopResult<String> {
+    let path = std::path::PathBuf::from(&cwd);
+    if !gh_available(&path) {
+        return Ok(String::new());
+    }
+
+    let out = crate::win_console::command("gh")
+        .args(["pr", "diff"])
+        .current_dir(&path)
+        .output()
+        .map_err(|e| DesktopError::Message(format!("gh pr diff failed: {e}")))?;
+
+    if !out.status.success() {
+        return Ok(String::new());
+    }
+
+    let mut diff = String::from_utf8_lossy(&out.stdout).into_owned();
+    // Cap so a huge monorepo PR cannot freeze the DiffView.
+    const MAX_CHARS: usize = 512_000;
+    if diff.len() > MAX_CHARS {
+        diff.truncate(MAX_CHARS);
+        diff.push_str("\n\n… diff truncated …\n");
+    }
+    Ok(diff)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrDraft {

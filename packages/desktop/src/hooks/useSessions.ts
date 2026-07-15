@@ -89,6 +89,7 @@ export const useSessions = () => {
       // Drop Files buffers / open tabs / terminal metas so deleted session
       // ids never leak into persisted openTabsBySession or in-memory drafts.
       state.clearSessionPanelState(deletedId)
+      state.closeChatTab(deletedId)
     },
     // If the engine delete fails, we intentionally do nothing else here —
     // no local cleanup, no cache mutation. The caller (handleDelete) surfaces

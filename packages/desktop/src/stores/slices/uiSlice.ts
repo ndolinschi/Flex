@@ -45,6 +45,7 @@ export const createUiSlice: StateCreator<
   recentCwds: [],
   pinnedSessionIds: [],
   archivedSessionIds: [],
+  openChatSessionIds: [],
   unreadBySession: {},
   toasts: [],
   setRoute: (route) =>
@@ -177,6 +178,32 @@ export const createUiSlice: StateCreator<
     }),
   setPinnedSessionIds: (ids) => set({ pinnedSessionIds: ids }),
   setArchivedSessionIds: (ids) => set({ archivedSessionIds: ids }),
+  openChatTab: (id) =>
+    set((state) => {
+      if (state.openChatSessionIds.includes(id)) return state
+      // Cap so a long day of switching does not grow an endless strip.
+      const openChatSessionIds = [...state.openChatSessionIds, id].slice(-20)
+      void persistUiState({ openChatSessionIds })
+      return { openChatSessionIds }
+    }),
+  closeChatTab: (id) => {
+    const state = get()
+    const ids = state.openChatSessionIds
+    const idx = ids.indexOf(id)
+    if (idx < 0) {
+      return state.activeSessionId === id ? null : state.activeSessionId
+    }
+    const openChatSessionIds = ids.filter((sid) => sid !== id)
+    void persistUiState({ openChatSessionIds })
+    set({ openChatSessionIds })
+    if (state.activeSessionId !== id) return state.activeSessionId
+    // Prefer the tab to the right, else the one to the left.
+    return openChatSessionIds[idx] ?? openChatSessionIds[idx - 1] ?? null
+  },
+  setOpenChatSessionIds: (ids) => {
+    const openChatSessionIds = [...new Set(ids.filter(Boolean))].slice(-20)
+    set({ openChatSessionIds })
+  },
   markUnread: (sessionId) =>
     set((state) => ({
       unreadBySession: {

@@ -106,6 +106,7 @@ export const createSessionSlice: StateCreator<
     void persistUiState({ activeSessionId: id })
     // Focusing a session clears its unread flag (design: dot disappears on view).
     if (id) {
+      get().openChatTab(id)
       set((state) => {
         if (!state.unreadBySession[id]) return state
         const next = { ...state.unreadBySession }

@@ -41,6 +41,8 @@ export type UiPersisted = {
   browserLastUrl?: string
   pinnedSessionIds?: string[]
   archivedSessionIds?: string[]
+  /** Center-pane open chat tabs (session ids), open-order left→right. */
+  openChatSessionIds?: string[]
   /** Plan-tab annotations + last-opened plan id, keyed by session id. */
   planAnnotationsBySession?: Record<string, PlanAnnotationsPersisted>
 }

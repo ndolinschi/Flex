@@ -278,6 +278,7 @@ pub fn run() {
             commands::git_create_branch_and_commit,
             commands::git_create_pr,
             commands::git_pr_status,
+            commands::git_pr_diff,
             commands::git_create_pr_for_branch,
             commands::git_pr_draft,
             commands::suggest_commit_message,

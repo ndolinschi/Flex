@@ -36,7 +36,7 @@ audit and fix UI against this file.
 │ traffic / captions │ menus │ drag region │                   │
 ├─ body (flex-1, relative) ────────────────────────────────────┤
 │ ┌ SessionSidebar ┐ ┌ Chat column (flex-1) ┐ ┌ RightPanel ┐ │
-│ │                │ │ AppHeader (30px)     │ │ TabStrip   │ │
+│ │                │ │ AppHeader (tabs)     │ │ TabStrip   │ │
 │ │ actions        │ │ TurnTimeline         │ │ tab body   │ │
 │ │ session list   │ │ Composer             │ │            │ │
 │ │ footer         │ │                      │ │            │ │
@@ -52,8 +52,9 @@ Composition root: `src/App.tsx`.
 | `WindowTitleBar` | Custom chrome (`decorations: false`); `--titlebar-height` |
 | `SessionSidebar` | Agents list; left column (wide) or full overlay (narrow/tight) |
 | Chat column | `ChatPage` kept mounted; settings routes overlay it |
+| `ChatSessionTabBar` | Open-chat pills inside AppHeader (scrollable; close ≠ delete) |
 | `RightPanel` | Details pane; sibling of chat column |
-| `RightPanelMiniTabs` | Closed-panel mini rows (chat only); no section chrome |
+| `RightPanelMiniTabs` | Closed-panel flyout (wide only); Cursor Open Tabs / On {project} |
 | Overlays | CommandPalette, SearchModal, ToastHost — app-level |
 
 **Chat stays mounted** when opening Settings / Customize / Memory /
@@ -81,7 +82,7 @@ survive.
 ### Chat (`ChatShell`)
 
 ```
-AppHeader
+AppHeader (30px) — sidebar toggle · scrollable open-chat tabs · panel toggle + session menu
 main
   ├── timeline (flex-1) — hidden in composer-hero empty state
   └── composer stack (shrink-0, pb-2)
@@ -90,9 +91,12 @@ main
 ```
 
 - Wide: chat pane `min-w-[380px]` (`CHAT_MIN_WIDTH`)
-- Tight: `--content-rail: 100%`; hero/overlay wrappers `px-3` (timeline +
-  composer outer wrappers stay `px-4`)
-
+- Tight: `--content-rail: 100%`; hero/overlay/timeline/composer use chat chrome `px-3`
+- **Chat tabs:** live in `AppHeader` between the sidebar toggles (not a separate
+  row). Opening/switching a session appends it to `openChatSessionIds`
+  (persisted). Closing a tab removes it from the strip only — the session
+  stays in the sidebar. Working sessions show a small accent dot; unread
+  shows a count prefix. Strip scrolls horizontally when tabs overflow.
 ### Settings (`SettingsShell`)
 
 ```
@@ -136,11 +140,13 @@ Sashes never shrink chat below `CHAT_MIN_WIDTH` when both side panes are open.
 Browser / Terminal always fill remaining height.
 
 **Closed-panel mini tabs:** when `rightPanelOpen` is false on the chat route
-(with an active session), `RightPanelMiniTabs` anchors to the right edge of
-the chat+panel row (`absolute right-2`, below `--header-height`). Borderless
-row stack (`w-[200px]`, no shadow/section labels/expand control); rows use
-`fill-2` selected / `fill-4` hover. Not a third panel state — ⌘J / PanelRight
-still owns open/close; the flyout only appears while closed.
+(with an active session) **and viewport is `wide`**, `RightPanelMiniTabs`
+anchors to the right edge (`absolute right-2`, below `--header-height`).
+Cursor layout: "Open Tabs" + "On {project}" section labels, ghost rows
+(`w-[200px]`, no card/shadow). Hidden on narrow/tight. Chat column adds
+`padding-right: 216px` (`RIGHT_PANEL_MINI_TABS_RESERVE_PX`) while visible so
+the content rail does not sit under the flyout. Not a third panel state —
+⌘J / PanelRight still owns open/close.
 
 ---
 
@@ -150,7 +156,7 @@ Use these gutters unless a surface documents an exception.
 
 | Surface | Horizontal | Vertical / rhythm |
 |---|---|---|
-| **Chat chrome** (AppHeader, timeline, composer outer) | `px-4` (16px) | Timeline `py-3`; composer `pt-1.5 pb-0.5`; stack `pb-2` |
+| **Chat chrome** (AppHeader, timeline, composer outer) | `px-3` (12px) | Timeline `py-3`; composer `pt-1.5 pb-0.5`; stack `pb-2` |
 | **Right panel chrome** (TabStrip, tab headers, banners, CommitCenter) | `px-2.5` (10px) | Rows = `--header-height` (30px) |
 | **Session sidebar** (actions, list, section headers) | `px-2` (8px) | Actions `pt-2 pb-2 gap-0.5`; sections `gap-2` |
 | **Sidebar footer** | `px-2.5` | `py-1.5` |
@@ -158,7 +164,7 @@ Use these gutters unless a surface documents an exception.
 | **Settings shell** | `px-4` | Nav↔content `gap-6`; cards `gap-3` |
 | **Settings rows / card labels** | `px-3.5` | Rows `py-3`; dividers `before:inset-x-3.5` |
 | **Welcome** | `px-4` | `py-8`; form `gap-3` |
-| **Tight hero/overlay only** | `px-3` | — |
+| **Tight viewport** | chat chrome stays `px-3` | `--content-rail: 100%` (full column) |
 
 ### Content rails
 
@@ -237,12 +243,13 @@ Selected row: `bg-fill-2`. Hover: `bg-fill-4`.
 
 ### AppHeader
 
-`h-[var(--header-height)] px-4` · left: sidebar toggle + title · right:
-panel toggle + session menu. Quiet `h-6` icon buttons.
+`h-[var(--header-height)] px-3` · left: sidebar toggle · center: scrollable
+`ChatSessionTabBar` (`flex-1 min-w-0 overflow-x-auto`, no second border) ·
+right: panel toggle + session menu. Quiet `h-6` icon buttons.
 
 ### Composer
 
-1. Outer `px-4` → rail `max-w-[var(--content-rail)]`
+1. Outer `px-3` → rail `max-w-[var(--content-rail)]`
 2. Optional `workersSlot` / HITL docked flush above the bubble
 3. ContextBar above bubble (`mb-1`, min-height status bar)
 4. Bubble: `--radius-composer`, shadow-composer
@@ -250,7 +257,7 @@ panel toggle + session menu. Quiet `h-6` icon buttons.
 
 ### TurnTimeline
 
-Scroll `px-4 py-3` → rail `max-w-[var(--content-rail)] pb-2`. Virtual rows
+Scroll `px-3 py-3` → rail `max-w-[var(--content-rail)] pb-2`. Virtual rows
 are `absolute` with padding-based gaps. Live tail (Working, reconnect,
 FilesChangedCard) sits **outside** the virtual window. Scroll-down FAB:
 `absolute bottom-3 left-1/2`.
@@ -266,6 +273,7 @@ FilesChangedCard) sits **outside** the virtual window. Scroll-down FAB:
 |---|---|
 | Plan | `PlanToolbar` breadcrumbs + Build (`h-6` controls) |
 | Changes | Quiet title row; select toolbar `h-7` (dedicated row, not `--header-height`); file list `px-2` / rows `px-2.5` |
+| Pull Request | Title / # / state / checks; Open in browser; DiffView of `gh pr diff` (tab only when branch has a PR) |
 | Files | Open-buffer chips (`Tab` sm) + Monaco / explorer |
 | Terminal | Title + New / List; agent subtitle separate bordered row |
 | Browser | Toolbar `z-20` over webview slot |
@@ -318,7 +326,7 @@ Tailwind `p-*` / `gap-*` map through `@theme` in `src/index.css`.
 | Do | Don’t |
 |---|---|
 | Reuse `Tab` / `TabStrip` / `TabClose` for panel tabs + file chips | Duplicate pill markup per surface |
-| Keep panel chrome at `px-2.5`; chat at `px-4` | Mix gutters under the same strip |
+| Keep panel chrome at `px-2.5`; chat at `px-3` | Mix gutters under the same strip |
 | Put only **`h-6`** controls in 30px header rows | `h-7` pills inside `--header-height` (reads flush) |
 | Give TabStrip the bottom border; content headers title the body | Stack two `border-b` with no content between |
 | Neutral `stroke-2` focus rings on chrome inputs | Accent glow focus |
@@ -334,7 +342,7 @@ Tailwind `p-*` / `gap-*` map through `@theme` in `src/index.css`.
 
 ## Checklist for UI changes
 
-1. Pick the surface gutter from **Spacing canon** (chat `px-4`, panel `px-2.5`, sidebar `px-2`).
+1. Pick the surface gutter from **Spacing canon** (chat `px-3`, panel `px-2.5`, sidebar `px-2`).
 2. Keep header rows at `--header-height`; controls inside them at **`h-6`**.
 3. Align nested chrome with the parent strip (don’t mix `px-2` under a `px-2.5` TabStrip).
 4. Prefer tokens / shared atoms (`Tab`, `TabStrip`, `IconButton`) over one-off heights.

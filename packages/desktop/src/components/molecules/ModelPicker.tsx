@@ -85,6 +85,7 @@ const EffortSubmenu = ({
       ref={menuRef}
       role="menu"
       aria-label="Effort"
+      data-popover-outside-ignore
       style={{
         position: "fixed",
         left: coords?.x ?? anchorRect.right,
@@ -239,9 +240,11 @@ export const ModelPicker = ({
             value={modelEffort}
             onChange={(effort) => {
               // One gesture: picking an effort on any row also selects that
-              // model at that effort (reference design).
+              // model at that effort (reference design), then close so the
+              // composer chip shows the new label.
               onEffortChange(m.id, effort)
               onChange(m.id)
+              handleClose()
             }}
             onClose={() => setEffortMenuFor(null)}
           />
@@ -259,7 +262,7 @@ export const ModelPicker = ({
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          "inline-flex h-6 max-w-[12rem] items-center gap-1 rounded-full border border-stroke-3 bg-fill-4 px-2",
+          "inline-flex h-6 max-w-[14rem] items-center gap-1 rounded-full border border-stroke-3 bg-fill-4 px-2",
           "text-xs tracking-[var(--tracking-caption)] text-ink-secondary",
           "transition-[color,opacity,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
           "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink disabled:opacity-50",
@@ -268,8 +271,8 @@ export const ModelPicker = ({
       >
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {selectedEffort ? (
-          <span className="shrink-0 truncate text-ink-muted">
-            {effortLabel(selectedEffort)}
+          <span className="shrink-0 text-ink-muted">
+            · {effortLabel(selectedEffort)}
           </span>
         ) : null}
         <ChevronDown

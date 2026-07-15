@@ -4,6 +4,7 @@ import {
   FileCode2,
   Globe,
   GitBranch,
+  GitPullRequest,
   Terminal as TerminalIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -27,6 +28,7 @@ export type RightPanelTabDef = {
 export const BUILTIN_TABS: RightPanelTabDef[] = [
   { id: "plan", label: "Plan", icon: ClipboardList },
   { id: "changes", label: "Changes", icon: GitBranch },
+  { id: "pr", label: "PR", icon: GitPullRequest },
   { id: "files", label: "Files", icon: FileCode2 },
   { id: "terminal", label: "Terminal", icon: TerminalIcon },
   { id: "browser", label: "Browser", icon: Globe },
@@ -45,9 +47,17 @@ export const PROJECT_PINNED_TABS: readonly RightPanelTab[] = [
   "files",
 ] as const
 
-/** Tabs shown in the strip / "+" menu — builtins + registered UI plugins. */
-export const visibleRightPanelTabs = (): RightPanelTabDef[] => {
-  const builtins = BUILTIN_TABS.filter((tab) => isRightPanelTabEnabled(tab.id))
+/** Tabs shown in the strip / "+" menu — builtins + registered UI plugins.
+ * Pass `hasBranchPr` so the Pull Request tab only appears when the current
+ * branch has an open PR (polled via `git_pr_status`). */
+export const visibleRightPanelTabs = (opts?: {
+  hasBranchPr?: boolean
+}): RightPanelTabDef[] => {
+  const builtins = BUILTIN_TABS.filter((tab) => {
+    if (!isRightPanelTabEnabled(tab.id)) return false
+    if (tab.id === "pr") return opts?.hasBranchPr === true
+    return true
+  })
   const fromPlugins: RightPanelTabDef[] = pluginRightPanelTabs().map((t) => ({
     id: t.id,
     label: t.label,

@@ -192,7 +192,7 @@ export const Composer = ({
 
   if (!activeSessionId) {
     return (
-      <div className="px-4 pb-3 text-center text-sm text-ink-muted">
+      <div className="px-3 pb-3 text-center text-sm text-ink-muted">
         Select or create a session to start chatting.
       </div>
     )
@@ -249,7 +249,7 @@ export const Composer = ({
   }
 
   return (
-    <div className="px-4 pt-1.5 pb-0.5">
+    <div className="px-3 pt-1.5 pb-0.5">
       {error ? (
         <div className="mx-auto mb-1.5 max-w-[var(--content-rail)]">
           <ErrorBanner

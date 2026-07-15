@@ -74,6 +74,7 @@ export type Viewport = "wide" | "narrow" | "tight"
 export type RightPanelTab =
   | "plan"
   | "changes"
+  | "pr"
   | "terminal"
   | "browser"
   | "files"
@@ -367,6 +368,12 @@ export type UiSliceState = {
   recentCwds: string[]
   pinnedSessionIds: string[]
   archivedSessionIds: string[]
+  /**
+   * Open chat tabs in the center pane (MRU-append order). Distinct from the
+   * sidebar's full session list — closing a tab does not delete the session.
+   * Persisted in `ui.json`.
+   */
+  openChatSessionIds: SessionId[]
   unreadBySession: Record<SessionId, number>
   toasts: Array<{
     id: string
@@ -391,6 +398,13 @@ export type UiSliceState = {
   setSessionArchived: (id: SessionId, archived: boolean) => void
   setPinnedSessionIds: (ids: SessionId[]) => void
   setArchivedSessionIds: (ids: SessionId[]) => void
+  /** Ensure `id` is in the center-pane open-tab strip (append if new). */
+  openChatTab: (id: SessionId) => void
+  /** Remove from the open-tab strip only — does not delete the session.
+   * Returns the neighbor id to activate when the closed tab was focused,
+   * or `null` if none remain. */
+  closeChatTab: (id: SessionId) => SessionId | null
+  setOpenChatSessionIds: (ids: SessionId[]) => void
   markUnread: (sessionId: SessionId) => void
   pushToast: (
     text: string,

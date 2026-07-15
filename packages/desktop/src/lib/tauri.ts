@@ -374,6 +374,10 @@ export type BranchPrStatus = {
 export const gitPrStatus = (cwd: string): Promise<BranchPrStatus> =>
   invoke("git_pr_status", { cwd })
 
+/** Unified diff for the current branch PR (`gh pr diff`). Empty when no PR. */
+export const gitPrDiff = (cwd: string): Promise<string> =>
+  invoke("git_pr_diff", { cwd })
+
 export type PrDraft = {
   title: string
   body: string

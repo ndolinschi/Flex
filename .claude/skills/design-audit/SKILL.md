@@ -22,7 +22,7 @@ Do **not** invent a parallel design-map. If comments still say `design-map/…`,
 
 | Surface | Horizontal gutter | Chrome height / controls |
 |---|---|---|
-| Chat (AppHeader, timeline, composer outer) | `px-4` | `--header-height` 30px; controls **`h-6`** |
+| Chat (AppHeader, timeline, composer outer) | `px-3` | `--header-height` 30px; controls **`h-6`** |
 | Right panel chrome (TabStrip, tab headers, banners) | `px-2.5` | TabStrip `gap-1.5`; `Tab` md/sm **`h-6`** |
 | Session sidebar list / actions | `px-2` | Rows `min-h-7`; section headers `h-6` |
 | Sidebar footer | `px-2.5` | `py-1.5` |
