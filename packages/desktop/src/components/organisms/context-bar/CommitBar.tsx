@@ -40,8 +40,7 @@ export const CommitBar = ({
   const rootRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const pushToast = useAppStore((s) => s.pushToast)
-  const setRightPanelOpen = useAppStore((s) => s.setRightPanelOpen)
-  const setRightPanelTab = useAppStore((s) => s.setRightPanelTab)
+  const openToolBesideChat = useAppStore((s) => s.openToolBesideChat)
 
   const { data: summary } = useQuery({
     queryKey: ["git-status", cwd ?? "", sessionId ?? null],
@@ -139,8 +138,7 @@ export const CommitBar = ({
       <button
         type="button"
         onClick={() => {
-          setRightPanelOpen(true)
-          setRightPanelTab("changes")
+          openToolBesideChat(sessionId, "changes")
         }}
         className={cn(
           "flex h-6 max-w-[12rem] shrink items-center gap-1.5 truncate rounded-md",

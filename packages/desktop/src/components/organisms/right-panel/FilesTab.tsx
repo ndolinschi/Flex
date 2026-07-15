@@ -14,7 +14,6 @@ import { basename, cn } from "../../../lib/utils"
 import {
   sessionScopeKey,
   useAppStore,
-  type RightPanelTab,
 } from "../../../stores/appStore"
 import { useSessions } from "../../../hooks/useSessions"
 import { FileExplorer } from "./FileExplorer"
@@ -70,12 +69,8 @@ export const FilesTab = ({ active }: FilesTabProps) => {
   const closeFile = useAppStore((s) => s.closeWorkspaceFile)
   const setDraft = useAppStore((s) => s.setWorkspaceFileDraft)
   const openWorkspaceFile = useAppStore((s) => s.openWorkspaceFile)
-  const closeTab = useAppStore((s) => s.closeTab)
-  const setRightPanelTab = useAppStore((s) => s.setRightPanelTab)
-  const setRightPanelOpen = useAppStore((s) => s.setRightPanelOpen)
-  const openTabs = useAppStore(
-    (s) => s.openTabsBySession[sessionKey] ?? EMPTY_TABS,
-  )
+  const closeTabInPane = useAppStore((s) => s.closeTabInPane)
+  const contentLayout = useAppStore((s) => s.contentLayout)
   const pushToast = useAppStore((s) => s.pushToast)
   const queryClient = useQueryClient()
   const { sessions } = useSessions()
@@ -97,26 +92,23 @@ export const FilesTab = ({ active }: FilesTabProps) => {
   const path =
     activePath && openFiles.includes(activePath) ? activePath : openFiles[0] ?? null
 
-  // Only tear down the Files tab after the user closes the last buffer —
+  // Only tear down the Files tool tab after the user closes the last buffer —
   // never when they open an empty Files tab to browse.
   useEffect(() => {
     const had = hadOpenFilesRef.current
     hadOpenFilesRef.current = openFiles.length > 0
-    if (!(had && openFiles.length === 0 && openTabs.includes("files"))) return
-    closeTab(sessionKey, "files")
-    const remaining = openTabs.filter((t) => t !== "files")
-    if (remaining.length > 0) {
-      setRightPanelTab(remaining[remaining.length - 1])
-    } else {
-      setRightPanelOpen(false)
-    }
+    if (!(had && openFiles.length === 0 && activeSessionId)) return
+    const filesTabId = `tool:${activeSessionId}:files`
+    contentLayout.panes.forEach((pane, index) => {
+      if (pane.tabs.some((t) => t.id === filesTabId)) {
+        closeTabInPane(index as 0 | 1, filesTabId)
+      }
+    })
   }, [
     openFiles.length,
-    openTabs,
-    closeTab,
-    sessionKey,
-    setRightPanelTab,
-    setRightPanelOpen,
+    activeSessionId,
+    contentLayout.panes,
+    closeTabInPane,
   ])
 
   // Opening a file leaves browse mode so the editor is visible. Depend only
@@ -409,5 +401,4 @@ export const FilesTab = ({ active }: FilesTabProps) => {
 }
 
 const EMPTY_PATHS: string[] = []
-const EMPTY_TABS: RightPanelTab[] = []
 const EMPTY_DRAFTS: Record<string, string> = {}

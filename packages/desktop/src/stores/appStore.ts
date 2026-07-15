@@ -4,6 +4,7 @@ import { emptyStreaming } from "./types"
 import { createSessionSlice } from "./slices/sessionSlice"
 import { createComposerSlice } from "./slices/composerSlice"
 import { createLayoutSlice } from "./slices/layoutSlice"
+import { createContentLayoutSlice } from "./slices/contentLayoutSlice"
 import { createUiSlice } from "./slices/uiSlice"
 import { createPanelExtrasSlice } from "./slices/panelExtrasSlice"
 
@@ -16,6 +17,8 @@ export type {
   BrowserViewportPreset,
   BrowserSessionState,
   AppState,
+  ContentLayout,
+  ContentTab,
 } from "./types"
 export { sessionScopeKey, sessionHasActivity } from "./types"
 export { persistUiState, restoreUiState } from "./persist"
@@ -25,6 +28,7 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createSessionSlice(...a),
   ...createComposerSlice(...a),
   ...createLayoutSlice(...a),
+  ...createContentLayoutSlice(...a),
   ...createUiSlice(...a),
   ...createPanelExtrasSlice(...a),
 }))

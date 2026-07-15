@@ -2,7 +2,6 @@ import type { CSSProperties, ReactNode } from "react"
 import { AppHeader } from "../organisms"
 import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
-import { RIGHT_PANEL_MINI_TABS_RESERVE_PX } from "../organisms/right-panel/RightPanelMiniTabs"
 
 const QUICKSTART_SUGGESTIONS = [
   "Fix a bug in this repo",
@@ -13,6 +12,8 @@ const QUICKSTART_SUGGESTIONS = [
 type ChatShellProps = {
   sidebar?: ReactNode
   hideSidebar?: boolean
+  /** When false, omit AppHeader (content panes own chrome). Default true. */
+  showHeader?: boolean
   timeline: ReactNode
   composer: ReactNode
   overlay?: ReactNode
@@ -28,6 +29,7 @@ type ChatShellProps = {
 export const ChatShell = ({
   sidebar,
   hideSidebar = false,
+  showHeader = true,
   timeline,
   composer,
   overlay,
@@ -37,15 +39,8 @@ export const ChatShell = ({
   heroHint = "Describe a task to start the native agent loop.",
 }: ChatShellProps) => {
   const setComposerDraft = useAppStore((s) => s.setComposerDraft)
-  // "tight" viewport (~<680px): expand the content rail to full width so
-  // TurnTimeline/Composer (max-w-[var(--content-rail)]) fill the column.
-  // Chat chrome gutters are already `px-3` at every viewport.
   const tight = useAppStore((s) => s.viewport === "tight")
   const wide = useAppStore((s) => s.viewport === "wide")
-  const rightPanelOpen = useAppStore((s) => s.rightPanelOpen)
-  const activeSessionId = useAppStore((s) => s.activeSessionId)
-  // Match RightPanel's showMiniTabs gate — keep chat clear of the flyout.
-  const reserveMiniTabs = wide && !rightPanelOpen && !!activeSessionId
 
   const handleQuickstart = (text: string) => {
     setComposerDraft(text)
@@ -55,17 +50,8 @@ export const ChatShell = ({
     })
   }
 
-  // Hard CSS floor for the chat column — wide viewport only. No live-clamp
-  // math (see stores/appStore.ts's CHAT_MIN_WIDTH) can ever fully hide chat:
-  // this is a backstop against a sash math error, not the primary defense.
-  // Narrow/tight are exempt — sidebar/right-panel are absolute overlays
-  // there (see SessionSidebar.tsx / RightPanel.tsx `narrow` handling), so the
-  // chat pane already renders at full width underneath them.
   const paneStyle = {
     ...(tight ? ({ "--content-rail": "100%" } as CSSProperties) : {}),
-    ...(reserveMiniTabs
-      ? { paddingRight: RIGHT_PANEL_MINI_TABS_RESERVE_PX }
-      : {}),
   } as CSSProperties
 
   const pane = (
@@ -73,12 +59,10 @@ export const ChatShell = ({
       className={cn(
         "flex h-full min-h-0 min-w-0 flex-1 flex-col",
         wide && "min-w-[380px]",
-        reserveMiniTabs &&
-          "transition-[padding] duration-[var(--duration-normal)] ease-[var(--easing-default)]",
       )}
       style={Object.keys(paneStyle).length > 0 ? paneStyle : undefined}
     >
-      <AppHeader />
+      {showHeader ? <AppHeader /> : null}
       <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div
           className={cn(

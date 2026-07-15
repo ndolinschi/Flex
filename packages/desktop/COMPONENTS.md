@@ -17,9 +17,9 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `TextArea` | Multi-line text field | standard textarea props | Composer |
 | `Label` | Accessible form label | `htmlFor`, `children` | FormField, ModelSelect |
 | `Spinner` | Indeterminate loading | `size` | SessionSidebar, ProviderSettingsForm |
-| `Tab` | Pill tab / open-buffer chip (primary right-panel chrome) | `selected`, `size?` (md/sm both `h-6`), `variant?`, `icon?`, `badge?`, `onSelect`, `onClose?` | RightPanelTabBar, FilesTab (`FileChip`) |
+| `Tab` | Pill tab / open-buffer chip | `selected`, `size?` (md/sm both `h-6`), `variant?`, `icon?`, `badge?`, `onSelect`, `onClose?` | ContentPane, FilesTab (`FileChip`) |
 | `TabClose` | Hover-collapse close control for tabs/chips | `label`, `onClose`, `revealOnFocusWithin?` | `Tab` |
-| `TabStrip` | Horizontal open-tabs strip (`role="tablist"`) | `children`, `className?` | RightPanelTabBar |
+| `TabStrip` | Horizontal open-tabs strip (`role="tablist"`) | `children`, `className?` | ContentPane |
 | `Badge` | Status / meta chip | `tone`, `children` | ToolCallChip |
 | `BypassPermissionsButton` | Session bypass-permissions shield | `composerMode`, `sessionBypass`, `onToggle` | Composer |
 | `Kbd` | Keyboard shortcut hint | `children` | WelcomePage |
@@ -53,12 +53,12 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `ModelSelect` | Simple model `<select>` | `models`, `value`, `onChange` | ProviderSettingsForm |
 | `ModelPicker` | Searchable model tray (PopoverTray) | `models`, `value`, `onChange` | Composer |
 | `ModePicker` | Agent / Plan / Ask pill switcher | `value`, `onChange` | Composer |
-| `PlanBuildBar` | Cursor-style Build CTA after ExitPlanMode | `onBuild`, `onKeepPlanning?`, `variant` | RightPanel Plan tab, ChatPage |
-| `PlanCard` | Checklist from `plan_updated` (right Plan tab; not inlined in timeline) | `entries` | RightPanel |
-| `PlanList` | Multi-plan “Review plans” list for a session | `plans`, `onSelect` | RightPanel Plan tab (`PlanTab`) |
-| `PlanCommentButton` | Floating Comment control on plan text selection | `selection`, `onComment` | RightPanel Plan tab (`PlanTab`) |
-| `PlanCommentPopover` | Selection → comment form (Save / Save & send) | `draft`, `onSave`, `onSaveAndSend` | RightPanel Plan tab (`PlanTab`) |
-| `PlanCommentList` | Annotations on the open plan | `comments`, `onFocus`, `onRemove` | RightPanel Plan tab (`PlanTab`) |
+| `PlanBuildBar` | Cursor-style Build CTA after ExitPlanMode | `onBuild`, `onKeepPlanning?`, `variant` | Plan tab, ChatSessionBody |
+| `PlanCard` | Checklist from `plan_updated` (Plan tool tab; not inlined in timeline) | `entries` | PlanTab |
+| `PlanList` | Multi-plan “Review plans” list for a session | `plans`, `onSelect` | PlanTab |
+| `PlanCommentButton` | Floating Comment control on plan text selection | `selection`, `onComment` | PlanTab |
+| `PlanCommentPopover` | Selection → comment form (Save / Save & send) | `draft`, `onSave`, `onSaveAndSend` | PlanTab |
+| `PlanCommentList` | Annotations on the open plan | `comments`, `onFocus`, `onRemove` | PlanTab |
 | `PermissionActions` | Composer-footer Allow once / Always allow / Deny (replaces Send) | `permission` | Composer |
 | `PlusMenu` | Attach + mode shortcuts (Plan/Ask) | `onAttachFile`, `onAttachImage`, `onSetMode?` | Composer |
 | `ProjectPicker` | Recent cwds + Open Folder | `sessionId`, `cwd`, `onError?` | ContextBar |
@@ -66,7 +66,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `BranchPrStatusChip` | Current-branch PR # + title + CI summary; opens PR in browser | `pr` | ChangesTab header |
 | `CreatePrDialog` | Editable title/body modal before `gh pr create` | `open`, `initialTitle?`, `initialBody?`, `onConfirm` | ChangesTab, CommitCenter, CommitBar |
 | `PopoverTray` | Shared Esc/click-outside/↑↓ tray; `onClose` via ref so stream re-renders don't rebind listeners | `open`, `onClose`, `placement`, `children` | Model/Mode/Plus/Project/Branch pickers |
-| `ContextMenu` | Portal menu; ignores timeline scroll + webview-induced `window.blur` so it stays open mid-stream | `position`, `items`, `onClose` | RightPanel `+`, SessionListItem, FileExplorer, PlanToolbar |
+| `ContextMenu` | Portal menu; ignores timeline scroll + webview-induced `window.blur` so it stays open mid-stream | `position`, `items`, `onClose` | ContentPane `+`, SessionListItem, FileExplorer, PlanToolbar |
 | `ConfirmDialog` | In-app modal (rename/delete/create PR fields) | `open`, `title`, `onConfirm`, `onCancel`, `confirmDisabled?` | SessionMenu, CreatePrDialog |
 | `AttachmentChip` | Pending attachment pill (file/image/directory/dom) | `attachment`, `onRemove` | Composer |
 | `SendButton` | Circular send / stop / queue | `isStreaming`, `canQueue?`, `onSend`, `onStop` | Composer |
@@ -84,13 +84,13 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `StreamingCaret` | Streaming caret | — | TurnTimeline |
 | `SubagentGroup` | Nested subagent work block — status glyph, live activity, tool-count · duration; click opens `SubagentViewer` | `task`, `role?`, `phase`, `nestedRows?`, `compact?`, `onOpenViewer?` | TurnTimeline, WorkersGroup, WorkflowGroup |
 | `WorkersGroup` | Parallel Agent fan-out card ("Working with N agents") expanding to enriched worker rows | `workers`, `onOpenViewer`, `anchorId?` | TurnTimeline (via ToolStepList) |
-| `WorkingAgentsPill` | Composer-adjacent "N Working" glance — menu of running worker titles + jump to group | `rows`, `onScrollToWorkers?` | ChatPage → Composer `workersSlot` |
+| `WorkingAgentsPill` | Composer-adjacent "N Working" glance — menu of running worker titles + jump to group | `rows`, `onScrollToWorkers?` | ChatSessionBody → Composer `workersSlot` |
 | `WorkGroup` | "Worked for Xs" / live "Working" XOR "Thinking" XOR "Compacting context…"; `memo` | `isOpen`, `liveStatus?`, `durationMs?` | TurnTimeline |
 | `WorkflowGroup` | Multi-step workflow block (steps + nested subagents); organism-scale but kept in `molecules/` since it nests inside `TimelineRowView` like `SubagentGroup`/`WorkGroup` | `steps`, `subagents`, `status` | TurnTimeline (via `TimelineRowView`) |
 | `SidebarSkeleton` | Sidebar loading placeholder (headers + rows) | — | SessionSidebar |
 | `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?`, `disabled?` | SessionSidebar |
 | `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle` | SessionSidebar |
-| `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions | `title`, `status`, `onBuild`, `onAddComment?` | RightPanel Plan tab (`PlanTab`) |
+| `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions | `title`, `status`, `onBuild`, `onAddComment?` | PlanTab |
 | `AppMark` / `TitleBarMenus` | Wireframe mark + File/Edit/View/Help for custom window chrome; Help → **Submit Bug…** opens `BugReportDialog` | `onOpenCommandPalette?`, `onOpenSearch?` | WindowTitleBar |
 | `BugReportDialog` | Google-style Submit Bug modal: disclosure (app id + session/task ids), Terms/Privacy links, “Tell us what went wrong”, opens GitHub issue form | `open`, `onClose` | TitleBarMenus |
 | `WindowControls` / `TrafficLights` / `CaptionButtons` | Platform window controls (macOS traffic lights · Windows/Linux caption buttons) | `host?` | WindowTitleBar |
@@ -101,21 +101,20 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|---|---|
 | `SessionSidebar` | New Agent + Search + Agents list; groups via `useSessionSidebarGroups`; footer/resume/archive molecules | (hooks) | App shell |
 | `ProviderSettingsForm` | Provider / key / model; pieces: `ProviderProfileList`, `ProviderConnectionForm`, `SecretStorageSection` | — | SettingsPage, WelcomePage |
-| `Composer` | Prompt + ContextBar; draft in `ComposerInput`; trays/queue under `organisms/composer/`; optional `dockedOverlay` stacks Permission/Question flush above the bubble; optional `workersSlot` for WorkingAgentsPill | `isHero?`, `dockedOverlay?`, `workersSlot?` | ChatShell |
+| `Composer` | Prompt + ContextBar; draft in `ComposerInput`; trays/queue under `organisms/composer/`; optional `dockedOverlay` stacks Permission/Question flush above the bubble; optional `workersSlot` for WorkingAgentsPill | `isHero?`, `dockedOverlay?`, `workersSlot?`, `sessionId?` | ChatSessionBody |
 | `ContextBar` | Project · branch · context % | `cwd`, `sessionId` | Composer |
-| `TurnTimeline` | Turns + tools + plans + streaming; `@tanstack/react-virtual` over `displayItems` + live tail; pieces under `organisms/timeline/` (`WorkGroupBody` owns stable `renderOther`; `ToolStepList` clusters tools + parallel workers via `clusterWorkRows`) | `sessionId`, `onLiveRows?` | ChatShell |
-| `PermissionPrompt` | Tool permission HITL header docked above composer bubble; actions in `PermissionActions` | `permission` | ChatPage → `Composer.dockedOverlay` |
-| `QuestionPrompt` | AskUserQuestion HITL (same dock seam as PermissionPrompt) | `question` | ChatPage → `Composer.dockedOverlay` |
-| `RightPanel` | Plan / Changes / Pull Request (when branch has a PR) / Files / Terminal / Browser / Memory (flagged) / plugin tabs (Database); tabs under `organisms/right-panel/` (`RightPanelTabBar`, `RightPanelMiniTabs`, `tabs`, `PrTab`) + `src/plugins/` registry. Closed by default on app start and New Agent (`setActiveSessionId(…, { panel: "closed" })`); opens via `+`, ⌘J, Plan mode, session switch restore, agent-created PR (null→PR), or the closed-panel mini-tabs flyout. Memory gated by `MEMORY_TAB_ENABLED` (default off). Database via UI plugin (`DATABASE_TAB_ENABLED`, default on). | — | App shell |
-| `RightPanelMiniTabs` | Cursor-style closed-panel flyout (wide viewport only): "Open Tabs" + "On {project}" ghost rows; click opens the full panel. Hidden on narrow/tight. Chat column reserves `RIGHT_PANEL_MINI_TABS_RESERVE_PX` so the rail does not collide. | `openTabDefs`, `selectedTab`, `changesTotals`, `terminalCount`, `catalog`, `projectLabel`, `onSelectTab` | RightPanel |
-| `MemoryTab` | Right-panel Memory surface; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | RightPanel |
-| `DatabaseTab` | UI plugin (Terminal-style 2-col): 180px sidebar (connections + tables) + SQL/results main pane. **Connections are scoped per project cwd** (`projectKey` on each saved spec in `db_connections.json`; list/upsert/connect/mention/active filter by the active session's cwd). Switching sessions clears selection and restores that project's last active connection. Legacy unscoped entries (`projectKey: ""`) stay in the store but are hidden until re-saved under a project. Empty state has no duplicate chrome (Add CTA only); with connections, slim count + refresh/add. Result grid paginates (50/page; table preview via `limit`/`offset`, query results client-side). | `active`, `session` | RightPanel (plugin registry) |
-| `FilesTab` | Open-file strip (close-on-hover like panel tabs) + Monaco editor; `.md`/`.mdx` default to `MarkdownBody` preview (Code/Eye toggle); empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children`, search with `includeIgnored`). Dir/file queries invalidate on turn settle, FS-mutating tool completion (Write/Edit/Bash/…), and project cwd change (`invalidateWorkspaceQueries`, same pattern as `invalidateGitQueries`). | `active` | RightPanel |
+| `TurnTimeline` | Turns + tools + plans + streaming; `@tanstack/react-virtual` over `displayItems` + live tail; pieces under `organisms/timeline/` (`WorkGroupBody` owns stable `renderOther`; `ToolStepList` clusters tools + parallel workers via `clusterWorkRows`) | `sessionId`, `onLiveRows?` | ChatSessionBody |
+| `PermissionPrompt` | Tool permission HITL header docked above composer bubble; actions in `PermissionActions` | `permission` | ChatSessionBody → `Composer.dockedOverlay` |
+| `QuestionPrompt` | AskUserQuestion HITL (same dock seam as PermissionPrompt) | `question` | ChatSessionBody → `Composer.dockedOverlay` |
+| `ContentWorkspace` | AppHeader + one or two content panes (optional split sash) | — | App shell |
+| `ContentPane` | Tab strip for chat + tool tabs; `+` menu; open-to-side | `paneIndex` | ContentWorkspace |
+| `AppHeader` | Sidebar toggle, split toggle (⌘J), session menu | — | ContentWorkspace |
+| `MemoryTab` | Memory surface; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | ToolTabBody |
+| `DatabaseTab` | UI plugin (Terminal-style 2-col): 180px sidebar (connections + tables) + SQL/results main pane. **Connections are scoped per project cwd** (`projectKey` on each saved spec in `db_connections.json`; list/upsert/connect/mention/active filter by the active session's cwd). Switching sessions clears selection and restores that project's last active connection. Legacy unscoped entries (`projectKey: ""`) stay in the store but are hidden until re-saved under a project. Empty state has no duplicate chrome (Add CTA only); with connections, slim count + refresh/add. Result grid paginates (50/page; table preview via `limit`/`offset`, query results client-side). | `active`, `session` | ToolTabBody (plugin registry) |
+| `FilesTab` | Open-file strip (close-on-hover like panel tabs) + Monaco editor; `.md`/`.mdx` default to `MarkdownBody` preview (Code/Eye toggle); empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children`, search with `includeIgnored`). Dir/file queries invalidate on turn settle, FS-mutating tool completion (Write/Edit/Bash/…), and project cwd change (`invalidateWorkspaceQueries`, same pattern as `invalidateGitQueries`). | `active` | ToolTabBody |
 | `WindowTitleBar` | Compact custom window chrome (`decorations: false`, 30px): traffic lights / caption buttons + File/Edit/View/Help + drag region | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
-| `AppHeader` | Compact chat chrome (30px): sidebar/panel toggles with scrollable open-chat tabs between them + session menu | — | ChatShell |
-| `ChatSessionTabBar` | Open-chat pills embedded in AppHeader — same `Tab`/`TabStrip` md pills as `RightPanelTabBar`; horizontal scroll on overflow; close removes from strip only | — | AppHeader |
-| `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | RightPanel |
-| `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/`. Opening the tab with zero workspace PTYs auto-creates one shell. | — | RightPanel |
+| `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | ToolTabBody |
+| `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/`. Opening the tab with zero workspace PTYs auto-creates one shell. | — | ToolTabBody |
 | `CommandPalette` | ⌘K-style action palette (nav, theme, new agent); rows via `CommandPaletteRow`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell |
 | `SearchModal` | Fuzzy session search overlay; rows via `FuzzySessionRow` + `HighlightedLabel`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell (via SessionSidebar's `onOpenSearch`) |
 | `SubagentViewer` | Bottom-anchored overlay replaying a subagent's inner session feed | (reads `useAppStore` `subagentViewer`) | App shell; opened from `TimelineRowView` |
@@ -126,7 +125,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|
 | `organisms/timeline/` | `buildDisplayItems` (+ `estimateSizeForItem`), `TimelineRowView`, `WorkGroupBody`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
 | `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
-| `organisms/right-panel/` | `PlanTab`, `ChangesTab` (quiet header + select toolbar + DiffStat rows), `PrTab` (branch PR overview + `gh pr diff` via DiffView; catalog only when `git_pr_status` finds a PR), `FilesTab` (Monaco + MD preview, hover-close chips), `FileExplorer` (VS Code–style expandable tree + search; New file + right-click Open/Rename/Delete), `FileRow` (round `Checkbox`, DiffStat, hover-overlay actions), `CommitCenter` (message + selection label + split commit), `RightPanelTabBar`, `RightPanelMiniTabs` (closed-panel flyout), `tabs` |
+| `organisms/right-panel/` | Tool tab bodies: `PlanTab`, `ChangesTab`, `PrTab`, `FilesTab`, `FileExplorer`, `FileRow`, `CommitCenter`, `tabs` catalog |
+| `organisms/content/` | `ContentWorkspace`, `ContentPane`, `ChatSessionBody`, `ToolTabBody` |
 | `organisms/context-bar/` | `CommitBar` (changes chip + Commit / Commit & Push / Create PR), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
 | `organisms/browser/` | `BrowserToolbar` (Design Mode toggle), `BrowserOverflowMenu` — composed by `BrowserTab` |
 | `organisms/terminal/` | `TerminalTab`, `TerminalInstance`, `TerminalRow`, `AgentTerminalRow`, `time` helpers |
@@ -135,10 +135,9 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 
 | Component | Purpose |
 |---|---|
-| `ChatShell` | Header + timeline + composer (`hideSidebar` when App owns sidebar) |
+| `ChatShell` | Timeline + composer layout (`hideSidebar` when App owns sidebar) |
 | `SettingsShell` | Back header + form (`embedded` when App owns sidebar) |
 | `ErrorBoundary` | Top-level render-error fence (`templates/`) |
-| `ChatPage` | Conversation (`embedded`) |
 | `SettingsPage` | Settings shell; sections from `pages/settings/` |
 | `CustomizeSection` / `MemorySection` / `IndexingSection` / `AutomationsSection` / `DiagnosticsSection` | Settings nav sections (`pages/settings/`) |
 | `WelcomePage` | First-run wizard: provider key → model → optional project |
@@ -176,7 +175,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/lib/fuzzySearch.ts` | Shared `fuzzyScore` / `fuzzyMatchIndices` for CommandPalette + SearchModal |
 | `src/lib/markdownHighlight.ts` | Lazy-loaded rehype-highlight + core language subset (dynamic import from `MarkdownBody`) |
 | `src/stores/appStore.ts` | Composes Zustand slices; public `useAppStore` API |
-| `src/stores/slices/` | `session` / `composer` / `layout` / `ui` / `panelExtras` slices |
+| `src/stores/slices/` | `session` / `composer` / `layout` / `contentLayout` / `ui` / `panelExtras` slices |
 | `src/lib/accent.ts` | Accent presets + custom hex → `--color-accent*` DOM apply |
 | `src/stores/persist.ts` | `persistUiState` / `restoreUiState` |
 | `src/stores/layoutConstants.ts` | Sidebar / right-panel / chat width clamps |
@@ -185,7 +184,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/hooks/useSessionSidebarGroups.ts` | Pin/archive/repo grouping + stable order for SessionSidebar |
 | `src/hooks/useSessionEvents.ts` | Active-session replay + timeline rows (thin over `lib/timeline`) |
 | `src/hooks/useLatestVerdict.ts` | Narrow per-session latest Verify verdict (Plan tab) |
-| `src/hooks/useIsGitRepo.ts` | Shared `git-is-repo` TanStack query (ContextBar / FilesChangedCard / RightPanel / ChangesTab) |
+| `src/hooks/useIsGitRepo.ts` | Shared `git-is-repo` TanStack query (ContextBar / FilesChangedCard / ChangesTab) |
 | `src/hooks/useGlobalSessionEvents.ts` | App-level session-event fan-out + subscribe (via `sessionEventBus`) |
 | `src/lib/sessionEventBus.ts` | Ref-counted single Tauri `session-event` listener; demux to React subscribers |
 | `src/components/organisms/timeline/mergeLiveRows.ts` | Pure live+materialized row merge with O(1) id Sets |
@@ -241,8 +240,8 @@ spacing changes, update [DESIGN.md](./DESIGN.md).
 - **WorkGroup props:** `buildDisplayItems` precomputes `verdict` / `resumeLine` / `hasLiveThinking` on each `WorkGroupItem` so the virtualizer map does not re-scan `item.rows` every parent render. Compacting/indexing cues still override at render time from session status. `mergeSettledThinkingRows` folds consecutive settled thoughts (any duration, plus empty/untimed) into one `ThinkingBlock` with summed duration; live streaming thoughts stay separate; empty-only runs are dropped.
 - **Tool / workflow memo:** `ToolStepList` memos `clusterToolRows`; `WorkflowGroup` memos `resolveSteps`.
 - **Session-event demux:** `lib/sessionEventBus` attaches one Tauri `session-event` listener; `useGlobalSessionEvents` and each `useSessionEvents` subscribe to the bus (SubagentViewer no longer triples wire delivery).
-- **Browser / terminal selectors:** `useBrowserSession` selects per-session primitives; `TerminalTab` mounts xterm only for the active session's terminals (+ that session's agent terminal). `useIsGitRepo` shares the 5s `git-is-repo` poll across ContextBar / FilesChangedCard / RightPanel / ChangesTab.
+- **Browser / terminal selectors:** `useBrowserSession` selects per-session primitives; `TerminalTab` mounts xterm only for the active session's terminals (+ that session's agent terminal). `useIsGitRepo` shares the 5s `git-is-repo` poll across ContextBar / FilesChangedCard / ChangesTab.
 - **MarkdownBody:** module-scoped `components` map so settled `react-markdown` trees keep stable element constructors across parent re-renders.
-- **Spacing balance (careful):** see [DESIGN.md](./DESIGN.md) for the full gutter/height canon. Short form: chat chrome `px-3`; RightPanel `TabStrip` + tab chrome `px-2.5` / `--header-height` with `Tab` at `h-6`; Terminal/Database side lists `px-2.5 py-1.5 text-xs`; Settings `px-3.5` rows / `gap-3` cards; Welcome `h-9` inputs; session sidebar list `px-2`.
+- **Spacing balance (careful):** see [DESIGN.md](./DESIGN.md) for the full gutter/height canon. Short form: chat chrome `px-3`; content pane `TabStrip` + tab chrome `px-2.5` / `--header-height` with `Tab` at `h-6`; Terminal/Database side lists `px-2.5 py-1.5 text-xs`; Settings `px-3.5` rows / `gap-3` cards; Welcome `h-9` inputs; session sidebar list `px-2`.
 - **Streaming visuals:** `StreamingCaret` renders inline inside live `MarkdownBody` (including mid-turn narration in work groups); live assistant rows reserve `MessageActions` height; highlight.js preloads while live; `TurnTimeline` uses per-session `streamingSessions[id]` (SubagentViewer-safe); bottom “Working” hides when live answer text is visible; double-rAF remeasure on stream settle.
-- **Files / Monaco:** `@monaco-editor/react` + Vite `?worker` locals (`lib/monacoEnv.ts`); editor/vendor split via `manualChunks.monaco`. Open buffers live in `openFilesBySession` under one right-panel `files` tab (keep-alive like Terminal).
+- **Files / Monaco:** `@monaco-editor/react` + Vite `?worker` locals (`lib/monacoEnv.ts`); editor/vendor split via `manualChunks.monaco`. Open buffers live in `openFilesBySession` under one content `files` tab (keep-alive like Terminal).

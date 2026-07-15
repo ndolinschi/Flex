@@ -35,13 +35,12 @@ audit and fix UI against this file.
 ┌─ WindowTitleBar (30px) ──────────────────────────────────────┐
 │ traffic / captions │ menus │ drag region │                   │
 ├─ body (flex-1, relative) ────────────────────────────────────┤
-│ ┌ SessionSidebar ┐ ┌ Chat column (flex-1) ┐ ┌ RightPanel ┐ │
-│ │                │ │ AppHeader (tabs)     │ │ TabStrip   │ │
-│ │ actions        │ │ TurnTimeline         │ │ tab body   │ │
-│ │ session list   │ │ Composer             │ │            │ │
-│ │ footer         │ │                      │ │            │ │
-│ └────────────────┘ └──────────────────────┘ └────────────┘ │
-│   When RightPanel closed: RightPanelMiniTabs flyout (right)  │
+│ ┌ SessionSidebar ┐ ┌ ContentWorkspace (flex-1) ─────────────┐ │
+│ │                │ │ AppHeader (sidebar · split)            │ │
+│ │ actions        │ │ ContentPane(s) — tabs + chat/tool body │ │
+│ │ session list   │ │   single OR left | sash | right        │ │
+│ │ footer         │ │                                        │ │
+│ └────────────────┘ └────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -51,10 +50,8 @@ Composition root: `src/App.tsx`.
 |---|---|
 | `WindowTitleBar` | Custom chrome (`decorations: false`); `--titlebar-height` |
 | `SessionSidebar` | Agents list; left column (wide) or full overlay (narrow/tight) |
-| Chat column | `ChatPage` kept mounted; settings routes overlay it |
-| `ChatSessionTabBar` | Open-chat pills inside AppHeader (scrollable; close ≠ delete) |
-| `RightPanel` | Details pane; sibling of chat column |
-| `RightPanelMiniTabs` | Closed-panel flyout (wide only); Cursor Open Tabs / On {project} |
+| `ContentWorkspace` | Header + content panes (chat + tool tabs; optional split) |
+| `ContentPane` | Per-pane tab strip + bodies; `+` / open-to-side |
 | Overlays | CommandPalette, SearchModal, ToastHost — app-level |
 
 **Chat stays mounted** when opening Settings / Customize / Memory /
@@ -68,7 +65,7 @@ survive.
 | Route | Page | Layout |
 |---|---|---|
 | `welcome` | `WelcomePage` | Title bar + centered rail (`--welcome-rail`); no sidebars |
-| `chat` | `ChatPage` → `ChatShell` | Sidebar + header + timeline + composer + right panel |
+| `chat` | `ContentWorkspace` | Sidebar + header + content panes (chat + tools; optional split) |
 | `settings` | `SettingsPage` → `SettingsShell` | Absolute overlay over chat; back header + sticky nav + cards |
 | `customize` / `memory` / `automations` | Same shell, different section | Same as settings |
 
@@ -79,24 +76,20 @@ survive.
 - Primary controls: **`h-9`** inputs / `Button size="lg"`
 - Cards: `rounded-[var(--radius-card)]` · `px-3.5 py-3`
 
-### Chat (`ChatShell`)
+### Chat (`ContentWorkspace`)
 
 ```
-AppHeader (30px) — sidebar toggle · scrollable open-chat tabs · panel toggle + session menu
-main
-  ├── timeline (flex-1) — hidden in composer-hero empty state
-  └── composer stack (shrink-0, pb-2)
-        ├── optional HITL / workers above bubble
-        └── Composer
+AppHeader (30px) — sidebar toggle · split toggle (⌘J) · session menu
+ContentPane(s)
+  ├── TabStrip — chat sessions + tool tabs (+ / open-to-side)
+  └── body — ChatSessionBody or tool tab (Plan/Changes/…)
 ```
 
-- Wide: chat pane `min-w-[380px]` (`CHAT_MIN_WIDTH`)
-- Tight: `--content-rail: 100%`; hero/overlay/timeline/composer use chat chrome `px-3`
-- **Chat tabs:** live in `AppHeader` between the sidebar toggles (not a separate
-  row). Opening/switching a session appends it to `openChatSessionIds`
-  (persisted). Closing a tab removes it from the strip only — the session
-  stays in the sidebar. Working sessions show a small accent dot; unread
-  shows a count prefix. Strip scrolls horizontally when tabs overflow.
+- **Single:** one pane fills the column.
+- **Split (wide only):** left | sash | right; each pane has its own tabs.
+- Auto-open (plan approval, PR, files, browser, terminal) uses `openToolBesideChat`.
+- Narrow/tight: force single pane.
+
 ### Settings (`SettingsShell`)
 
 ```
@@ -112,10 +105,10 @@ main (px-4 gap-6 overflow-y-auto)
 
 ## Viewports & positioning
 
-| Viewport | Width | Sidebar / right panel |
+| Viewport | Width | Sidebar / content |
 |---|---|---|
-| `wide` | ≥ 940px | Side-by-side columns; resizable sashes |
-| `narrow` | 680–939px | Full-height overlays (`z-30` + backdrop `z-20`); auto-collapse on enter |
+| `wide` | ≥ 940px | Side-by-side; optional content split sash |
+| `narrow` | 680–939px | Sidebar full-height overlay; content forced single pane |
 | `tight` | < 680px | Same overlays as narrow + tighter chat gutters |
 
 **Wide widths** (Zustand + `layoutConstants.ts`):
@@ -123,30 +116,24 @@ main (px-4 gap-6 overflow-y-auto)
 | Pane | Default | Min | Max |
 |---|---|---|---|
 | Sidebar | 260px | 210 | 400 |
-| Right panel | 380px | 300 | 960 |
-| Chat | fluid | **380px** floor | — |
+| Content pane (each, when split) | ~50% | **380px** floor | — |
+| Chat body (single) | fluid | **380px** floor | — |
 
-Sashes never shrink chat below `CHAT_MIN_WIDTH` when both side panes are open.
+Sashes never shrink a content pane below `CHAT_MIN_WIDTH` when split.
 
 **Narrow/tight overlays:**
 
 - Sidebar: `absolute inset-y-0 left-0 z-30 w-full shadow-popover`
-- Right panel: `absolute inset-y-0 right-0 z-30 shadow-popover`
 - Backdrop: `absolute inset-0 z-20 bg-black/30`
-- Mutual exclusion: opening one closes the other
-- Esc order: HITL → sidebar → right panel → cancel turn
+- Content split is disabled (single pane only)
+- Esc order: HITL → sidebar → cancel turn
 
-**Right panel body:** tab content uses `absolute inset-0` under the strip so
+**Tool tab bodies:** tab content uses `absolute inset-0` under the strip so
 Browser / Terminal always fill remaining height.
 
-**Closed-panel mini tabs:** when `rightPanelOpen` is false on the chat route
-(with an active session) **and viewport is `wide`**, `RightPanelMiniTabs`
-anchors to the right edge (`absolute right-2`, below `--header-height`).
-Cursor layout: "Open Tabs" + "On {project}" section labels, ghost rows
-(`w-[200px]`, no card/shadow). Hidden on narrow/tight. Chat column adds
-`padding-right: 216px` (`RIGHT_PANEL_MINI_TABS_RESERVE_PX`) while visible so
-the content rail does not sit under the flyout. Not a third panel state —
-⌘J / PanelRight still owns open/close.
+**Closed-panel mini tabs:** removed — the right column no longer exists.
+Tool surfaces open as content tabs (optionally beside chat in split mode).
+
 
 ---
 
@@ -157,7 +144,7 @@ Use these gutters unless a surface documents an exception.
 | Surface | Horizontal | Vertical / rhythm |
 |---|---|---|
 | **Chat chrome** (AppHeader, timeline, composer outer) | `px-3` (12px) | Timeline `py-3`; composer `pt-1.5 pb-0.5`; stack `pb-2` |
-| **Right panel chrome** (TabStrip, tab headers, banners, CommitCenter) | `px-2.5` (10px) | Rows = `--header-height` (30px) |
+| **Content pane chrome** (TabStrip, tool tab headers, banners, CommitCenter) | `px-2.5` (10px) | Rows = `--header-height` (30px) |
 | **Session sidebar** (actions, list, section headers) | `px-2` (8px) | Actions `pt-2 pb-2 gap-0.5`; sections `gap-2` |
 | **Sidebar footer** | `px-2.5` | `py-1.5` |
 | **Composer toolbar / textarea** | `px-2.5` | Toolbar `pt-1 pb-1.5`; textarea `pt-2 pb-1` |
@@ -291,7 +278,7 @@ Nav sticky `pt-6`. Cards use `--radius-card` + `bg-settings-card`. Rows
 | Surface | Positioning | z |
 |---|---|---|
 | CommandPalette / SearchModal | `fixed inset-0`; panel `mt-[10vh] w-[560px]` | `z-[300]` |
-| Sidebar / right panel overlay + backdrop | `absolute` on app body | `z-30` / `z-20` |
+| Sidebar overlay + backdrop | `absolute` on app body | `z-30` / `z-20` |
 | Composer stack / HITL | In-flow above bubble; ChatShell slot `z-50` | — |
 | SubagentViewer | Bottom sheet over timeline `main` | `z-10`–`z-20` |
 | Scroll-to-bottom | Absolute in timeline | `z-20` |
@@ -333,7 +320,7 @@ Tailwind `p-*` / `gap-*` map through `@theme` in `src/index.css`.
 | `fill-2` selected / `fill-4` list hover | One-off active fills (`fill-3` as selected) |
 | Quiet sash hover (white-alpha) | Accent-colored resize lines |
 | Timeline gaps via **padding** | Margin between virtualized rows |
-| Keep Chat mounted under settings overlays | Remount ChatPage on settings round-trips |
+| Keep Chat mounted under settings overlays | Remount ContentWorkspace on settings round-trips |
 | Update this file when gutters change | Leave docs stale after a spacing PR |
 
 **Agent skill:** `.claude/skills/design-audit/SKILL.md` — run that procedure for spacing / layout audits.
@@ -342,7 +329,7 @@ Tailwind `p-*` / `gap-*` map through `@theme` in `src/index.css`.
 
 ## Checklist for UI changes
 
-1. Pick the surface gutter from **Spacing canon** (chat `px-3`, panel `px-2.5`, sidebar `px-2`).
+1. Pick the surface gutter from **Spacing canon** (chat `px-3`, content pane `px-2.5`, sidebar `px-2`).
 2. Keep header rows at `--header-height`; controls inside them at **`h-6`**.
 3. Align nested chrome with the parent strip (don’t mix `px-2` under a `px-2.5` TabStrip).
 4. Prefer tokens / shared atoms (`Tab`, `TabStrip`, `IconButton`) over one-off heights.

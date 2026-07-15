@@ -28,9 +28,7 @@ const openDevServerUrlInBrowser = (sessionId: string, url: string) => {
   const wasStarted = !!store.browserBySession[sessionKey]?.started
   store.setBrowserSessionState(sessionKey, { loading: true, url })
   store.setBrowserOwnerSessionId(sessionKey)
-  store.setRightPanelOpen(true)
-  store.openTab(sessionKey, "browser")
-  store.setRightPanelTab("browser")
+  store.openToolBesideChat(sessionId, "browser")
   if (wasStarted) {
     void browserNavigate(url).catch(() => {})
   } else {

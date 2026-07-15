@@ -13,14 +13,13 @@ import { browserOpen, cancel, createSession } from "./lib/tauri"
 import { newAgentCreateInput } from "./lib/sessions"
 import {
   CommandPalette,
-  RightPanel,
   SearchModal,
   SessionSidebar,
   WindowTitleBar,
 } from "./components/organisms"
+import { ContentWorkspace } from "./components/organisms/content/ContentWorkspace"
 import { ToastHost } from "./components/molecules"
 import { Spinner } from "./components/atoms"
-import { ChatPage } from "./pages/ChatPage"
 import { WelcomePage } from "./pages/WelcomePage"
 import { sessionScopeKey, useAppStore } from "./stores/appStore"
 import { cn } from "./lib/utils"
@@ -56,7 +55,7 @@ const AppRoutes = () => {
   const isBootstrapped = useAppStore((s) => s.isBootstrapped)
   const setRoute = useAppStore((s) => s.setRoute)
   const toggleSidebarCollapsed = useAppStore((s) => s.toggleSidebarCollapsed)
-  const toggleRightPanel = useAppStore((s) => s.toggleRightPanel)
+  const toggleSplit = useAppStore((s) => s.toggleSplit)
   const setTheme = useAppStore((s) => s.setTheme)
   const { newAgent } = useSessions()
   useGlobalSessionEvents()
@@ -67,8 +66,6 @@ const AppRoutes = () => {
   useViewportWidth(isBootstrapped)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [searchModalOpen, setSearchModalOpen] = useState(false)
-  const setRightPanelOpen = useAppStore((s) => s.setRightPanelOpen)
-  const setRightPanelTab = useAppStore((s) => s.setRightPanelTab)
 
   // Dev QA: Rust emits `qa-open-browser` when FLEX_BROWSER_QA=1 so we can
   // validate native webview bounds without flaky UI automation.
@@ -93,8 +90,7 @@ const AppRoutes = () => {
           }
         }
         const key = sessionScopeKey(sessionId)
-        store.setRightPanelOpen(true)
-        store.setRightPanelTab("browser")
+        store.openToolBesideChat(sessionId, "browser")
         store.setBrowserOwnerSessionId(key)
         store.setBrowserSessionState(key, {
           started: true,
@@ -102,7 +98,7 @@ const AppRoutes = () => {
           url: event.payload,
           loadError: null,
         })
-        // Let RightPanel + BrowserTab commit refs before open/bounds.
+        // Let ContentPane + BrowserTab commit refs before open/bounds.
         await new Promise((r) => window.setTimeout(r, 500))
         if (cancelled) return
         await browserOpen(event.payload)
@@ -115,7 +111,7 @@ const AppRoutes = () => {
       cancelled = true
       unlisten?.()
     }
-  }, [setRightPanelOpen, setRightPanelTab])
+  }, [])
 
   // A web link clicked anywhere in chat markdown (see MarkdownBody's `a`)
   // opens in the embedded Browser panel — never the app's own webview (which
@@ -132,9 +128,7 @@ const AppRoutes = () => {
         if (!sessionId) return
         const key = sessionScopeKey(sessionId)
         const alreadyStarted = !!store.browserBySession[key]?.started
-        store.setRightPanelOpen(true)
-        store.openTab(key, "browser")
-        store.setRightPanelTab("browser")
+        store.openToolBesideChat(sessionId, "browser")
         store.setBrowserOwnerSessionId(key)
         store.setBrowserSessionState(key, {
           started: true,
@@ -142,7 +136,7 @@ const AppRoutes = () => {
           url,
           loadError: null,
         })
-        // First open: let RightPanel + BrowserTab mount/commit refs before the
+        // First open: let ContentPane + BrowserTab mount/commit refs before the
         // native webview is created and positioned (mirrors qa-open-browser).
         if (!alreadyStarted) {
           await new Promise((r) => window.setTimeout(r, 500))
@@ -193,7 +187,7 @@ const AppRoutes = () => {
       toggleSidebarCollapsed()
     },
     onToggleRightPanel: () => {
-      toggleRightPanel()
+      toggleSplit()
     },
     onToggleCommandPalette: () => {
       setCommandPaletteOpen((v) => !v)
@@ -221,15 +215,11 @@ const AppRoutes = () => {
       ) {
         return true
       }
-      // Narrow/tight: an open sidebar or right-panel overlay covers the
-      // chat area — Esc closes it before falling through to turn-cancel.
+      // Narrow/tight: an open sidebar overlay covers the chat area — Esc
+      // closes it before falling through to turn-cancel. Split is wide-only.
       if (state.viewport !== "wide") {
         if (!state.sidebarCollapsed) {
           state.setSidebarCollapsed(true)
-          return true
-        }
-        if (state.rightPanelOpen) {
-          state.setRightPanelOpen(false)
           return true
         }
       }
@@ -306,42 +296,35 @@ const AppRoutes = () => {
          * anchored to this container's left edge — see SessionSidebar.tsx's
          * `narrow` handling) spans the full app width, not just the chat area. */}
         <SessionSidebar onOpenSearch={() => setSearchModalOpen(true)} />
-        {/* Relative + flex-row: at "wide" the right panel lays out as a normal
-         * side-by-side column (unchanged from before); at "narrow"/"tight" it
-         * switches to an absolute overlay anchored to this container's right
-         * edge, so the overlay + backdrop cover only the chat area, not the
-         * sidebar (see RightPanel.tsx's `narrow` handling). */}
-        <div className="relative flex min-h-0 min-w-0 flex-1">
-          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-            <div
-              className={cn(
-                "flex h-full min-h-0 flex-1 flex-col",
-                "transition-opacity duration-[var(--duration-normal)] ease-[var(--easing-default)]",
-                route !== "chat" && "pointer-events-none opacity-0",
-              )}
-              aria-hidden={route !== "chat"}
-            >
-              <ChatPage embedded />
-            </div>
-            {route === "settings" ||
-            route === "customize" ||
-            (AUTOMATIONS_UI_ENABLED && route === "automations") ||
-            route === "memory" ? (
-              <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
-                <Suspense
-                  fallback={
-                    <div className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted">
-                      <Spinner size="md" />
-                      Loading…
-                    </div>
-                  }
-                >
-                  <SettingsPage embedded />
-                </Suspense>
-              </div>
-            ) : null}
+        {/* Content workspace fills remaining width (tabs + optional split). */}
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+          <div
+            className={cn(
+              "flex h-full min-h-0 flex-1 flex-col",
+              "transition-opacity duration-[var(--duration-normal)] ease-[var(--easing-default)]",
+              route !== "chat" && "pointer-events-none opacity-0",
+            )}
+            aria-hidden={route !== "chat"}
+          >
+            <ContentWorkspace />
           </div>
-          <RightPanel />
+          {route === "settings" ||
+          route === "customize" ||
+          (AUTOMATIONS_UI_ENABLED && route === "automations") ||
+          route === "memory" ? (
+            <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted">
+                    <Spinner size="md" />
+                    Loading…
+                  </div>
+                }
+              >
+                <SettingsPage embedded />
+              </Suspense>
+            </div>
+          ) : null}
         </div>
         <CommandPalette
           open={commandPaletteOpen}

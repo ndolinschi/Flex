@@ -27,8 +27,7 @@ const STATUS_COLOR: Record<string, string> = {
  */
 export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
   const [expanded, setExpanded] = useState(false)
-  const setRightPanelOpen = useAppStore((s) => s.setRightPanelOpen)
-  const setRightPanelTab = useAppStore((s) => s.setRightPanelTab)
+  const openToolBesideChat = useAppStore((s) => s.openToolBesideChat)
   const openWorkspaceFile = useAppStore((s) => s.openWorkspaceFile)
 
   const { data: isRepo } = useIsGitRepo(cwd)
@@ -57,8 +56,8 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
   }
 
   const handleReview = () => {
-    setRightPanelOpen(true)
-    setRightPanelTab("changes")
+    if (!sessionId) return
+    openToolBesideChat(sessionId, "changes")
   }
 
   const handleOpenFile = (path: string, status: string, isDir: boolean) => {

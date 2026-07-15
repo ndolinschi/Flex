@@ -61,17 +61,36 @@ export const useBootstrap = (
           return
         }
 
-        // Restore per-session open tabs BEFORE focusing a session so
-        // `setActiveSessionId` can sync `rightPanelTab` from
-        // `openTabsBySession`. The panel itself is forced closed after boot
-        // (see below) — tabs are remembered for when the user opens it.
+        // Restore content layout (or migrate from legacy openTabs / chat tabs)
+        // BEFORE focusing a session so panes already exist.
         if (ui.openTabsBySession) {
           useAppStore.getState().setOpenTabsBySession(ui.openTabsBySession)
         }
-        // Center-pane chat tabs before focus so we don't wipe MRU with a
-        // single-id list from `openChatTab` alone.
         if (ui.openChatSessionIds?.length) {
           useAppStore.getState().setOpenChatSessionIds(ui.openChatSessionIds)
+        }
+        {
+          const { migrateToContentLayout } = await import(
+            "../stores/contentLayoutModel"
+          )
+          const layout = migrateToContentLayout({
+            contentLayout: ui.contentLayout,
+            activeSessionId: ui.activeSessionId ?? null,
+            openChatSessionIds: ui.openChatSessionIds,
+            openTabsBySession: ui.openTabsBySession,
+            rightPanelOpen: ui.rightPanelOpen,
+          })
+          // Boot always starts single unless user had persisted split layout.
+          if (!ui.contentLayout && layout.mode === "split") {
+            useAppStore.getState().setContentLayout({
+              ...layout,
+              mode: "single",
+              focusedPane: 0,
+              panes: [layout.panes[0]!],
+            })
+          } else {
+            useAppStore.getState().setContentLayout(layout)
+          }
         }
 
         if (ui.activeSessionId) {

@@ -83,6 +83,13 @@ export type RightPanelTab =
   /** Plugin-contributed tab ids (string & {} keeps autocomplete for builtins). */
   | (string & {})
 
+export type {
+  ContentTab,
+  ContentLayout,
+  PaneState,
+  ToolTabId,
+} from "./contentLayoutModel"
+
 export type TerminalMeta = {
   id: string
   title: string
@@ -297,7 +304,7 @@ export type ComposerSliceState = {
   selectedEffort: string | null
   effortByModel: Record<string, string>
   attachments: ComposerAttachment[]
-  setComposerDraft: (draft: string) => void
+  setComposerDraft: (draft: string, forSessionId?: string | null) => void
   getComposerDraft: () => string
   setComposerMode: (mode: ComposerMode) => void
   setDefaultPermissionMode: (mode: PermissionMode) => void
@@ -317,15 +324,17 @@ export type LayoutSliceState = {
   sidebarSearchQuery: string
   sidebarCollapsed: boolean
   sidebarWidth: number
+  /**
+   * @deprecated Prefer `contentLayout` — kept as derived compat for call sites
+   * mid-migration (`true` when split or a non-chat tab is focused).
+   */
   rightPanelOpen: boolean
+  /** @deprecated Prefer contentLayout active tool tab. */
   rightPanelTab: RightPanelTab
+  /** @deprecated Unused after content panes; retained for persist compat. */
   rightPanelWidth: number
-  /** Legacy slim-strip flag — UI no longer offers collapse-to-strip (one
-   * PanelRight toggle only, Cursor-style). Kept for persist/bootstrap compat;
-   * RightPanel clears it on mount if set. */
   rightPanelCollapsed: boolean
-  /** True while the right-panel resize sash is being dragged — hides the
-   * native browser child webview so the sash stays clickable. */
+  /** True while a content-pane sash is dragged — hides native browser webview. */
   rightPanelDragging: boolean
   viewport: Viewport
   sidebarCollapsedBeforeNarrow: boolean | null
@@ -336,14 +345,47 @@ export type LayoutSliceState = {
   setSidebarCollapsed: (collapsed: boolean) => void
   toggleSidebarCollapsed: () => void
   setSidebarWidth: (width: number, persist?: boolean) => void
+  /** Compat: `true` → ensure split; `false` → collapse to single. */
   setRightPanelOpen: (open: boolean) => void
+  /** Compat: toggles content split (⌘J). */
   toggleRightPanel: () => void
+  /** Compat: open tool beside chat (or activate in focused pane). */
   setRightPanelTab: (tab: RightPanelTab) => void
   setRightPanelWidth: (width: number, persist?: boolean) => void
   setRightPanelCollapsed: (collapsed: boolean) => void
   toggleRightPanelCollapsed: () => void
   setRightPanelDragging: (dragging: boolean) => void
   setViewport: (viewport: Viewport) => void
+}
+
+export type ContentLayoutSliceState = {
+  contentLayout: import("./contentLayoutModel").ContentLayout
+  setContentLayout: (
+    layout: import("./contentLayoutModel").ContentLayout,
+  ) => void
+  setFocusedPane: (pane: 0 | 1) => void
+  setSplitRatio: (ratio: number, persist?: boolean) => void
+  toggleSplit: () => void
+  ensureSplit: () => void
+  collapseSplit: () => void
+  /** Discard one pane (and its tabs) when split; keep the other as single. */
+  closePane: (pane: 0 | 1) => void
+  openChatInPane: (pane: 0 | 1, sessionId: import("../lib/types").SessionId) => void
+  openToolInPane: (
+    pane: 0 | 1,
+    sessionId: import("../lib/types").SessionId,
+    tool: RightPanelTab,
+  ) => void
+  /** Ensure chat for session + open tool in the other pane (auto-reveal). */
+  openToolBesideChat: (
+    sessionId: import("../lib/types").SessionId,
+    tool: RightPanelTab,
+  ) => void
+  openTabToSide: (fromPane: 0 | 1, tabId: string) => void
+  activateTabInPane: (pane: 0 | 1, tabId: string) => void
+  closeTabInPane: (pane: 0 | 1, tabId: string) => void
+  /** Focus pane + sync activeSessionId when activating a chat tab. */
+  focusContentTab: (pane: 0 | 1, tabId: string) => void
 }
 
 export type UiSliceState = {
@@ -482,6 +524,7 @@ export type PanelExtrasSliceState = {
 export type AppState = SessionSliceState &
   ComposerSliceState &
   LayoutSliceState &
+  ContentLayoutSliceState &
   UiSliceState &
   PanelExtrasSliceState
 

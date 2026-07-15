@@ -10,6 +10,8 @@ import { AttachmentChip } from "./AttachmentChip"
 import { modePlaceholder } from "./ModePicker"
 
 type ComposerInputProps = {
+  /** Bind drafts to this session (defaults to store activeSessionId). */
+  sessionId?: string | null
   composerMode: ComposerMode
   isHero?: boolean
   cwd: string | undefined
@@ -32,6 +34,7 @@ type ComposerInputProps = {
  * ContextBar / ModelPicker in the parent do not re-render on keystrokes.
  */
 export const ComposerInput = ({
+  sessionId: sessionIdProp = null,
   composerMode,
   isHero = false,
   cwd,
@@ -45,11 +48,15 @@ export const ComposerInput = ({
   onSend,
   textareaRefOut,
 }: ComposerInputProps) => {
-  const activeSessionId = useAppStore((s) => s.activeSessionId)
+  const storeActive = useAppStore((s) => s.activeSessionId)
+  const activeSessionId = sessionIdProp ?? storeActive
   const composerDraft = useAppStore((s) =>
     activeSessionId ? (s.draftsBySession[activeSessionId] ?? "") : s.orphanDraft,
   )
-  const setComposerDraft = useAppStore((s) => s.setComposerDraft)
+  const storeSetComposerDraft = useAppStore((s) => s.setComposerDraft)
+  const setComposerDraft = (draft: string) => {
+    storeSetComposerDraft(draft, activeSessionId)
+  }
   const browserDesignMode = useAppStore((s) => s.browserDesignMode)
   const hasDomChip = attachments.some((a) => a.kind === "dom")
   const backdropRef = useRef<HTMLDivElement>(null)

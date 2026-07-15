@@ -25,6 +25,8 @@ import { ContextBar } from "./ContextBar"
 import { ComposerQueue } from "./composer/ComposerQueue"
 
 type ComposerProps = {
+  /** When set, bind drafts/send to this session instead of global active. */
+  sessionId?: string | null
   isHero?: boolean
   /** Permission / question card stacked flush above the bubble (same rail). */
   dockedOverlay?: ReactNode
@@ -35,20 +37,21 @@ type ComposerProps = {
 /** Send control that narrow-selects draft emptiness so the parent Composer
  * (and its ModelPicker) do not re-render on every keystroke. */
 const ComposerSendButton = ({
+  sessionId,
   isStreaming,
   hasAttachments,
   onSend,
   onStop,
 }: {
+  sessionId: string | null
   isStreaming: boolean
   hasAttachments: boolean
   onSend: () => void
   onStop: () => void
 }) => {
-  const activeSessionId = useAppStore((s) => s.activeSessionId)
   const hasText = useAppStore((s) => {
-    const draft = activeSessionId
-      ? (s.draftsBySession[activeSessionId] ?? "")
+    const draft = sessionId
+      ? (s.draftsBySession[sessionId] ?? "")
       : s.orphanDraft
     return draft.trim().length > 0
   })
@@ -76,11 +79,13 @@ const DOCKED_BUBBLE_SHADOW_FOCUS =
  * Draft subscription lives in `ComposerInput` / `ComposerSendButton` so
  * ContextBar + ModelPicker stay stable across keystrokes. */
 export const Composer = ({
+  sessionId: sessionIdProp = null,
   isHero = false,
   dockedOverlay = null,
   workersSlot = null,
 }: ComposerProps) => {
-  const activeSessionId = useAppStore((s) => s.activeSessionId)
+  const storeActiveSessionId = useAppStore((s) => s.activeSessionId)
+  const activeSessionId = sessionIdProp ?? storeActiveSessionId
   // Docked Permission/Question sits as a sibling above this bubble — squash
   // top corners and drop the top shadow-ring so the seam reads as one panel.
   const hasDockedOverlay = !!dockedOverlay
@@ -311,6 +316,7 @@ export const Composer = ({
           )}
         >
           <ComposerInput
+            sessionId={activeSessionId}
             composerMode={composerMode}
             isHero={isHero}
             cwd={active?.cwd}
@@ -367,6 +373,7 @@ export const Composer = ({
                     onToggle={handleToggleBypass}
                   />
                   <ComposerSendButton
+                    sessionId={activeSessionId}
                     isStreaming={isStreaming}
                     hasAttachments={attachments.length > 0}
                     onSend={() => void handleSend()}

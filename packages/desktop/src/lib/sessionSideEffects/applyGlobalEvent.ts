@@ -372,24 +372,24 @@ export const applyGlobalSessionEvent = (
     pushTerminalData(key, text)
     store.setAgentStreamPresent(key)
 
+    // Open Terminal beside chat for exec output (skip while Browser is focused).
+    const focusedPane =
+      store.contentLayout.panes[store.contentLayout.focusedPane]
+    const focusedTab = focusedPane?.tabs.find(
+      (t) => t.id === focusedPane.activeTabId,
+    )
+    const browserFocused =
+      focusedTab?.kind === "tool" && focusedTab.tool === "browser"
     if (
       event.session_id === store.activeSessionId &&
-      store.rightPanelOpen &&
-      store.rightPanelTab !== "terminal" &&
-      // Don't yank the user off an active Browser tab (e.g. Design Mode) to
-      // show exec output — auto-switching away mid-interaction is disruptive.
-      // The terminal tab still exists / can be opened manually.
-      store.rightPanelTab !== "browser" &&
+      !browserFocused &&
       !autoActivatedCallIds.has(payload.call_id)
     ) {
       autoActivatedCallIds.add(payload.call_id)
-      // Always register the tab in the strip so output is one click away.
-      store.openTab(event.session_id, "terminal")
-      // During an active generation, skip forced tab switch — mounting xterm
-      // mid exec_chunk flood freezes WebView2 on Windows. After the turn,
-      // switch so Bash output is still discoverable.
       if (!store.streamingSessions[event.session_id]) {
-        store.setRightPanelTab("terminal")
+        store.openToolBesideChat(event.session_id, "terminal")
+      } else {
+        store.openTab(event.session_id, "terminal")
       }
     }
   }

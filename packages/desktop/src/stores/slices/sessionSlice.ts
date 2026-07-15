@@ -6,12 +6,12 @@ import type {
   SessionPlan,
   SessionSliceState,
 } from "../types"
-import { emptyStreaming, sessionScopeKey } from "../types"
+import { emptyStreaming } from "../types"
 import { persistUiState } from "../persist"
 import { firstPlanHeading } from "../../lib/planTitle"
-import { isRightPanelTabEnabled } from "../../lib/featureFlags"
 import { log } from "../../lib/debug/log"
 import type { PlanEntry, SessionId } from "../../lib/types"
+import { defaultContentLayout } from "../contentLayoutModel"
 
 /** Snapshot annotations from in-memory plans for ui.json persistence. */
 const annotationsFromPlans = (
@@ -114,43 +114,20 @@ export const createSessionSlice: StateCreator<
         return { unreadBySession: next }
       })
     }
-    // Right panel open/tab are global fields (single `<aside>`, one visible
-    // panel), but which tabs a session has open is per-session
-    // (`openTabsBySession`, see BUG #37). Without this sync, switching
-    // sessions left `rightPanelOpen`/`rightPanelTab` at whatever the
-    // PREVIOUS session had — e.g. closing the panel on session B (which has
-    // no open tabs) then switching back to session A (which still has
-    // Changes+Terminal open in `openTabsBySession`) left the panel closed
-    // for A too, even though its tabs were never actually lost. Re-derive
-    // both from the target session's own remembered state on every switch:
-    // open + restore its last-selected tab if it has any open tabs, closed
-    // otherwise (matches the "new session: panel closed" default).
-    //
-    // `opts.panel: "closed"` forces closed (app boot + New Agent) while still
-    // syncing `rightPanelTab` so ⌘J later shows the right strip.
-    const key = sessionScopeKey(id)
-    const openIds = (get().openTabsBySession[key] ?? []).filter(
-      isRightPanelTabEnabled,
-    )
-    const forceClosed = opts?.panel === "closed"
-    if (openIds.length > 0) {
-      const remembered = get().selectedTabBySession[key]
-      const tab =
-        remembered &&
-        openIds.includes(remembered) &&
-        isRightPanelTabEnabled(remembered)
-          ? remembered
-          : openIds[openIds.length - 1]
-      // set() directly for the tab (not setRightPanelTab) — that action
-      // re-runs openTab/selectedTabBySession bookkeeping for the NEW
-      // session, which is redundant here (this tab is already recorded as
-      // open+selected for it) and would be wrong to run against `id` after
-      // switching anyway.
-      set({ rightPanelTab: tab })
-      void persistUiState({ rightPanelTab: tab })
-      get().setRightPanelOpen(!forceClosed)
+    // Sync content panes: open/activate this session's chat in the focused pane.
+    // `opts.panel: "closed"` collapses split on boot / New Agent.
+    if (id) {
+      get().openChatInPane(
+        get().contentLayout.mode === "split"
+          ? get().contentLayout.focusedPane
+          : 0,
+        id,
+      )
+      if (opts?.panel === "closed" && get().contentLayout.mode === "split") {
+        get().collapseSplit()
+      }
     } else {
-      get().setRightPanelOpen(false)
+      get().setContentLayout(defaultContentLayout(null))
     }
   },
   setIsStreaming: (streaming) => set({ isStreaming: streaming }),
@@ -303,9 +280,9 @@ export const createSessionSlice: StateCreator<
     set({ pendingPlanApproval: null })
   },
   revealPlanPanel: () => {
-    get().setRightPanelOpen(true)
-    get().setRightPanelCollapsed(false)
-    get().setRightPanelTab("plan")
+    const sessionId = get().activeSessionId
+    if (!sessionId) return
+    get().openToolBesideChat(sessionId, "plan")
   },
   setPlanEntries: (sessionId, entries) =>
     set((state) => {

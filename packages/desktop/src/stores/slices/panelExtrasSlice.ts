@@ -62,8 +62,10 @@ export const createPanelExtrasSlice: StateCreator<
       },
     })
     get().openTab(sessionKey, "files")
-    get().setRightPanelOpen(true)
-    get().setRightPanelTab("files")
+    // sessionKey is the session id (or "none").
+    if (sessionKey !== "none") {
+      get().openToolBesideChat(sessionKey, "files")
+    }
   },
   closeWorkspaceFile: (sessionKey, path) => {
     const prev = get().openFilesBySession[sessionKey] ?? []

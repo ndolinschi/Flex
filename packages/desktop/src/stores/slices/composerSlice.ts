@@ -24,8 +24,8 @@ export const createComposerSlice: StateCreator<
     if (!state.activeSessionId) return state.orphanDraft
     return state.draftsBySession[state.activeSessionId] ?? ""
   },
-  setComposerDraft: (draft) => {
-    const sessionId = get().activeSessionId
+  setComposerDraft: (draft, forSessionId) => {
+    const sessionId = forSessionId ?? get().activeSessionId
     if (!sessionId) {
       set({ orphanDraft: draft })
       return

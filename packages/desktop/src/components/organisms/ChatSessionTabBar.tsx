@@ -90,7 +90,7 @@ export const ChatSessionTabBar = () => {
           <Tab
             key={id}
             selected={id === activeSessionId}
-            // Same md pill as RightPanelTabBar; max-w keeps long titles truncating.
+            // Same md pill as ContentPane tabs; max-w keeps long titles truncating.
             className="max-w-[200px] shrink-0"
             title={label}
             onSelect={() => void handleSelect(id)}

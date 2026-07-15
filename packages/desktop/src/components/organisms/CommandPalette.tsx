@@ -56,17 +56,17 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
   const { sessions, newAgent } = useSessions()
   const setRoute = useAppStore((s) => s.setRoute)
   const toggleSidebarCollapsed = useAppStore((s) => s.toggleSidebarCollapsed)
-  const toggleRightPanel = useAppStore((s) => s.toggleRightPanel)
-  const setRightPanelOpen = useAppStore((s) => s.setRightPanelOpen)
-  const setRightPanelTab = useAppStore((s) => s.setRightPanelTab)
+  const toggleSplit = useAppStore((s) => s.toggleSplit)
+  const openToolBesideChat = useAppStore((s) => s.openToolBesideChat)
   const toggleTheme = useAppStore((s) => s.toggleTheme)
   const setComposerMode = useAppStore((s) => s.setComposerMode)
   const setActiveSessionId = useAppStore((s) => s.setActiveSessionId)
 
-  const openRightPanelTab = (tab: RightPanelTab) => {
+  const openToolTab = (tab: RightPanelTab) => {
     setRoute("chat")
-    setRightPanelOpen(true)
-    setRightPanelTab(tab)
+    const sessionId = useAppStore.getState().activeSessionId
+    if (!sessionId) return
+    openToolBesideChat(sessionId, tab)
   }
 
   const handleSelectSession = async (id: string) => {
@@ -105,52 +105,52 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
       },
       {
         id: "toggle-right-panel",
-        label: "Toggle Right Panel",
+        label: "Toggle Split View",
         icon: PanelRight,
         group: "Commands",
         hint: "⌘J",
-        run: () => toggleRightPanel(),
+        run: () => toggleSplit(),
       },
       {
         id: "tab-plan",
-        label: "Switch to Plan tab",
+        label: "Open Plan beside chat",
         group: "Commands",
-        run: () => openRightPanelTab("plan"),
+        run: () => openToolTab("plan"),
       },
       {
         id: "tab-changes",
-        label: "Switch to Changes tab",
+        label: "Open Changes beside chat",
         group: "Commands",
-        run: () => openRightPanelTab("changes"),
+        run: () => openToolTab("changes"),
       },
       {
         id: "tab-files",
-        label: "Switch to Files tab",
+        label: "Open Files beside chat",
         icon: FileCode2,
         group: "Commands",
-        run: () => openRightPanelTab("files"),
+        run: () => openToolTab("files"),
       },
       {
         id: "tab-terminal",
-        label: "Switch to Terminal tab",
+        label: "Open Terminal beside chat",
         icon: TerminalIcon,
         group: "Commands",
-        run: () => openRightPanelTab("terminal"),
+        run: () => openToolTab("terminal"),
       },
       {
         id: "tab-browser",
-        label: "Switch to Browser tab",
+        label: "Open Browser beside chat",
         group: "Commands",
-        run: () => openRightPanelTab("browser"),
+        run: () => openToolTab("browser"),
       },
       ...(MEMORY_TAB_ENABLED
         ? [
             {
               id: "tab-memory",
-              label: "Switch to Memory tab",
+              label: "Open Memory beside chat",
               icon: Brain,
               group: "Commands" as const,
-              run: () => openRightPanelTab("memory"),
+              run: () => openToolTab("memory"),
             },
           ]
         : []),
@@ -158,10 +158,10 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
         ? [
             {
               id: "tab-database",
-              label: "Switch to Database tab",
+              label: "Open Database beside chat",
               icon: Database,
               group: "Commands" as const,
-              run: () => openRightPanelTab("database"),
+              run: () => openToolTab("database"),
             },
           ]
         : []),
@@ -173,7 +173,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
         // The actual PTY spawn (terminalCreate) is owned by TerminalTab, which
         // is keyed to the active session's cwd — surface the tab (with its own
         // New Terminal affordance) rather than duplicating that logic here.
-        run: () => openRightPanelTab("terminal"),
+        run: () => openToolTab("terminal"),
       },
       {
         id: "toggle-theme",

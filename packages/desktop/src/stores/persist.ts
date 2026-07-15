@@ -6,6 +6,7 @@ import type {
   SessionId,
 } from "../lib/types"
 import type { RightPanelTab, UiTheme, PlanAnnotationsPersisted } from "./types"
+import type { ContentLayout } from "./contentLayoutModel"
 import { log } from "../lib/debug/log"
 
 export type UiPersisted = {
@@ -29,15 +30,16 @@ export type UiPersisted = {
   recentCwds?: string[]
   sidebarCollapsed?: boolean
   sidebarWidth?: number
+  /** @deprecated Prefer contentLayout — still read for migration. */
   rightPanelOpen?: boolean
+  /** @deprecated Prefer contentLayout. */
   rightPanelTab?: RightPanelTab
   rightPanelWidth?: number
   rightPanelCollapsed?: boolean
-  /** Per-session set of open right-panel tabs ("Open Tabs") —
-   * keyed by `sessionScopeKey`. Restored on boot so a session's open tabs
-   * survive an app restart even though the underlying terminal/browser
-   * state itself does not (see `openTabsBySession` in stores/types.ts). */
+  /** @deprecated Prefer contentLayout — still read for migration. */
   openTabsBySession?: Record<string, RightPanelTab[]>
+  /** Primary content pane layout (single / split + tabs). */
+  contentLayout?: ContentLayout
   browserLastUrl?: string
   pinnedSessionIds?: string[]
   archivedSessionIds?: string[]
