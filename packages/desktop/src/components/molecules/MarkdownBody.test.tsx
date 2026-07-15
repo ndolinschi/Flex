@@ -55,6 +55,10 @@ const x = 1
     expect(html).toContain("[&amp;_ul]:my-1.5")
     expect(html).toContain("[&amp;_pre]:my-1.5")
     expect(html).toContain("[&amp;_blockquote]:my-1.5")
+    // Link underline is per-anchor hover, not container hover (which would
+    // underline every link in the message at once).
+    expect(html).toContain("[&amp;_a:hover]:underline")
+    expect(html).not.toContain("hover:[&amp;_a]:underline")
     // Multi-block content actually renders.
     expect(html).toMatch(/<h1[^>]*>Title<\/h1>/)
     expect(html).toContain("<p>")

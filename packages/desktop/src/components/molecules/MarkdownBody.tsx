@@ -109,7 +109,9 @@ const MARKDOWN_PROSE_CLASS = cn(
   "[&_li]:my-0.5 [&_li]:first:mt-0 [&_li]:last:mb-0",
   "[&_li>_ul]:my-0.5 [&_li>_ol]:my-0.5",
   "[&_strong]:font-semibold",
-  "[&_a]:text-link [&_a]:underline-offset-2 hover:[&_a]:underline",
+  // Per-link hover only — `hover:[&_a]:…` would light every link when the
+  // markdown container itself is hovered.
+  "[&_a]:text-link [&_a]:underline-offset-2 [&_a:hover]:underline",
   "[&_code]:rounded-[5px] [&_code]:bg-code-inline [&_code]:px-1 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.9em]",
   "[&_pre]:my-1.5 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-stroke-3 [&_pre]:bg-panel [&_pre]:p-2.5 [&_pre]:text-[0.9em] [&_pre]:first:mt-0 [&_pre]:last:mb-0",
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0",
