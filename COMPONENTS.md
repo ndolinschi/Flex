@@ -107,11 +107,13 @@ NDJSON wire framing over `EngineService`: `OneTurnRequest`, `event_visible()`.
 groq, mistral, xai), `connect_bedrock`, `native`/`native_all`. Re-exports every
 connector.
 
-### LLM clients — `crates/{anthropic,openai,gemini,ollama,bedrock,copilot}/src/`
+### LLM clients — `crates/{anthropic,openai,gemini,ollama,bedrock,copilot,chatgpt}/src/`
 Each has `provider.rs` (stream → `ProviderStreamEvent` mapping), `wire.rs`, `config.rs`.
 Extras: `openai/src/compat.rs` (OpenAI-compatible endpoints) and `oauth.rs`;
 `bedrock/src/{eventstream,sigv4}.rs` (AWS framing + signing);
-`copilot/src/device_flow.rs` (GitHub device-flow sign-in, `store_github_token`).
+`copilot/src/device_flow.rs` (GitHub device-flow sign-in, `store_github_token`);
+`chatgpt/` — ChatGPT Plus/Pro subscription via Codex Responses
+(`chatgpt.com/backend-api/codex/responses`), reusing `openai` OAuth.
 
 ### common (`agentloop-provider-common`) — `crates/common/src/`
 Shared client plumbing: `http.rs`, `sse.rs`, `env.rs`.
@@ -173,7 +175,9 @@ Rust side
 (`src-tauri`) is a thin command layer over `agentloop-sdk::AgentBuilder` (native
 providers only; no delegators). Sessions persist via `JsonlStore`; secrets via OS
 keychain. GitHub Copilot uses device-flow commands (`copilot_auth_*`) that call
-`providers::copilot::{DeviceFlow, store_github_token}`.
+`providers::copilot::{DeviceFlow, store_github_token}`. ChatGPT subscription uses
+`chatgpt_auth_*` (headless OAuth via `providers::openai::{start_oauth, store_oauth_tokens}`)
+to unlock the native `chatgpt` provider.
 
 ## packages/gateway
 

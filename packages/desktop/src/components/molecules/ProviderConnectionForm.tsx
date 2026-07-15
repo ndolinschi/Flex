@@ -25,6 +25,8 @@ type ProviderConnectionFormProps = {
   isBedrock: boolean
   /** GitHub Copilot: device-flow / editor sign-in is present. */
   copilotSignedIn?: boolean
+  /** ChatGPT Plus/Pro: OAuth tokens are discoverable. */
+  chatgptSignedIn?: boolean
   models: ModelInfoDto[]
   defaultModelOptions: ModelInfoDto[]
   builtinProviders: BuiltinProvider[]
@@ -44,6 +46,7 @@ type ProviderConnectionFormProps = {
   onValidate: () => void
   onSave: () => void
   onCopilotSignIn?: () => void
+  onChatgptSignIn?: () => void
 }
 
 /** Connection create/edit form (fields + models + isolation + save footer). */
@@ -61,6 +64,7 @@ export const ProviderConnectionForm = ({
   hasStoredKey,
   isBedrock,
   copilotSignedIn = false,
+  chatgptSignedIn = false,
   models,
   defaultModelOptions,
   builtinProviders,
@@ -80,8 +84,10 @@ export const ProviderConnectionForm = ({
   onValidate,
   onSave,
   onCopilotSignIn,
+  onChatgptSignIn,
 }: ProviderConnectionFormProps) => {
   const isCopilot = provider === "copilot"
+  const isChatgpt = provider === "chatgpt"
   const [showTokenPaste, setShowTokenPaste] = useState(false)
 
   return (
@@ -180,6 +186,36 @@ export const ProviderConnectionForm = ({
               </FieldRow>
             ) : null}
           </>
+        ) : isChatgpt ? (
+          <FieldRow
+            label="ChatGPT subscription"
+            htmlFor="chatgptSignIn"
+            hint={
+              chatgptSignedIn
+                ? "Signed in — validate to list models, then save"
+                : "Sign in with your ChatGPT Plus/Pro account (Codex subscription)"
+            }
+          >
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-ink">
+                {chatgptSignedIn ? (
+                  <span className="text-success">Signed in</span>
+                ) : (
+                  <span className="text-ink-muted">Not signed in</span>
+                )}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  id="chatgptSignIn"
+                  size="sm"
+                  onClick={onChatgptSignIn}
+                >
+                  {chatgptSignedIn ? "Sign in again" : "Sign in with ChatGPT"}
+                </Button>
+              </div>
+            </div>
+          </FieldRow>
         ) : (
           <>
             <FieldRow

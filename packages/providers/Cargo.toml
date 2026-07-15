@@ -4,6 +4,7 @@ members = [
     "crates/providers",
     "crates/anthropic",
     "crates/bedrock",
+    "crates/chatgpt",
     "crates/common",
     "crates/copilot",
     "crates/gemini",
@@ -31,6 +32,7 @@ agentloop-providers = { path = "crates/providers", version = "0.1.0" }
 # provider clients
 agentloop-provider-anthropic = { path = "crates/anthropic", version = "0.1.0" }
 agentloop-provider-bedrock = { path = "crates/bedrock", version = "0.1.0" }
+agentloop-provider-chatgpt = { path = "crates/chatgpt", version = "0.1.0" }
 agentloop-provider-common = { path = "crates/common", version = "0.1.0" }
 agentloop-provider-copilot = { path = "crates/copilot", version = "0.1.0" }
 agentloop-provider-gemini = { path = "crates/gemini", version = "0.1.0" }
@@ -81,7 +83,7 @@ http = "1"
 insta = { version = "1", features = ["json", "redactions"] }
 pretty_assertions = "1"
 tempfile = "3"
-temp_env = { package = "temp-env", version = "0.3" }
+temp_env = { package = "temp-env", version = "0.3", features = ["async_closure"] }
 wiremock = "0.6"
 
 [workspace.lints.rust]

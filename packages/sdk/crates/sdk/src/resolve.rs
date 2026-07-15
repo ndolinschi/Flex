@@ -387,6 +387,12 @@ pub(crate) async fn doctor(workdir: &Path) -> anyhow::Result<()> {
         "not found (sign in with VS Code or the Copilot CLI, or set COPILOT_GITHUB_TOKEN)"
     };
     println!("  github copilot auth: {copilot_auth}");
+    let chatgpt_auth = if agentloop_providers::chatgpt::ChatgptConfig::discoverable() {
+        "found (ChatGPT Plus/Pro OAuth)"
+    } else {
+        "not found (sign in with ChatGPT Plus/Pro in desktop Settings → Models)"
+    };
+    println!("  chatgpt subscription auth: {chatgpt_auth}");
 
     println!("external agents:");
     let config = ClaudeCodeConfig::default();

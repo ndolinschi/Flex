@@ -15,6 +15,7 @@ agentloop-engine = { workspace = true }
 agentloop-session = { workspace = true }
 agentloop-provider-anthropic = { workspace = true }
 agentloop-provider-bedrock = { workspace = true }
+agentloop-provider-chatgpt = { workspace = true }
 agentloop-provider-copilot = { workspace = true }
 agentloop-provider-gemini = { workspace = true }
 agentloop-provider-ollama = { workspace = true }

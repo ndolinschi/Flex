@@ -47,6 +47,10 @@ pub struct OpenAiOAuthStart {
     pub url: String,
     pub instructions: String,
     pub method: OpenAiOAuthMethod,
+    /// One-time user code for headless device flow (empty for browser).
+    pub user_code: String,
+    /// Verification URI the user should open (same as [`Self::url`] for headless).
+    pub verification_uri: String,
     browser: Option<BrowserPending>,
     headless: Option<HeadlessPending>,
 }
@@ -102,11 +106,13 @@ pub async fn start_oauth(method: OpenAiOAuthMethod) -> Result<OpenAiOAuthStart, 
             let redirect_uri = format!("http://localhost:{OAUTH_PORT}/auth/callback");
             let url = build_authorize_url(&redirect_uri, &pkce, &state);
             Ok(OpenAiOAuthStart {
-                url,
+                url: url.clone(),
                 instructions:
                     "Complete authorization in your browser. This window will close automatically."
                         .to_owned(),
                 method,
+                user_code: String::new(),
+                verification_uri: url,
                 browser: Some(BrowserPending {
                     redirect_uri,
                     verifier: pkce.verifier,
@@ -137,10 +143,13 @@ pub async fn start_oauth(method: OpenAiOAuthMethod) -> Result<OpenAiOAuthStart, 
                     message: format!("device authorization response was not JSON: {err}"),
                 })?;
             let interval_secs = device.interval.parse::<u64>().unwrap_or(5).max(1);
+            let url = format!("{ISSUER}/codex/device");
             Ok(OpenAiOAuthStart {
-                url: format!("{ISSUER}/codex/device"),
+                url: url.clone(),
                 instructions: format!("Enter code: {}", device.user_code),
                 method,
+                user_code: device.user_code.clone(),
+                verification_uri: url,
                 browser: None,
                 headless: Some(HeadlessPending {
                     device_auth_id: device.device_auth_id,
@@ -250,7 +259,8 @@ pub(crate) fn load_oauth_tokens() -> Result<OpenAiOAuthTokens, ProviderError> {
     })
 }
 
-pub(crate) fn oauth_account_id() -> Option<String> {
+/// ChatGPT account / workspace id from stored OAuth tokens, if present.
+pub fn oauth_account_id() -> Option<String> {
     load_oauth_tokens()
         .ok()
         .and_then(|tokens| tokens.account_id)
