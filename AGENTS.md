@@ -121,7 +121,7 @@ packages/providers/           # connector umbrella — its own workspace
   crates/
     providers/                # facade: resolve_{real,available}_providers, CustomProviderSpec,
                               # connect_bedrock, native/native_all; re-exports every connector
-    {anthropic,openai,gemini,ollama,bedrock,copilot}/   # LLM Provider clients
+    {anthropic,openai,gemini,ollama,bedrock,copilot,chatgpt}/   # LLM Provider clients
     common/                   # shared provider client utilities
     delegators/{common,acp,claude-code,copilot,cursor,opencode}/   # external-agent Agent impls
 packages/search/              # deep-search plugin — its own workspace

@@ -431,6 +431,7 @@ fn provider_display_label(id: &str) -> String {
         "ollama" => "Ollama",
         "bedrock" => "Amazon Bedrock",
         "copilot" => "GitHub Copilot",
+        "chatgpt" => "ChatGPT",
         other => other,
     }
     .to_owned()
@@ -482,9 +483,7 @@ fn legacy_migration_marker_path(dir: &std::path::Path) -> PathBuf {
 fn strip_profile_keys(secrets: &BTreeMap<String, String>) -> BTreeMap<String, String> {
     secrets
         .iter()
-        .filter(|(k, _)| {
-            !k.starts_with(LEGACY_KEY_PREFIX) && !k.starts_with(MCP_SECRET_PREFIX)
-        })
+        .filter(|(k, _)| !k.starts_with(LEGACY_KEY_PREFIX) && !k.starts_with(MCP_SECRET_PREFIX))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect()
 }
@@ -536,7 +535,9 @@ fn mcp_args_suffix_key(server_id: &str) -> String {
 /// intentionally do **not** match.
 pub fn is_likely_secret_env_name(name: &str) -> bool {
     let upper = name.to_ascii_uppercase();
-    if upper.ends_with("_TEAM_ID") || upper.ends_with("_CHANNEL_IDS") || upper.ends_with("_CHANNEL_ID")
+    if upper.ends_with("_TEAM_ID")
+        || upper.ends_with("_CHANNEL_IDS")
+        || upper.ends_with("_CHANNEL_ID")
     {
         return false;
     }
@@ -613,8 +614,9 @@ pub fn upsert_mcp_server_secrets(
         let stale: Vec<String> = all
             .keys()
             .filter(|k| {
-                k.strip_prefix(&prefix)
-                    .is_some_and(|rest| rest != MCP_ARGS_SUFFIX_META && !rest.is_empty() && !rest.contains(':'))
+                k.strip_prefix(&prefix).is_some_and(|rest| {
+                    rest != MCP_ARGS_SUFFIX_META && !rest.is_empty() && !rest.contains(':')
+                })
             })
             .cloned()
             .collect();
@@ -643,8 +645,8 @@ pub fn upsert_mcp_server_secrets(
         if suffix.is_empty() {
             all.remove(&key);
         } else {
-            let encoded = serde_json::to_string(suffix)
-                .map_err(|e| DesktopError::Config(e.to_string()))?;
+            let encoded =
+                serde_json::to_string(suffix).map_err(|e| DesktopError::Config(e.to_string()))?;
             all.insert(key, encoded);
         }
     }
@@ -798,7 +800,11 @@ impl ProviderConfig {
         // legacy top-level fields so a not-yet-migrated (or profile-less)
         // config still reports something sensible.
         if let Some(profile) = self.active_profile() {
-            let has_key = self.profile_keys.contains_key(&profile.id);
+            let oauth_ready = (profile.provider == "copilot"
+                && agentloop_sdk::providers::copilot::CopilotConfig::discoverable())
+                || (profile.provider == "chatgpt"
+                    && agentloop_sdk::providers::chatgpt::ChatgptConfig::discoverable());
+            let has_key = self.profile_keys.contains_key(&profile.id) || oauth_ready;
             let configured: Vec<String> = if has_key {
                 vec![profile.provider.clone()]
             } else {
@@ -855,6 +861,9 @@ impl ProviderConfig {
                 return self.profile_keys.contains_key(&profile.id)
                     || agentloop_sdk::providers::copilot::CopilotConfig::discoverable();
             }
+            if profile.provider == "chatgpt" {
+                return agentloop_sdk::providers::chatgpt::ChatgptConfig::discoverable();
+            }
             return self.profile_keys.contains_key(&profile.id);
         }
         let Some(preferred) = self.prefs.preferred_provider.as_deref() else {
@@ -867,6 +876,9 @@ impl ProviderConfig {
         if preferred == "copilot" {
             return self.keys.contains_key(preferred)
                 || agentloop_sdk::providers::copilot::CopilotConfig::discoverable();
+        }
+        if preferred == "chatgpt" {
+            return agentloop_sdk::providers::chatgpt::ChatgptConfig::discoverable();
         }
         self.keys.contains_key(preferred)
     }

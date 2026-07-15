@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import {
+  ChatgptSignInDialog,
   ConfirmDialog,
   CopilotSignInDialog,
   ProviderConnectionForm,
@@ -7,6 +8,7 @@ import {
   SecretStorageSection,
 } from "../molecules"
 import { Spinner } from "../atoms"
+import { useChatgptAuth } from "../../hooks/useChatgptAuth"
 import { useCopilotAuth } from "../../hooks/useCopilotAuth"
 import { useProviderProfiles } from "../../hooks/useProviderProfiles"
 import { useProviderConfig } from "../../hooks/useProviderConfig"
@@ -82,9 +84,11 @@ export const ProviderSettingsForm = () => {
   const [validateMessage, setValidateMessage] = useState<string | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [copilotSignInOpen, setCopilotSignInOpen] = useState(false)
+  const [chatgptSignInOpen, setChatgptSignInOpen] = useState(false)
   const pushToast = useAppStore((s) => s.pushToast)
 
   const isCopilotProvider = provider === "copilot"
+  const isChatgptProvider = provider === "chatgpt"
   const {
     signedIn: copilotSignedIn,
     start: copilotStart,
@@ -92,6 +96,13 @@ export const ProviderSettingsForm = () => {
     cancel: copilotCancel,
     refetchStatus: refetchCopilotStatus,
   } = useCopilotAuth(isCopilotProvider)
+  const {
+    signedIn: chatgptSignedIn,
+    start: chatgptStart,
+    wait: chatgptWait,
+    cancel: chatgptCancel,
+    refetchStatus: refetchChatgptStatus,
+  } = useChatgptAuth(isChatgptProvider)
 
   // Platform gate for the Security section's "System Keychain" option —
   // detected once via `@tauri-apps/plugin-os` (mock mode reports "macos" so
@@ -168,6 +179,12 @@ export const ProviderSettingsForm = () => {
     if (provider === "copilot") {
       if (!apiKey.trim() && !hasStoredKey && !copilotSignedIn) {
         return "Sign in with GitHub or paste a Copilot token"
+      }
+      return null
+    }
+    if (provider === "chatgpt") {
+      if (!chatgptSignedIn) {
+        return "Sign in with ChatGPT Plus/Pro"
       }
       return null
     }
@@ -295,6 +312,7 @@ export const ProviderSettingsForm = () => {
         hasStoredKey={hasStoredKey}
         isBedrock={isBedrock}
         copilotSignedIn={copilotSignedIn}
+        chatgptSignedIn={chatgptSignedIn}
         models={models}
         defaultModelOptions={defaultModelOptions}
         builtinProviders={builtinProviders}
@@ -325,6 +343,7 @@ export const ProviderSettingsForm = () => {
         onValidate={() => void handleValidate()}
         onSave={() => void handleSave()}
         onCopilotSignIn={() => setCopilotSignInOpen(true)}
+        onChatgptSignIn={() => setChatgptSignInOpen(true)}
       />
 
       <SecretStorageSection
@@ -356,6 +375,19 @@ export const ProviderSettingsForm = () => {
         start={copilotStart}
         wait={copilotWait}
         cancel={copilotCancel}
+      />
+
+      <ChatgptSignInDialog
+        open={chatgptSignInOpen}
+        onClose={() => setChatgptSignInOpen(false)}
+        onSuccess={() => {
+          setChatgptSignInOpen(false)
+          void refetchChatgptStatus()
+          pushToast("Signed in to ChatGPT", "success")
+        }}
+        start={chatgptStart}
+        wait={chatgptWait}
+        cancel={chatgptCancel}
       />
     </div>
   )

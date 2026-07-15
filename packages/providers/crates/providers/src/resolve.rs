@@ -16,6 +16,7 @@ use agentloop_provider_anthropic::{ANTHROPIC_PROVIDER_ID, AnthropicConfig, Anthr
 use agentloop_provider_bedrock::{
     BEDROCK_PROVIDER_ID, BedrockAuth, BedrockConfig, BedrockProvider,
 };
+use agentloop_provider_chatgpt::{CHATGPT_PROVIDER_ID, ChatgptConfig, ChatgptProvider};
 use agentloop_provider_copilot::{COPILOT_PROVIDER_ID, CopilotConfig, CopilotProvider};
 use agentloop_provider_gemini::{GEMINI_PROVIDER_ID, GeminiConfig, GeminiProvider};
 use agentloop_provider_ollama::{OLLAMA_PROVIDER_ID, OllamaProvider};
@@ -36,11 +37,12 @@ fn env_is_set(name: &str) -> bool {
 /// user can supply credentials for via `/connect <id> <key>`, so a custom spec
 /// of either id must resolve (and win over the env built-in) rather than be
 /// rejected as a conflict.
-const BUILTIN_PROVIDER_IDS: [&str; 5] = [
+const BUILTIN_PROVIDER_IDS: [&str; 6] = [
     ANTHROPIC_PROVIDER_ID,
     BEDROCK_PROVIDER_ID,
     GEMINI_PROVIDER_ID,
     COPILOT_PROVIDER_ID,
+    CHATGPT_PROVIDER_ID,
     OLLAMA_PROVIDER_ID,
 ];
 
@@ -263,17 +265,19 @@ pub fn resolve_real_providers(
         None if env_is_set("OPENROUTER_API_KEY") => "openrouter",
         None if env_is_set("AWS_BEARER_TOKEN_BEDROCK") => BEDROCK_PROVIDER_ID,
         None if CopilotConfig::discoverable() => COPILOT_PROVIDER_ID,
+        None if ChatgptConfig::discoverable() => CHATGPT_PROVIDER_ID,
         None if env_is_set("OLLAMA_HOST") || env_is_set("OLLAMA_MODEL") => OLLAMA_PROVIDER_ID,
         None => {
             return Err(ProviderError::AuthMissing {
                 provider: ProviderId::from("runtime"),
                 hint: "set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, \
                        `DEEPSEEK_API_KEY`, `AWS_BEARER_TOKEN_BEDROCK` for AWS Bedrock, \
-                       `OLLAMA_HOST`/`OLLAMA_MODEL` for local Ollama, or sign \
-                       in to GitHub Copilot (VS Code / Copilot CLI, or set `COPILOT_GITHUB_TOKEN`); \
+                       `OLLAMA_HOST`/`OLLAMA_MODEL` for local Ollama, sign \
+                       in to GitHub Copilot (VS Code / Copilot CLI, or set `COPILOT_GITHUB_TOKEN`), \
+                       or sign in with ChatGPT Plus/Pro; \
                        optional model env vars: `OPENAI_MODEL`, `ANTHROPIC_MODEL`, \
                        `GEMINI_MODEL`, `DEEPSEEK_MODEL`, `BEDROCK_MODEL`, `OLLAMA_MODEL`, \
-                       `COPILOT_MODEL`"
+                       `COPILOT_MODEL`, `CHATGPT_MODEL`"
                     .to_owned(),
             }
             .into());
@@ -341,6 +345,16 @@ pub fn resolve_real_providers(
             Ok((
                 providers,
                 ModelRef(format!("{COPILOT_PROVIDER_ID}/{model}")),
+            ))
+        }
+        CHATGPT_PROVIDER_ID => {
+            let provider = ChatgptProvider::from_oauth()?;
+            let model = model_arg.unwrap_or_else(|| provider.default_model().to_owned());
+            let mut providers = ProviderRegistry::new();
+            providers.register(Arc::new(provider));
+            Ok((
+                providers,
+                ModelRef(format!("{CHATGPT_PROVIDER_ID}/{model}")),
             ))
         }
         OLLAMA_PROVIDER_ID => {
@@ -505,6 +519,10 @@ pub fn resolve_available_providers(
                     })
                 }
             }
+            CHATGPT_PROVIDER_ID => ChatgptProvider::from_oauth().map(|p| {
+                let model = p.default_model().to_owned();
+                boxed(p, model)
+            }),
             OLLAMA_PROVIDER_ID => {
                 let provider = OllamaProvider::from_env();
                 let model = provider.default_model().to_owned();
@@ -538,6 +556,7 @@ pub fn resolve_available_providers(
         ANTHROPIC_PROVIDER_ID,
         GEMINI_PROVIDER_ID,
         COPILOT_PROVIDER_ID,
+        CHATGPT_PROVIDER_ID,
     ] {
         if name == OPENAI_PROVIDER_ID && custom.iter().any(|spec| spec.id == OPENAI_PROVIDER_ID) {
             continue;

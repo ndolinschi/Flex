@@ -351,6 +351,18 @@ export type CopilotAuthStart = {
   expiresIn: number
 }
 
+/** Result of `chatgpt_auth_status` / `chatgpt_auth_wait`. */
+export type ChatgptAuthStatus = {
+  signedIn: boolean
+}
+
+/** Public half of a pending ChatGPT headless OAuth session. */
+export type ChatgptAuthStart = {
+  sessionId: string
+  userCode: string
+  verificationUri: string
+}
+
 /** A named provider connection ("profile") — e.g. "AWS work" (Bedrock, key A,
  * us-east-1) vs. "AWS personal" (Bedrock, key B, eu-west-1). The API key
  * itself is never returned; `hasKey` reports whether one is stored. See

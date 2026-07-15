@@ -2,12 +2,14 @@ import { useMemo, useState } from "react"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
 import { Button, Kbd, Skeleton, TextInput } from "../components/atoms"
 import {
+  ChatgptSignInDialog,
   CopilotSignInDialog,
   ErrorBanner,
   FormField,
   ModelSelect,
   ProviderPicker,
 } from "../components/molecules"
+import { useChatgptAuth } from "../hooks/useChatgptAuth"
 import { useCopilotAuth } from "../hooks/useCopilotAuth"
 import { useModels } from "../hooks/useModels"
 import { useProviderProfiles } from "../hooks/useProviderProfiles"
@@ -54,11 +56,13 @@ export const WelcomePage = () => {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [copilotSignInOpen, setCopilotSignInOpen] = useState(false)
+  const [chatgptSignInOpen, setChatgptSignInOpen] = useState(false)
   const [showCopilotToken, setShowCopilotToken] = useState(false)
 
   const selectedBuiltin = builtinProviders.find((p) => p.id === provider)
   const requiresKey = selectedBuiltin?.requiresApiKey ?? true
   const isCopilot = provider === "copilot"
+  const isChatgpt = provider === "chatgpt"
   const {
     signedIn: copilotSignedIn,
     start: copilotStart,
@@ -66,6 +70,13 @@ export const WelcomePage = () => {
     cancel: copilotCancel,
     refetchStatus: refetchCopilotStatus,
   } = useCopilotAuth(isCopilot)
+  const {
+    signedIn: chatgptSignedIn,
+    start: chatgptStart,
+    wait: chatgptWait,
+    cancel: chatgptCancel,
+    refetchStatus: refetchChatgptStatus,
+  } = useChatgptAuth(isChatgpt)
 
   const providerModels = useMemo(
     () => (provider ? models.filter((m) => m.providerId === provider) : models),
@@ -92,6 +103,11 @@ export const WelcomePage = () => {
     if (isCopilot) {
       if (!apiKey.trim() && !copilotSignedIn) {
         setError("Sign in with GitHub or paste a Copilot token")
+        return
+      }
+    } else if (isChatgpt) {
+      if (!chatgptSignedIn) {
+        setError("Sign in with ChatGPT Plus/Pro")
         return
       }
     } else if (requiresKey && !apiKey.trim()) {
@@ -266,6 +282,24 @@ export const WelcomePage = () => {
                   </FormField>
                 ) : null}
               </div>
+            ) : isChatgpt ? (
+              <div className="flex flex-col gap-2 rounded-[var(--radius-card)] border border-border bg-surface px-3.5 py-3">
+                <p className="text-sm text-ink">
+                  {chatgptSignedIn ? (
+                    <span className="text-success">Signed in to ChatGPT</span>
+                  ) : (
+                    <span className="text-ink-muted">Not signed in</span>
+                  )}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => setChatgptSignInOpen(true)}
+                    disabled={busy}
+                  >
+                    {chatgptSignedIn ? "Sign in again" : "Sign in with ChatGPT"}
+                  </Button>
+                </div>
+              </div>
             ) : requiresKey ? (
               <FormField label="API key" htmlFor="welcome-api-key">
                 <TextInput
@@ -398,6 +432,19 @@ export const WelcomePage = () => {
         start={copilotStart}
         wait={copilotWait}
         cancel={copilotCancel}
+      />
+
+      <ChatgptSignInDialog
+        open={chatgptSignInOpen}
+        onClose={() => setChatgptSignInOpen(false)}
+        onSuccess={() => {
+          setChatgptSignInOpen(false)
+          void refetchChatgptStatus()
+          pushToast("Signed in to ChatGPT", "success")
+        }}
+        start={chatgptStart}
+        wait={chatgptWait}
+        cancel={chatgptCancel}
       />
     </div>
   )

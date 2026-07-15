@@ -183,7 +183,7 @@ pub(crate) fn usage() -> String {
     format!(
         "usage:\n  {slug} --version\n  {slug} doctor\n  {slug} run [--agent native|claude-code|copilot|opencode|cursor|acp] \
          [--agent-cmd <program>] \
-         [--provider anthropic|openai|gemini|ollama|copilot] [--model <model>] \
+         [--provider anthropic|openai|gemini|ollama|copilot|chatgpt] [--model <model>] \
          [--fallback-model <model>]... [--plugin <id>]... -p <prompt> \
          [--workdir <path>] [--output-format ndjson]\n  {slug} eval [--task <id>]... \
          [--tasks-dir <dir>] [--agent <agent>] [--provider <id>] [--model <model>] \

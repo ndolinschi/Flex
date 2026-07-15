@@ -90,6 +90,8 @@ pub async fn list_builtin_providers() -> DesktopResult<Vec<BuiltinProvider>> {
         // Copilot uses GitHub device-flow OAuth (or an existing editor
         // sign-in), not a required pasted API key.
         BuiltinProvider::new("copilot", "GitHub Copilot", false),
+        // ChatGPT Plus/Pro subscription via Codex Responses OAuth.
+        BuiltinProvider::new("chatgpt", "ChatGPT", false),
     ])
 }
 
@@ -155,10 +157,15 @@ pub async fn save_provider_config(
 // Settings page's "Connections" section drives.
 // ---------------------------------------------------------------------------
 
+fn chatgpt_oauth_discoverable() -> bool {
+    agentloop_sdk::providers::chatgpt::ChatgptConfig::discoverable()
+}
+
 fn profile_view(cfg: &ProviderConfig, profile: &ProviderProfile) -> ProviderProfileView {
     let has_key = cfg.profile_keys.contains_key(&profile.id)
         || (profile.provider == "copilot"
-            && agentloop_sdk::providers::copilot::CopilotConfig::discoverable());
+            && agentloop_sdk::providers::copilot::CopilotConfig::discoverable())
+        || (profile.provider == "chatgpt" && chatgpt_oauth_discoverable());
     let is_active = cfg.prefs.active_profile_id.as_deref() == Some(profile.id.as_str());
     ProviderProfileView {
         id: profile.id.clone(),
@@ -414,6 +421,7 @@ pub async fn validate_profile(
     } else if built.provider != "ollama"
         && !(built.provider == "copilot"
             && agentloop_sdk::providers::copilot::CopilotConfig::discoverable())
+        && !(built.provider == "chatgpt" && chatgpt_oauth_discoverable())
         && !cfg.profile_keys.contains_key(&id)
     {
         return Err(DesktopError::Message(
@@ -500,6 +508,7 @@ fn apply_save_input(
         cfg.keys.insert(id.to_owned(), key.to_owned());
     } else if id != "ollama"
         && !(id == "copilot" && agentloop_sdk::providers::copilot::CopilotConfig::discoverable())
+        && !(id == "chatgpt" && chatgpt_oauth_discoverable())
         && !cfg.keys.contains_key(id)
     {
         return Err(DesktopError::Message(
@@ -977,11 +986,11 @@ fn guess_media_type(path: &str, kind: &str) -> String {
         (
             _,
             "ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" | "rs" | "txt" | "py" | "pyi" | "go"
-            | "java" | "kt" | "kts" | "c" | "cc" | "cpp" | "cxx" | "h" | "hh" | "hpp" | "cs"
-            | "rb" | "php" | "swift" | "sh" | "bash" | "zsh" | "fish" | "ps1" | "sql" | "r"
-            | "lua" | "vim" | "el" | "clj" | "scala" | "rsx" | "svelte" | "vue" | "astro"
-            | "gradle" | "dockerfile" | "makefile" | "cmake" | "ini" | "cfg" | "conf"
-            | "env" | "gitignore" | "dockerignore" | "editorconfig" | "lock",
+            | "java" | "kt" | "kts" | "c" | "cc" | "cpp" | "cxx" | "h" | "hh" | "hpp" | "cs" | "rb"
+            | "php" | "swift" | "sh" | "bash" | "zsh" | "fish" | "ps1" | "sql" | "r" | "lua"
+            | "vim" | "el" | "clj" | "scala" | "rsx" | "svelte" | "vue" | "astro" | "gradle"
+            | "dockerfile" | "makefile" | "cmake" | "ini" | "cfg" | "conf" | "env" | "gitignore"
+            | "dockerignore" | "editorconfig" | "lock",
         ) => "text/plain".into(),
         _ => "application/octet-stream".into(),
     }
@@ -1311,9 +1320,10 @@ pub async fn set_turn_permission_mode(
     let id = SessionId::from(session_id);
     let parsed = match mode.as_deref() {
         None | Some("") => None,
-        Some(raw) => Some(parse_permission_mode(Some(raw)).ok_or_else(|| {
-            DesktopError::Message(format!("unknown permission mode: {raw}"))
-        })?),
+        Some(raw) => Some(
+            parse_permission_mode(Some(raw))
+                .ok_or_else(|| DesktopError::Message(format!("unknown permission mode: {raw}")))?,
+        ),
     };
     Ok(service.set_turn_permission_mode(&id, parsed)?)
 }
@@ -1501,6 +1511,108 @@ pub async fn copilot_auth_cancel(
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// ChatGPT Plus/Pro subscription OAuth (Codex CLI headless device flow).
+// Tokens land in `~/.config/agentloop/openai-auth.json` and unlock the
+// native `chatgpt` provider (Codex Responses backend).
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatgptAuthStatus {
+    pub signed_in: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatgptAuthStart {
+    pub session_id: String,
+    pub user_code: String,
+    pub verification_uri: String,
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn chatgpt_auth_status() -> DesktopResult<ChatgptAuthStatus> {
+    Ok(ChatgptAuthStatus {
+        signed_in: chatgpt_oauth_discoverable(),
+    })
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn chatgpt_auth_start(state: State<'_, AppState>) -> DesktopResult<ChatgptAuthStart> {
+    use crate::state::PendingChatgptAuth;
+    use agentloop_sdk::providers::openai::{OpenAiOAuthMethod, start_oauth};
+
+    let started = start_oauth(OpenAiOAuthMethod::Headless)
+        .await
+        .map_err(|e| DesktopError::Message(e.to_string()))?;
+
+    let session_id = format!("chatgpt-auth-{}", uuid_like_suffix());
+    let view = ChatgptAuthStart {
+        session_id: session_id.clone(),
+        user_code: started.user_code.clone(),
+        verification_uri: started.verification_uri.clone(),
+    };
+
+    let mut pending = state.pending_chatgpt_auth.lock().await;
+    for (_, prior) in pending.drain() {
+        prior.cancel.cancel();
+    }
+    pending.insert(
+        session_id,
+        PendingChatgptAuth {
+            start: started,
+            cancel: CancellationToken::new(),
+        },
+    );
+    Ok(view)
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn chatgpt_auth_wait(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> DesktopResult<ChatgptAuthStatus> {
+    use agentloop_sdk::providers::openai::store_oauth_tokens;
+
+    let session_id = session_id.trim().to_owned();
+    let (started, cancel) = {
+        let mut pending = state.pending_chatgpt_auth.lock().await;
+        let entry = pending.remove(&session_id).ok_or_else(|| {
+            DesktopError::Message("ChatGPT sign-in session not found — start a new sign-in".into())
+        })?;
+        (entry.start, entry.cancel)
+    };
+
+    match started.complete(cancel).await {
+        Ok(tokens) => {
+            store_oauth_tokens(&tokens).map_err(|e| DesktopError::Message(e.to_string()))?;
+            Ok(ChatgptAuthStatus { signed_in: true })
+        }
+        Err(agentloop_core::ProviderError::Cancelled { .. }) => {
+            Err(DesktopError::Message("sign-in cancelled".into()))
+        }
+        Err(err) => Err(DesktopError::Message(err.to_string())),
+    }
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn chatgpt_auth_cancel(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> DesktopResult<()> {
+    let session_id = session_id.trim();
+    let mut pending = state.pending_chatgpt_auth.lock().await;
+    if let Some(entry) = pending.remove(session_id) {
+        entry.cancel.cancel();
+    }
+    Ok(())
+}
+
 /// Whether `cwd` is inside a git repository at all (`git rev-parse
 /// --git-dir` succeeds), regardless of whether it has any commits yet. Used
 /// to gate the entire git chrome (branch pill, changes badge, commit bar,
@@ -1530,10 +1642,7 @@ pub fn git_has_remote(cwd: String) -> bool {
         .args(["remote"])
         .current_dir(cwd)
         .output()
-        .map(|out| {
-            out.status.success()
-                && !String::from_utf8_lossy(&out.stdout).trim().is_empty()
-        })
+        .map(|out| out.status.success() && !String::from_utf8_lossy(&out.stdout).trim().is_empty())
         .unwrap_or(false)
 }
 
@@ -2430,12 +2539,12 @@ fn summarize_status_checks(rollup: &[serde_json::Value]) -> String {
             .unwrap_or("")
             .to_ascii_uppercase();
 
-        if matches!(conclusion.as_str(), "SUCCESS" | "NEUTRAL" | "SKIPPED")
-            || state == "SUCCESS"
-        {
+        if matches!(conclusion.as_str(), "SUCCESS" | "NEUTRAL" | "SKIPPED") || state == "SUCCESS" {
             passing += 1;
-        } else if matches!(conclusion.as_str(), "FAILURE" | "TIMED_OUT" | "CANCELLED" | "ACTION_REQUIRED")
-            || matches!(state.as_str(), "FAILURE" | "ERROR")
+        } else if matches!(
+            conclusion.as_str(),
+            "FAILURE" | "TIMED_OUT" | "CANCELLED" | "ACTION_REQUIRED"
+        ) || matches!(state.as_str(), "FAILURE" | "ERROR")
         {
             failing += 1;
         } else if status == "COMPLETED" && conclusion.is_empty() && state.is_empty() {
@@ -2488,9 +2597,8 @@ pub fn git_pr_status(cwd: String) -> DesktopResult<BranchPrStatus> {
     }
 
     let raw = String::from_utf8_lossy(&out.stdout);
-    let value: serde_json::Value = serde_json::from_str(raw.trim()).map_err(|e| {
-        DesktopError::Message(format!("gh pr view returned invalid JSON: {e}"))
-    })?;
+    let value: serde_json::Value = serde_json::from_str(raw.trim())
+        .map_err(|e| DesktopError::Message(format!("gh pr view returned invalid JSON: {e}")))?;
 
     let number = value
         .get("number")
@@ -2616,8 +2724,7 @@ pub fn git_create_pr_for_branch(
             commit_sha: String::new(),
             pr_url: None,
             degraded_reason: Some(
-                "GitHub CLI not available — push the branch and create a PR from the host"
-                    .into(),
+                "GitHub CLI not available — push the branch and create a PR from the host".into(),
             ),
         });
     }
@@ -2764,7 +2871,10 @@ fn normalize_path_slashes(s: &str) -> String {
 /// Strip `worktree` from an absolute `path`, returning a forward-slashed
 /// relative path. Lexical first (so deleted files still resolve), then
 /// canonicalize when both sides exist (symlinks / Windows drive casing).
-fn strip_worktree_prefix(path: &std::path::Path, worktree: &std::path::Path) -> DesktopResult<PathBuf> {
+fn strip_worktree_prefix(
+    path: &std::path::Path,
+    worktree: &std::path::Path,
+) -> DesktopResult<PathBuf> {
     if let Ok(rel) = path.strip_prefix(worktree) {
         return Ok(rel.to_path_buf());
     }
@@ -3236,11 +3346,7 @@ fn score_file(rel_path: &str, name: &str, needle: &str) -> Option<i32> {
 /// pruned so typing stays snappy).
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
-pub fn list_files(
-    cwd: String,
-    query: String,
-    include_ignored: Option<bool>,
-) -> Vec<FileHit> {
+pub fn list_files(cwd: String, query: String, include_ignored: Option<bool>) -> Vec<FileHit> {
     let root = PathBuf::from(&cwd);
     if !root.is_dir() {
         return Vec::new();
@@ -3422,11 +3528,7 @@ pub fn list_dir_children(cwd: String, relative_dir: String) -> Vec<FileHit> {
         if path.is_empty() {
             continue;
         }
-        hits.push(FileHit {
-            path,
-            name,
-            is_dir,
-        });
+        hits.push(FileHit { path, name, is_dir });
         if hits.len() >= MAX_CHILDREN {
             break;
         }
@@ -3880,12 +3982,8 @@ fn mcp_config_to_dto(config: agentloop_sdk::McpServerConfig) -> McpServerDto {
         }
     }
     if !migrated_secrets.is_empty() {
-        match crate::config::upsert_mcp_server_secrets(
-            &config.name,
-            &migrated_secrets,
-            false,
-            None,
-        ) {
+        match crate::config::upsert_mcp_server_secrets(&config.name, &migrated_secrets, false, None)
+        {
             Ok(()) => {
                 // Rewrite the TOML without the migrated secrets so they don't
                 // linger on disk in plaintext (sync write — avoids nesting
@@ -3943,8 +4041,7 @@ fn mcp_config_to_dto(config: agentloop_sdk::McpServerConfig) -> McpServerDto {
 
     let configured_secret_env =
         crate::config::list_mcp_configured_secret_env(&config.name).unwrap_or_default();
-    let has_secret_args =
-        crate::config::mcp_has_secret_args_suffix(&config.name).unwrap_or(false);
+    let has_secret_args = crate::config::mcp_has_secret_args_suffix(&config.name).unwrap_or(false);
 
     McpServerDto {
         id: config.name,
@@ -4710,9 +4807,9 @@ pub async fn create_text_file(
             DesktopError::Message(format!("cannot create `{}`: {e}", parent.display()))
         })?;
 
-        let canonical_parent = parent.canonicalize().map_err(|e| {
-            DesktopError::Message(format!("invalid target directory: {e}"))
-        })?;
+        let canonical_parent = parent
+            .canonicalize()
+            .map_err(|e| DesktopError::Message(format!("invalid target directory: {e}")))?;
         if !canonical_parent.starts_with(&canonical_cwd) {
             return Err(DesktopError::Message(
                 "resolved path escapes the session's working directory".into(),
@@ -4758,33 +4855,29 @@ pub async fn rename_path(
         let from = canonical_cwd.join(&from_rel);
         let to = canonical_cwd.join(&to_rel);
 
-        let canonical_from = from.canonicalize().map_err(|e| {
-            DesktopError::Message(format!("cannot rename `{}`: {e}", from_rel))
-        })?;
+        let canonical_from = from
+            .canonicalize()
+            .map_err(|e| DesktopError::Message(format!("cannot rename `{}`: {e}", from_rel)))?;
         if !canonical_from.starts_with(&canonical_cwd) {
             return Err(DesktopError::Message(
                 "source path escapes the session's working directory".into(),
             ));
         }
         if !canonical_from.is_file() {
-            return Err(DesktopError::Message(format!(
-                "`{from_rel}` is not a file"
-            )));
+            return Err(DesktopError::Message(format!("`{from_rel}` is not a file")));
         }
 
         if to.exists() {
-            return Err(DesktopError::Message(format!(
-                "`{to_rel}` already exists"
-            )));
+            return Err(DesktopError::Message(format!("`{to_rel}` already exists")));
         }
 
         if let Some(parent) = to.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
                 DesktopError::Message(format!("cannot create `{}`: {e}", parent.display()))
             })?;
-            let canonical_parent = parent.canonicalize().map_err(|e| {
-                DesktopError::Message(format!("invalid target directory: {e}"))
-            })?;
+            let canonical_parent = parent
+                .canonicalize()
+                .map_err(|e| DesktopError::Message(format!("invalid target directory: {e}")))?;
             if !canonical_parent.starts_with(&canonical_cwd) {
                 return Err(DesktopError::Message(
                     "destination path escapes the session's working directory".into(),
@@ -4793,9 +4886,7 @@ pub async fn rename_path(
         }
 
         std::fs::rename(&canonical_from, &to).map_err(|e| {
-            DesktopError::Message(format!(
-                "cannot rename `{from_rel}` → `{to_rel}`: {e}"
-            ))
+            DesktopError::Message(format!("cannot rename `{from_rel}` → `{to_rel}`: {e}"))
         })?;
         Ok(to_rel)
     })
@@ -4825,23 +4916,20 @@ pub async fn delete_path(
             .map_err(|e| DesktopError::Message(format!("invalid session cwd: {e}")))?;
         let target = canonical_cwd.join(&relative);
 
-        let canonical_target = target.canonicalize().map_err(|e| {
-            DesktopError::Message(format!("cannot delete `{}`: {e}", relative))
-        })?;
+        let canonical_target = target
+            .canonicalize()
+            .map_err(|e| DesktopError::Message(format!("cannot delete `{}`: {e}", relative)))?;
         if !canonical_target.starts_with(&canonical_cwd) {
             return Err(DesktopError::Message(
                 "resolved path escapes the session's working directory".into(),
             ));
         }
         if !canonical_target.is_file() {
-            return Err(DesktopError::Message(format!(
-                "`{relative}` is not a file"
-            )));
+            return Err(DesktopError::Message(format!("`{relative}` is not a file")));
         }
 
-        std::fs::remove_file(&canonical_target).map_err(|e| {
-            DesktopError::Message(format!("cannot delete `{relative}`: {e}"))
-        })?;
+        std::fs::remove_file(&canonical_target)
+            .map_err(|e| DesktopError::Message(format!("cannot delete `{relative}`: {e}")))?;
         Ok(relative)
     })
     .await

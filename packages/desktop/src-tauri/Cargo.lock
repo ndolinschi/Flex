@@ -358,6 +358,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "agentloop-provider-chatgpt"
+version = "0.1.0"
+dependencies = [
+ "agentloop-contracts",
+ "agentloop-core",
+ "agentloop-provider-common",
+ "agentloop-provider-openai",
+ "async-trait",
+ "futures",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "agentloop-provider-common"
 version = "0.1.0"
 dependencies = [
@@ -449,6 +467,7 @@ dependencies = [
  "agentloop-engine",
  "agentloop-provider-anthropic",
  "agentloop-provider-bedrock",
+ "agentloop-provider-chatgpt",
  "agentloop-provider-copilot",
  "agentloop-provider-gemini",
  "agentloop-provider-ollama",

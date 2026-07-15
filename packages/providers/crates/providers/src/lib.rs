@@ -22,6 +22,7 @@ pub use agentloop_engine::{EngineConfig, EngineResult, EngineService, EngineServ
 
 pub use agentloop_provider_anthropic as anthropic;
 pub use agentloop_provider_bedrock as bedrock;
+pub use agentloop_provider_chatgpt as chatgpt;
 pub use agentloop_provider_copilot as copilot;
 pub use agentloop_provider_gemini as gemini;
 pub use agentloop_provider_ollama as ollama;

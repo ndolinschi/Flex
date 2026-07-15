@@ -7,6 +7,8 @@ import type {
   BrowserStateEvent,
   BuiltinProvider,
   CommandInfoDto,
+  ChatgptAuthStart,
+  ChatgptAuthStatus,
   CopilotAuthStart,
   CopilotAuthStatus,
   CreateSessionInput,
@@ -144,6 +146,23 @@ export const copilotAuthWait = (
 /** Cancel an in-flight Copilot device-flow wait. */
 export const copilotAuthCancel = (sessionId: string): Promise<void> =>
   invoke("copilot_auth_cancel", { sessionId })
+
+/** Whether ChatGPT Plus/Pro OAuth tokens are discoverable. */
+export const chatgptAuthStatus = (): Promise<ChatgptAuthStatus> =>
+  invoke("chatgpt_auth_status")
+
+/** Start a ChatGPT headless device-code sign-in; returns the user code. */
+export const chatgptAuthStart = (): Promise<ChatgptAuthStart> =>
+  invoke("chatgpt_auth_start")
+
+/** Poll until the user confirms the code on auth.openai.com. */
+export const chatgptAuthWait = (
+  sessionId: string,
+): Promise<ChatgptAuthStatus> => invoke("chatgpt_auth_wait", { sessionId })
+
+/** Cancel an in-flight ChatGPT OAuth wait. */
+export const chatgptAuthCancel = (sessionId: string): Promise<void> =>
+  invoke("chatgpt_auth_cancel", { sessionId })
 
 export const listModels = (): Promise<ModelInfoDto[]> => invoke("list_models")
 
