@@ -150,7 +150,7 @@ export const SearchModal = ({ open, onClose }: SearchModalProps) => {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search Agents…"
             aria-label="Search agents input"
-            className="w-full bg-transparent text-base text-ink outline-none placeholder:text-ink-faint focus-visible:[box-shadow:inset_0_0_0_1px_var(--color-stroke-2)]"
+            className="w-full bg-transparent text-base text-ink outline-none placeholder:text-ink-faint"
           />
         </div>
 

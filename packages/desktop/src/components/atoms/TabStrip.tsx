@@ -7,13 +7,15 @@ type TabStripProps = HTMLAttributes<HTMLDivElement> & {
 
 /** Horizontal open-tabs strip — content pane chrome (and any embedded
  * open-buffer strips). Default `px-2.5` + `gap-1.5` + bottom border;
- * callers override (`border-b-0`, `flex-1`, overflow) when embedding. */
+ * callers override (`border-b-0`, `flex-1`, overflow) when embedding.
+ * Use a `min-w-0 flex-1 overflow-x-auto` child for the tab pills so trailing
+ * actions (+ / close pane) stay pinned. */
 export const TabStrip = ({ children, className, ...props }: TabStripProps) => {
   return (
     <div
       role="tablist"
       className={cn(
-        "flex h-[var(--header-height)] shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5",
+        "flex h-[var(--header-height)] min-w-0 shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5",
         className,
       )}
       {...props}

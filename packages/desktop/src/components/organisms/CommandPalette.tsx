@@ -3,9 +3,6 @@ import { createPortal } from "react-dom"
 import {
   Bot,
   Brain,
-  Database,
-  FileCode2,
-  MessagesSquare,
   Moon,
   Network,
   PanelLeft,
@@ -14,22 +11,21 @@ import {
   Sparkles,
   SquarePen,
   Settings as SettingsIcon,
-  Terminal as TerminalIcon,
+  MessagesSquare,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { CommandPaletteRow } from "../molecules"
 import { useSessions } from "../../hooks/useSessions"
 import {
   AUTOMATIONS_UI_ENABLED,
-  DATABASE_TAB_ENABLED,
   FLEX_MODE_ENABLED,
-  MEMORY_TAB_ENABLED,
 } from "../../lib/featureFlags"
 import { fuzzyScore } from "../../lib/fuzzySearch"
 import { resumeSession, toInvokeError } from "../../lib/tauri"
 import { sessionLabel } from "../../lib/types"
 import { basename, cn } from "../../lib/utils"
 import { useAppStore, type RightPanelTab } from "../../stores/appStore"
+import { visibleRightPanelTabs } from "./right-panel/tabs"
 import { log } from "../../lib/debug/log"
 
 type CommandEntry = {
@@ -70,9 +66,6 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
   }
 
   const handleSelectSession = async (id: string) => {
-    // Mirrors SessionSidebar.handleSelect's happy path (resume then activate)
-    // without duplicating its per-row error-banner state — log.error is enough
-    // for a palette action the user can just retry.
     try {
       await resumeSession(id)
       setActiveSessionId(id)
@@ -84,6 +77,11 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
       })
     }
   }
+
+  const tabCatalog = useMemo(
+    () => visibleRightPanelTabs({ hasBranchPr: true }),
+    [],
+  )
 
   const commands: CommandEntry[] = useMemo(
     () => [
@@ -111,77 +109,15 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
         hint: "⌘J",
         run: () => toggleSplit(),
       },
-      {
-        id: "tab-plan",
-        label: "Open Plan beside chat",
-        group: "Commands",
-        run: () => openToolTab("plan"),
-      },
-      {
-        id: "tab-prompt",
-        label: "Open Prompt editor",
-        icon: SquarePen,
-        group: "Commands",
-        run: () => openToolTab("prompt"),
-      },
-      {
-        id: "tab-changes",
-        label: "Open Changes beside chat",
-        group: "Commands",
-        run: () => openToolTab("changes"),
-      },
-      {
-        id: "tab-files",
-        label: "Open Files beside chat",
-        icon: FileCode2,
-        group: "Commands",
-        run: () => openToolTab("files"),
-      },
-      {
-        id: "tab-terminal",
-        label: "Open Terminal beside chat",
-        icon: TerminalIcon,
-        group: "Commands",
-        run: () => openToolTab("terminal"),
-      },
-      {
-        id: "tab-browser",
-        label: "Open Browser beside chat",
-        group: "Commands",
-        run: () => openToolTab("browser"),
-      },
-      ...(MEMORY_TAB_ENABLED
-        ? [
-            {
-              id: "tab-memory",
-              label: "Open Memory beside chat",
-              icon: Brain,
-              group: "Commands" as const,
-              run: () => openToolTab("memory"),
-            },
-          ]
-        : []),
-      ...(DATABASE_TAB_ENABLED
-        ? [
-            {
-              id: "tab-database",
-              label: "Open Database beside chat",
-              icon: Database,
-              group: "Commands" as const,
-              run: () => openToolTab("database"),
-            },
-          ]
-        : []),
-      {
-        id: "new-terminal",
-        label: "New Terminal",
-        icon: TerminalIcon,
-        group: "Commands",
-        // The actual PTY spawn (terminalCreate) is owned by TerminalTab, which
-        // is keyed to the active session's cwd — surface the tab (with its own
-        // New Terminal affordance) rather than duplicating that logic here.
-        run: () => openToolTab("terminal"),
-      },
+      ...tabCatalog.map(
+        (t): CommandEntry => ({
+          id: `tab-${t.id}`,
+          label: `Open ${t.label} beside chat`,
+          icon: t.icon,
+          group: "Commands",
+          run: () => openToolTab(t.id),
+        }),
+      ),
       {
         id: "toggle-theme",
         label: "Toggle Theme",
@@ -266,16 +202,18 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
             } satisfies CommandEntry,
           ]
         : []),
-      ...sessions.map((session): CommandEntry => ({
-        id: `session:${session.id}`,
-        label: sessionLabel(session),
-        hint: basename(session.cwd || "~"),
-        group: "Sessions",
-        run: () => void handleSelectSession(session.id),
-      })),
+      ...sessions.map(
+        (session): CommandEntry => ({
+          id: `session:${session.id}`,
+          label: sessionLabel(session),
+          hint: basename(session.cwd || "~"),
+          group: "Sessions",
+          run: () => void handleSelectSession(session.id),
+        }),
+      ),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sessions],
+    [sessions, tabCatalog],
   )
 
   const filtered = useMemo(() => {
@@ -376,7 +314,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Type a command or search sessions…"
             aria-label="Command palette input"
-            className="w-full bg-transparent text-base text-ink outline-none placeholder:text-ink-faint focus-visible:[box-shadow:inset_0_0_0_1px_var(--color-stroke-2)]"
+            className="w-full bg-transparent text-base text-ink outline-none placeholder:text-ink-faint"
           />
         </div>
 

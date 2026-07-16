@@ -1,4 +1,5 @@
 import {
+  Activity,
   Brain,
   ClipboardList,
   FileCode2,
@@ -27,6 +28,7 @@ export type RightPanelTabDef = {
 
 /** Built-in (non-plugin) tab metadata. Plugin tabs come from the UI registry. */
 export const BUILTIN_TABS: RightPanelTabDef[] = [
+  { id: "status", label: "Status", icon: Activity },
   { id: "prompt", label: "Prompt", icon: SquarePen },
   { id: "plan", label: "Plan", icon: ClipboardList },
   { id: "changes", label: "Changes", icon: GitBranch },

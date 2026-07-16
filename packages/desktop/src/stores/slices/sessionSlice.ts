@@ -11,6 +11,7 @@ import { persistUiState } from "../persist"
 import { firstPlanHeading } from "../../lib/planTitle"
 import { log } from "../../lib/debug/log"
 import type { PlanEntry, SessionId } from "../../lib/types"
+import { addUsageToModelMap } from "../../lib/modelUsage"
 import { defaultContentLayout } from "../contentLayoutModel"
 
 /** Snapshot annotations from in-memory plans for ui.json persistence. */
@@ -85,6 +86,10 @@ export const createSessionSlice: StateCreator<
   lastTurnUsage: {},
   lastTurnSummary: {},
   sessionTotals: {},
+  modelUsageBySession: {},
+  lastModelBySession: {},
+  turnUsageAttributedBySession: {},
+  lastCompactionBySession: {},
   streamingBySession: {},
   sweepRequests: {},
   resyncRequests: {},
@@ -217,10 +222,100 @@ export const createSessionSlice: StateCreator<
     }),
   resetSessionTotals: (sessionId) =>
     set((state) => {
-      const next = { ...state.sessionTotals }
-      delete next[sessionId]
-      return { sessionTotals: next }
+      const nextTotals = { ...state.sessionTotals }
+      delete nextTotals[sessionId]
+      const nextModel = { ...state.modelUsageBySession }
+      delete nextModel[sessionId]
+      const nextLast = { ...state.lastModelBySession }
+      delete nextLast[sessionId]
+      const nextAttr = { ...state.turnUsageAttributedBySession }
+      delete nextAttr[sessionId]
+      const nextCompact = { ...state.lastCompactionBySession }
+      delete nextCompact[sessionId]
+      return {
+        sessionTotals: nextTotals,
+        modelUsageBySession: nextModel,
+        lastModelBySession: nextLast,
+        turnUsageAttributedBySession: nextAttr,
+        lastCompactionBySession: nextCompact,
+      }
     }),
+  addModelUsage: (sessionId, model, usage) =>
+    set((state) => {
+      const key = model.trim()
+      if (!key) return state
+      const prevMap = state.modelUsageBySession[sessionId] ?? {}
+      return {
+        modelUsageBySession: {
+          ...state.modelUsageBySession,
+          [sessionId]: addUsageToModelMap(prevMap, key, usage),
+        },
+        lastModelBySession: {
+          ...state.lastModelBySession,
+          [sessionId]: key,
+        },
+        turnUsageAttributedBySession: {
+          ...state.turnUsageAttributedBySession,
+          [sessionId]: true,
+        },
+      }
+    }),
+  setLastModel: (sessionId, model) =>
+    set((state) => {
+      const key = model.trim()
+      if (!key) return state
+      return {
+        lastModelBySession: {
+          ...state.lastModelBySession,
+          [sessionId]: key,
+        },
+      }
+    }),
+  attributeTurnUsageIfNeeded: (sessionId, usage, fallbackModel) =>
+    set((state) => {
+      if (state.turnUsageAttributedBySession[sessionId]) {
+        const nextAttr = { ...state.turnUsageAttributedBySession }
+        delete nextAttr[sessionId]
+        return { turnUsageAttributedBySession: nextAttr }
+      }
+      const model =
+        state.lastModelBySession[sessionId]?.trim() ||
+        fallbackModel?.trim() ||
+        ""
+      if (!model) {
+        const nextAttr = { ...state.turnUsageAttributedBySession }
+        delete nextAttr[sessionId]
+        return { turnUsageAttributedBySession: nextAttr }
+      }
+      const prevMap = state.modelUsageBySession[sessionId] ?? {}
+      const nextAttr = { ...state.turnUsageAttributedBySession }
+      delete nextAttr[sessionId]
+      return {
+        modelUsageBySession: {
+          ...state.modelUsageBySession,
+          [sessionId]: addUsageToModelMap(prevMap, model, usage),
+        },
+        lastModelBySession: {
+          ...state.lastModelBySession,
+          [sessionId]: model,
+        },
+        turnUsageAttributedBySession: nextAttr,
+      }
+    }),
+  clearTurnUsageAttributed: (sessionId) =>
+    set((state) => {
+      if (!(sessionId in state.turnUsageAttributedBySession)) return state
+      const next = { ...state.turnUsageAttributedBySession }
+      delete next[sessionId]
+      return { turnUsageAttributedBySession: next }
+    }),
+  setLastCompaction: (sessionId, info) =>
+    set((state) => ({
+      lastCompactionBySession: {
+        ...state.lastCompactionBySession,
+        [sessionId]: info,
+      },
+    })),
   setStreamingBuffers: (sessionId, buffers) =>
     set((state) => ({
       streamingBySession: { ...state.streamingBySession, [sessionId]: buffers },

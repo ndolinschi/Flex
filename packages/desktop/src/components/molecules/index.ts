@@ -45,6 +45,7 @@ export {
   PopoverSection,
   PopoverTray,
 } from "./PopoverTray"
+export { OpenTabModal } from "./OpenTabModal"
 export { PermissionActions } from "./PermissionActions"
 export { PlusMenu } from "./PlusMenu"
 export { ProjectPicker } from "./ProjectPicker"

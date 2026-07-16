@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import type { ReactNode, DragEvent } from "react"
 import { cn } from "../../lib/utils"
 import { TabClose } from "./TabClose"
 
@@ -21,6 +21,17 @@ type TabProps = {
   closeLabel?: string
   title?: string
   className?: string
+  /** Stable id for scroll-into-view / DnD (rendered as data-tab-id). */
+  tabId?: string
+  /** Chrome-style reorder (content pane strip only). */
+  draggable?: boolean
+  onDragStart?: (e: DragEvent<HTMLElement>) => void
+  onDragEnd?: (e: DragEvent<HTMLElement>) => void
+  onDragOver?: (e: DragEvent<HTMLElement>) => void
+  onDrop?: (e: DragEvent<HTMLElement>) => void
+  onDragLeave?: (e: DragEvent<HTMLElement>) => void
+  /** Visual drop target: line before / after this tab. */
+  dropEdge?: "before" | "after" | null
 }
 
 const sizeClasses: Record<TabSize, string> = {
@@ -42,16 +53,36 @@ export const Tab = ({
   closeLabel,
   title,
   className,
+  tabId,
+  draggable = false,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
+  onDragLeave,
+  dropEdge = null,
 }: TabProps) => {
   const shell = cn(
-    "group flex items-center tracking-[var(--tracking-caption)]",
+    "group relative flex items-center tracking-[var(--tracking-caption)]",
     "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
     sizeClasses[size],
     selected
       ? "bg-fill-2 text-ink"
       : "text-ink-muted hover:bg-fill-3 hover:text-ink-secondary",
+    draggable && "cursor-grab active:cursor-grabbing",
     className,
   )
+
+  const dropMarker =
+    dropEdge != null ? (
+      <span
+        className={cn(
+          "pointer-events-none absolute top-1 bottom-1 w-0.5 rounded-full bg-accent",
+          dropEdge === "before" ? "left-0 -translate-x-1" : "right-0 translate-x-1",
+        )}
+        aria-hidden
+      />
+    ) : null
 
   const label = (
     <span className="flex min-w-0 items-center gap-1.5">
@@ -76,7 +107,8 @@ export const Tab = ({
 
   if (variant === "chip") {
     return (
-      <div className={shell}>
+      <div className={shell} data-tab-id={tabId}>
+        {dropMarker}
         <button
           type="button"
           className="min-w-0 flex-1 truncate py-0.5 text-left"
@@ -97,8 +129,16 @@ export const Tab = ({
       aria-selected={selected}
       role="tab"
       title={title}
+      data-tab-id={tabId}
       className={shell}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragLeave={onDragLeave}
     >
+      {dropMarker}
       {label}
       {close}
     </button>

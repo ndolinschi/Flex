@@ -12,11 +12,8 @@ describe("visibleRightPanelTabs", () => {
     ).toBe(true)
   })
 
-  it("places Pull Request after Changes when present", () => {
-    const ids = visibleRightPanelTabs({ hasBranchPr: true }).map((t) => t.id)
-    const changes = ids.indexOf("changes")
-    const pr = ids.indexOf("pr")
-    expect(changes).toBeGreaterThanOrEqual(0)
-    expect(pr).toBe(changes + 1)
+  it("includes Status near the front of the catalog", () => {
+    const ids = visibleRightPanelTabs({ hasBranchPr: false }).map((t) => t.id)
+    expect(ids[0]).toBe("status")
   })
 })

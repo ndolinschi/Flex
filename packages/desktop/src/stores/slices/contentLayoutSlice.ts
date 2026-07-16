@@ -14,6 +14,7 @@ import {
   ensureChatInPane,
   normalizeLayout,
   otherPaneIndex,
+  reorderContentTabs,
   toolTabId,
   upsertToolInPane,
   type ContentLayout,
@@ -296,6 +297,26 @@ export const createContentLayoutSlice: StateCreator<
       ...(tab?.kind === "chat" ? { activeSessionId: tab.sessionId } : {}),
       ...syncCompatFlags(next),
     })
+    persistLayout(next)
+  },
+
+  reorderTabInPane: (pane, tabId, insertAt) => {
+    const layout = get().contentLayout
+    const panes = clonePanes(layout)
+    const p = panes[pane]
+    if (!p) return
+    const fromIndex = p.tabs.findIndex((t) => t.id === tabId)
+    if (fromIndex < 0) return
+    const reordered = reorderContentTabs(p.tabs, fromIndex, insertAt)
+    if (reordered === p.tabs) return
+    p.tabs = reordered
+    const next: ContentLayout = {
+      ...layout,
+      focusedPane: pane,
+      panes:
+        layout.mode === "split" ? [panes[0]!, panes[1]!] : [panes[0]!],
+    }
+    set({ contentLayout: next, ...syncCompatFlags(next) })
     persistLayout(next)
   },
 

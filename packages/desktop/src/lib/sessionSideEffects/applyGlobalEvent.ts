@@ -268,10 +268,30 @@ export const applyGlobalSessionEvent = (
     }
   }
 
+  if (payload.kind === "turn_started") {
+    store.clearTurnUsageAttributed(event.session_id)
+  }
+
+  if (payload.kind === "assistant_message" && payload.model) {
+    if (payload.usage) {
+      store.addModelUsage(event.session_id, payload.model, payload.usage)
+    } else {
+      store.setLastModel(event.session_id, payload.model)
+    }
+  }
+
   if (payload.kind === "turn_completed") {
     store.setLastTurnUsage(event.session_id, payload.summary.usage)
     store.setLastTurnSummary(event.session_id, payload.summary)
     store.addTurnToSessionTotals(event.session_id, payload.summary)
+    const meta = sessionMetaFromCache(opts?.queryClient, event.session_id)
+    const fallbackModel =
+      meta?.model ?? useAppStore.getState().selectedModelId ?? undefined
+    store.attributeTurnUsageIfNeeded(
+      event.session_id,
+      payload.summary.usage,
+      fallbackModel,
+    )
 
     // Semantic auto-title: only for a live first-turn
     // completion (never during JSONL replay — a resumed session's title
@@ -284,6 +304,17 @@ export const applyGlobalSessionEvent = (
         opts?.queryClient,
       )
     }
+  }
+
+  if (payload.kind === "compaction_boundary") {
+    const s = payload.summary
+    store.setLastCompaction(event.session_id, {
+      strategy: s.strategy ?? "",
+      tokensBefore:
+        typeof s.tokens_before === "number" ? s.tokens_before : undefined,
+      tokensAfter:
+        typeof s.tokens_after === "number" ? s.tokens_after : undefined,
+    })
   }
 
   // Invalidate the shared `["git-status", cwd, sessionId]` cache on every

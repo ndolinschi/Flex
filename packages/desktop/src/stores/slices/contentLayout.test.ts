@@ -4,8 +4,18 @@ import {
   chatTabId,
   defaultContentLayout,
   migrateToContentLayout,
+  reorderContentTabs,
   toolTabId,
 } from "../contentLayoutModel"
+
+describe("reorderContentTabs", () => {
+  it("moves an item to insertAt (Chrome-style)", () => {
+    expect(reorderContentTabs(["a", "b", "c"], 2, 1)).toEqual(["a", "c", "b"])
+    expect(reorderContentTabs(["a", "b", "c"], 0, 3)).toEqual(["b", "c", "a"])
+    expect(reorderContentTabs(["a", "b", "c"], 1, 1)).toEqual(["a", "b", "c"])
+    expect(reorderContentTabs(["a", "b", "c"], 1, 2)).toEqual(["a", "b", "c"])
+  })
+})
 
 describe("contentLayout", () => {
   beforeEach(() => {
@@ -108,5 +118,31 @@ describe("contentLayout", () => {
     expect(
       layout.panes[0]!.tabs.some((t) => t.id === toolTabId("sess-a", "files")),
     ).toBe(false)
+  })
+
+  it("reorderTabInPane moves a tab Chrome-style", () => {
+    useAppStore.getState().openChatInPane(0, "sess-a")
+    useAppStore.getState().openToolInPane(0, "sess-a", "plan")
+    useAppStore.getState().openToolInPane(0, "sess-a", "status")
+    const before = useAppStore
+      .getState()
+      .contentLayout.panes[0]!.tabs.map((t) => t.id)
+    expect(before).toEqual([
+      chatTabId("sess-a"),
+      toolTabId("sess-a", "plan"),
+      toolTabId("sess-a", "status"),
+    ])
+    // Drag status before plan → insertAt = 1
+    useAppStore
+      .getState()
+      .reorderTabInPane(0, toolTabId("sess-a", "status"), 1)
+    const after = useAppStore
+      .getState()
+      .contentLayout.panes[0]!.tabs.map((t) => t.id)
+    expect(after).toEqual([
+      chatTabId("sess-a"),
+      toolTabId("sess-a", "status"),
+      toolTabId("sess-a", "plan"),
+    ])
   })
 })

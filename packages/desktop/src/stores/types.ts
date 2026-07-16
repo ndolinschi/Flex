@@ -15,6 +15,7 @@ import type {
   PlanEntry,
   VerificationVerdict,
 } from "../lib/types"
+import type { ModelUsageMap } from "../lib/modelUsage"
 import type { SettingsSectionId } from "../lib/settingsSearchIndex"
 
 /** Latest `Verify` call for a session — written from `applyGlobalSessionEvent`
@@ -81,6 +82,7 @@ export type RightPanelTab =
   | "memory"
   | "database"
   | "prompt"
+  | "status"
   /** Plugin-contributed tab ids (string & {} keeps autocomplete for builtins). */
   | (string & {})
 
@@ -186,6 +188,21 @@ export type SessionSliceState = {
   lastTurnUsage: Record<SessionId, TokenUsage>
   lastTurnSummary: Record<SessionId, TurnSummary>
   sessionTotals: Record<SessionId, { costUsd: number; input: number; output: number }>
+  /** Per-model token totals for the Status tab (rebuilt on replay). */
+  modelUsageBySession: Record<SessionId, ModelUsageMap>
+  /** Last model id seen for a session (assistant_message or session meta). */
+  lastModelBySession: Record<SessionId, string>
+  /**
+   * Whether the current turn already attributed usage via assistant_message
+   * (so turn_completed should not double-count). Cleared on turn_started /
+   * turn_completed.
+   */
+  turnUsageAttributedBySession: Record<SessionId, boolean>
+  /** Latest compaction boundary for Status tab Compact row. */
+  lastCompactionBySession: Record<
+    SessionId,
+    { tokensBefore?: number; tokensAfter?: number; strategy: string }
+  >
   streamingBySession: Record<SessionId, StreamingBuffers>
   sweepRequests: Record<SessionId, number>
   resyncRequests: Record<SessionId, number>
@@ -242,6 +259,24 @@ export type SessionSliceState = {
   setLastTurnSummary: (sessionId: SessionId, summary: TurnSummary) => void
   addTurnToSessionTotals: (sessionId: SessionId, summary: TurnSummary) => void
   resetSessionTotals: (sessionId: SessionId) => void
+  /** Record assistant_message usage against a model (Status tab). */
+  addModelUsage: (
+    sessionId: SessionId,
+    model: string,
+    usage: TokenUsage,
+  ) => void
+  setLastModel: (sessionId: SessionId, model: string) => void
+  /** Attribute turn_completed usage when no per-message usage was seen. */
+  attributeTurnUsageIfNeeded: (
+    sessionId: SessionId,
+    usage: TokenUsage,
+    fallbackModel?: string | null,
+  ) => void
+  clearTurnUsageAttributed: (sessionId: SessionId) => void
+  setLastCompaction: (
+    sessionId: SessionId,
+    info: { tokensBefore?: number; tokensAfter?: number; strategy: string },
+  ) => void
   setStreamingBuffers: (sessionId: SessionId, buffers: StreamingBuffers) => void
   updateStreamingBuffers: (
     sessionId: SessionId,
@@ -384,6 +419,11 @@ export type ContentLayoutSliceState = {
   ) => void
   openTabToSide: (fromPane: 0 | 1, tabId: string) => void
   activateTabInPane: (pane: 0 | 1, tabId: string) => void
+  /**
+   * Reorder a tab within a pane. `insertAt` is the index before which the tab
+   * should land in the current list (Chrome-style DnD).
+   */
+  reorderTabInPane: (pane: 0 | 1, tabId: string, insertAt: number) => void
   closeTabInPane: (pane: 0 | 1, tabId: string) => void
   /** Focus pane + sync activeSessionId when activating a chat tab. */
   focusContentTab: (pane: 0 | 1, tabId: string) => void

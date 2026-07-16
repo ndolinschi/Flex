@@ -17,9 +17,9 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `TextArea` | Multi-line text field | standard textarea props | Composer |
 | `Label` | Accessible form label | `htmlFor`, `children` | FormField, ModelSelect |
 | `Spinner` | Indeterminate loading | `size` | SessionSidebar, ProviderSettingsForm |
-| `Tab` | Pill tab / open-buffer chip | `selected`, `size?` (md/sm both `h-6`), `variant?`, `icon?`, `badge?`, `onSelect`, `onClose?` | ContentPane, FilesTab (`FileChip`) |
+| `Tab` | Pill tab / open-buffer chip; optional Chrome-style DnD | `selected`, `size?`, `variant?`, `icon?`, `badge?`, `onSelect`, `onClose?`, `draggable?`, `dropEdge?` | ContentPane, FilesTab (`FileChip`) |
 | `TabClose` | Hover-collapse close control for tabs/chips | `label`, `onClose`, `revealOnFocusWithin?` | `Tab` |
-| `TabStrip` | Horizontal open-tabs strip (`role="tablist"`) | `children`, `className?` | ContentPane |
+| `TabStrip` | Horizontal open-tabs strip; content panes scroll tabs and pin trailing actions | `children`, `className?` | ContentPane, ChatSessionTabBar |
 | `Badge` | Status / meta chip | `tone`, `children` | ToolCallChip |
 | `BypassPermissionsButton` | Session bypass-permissions shield | `composerMode`, `sessionBypass`, `onToggle` | Composer |
 | `Kbd` | Keyboard shortcut hint | `children` | WelcomePage |
@@ -59,6 +59,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `PlanCommentButton` | Floating Comment control on plan text selection | `selection`, `onComment` | PlanTab |
 | `PlanCommentPopover` | Selection → comment form (Save / Save & send) | `draft`, `onSave`, `onSaveAndSend` | PlanTab |
 | `PlanCommentList` | Annotations on the open plan | `comments`, `onFocus`, `onRemove` | PlanTab |
+| `OpenTabModal` | Searchable open-tab picker anchored near ContentPane `+` | `open`, `onClose`, `anchor`, `paneIndex`, `sessionId`, `tabs`, `onOpenChat`, `onOpenTool` | ContentPane |
 | `PermissionActions` | Composer-footer Allow once / Always allow / Deny (replaces Send) | `permission` | Composer |
 | `PlusMenu` | Attach + mode shortcuts (Plan/Ask) | `onAttachFile`, `onAttachImage`, `onSetMode?` | Composer |
 | `ProjectPicker` | Recent cwds + Open Folder | `sessionId`, `cwd`, `onError?` | ContextBar |
@@ -114,6 +115,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `DatabaseTab` | UI plugin (Terminal-style 2-col): 180px sidebar (connections + tables) + SQL/results main pane. **Connections are scoped per project cwd** (`projectKey` on each saved spec in `db_connections.json`; list/upsert/connect/mention/active filter by the active session's cwd). Switching sessions clears selection and restores that project's last active connection. Legacy unscoped entries (`projectKey: ""`) stay in the store but are hidden until re-saved under a project. Empty state has no duplicate chrome (Add CTA only); with connections, slim count + refresh/add. Result grid paginates (50/page; table preview via `limit`/`offset`, query results client-side). | `active`, `session` | ToolTabBody (plugin registry) |
 | `FilesTab` | Open-file strip (close-on-hover like panel tabs) + Monaco editor; `.md`/`.mdx` default to `MarkdownBody` preview (Code/Eye toggle); empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children`, search with `includeIgnored`). Dir/file queries invalidate on turn settle, FS-mutating tool completion (Write/Edit/Bash/…), and project cwd change (`invalidateWorkspaceQueries`, same pattern as `invalidateGitQueries`). | `active` | ToolTabBody |
 | `PromptTab` | Session prompt pad: write with `@`/`/` → **Verify** (session model grill) → apply/dismiss findings without ending review; coach questions + re-verify; synced to `draftsBySession` | `sessionId`, `active` | ToolTabBody |
+| `StatusTab` | OpenCode-style session status: model, context approx, tokens, queue, per-model usage | `session`, `active` | ToolTabBody |
 | `WindowTitleBar` | Compact custom window chrome (`decorations: false`, 30px): traffic lights / caption buttons + File/Edit/View/Help + drag region | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | ToolTabBody |
 | `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/`. Opening the tab with zero workspace PTYs auto-creates one shell. | — | ToolTabBody |

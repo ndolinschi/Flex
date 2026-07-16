@@ -1,4 +1,4 @@
-import type { MouseEvent as ReactMouseEvent } from "react"
+import type { MouseEvent as ReactMouseEvent, DragEvent as ReactDragEvent } from "react"
 import { X } from "lucide-react"
 import { cn } from "../../lib/utils"
 
@@ -26,6 +26,14 @@ export const TabClose = ({
       onClick={(e: ReactMouseEvent) => {
         e.stopPropagation()
         onClose()
+      }}
+      onMouseDown={(e: ReactMouseEvent) => {
+        // Keep tab drag from starting when grabbing the close control.
+        e.stopPropagation()
+      }}
+      onDragStart={(e: ReactDragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
       }}
       className={cn(
         "ml-0 max-w-0 shrink-0 overflow-hidden rounded-sm p-0 opacity-0",

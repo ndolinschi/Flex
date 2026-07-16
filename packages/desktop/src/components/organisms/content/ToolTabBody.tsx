@@ -11,6 +11,7 @@ import { FilesTab } from "../right-panel/FilesTab"
 import { MemoryTab } from "../right-panel/MemoryTab"
 import { PrTab } from "../right-panel/PrTab"
 import { PromptTab } from "../right-panel/PromptTab"
+import { StatusTab } from "../right-panel/StatusTab"
 import { cn } from "../../../lib/utils"
 
 type ToolTabBodyProps = {
@@ -33,6 +34,15 @@ export const ToolTabBody = ({
   void isRepo
 
   const pluginTab = useMemo(() => findPluginTab(tool), [tool])
+
+  if (tool === "status") {
+    if (!session) return null
+    return active ? (
+      <div className="absolute inset-0 flex flex-col">
+        <StatusTab session={session} active={active} />
+      </div>
+    ) : null
+  }
 
   if (tool === "prompt") {
     if (!session) return null

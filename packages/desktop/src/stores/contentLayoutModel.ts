@@ -67,6 +67,34 @@ export const defaultContentLayout = (
 export const clampSplitRatio = (ratio: number): number =>
   Math.min(0.8, Math.max(0.2, ratio))
 
+/**
+ * Move an item within a tab list. `insertAt` is the index in the *current*
+ * array before which the item should land (0…length). After removal, the
+ * insert index is adjusted so the final order matches Chrome-style DnD.
+ */
+export const reorderContentTabs = <T,>(
+  tabs: T[],
+  fromIndex: number,
+  insertAt: number,
+): T[] => {
+  if (
+    fromIndex < 0 ||
+    fromIndex >= tabs.length ||
+    insertAt < 0 ||
+    insertAt > tabs.length
+  ) {
+    return tabs
+  }
+  // No-op: dropping immediately before/after self.
+  if (insertAt === fromIndex || insertAt === fromIndex + 1) return tabs
+  const next = [...tabs]
+  const [item] = next.splice(fromIndex, 1)
+  if (item === undefined) return tabs
+  const dest = insertAt > fromIndex ? insertAt - 1 : insertAt
+  next.splice(dest, 0, item)
+  return next
+}
+
 /** Ensure pane 0 has a chat tab for `sessionId`; returns updated layout. */
 export const ensureChatInPane = (
   layout: ContentLayout,
