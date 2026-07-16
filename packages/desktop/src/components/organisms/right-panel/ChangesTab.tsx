@@ -255,7 +255,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       </div>
 
       {showSelectAll ? (
-        <div className="flex h-7 shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5">
+        <div className="flex h-6 shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5">
           <Checkbox
             checked={allSelected}
             indeterminate={someSelected}
@@ -303,7 +303,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             </p>
           </div>
         ) : (
-          <ul className="flex flex-col gap-0.5 px-2 py-1.5">
+          <ul className="flex flex-col gap-0.5 px-2.5 py-1.5">
             {files.map((file) => (
               <FileRow
                 key={file.path}

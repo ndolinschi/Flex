@@ -197,6 +197,37 @@ export const suggestSessionTitle = (
 ): Promise<string> =>
   invoke("suggest_session_title", { sessionId, promptText })
 
+/** One-shot prompt critique (JSON findings) via the session model — see
+ * `commands::review_prompt`. Used by the Prompt editor Verify flow. */
+export type PromptReviewFinding = {
+  quote: string
+  severity: "error" | "warn" | "info" | string
+  message: string
+  fix?: string | null
+}
+
+export type PromptReview = {
+  summary: string
+  findings: PromptReviewFinding[]
+  questions?: string[]
+}
+
+export type PromptReviewAnswer = {
+  question: string
+  answer: string
+}
+
+export const reviewPrompt = (
+  sessionId: string,
+  promptText: string,
+  answers?: PromptReviewAnswer[],
+): Promise<PromptReview> =>
+  invoke("review_prompt", {
+    sessionId,
+    promptText,
+    answers: answers?.length ? answers : null,
+  })
+
 export const deleteSession = (sessionId: string): Promise<void> =>
   invoke("delete_session", { sessionId })
 

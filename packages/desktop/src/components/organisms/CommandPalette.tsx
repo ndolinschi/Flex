@@ -118,6 +118,13 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
         run: () => openToolTab("plan"),
       },
       {
+        id: "tab-prompt",
+        label: "Open Prompt editor",
+        icon: SquarePen,
+        group: "Commands",
+        run: () => openToolTab("prompt"),
+      },
+      {
         id: "tab-changes",
         label: "Open Changes beside chat",
         group: "Commands",

@@ -1,9 +1,11 @@
 import { useEffect, useRef, type KeyboardEvent, type RefObject } from "react"
+import { Maximize2 } from "lucide-react"
 import { useAutoGrowTextarea } from "../../hooks/useAutoGrowTextarea"
 import { useComposerAutocomplete } from "../../hooks/useComposerAutocomplete"
 import type { ComposerAttachment, ComposerMode } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
+import { IconButton, Tooltip } from "../atoms"
 import { AtMentionTray } from "../organisms/composer/AtMentionTray"
 import { SlashCommandTray } from "../organisms/composer/SlashCommandTray"
 import { AttachmentChip } from "./AttachmentChip"
@@ -57,6 +59,7 @@ export const ComposerInput = ({
   const setComposerDraft = (draft: string) => {
     storeSetComposerDraft(draft, activeSessionId)
   }
+  const openToolBesideChat = useAppStore((s) => s.openToolBesideChat)
   const browserDesignMode = useAppStore((s) => s.browserDesignMode)
   const hasDomChip = attachments.some((a) => a.kind === "dom")
   const backdropRef = useRef<HTMLDivElement>(null)
@@ -233,6 +236,20 @@ export const ComposerInput = ({
       {/* Rich input: a transparent textarea over a highlight backdrop that
           renders @mentions as inline pills (aligned 1:1 by sharing metrics). */}
       <div className="relative">
+        {activeSessionId && enabled ? (
+          <div className="absolute right-1.5 top-1.5 z-10">
+            <Tooltip label="Open prompt editor">
+              <IconButton
+                label="Open prompt editor"
+                quiet
+                className="h-6 w-6 bg-user-bubble/80 text-ink-muted hover:bg-fill-3 hover:text-ink"
+                onClick={() => openToolBesideChat(activeSessionId, "prompt")}
+              >
+                <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+              </IconButton>
+            </Tooltip>
+          </div>
+        ) : null}
         <div
           ref={backdropRef}
           aria-hidden
@@ -241,6 +258,7 @@ export const ComposerInput = ({
             "min-h-[var(--composer-min-height)] max-h-[var(--composer-max-height)]",
             "whitespace-pre-wrap break-words px-2.5 pt-2 pb-1 text-sm leading-snug text-ink",
             "[overflow-wrap:break-word] [word-break:normal]",
+            activeSessionId && enabled && "pr-9",
           )}
         >
           {mentionSegments.map((seg, i) =>
@@ -292,6 +310,7 @@ export const ComposerInput = ({
             "[overflow-wrap:break-word] [word-break:normal]",
             "px-2.5 pt-2 pb-1 text-sm leading-snug outline-none transition-none",
             "placeholder:text-ink-muted",
+            activeSessionId && enabled && "pr-9",
           )}
         />
       </div>

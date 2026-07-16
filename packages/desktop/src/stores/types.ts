@@ -80,6 +80,7 @@ export type RightPanelTab =
   | "files"
   | "memory"
   | "database"
+  | "prompt"
   /** Plugin-contributed tab ids (string & {} keeps autocomplete for builtins). */
   | (string & {})
 

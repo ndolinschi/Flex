@@ -70,7 +70,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `ConfirmDialog` | In-app modal (rename/delete/create PR fields) | `open`, `title`, `onConfirm`, `onCancel`, `confirmDisabled?` | SessionMenu, CreatePrDialog |
 | `AttachmentChip` | Pending attachment pill (file/image/directory/dom) | `attachment`, `onRemove` | Composer |
 | `SendButton` | Circular send / stop / queue | `isStreaming`, `canQueue?`, `onSend`, `onStop` | Composer |
-| `MarkdownBody` | GFM + lazy highlight.js language pack; `live` plain pre-wrap fast-path | `content`, `live?` | TurnTimeline (`TimelineRowView`) |
+| `MarkdownBody` | GFM + lazy highlight.js language pack; `live` plain pre-wrap fast-path; `diff` fences → `ChatDiffCard` | `content`, `live?` | TurnTimeline (`TimelineRowView`) |
+| `ChatDiffCard` | Cursor-style file diff card (ext chip + basename + DiffStat + gutter bars); used by markdown fences and Edit/Write expand | `diff?`, `path?`, `added?`, `removed?`, `onOpenFile?`, `maxHeight?` | MarkdownBody, DetailRow |
 | `MentionText` | Plain text with `@mention` accent pills (composer-matching cue) | `text`, `knownNames?` | TurnTimeline user bubble |
 | `CompactionCard` | Settled context-compaction boundary (divider + expandable summary) | `summaryMarkdown`, `strategy`, `tokensBefore?`, `tokensAfter?` | TurnTimeline (`TimelineRowView`) |
 | `IndexingCard` | Settled code-index boundary (divider + file counts) | `added`, `changed`, `removed`, `unchanged` | TurnTimeline (`TimelineRowView`) |
@@ -78,7 +79,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `EmptyState` | Empty async surface | `title`, `description?`, `action?` | SessionSidebar, TurnTimeline |
 | `ErrorBanner` | Inline error | `message`, `onDismiss?` | Composer, Settings |
 | `ToolCallChip` | Single tool as Cursor-style step | `call` | TurnTimeline |
-| `ToolStepGroup` | Aggregated explore/edit/shell summary + card expand | `calls` | TurnTimeline (via ToolStepList) |
+| `ToolStepGroup` | Aggregated explore/edit/shell summary + card expand; single settled Edit/Write auto-expands `ChatDiffCard` | `calls` | TurnTimeline (via ToolStepList) |
 | `ToolStepList` | Clusters consecutive same-kind tool rows | `rows`, `renderOther` | TurnTimeline |
 | `DetailRow` / `BackgroundBashRow` / `ExecTail` | Tool-step detail / background bash / exec tail; Open file → Files tab when path known | — | ToolStepGroup |
 | `StreamingCaret` | Streaming caret | — | TurnTimeline |
@@ -112,6 +113,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `MemoryTab` | Memory surface; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | ToolTabBody |
 | `DatabaseTab` | UI plugin (Terminal-style 2-col): 180px sidebar (connections + tables) + SQL/results main pane. **Connections are scoped per project cwd** (`projectKey` on each saved spec in `db_connections.json`; list/upsert/connect/mention/active filter by the active session's cwd). Switching sessions clears selection and restores that project's last active connection. Legacy unscoped entries (`projectKey: ""`) stay in the store but are hidden until re-saved under a project. Empty state has no duplicate chrome (Add CTA only); with connections, slim count + refresh/add. Result grid paginates (50/page; table preview via `limit`/`offset`, query results client-side). | `active`, `session` | ToolTabBody (plugin registry) |
 | `FilesTab` | Open-file strip (close-on-hover like panel tabs) + Monaco editor; `.md`/`.mdx` default to `MarkdownBody` preview (Code/Eye toggle); empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children`, search with `includeIgnored`). Dir/file queries invalidate on turn settle, FS-mutating tool completion (Write/Edit/Bash/…), and project cwd change (`invalidateWorkspaceQueries`, same pattern as `invalidateGitQueries`). | `active` | ToolTabBody |
+| `PromptTab` | Session prompt pad: write with `@`/`/` → **Verify** (session model grill) → apply/dismiss findings without ending review; coach questions + re-verify; synced to `draftsBySession` | `sessionId`, `active` | ToolTabBody |
 | `WindowTitleBar` | Compact custom window chrome (`decorations: false`, 30px): traffic lights / caption buttons + File/Edit/View/Help + drag region | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | ToolTabBody |
 | `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/`. Opening the tab with zero workspace PTYs auto-creates one shell. | — | ToolTabBody |
@@ -125,7 +127,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|
 | `organisms/timeline/` | `buildDisplayItems` (+ `estimateSizeForItem`), `TimelineRowView`, `WorkGroupBody`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
 | `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
-| `organisms/right-panel/` | Tool tab bodies: `PlanTab`, `ChangesTab`, `PrTab`, `FilesTab`, `FileExplorer`, `FileRow`, `CommitCenter`, `tabs` catalog |
+| `organisms/right-panel/` | Tool tab bodies: `PlanTab`, `ChangesTab`, `PrTab`, `PromptTab`, `FilesTab`, `FileExplorer`, `FileRow`, `CommitCenter`, `tabs` catalog |
 | `organisms/content/` | `ContentWorkspace`, `ContentPane`, `ChatSessionBody`, `ToolTabBody` |
 | `organisms/context-bar/` | `CommitBar` (changes chip + Commit / Commit & Push / Create PR), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
 | `organisms/browser/` | `BrowserToolbar` (Design Mode toggle), `BrowserOverflowMenu` — composed by `BrowserTab` |

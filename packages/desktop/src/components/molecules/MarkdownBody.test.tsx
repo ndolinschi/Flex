@@ -66,4 +66,29 @@ const x = 1
     expect(html).toContain("<pre")
     expect(html).toContain("<blockquote>")
   })
+
+  it("renders ChatDiffCard for diff fences", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownBody
+        content={`Before
+
+\`\`\`diff
+--- a/foo.ts
++++ b/foo.ts
+@@ -1,2 +1,2 @@
+ import { A } from "./a"
+-import { B } from "./b"
++import { C } from "./c"
+\`\`\`
+
+After`}
+      />,
+    )
+
+    expect(html).toContain("data-chat-diff-card")
+    expect(html).toContain("foo.ts")
+    expect(html).toContain("+1")
+    expect(html).toContain("−1")
+    expect(html).not.toContain("<pre")
+  })
 })

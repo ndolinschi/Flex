@@ -5,6 +5,7 @@ import {
   Globe,
   GitBranch,
   GitPullRequest,
+  SquarePen,
   Terminal as TerminalIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -26,6 +27,7 @@ export type RightPanelTabDef = {
 
 /** Built-in (non-plugin) tab metadata. Plugin tabs come from the UI registry. */
 export const BUILTIN_TABS: RightPanelTabDef[] = [
+  { id: "prompt", label: "Prompt", icon: SquarePen },
   { id: "plan", label: "Plan", icon: ClipboardList },
   { id: "changes", label: "Changes", icon: GitBranch },
   { id: "pr", label: "PR", icon: GitPullRequest },

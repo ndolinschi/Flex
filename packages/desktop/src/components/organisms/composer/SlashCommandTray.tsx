@@ -30,6 +30,7 @@ export const SlashCommandTray = ({
   return (
     <PopoverTray
       open={open}
+      autoFocus={false}
       onClose={() => {
         /* keep draft; Esc handled in textarea keydown */
       }}

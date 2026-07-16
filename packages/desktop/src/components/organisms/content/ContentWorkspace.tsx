@@ -28,7 +28,10 @@ export const ContentWorkspace = () => {
       for (const t of pane.tabs) {
         if (
           t.kind === "tool" &&
-          (t.tool === "files" || t.tool === "terminal" || t.tool === "browser")
+          (t.tool === "files" ||
+            t.tool === "terminal" ||
+            t.tool === "browser" ||
+            t.tool === "prompt")
         ) {
           set.add(`${t.sessionId}:${t.tool}`)
         }

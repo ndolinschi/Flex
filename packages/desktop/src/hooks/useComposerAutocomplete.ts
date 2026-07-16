@@ -18,6 +18,12 @@ type UseComposerAutocompleteArgs = {
   cwd: string | undefined
   textareaRef: RefObject<HTMLTextAreaElement | null>
   enabled: boolean
+  /**
+   * When true, `/` autocomplete triggers on a caret token (after whitespace /
+   * start of line) — for multi-line surfaces like the Prompt tab. Default
+   * false keeps composer behavior (whole draft must be `/query`).
+   */
+  slashAtCaret?: boolean
 }
 
 /** Slash-command and @-mention autocomplete: token detection/segmenting state
@@ -30,6 +36,7 @@ export const useComposerAutocomplete = ({
   cwd,
   textareaRef,
   enabled,
+  slashAtCaret = false,
 }: UseComposerAutocompleteArgs) => {
   const [slashHighlight, setSlashHighlight] = useState(0)
   const [atHighlight, setAtHighlight] = useState(0)
@@ -43,11 +50,26 @@ export const useComposerAutocomplete = ({
     staleTime: 60_000,
   })
 
+  const slashToken = useMemo(() => {
+    if (!slashAtCaret) return null
+    const pos = Math.min(caret, composerDraft.length)
+    const before = composerDraft.slice(0, pos)
+    const slash = before.lastIndexOf("/")
+    if (slash < 0) return null
+    if (slash > 0 && !/\s/.test(before[slash - 1]!)) return null
+    const query = before.slice(slash + 1)
+    if (/\s/.test(query) || query.includes("\n")) return null
+    return { start: slash, query: query.toLowerCase() }
+  }, [caret, composerDraft, slashAtCaret])
+
   const slashQuery = useMemo(() => {
+    if (slashAtCaret) {
+      return slashToken ? slashToken.query : null
+    }
     if (!composerDraft.startsWith("/")) return null
     if (composerDraft.includes(" ") || composerDraft.includes("\n")) return null
     return composerDraft.slice(1).toLowerCase()
-  }, [composerDraft])
+  }, [composerDraft, slashAtCaret, slashToken])
 
   const slashMatches = useMemo(() => {
     if (slashQuery === null) return []
@@ -66,16 +88,16 @@ export const useComposerAutocomplete = ({
   }, [slashQuery])
 
   const atToken = useMemo(() => {
-    if (slashQuery !== null) return null
+    if (slashOpen) return null
     const pos = Math.min(caret, composerDraft.length)
     const before = composerDraft.slice(0, pos)
     const at = before.lastIndexOf("@")
     if (at < 0) return null
-    if (at > 0 && !/\s/.test(before[at - 1])) return null
+    if (at > 0 && !/\s/.test(before[at - 1]!)) return null
     const query = before.slice(at + 1)
     if (/\s/.test(query)) return null
     return { start: at, query }
-  }, [composerDraft, caret, slashQuery])
+  }, [composerDraft, caret, slashOpen])
 
   const atQuery = atToken?.query ?? null
 
@@ -108,7 +130,6 @@ export const useComposerAutocomplete = ({
   const atHits: AtMentionHit[] = useMemo(() => {
     const files = fileHits.map(fileHitToAtMention)
     const plugins = pluginHits.map(pluginHitToAtMention)
-    // Tables first when the query looks schema-ish, otherwise files/folders first.
     return [...files, ...plugins].slice(0, 40)
   }, [fileHits, pluginHits])
 
@@ -130,6 +151,22 @@ export const useComposerAutocomplete = ({
   }, [composerDraft, attachments])
 
   const handleInsertCommand = (name: string) => {
+    if (slashAtCaret && slashToken) {
+      const pos = Math.min(caret, composerDraft.length)
+      const before = composerDraft.slice(0, slashToken.start)
+      const after = composerDraft.slice(pos)
+      const insert = `/${name} `
+      setComposerDraft(before + insert + after)
+      const nextCaret = before.length + insert.length
+      window.requestAnimationFrame(() => {
+        const el = textareaRef.current
+        if (!el) return
+        el.focus()
+        el.setSelectionRange(nextCaret, nextCaret)
+        setCaret(nextCaret)
+      })
+      return
+    }
     setComposerDraft(`/${name} `)
     textareaRef.current?.focus()
   }

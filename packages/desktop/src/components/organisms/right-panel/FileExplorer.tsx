@@ -385,7 +385,7 @@ export const FileExplorer = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5">
         <Search className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
         <input
           type="search"

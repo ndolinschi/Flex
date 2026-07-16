@@ -11,6 +11,11 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Check, Copy } from "lucide-react"
 import { cn } from "../../lib/utils"
+import {
+  parseFenceMeta,
+  shouldRenderChatDiff,
+} from "../../lib/chatDiff"
+import { ChatDiffCard } from "./ChatDiffCard"
 import { StreamingCaret } from "./StreamingCaret"
 
 type MarkdownBodyProps = {
@@ -46,12 +51,18 @@ const languageFromPreChildren = (node: ReactNode): string | null => {
 }
 
 /** Code-block chrome: language label + copy button, revealed on hover. Wraps
- * the existing `pre` styling untouched — only adds the overlay. */
+ * the existing `pre` styling untouched — only adds the overlay. Diff fences
+ * (and bodies that look like unified diffs) render as `ChatDiffCard`. */
 const CodeBlock = (props: HTMLAttributes<HTMLPreElement>) => {
   const { children, ...rest } = props
   const [copied, setCopied] = useState(false)
   const language = languageFromPreChildren(children)
   const text = childrenToText(children)
+  const fence = parseFenceMeta(language)
+
+  if (shouldRenderChatDiff(language, text)) {
+    return <ChatDiffCard diff={text} path={fence.path} />
+  }
 
   const handleCopy = async () => {
     if (!text) return

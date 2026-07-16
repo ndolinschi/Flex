@@ -10,6 +10,7 @@ import { ChangesTab } from "../right-panel/ChangesTab"
 import { FilesTab } from "../right-panel/FilesTab"
 import { MemoryTab } from "../right-panel/MemoryTab"
 import { PrTab } from "../right-panel/PrTab"
+import { PromptTab } from "../right-panel/PromptTab"
 import { cn } from "../../../lib/utils"
 
 type ToolTabBodyProps = {
@@ -17,7 +18,7 @@ type ToolTabBodyProps = {
   session: SessionMeta | undefined
   /** Whether this tab is the active one in its pane (visibility). */
   active: boolean
-  /** Keep Files/Terminal/Browser mounted while the tab exists in any pane. */
+  /** Keep Files/Terminal/Browser/Prompt mounted while the tab exists in any pane. */
   keepAlive: boolean
 }
 
@@ -32,6 +33,20 @@ export const ToolTabBody = ({
   void isRepo
 
   const pluginTab = useMemo(() => findPluginTab(tool), [tool])
+
+  if (tool === "prompt") {
+    if (!session) return null
+    return (
+      <div
+        className={cn(
+          "absolute inset-0 flex flex-col",
+          active || keepAlive ? (active ? "flex" : "hidden") : "hidden",
+        )}
+      >
+        <PromptTab sessionId={session.id} active={active} />
+      </div>
+    )
+  }
 
   if (tool === "plan") {
     return active ? (

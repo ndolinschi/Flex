@@ -1,11 +1,11 @@
-import { useState, type MouseEvent } from "react"
+import { useEffect, useState, type MouseEvent } from "react"
 import { ChevronRight, FileCode2, ListEnd, LoaderCircle } from "lucide-react"
 import { backgroundDemote, reviewFileDiff, toInvokeError } from "../../lib/tauri"
 import { cn, toSessionRelativePath } from "../../lib/utils"
 import { sessionScopeKey, useAppStore } from "../../stores/appStore"
 import { useSessions } from "../../hooks/useSessions"
 import { Collapsible } from "./Collapsible"
-import { DiffView } from "./DiffView"
+import { ChatDiffCard } from "./ChatDiffCard"
 import { IconButton } from "../atoms/IconButton"
 import { BackgroundBashRow } from "./BackgroundBashRow"
 import { DiffBadge, ExecErrorAction, ExecTail } from "./ExecTail"
@@ -36,47 +36,88 @@ const DemoteButton = ({ callId }: { callId: string }) => {
 type DetailRowProps = {
   detail: ToolStepDetail
   note?: string
+  /** When true, expand and fetch the file diff on mount (single Edit/Write groups). */
+  autoExpandDiff?: boolean
 }
 
 /** Single detail line under a tool-step group. Edit/write rows that carry a
  * resolvable `diffPath` become expandable: first expand lazy-fetches the
  * file's diff against its pre-agent base state and renders it inline
- * (display-only — no hunk actions, this is a timeline row, not the Changes
- * tab). Rows without a path behave exactly as before. */
-export const DetailRow = ({ detail, note }: DetailRowProps) => {
+ * (display-only chat card — no hunk actions; Changes tab owns Keep/Undo).
+ * Rows without a path behave exactly as before. */
+export const DetailRow = ({
+  detail,
+  note,
+  autoExpandDiff = false,
+}: DetailRowProps) => {
   const sessionId = useAppStore((s) => s.activeSessionId)
   const openWorkspaceFile = useAppStore((s) => s.openWorkspaceFile)
   const { sessions } = useSessions()
   const cwd = sessions.find((s) => s.id === sessionId)?.cwd
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(autoExpandDiff)
   const [diff, setDiff] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  if (detail.background) {
-    return <BackgroundBashRow detail={detail} />
-  }
 
   const rawPath = detail.diffPath ?? detail.filePath
   const relativePath = rawPath
     ? toSessionRelativePath(rawPath, cwd)
     : undefined
+
+  // Auto-expand single Edit/Write: fetch once when the row can resolve a path.
+  useEffect(() => {
+    if (!autoExpandDiff) return
+    if (!detail.diffPath || !sessionId || !relativePath) return
+    if (detail.background) return
+    setExpanded(true)
+    setLoading(true)
+    setError(null)
+    let cancelled = false
+    reviewFileDiff(sessionId, relativePath)
+      .then((text) => {
+        if (!cancelled) setDiff(text)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(toInvokeError(err))
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [
+    autoExpandDiff,
+    detail.diffPath,
+    detail.background,
+    sessionId,
+    relativePath,
+  ])
+
+  if (detail.background) {
+    return <BackgroundBashRow detail={detail} />
+  }
+
   const canExpand = !!detail.diffPath && !!sessionId && !!relativePath
   const canOpenFile =
     !!sessionId && !!relativePath && !relativePath.endsWith("/")
+
+  const loadDiff = () => {
+    if (!canExpand || !relativePath || !sessionId) return
+    if (diff !== null || loading) return
+    setLoading(true)
+    setError(null)
+    reviewFileDiff(sessionId, relativePath)
+      .then((text) => setDiff(text))
+      .catch((err) => setError(toInvokeError(err)))
+      .finally(() => setLoading(false))
+  }
 
   const handleToggle = () => {
     if (!canExpand || !relativePath) return
     const next = !expanded
     setExpanded(next)
-    if (next && diff === null && !loading) {
-      setLoading(true)
-      setError(null)
-      reviewFileDiff(sessionId!, relativePath)
-        .then((text) => setDiff(text))
-        .catch((err) => setError(toInvokeError(err)))
-        .finally(() => setLoading(false))
-    }
+    if (next) loadDiff()
   }
 
   const handleOpenFile = (e: MouseEvent) => {
@@ -159,19 +200,34 @@ export const DetailRow = ({ detail, note }: DetailRowProps) => {
       ) : null}
       {canExpand ? (
         <Collapsible open={expanded}>
-          <div className="ml-3.5 max-h-[300px] overflow-auto rounded-md border border-stroke-3 bg-panel py-1">
+          <div className="ml-3.5 mt-0.5">
             {loading ? (
-              <div className="px-3 py-1 text-sm text-ink-faint">
+              <div className="rounded-md border border-stroke-3 bg-panel px-3 py-1 text-sm text-ink-faint">
                 Loading diff…
               </div>
             ) : error ? (
-              <div className="px-3 py-1 text-sm text-ink-faint">
+              <div className="rounded-md border border-stroke-3 bg-panel px-3 py-1 text-sm text-ink-faint">
                 Diff unavailable — {error}
               </div>
             ) : diff ? (
-              <DiffView diff={diff} />
+              <ChatDiffCard
+                diff={diff}
+                path={relativePath}
+                maxHeight={300}
+                onOpenFile={
+                  canOpenFile
+                    ? () => {
+                        if (!sessionId || !relativePath) return
+                        openWorkspaceFile(
+                          sessionScopeKey(sessionId),
+                          relativePath,
+                        )
+                      }
+                    : undefined
+                }
+              />
             ) : (
-              <div className="px-3 py-1 text-sm text-ink-faint">
+              <div className="rounded-md border border-stroke-3 bg-panel px-3 py-1 text-sm text-ink-faint">
                 No changes vs HEAD
               </div>
             )}

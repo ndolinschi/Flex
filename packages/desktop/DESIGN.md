@@ -167,7 +167,7 @@ Use these gutters unless a surface documents an exception.
 | Token | Value | Surfaces |
 |---|---|---|
 | `--titlebar-height` | 30px | `WindowTitleBar` |
-| `--header-height` | 30px | AppHeader, TabStrip, all right-panel tab headers |
+| `--header-height` | 30px | AppHeader, content TabStrip, tool tab subheaders |
 | `--status-bar-height` | 1.75rem (28px) | ContextBar min height |
 | `--composer-min/max-height` | 1.75rem / 10rem | Textarea grow |
 
@@ -313,7 +313,7 @@ Tailwind `p-*` / `gap-*` map through `@theme` in `src/index.css`.
 | Do | Don’t |
 |---|---|
 | Reuse `Tab` / `TabStrip` / `TabClose` for panel tabs + file chips | Duplicate pill markup per surface |
-| Keep panel chrome at `px-2.5`; chat at `px-3` | Mix gutters under the same strip |
+| Keep content-pane / tool chrome at `px-2.5`; chat at `px-3` | Mix gutters under the same strip (`px-2` under a `px-2.5` TabStrip) |
 | Put only **`h-6`** controls in 30px header rows | `h-7` pills inside `--header-height` (reads flush) |
 | Give TabStrip the bottom border; content headers title the body | Stack two `border-b` with no content between |
 | Neutral `stroke-2` focus rings on chrome inputs | Accent glow focus |

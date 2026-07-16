@@ -25,7 +25,7 @@ export const AppHeader = () => {
   const split = contentLayout.mode === "split"
 
   return (
-    <header className="flex h-[var(--header-height)] shrink-0 items-center gap-1 border-b border-stroke-3 bg-bg px-3">
+    <header className="flex h-[var(--header-height)] shrink-0 items-center gap-0.5 border-b border-stroke-3 bg-bg px-3">
       <IconButton
         label={`${collapsed ? "Show" : "Hide"} sidebar (${isMac ? "⌘B" : "Ctrl+B"})`}
         onClick={toggleSidebar}

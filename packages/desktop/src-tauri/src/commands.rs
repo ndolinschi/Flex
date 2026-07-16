@@ -846,6 +846,190 @@ pub async fn suggest_session_title(
     Ok(title)
 }
 
+/// One-shot prompt critique for the Prompt editor tab — tool-free
+/// `stream_chat` like `suggest_session_title`. Returns structured findings
+/// (quote + severity + message) so the UI can highlight spans and show hover
+/// notes. Not persisted; not a session turn.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PromptReviewFindingDto {
+    /// Exact substring copied from the user's prompt (preferred over offsets).
+    pub quote: String,
+    /// `error` | `warn` | `info`
+    pub severity: String,
+    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PromptReviewDto {
+    pub summary: String,
+    pub findings: Vec<PromptReviewFindingDto>,
+    #[serde(default)]
+    pub questions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PromptReviewAnswerDto {
+    pub question: String,
+    pub answer: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PromptReviewModelPayload {
+    #[serde(default)]
+    summary: String,
+    #[serde(default)]
+    findings: Vec<PromptReviewFindingDto>,
+    #[serde(default)]
+    questions: Vec<String>,
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn review_prompt(
+    state: State<'_, AppState>,
+    session_id: String,
+    prompt_text: String,
+    answers: Option<Vec<PromptReviewAnswerDto>>,
+) -> DesktopResult<PromptReviewDto> {
+    let text = prompt_text.trim().to_string();
+    if text.is_empty() {
+        return Err(DesktopError::Message("prompt is empty".into()));
+    }
+
+    let service = require_service(&state).await?;
+    let id = SessionId::from(session_id);
+    let meta = service.session_meta(&id).await?;
+    let model = meta
+        .model
+        .ok_or_else(|| DesktopError::Message("session has no model set".into()))?;
+
+    let registry = service.provider_registry();
+    let (provider, model_id) = registry
+        .resolve(&model)
+        .ok_or_else(|| DesktopError::Message(format!("no provider for model {model}")))?;
+
+    let truncated: String = text.chars().take(12_000).collect();
+    let system = "You are a ruthless prompt coach for coding agents (grill the draft). \
+        Critique the user prompt. Look for: typos and wrong words, vague goals, \
+        missing constraints/success criteria, empty or useless context, bloated laundry lists, \
+        and missing canonical examples when the task is complex. \
+        If critical facts are missing, ask up to 3 short clarifying questions. \
+        Reply with JSON only (no markdown fences), shape: \
+        {\"summary\":\"one sentence\",\"findings\":[{\"quote\":\"exact substring from the prompt\", \
+        \"severity\":\"error\"|\"warn\"|\"info\",\"message\":\"what is wrong\", \
+        \"fix\":\"optional concrete rewrite for that quote\"}], \
+        \"questions\":[\"optional clarifying question\", ...]}. \
+        quote MUST be copied verbatim from the prompt (short span). \
+        Use severity error for typos/broken instructions, warn for weak/missing context, \
+        info for polish. Prefer 3–8 high-signal findings; skip praise. \
+        If the user already answered questions, fold those answers into your critique \
+        and only ask new questions when still blocked."
+        .to_string();
+
+    let mut user_body = format!(
+        "Critique this agent prompt:\n\n----- PROMPT -----\n{truncated}\n----- END -----"
+    );
+    if let Some(ans) = answers.as_ref() {
+        let answered: Vec<_> = ans
+            .iter()
+            .filter(|a| !a.answer.trim().is_empty())
+            .collect();
+        if !answered.is_empty() {
+            user_body.push_str("\n\n----- ANSWERS TO YOUR QUESTIONS -----\n");
+            for a in answered {
+                user_body.push_str(&format!("Q: {}\nA: {}\n\n", a.question, a.answer.trim()));
+            }
+            user_body.push_str("----- END ANSWERS -----\n");
+        }
+    }
+
+    let mut request = ChatRequest::new(model_id, vec![Message::user(user_body)]);
+    request.system = Some(system);
+    request.max_tokens = Some(2048);
+
+    let cancel = CancellationToken::new();
+    let mut stream = provider
+        .stream_chat(request, cancel)
+        .await
+        .map_err(|e| DesktopError::Message(e.to_string()))?;
+
+    let mut raw = String::new();
+    while let Some(event) = stream.next().await {
+        match event.map_err(|e| DesktopError::Message(e.to_string()))? {
+            ProviderStreamEvent::MarkdownDelta { text: delta } => {
+                raw.push_str(&delta);
+            }
+            ProviderStreamEvent::MessageEnd { .. } => break,
+            _ => {}
+        }
+    }
+
+    let json_slice = extract_json_object(&raw).ok_or_else(|| {
+        DesktopError::Message("prompt review returned no JSON".into())
+    })?;
+    let parsed: PromptReviewModelPayload = serde_json::from_str(json_slice)
+        .map_err(|e| DesktopError::Message(format!("prompt review JSON parse: {e}")))?;
+
+    let findings: Vec<PromptReviewFindingDto> = parsed
+        .findings
+        .into_iter()
+        .filter(|f| !f.quote.trim().is_empty() && !f.message.trim().is_empty())
+        .map(|mut f| {
+            let sev = f.severity.to_ascii_lowercase();
+            f.severity = match sev.as_str() {
+                "error" | "warn" | "info" => sev,
+                "warning" => "warn".into(),
+                _ => "warn".into(),
+            };
+            f
+        })
+        .collect();
+
+    let questions: Vec<String> = parsed
+        .questions
+        .into_iter()
+        .map(|q| q.trim().to_string())
+        .filter(|q| !q.is_empty())
+        .take(3)
+        .collect();
+
+    Ok(PromptReviewDto {
+        summary: if parsed.summary.trim().is_empty() {
+            if findings.is_empty() && questions.is_empty() {
+                "Looks solid — no major issues found.".into()
+            } else {
+                let q = if questions.is_empty() {
+                    String::new()
+                } else {
+                    format!(", {} question(s)", questions.len())
+                };
+                format!("{} issue(s){} to tighten.", findings.len(), q)
+            }
+        } else {
+            parsed.summary.trim().to_string()
+        },
+        findings,
+        questions,
+    })
+}
+
+fn extract_json_object(raw: &str) -> Option<&str> {
+    let trimmed = raw.trim();
+    if let Some(start) = trimmed.find('{') {
+        if let Some(end) = trimmed.rfind('}') {
+            if end > start {
+                return Some(&trimmed[start..=end]);
+            }
+        }
+    }
+    None
+}
+
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn resume_session(state: State<'_, AppState>, session_id: String) -> DesktopResult<()> {

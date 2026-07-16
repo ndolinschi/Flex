@@ -249,6 +249,7 @@ pub fn run() {
             commands::resume_session,
             commands::update_session,
             commands::suggest_session_title,
+            commands::review_prompt,
             commands::delete_session,
             commands::replay,
             commands::subscribe_session,

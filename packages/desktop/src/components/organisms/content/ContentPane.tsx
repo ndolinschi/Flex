@@ -120,7 +120,6 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     >
       <TabStrip
         aria-label={paneIndex === 0 ? "Left pane tabs" : "Right pane tabs"}
-        className="border-b border-stroke-3"
       >
         {pane.tabs.map((t) => {
           const def =
@@ -205,7 +204,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
           )
         })}
         {pane.tabs.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-4 text-sm text-ink-muted">
+          <div className="flex h-full items-center justify-center px-2.5 text-sm text-ink-muted">
             Open a chat or tool tab with +
           </div>
         ) : null}

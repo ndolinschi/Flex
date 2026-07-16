@@ -79,21 +79,38 @@ export const ToolStepGroup = memo(function ToolStepGroup({
   progress,
 }: ToolStepGroupProps) {
   const summary = summarizeToolCalls(calls)
-  const [expanded, setExpanded] = useState(forceOpen || summary.running)
+  const singleEditDiff =
+    summary.kind === "edit" &&
+    !summary.running &&
+    summary.details.length === 1 &&
+    !!summary.details[0]?.diffPath
+  const [expanded, setExpanded] = useState(
+    forceOpen || summary.running || singleEditDiff,
+  )
   const open = forceOpen || expanded
   const canExpand = summary.details.length > 0
 
   // Auto-expand while `forceOpen` (cluster still running). When the run
-  // finishes, `forceOpen` drops and we collapse — user can re-expand via the
-  // header. Only reacts to `forceOpen` actually flipping so a manual toggle
-  // after finish is never clobbered by unrelated re-renders.
+  // finishes, `forceOpen` drops — keep open for a single Edit/Write so the
+  // chat diff card stays visible; otherwise collapse. Only reacts to
+  // `forceOpen` / single-edit settling so a manual toggle isn't clobbered.
   const prevForceOpen = useRef(forceOpen)
+  const prevSingleEdit = useRef(singleEditDiff)
   useEffect(() => {
     if (prevForceOpen.current !== forceOpen) {
-      setExpanded(forceOpen)
+      if (forceOpen) {
+        setExpanded(true)
+      } else if (singleEditDiff) {
+        setExpanded(true)
+      } else {
+        setExpanded(false)
+      }
       prevForceOpen.current = forceOpen
+    } else if (prevSingleEdit.current !== singleEditDiff && singleEditDiff) {
+      setExpanded(true)
     }
-  }, [forceOpen])
+    prevSingleEdit.current = singleEditDiff
+  }, [forceOpen, singleEditDiff])
 
   const handleToggle = () => {
     if (!canExpand) return
@@ -162,6 +179,7 @@ export const ToolStepGroup = memo(function ToolStepGroup({
               key={detail.id}
               detail={detail}
               note={detail.running ? progress?.[detail.id] : undefined}
+              autoExpandDiff={singleEditDiff && detail.id === summary.details[0]?.id}
             />
           ))}
         </ul>
