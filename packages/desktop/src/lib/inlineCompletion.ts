@@ -19,7 +19,7 @@ export const acceptInlineSuggestion = (
 }
 
 /** Minimum prefix length before we ask the model. */
-export const INLINE_COMPLETION_MIN_PREFIX = 8
+export const INLINE_COMPLETION_MIN_PREFIX = 4
 
 /** Debounce before invoking `complete_prompt_inline`. */
 export const INLINE_COMPLETION_DEBOUNCE_MS = 300
@@ -28,3 +28,19 @@ export const INLINE_COMPLETION_DEBOUNCE_MS = 300
 export const RECOMMENDED_OLLAMA_MODEL = "qwen2.5:0.5b"
 
 export const OLLAMA_PULL_COMMAND = `ollama pull ${RECOMMENDED_OLLAMA_MODEL}`
+
+/** Strip a redundant `provider/` prefix from a model id (dropdown values). */
+export const normalizeCompletionModelId = (
+  providerId: string,
+  modelId: string,
+): string => {
+  const prefix = `${providerId}/`
+  return modelId.startsWith(prefix) ? modelId.slice(prefix.length) : modelId
+}
+
+/** ModelSelect values are qualified; prefs store bare model ids. */
+export const qualifiedCompletionModelId = (
+  providerId: string,
+  modelId: string,
+): string =>
+  modelId.includes("/") ? modelId : `${providerId}/${modelId}`

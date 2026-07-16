@@ -7,8 +7,11 @@ import { useModels } from "../../hooks/useModels"
 import {
   OLLAMA_PULL_COMMAND,
   RECOMMENDED_OLLAMA_MODEL,
+  normalizeCompletionModelId,
+  qualifiedCompletionModelId,
 } from "../../lib/inlineCompletion"
 import type { InlineCompletionPrefs } from "../../lib/types"
+import { checkInlineCompletionConnection } from "../../lib/tauri"
 import { cn } from "../../lib/utils"
 
 type Path = "ollama" | "provider"
@@ -36,6 +39,9 @@ export const CompletionSetupModal = ({
   const [modelId, setModelId] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [checking, setChecking] = useState(false)
+  const [checkMessage, setCheckMessage] = useState<string | null>(null)
+  const [checkOk, setCheckOk] = useState<boolean | null>(null)
 
   const ollamaModels = useMemo(
     () => models.filter((m) => m.providerId === "ollama"),
@@ -65,9 +71,13 @@ export const CompletionSetupModal = ({
     if (!open) return
     setError(null)
     setCopied(false)
+    setCheckMessage(null)
+    setCheckOk(null)
     if (prefs?.providerId && prefs?.modelId) {
       setProviderId(prefs.providerId)
-      setModelId(prefs.modelId)
+      // Prefer bare model ids in local state; ModelSelect gets a qualified
+      // value via `qualifiedCompletionModelId` below.
+      setModelId(normalizeCompletionModelId(prefs.providerId, prefs.modelId))
       setPath(prefs.providerId === "ollama" ? "ollama" : "provider")
     } else {
       setPath("ollama")
@@ -87,13 +97,47 @@ export const CompletionSetupModal = ({
     }
   }
 
+  const resolvedProviderId = path === "ollama" ? "ollama" : providerId
+  const resolvedModelId =
+    path === "ollama"
+      ? modelId || RECOMMENDED_OLLAMA_MODEL
+      : modelId
+
+  const handleCheckConnection = async () => {
+    setError(null)
+    setCheckMessage(null)
+    setCheckOk(null)
+    const pid = resolvedProviderId
+    const mid = resolvedModelId
+    if (!pid || !mid) {
+      setCheckOk(false)
+      setCheckMessage("Pick a provider and model.")
+      return
+    }
+    setChecking(true)
+    try {
+      const result = await checkInlineCompletionConnection(
+        pid,
+        normalizeCompletionModelId(pid, mid),
+      )
+      setCheckOk(result.ok)
+      setCheckMessage(
+        result.sample
+          ? `${result.message} Sample: “${result.sample.slice(0, 60)}${result.sample.length > 60 ? "…" : ""}”`
+          : result.message,
+      )
+    } catch (err) {
+      setCheckOk(false)
+      setCheckMessage(err instanceof Error ? err.message : String(err))
+    } finally {
+      setChecking(false)
+    }
+  }
+
   const handleSave = async () => {
     setError(null)
-    const pid = path === "ollama" ? "ollama" : providerId
-    const mid =
-      path === "ollama"
-        ? modelId || RECOMMENDED_OLLAMA_MODEL
-        : modelId
+    const pid = resolvedProviderId
+    const mid = normalizeCompletionModelId(pid, resolvedModelId)
     if (!pid || !mid) {
       setError("Pick a provider and model.")
       return
@@ -180,6 +224,18 @@ export const CompletionSetupModal = ({
         </div>
 
         {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}
+        {checkMessage ? (
+          <p
+            className={cn(
+              "rounded-md border px-2.5 py-2 text-sm",
+              checkOk
+                ? "border-success/30 bg-success-subtle text-success"
+                : "border-danger/30 bg-danger-subtle text-danger",
+            )}
+          >
+            {checkMessage}
+          </p>
+        ) : null}
 
         {path === "ollama" ? (
           <div className="flex flex-col gap-2 text-sm">
@@ -193,9 +249,10 @@ export const CompletionSetupModal = ({
                 {!ollamaReachable ? (
                   <>
                     <p className="text-ink-secondary">
-                      No Ollama models in the engine yet (or the daemon is
-                      down). Install Ollama if needed, pull a small model, then
-                      save — Flex will register it on the next rebuild.
+                      Ollama is not listed in the engine yet. If the daemon is
+                      running and you have models pulled, click Refresh models
+                      (or Check connection) — Flex registers local Ollama on
+                      rebuild without needing env vars.
                     </p>
                     <a
                       href="https://ollama.com/download"
@@ -241,8 +298,10 @@ export const CompletionSetupModal = ({
                       id="completion-ollama-model"
                       label=""
                       models={ollamaModels}
-                      value={modelId}
-                      onChange={setModelId}
+                      value={qualifiedCompletionModelId("ollama", modelId)}
+                      onChange={(id) =>
+                        setModelId(normalizeCompletionModelId("ollama", id))
+                      }
                       isLoading={modelsLoading}
                       placeholder={RECOMMENDED_OLLAMA_MODEL}
                     />
@@ -250,8 +309,12 @@ export const CompletionSetupModal = ({
                     <input
                       type="text"
                       className="h-8 rounded-md border border-stroke-3 bg-elevated px-2 text-sm text-ink outline-none focus:border-stroke-2"
-                      value={modelId}
-                      onChange={(e) => setModelId(e.target.value)}
+                      value={normalizeCompletionModelId("ollama", modelId)}
+                      onChange={(e) =>
+                        setModelId(
+                          normalizeCompletionModelId("ollama", e.target.value),
+                        )
+                      }
                       placeholder={RECOMMENDED_OLLAMA_MODEL}
                     />
                   )}
@@ -294,8 +357,18 @@ export const CompletionSetupModal = ({
                   id="completion-provider-model"
                   label="Model"
                   models={providerModels}
-                  value={modelId}
-                  onChange={setModelId}
+                  value={
+                    providerId
+                      ? qualifiedCompletionModelId(providerId, modelId)
+                      : modelId
+                  }
+                  onChange={(id) =>
+                    setModelId(
+                      providerId
+                        ? normalizeCompletionModelId(providerId, id)
+                        : id,
+                    )
+                  }
                   isLoading={modelsLoading}
                   placeholder="Select a model…"
                 />
@@ -304,21 +377,36 @@ export const CompletionSetupModal = ({
           </div>
         )}
 
-        <div className="flex justify-end gap-2 pt-1">
-          <Button variant="ghost" size="sm" onClick={handleDismiss}>
-            Not now
-          </Button>
+        <div className="flex justify-between gap-2 pt-1">
           <Button
+            variant="ghost"
             size="sm"
             disabled={
+              checking ||
               isSaving ||
-              (path === "ollama" && !(modelId || RECOMMENDED_OLLAMA_MODEL).trim()) ||
+              (path === "ollama" && !resolvedModelId.trim()) ||
               (path === "provider" && (!providerId || !modelId))
             }
-            onClick={() => void handleSave()}
+            onClick={() => void handleCheckConnection()}
           >
-            {isSaving ? "Saving…" : "Save"}
+            {checking ? "Checking…" : "Check connection"}
           </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={handleDismiss}>
+              Not now
+            </Button>
+            <Button
+              size="sm"
+              disabled={
+                isSaving ||
+                (path === "ollama" && !resolvedModelId.trim()) ||
+                (path === "provider" && (!providerId || !modelId))
+              }
+              onClick={() => void handleSave()}
+            >
+              {isSaving ? "Saving…" : "Save"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>,

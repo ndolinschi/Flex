@@ -252,6 +252,7 @@ pub fn run() {
             commands::get_inline_completion_prefs,
             commands::save_inline_completion_prefs,
             commands::complete_prompt_inline,
+            commands::check_inline_completion_connection,
             commands::review_prompt,
             commands::delete_session,
             commands::replay,

@@ -43,6 +43,7 @@ export const useInlineCompletion = ({
   const { prefs, save } = useInlineCompletionPrefs()
   const [suggestion, setSuggestion] = useState("")
   const [setupOpen, setSetupOpen] = useState(false)
+  const [lastError, setLastError] = useState<string | null>(null)
   const genRef = useRef(0)
 
   const pluginOn = INLINE_COMPLETION_ENABLED && hasInlineCompletionPlugin()
@@ -53,6 +54,7 @@ export const useInlineCompletion = ({
   // Clear on every draft/caret/tray change; refetch after debounce.
   useEffect(() => {
     setSuggestion("")
+    setLastError(null)
     if (!completionEnabled || traysOpen) return
     // v1: only complete at end of draft so ghost can append after the backdrop.
     if (caret !== draft.length) return
@@ -60,19 +62,22 @@ export const useInlineCompletion = ({
     const prefix = draft.slice(0, caret)
     if (prefix.trim().length < INLINE_COMPLETION_MIN_PREFIX) return
 
-    const gen = ++genRef.current
-    const suffix = draft.slice(caret)
+    let cancelled = false
     const timer = window.setTimeout(() => {
       void (async () => {
+        const gen = ++genRef.current
         try {
-          const text = await completePromptInline(prefix, suffix)
-          if (genRef.current !== gen) return
+          const text = await completePromptInline(prefix, draft.slice(caret))
+          if (cancelled || genRef.current !== gen) return
           setSuggestion(text)
+          setLastError(null)
         } catch (err) {
-          if (genRef.current !== gen) return
+          if (cancelled || genRef.current !== gen) return
           const msg = toInvokeError(err)
           if (msg.includes(INLINE_COMPLETION_NOT_CONFIGURED)) {
             if (!prefs?.setupDismissed) setSetupOpen(true)
+          } else {
+            setLastError(msg)
           }
           setSuggestion("")
         }
@@ -80,8 +85,8 @@ export const useInlineCompletion = ({
     }, INLINE_COMPLETION_DEBOUNCE_MS)
 
     return () => {
+      cancelled = true
       window.clearTimeout(timer)
-      genRef.current += 1
     }
   }, [
     completionEnabled,
@@ -142,5 +147,6 @@ export const useInlineCompletion = ({
     prefs,
     completionEnabled,
     configured,
+    lastError,
   }
 }

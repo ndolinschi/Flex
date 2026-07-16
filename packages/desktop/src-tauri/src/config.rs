@@ -141,6 +141,17 @@ impl Default for InlineCompletionPrefs {
     }
 }
 
+/// Strip a redundant `provider/` prefix from a model id (e.g. UI dropdown values).
+pub fn normalize_inline_model_id(provider_id: &str, model_id: &str) -> String {
+    let provider_id = provider_id.trim();
+    let model_id = model_id.trim();
+    let prefix = format!("{provider_id}/");
+    model_id
+        .strip_prefix(&prefix)
+        .unwrap_or(model_id)
+        .to_string()
+}
+
 impl InlineCompletionPrefs {
     /// True when a provider/model pair is saved (ready to complete).
     pub fn is_configured(&self) -> bool {
@@ -157,6 +168,7 @@ impl InlineCompletionPrefs {
         if provider.is_empty() || model.is_empty() {
             return None;
         }
+        let model = normalize_inline_model_id(provider, model);
         Some(format!("{provider}/{model}"))
     }
 }
@@ -984,6 +996,16 @@ mod tests {
         assert!(configured.is_configured());
         assert_eq!(
             configured.model_ref().as_deref(),
+            Some("ollama/qwen2.5:0.5b")
+        );
+        let doubled = InlineCompletionPrefs {
+            enabled: true,
+            provider_id: Some("ollama".into()),
+            model_id: Some("ollama/qwen2.5:0.5b".into()),
+            setup_dismissed: false,
+        };
+        assert_eq!(
+            doubled.model_ref().as_deref(),
             Some("ollama/qwen2.5:0.5b")
         );
     }

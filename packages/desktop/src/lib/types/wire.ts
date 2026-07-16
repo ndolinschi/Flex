@@ -296,6 +296,12 @@ export type InlineCompletionPrefs = {
   setupDismissed?: boolean
 }
 
+export type CheckInlineCompletionResult = {
+  ok: boolean
+  message: string
+  sample?: string
+}
+
 export type IndexStatus = {
   repoRoot: string
   indexDir: string

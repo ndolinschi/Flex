@@ -23,7 +23,8 @@ use tokio_util::sync::CancellationToken;
 use crate::compose::build_service;
 use crate::config::{
     InlineCompletionPrefs, ProviderConfig, ProviderConfigView, ProviderProfile,
-    ProviderProfileInput, ProviderProfileView, SaveProviderConfigInput, persist_config,
+    ProviderProfileInput, ProviderProfileView, SaveProviderConfigInput, normalize_inline_model_id,
+    persist_config,
 };
 use crate::error::{DesktopError, DesktopResult};
 use crate::secrets::SecretStorageMode;
@@ -863,21 +864,19 @@ pub async fn get_inline_completion_prefs(
 #[tauri::command]
 pub async fn save_inline_completion_prefs(
     state: State<'_, AppState>,
-    prefs: InlineCompletionPrefs,
+    mut prefs: InlineCompletionPrefs,
 ) -> DesktopResult<InlineCompletionPrefs> {
+    if let (Some(provider_id), Some(model_id)) =
+        (&prefs.provider_id, &mut prefs.model_id)
+    {
+        *model_id = normalize_inline_model_id(provider_id, model_id);
+    }
     let mut cfg = state.config.lock().await.clone();
-    let prev_provider = cfg.prefs.inline_completion.provider_id.clone();
     cfg.prefs.inline_completion = prefs.clone();
     persist_config(&cfg)?;
     *state.config.lock().await = cfg.clone();
 
-    let active_provider = resolve_active_provider_id(&cfg);
-    let needs_rebuild = prefs.provider_id.as_deref() != prev_provider.as_deref()
-        || prefs
-            .provider_id
-            .as_deref()
-            .is_some_and(|p| Some(p) != active_provider.as_deref());
-    if needs_rebuild && cfg.is_ready() {
+    if prefs.is_configured() && cfg.is_ready() {
         match build_service(&cfg, state.store.clone()) {
             Ok(service) => {
                 *state.service.lock().await = Some(service);
@@ -889,12 +888,6 @@ pub async fn save_inline_completion_prefs(
         }
     }
     Ok(prefs)
-}
-
-fn resolve_active_provider_id(cfg: &ProviderConfig) -> Option<String> {
-    cfg.active_profile()
-        .map(|p| p.provider.clone())
-        .or_else(|| cfg.prefs.preferred_provider.clone())
 }
 
 /// One-shot ghost-text continuation for the composer / Prompt tab.
@@ -921,8 +914,116 @@ pub async fn complete_prompt_inline(
         .ok_or_else(|| DesktopError::Message(INLINE_COMPLETION_NOT_CONFIGURED.into()))?;
 
     let service = require_service(&state).await?;
+    stream_inline_completion(&service, &model_ref, &prefix, suffix.as_deref()).await
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckInlineCompletionInput {
+    pub provider_id: String,
+    pub model_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckInlineCompletionResult {
+    pub ok: bool,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sample: Option<String>,
+}
+
+/// Probe inline-completion connectivity without persisting prefs. Rebuilds a
+/// throwaway engine snapshot so Ollama (or another non-active provider) can be
+/// registered via `all_providers` before the user saves.
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn check_inline_completion_connection(
+    state: State<'_, AppState>,
+    input: CheckInlineCompletionInput,
+) -> DesktopResult<CheckInlineCompletionResult> {
+    let provider_id = input.provider_id.trim().to_string();
+    let model_id = normalize_inline_model_id(&provider_id, &input.model_id.trim());
+    if provider_id.is_empty() || model_id.is_empty() {
+        return Ok(CheckInlineCompletionResult {
+            ok: false,
+            message: "Pick a provider and model.".into(),
+            sample: None,
+        });
+    }
+
+    let mut cfg = state.config.lock().await.clone();
+    if !cfg.is_ready() {
+        return Ok(CheckInlineCompletionResult {
+            ok: false,
+            message: "Configure a provider under Settings → Models first.".into(),
+            sample: None,
+        });
+    }
+
+    cfg.prefs.inline_completion = InlineCompletionPrefs {
+        enabled: true,
+        provider_id: Some(provider_id.clone()),
+        model_id: Some(model_id.clone()),
+        setup_dismissed: false,
+    };
+
+    let service = match build_service(&cfg, state.store.clone()) {
+        Ok(service) => service,
+        Err(err) => {
+            return Ok(CheckInlineCompletionResult {
+                ok: false,
+                message: err.to_string(),
+                sample: None,
+            });
+        }
+    };
+
+    let model_ref = format!("{provider_id}/{model_id}");
+    let prefix = "Please help me write a prompt to";
+    match stream_inline_completion(&service, &model_ref, prefix, None).await {
+        Ok(sample) if sample.trim().is_empty() => {
+            // Still install so Refresh models can list Ollama tags next.
+            *state.service.lock().await = Some(service);
+            respawn_cron_loop(&state).await;
+            Ok(CheckInlineCompletionResult {
+                ok: false,
+                message: "Connected, but the model returned an empty completion — try another model."
+                    .into(),
+                sample: None,
+            })
+        }
+        Ok(sample) => {
+            *state.service.lock().await = Some(service);
+            respawn_cron_loop(&state).await;
+            Ok(CheckInlineCompletionResult {
+                ok: true,
+                message: "Connection OK — inline completions should work after you save.".into(),
+                sample: Some(sample),
+            })
+        }
+        Err(err) => {
+            // Provider registered but call failed (daemon down, missing model, …).
+            // Keep the rebuilt registry so Refresh models can surface tags.
+            *state.service.lock().await = Some(service);
+            respawn_cron_loop(&state).await;
+            Ok(CheckInlineCompletionResult {
+                ok: false,
+                message: err.to_string(),
+                sample: None,
+            })
+        }
+    }
+}
+
+async fn stream_inline_completion(
+    service: &EngineService,
+    model_ref: &str,
+    prefix: &str,
+    suffix: Option<&str>,
+) -> DesktopResult<String> {
     let registry = service.provider_registry();
-    let model = ModelRef(model_ref.clone());
+    let model = ModelRef(model_ref.to_owned());
     let (provider, model_id) = registry.resolve(&model).ok_or_else(|| {
         DesktopError::Message(format!(
             "no provider for inline completion model {model_ref} — pick a connected model in Settings → Tools"

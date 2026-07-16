@@ -17,6 +17,7 @@ import type {
   IndexRebuildResult,
   IndexStatus,
   InlineCompletionPrefs,
+  CheckInlineCompletionResult,
   McpServerDto,
   MemoryEntryDto,
   ModelInfoDto,
@@ -218,6 +219,15 @@ export const completePromptInline = (
   invoke("complete_prompt_inline", {
     prefix,
     suffix: suffix ?? null,
+  })
+
+/** Probe inline-completion connectivity without saving prefs. */
+export const checkInlineCompletionConnection = (
+  providerId: string,
+  modelId: string,
+): Promise<CheckInlineCompletionResult> =>
+  invoke("check_inline_completion_connection", {
+    input: { providerId, modelId },
   })
 
 /** One-shot prompt critique (JSON findings) via the session model — see

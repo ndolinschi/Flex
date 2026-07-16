@@ -570,10 +570,14 @@ pub fn resolve_available_providers(
             Err(err) => return Err(err.into()),
         }
     }
-    if env_is_set("OLLAMA_HOST") || env_is_set("OLLAMA_MODEL") {
-        if let Ok(Some((provider, model))) = build_provider(OLLAMA_PROVIDER_ID, provider_keys) {
-            register(&mut providers, provider, model);
-        }
+    // Ollama needs a host, not credentials — always register with the default
+    // localhost when building the multi-provider registry. Gating on
+    // `OLLAMA_HOST`/`OLLAMA_MODEL` hid local Ollama from desktop inline
+    // completion (and any other all_providers consumer) when chat used a
+    // different preferred provider. `list_models` already tolerates a down
+    // daemon; stream calls surface the connection error.
+    if let Ok(Some((provider, model))) = build_provider(OLLAMA_PROVIDER_ID, provider_keys) {
+        register(&mut providers, provider, model);
     }
     if env_is_set("AWS_BEARER_TOKEN_BEDROCK") {
         if let Ok(Some((provider, model))) = build_provider(BEDROCK_PROVIDER_ID, provider_keys) {
@@ -830,6 +834,20 @@ mod tests {
         if providers.ids().is_empty() {
             assert!(model.is_none());
         }
+    }
+
+    #[test]
+    fn ollama_always_registers_in_multi_resolver_without_env() {
+        let (providers, _) = resolve_available_providers(None, None, &[], &no_keys())
+            .expect("available resolver must not fail");
+        assert!(
+            providers
+                .ids()
+                .iter()
+                .any(|id| id.as_str() == OLLAMA_PROVIDER_ID),
+            "ollama must register without OLLAMA_HOST/OLLAMA_MODEL so desktop \
+             inline completion can use a local daemon alongside another chat provider"
+        );
     }
 
     #[test]
