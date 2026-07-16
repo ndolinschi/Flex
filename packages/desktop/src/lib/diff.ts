@@ -232,3 +232,33 @@ export const buildPatch = (
   const patch = parts.join("\n")
   return patch.endsWith("\n") ? patch : `${patch}\n`
 }
+
+/**
+ * Human-readable label for a file section that parsed cleanly but has no
+ * hunks — empty adds (git's `e69de29` empty blob), binary notices, renames
+ * with no content change, mode-only flips. DiffView uses this instead of
+ * dumping raw `diff --git` / `index` metadata at the user.
+ */
+export const describeHunklessDiff = (file: ParsedDiffFile): string => {
+  const header = file.header.join("\n")
+  if (header.includes("Binary files ") || /^GIT binary patch/m.test(header)) {
+    return "Binary file"
+  }
+  if (header.includes("new file mode")) {
+    return "Empty new file"
+  }
+  if (header.includes("deleted file mode")) {
+    return "Empty deleted file"
+  }
+  if (
+    header.includes("similarity index") ||
+    /^rename from /m.test(header) ||
+    /^rename to /m.test(header)
+  ) {
+    return "Renamed — no content change"
+  }
+  if (header.includes("old mode ") || header.includes("new mode ")) {
+    return "Mode change only"
+  }
+  return "No content changes"
+}

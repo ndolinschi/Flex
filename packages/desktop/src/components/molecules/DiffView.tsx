@@ -1,6 +1,7 @@
 import { useMemo } from "react"
 import { cn } from "../../lib/utils"
 import {
+  describeHunklessDiff,
   isDiffTruncated,
   parseUnifiedDiff,
   type Hunk,
@@ -114,8 +115,10 @@ const HunkBlock = ({
 
 /** Unified-diff renderer. Renders structured per-hunk sections (with
  * hover-revealed Keep/Undo actions) when `diff` parses cleanly, isn't
- * truncated, and the caller opted in via `onKeepHunk`/`onUndoHunk`; otherwise
- * falls back to the original flat colored-line rendering. */
+ * truncated, and the caller opted in via `onKeepHunk`/`onUndoHunk`.
+ * Hunk-less files (empty adds, binary, rename-only) always get a short
+ * label instead of raw git headers. Otherwise falls back to flat
+ * colored-line rendering. */
 export const DiffView = ({
   diff,
   className,
@@ -127,18 +130,23 @@ export const DiffView = ({
     hunkActionsEnabled ?? (!!onKeepHunk || !!onUndoHunk)
 
   const parsed = useMemo(() => {
-    if (!wantsHunkActions) return null
     if (isDiffTruncated(diff)) return null
     try {
       const result = parseUnifiedDiff(diff)
-      // No files/hunks recognized — nothing structured to render; let the
-      // caller fall back to plain rendering rather than showing a blank pane.
       if (result.files.length === 0) return null
       return result
     } catch {
       return null
     }
-  }, [diff, wantsHunkActions])
+  }, [diff])
+
+  // Structured path when hunk actions are on, or when every file is
+  // hunk-less (so we can show "Empty new file" instead of raw headers
+  // even for callers that never opt into Keep/Undo).
+  const useStructured =
+    parsed !== null &&
+    (wantsHunkActions ||
+      parsed.files.every((file) => file.hunks.length === 0))
 
   return (
     <pre
@@ -147,7 +155,7 @@ export const DiffView = ({
         className,
       )}
     >
-      {parsed ? (
+      {useStructured && parsed ? (
         parsed.files.map((file, fi) =>
           file.hunks.length > 0 ? (
             file.hunks.map((hunk, hi) => (
@@ -155,23 +163,18 @@ export const DiffView = ({
                 key={`${fi}-${hi}`}
                 file={file}
                 hunk={hunk}
-                onKeepHunk={onKeepHunk}
-                onUndoHunk={onUndoHunk}
+                onKeepHunk={wantsHunkActions ? onKeepHunk : undefined}
+                onUndoHunk={wantsHunkActions ? onUndoHunk : undefined}
               />
             ))
           ) : (
-            // File section with no hunks (e.g. a rename with no content
-            // change, or a binary-file notice) — render its header lines
-            // plainly so nothing silently disappears.
-            <div key={fi}>
-              {file.header.map((line, li) => (
-                <div
-                  key={li}
-                  className={cn("whitespace-pre px-3", lineClass(line))}
-                >
-                  {line || " "}
-                </div>
-              ))}
+            // No hunks: empty new file, binary, rename-only, etc. Show a
+            // short label instead of raw `diff --git` / `index` metadata.
+            <div
+              key={fi}
+              className="px-3 py-2.5 text-sm text-ink-muted"
+            >
+              {describeHunklessDiff(file)}
             </div>
           ),
         )
