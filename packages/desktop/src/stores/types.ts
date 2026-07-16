@@ -424,6 +424,16 @@ export type ContentLayoutSliceState = {
    * should land in the current list (Chrome-style DnD).
    */
   reorderTabInPane: (pane: 0 | 1, tabId: string, insertAt: number) => void
+  /**
+   * Move a tab between panes (or reorder if same pane). Collapses split when
+   * a side pane empties. Dedupes by tab id on the target.
+   */
+  moveTabBetweenPanes: (
+    fromPane: 0 | 1,
+    toPane: 0 | 1,
+    tabId: string,
+    insertAt: number,
+  ) => void
   closeTabInPane: (pane: 0 | 1, tabId: string) => void
   /** Focus pane + sync activeSessionId when activating a chat tab. */
   focusContentTab: (pane: 0 | 1, tabId: string) => void

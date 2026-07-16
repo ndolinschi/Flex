@@ -95,6 +95,106 @@ export const reorderContentTabs = <T,>(
   return next
 }
 
+/**
+ * Move a tab from one pane to another (or reorder if same pane).
+ * `insertAt` is Chrome-style (index in the target list before splice).
+ * Dedupes by tab id: if the target already has it, activate and drop the
+ * source copy. Collapses split when a side pane empties.
+ */
+export const moveTabBetweenPanes = (
+  layout: ContentLayout,
+  fromPane: 0 | 1,
+  toPane: 0 | 1,
+  tabId: string,
+  insertAt: number,
+): ContentLayout => {
+  if (fromPane === toPane) {
+    const pane = layout.panes[fromPane]
+    if (!pane) return layout
+    const fromIndex = pane.tabs.findIndex((t) => t.id === tabId)
+    if (fromIndex < 0) return layout
+    const tabs = reorderContentTabs(pane.tabs, fromIndex, insertAt)
+    if (tabs === pane.tabs) return layout
+    const panes = layout.panes.map((p, i) =>
+      i === fromPane ? { ...p, tabs, activeTabId: tabId } : { ...p, tabs: [...p.tabs] },
+    ) as ContentLayout["panes"]
+    return {
+      ...layout,
+      focusedPane: fromPane,
+      panes:
+        layout.mode === "split"
+          ? ([panes[0]!, panes[1]!] as [PaneState, PaneState])
+          : ([panes[0]!] as [PaneState]),
+    }
+  }
+
+  // Ensure split when targeting pane 1.
+  let working: ContentLayout = layout
+  if (toPane === 1 && working.mode !== "split") {
+    working = {
+      ...working,
+      mode: "split",
+      panes: [working.panes[0] ?? emptyPane(), emptyPane()],
+    }
+  }
+  if (fromPane === 1 && working.mode !== "split") return layout
+
+  const panes: [PaneState, PaneState] = [
+    {
+      tabs: [...(working.panes[0]?.tabs ?? [])],
+      activeTabId: working.panes[0]?.activeTabId ?? null,
+    },
+    {
+      tabs: [...(working.panes[1]?.tabs ?? [])],
+      activeTabId: working.panes[1]?.activeTabId ?? null,
+    },
+  ]
+
+  const source = panes[fromPane]
+  const target = panes[toPane]
+  const fromIndex = source.tabs.findIndex((t) => t.id === tabId)
+  if (fromIndex < 0) return layout
+  const [tab] = source.tabs.splice(fromIndex, 1)
+  if (!tab) return layout
+  if (source.activeTabId === tabId) {
+    source.activeTabId = source.tabs[source.tabs.length - 1]?.id ?? null
+  }
+
+  const existingIdx = target.tabs.findIndex((t) => t.id === tabId)
+  if (existingIdx >= 0) {
+    target.activeTabId = tabId
+  } else {
+    const dest = Math.max(0, Math.min(insertAt, target.tabs.length))
+    target.tabs.splice(dest, 0, tab)
+    target.activeTabId = tabId
+  }
+
+  // Collapse when either side is empty after the move.
+  if (panes[1].tabs.length === 0) {
+    return {
+      mode: "single",
+      splitRatio: working.splitRatio,
+      focusedPane: 0,
+      panes: [panes[0]],
+    }
+  }
+  if (panes[0].tabs.length === 0) {
+    return {
+      mode: "single",
+      splitRatio: working.splitRatio,
+      focusedPane: 0,
+      panes: [panes[1]],
+    }
+  }
+
+  return {
+    ...working,
+    mode: "split",
+    focusedPane: toPane,
+    panes,
+  }
+}
+
 /** Ensure pane 0 has a chat tab for `sessionId`; returns updated layout. */
 export const ensureChatInPane = (
   layout: ContentLayout,

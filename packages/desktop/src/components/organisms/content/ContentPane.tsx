@@ -13,6 +13,14 @@ import { IconButton, Tab, TabStrip, Tooltip } from "../../atoms"
 import { OpenTabModal } from "../../molecules"
 import { useSessions } from "../../../hooks/useSessions"
 import { gitPrStatus } from "../../../lib/tauri"
+import {
+  FLEX_TAB_DND_MIME,
+  beginTabDrag,
+  endTabDrag,
+  getActiveTabDrag,
+  isFlexTabDrag,
+  readTabIdFromDataTransfer,
+} from "../../../lib/tabDnD"
 import { sessionLabel, type SessionId } from "../../../lib/types"
 import {
   useAppStore,
@@ -29,8 +37,6 @@ type ContentPaneProps = {
   /** Tool tabs that must stay mounted (browser/terminal/files) across panes. */
   keepAliveTools: Set<string>
 }
-
-const DND_MIME = "application/x-flex-tab-id"
 
 const tabLabel = (
   tab: ContentTab,
@@ -56,6 +62,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   const openChatInPane = useAppStore((s) => s.openChatInPane)
   const openToolInPane = useAppStore((s) => s.openToolInPane)
   const reorderTabInPane = useAppStore((s) => s.reorderTabInPane)
+  const moveTabBetweenPanes = useAppStore((s) => s.moveTabBetweenPanes)
   const setFocusedPane = useAppStore((s) => s.setFocusedPane)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const { sessions } = useSessions()
@@ -108,35 +115,69 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
 
   const handleTabDragStart = (e: DragEvent<HTMLElement>, tabId: string) => {
     suppressClickRef.current = false
+    beginTabDrag({ tabId, fromPane: paneIndex })
     setDragTabId(tabId)
     e.dataTransfer.effectAllowed = "move"
-    e.dataTransfer.setData(DND_MIME, tabId)
+    e.dataTransfer.setData(FLEX_TAB_DND_MIME, tabId)
     e.dataTransfer.setData("text/plain", tabId)
   }
 
+  const syncDropTarget = (insertAt: number) => {
+    const session = getActiveTabDrag()
+    if (session) setDragTabId(session.tabId)
+    setDropInsertAt(insertAt)
+  }
+
   const handleTabDragOver = (e: DragEvent<HTMLElement>, index: number) => {
-    if (!dragTabId) return
+    if (!isFlexTabDrag(e.dataTransfer)) return
     e.preventDefault()
     e.dataTransfer.dropEffect = "move"
     const rect = e.currentTarget.getBoundingClientRect()
     const before = e.clientX < rect.left + rect.width / 2
-    setDropInsertAt(before ? index : index + 1)
+    syncDropTarget(before ? index : index + 1)
   }
 
-  const handleTabDrop = (e: DragEvent<HTMLElement>) => {
+  const handleStripDragOver = (e: DragEvent<HTMLDivElement>) => {
+    if (!isFlexTabDrag(e.dataTransfer)) return
     e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+    // Dropping on empty strip trailing space → append.
+    if (e.target === e.currentTarget) {
+      syncDropTarget(pane.tabs.length)
+    }
+  }
+
+  const commitDrop = (e: DragEvent<HTMLElement>, insertAt: number | null) => {
+    e.preventDefault()
+    const session = getActiveTabDrag()
     const id =
-      e.dataTransfer.getData(DND_MIME) ||
-      e.dataTransfer.getData("text/plain") ||
+      readTabIdFromDataTransfer(e.dataTransfer) ||
+      session?.tabId ||
       dragTabId
-    if (id && dropInsertAt != null) {
-      reorderTabInPane(paneIndex, id, dropInsertAt)
+    const fromPane = session?.fromPane ?? paneIndex
+    const at = insertAt ?? dropInsertAt ?? pane.tabs.length
+    if (id) {
+      if (fromPane === paneIndex) {
+        reorderTabInPane(paneIndex, id, at)
+      } else {
+        moveTabBetweenPanes(fromPane, paneIndex, id, at)
+      }
       suppressClickRef.current = true
     }
+    endTabDrag()
     clearDnD()
   }
 
+  const handleTabDrop = (e: DragEvent<HTMLElement>) => {
+    commitDrop(e, dropInsertAt)
+  }
+
+  const handleStripDrop = (e: DragEvent<HTMLDivElement>) => {
+    commitDrop(e, dropInsertAt ?? pane.tabs.length)
+  }
+
   const handleTabDragEnd = () => {
+    endTabDrag()
     clearDnD()
   }
 
@@ -176,6 +217,8 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
           ref={tabsScrollRef}
           role="presentation"
           onWheel={handleTabsWheel}
+          onDragOver={handleStripDragOver}
+          onDrop={handleStripDrop}
           className={cn(
             "flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto",
             "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",

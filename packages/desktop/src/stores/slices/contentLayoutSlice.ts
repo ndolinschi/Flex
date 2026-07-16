@@ -12,6 +12,7 @@ import {
   defaultContentLayout,
   emptyPane,
   ensureChatInPane,
+  moveTabBetweenPanes as moveTabBetweenPanesModel,
   normalizeLayout,
   otherPaneIndex,
   reorderContentTabs,
@@ -318,6 +319,29 @@ export const createContentLayoutSlice: StateCreator<
     }
     set({ contentLayout: next, ...syncCompatFlags(next) })
     persistLayout(next)
+  },
+
+  moveTabBetweenPanes: (fromPane, toPane, tabId, insertAt) => {
+    const layout = get().contentLayout
+    const next = moveTabBetweenPanesModel(
+      layout,
+      fromPane,
+      toPane,
+      tabId,
+      insertAt,
+    )
+    if (next === layout) return
+    const focused = next.panes[next.focusedPane] ?? next.panes[0]
+    const active = focused?.tabs.find((t) => t.id === focused.activeTabId)
+    set({
+      contentLayout: next,
+      ...(active?.kind === "chat" ? { activeSessionId: active.sessionId } : {}),
+      ...syncCompatFlags(next),
+    })
+    persistLayout(next)
+    if (active?.kind === "chat") {
+      void persistUiState({ activeSessionId: active.sessionId })
+    }
   },
 
   closeTabInPane: (pane, tabId) => {

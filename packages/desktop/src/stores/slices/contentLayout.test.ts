@@ -4,8 +4,10 @@ import {
   chatTabId,
   defaultContentLayout,
   migrateToContentLayout,
+  moveTabBetweenPanes,
   reorderContentTabs,
   toolTabId,
+  type ContentLayout,
 } from "../contentLayoutModel"
 
 describe("reorderContentTabs", () => {
@@ -14,6 +16,128 @@ describe("reorderContentTabs", () => {
     expect(reorderContentTabs(["a", "b", "c"], 0, 3)).toEqual(["b", "c", "a"])
     expect(reorderContentTabs(["a", "b", "c"], 1, 1)).toEqual(["a", "b", "c"])
     expect(reorderContentTabs(["a", "b", "c"], 1, 2)).toEqual(["a", "b", "c"])
+  })
+})
+
+describe("moveTabBetweenPanes", () => {
+  it("reorders within the same pane", () => {
+    const layout: ContentLayout = {
+      mode: "single",
+      splitRatio: 0.5,
+      focusedPane: 0,
+      panes: [
+        {
+          tabs: [
+            { id: "a", kind: "chat", sessionId: "s" },
+            { id: "b", kind: "chat", sessionId: "s" },
+            { id: "c", kind: "chat", sessionId: "s" },
+          ],
+          activeTabId: "c",
+        },
+      ],
+    }
+    const next = moveTabBetweenPanes(layout, 0, 0, "c", 1)
+    expect(next.panes[0]!.tabs.map((t) => t.id)).toEqual(["a", "c", "b"])
+    expect(next.panes[0]!.activeTabId).toBe("c")
+  })
+
+  it("moves a tab across panes and activates it", () => {
+    const layout: ContentLayout = {
+      mode: "split",
+      splitRatio: 0.5,
+      focusedPane: 0,
+      panes: [
+        {
+          tabs: [
+            { id: chatTabId("a"), kind: "chat", sessionId: "a" },
+            {
+              id: toolTabId("a", "plan"),
+              kind: "tool",
+              tool: "plan",
+              sessionId: "a",
+            },
+          ],
+          activeTabId: toolTabId("a", "plan"),
+        },
+        {
+          tabs: [{ id: chatTabId("b"), kind: "chat", sessionId: "b" }],
+          activeTabId: chatTabId("b"),
+        },
+      ],
+    }
+    const next = moveTabBetweenPanes(
+      layout,
+      0,
+      1,
+      toolTabId("a", "plan"),
+      0,
+    )
+    expect(next.mode).toBe("split")
+    expect(next.panes[0]!.tabs.map((t) => t.id)).toEqual([chatTabId("a")])
+    expect(next.panes[1]!.tabs.map((t) => t.id)).toEqual([
+      toolTabId("a", "plan"),
+      chatTabId("b"),
+    ])
+    expect(next.panes[1]!.activeTabId).toBe(toolTabId("a", "plan"))
+    expect(next.focusedPane).toBe(1)
+  })
+
+  it("collapses split when the right pane empties", () => {
+    const layout: ContentLayout = {
+      mode: "split",
+      splitRatio: 0.5,
+      focusedPane: 1,
+      panes: [
+        {
+          tabs: [{ id: chatTabId("a"), kind: "chat", sessionId: "a" }],
+          activeTabId: chatTabId("a"),
+        },
+        {
+          tabs: [
+            {
+              id: toolTabId("a", "files"),
+              kind: "tool",
+              tool: "files",
+              sessionId: "a",
+            },
+          ],
+          activeTabId: toolTabId("a", "files"),
+        },
+      ],
+    }
+    const next = moveTabBetweenPanes(layout, 1, 0, toolTabId("a", "files"), 1)
+    expect(next.mode).toBe("single")
+    expect(next.panes).toHaveLength(1)
+    expect(next.panes[0]!.tabs.map((t) => t.id)).toEqual([
+      chatTabId("a"),
+      toolTabId("a", "files"),
+    ])
+  })
+
+  it("dedupes when the target already has the tab", () => {
+    const id = toolTabId("a", "plan")
+    const layout: ContentLayout = {
+      mode: "split",
+      splitRatio: 0.5,
+      focusedPane: 0,
+      panes: [
+        {
+          tabs: [
+            { id: chatTabId("a"), kind: "chat", sessionId: "a" },
+            { id, kind: "tool", tool: "plan", sessionId: "a" },
+          ],
+          activeTabId: id,
+        },
+        {
+          tabs: [{ id, kind: "tool", tool: "plan", sessionId: "a" }],
+          activeTabId: id,
+        },
+      ],
+    }
+    const next = moveTabBetweenPanes(layout, 0, 1, id, 0)
+    expect(next.panes[0]!.tabs.map((t) => t.id)).toEqual([chatTabId("a")])
+    expect(next.panes[1]!.tabs.map((t) => t.id)).toEqual([id])
+    expect(next.panes[1]!.activeTabId).toBe(id)
   })
 })
 
@@ -144,5 +268,19 @@ describe("contentLayout", () => {
       toolTabId("sess-a", "status"),
       toolTabId("sess-a", "plan"),
     ])
+  })
+
+  it("moveTabBetweenPanes moves across panes and collapses when empty", () => {
+    useAppStore.getState().openChatInPane(0, "sess-a")
+    useAppStore.getState().openToolBesideChat("sess-a", "plan")
+    const planId = toolTabId("sess-a", "plan")
+    useAppStore.getState().moveTabBetweenPanes(1, 0, planId, 1)
+    const layout = useAppStore.getState().contentLayout
+    expect(layout.mode).toBe("single")
+    expect(layout.panes[0]!.tabs.map((t) => t.id)).toEqual([
+      chatTabId("sess-a"),
+      planId,
+    ])
+    expect(layout.panes[0]!.activeTabId).toBe(planId)
   })
 })
