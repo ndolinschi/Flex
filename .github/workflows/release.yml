@@ -158,7 +158,7 @@ jobs:
           echo "sig=${sig}" >> "$GITHUB_OUTPUT"
 
       - name: Upload release asset
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: packages/desktop/${{ steps.dmg.outputs.path }}
           draft: true
@@ -169,7 +169,7 @@ jobs:
       # never breaks the dmg-only path (unsigned packaging CI).
       - name: Upload updater channel assets
         if: ${{ steps.updater.outputs.has_updater == 'true' }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             packages/desktop/${{ steps.updater.outputs.archive }}
