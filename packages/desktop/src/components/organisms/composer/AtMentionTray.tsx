@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react"
-import { FileIcon, Folder, Table2 } from "lucide-react"
+import { FileIcon, Folder, Plug, Table2 } from "lucide-react"
 import { PopoverItem, PopoverTray } from "../../molecules"
 import type { AtMentionHit } from "../../../lib/atMentionHits"
 
@@ -16,10 +16,11 @@ const MentionIcon = ({ kind }: { kind: AtMentionHit["kind"] }) => {
   const className = "h-3.5 w-3.5 shrink-0 text-icon-3"
   if (kind === "folder") return <Folder className={className} aria-hidden />
   if (kind === "table") return <Table2 className={className} aria-hidden />
+  if (kind === "mcp") return <Plug className={className} aria-hidden />
   return <FileIcon className={className} aria-hidden />
 }
 
-/** Composer `@` suggestion tray — files, folders, and plugin hits (tables). */
+/** Composer `@` suggestion tray — files, folders, tables, and MCP servers. */
 export const AtMentionTray = ({
   open,
   anchorRef,
@@ -46,7 +47,7 @@ export const AtMentionTray = ({
       anchorRef={anchorRef}
       placement="above"
       role="listbox"
-      aria-label="Mention a file, folder, or table"
+      aria-label="Mention a file, folder, table, or MCP server"
       className="left-0 right-0 w-full"
     >
       <ul ref={listRef} className="max-h-56 overflow-y-auto py-0.5">

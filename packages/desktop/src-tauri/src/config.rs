@@ -113,6 +113,54 @@ impl Default for PluginPrefs {
     }
 }
 
+/// Desktop UI prefs for inline (ghost-text) prompt completion — not an engine
+/// plugin. Model is any connected provider (often a small Ollama model).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct InlineCompletionPrefs {
+    /// Master switch. Default off until the user configures a model.
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub provider_id: Option<String>,
+    #[serde(default)]
+    pub model_id: Option<String>,
+    /// User closed the setup modal without connecting — stop auto-prompting.
+    #[serde(default)]
+    pub setup_dismissed: bool,
+}
+
+impl Default for InlineCompletionPrefs {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            provider_id: None,
+            model_id: None,
+            setup_dismissed: false,
+        }
+    }
+}
+
+impl InlineCompletionPrefs {
+    /// True when a provider/model pair is saved (ready to complete).
+    pub fn is_configured(&self) -> bool {
+        self.provider_id
+            .as_deref()
+            .is_some_and(|p| !p.is_empty())
+            && self.model_id.as_deref().is_some_and(|m| !m.is_empty())
+    }
+
+    /// Qualified `provider/model` ref for `ProviderRegistry::resolve`.
+    pub fn model_ref(&self) -> Option<String> {
+        let provider = self.provider_id.as_deref()?.trim();
+        let model = self.model_id.as_deref()?.trim();
+        if provider.is_empty() || model.is_empty() {
+            return None;
+        }
+        Some(format!("{provider}/{model}"))
+    }
+}
+
 /// A named provider connection ("profile") — e.g. "AWS work" (Bedrock, key A,
 /// us-east-1) vs. "AWS personal" (Bedrock, key B, eu-west-1). The API key
 /// itself never lives on this struct once persisted: it's stored in the OS
@@ -181,6 +229,9 @@ pub struct ProviderPrefs {
     /// `secrets.rs` module docs.
     #[serde(default)]
     pub secret_storage: Option<String>,
+    /// Inline prompt ghost-text completion (desktop UI plugin prefs).
+    #[serde(default)]
+    pub inline_completion: InlineCompletionPrefs,
 }
 
 /// Full runtime config: prefs + secrets loaded from the OS keychain.
@@ -916,6 +967,25 @@ mod tests {
         assert!(!prefs.learning_require_human_approval);
         assert!(!prefs.learning_require_verified_memory);
         assert!(!prefs.verifier);
+    }
+
+    #[test]
+    fn inline_completion_prefs_default_unconfigured() {
+        let prefs = InlineCompletionPrefs::default();
+        assert!(!prefs.enabled);
+        assert!(!prefs.is_configured());
+        assert!(prefs.model_ref().is_none());
+        let configured = InlineCompletionPrefs {
+            enabled: true,
+            provider_id: Some("ollama".into()),
+            model_id: Some("qwen2.5:0.5b".into()),
+            setup_dismissed: false,
+        };
+        assert!(configured.is_configured());
+        assert_eq!(
+            configured.model_ref().as_deref(),
+            Some("ollama/qwen2.5:0.5b")
+        );
     }
 
     #[test]

@@ -22,8 +22,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::compose::build_service;
 use crate::config::{
-    ProviderConfig, ProviderConfigView, ProviderProfile, ProviderProfileInput, ProviderProfileView,
-    SaveProviderConfigInput, persist_config,
+    InlineCompletionPrefs, ProviderConfig, ProviderConfigView, ProviderProfile,
+    ProviderProfileInput, ProviderProfileView, SaveProviderConfigInput, persist_config,
 };
 use crate::error::{DesktopError, DesktopResult};
 use crate::secrets::SecretStorageMode;
@@ -844,6 +844,172 @@ pub async fn suggest_session_title(
         return Ok(fallback);
     }
     Ok(title)
+}
+
+/// Stable error prefix the UI maps to the completion setup modal.
+pub const INLINE_COMPLETION_NOT_CONFIGURED: &str = "inline_completion_not_configured";
+
+/// Read desktop inline-completion prefs (ghost-text model + enable flag).
+#[tauri::command]
+pub async fn get_inline_completion_prefs(
+    state: State<'_, AppState>,
+) -> DesktopResult<InlineCompletionPrefs> {
+    let cfg = state.config.lock().await;
+    Ok(cfg.prefs.inline_completion.clone())
+}
+
+/// Persist inline-completion prefs and rebuild the engine when the chosen
+/// provider differs from the active chat profile (so it lands in the registry).
+#[tauri::command]
+pub async fn save_inline_completion_prefs(
+    state: State<'_, AppState>,
+    prefs: InlineCompletionPrefs,
+) -> DesktopResult<InlineCompletionPrefs> {
+    let mut cfg = state.config.lock().await.clone();
+    let prev_provider = cfg.prefs.inline_completion.provider_id.clone();
+    cfg.prefs.inline_completion = prefs.clone();
+    persist_config(&cfg)?;
+    *state.config.lock().await = cfg.clone();
+
+    let active_provider = resolve_active_provider_id(&cfg);
+    let needs_rebuild = prefs.provider_id.as_deref() != prev_provider.as_deref()
+        || prefs
+            .provider_id
+            .as_deref()
+            .is_some_and(|p| Some(p) != active_provider.as_deref());
+    if needs_rebuild && cfg.is_ready() {
+        match build_service(&cfg, state.store.clone()) {
+            Ok(service) => {
+                *state.service.lock().await = Some(service);
+                respawn_cron_loop(&state).await;
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "inline completion prefs saved; engine rebuild failed");
+            }
+        }
+    }
+    Ok(prefs)
+}
+
+fn resolve_active_provider_id(cfg: &ProviderConfig) -> Option<String> {
+    cfg.active_profile()
+        .map(|p| p.provider.clone())
+        .or_else(|| cfg.prefs.preferred_provider.clone())
+}
+
+/// One-shot ghost-text continuation for the composer / Prompt tab.
+/// Tool-free `stream_chat` (same pattern as `suggest_session_title`).
+/// Returns only the continuation text; empty string when the model yields nothing.
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn complete_prompt_inline(
+    state: State<'_, AppState>,
+    prefix: String,
+    suffix: Option<String>,
+) -> DesktopResult<String> {
+    let prefs = {
+        let cfg = state.config.lock().await;
+        cfg.prefs.inline_completion.clone()
+    };
+    if !prefs.enabled || !prefs.is_configured() {
+        return Err(DesktopError::Message(
+            INLINE_COMPLETION_NOT_CONFIGURED.into(),
+        ));
+    }
+    let model_ref = prefs
+        .model_ref()
+        .ok_or_else(|| DesktopError::Message(INLINE_COMPLETION_NOT_CONFIGURED.into()))?;
+
+    let service = require_service(&state).await?;
+    let registry = service.provider_registry();
+    let model = ModelRef(model_ref.clone());
+    let (provider, model_id) = registry.resolve(&model).ok_or_else(|| {
+        DesktopError::Message(format!(
+            "no provider for inline completion model {model_ref} — pick a connected model in Settings → Tools"
+        ))
+    })?;
+
+    let prefix: String = prefix.chars().take(4000).collect();
+    if prefix.trim().is_empty() {
+        return Ok(String::new());
+    }
+    let suffix = suffix.unwrap_or_default();
+    let suffix: String = suffix.chars().take(500).collect();
+
+    let system = "You are an inline autocomplete for an AI agent prompt editor. \
+        Continue the user's draft prompt. Reply with ONLY the continuation text \
+        that should be inserted at the cursor — no quotes, no markdown fences, \
+        no explanation. Prefer completing the current line or the next short phrase. \
+        Keep the continuation under ~40 tokens."
+        .to_string();
+
+    let user = if suffix.trim().is_empty() {
+        format!("Complete this prompt draft:\n\n{prefix}")
+    } else {
+        format!(
+            "Complete the prompt draft at the cursor (marked «CURSOR»). \
+             Return only text to insert at «CURSOR».\n\n{prefix}«CURSOR»{suffix}"
+        )
+    };
+
+    let mut request = ChatRequest::new(model_id, vec![Message::user(user)]);
+    request.system = Some(system);
+    request.max_tokens = Some(64);
+
+    let cancel = CancellationToken::new();
+    let mut stream = provider
+        .stream_chat(request, cancel)
+        .await
+        .map_err(|e| DesktopError::Message(e.to_string()))?;
+
+    let mut text = String::new();
+    while let Some(event) = stream.next().await {
+        match event.map_err(|e| DesktopError::Message(e.to_string()))? {
+            ProviderStreamEvent::MarkdownDelta { text: delta } => {
+                text.push_str(&delta);
+            }
+            ProviderStreamEvent::MessageEnd { .. } => break,
+            _ => {}
+        }
+    }
+
+    Ok(sanitize_inline_completion(&text))
+}
+
+/// Strip fences/quotes models sometimes wrap around a bare continuation.
+fn sanitize_inline_completion(raw: &str) -> String {
+    let mut t = raw.trim().to_string();
+    if t.starts_with("```") {
+        // Drop opening fence line (` ``` ` or ` ```lang `), then closing fence.
+        let after_fence = t
+            .find('\n')
+            .map(|i| &t[i + 1..])
+            .unwrap_or("")
+            .to_string();
+        t = after_fence
+            .rsplit_once("```")
+            .map(|(before, _)| before.trim().to_string())
+            .unwrap_or_else(|| after_fence.trim().to_string());
+    }
+    t = t.trim_matches(['"', '\'', '`']).trim().to_string();
+    if t.starts_with('\n') && !t.starts_with("\n\n") {
+        t = t.trim_start_matches('\n').to_string();
+    }
+    t
+}
+
+#[cfg(test)]
+mod inline_completion_tests {
+    use super::sanitize_inline_completion;
+
+    #[test]
+    fn sanitize_strips_quotes_and_fences() {
+        assert_eq!(sanitize_inline_completion("\"hello world\""), "hello world");
+        assert_eq!(
+            sanitize_inline_completion("```\nadd tests\n```"),
+            "add tests"
+        );
+    }
 }
 
 /// One-shot prompt critique for the Prompt editor tab — tool-free

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { registerUiPlugin, resetUiPluginsForTests, pluginRightPanelTabs } from "./registry"
+import {
+  hasInlineCompletionPlugin,
+  registerUiPlugin,
+  resetUiPluginsForTests,
+  pluginRightPanelTabs,
+} from "./registry"
 import { Database } from "lucide-react"
 
 describe("UI plugin registry", () => {
@@ -18,5 +23,12 @@ describe("UI plugin registry", () => {
       ],
     })
     expect(pluginRightPanelTabs().map((t) => t.id)).toEqual(["demo-tab"])
+  })
+
+  it("tracks inlineCompletion contributions", () => {
+    resetUiPluginsForTests()
+    expect(hasInlineCompletionPlugin()).toBe(false)
+    registerUiPlugin({ id: "prompt-completion", inlineCompletion: true })
+    expect(hasInlineCompletionPlugin()).toBe(true)
   })
 })

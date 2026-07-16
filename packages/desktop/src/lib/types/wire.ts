@@ -287,6 +287,15 @@ export type PluginPrefs = {
   verifier: boolean
 }
 
+/** Desktop UI prefs for ghost-text prompt completion (not an engine plugin). */
+export type InlineCompletionPrefs = {
+  enabled: boolean
+  providerId?: string
+  modelId?: string
+  /** User dismissed setup without connecting — stop auto-prompting. */
+  setupDismissed?: boolean
+}
+
 export type IndexStatus = {
   repoRoot: string
   indexDir: string

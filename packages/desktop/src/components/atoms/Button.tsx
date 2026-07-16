@@ -24,9 +24,11 @@ const variantClasses: Record<ButtonVariant, string> = {
 }
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: "h-7 px-2.5 text-sm gap-1.5",
-  md: "h-8 px-3 text-sm gap-1.5",
-  lg: "h-9 px-4 text-base gap-2",
+  // Use explicit length utilities — never `text-base`/`text-sm` alone for
+  // color-bearing buttons: those names can resolve to color tokens.
+  sm: "h-7 px-2.5 text-[length:var(--text-sm)] leading-[var(--text-sm--line-height)] gap-1.5",
+  md: "h-8 px-3 text-[length:var(--text-sm)] leading-[var(--text-sm--line-height)] gap-1.5",
+  lg: "h-9 px-4 text-[length:var(--text-base)] leading-[var(--text-base--line-height)] gap-2",
 }
 
 export const Button = ({

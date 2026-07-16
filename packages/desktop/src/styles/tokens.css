@@ -4,6 +4,9 @@
      Neutral charcoal surfaces (not Nord blue-black). Steps between chrome /
      panel / elevated stay close so chrome reads continuous and quiet. Text,
      fills, and strokes use white-alpha hierarchy — whisper, not chalk. */
+  /* Primary ink on dark / surfaces on light — kept as a raw token for
+   * non-Tailwind use. Not exposed as `--color-base` in `@theme` (that name
+   * steals the `text-base` font-size utility). */
   --color-base: #f2f2f2;
   --color-chrome: #141414; /* chat pane / main surface */
   --color-panel: #181818; /* sidebar + popovers */

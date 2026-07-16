@@ -49,7 +49,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `SidebarFooter` | Theme + settings chrome (+ optional creating spinner) | `theme`, `onToggleTheme`, `onOpenSettings`, `isCreating?` | SessionSidebar |
 | `SidebarResumeError` | Resume-failure Retry / Dismiss banner | `message`, `onRetry`, `onDismiss` | SessionSidebar |
 | `ArchivedSectionHeader` | Collapsible Archived group header | `count`, `collapsed`, `onToggle` | SessionSidebar |
-| `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays (isolates keystrokes from ModelPicker/ContextBar) | `composerMode`, `anchorRef`, `attachments`, `onSend` | Composer |
+| `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays + optional ghost-text inline completion (isolates keystrokes from ModelPicker/ContextBar) | `composerMode`, `anchorRef`, `attachments`, `onSend` | Composer |
 | `ModelSelect` | Simple model `<select>` | `models`, `value`, `onChange` | ProviderSettingsForm |
 | `ModelPicker` | Searchable model tray (PopoverTray) | `models`, `value`, `onChange` | Composer |
 | `ModePicker` | Agent / Plan / Ask pill switcher | `value`, `onChange` | Composer |
@@ -114,7 +114,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `MemoryTab` | Memory surface; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | ToolTabBody |
 | `DatabaseTab` | UI plugin (Terminal-style 2-col): 180px sidebar (connections + tables) + SQL/results main pane. **Connections are scoped per project cwd** (`projectKey` on each saved spec in `db_connections.json`; list/upsert/connect/mention/active filter by the active session's cwd). Switching sessions clears selection and restores that project's last active connection. Legacy unscoped entries (`projectKey: ""`) stay in the store but are hidden until re-saved under a project. Empty state has no duplicate chrome (Add CTA only); with connections, slim count + refresh/add. Result grid paginates (50/page; table preview via `limit`/`offset`, query results client-side). | `active`, `session` | ToolTabBody (plugin registry) |
 | `FilesTab` | Open-file strip (close-on-hover like panel tabs) + Monaco editor; `.md`/`.mdx` default to `MarkdownBody` preview (Code/Eye toggle); empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children`, search with `includeIgnored`). Dir/file queries invalidate on turn settle, FS-mutating tool completion (Write/Edit/Bash/…), and project cwd change (`invalidateWorkspaceQueries`, same pattern as `invalidateGitQueries`). | `active` | ToolTabBody |
-| `PromptTab` | Session prompt pad: write with `@`/`/` → **Verify** (session model grill) → apply/dismiss findings without ending review; coach questions + re-verify; synced to `draftsBySession` | `sessionId`, `active` | ToolTabBody |
+| `PromptTab` | Session prompt pad: write with `@`/`/` + optional ghost-text completion → **Verify** (session model grill) → apply/dismiss findings without ending review; coach questions + re-verify; synced to `draftsBySession` | `sessionId`, `active` | ToolTabBody |
 | `StatusTab` | OpenCode-style session status: model, context approx, tokens, queue, per-model usage | `session`, `active` | ToolTabBody |
 | `WindowTitleBar` | Compact custom window chrome (`decorations: false`, 30px): traffic lights / caption buttons + File/Edit/View/Help + drag region | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | ToolTabBody |
@@ -144,6 +144,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `ErrorBoundary` | Top-level render-error fence (`templates/`) |
 | `SettingsPage` | Settings shell; sections from `pages/settings/` |
 | `CustomizeSection` / `MemorySection` / `IndexingSection` / `AutomationsSection` / `DiagnosticsSection` | Settings nav sections (`pages/settings/`) |
+| `plugins/prompt-completion/` | UI plugin: `CompletionSetupModal` (Ollama pull guidance or existing provider) + `InlineCompletionSettingsCard` (Customize) |
 | `WelcomePage` | First-run wizard: provider key → model → optional project |
 
 ### Page subfolders
@@ -189,6 +190,9 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/hooks/useSessionEvents.ts` | Active-session replay + timeline rows (thin over `lib/timeline`) |
 | `src/hooks/useLatestVerdict.ts` | Narrow per-session latest Verify verdict (Plan tab) |
 | `src/hooks/useIsGitRepo.ts` | Shared `git-is-repo` TanStack query (ContextBar / FilesChangedCard / ChangesTab) |
+| `src/hooks/useInlineCompletion.ts` | Debounced ghost-text completion for composer / Prompt tab (Tab accept) |
+| `src/hooks/useInlineCompletionPrefs.ts` | TanStack query + save for `InlineCompletionPrefs` |
+| `src/plugins/mcp/mentions.ts` | `@`-mention provider for enabled MCP servers (`@{id}`) |
 | `src/hooks/useGlobalSessionEvents.ts` | App-level session-event fan-out + subscribe (via `sessionEventBus`) |
 | `src/lib/sessionEventBus.ts` | Ref-counted single Tauri `session-event` listener; demux to React subscribers |
 | `src/components/organisms/timeline/mergeLiveRows.ts` | Pure live+materialized row merge with O(1) id Sets |
@@ -229,6 +233,7 @@ spacing changes, update [DESIGN.md](./DESIGN.md).
 | `FLEX_MODE_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_FLEX_MODE=true` | Shows composer Flex mode in the ModePicker (orchestrator across plan / review / workers) |
 | `MEMORY_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_MEMORY_TAB=true` | Shows Memory in the right-panel tab strip / `+` menu / command palette (Settings → Memory stays available either way) |
 | `DATABASE_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `true` | `VITE_DATABASE_TAB=false` | Shows Database UI plugin tab (connections / schemas / tables / query) |
+| `INLINE_COMPLETION_ENABLED` (`src/lib/featureFlags.ts`) | `true` | `VITE_INLINE_COMPLETION=false` | Registers the `prompt-completion` UI plugin (ghost-text in composer + Prompt tab; setup under Settings → Tools) |
 
 ## Perf notes (Wave 3)
 

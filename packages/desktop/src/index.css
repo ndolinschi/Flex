@@ -9,7 +9,10 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 
-  --color-base: var(--color-base);
+  /* Do NOT register `--color-base` in @theme: it collides with the
+   * `text-base` font-size utility (Tailwind prefers the color token), which
+   * paints primary buttons white-on-white (`--color-base` is the light ink
+   * on dark). Surfaces use chrome/panel/elevated; body ink uses `text-ink`. */
   --color-chrome: var(--color-chrome);
   --color-panel: var(--color-panel);
   --color-elevated: var(--color-elevated);
@@ -147,8 +150,28 @@ body {
   color: var(--color-ink);
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
+  /* Native <select>/<option> popups inherit this — without it, WebView2 on
+   * Windows often opens a light system menu while page text stays light. */
+  color-scheme: dark;
   transition: background-color var(--duration-normal) var(--easing-default),
     color var(--duration-normal) var(--easing-default);
+}
+
+[data-theme="light"] body {
+  color-scheme: light;
+}
+
+/* Themed native selects (completion setup, settings) — closed control +
+ * option list follow panel/ink rather than OS defaults. */
+select {
+  background-color: var(--color-elevated);
+  color: var(--color-ink);
+  border-color: var(--color-stroke-3);
+}
+
+select option {
+  background-color: var(--color-panel);
+  color: var(--color-ink);
 }
 
 /* Custom title bar: mark drag regions for Tauri + Chromium app-region. */

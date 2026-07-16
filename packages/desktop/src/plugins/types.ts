@@ -16,11 +16,11 @@ export type UiPluginTab = {
   }) => ReactNode
 }
 
-/** Optional @-mention suggestion provider (files / folders / tables / …). */
+/** Optional @-mention suggestion provider (files / folders / tables / MCP / …). */
 export type UiMentionHit = {
-  kind: "file" | "folder" | "table"
+  kind: "file" | "folder" | "table" | "mcp"
   name: string
-  /** Secondary label (relative path, schema.table, …). */
+  /** Secondary label (relative path, schema.table, “MCP server”, …). */
   path: string
   /** Opaque payload for the insert handler. */
   insertText: string
@@ -31,9 +31,12 @@ export type UiMentionProvider = {
   search: (query: string, cwd: string | undefined) => Promise<UiMentionHit[]>
 }
 
-/** Desktop UI plugin — contributes chrome (tabs, mentions), not engine tools. */
+/** Desktop UI plugin — contributes chrome (tabs, mentions, inline completion),
+ * not engine tools. */
 export type UiPlugin = {
   id: string
   tabs?: UiPluginTab[]
   mentionProviders?: UiMentionProvider[]
+  /** When true, this plugin contributes inline prompt ghost-text completion. */
+  inlineCompletion?: boolean
 }

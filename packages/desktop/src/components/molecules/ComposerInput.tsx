@@ -2,9 +2,11 @@ import { useEffect, useRef, type KeyboardEvent, type RefObject } from "react"
 import { Maximize2 } from "lucide-react"
 import { useAutoGrowTextarea } from "../../hooks/useAutoGrowTextarea"
 import { useComposerAutocomplete } from "../../hooks/useComposerAutocomplete"
+import { useInlineCompletion } from "../../hooks/useInlineCompletion"
 import type { ComposerAttachment, ComposerMode } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
+import { CompletionSetupModal } from "../../plugins/prompt-completion"
 import { IconButton, Tooltip } from "../atoms"
 import { AtMentionTray } from "../organisms/composer/AtMentionTray"
 import { SlashCommandTray } from "../organisms/composer/SlashCommandTray"
@@ -73,6 +75,7 @@ export const ComposerInput = ({
   }, [textareaRefOut, textareaRef])
 
   const {
+    caret,
     setCaret,
     mentionSegments,
     slashOpen,
@@ -94,6 +97,30 @@ export const ComposerInput = ({
     cwd,
     textareaRef,
     enabled,
+  })
+
+  const {
+    suggestion,
+    accept: acceptCompletion,
+    dismiss: dismissCompletion,
+    setupOpen,
+    setSetupOpen,
+    dismissSetup,
+  } = useInlineCompletion({
+    draft: composerDraft,
+    caret,
+    traysOpen: atOpen || slashOpen,
+    surfaceEnabled: enabled,
+    setDraft: setComposerDraft,
+    setCaret,
+    focusCaret: (nextCaret) => {
+      window.requestAnimationFrame(() => {
+        const ta = textareaRef.current
+        if (!ta) return
+        ta.focus()
+        ta.setSelectionRange(nextCaret, nextCaret)
+      })
+    },
   })
 
   const placeholder =
@@ -153,6 +180,18 @@ export const ComposerInput = ({
       if (e.key === "Escape") {
         e.preventDefault()
         setComposerDraft("")
+        return
+      }
+    }
+    if (suggestion && !atOpen && !slashOpen) {
+      if (e.key === "Tab") {
+        e.preventDefault()
+        acceptCompletion()
+        return
+      }
+      if (e.key === "Escape") {
+        e.preventDefault()
+        dismissCompletion()
         return
       }
     }
@@ -276,6 +315,9 @@ export const ComposerInput = ({
               <span key={i}>{seg.value}</span>
             ),
           )}
+          {suggestion ? (
+            <span className="text-ink-faint">{suggestion}</span>
+          ) : null}
           {/* trailing newline needs a rendered box to match the textarea */}
           {"​"}
         </div>
@@ -314,6 +356,12 @@ export const ComposerInput = ({
           )}
         />
       </div>
+
+      <CompletionSetupModal
+        open={setupOpen}
+        onClose={() => setSetupOpen(false)}
+        onDismiss={() => void dismissSetup()}
+      />
     </>
   )
 }

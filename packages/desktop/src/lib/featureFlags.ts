@@ -28,6 +28,10 @@ export const MEMORY_TAB_ENABLED = envBool("VITE_MEMORY_TAB", false)
  * Disable with `VITE_DATABASE_TAB=false`. */
 export const DATABASE_TAB_ENABLED = envBool("VITE_DATABASE_TAB", true)
 
+/** Inline (ghost-text) prompt completion UI plugin. Default on.
+ * Disable with `VITE_INLINE_COMPLETION=false`. */
+export const INLINE_COMPLETION_ENABLED = envBool("VITE_INLINE_COMPLETION", true)
+
 /** Flag-gated built-in right-panel tabs. Plugin tabs use their own
  * `enabled` bit on the UI plugin registry. */
 export const isRightPanelTabEnabled = (tab: string): boolean => {

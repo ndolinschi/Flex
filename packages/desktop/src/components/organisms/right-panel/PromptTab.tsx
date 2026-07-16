@@ -18,6 +18,7 @@ import { IconButton, Tooltip } from "../../atoms"
 import { AtMentionTray } from "../composer/AtMentionTray"
 import { SlashCommandTray } from "../composer/SlashCommandTray"
 import { useComposerAutocomplete } from "../../../hooks/useComposerAutocomplete"
+import { useInlineCompletion } from "../../../hooks/useInlineCompletion"
 import { useSessions } from "../../../hooks/useSessions"
 import {
   annotationsFromFindings,
@@ -36,6 +37,7 @@ import {
 import type { SessionId } from "../../../lib/types"
 import { cn } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
+import { CompletionSetupModal } from "../../../plugins/prompt-completion"
 
 type PromptTabProps = {
   sessionId: SessionId
@@ -77,12 +79,14 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
 
   const rootRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const promptBackdropRef = useRef<HTMLDivElement>(null)
 
   const setDraft = (value: string) => {
     setComposerDraft(value, sessionId)
   }
 
   const {
+    caret,
     setCaret,
     slashOpen,
     slashMatches,
@@ -104,6 +108,30 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
     textareaRef,
     enabled: active,
     slashAtCaret: true,
+  })
+
+  const {
+    suggestion,
+    accept: acceptCompletion,
+    dismiss: dismissCompletion,
+    setupOpen,
+    setSetupOpen,
+    dismissSetup,
+  } = useInlineCompletion({
+    draft,
+    caret,
+    traysOpen: atOpen || slashOpen || showMarks,
+    surfaceEnabled: active,
+    setDraft,
+    setCaret,
+    focusCaret: (nextCaret) => {
+      window.requestAnimationFrame(() => {
+        const ta = textareaRef.current
+        if (!ta) return
+        ta.focus()
+        ta.setSelectionRange(nextCaret, nextCaret)
+      })
+    },
   })
 
   // Findings whose quote still exists in the draft (after partial applies/edits).
@@ -235,6 +263,18 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
       }
       if (e.key === "Escape") {
         e.preventDefault()
+        return
+      }
+    }
+    if (suggestion && !atOpen && !slashOpen) {
+      if (e.key === "Tab") {
+        e.preventDefault()
+        acceptCompletion()
+        return
+      }
+      if (e.key === "Escape") {
+        e.preventDefault()
+        dismissCompletion()
         return
       }
     }
@@ -403,23 +443,43 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
             )}
           </div>
         ) : (
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            onChange={(e) => {
-              setDraft(e.target.value)
-              setCaret(e.target.selectionStart ?? e.target.value.length)
-            }}
-            onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
-            onKeyDown={handleKeyDown}
-            placeholder="Write the prompt… Use @ for files and / for commands. Then Verify."
-            className={cn(
-              "h-full w-full resize-none bg-transparent px-2.5 py-2",
-              "text-sm leading-relaxed text-ink outline-none",
-              "placeholder:text-ink-muted",
-            )}
-            aria-label="Prompt draft"
-          />
+          <div className="relative h-full min-h-0">
+            <div
+              ref={promptBackdropRef}
+              aria-hidden
+              className={cn(
+                "pointer-events-none absolute inset-0 overflow-hidden",
+                "whitespace-pre-wrap break-words px-2.5 py-2 text-sm leading-relaxed text-ink",
+              )}
+            >
+              {draft}
+              {suggestion ? (
+                <span className="text-ink-faint">{suggestion}</span>
+              ) : null}
+              {"​"}
+            </div>
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(e) => {
+                setDraft(e.target.value)
+                setCaret(e.target.selectionStart ?? e.target.value.length)
+              }}
+              onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
+              onKeyDown={handleKeyDown}
+              onScroll={(e) => {
+                const bd = promptBackdropRef.current
+                if (bd) bd.scrollTop = e.currentTarget.scrollTop
+              }}
+              placeholder="Write the prompt… Use @ for files/MCP and / for commands. Then Verify."
+              className={cn(
+                "relative h-full w-full resize-none overflow-y-auto bg-transparent px-2.5 py-2",
+                "text-sm leading-relaxed text-transparent caret-ink outline-none",
+                "placeholder:text-ink-muted",
+              )}
+              aria-label="Prompt draft"
+            />
+          </div>
         )}
       </div>
 
@@ -512,7 +572,7 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
         </p>
       ) : (
         <p className="shrink-0 border-t border-stroke-3 px-2.5 py-1.5 text-xs text-ink-faint">
-          @ files · / commands · Verify to grill (apply fixes without ending the
+          @ files/MCP · / commands · Verify to grill (apply fixes without ending the
           review).
         </p>
       )}
@@ -529,6 +589,12 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
           ) : null}
         </div>
       ) : null}
+
+      <CompletionSetupModal
+        open={setupOpen}
+        onClose={() => setSetupOpen(false)}
+        onDismiss={() => void dismissSetup()}
+      />
     </div>
   )
 }

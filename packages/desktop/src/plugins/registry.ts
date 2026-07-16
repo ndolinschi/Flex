@@ -25,6 +25,10 @@ export const findPluginTab = (id: string): UiPluginTab | undefined =>
 export const pluginMentionProviders = (): UiMentionProvider[] =>
   listUiPlugins().flatMap((p) => p.mentionProviders ?? [])
 
+/** True when any registered plugin opts into inline prompt completion. */
+export const hasInlineCompletionPlugin = (): boolean =>
+  listUiPlugins().some((p) => p.inlineCompletion === true)
+
 /** Fan-out @-mention search across every registered provider. */
 export const searchPluginMentions = async (
   query: string,

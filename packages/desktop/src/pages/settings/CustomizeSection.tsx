@@ -1,6 +1,7 @@
 import { McpCatalogSection } from "./customize/McpCatalogSection"
 import { McpServersSection } from "./customize/McpServersSection"
 import { PluginCatalog } from "./customize/PluginCatalog"
+import { InlineCompletionSettingsCard } from "../../plugins/prompt-completion"
 
 /** Customize content: searchable plugin cards with Add / Added, plus the MCP
  * catalog and servers list. Mounted inside the Settings shell's "Tools & MCP"
@@ -15,6 +16,7 @@ export const CustomizeContent = () => {
   return (
     <div className="flex flex-col gap-3">
       <PluginCatalog />
+      <InlineCompletionSettingsCard />
       <McpCatalogSection />
       <McpServersSection />
     </div>

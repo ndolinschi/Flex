@@ -263,11 +263,19 @@ pub fn build_service(cfg: &ProviderConfig, store: Arc<JsonlStore>) -> DesktopRes
 
     let base_url = conn.base_url;
     let fallbacks = conn.fallback_models.clone();
+    let inline_provider = cfg
+        .prefs
+        .inline_completion
+        .provider_id
+        .as_deref()
+        .filter(|p| !p.is_empty());
+    // Fallbacks or inline-completion models on another provider need the
+    // full registry so `ProviderRegistry::resolve` can find them.
     let needs_all = fallbacks.iter().any(|m| {
         provider_of_model(m)
             .map(|p| p != preferred)
             .unwrap_or(false)
-    });
+    }) || inline_provider.is_some_and(|p| p != preferred);
     let bedrock_key = (preferred == "bedrock").then_some(conn.api_key).flatten();
     let bedrock_region = conn.region;
 

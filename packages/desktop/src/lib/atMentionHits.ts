@@ -1,8 +1,8 @@
 import type { UiMentionHit } from "../plugins/types"
 
-/** Unified @-mention row for the composer tray (files, folders, DB tables). */
+/** Unified @-mention row for the composer tray (files, folders, DB tables, MCP). */
 export type AtMentionHit = {
-  kind: "file" | "folder" | "table"
+  kind: "file" | "folder" | "table" | "mcp"
   name: string
   path: string
   /** Text inserted after `@`. Defaults to `name`. */

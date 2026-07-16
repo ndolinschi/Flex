@@ -69,7 +69,9 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
 
   return (
     <div className="overflow-hidden rounded-[var(--radius-lg)] border border-stroke-3 bg-transparent">
-      <div className="flex h-[var(--end-of-turn-reserved-height)] items-center gap-2 px-2">
+      {/* Shared horizontal recipe with file rows: px-2 shell + px-1.5 row
+          gutters so chevron/icon and Review/status share one vertical axis. */}
+      <div className="flex min-h-[var(--end-of-turn-reserved-height)] items-center gap-2 px-2">
         <button
           type="button"
           onClick={handleToggle}
@@ -92,12 +94,12 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
           <span className="truncate text-base text-ink">
             {totalCount} file{totalCount === 1 ? "" : "s"} changed
           </span>
+          <DiffStat summary={totals} size="sm" className="shrink-0" />
         </button>
-        <DiffStat summary={totals} size="sm" className="shrink-0" />
         <button
           type="button"
           onClick={handleReview}
-          className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs text-accent transition-opacity hover:opacity-80"
+          className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-accent transition-opacity hover:opacity-80"
         >
           Review
           <ArrowRight className="h-3 w-3" aria-hidden />
@@ -105,7 +107,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
       </div>
 
       {expanded ? (
-        <ul className="border-t border-stroke-3 px-2 py-1.5" role="list">
+        <ul className="border-t border-stroke-3 px-2 py-1" role="list">
           {files.map((file) => {
             const isDir = file.path.endsWith("/")
             const name = isDir ? file.path : basename(file.path)
@@ -116,6 +118,8 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
             const FileGlyph = fileIconForPath(file.path)
             const statusClass = STATUS_COLOR[file.status] ?? "text-ink-muted"
             const canOpen = !isDir && file.status !== "D" && !!sessionId
+            const hasLineStats =
+              (file.added ?? 0) > 0 || (file.removed ?? 0) > 0
             return (
               <li key={file.path} className="list-none">
                 <button
@@ -126,7 +130,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
                     handleOpenFile(file.path, file.status, isDir)
                   }
                   className={cn(
-                    "flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-base",
+                    "flex h-7 w-full items-center gap-1.5 rounded-md px-1.5 text-left text-base",
                     canOpen
                       ? "hover:bg-fill-3"
                       : "cursor-default opacity-70",
@@ -142,26 +146,25 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
                     ) : null}
                     <span className="text-ink">{name}</span>
                   </span>
-                  <span className="flex w-[4.75rem] shrink-0 items-center justify-end">
-                    {(file.added ?? 0) > 0 || (file.removed ?? 0) > 0 ? (
-                      <DiffStat
-                        summary={{
-                          added: file.added ?? 0,
-                          removed: file.removed ?? 0,
-                        }}
-                        size="xs"
-                      />
-                    ) : (
-                      <span
-                        className={cn(
-                          "font-mono text-xs",
-                          statusClass,
-                        )}
-                      >
-                        {file.status === "?" ? "U" : file.status}
-                      </span>
-                    )}
-                  </span>
+                  {hasLineStats ? (
+                    <DiffStat
+                      summary={{
+                        added: file.added ?? 0,
+                        removed: file.removed ?? 0,
+                      }}
+                      size="xs"
+                      className="shrink-0"
+                    />
+                  ) : (
+                    <span
+                      className={cn(
+                        "w-3.5 shrink-0 text-center font-mono text-xs",
+                        statusClass,
+                      )}
+                    >
+                      {file.status === "?" ? "U" : file.status}
+                    </span>
+                  )}
                 </button>
               </li>
             )

@@ -3,6 +3,7 @@ import {
   AUTOMATIONS_UI_ENABLED,
   DATABASE_TAB_ENABLED,
   FLEX_MODE_ENABLED,
+  INLINE_COMPLETION_ENABLED,
   MEMORY_TAB_ENABLED,
   isRightPanelTabEnabled,
 } from "./featureFlags"
@@ -10,7 +11,10 @@ import { visibleComposerModes } from "../components/molecules/ModePicker"
 import { SETTINGS_NAV_ITEMS } from "../components/molecules/SettingsNav"
 import { visibleRightPanelTabs } from "../components/organisms/right-panel/tabs"
 import { registerBuiltinUiPlugins } from "../plugins/builtins"
-import { resetUiPluginsForTests } from "../plugins/registry"
+import {
+  hasInlineCompletionPlugin,
+  resetUiPluginsForTests,
+} from "../plugins/registry"
 
 describe("FLEX_MODE_ENABLED", () => {
   it("defaults off so Flex is hidden from the mode picker", () => {
@@ -39,6 +43,8 @@ describe("MEMORY_TAB_ENABLED", () => {
     expect(isRightPanelTabEnabled("memory")).toBe(false)
     expect(visibleRightPanelTabs().map((t) => t.id)).not.toContain("memory")
     expect(visibleRightPanelTabs().map((t) => t.id)).toEqual([
+      "status",
+      "prompt",
       "plan",
       "changes",
       "files",
@@ -55,5 +61,14 @@ describe("DATABASE_TAB_ENABLED", () => {
     expect(DATABASE_TAB_ENABLED).toBe(true)
     expect(isRightPanelTabEnabled("database")).toBe(true)
     expect(visibleRightPanelTabs().map((t) => t.id)).toContain("database")
+  })
+})
+
+describe("INLINE_COMPLETION_ENABLED", () => {
+  it("defaults on and registers the prompt-completion UI plugin", () => {
+    resetUiPluginsForTests()
+    registerBuiltinUiPlugins()
+    expect(INLINE_COMPLETION_ENABLED).toBe(true)
+    expect(hasInlineCompletionPlugin()).toBe(true)
   })
 })

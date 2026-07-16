@@ -16,6 +16,7 @@ import type {
   GitStatusSummary,
   IndexRebuildResult,
   IndexStatus,
+  InlineCompletionPrefs,
   McpServerDto,
   MemoryEntryDto,
   ModelInfoDto,
@@ -196,6 +197,28 @@ export const suggestSessionTitle = (
   promptText: string,
 ): Promise<string> =>
   invoke("suggest_session_title", { sessionId, promptText })
+
+/** Desktop inline (ghost-text) completion prefs. */
+export const getInlineCompletionPrefs = (): Promise<InlineCompletionPrefs> =>
+  invoke("get_inline_completion_prefs")
+
+export const saveInlineCompletionPrefs = (
+  prefs: InlineCompletionPrefs,
+): Promise<InlineCompletionPrefs> =>
+  invoke("save_inline_completion_prefs", { prefs })
+
+/** Stable error substring from `complete_prompt_inline` when unset. */
+export const INLINE_COMPLETION_NOT_CONFIGURED = "inline_completion_not_configured"
+
+/** One-shot ghost-text continuation for the composer / Prompt tab. */
+export const completePromptInline = (
+  prefix: string,
+  suffix?: string,
+): Promise<string> =>
+  invoke("complete_prompt_inline", {
+    prefix,
+    suffix: suffix ?? null,
+  })
 
 /** One-shot prompt critique (JSON findings) via the session model — see
  * `commands::review_prompt`. Used by the Prompt editor Verify flow. */
