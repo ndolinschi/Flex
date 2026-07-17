@@ -1,6 +1,14 @@
 import { FileIcon, Folder, ImageIcon, MousePointer2, Palette, X } from "@/components/icons"
 import type { ComposerAttachment } from "../../lib/types"
 import { cn } from "../../lib/utils"
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentMedia,
+  AttachmentTitle,
+} from "@/components/ui/attachment"
 
 type AttachmentChipProps = {
   attachment: ComposerAttachment
@@ -21,26 +29,42 @@ export const AttachmentChip = ({ attachment, onRemove }: AttachmentChipProps) =>
             : FileIcon
 
   return (
-    <span
+    <Attachment
+      state="done"
+      size="xs"
+      orientation="horizontal"
       className={cn(
-        "group/chip inline-flex h-5 max-w-[12rem] items-center gap-1 rounded-[4px]",
-        "border border-stroke-3 bg-fill-3 px-1 text-sm text-ink-secondary",
-        "transition-colors duration-[var(--duration-fast)] hover:border-stroke-2 hover:bg-fill-2",
+        "h-5 max-w-[12rem] min-w-0 items-center gap-1 rounded-[4px]",
+        "border-stroke-3 bg-fill-3 text-ink-secondary",
+        "hover:border-stroke-2 hover:bg-fill-2",
+        "has-[>a,>button]:hover:bg-fill-2",
       )}
     >
-      <Icon className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
-      <span className="truncate">{attachment.name}</span>
-      <button
-        type="button"
-        aria-label={`Remove ${attachment.name}`}
-        onClick={() => onRemove(attachment.id)}
-        className={cn(
-          "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded",
-          "text-icon-3 transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink",
-        )}
+      <AttachmentMedia
+        variant="icon"
+        className="aspect-auto size-auto w-auto rounded-none bg-transparent p-0 text-icon-3 [&_svg]:size-3"
       >
-        <X className="h-2.5 w-2.5" aria-hidden />
-      </button>
-    </span>
+        <Icon aria-hidden />
+      </AttachmentMedia>
+      <AttachmentContent className="min-w-0 px-0 py-0">
+        <AttachmentTitle className="text-sm font-normal text-ink-secondary">
+          {attachment.name}
+        </AttachmentTitle>
+      </AttachmentContent>
+      <AttachmentActions>
+        <AttachmentAction
+          type="button"
+          size="icon-xs"
+          variant="ghost"
+          aria-label={`Remove ${attachment.name}`}
+          onClick={() => onRemove(attachment.id)}
+          className={cn(
+            "size-4 rounded text-icon-3 hover:bg-fill-2 hover:text-ink",
+          )}
+        >
+          <X className="size-2.5" aria-hidden />
+        </AttachmentAction>
+      </AttachmentActions>
+    </Attachment>
   )
 }

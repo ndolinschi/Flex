@@ -16,7 +16,7 @@ import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Button, IconButton, RunningDot } from "../atoms"
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu"
-import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
+import { PopoverItem, PopoverSearch, PopoverSection } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
 import {
   Breadcrumb,
@@ -26,6 +26,11 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 
 export type PlanBuildStatus = "draft" | "ready" | "building" | "built"
 
@@ -90,46 +95,48 @@ const PlanModelPill = ({
 }) => {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
-  const rootRef = useRef<HTMLDivElement>(null)
 
   const selected = models.find((m) => m.id === value)
   const label = selected?.displayName ?? selected?.id ?? "Select model"
   const { groups } = useGroupedModels(models, query, builtinProviders)
 
-  const handleClose = () => {
-    setOpen(false)
-    setQuery("")
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next)
+    if (!next) setQuery("")
   }
 
   return (
-    <div ref={rootRef} className="relative shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        disabled={isLoading}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className={cn(
-          "inline-flex h-6 max-w-[12rem] items-center gap-1 rounded-full border border-stroke-3 px-2",
-          "text-xs text-ink-secondary transition-colors duration-[var(--duration-fast)]",
-          "hover:border-stroke-2 hover:text-ink disabled:opacity-50",
-          open && "border-stroke-2 text-ink",
-        )}
-      >
-        <span className="min-w-0 flex-1 truncate">{label}</span>
-        <ChevronDown className="h-2.5 w-2.5 shrink-0 text-icon-3" aria-hidden />
-      </button>
-
-      <PopoverTray
-        open={open}
-        onClose={handleClose}
-        anchorRef={rootRef}
-        placement="below"
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={isLoading}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className={cn(
+            "inline-flex h-6 max-w-[12rem] shrink-0 items-center gap-1 rounded-full border border-stroke-3 px-2",
+            "text-xs text-ink-secondary transition-colors duration-[var(--duration-fast)]",
+            "hover:border-stroke-2 hover:text-ink disabled:opacity-50",
+            open && "border-stroke-2 text-ink",
+          )}
+        >
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          <ChevronDown className="h-2.5 w-2.5 shrink-0 text-icon-3" aria-hidden />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={4}
         role="listbox"
         aria-label="Build model"
-        className="right-0 left-auto w-64"
+        className="w-64 gap-0 p-0 ring-0"
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <PopoverSearch value={query} onChange={setQuery} placeholder="Search models" />
+        <PopoverSearch
+          value={query}
+          onChange={setQuery}
+          placeholder="Search models"
+        />
         <div className="max-h-56 overflow-y-auto py-0.5">
           {groups.length === 0 ? (
             <p className="px-2.5 py-3 text-center text-xs text-ink-faint">
@@ -147,7 +154,7 @@ const PlanModelPill = ({
                           active={active}
                           onClick={() => {
                             onChange(m.id)
-                            handleClose()
+                            handleOpenChange(false)
                           }}
                         >
                           <span className="min-w-0 flex-1 truncate">
@@ -170,8 +177,8 @@ const PlanModelPill = ({
             ))
           )}
         </div>
-      </PopoverTray>
-    </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 

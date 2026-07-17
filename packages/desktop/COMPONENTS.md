@@ -274,7 +274,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Alert | yes | `ErrorBanner`, resume banners | **ErrorBanner migrated** |
 | Alert Dialog | yes | `ConfirmDialog` (danger paths) | Rename/delete session, discard |
 | Aspect Ratio | skip | — | No first-class need |
-| Attachment | yes (chat kit) | `AttachmentChip` | Registry name `attachment` (not `AttachmentNew`) |
+| Attachment | yes (chat kit) | `AttachmentChip` | **AttachmentChip migrated** (`size=xs` composer density) |
 | Avatar | yes | `Avatar` atom | Thin wrap + `AvatarFallback` |
 | Badge | yes | `Badge`, `NewBadge`, `VerdictBadge` | Keep tone mapping via variants/`className` |
 | Breadcrumb | yes | `PlanToolbar` crumbs | **PlanToolbar migrated** |
@@ -312,7 +312,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Native Select | later | simple settings enums | Prefer Select/Combobox; ModelSelect stays searchable Popover |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
 | Pagination | later | DatabaseTab paging | Icons-only Previous/Next |
-| Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker, IsolationPicker, ModelSelect, ModelMultiSelect, BranchPicker, ProjectPicker**; Combobox next for ModelPicker |
+| Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker, IsolationPicker, ModelSelect, ModelMultiSelect, PlanModelPill, BranchPicker, ProjectPicker**; Combobox next for ModelPicker |
 | Progress | later | indexing / update UX | Soft need |
 | Radio Group | yes | `QuestionPrompt` choices | **QuestionPrompt** single-select migrated (multi stays pressed toggles) |
 | Resizable | yes | content split sash | **ContentWorkspace migrated** |
@@ -347,7 +347,7 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog + auth/bug/MCP dialogs, ToastHost/Sonner, Mode/Isolation/Model/Branch/Project pickers (Popover), PlusMenu+SessionMenu+BrowserOverflow (DropdownMenu), TitleBarMenus (Menubar), ContextMenu (scroll/webview dismiss preserved). |
 | **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select; searchable Popovers (incl. ModelMultiSelect); Toggle Group (Files); CommandPalette/SearchModal/OpenTabModal; RadioGroup (QuestionPrompt). **Next:** Combobox (optional), Input Group |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner→Alert; Collapsible sidebar headers; ContentWorkspace Resizable; PlanToolbar Breadcrumb. **Next:** optional Sidebar spike |
-| **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Adopt Attachment→Bubble→Message→Marker *inside* virtual rows; MessageScroller only after measured spike with react-virtual |
+| **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | **Done:** AttachmentChip→Attachment. **Next:** Bubble→Message→Marker *inside* virtual rows; MessageScroller only after measured spike with react-virtual |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
 
 ### Docs investigation (radix-nova)
