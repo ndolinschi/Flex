@@ -279,6 +279,10 @@ full-width with symmetric `px-2` insets — not a two-column FieldRow.
 **Open tab (`+`):** popover lists Chat + primary tools first; ~5 rows visible,
 remainder scrolls.
 
+**Tab reorder / split move:** pointer events (not HTML5 DnD — broken in
+Tauri WKWebView). Idle cursor is pointer; grabbing only after the drag
+threshold. Drop markers work within a strip and across split panes.
+
 ---
 
 ## Overlay z-index
