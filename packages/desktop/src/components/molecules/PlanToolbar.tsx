@@ -16,7 +16,6 @@ import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Button, IconButton, RunningDot } from "../atoms"
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu"
-import { PopoverItem, PopoverSearch, PopoverSection } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
 import {
   Breadcrumb,
@@ -27,10 +26,17 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+  Combobox,
+  ComboboxCollection,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxLabel,
+  ComboboxList,
+  ComboboxTrigger,
+} from "@/components/ui/combobox"
 
 export type PlanBuildStatus = "draft" | "ready" | "building" | "built"
 
@@ -94,91 +100,82 @@ const PlanModelPill = ({
   isLoading?: boolean
 }) => {
   const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState("")
 
-  const selected = models.find((m) => m.id === value)
+  const selected = models.find((m) => m.id === value) ?? null
   const label = selected?.displayName ?? selected?.id ?? "Select model"
-  const { groups } = useGroupedModels(models, query, builtinProviders)
-
-  const handleOpenChange = (next: boolean) => {
-    setOpen(next)
-    if (!next) setQuery("")
-  }
+  const { groups, providerLabel } = useGroupedModels(
+    models,
+    "",
+    builtinProviders,
+  )
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          disabled={isLoading}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          className={cn(
-            "inline-flex h-6 max-w-[12rem] shrink-0 items-center gap-1 rounded-full border border-stroke-3 px-2",
-            "text-xs text-ink-secondary transition-colors duration-[var(--duration-fast)]",
-            "hover:border-stroke-2 hover:text-ink disabled:opacity-50",
-            open && "border-stroke-2 text-ink",
-          )}
-        >
-          <span className="min-w-0 flex-1 truncate">{label}</span>
-          <ChevronDown className="h-2.5 w-2.5 shrink-0 text-icon-3" aria-hidden />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        sideOffset={4}
-        role="listbox"
-        aria-label="Build model"
-        className="w-64 gap-0 p-0 ring-0"
-        onOpenAutoFocus={(e) => e.preventDefault()}
+    <Combobox
+      items={groups}
+      value={selected}
+      onValueChange={(next) => {
+        if (!next) return
+        onChange(next.id)
+        setOpen(false)
+      }}
+      open={open}
+      onOpenChange={setOpen}
+      disabled={isLoading}
+      itemToStringLabel={(m) => m.displayName ?? m.id}
+      isItemEqualToValue={(a, b) => a.id === b.id}
+      filter={(item, query) => {
+        const q = query.trim().toLowerCase()
+        if (!q) return true
+        const m = item as ModelInfoDto
+        return (
+          m.id.toLowerCase().includes(q) ||
+          (m.displayName?.toLowerCase().includes(q) ?? false) ||
+          m.providerId.toLowerCase().includes(q) ||
+          providerLabel(m.providerId).toLowerCase().includes(q)
+        )
+      }}
+    >
+      <ComboboxTrigger
+        hideIcon
+        disabled={isLoading}
+        className={cn(
+          "inline-flex h-6 max-w-[12rem] shrink-0 items-center gap-1 rounded-full border border-stroke-3 px-2",
+          "text-xs text-ink-secondary shadow-none transition-colors duration-[var(--duration-fast)]",
+          "hover:border-stroke-2 hover:bg-transparent hover:text-ink disabled:opacity-50",
+          open && "border-stroke-2 text-ink",
+        )}
       >
-        <PopoverSearch
-          value={query}
-          onChange={setQuery}
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        <ChevronDown className="h-2.5 w-2.5 shrink-0 text-icon-3" aria-hidden />
+      </ComboboxTrigger>
+      <ComboboxContent align="end" sideOffset={4} className="w-64 min-w-64">
+        <ComboboxInput
           placeholder="Search models"
+          showTrigger={false}
+          className="w-full"
         />
-        <div className="max-h-56 overflow-y-auto py-0.5">
-          {groups.length === 0 ? (
-            <p className="px-2.5 py-3 text-center text-xs text-ink-faint">
-              No models found
-            </p>
-          ) : (
-            groups.map((group) => (
-              <PopoverSection key={group.providerId} label={group.label}>
-                <ul>
-                  {group.items.map((m) => {
-                    const active = m.id === value
-                    return (
-                      <li key={m.id}>
-                        <PopoverItem
-                          active={active}
-                          onClick={() => {
-                            onChange(m.id)
-                            handleOpenChange(false)
-                          }}
-                        >
-                          <span className="min-w-0 flex-1 truncate">
-                            {m.displayName ?? m.id}
-                          </span>
-                          <span className="flex w-3 shrink-0 items-center justify-center">
-                            {active ? (
-                              <Check
-                                className="h-3 w-3 text-accent"
-                                aria-hidden
-                              />
-                            ) : null}
-                          </span>
-                        </PopoverItem>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </PopoverSection>
-            ))
+        <ComboboxEmpty>No models found</ComboboxEmpty>
+        <ComboboxList className="max-h-56">
+          {(group) => (
+            <ComboboxGroup key={group.providerId} items={group.items}>
+              <ComboboxLabel>{group.label}</ComboboxLabel>
+              <ComboboxCollection>
+                {(m: ModelInfoDto) => (
+                  <ComboboxItem key={m.id} value={m}>
+                    <span className="min-w-0 flex-1 truncate">
+                      {m.displayName ?? m.id}
+                    </span>
+                    {m.id === value ? (
+                      <Check className="h-3 w-3 text-accent" aria-hidden />
+                    ) : null}
+                  </ComboboxItem>
+                )}
+              </ComboboxCollection>
+            </ComboboxGroup>
           )}
-        </div>
-      </PopoverContent>
-    </Popover>
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   )
 }
 

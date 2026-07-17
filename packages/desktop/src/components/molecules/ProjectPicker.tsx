@@ -10,15 +10,14 @@ import { useAppStore } from "../../stores/appStore"
 import { basename, parentPathPrefix } from "../../lib/utils"
 import { PickerTrigger } from "../atoms"
 import {
-  PopoverItem,
-  PopoverSearch,
-  PopoverSection,
-} from "./PopoverTray"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxTrigger,
+} from "@/components/ui/combobox"
 import { cn } from "@/lib/utils"
 
 type ProjectPickerProps = {
@@ -37,7 +36,6 @@ export const ProjectPicker = ({
   onError,
 }: ProjectPickerProps) => {
   const [openMenu, setOpenMenu] = useState(false)
-  const [query, setQuery] = useState("")
   const [busy, setBusy] = useState(false)
   const queryClient = useQueryClient()
   const recentCwds = useAppStore((s) => s.recentCwds)
@@ -73,18 +71,8 @@ export const ProjectPicker = ({
     return unique.slice(0, RECENT_CAP)
   }, [recentCwds, cwd, queryClient, openMenu])
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return recents
-    return recents.filter(
-      (p) =>
-        p.toLowerCase().includes(q) || basename(p).toLowerCase().includes(q),
-    )
-  }, [recents, query])
-
   const handleOpenChange = (next: boolean) => {
     setOpenMenu(next)
-    if (!next) setQuery("")
   }
 
   const applyCwd = async (nextCwd: string) => {
@@ -143,87 +131,93 @@ export const ProjectPicker = ({
   }
 
   return (
-    <Popover open={openMenu} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <PickerTrigger
-          leadingIcon={<Folder className="h-3 w-3 shrink-0" aria-hidden />}
-          label={label}
-          open={openMenu}
-          disabled={disabled || busy}
-          ariaLabel={`Project: ${label}`}
-          className="max-w-[10rem]"
-        />
-      </PopoverTrigger>
-
-      <PopoverContent
+    <Combobox
+      items={recents}
+      value={cwd ?? null}
+      onValueChange={(path) => {
+        if (path) void applyCwd(path)
+      }}
+      open={openMenu}
+      onOpenChange={handleOpenChange}
+      disabled={disabled || busy}
+      filter={(item, query) => {
+        const q = query.trim().toLowerCase()
+        if (!q) return true
+        const path = String(item)
+        return (
+          path.toLowerCase().includes(q) ||
+          basename(path).toLowerCase().includes(q)
+        )
+      }}
+    >
+      <ComboboxTrigger
+        disabled={disabled || busy}
+        className="border-0 bg-transparent p-0 shadow-none hover:bg-transparent data-pressed:bg-transparent"
+        render={
+          <PickerTrigger
+            leadingIcon={<Folder className="h-3 w-3 shrink-0" aria-hidden />}
+            label={label}
+            open={openMenu}
+            disabled={disabled || busy}
+            ariaLabel={`Project: ${label}`}
+            className="max-w-[10rem]"
+          />
+        }
+      />
+      <ComboboxContent
         side="top"
         align="start"
         sideOffset={6}
-        role="listbox"
-        aria-label="Projects"
-        className={cn(
-          "w-80 gap-0 rounded-md border-0 bg-panel p-0 shadow-[var(--shadow-popover)]",
-          "ring-0",
-        )}
-        onOpenAutoFocus={(e) => e.preventDefault()}
+        className="w-80 min-w-80"
       >
-        <PopoverSearch
-          value={query}
-          onChange={setQuery}
+        <ComboboxInput
           placeholder="Run agent anywhere…"
+          showTrigger={false}
+          disabled={busy}
+          className="w-full"
         />
-        {filtered.length > 0 ? (
-          <PopoverSection label="Recents">
-            <ul className="max-h-48 overflow-y-auto">
-              {filtered.map((path) => {
-                const active = path === cwd
-                const parent = parentPathPrefix(path)
-                const name = basename(path)
-                return (
-                  <li key={path}>
-                    <PopoverItem
-                      active={active}
-                      disabled={busy}
-                      onClick={() => void applyCwd(path)}
-                    >
-                      <Folder
-                        className="h-3.5 w-3.5 shrink-0 text-icon-3"
-                        aria-hidden
-                      />
-                      <span className="min-w-0 flex-1 truncate" title={path}>
-                        {parent ? (
-                          <span className="text-ink-faint">{parent}</span>
-                        ) : null}
-                        <span className="text-ink">{name}</span>
-                      </span>
-                      {active ? (
-                        <Check
-                          className="h-3 w-3 shrink-0 text-accent"
-                          aria-hidden
-                        />
-                      ) : null}
-                    </PopoverItem>
-                  </li>
-                )
-              })}
-            </ul>
-          </PopoverSection>
-        ) : (
-          <p className="px-2.5 py-3 text-center text-xs text-ink-faint">
-            No recent projects
-          </p>
-        )}
+        <ComboboxEmpty>No recent projects</ComboboxEmpty>
+        <ComboboxList className="max-h-48">
+          {(path) => {
+            const active = path === cwd
+            const parent = parentPathPrefix(String(path))
+            const name = basename(String(path))
+            return (
+              <ComboboxItem key={String(path)} value={path} disabled={busy}>
+                <Folder
+                  className="h-3.5 w-3.5 shrink-0 text-icon-3"
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1 truncate" title={String(path)}>
+                  {parent ? (
+                    <span className="text-ink-faint">{parent}</span>
+                  ) : null}
+                  <span className="text-ink">{name}</span>
+                </span>
+                {active ? (
+                  <Check className="h-3 w-3 shrink-0 text-accent" aria-hidden />
+                ) : null}
+              </ComboboxItem>
+            )
+          }}
+        </ComboboxList>
         <div className="border-t border-stroke-3 py-0.5">
-          <PopoverItem
-            role="menuitem"
+          <button
+            type="button"
             disabled={busy}
             onClick={() => void handleOpenFolder()}
+            className={cn(
+              "flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm text-ink-secondary",
+              "transition-colors duration-[var(--duration-fast)]",
+              "hover:bg-[color:var(--color-select-hover)] focus:bg-[color:var(--color-select-hover)] focus:outline-none",
+              "disabled:opacity-50",
+            )}
           >
             <FolderOpen className="h-3.5 w-3.5" aria-hidden />
             Open Folder
-          </PopoverItem>
+          </button>
         </div>
-      </PopoverContent>
-    </Popover>
+      </ComboboxContent>
+    </Combobox>
   )
 }

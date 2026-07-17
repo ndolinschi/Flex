@@ -3,13 +3,19 @@ import { ChevronDown, ChevronUp, Plus, X } from "@/components/icons"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Label } from "../atoms"
-import { PopoverItem, PopoverSearch, PopoverSection } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+  Combobox,
+  ComboboxCollection,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxLabel,
+  ComboboxList,
+  ComboboxTrigger,
+} from "@/components/ui/combobox"
 
 type ModelMultiSelectProps = {
   id: string
@@ -30,9 +36,7 @@ const displayFor = (id: string, models: ModelInfoDto[]): string =>
   models.find((m) => m.id === id)?.displayName ?? id
 
 /** Ordered multi-select for the fallback model chain: removable, reorderable
- * chips + an "Add fallback" button that opens the same grouped/searchable
- * picker surface as `ModelSelect` (already-chosen models are excluded from
- * the list). Order matters — index 0 is tried first on failover. */
+ * chips + an "Add fallback" Combobox (already-chosen models are excluded). */
 export const ModelMultiSelect = ({
   id,
   label = "Fallback models",
@@ -45,14 +49,16 @@ export const ModelMultiSelect = ({
   builtinProviders = [],
 }: ModelMultiSelectProps) => {
   const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState("")
 
   const available = models.filter((m) => !value.includes(m.id))
-  const { groups } = useGroupedModels(available, query, builtinProviders)
+  const { groups, providerLabel } = useGroupedModels(
+    available,
+    "",
+    builtinProviders,
+  )
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next)
-    if (!next) setQuery("")
   }
 
   const moveUp = (index: number) => {
@@ -73,8 +79,8 @@ export const ModelMultiSelect = ({
     onChange(value.filter((_, i) => i !== index))
   }
 
-  const add = (modelId: string) => {
-    onChange([...value, modelId])
+  const add = (model: ModelInfoDto) => {
+    onChange([...value, model.id])
     handleOpenChange(false)
   }
 
@@ -133,64 +139,69 @@ export const ModelMultiSelect = ({
         <p className="text-xs text-ink-faint">No fallbacks configured</p>
       )}
 
-      <Popover open={open} onOpenChange={handleOpenChange}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            disabled={disabled || isLoading || available.length === 0}
-            aria-haspopup="listbox"
-            aria-expanded={open}
-            className={cn(
-              "flex h-7 items-center gap-1 rounded-md border border-dashed border-stroke-2 px-2",
-              "text-xs text-ink-muted transition-colors duration-[var(--duration-fast)] hover:border-stroke-1 hover:text-ink-secondary",
-              "disabled:pointer-events-none disabled:opacity-40",
-            )}
-          >
-            <Plus className="h-3 w-3" aria-hidden />
-            Add fallback
-          </button>
-        </PopoverTrigger>
-        <PopoverContent
-          align="start"
-          sideOffset={4}
-          role="listbox"
-          aria-label="Add fallback model"
+      <Combobox
+        key={value.join("|")}
+        items={groups}
+        onValueChange={(next: ModelInfoDto | null) => {
+          if (next) add(next)
+        }}
+        open={open}
+        onOpenChange={handleOpenChange}
+        disabled={disabled || isLoading || available.length === 0}
+        itemToStringLabel={(m: ModelInfoDto) => m.displayName ?? m.id}
+        isItemEqualToValue={(a: ModelInfoDto, b: ModelInfoDto) => a.id === b.id}
+        filter={(item, query) => {
+          const q = query.trim().toLowerCase()
+          if (!q) return true
+          const m = item as ModelInfoDto
+          return (
+            m.id.toLowerCase().includes(q) ||
+            (m.displayName?.toLowerCase().includes(q) ?? false) ||
+            m.providerId.toLowerCase().includes(q) ||
+            providerLabel(m.providerId).toLowerCase().includes(q)
+          )
+        }}
+      >
+        <ComboboxTrigger
+          hideIcon
+          disabled={disabled || isLoading || available.length === 0}
           className={cn(
-            "w-72 gap-0 rounded-md border-0 bg-panel p-0 shadow-[var(--shadow-popover)]",
-            "ring-0",
+            "flex h-7 items-center gap-1 rounded-md border border-dashed border-stroke-2 px-2",
+            "text-xs text-ink-muted shadow-none transition-colors duration-[var(--duration-fast)]",
+            "hover:border-stroke-1 hover:bg-transparent hover:text-ink-secondary",
+            "disabled:pointer-events-none disabled:opacity-40",
           )}
-          onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          <PopoverSearch
-            value={query}
-            onChange={setQuery}
+          <Plus className="h-3 w-3" aria-hidden />
+          Add fallback
+        </ComboboxTrigger>
+        <ComboboxContent align="start" sideOffset={4} className="w-72 min-w-72">
+          <ComboboxInput
             placeholder="Search models"
+            showTrigger={false}
+            className="w-full"
           />
-          <div className="max-h-56 overflow-y-auto py-0.5">
-            {groups.length === 0 ? (
-              <p className="px-2.5 py-3 text-center text-xs text-ink-faint">
-                {available.length === 0 ? "All models added" : "No models found"}
-              </p>
-            ) : (
-              groups.map((group) => (
-                <PopoverSection key={group.providerId} label={group.label}>
-                  <ul>
-                    {group.items.map((m) => (
-                      <li key={m.id}>
-                        <PopoverItem onClick={() => add(m.id)}>
-                          <span className="min-w-0 flex-1 truncate">
-                            {m.displayName ?? m.id}
-                          </span>
-                        </PopoverItem>
-                      </li>
-                    ))}
-                  </ul>
-                </PopoverSection>
-              ))
+          <ComboboxEmpty>
+            {available.length === 0 ? "All models added" : "No models found"}
+          </ComboboxEmpty>
+          <ComboboxList className="max-h-56">
+            {(group) => (
+              <ComboboxGroup key={group.providerId} items={group.items}>
+                <ComboboxLabel>{group.label}</ComboboxLabel>
+                <ComboboxCollection>
+                  {(m: ModelInfoDto) => (
+                    <ComboboxItem key={m.id} value={m}>
+                      <span className="min-w-0 flex-1 truncate">
+                        {m.displayName ?? m.id}
+                      </span>
+                    </ComboboxItem>
+                  )}
+                </ComboboxCollection>
+              </ComboboxGroup>
             )}
-          </div>
-        </PopoverContent>
-      </Popover>
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
     </div>
   )
 }

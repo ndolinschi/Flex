@@ -22,8 +22,9 @@ function ComboboxValue({ ...props }: ComboboxPrimitive.Value.Props) {
 function ComboboxTrigger({
   className,
   children,
+  hideIcon = false,
   ...props
-}: ComboboxPrimitive.Trigger.Props) {
+}: ComboboxPrimitive.Trigger.Props & { hideIcon?: boolean }) {
   const hasRender = "render" in props && props.render != null
   return (
     <ComboboxPrimitive.Trigger
@@ -32,7 +33,7 @@ function ComboboxTrigger({
       {...props}
     >
       {children}
-      {hasRender ? null : (
+      {hasRender || hideIcon ? null : (
         <ChevronDownIcon className="pointer-events-none size-4 text-ink-faint" />
       )}
     </ComboboxPrimitive.Trigger>
