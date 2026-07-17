@@ -1,4 +1,5 @@
-import { cn } from "../../lib/utils"
+import { Skeleton as UiSkeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
 
 type SkeletonProps = {
   className?: string
@@ -6,12 +7,9 @@ type SkeletonProps = {
 
 export const Skeleton = ({ className }: SkeletonProps) => {
   return (
-    <div
+    <UiSkeleton
       aria-hidden="true"
-      className={cn(
-        "animate-pulse rounded-md bg-surface-muted",
-        className,
-      )}
+      className={cn("bg-surface-muted", className)}
     />
   )
 }

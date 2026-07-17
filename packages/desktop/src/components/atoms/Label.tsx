@@ -1,17 +1,19 @@
-import type { LabelHTMLAttributes, ReactNode } from "react"
-import { cn } from "../../lib/utils"
+import type { ComponentProps, ReactNode } from "react"
+import { Label as UiLabel } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
 
-type LabelProps = LabelHTMLAttributes<HTMLLabelElement> & {
+type LabelProps = Omit<ComponentProps<typeof UiLabel>, "children"> & {
   children: ReactNode
 }
 
+/** Thin wrap over shadcn `Label` with Flex secondary ink default. */
 export const Label = ({ className, children, ...props }: LabelProps) => {
   return (
-    <label
-      className={cn("block text-sm font-medium text-ink-secondary", className)}
+    <UiLabel
+      className={cn("block text-ink-secondary", className)}
       {...props}
     >
       {children}
-    </label>
+    </UiLabel>
   )
 }

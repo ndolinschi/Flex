@@ -1,18 +1,17 @@
 import { forwardRef, type InputHTMLAttributes } from "react"
-import { cn } from "../../lib/utils"
+import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 
 type TextInputProps = InputHTMLAttributes<HTMLInputElement>
 
+/** Compat alias over shadcn `Input` — keeps `TextInput` call-site name. */
 export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(
   ({ className, ...props }, ref) => {
     return (
-      <input
+      <Input
         ref={ref}
         className={cn(
-          "h-8 w-full rounded-md border border-border bg-surface px-2.5 text-sm text-ink",
-          "placeholder:text-ink-faint",
-          "focus:border-stroke-2 focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]",
-          "disabled:cursor-not-allowed disabled:opacity-50",
+          "rounded-md bg-surface text-ink placeholder:text-ink-faint",
           className,
         )}
         {...props}

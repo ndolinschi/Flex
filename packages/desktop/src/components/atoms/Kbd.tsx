@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
-import { cn } from "../../lib/utils"
+import { Kbd as UiKbd } from "@/components/ui/kbd"
+import { cn } from "@/lib/utils"
 
 type KbdProps = {
   children: ReactNode
@@ -8,14 +9,13 @@ type KbdProps = {
 
 export const Kbd = ({ children, className }: KbdProps) => {
   return (
-    <kbd
+    <UiKbd
       className={cn(
-        "inline-flex items-center rounded border border-border bg-surface-muted",
-        "px-1.5 py-0.5 font-mono text-xs text-ink-muted",
+        "rounded border border-border bg-surface-muted font-mono text-ink-muted",
         className,
       )}
     >
       {children}
-    </kbd>
+    </UiKbd>
   )
 }
