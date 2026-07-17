@@ -282,8 +282,6 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader`, WorkGroup | **Sidebar section headers wired** |
 | Combobox | yes | Model/Branch/Project pickers | Prefer over PopoverTray search trays; Popover interim done |
 | Command | yes | `CommandPalette`, `SearchModal`, `OpenTabModal` | **CommandPalette + SearchModal migrated** (CommandDialog) |
-| Resizable | yes | content split sash | **ContentWorkspace migrated** |
-| Toggle Group | yes | Files Code/Eye, filter chips | **Files markdown Eye/Code migrated** |
 | Context Menu | yes | `ContextMenu` molecule | Keep timeline-scroll / webview-blur ignore behavior |
 | Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
 | Date Picker | skip | — | |
