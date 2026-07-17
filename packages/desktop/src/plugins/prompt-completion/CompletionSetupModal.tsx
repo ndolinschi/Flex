@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react"
-import { createPortal } from "react-dom"
 import { Button, Spinner } from "../../components/atoms"
 import { ErrorBanner, ModelSelect } from "../../components/molecules"
 import { useInlineCompletionPrefs } from "../../hooks/useInlineCompletionPrefs"
@@ -13,6 +12,14 @@ import {
 import type { InlineCompletionPrefs } from "../../lib/types"
 import { checkInlineCompletionConnection } from "../../lib/tauri"
 import { cn } from "../../lib/utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 type Path = "ollama" | "provider"
 
@@ -86,8 +93,6 @@ export const CompletionSetupModal = ({
     }
   }, [open, prefs?.providerId, prefs?.modelId])
 
-  if (!open) return null
-
   const handleCopyPull = async () => {
     try {
       await navigator.clipboard.writeText(OLLAMA_PULL_COMMAND)
@@ -99,9 +104,7 @@ export const CompletionSetupModal = ({
 
   const resolvedProviderId = path === "ollama" ? "ollama" : providerId
   const resolvedModelId =
-    path === "ollama"
-      ? modelId || RECOMMENDED_OLLAMA_MODEL
-      : modelId
+    path === "ollama" ? modelId || RECOMMENDED_OLLAMA_MODEL : modelId
 
   const handleCheckConnection = async () => {
     setError(null)
@@ -161,32 +164,38 @@ export const CompletionSetupModal = ({
     onClose()
   }
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) handleDismiss()
+  const busy = checking || isSaving
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !busy) handleDismiss()
       }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="completion-setup-title"
-        className="flex w-full max-w-md flex-col gap-3 rounded-[var(--radius-card)] border border-stroke-3 bg-panel p-4 shadow-lg"
+      <DialogContent
+        showCloseButton={false}
+        data-suppress-native-webview=""
+        className={cn(
+          "max-w-md gap-3 sm:max-w-md",
+          "rounded-[var(--radius-card)]",
+        )}
+        onEscapeKeyDown={(e) => {
+          if (busy) e.preventDefault()
+        }}
+        onPointerDownOutside={(e) => {
+          if (busy) e.preventDefault()
+        }}
       >
-        <div className="flex flex-col gap-1">
-          <h2
-            id="completion-setup-title"
-            className="text-base font-semibold text-ink"
-          >
+        <DialogHeader className="gap-1 text-left">
+          <DialogTitle className="text-base font-semibold text-ink">
             Prompt completions
-          </h2>
-          <p className="text-sm text-ink-muted">
+          </DialogTitle>
+          <DialogDescription className="text-sm text-ink-muted">
             Ghost-text suggestions while you write prompts. Use a small local
             Ollama model or any connected provider.
-          </p>
-        </div>
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="flex gap-1 rounded-md bg-fill-4 p-0.5">
           <button
@@ -223,7 +232,9 @@ export const CompletionSetupModal = ({
           </button>
         </div>
 
-        {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}
+        {error ? (
+          <ErrorBanner message={error} onDismiss={() => setError(null)} />
+        ) : null}
         {checkMessage ? (
           <p
             className={cn(
@@ -377,7 +388,7 @@ export const CompletionSetupModal = ({
           </div>
         )}
 
-        <div className="flex justify-between gap-2 pt-1">
+        <DialogFooter className="mx-0 mb-0 border-0 bg-transparent p-0 pt-1 sm:justify-between">
           <Button
             variant="ghost"
             size="sm"
@@ -407,9 +418,8 @@ export const CompletionSetupModal = ({
               {isSaving ? "Saving…" : "Save"}
             </Button>
           </div>
-        </div>
-      </div>
-    </div>,
-    document.body,
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
