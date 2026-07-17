@@ -50,7 +50,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `SidebarResumeError` | Resume-failure Retry / Dismiss banner | `message`, `onRetry`, `onDismiss` | SessionSidebar |
 | `ArchivedSectionHeader` | Collapsible Archived group header | `count`, `collapsed`, `onToggle` | SessionSidebar |
 | `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays + optional ghost-text inline completion (isolates keystrokes from ModelPicker/ContextBar) | `composerMode`, `anchorRef`, `attachments`, `onSend` | Composer |
-| `ModelSelect` | Simple model `<select>` | `models`, `value`, `onChange` | ProviderSettingsForm |
+| `ModelSelect` | Searchable model picker (shadcn Popover) | `models`, `value`, `onChange` | ProviderSettingsForm |
 | `ModelPicker` | Searchable model tray (PopoverTray) | `models`, `value`, `onChange` | Composer |
 | `ModePicker` | Agent / Plan / Ask pill switcher | `value`, `onChange` | Composer |
 | `PlanBuildBar` | Cursor-style Build CTA after ExitPlanMode | `onBuild`, `onKeepPlanning?`, `variant` | Plan tab, ChatSessionBody |
@@ -288,7 +288,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Dialog | yes | `ConfirmDialog`, auth/PR/bug/MCP dialogs | **ConfirmDialog migrated**; next: auth/MCP/bug modals |
 | Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
 | Drawer | maybe | `SubagentViewer` (bottom overlay) | Spike vs keep custom (Vaul + virtualized timeline) |
-| Dropdown Menu | yes | `SessionMenu`, `PlusMenu`, overflow menus | **PlusMenu migrated**; next: SessionMenu / BrowserOverflow |
+| Dropdown Menu | yes | `SessionMenu`, `PlusMenu`, overflow menus | **PlusMenu, SessionMenu, BrowserOverflowMenu migrated** |
 | Empty | yes | `EmptyState` | **EmptyState migrated** |
 | Field | yes | `FormField` + settings forms | **FormField migrated** (`Field`/`FieldLabel`/`FieldError`) |
 | Hover Card | later | — | Optional enrichment on chips |
@@ -302,15 +302,15 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Menubar | yes | `TitleBarMenus` | Native-feeling File/Edit/View/Help |
 | Message | yes (chat kit) | timeline message rows | Compose with Bubble; keep actions — Phase 5 |
 | Message Scroller | spike | `TurnTimeline` + `useStickToBottom` | **Do not swap blindly** — compose *with* `@tanstack/react-virtual` |
-| Native Select | yes | `ModelSelect` | Settings simple selects |
+| Native Select | later | simple settings enums | Prefer Select/Combobox; ModelSelect stays searchable Popover |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
 | Pagination | later | DatabaseTab paging | Icons-only Previous/Next |
-| Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker + IsolationPicker**; retire trays gradually |
+| Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker, IsolationPicker, ModelSelect**; Combobox next for Branch/Project |
 | Progress | later | indexing / update UX | Soft need |
 | Radio Group | yes | `QuestionPrompt` choices | |
 | Resizable | yes | content split sash | `ContentWorkspace` dual pane |
 | Scroll Area | yes | `ScrollArea` atom | Sidebar / overlays; **not** the virtualized timeline |
-| Select | yes | model/settings selects | Next after Field |
+| Select | yes | settings enums without search | Primitive installed; searchable ModelSelect uses Popover interim |
 | Separator | yes | `Divider` | **done** |
 | Sheet | skip for Settings | settings overlay | Keep absolute kept-mounted chat overlay |
 | Sidebar | spike | `SessionSidebar` | Steal primitives only; don’t full-adopt kit |
@@ -337,8 +337,8 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 |---|---|---|
 | **0 — Foundation** | `shadcn init` in `packages/desktop` (Vite, Tailwind v4, **radix** base, `lucide`, css variables); path alias `@/`; upgrade `cn` to `clsx` + `tailwind-merge`; map shadcn semantic tokens → Flex tokens in `src/index.css` / `tokens.css` without breaking `data-theme` | `components.json` present; `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
 | **1 — Atom adapters** | Add Button, Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Spinner, Avatar, Tooltip, ScrollArea; re-export from `components/atoms` with temporary compat props | Atom unit tests + vitest green; call sites compile via barrel. **Done:** Button, TextInput, TextArea, Label, Badge, Kbd, Divider←Separator, Skeleton, Spinner, Checkbox (round), Toggle←Switch (green ON), Avatar, ScrollArea. **Deferred:** Tooltip (timeline scroll / programmatic-scroll coupling — keep custom until Provider + scroll policy ported). |
-| **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog, ToastHost/Sonner, ModePicker+IsolationPicker (Popover), PlusMenu (DropdownMenu). **Next:** SessionMenu, TitleBarMenus, ContextMenu last |
-| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field. **Next:** Select/Combobox for Model/Branch/Project |
+| **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog, ToastHost/Sonner, ModePicker+IsolationPicker (Popover), PlusMenu+SessionMenu+BrowserOverflow (DropdownMenu). **Next:** TitleBarMenus, auth/MCP dialogs; ContextMenu last |
+| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select primitive; ModelSelect→Popover (search). **Next:** Combobox for Branch/Project/ModelPicker |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner→Alert; Collapsible installed. **Next:** Resizable sash; Collapsible headers |
 | **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Adopt Attachment→Bubble→Message→Marker *inside* virtual rows; MessageScroller only after measured spike with react-virtual |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
