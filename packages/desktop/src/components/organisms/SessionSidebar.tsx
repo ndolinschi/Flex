@@ -30,6 +30,10 @@ import {
   SidebarSkeleton,
   type ContextMenuItem,
 } from "../molecules"
+import {
+  Collapsible,
+  CollapsibleContent,
+} from "@/components/ui/collapsible"
 import { useQueryClient } from "@tanstack/react-query"
 import { SESSIONS_KEY, useSessions } from "../../hooks/useSessions"
 import { useWorkspaceStatuses } from "../../hooks/useWorkspaceStatuses"
@@ -538,66 +542,74 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
             ) : null}
 
             {repoGroups.map((group) => (
-              <section key={group.cwd} className="flex flex-col gap-px">
+              <Collapsible
+                key={group.cwd}
+                open={!collapsedRepos[group.cwd]}
+                onOpenChange={(open) =>
+                  setCollapsedRepos((prev) => ({
+                    ...prev,
+                    [group.cwd]: !open,
+                  }))
+                }
+                className="flex flex-col gap-px"
+              >
                 <div
                   onContextMenu={(e) => handleRepoContextMenu(e, group.cwd)}
                 >
                   <RepoSectionHeader
                     label={group.label}
-                    collapsed={!!collapsedRepos[group.cwd]}
-                    onToggle={() => toggleRepo(group.cwd)}
                     onNewSession={() => void handleCreate(group.cwd)}
                     indexed={!!indexedRepos[group.cwd]}
                   />
                 </div>
-                {!collapsedRepos[group.cwd]
-                  ? group.sessions.map((session) => (
-                      <SessionListItem
-                        key={session.id}
-                        session={session}
-                        isActive={session.id === activeSessionId}
-                        errorMessage={rowErrors[session.id]}
-                        workspaceStatus={workspaceStatuses[session.id]}
-                        gitStatus={gitStatuses[session.id]}
-                        onSelect={handleSelectRow}
-                        onRename={renameSession}
-                        onDelete={deleteSession}
-                        onNewAgentInRepo={handleNewAgentInRepo}
-                        onTogglePin={toggleSessionPinned}
-                        onSetArchived={setSessionArchived}
-                      />
-                    ))
-                  : null}
-              </section>
+                <CollapsibleContent className="flex flex-col gap-px">
+                  {group.sessions.map((session) => (
+                    <SessionListItem
+                      key={session.id}
+                      session={session}
+                      isActive={session.id === activeSessionId}
+                      errorMessage={rowErrors[session.id]}
+                      workspaceStatus={workspaceStatuses[session.id]}
+                      gitStatus={gitStatuses[session.id]}
+                      onSelect={handleSelectRow}
+                      onRename={renameSession}
+                      onDelete={deleteSession}
+                      onNewAgentInRepo={handleNewAgentInRepo}
+                      onTogglePin={toggleSessionPinned}
+                      onSetArchived={setSessionArchived}
+                    />
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
             ))}
 
             {archivedSessions.length > 0 ? (
-              <section className="flex flex-col gap-px">
-                <ArchivedSectionHeader
-                  count={archivedSessions.length}
-                  collapsed={archivedCollapsed}
-                  onToggle={() => setArchivedCollapsed((prev) => !prev)}
-                />
-                {!archivedCollapsed
-                  ? archivedSessions.map((session) => (
-                      <SessionListItem
-                        key={session.id}
-                        session={session}
-                        isActive={session.id === activeSessionId}
-                        errorMessage={rowErrors[session.id]}
-                        workspaceStatus={workspaceStatuses[session.id]}
-                        gitStatus={gitStatuses[session.id]}
-                        archived
-                        onSelect={handleSelectRow}
-                        onRename={renameSession}
-                        onDelete={deleteSession}
-                        onNewAgentInRepo={handleNewAgentInRepo}
-                        onTogglePin={toggleSessionPinned}
-                        onSetArchived={setSessionArchived}
-                      />
-                    ))
-                  : null}
-              </section>
+              <Collapsible
+                open={!archivedCollapsed}
+                onOpenChange={(open) => setArchivedCollapsed(!open)}
+                className="flex flex-col gap-px"
+              >
+                <ArchivedSectionHeader count={archivedSessions.length} />
+                <CollapsibleContent className="flex flex-col gap-px">
+                  {archivedSessions.map((session) => (
+                    <SessionListItem
+                      key={session.id}
+                      session={session}
+                      isActive={session.id === activeSessionId}
+                      errorMessage={rowErrors[session.id]}
+                      workspaceStatus={workspaceStatuses[session.id]}
+                      gitStatus={gitStatuses[session.id]}
+                      archived
+                      onSelect={handleSelectRow}
+                      onRename={renameSession}
+                      onDelete={deleteSession}
+                      onNewAgentInRepo={handleNewAgentInRepo}
+                      onTogglePin={toggleSessionPinned}
+                      onSetArchived={setSessionArchived}
+                    />
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
             ) : null}
           </div>
         )}

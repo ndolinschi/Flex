@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
 import { openUrl } from "@tauri-apps/plugin-opener"
 import { useSessions } from "../../hooks/useSessions"
@@ -8,7 +8,15 @@ import { createSession, toInvokeError } from "../../lib/tauri"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
 import { BugReportDialog } from "./BugReportDialog"
-import { PopoverItem, PopoverTray } from "./PopoverTray"
+import {
+  Menubar,
+  MenubarContent,
+  MenubarItem,
+  MenubarMenu,
+  MenubarSeparator,
+  MenubarShortcut,
+  MenubarTrigger,
+} from "@/components/ui/menubar"
 
 type MenuId = "file" | "edit" | "view" | "help"
 
@@ -34,9 +42,7 @@ export const TitleBarMenus = ({
   onOpenCommandPalette,
   onOpenSearch,
 }: TitleBarMenusProps) => {
-  const [openMenu, setOpenMenu] = useState<MenuId | null>(null)
   const [bugOpen, setBugOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
   const { newAgent } = useSessions()
   const setRoute = useAppStore((s) => s.setRoute)
   const toggleSidebarCollapsed = useAppStore((s) => s.toggleSidebarCollapsed)
@@ -46,22 +52,6 @@ export const TitleBarMenus = ({
   const pushToast = useAppStore((s) => s.pushToast)
   const setActiveSessionId = useAppStore((s) => s.setActiveSessionId)
   const isBootstrapped = useAppStore((s) => s.isBootstrapped)
-
-  useEffect(() => {
-    if (!openMenu) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpenMenu(null)
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [openMenu])
-
-  const close = () => setOpenMenu(null)
-
-  const run = (fn: () => void) => {
-    close()
-    fn()
-  }
 
   const openFolder = async () => {
     if (!isBootstrapped) return
@@ -184,92 +174,60 @@ export const TitleBarMenus = ({
 
   return (
     <>
-    <div ref={rootRef} className="flex h-full items-center gap-px px-0.5">
-      {(Object.keys(menus) as MenuId[]).map((id) => {
-        const menu = menus[id]
-        const open = openMenu === id
-        return (
-          <div key={id} className="relative flex h-full items-center">
-            <button
-              type="button"
-              aria-haspopup="menu"
-              aria-expanded={open}
-              onClick={() => setOpenMenu(open ? null : id)}
-              onMouseEnter={() => {
-                if (openMenu && openMenu !== id) setOpenMenu(id)
-              }}
-              className={cn(
-                "flex h-[22px] items-center rounded-sm px-1.5 text-xs leading-none text-ink-secondary",
-                "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-                "hover:bg-fill-3 hover:text-ink",
-                open && "bg-fill-3 text-ink",
-              )}
-            >
-              {menu.label}
-            </button>
-            <PopoverTray
-              open={open}
-              onClose={close}
-              placement="below"
-              role="menu"
-              aria-label={menu.label}
-              className="left-0 top-full mt-0.5 min-w-[188px] py-1"
-            >
-              {menu.items.map((item) =>
-                item.separator ? (
-                  <div
-                    key={item.id}
-                    role="separator"
-                    className="my-1 h-px bg-stroke-3"
-                  />
-                ) : (
-                  <MenuRow
-                    key={item.id}
-                    label={item.label}
-                    hint={item.hint}
-                    disabled={item.disabled}
-                    onClick={() => {
-                      if (item.disabled || !item.run) return
-                      run(item.run)
-                    }}
-                  />
-                ),
-              )}
-            </PopoverTray>
-          </div>
-        )
-      })}
-    </div>
-    <BugReportDialog open={bugOpen} onClose={() => setBugOpen(false)} />
+      <Menubar
+        className={cn(
+          "h-full gap-px rounded-none border-0 bg-transparent p-0 shadow-none",
+        )}
+      >
+        {(Object.keys(menus) as MenuId[]).map((id) => {
+          const menu = menus[id]
+          return (
+            <MenubarMenu key={id}>
+              <MenubarTrigger
+                className={cn(
+                  "h-[22px] rounded-sm px-1.5 text-xs font-normal leading-none text-ink-secondary",
+                  "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+                )}
+              >
+                {menu.label}
+              </MenubarTrigger>
+              <MenubarContent
+                align="start"
+                sideOffset={4}
+                className="min-w-[188px] py-1"
+              >
+                {menu.items.map((item) =>
+                  item.separator ? (
+                    <MenubarSeparator
+                      key={item.id}
+                      className="mx-1 my-1 bg-stroke-3"
+                    />
+                  ) : (
+                    <MenubarItem
+                      key={item.id}
+                      disabled={item.disabled}
+                      className="justify-between gap-6 px-3 py-1.5 text-sm"
+                      onSelect={() => {
+                        if (item.disabled || !item.run) return
+                        item.run()
+                      }}
+                    >
+                      <span>{item.label}</span>
+                      {item.hint ? (
+                        <MenubarShortcut>{item.hint}</MenubarShortcut>
+                      ) : null}
+                    </MenubarItem>
+                  ),
+                )}
+              </MenubarContent>
+            </MenubarMenu>
+          )
+        })}
+      </Menubar>
+      <BugReportDialog open={bugOpen} onClose={() => setBugOpen(false)} />
     </>
   )
 }
-
-const MenuRow = ({
-  label,
-  hint,
-  disabled,
-  onClick,
-}: {
-  label: string
-  hint?: string
-  disabled?: boolean
-  onClick: () => void
-}) => (
-  <PopoverItem
-    role="menuitem"
-    disabled={disabled}
-    onClick={onClick}
-    className="justify-between gap-6 px-3 py-1.5 text-sm"
-  >
-    <span>{label}</span>
-    {hint ? (
-      <span className="text-xs text-ink-muted [font-variant-numeric:tabular-nums]">
-        {hint}
-      </span>
-    ) : null}
-  </PopoverItem>
-)
 
 /** Compact app mark used on Windows/Linux title bars (Cursor-style). */
 export const AppMark = ({ className }: { className?: string }) => (
