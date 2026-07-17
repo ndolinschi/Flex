@@ -174,7 +174,7 @@ fn package_json_is_react(raw: &str) -> (bool, String, Option<String>) {
     if has_dep("react") || has_dep("react-dom") {
         return (true, "react in package.json".into(), name);
     }
-    if has_dep("next") {
+    if has_dep("next") || has_dep("@next/swc") || has_dep("eslint-config-next") {
         return (true, "next in package.json".into(), name);
     }
     if has_dep("@vitejs/plugin-react") || has_dep("@vitejs/plugin-react-swc") {
@@ -183,10 +183,128 @@ fn package_json_is_react(raw: &str) -> (bool, String, Option<String>) {
     if has_dep("react-scripts") {
         return (true, "create-react-app (react-scripts)".into(), name);
     }
+    if has_dep("remix")
+        || has_dep("@remix-run/react")
+        || has_dep("@remix-run/node")
+        || has_dep("@remix-run/dev")
+    {
+        return (true, "remix in package.json".into(), name);
+    }
+    // Scripts often name the framework even when deps are hoisted elsewhere.
+    if let Some(scripts) = value.get("scripts").and_then(|s| s.as_object()) {
+        let mentions_next = scripts.values().any(|v| {
+            v.as_str()
+                .is_some_and(|s| s.split_whitespace().any(|tok| tok == "next"))
+        });
+        if mentions_next {
+            return (true, "next script in package.json".into(), name);
+        }
+    }
     (false, "no React markers in package.json".into(), name)
 }
 
-/// Detect whether `cwd` looks like a React application.
+const NEXT_CONFIG_NAMES: &[&str] = &[
+    "next.config.js",
+    "next.config.mjs",
+    "next.config.cjs",
+    "next.config.ts",
+    "next.config.mts",
+];
+
+fn has_next_config(dir: &Path) -> bool {
+    NEXT_CONFIG_NAMES
+        .iter()
+        .any(|name| dir.join(name).is_file())
+}
+
+fn try_package_json(path: &Path) -> Option<(bool, String, Option<String>)> {
+    let raw = fs::read_to_string(path).ok()?;
+    Some(package_json_is_react(&raw))
+}
+
+/// Scan one level of common monorepo / app folders when the root package.json
+/// is a workspace shell without React deps (e.g. Next lives in `apps/web`).
+fn detect_react_in_children(root: &Path) -> Option<ComponentsDetectResult> {
+    const CHILD_DIRS: &[&str] = &["apps", "packages", "web", "frontend", "client", "app", "src"];
+    let Ok(entries) = fs::read_dir(root) else {
+        return None;
+    };
+    let mut dirs: Vec<PathBuf> = entries
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .collect();
+    dirs.sort();
+
+    for dir in &dirs {
+        let Some(name) = dir.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        // Prefer well-known app folders; also accept any immediate child that
+        // ships its own package.json (covers `apps/web`-style layouts when we
+        // recurse one extra level below `apps`/`packages`).
+        let interesting = CHILD_DIRS.contains(&name) || dir.join("package.json").is_file();
+        if !interesting {
+            continue;
+        }
+
+        if has_next_config(dir) {
+            let package_name = try_package_json(&dir.join("package.json")).and_then(|r| r.2);
+            return Some(ComponentsDetectResult {
+                is_react: true,
+                reason: format!("next.config in {}", name),
+                package_name,
+            });
+        }
+        if let Some((true, reason, package_name)) = try_package_json(&dir.join("package.json")) {
+            return Some(ComponentsDetectResult {
+                is_react: true,
+                reason: format!("{reason} ({name})"),
+                package_name,
+            });
+        }
+
+        // One more level for `apps/web`, `packages/ui`, etc.
+        if matches!(name, "apps" | "packages") {
+            let Ok(nested) = fs::read_dir(dir) else {
+                continue;
+            };
+            let mut nested_dirs: Vec<PathBuf> = nested
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .filter(|p| p.is_dir())
+                .collect();
+            nested_dirs.sort();
+            for child in nested_dirs {
+                let child_name = child
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("app");
+                if has_next_config(&child) {
+                    let package_name =
+                        try_package_json(&child.join("package.json")).and_then(|r| r.2);
+                    return Some(ComponentsDetectResult {
+                        is_react: true,
+                        reason: format!("next.config in {name}/{child_name}"),
+                        package_name,
+                    });
+                }
+                if let Some((true, reason, package_name)) =
+                    try_package_json(&child.join("package.json"))
+                {
+                    return Some(ComponentsDetectResult {
+                        is_react: true,
+                        reason: format!("{reason} ({name}/{child_name})"),
+                        package_name,
+                    });
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Detect whether `cwd` looks like a React / Next.js application.
 pub fn detect_react(cwd: &Path) -> ComponentsDetectResult {
     if !cwd.is_dir() {
         return ComponentsDetectResult {
@@ -195,12 +313,28 @@ pub fn detect_react(cwd: &Path) -> ComponentsDetectResult {
             package_name: None,
         };
     }
-    let Some(pkg_path) = find_package_json(cwd) else {
+
+    // next.config.* is decisive even before package.json (covers pnpm workspaces
+    // where `next` is only declared in a nested package).
+    if has_next_config(cwd) {
+        let package_name = find_package_json(cwd)
+            .and_then(|p| try_package_json(&p))
+            .and_then(|r| r.2);
         return ComponentsDetectResult {
+            is_react: true,
+            reason: "next.config present".into(),
+            package_name,
+        };
+    }
+
+    let Some(pkg_path) = find_package_json(cwd) else {
+        // No package.json up-tree — still try shallow children (opened a
+        // parent folder that isn't itself a JS package).
+        return detect_react_in_children(cwd).unwrap_or(ComponentsDetectResult {
             is_react: false,
             reason: "no package.json found".into(),
             package_name: None,
-        };
+        });
     };
     let Ok(raw) = fs::read_to_string(&pkg_path) else {
         return ComponentsDetectResult {
@@ -210,8 +344,28 @@ pub fn detect_react(cwd: &Path) -> ComponentsDetectResult {
         };
     };
     let (is_react, reason, package_name) = package_json_is_react(&raw);
+    if is_react {
+        return ComponentsDetectResult {
+            is_react: true,
+            reason,
+            package_name,
+        };
+    }
+
+    // Workspace root without React deps — look in apps/packages/web/…
+    let search_root = pkg_path.parent().unwrap_or(cwd);
+    if let Some(hit) = detect_react_in_children(search_root) {
+        return hit;
+    }
+    // Also search from the session cwd when it differs (opened a subfolder).
+    if search_root != cwd {
+        if let Some(hit) = detect_react_in_children(cwd) {
+            return hit;
+        }
+    }
+
     ComponentsDetectResult {
-        is_react,
+        is_react: false,
         reason,
         package_name,
     }
@@ -593,6 +747,44 @@ mod tests {
         );
         let r = detect_react(dir.path());
         assert!(!r.is_react);
+    }
+
+    #[test]
+    fn detects_next_from_config_file() {
+        let dir = tempfile::tempdir().unwrap();
+        write_file(&dir.path().join("package.json"), r#"{"name":"web"}"#);
+        write_file(&dir.path().join("next.config.mjs"), "export default {}\n");
+        let r = detect_react(dir.path());
+        assert!(r.is_react);
+        assert!(r.reason.contains("next.config"));
+    }
+
+    #[test]
+    fn detects_next_in_monorepo_apps_web() {
+        let dir = tempfile::tempdir().unwrap();
+        write_file(
+            &dir.path().join("package.json"),
+            r#"{"name":"mono","private":true,"workspaces":["apps/*"]}"#,
+        );
+        write_file(
+            &dir.path().join("apps/web/package.json"),
+            r#"{"name":"web","dependencies":{"next":"15.0.0","react":"19.0.0","react-dom":"19.0.0"}}"#,
+        );
+        let r = detect_react(dir.path());
+        assert!(r.is_react, "reason={}", r.reason);
+        assert_eq!(r.package_name.as_deref(), Some("web"));
+    }
+
+    #[test]
+    fn detects_next_script_without_dep_key() {
+        let dir = tempfile::tempdir().unwrap();
+        write_file(
+            &dir.path().join("package.json"),
+            r#"{"name":"web","scripts":{"dev":"next dev","build":"next build"}}"#,
+        );
+        let r = detect_react(dir.path());
+        assert!(r.is_react);
+        assert!(r.reason.contains("next script"));
     }
 
     #[test]

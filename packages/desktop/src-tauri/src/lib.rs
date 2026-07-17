@@ -6,6 +6,8 @@ mod config;
 mod db_plugin;
 mod debug;
 mod error;
+#[cfg(target_os = "macos")]
+mod macos_window;
 mod secrets;
 mod state;
 mod terminal;
@@ -171,6 +173,12 @@ pub fn run() {
                 let _ = window.set_decorations(false);
                 let min_size = LogicalSize::new(MAIN_WINDOW_MIN_WIDTH, MAIN_WINDOW_MIN_HEIGHT);
                 let _ = window.set_min_size(Some(min_size));
+
+                // Undecorated macOS windows are square by default — clip the
+                // content view to the system corner radius so the shell matches
+                // native apps.
+                #[cfg(target_os = "macos")]
+                macos_window::apply_rounded_corners(&window);
 
                 if let Ok(scale) = window.scale_factor() {
                     if let Ok(current) = window.inner_size() {

@@ -45,6 +45,8 @@ type ProviderConnectionFormProps = {
   onDefaultIsolationChange: (value: string) => void
   onValidate: () => void
   onSave: () => void
+  /** Return to the connections list without saving. */
+  onCancel?: () => void
   onCopilotSignIn?: () => void
   onChatgptSignIn?: () => void
 }
@@ -83,6 +85,7 @@ export const ProviderConnectionForm = ({
   onDefaultIsolationChange,
   onValidate,
   onSave,
+  onCancel,
   onCopilotSignIn,
   onChatgptSignIn,
 }: ProviderConnectionFormProps) => {
@@ -116,7 +119,13 @@ export const ProviderConnectionForm = ({
           />
         </FieldRow>
 
-        <FieldRow label="Provider" htmlFor="provider">
+        <FieldRow
+          label="Provider"
+          htmlFor="provider"
+          // Full-width tile grid — two-column FieldRow leaves uneven side
+          // padding around DeepSeek / Copilot / … chips.
+          className="@[640px]/settings:grid-cols-1 @[640px]/settings:gap-2"
+        >
           <ProviderPicker
             providers={builtinProviders}
             value={provider}
@@ -353,6 +362,11 @@ export const ProviderConnectionForm = ({
           </p>
         ) : null}
 
+        {onCancel ? (
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            Back
+          </Button>
+        ) : null}
         <Button type="button" variant="ghost" isLoading={isValidating} onClick={onValidate}>
           Validate
         </Button>

@@ -11,10 +11,12 @@ import { AppHeader } from "../AppHeader"
 import { ContentPane } from "./ContentPane"
 import { cn } from "../../../lib/utils"
 import { useContentTabLifecycle } from "../../../hooks/useContentTabLifecycle"
+import { useInstallContentTabPointerDnD } from "../../../hooks/useContentTabPointerDnD"
 
 /** Main content host: AppHeader + one or two ContentPanes with a sash. */
 export const ContentWorkspace = () => {
   useContentTabLifecycle()
+  useInstallContentTabPointerDnD()
   const contentLayout = useAppStore((s) => s.contentLayout)
   const setSplitRatio = useAppStore((s) => s.setSplitRatio)
   const setRightPanelDragging = useAppStore((s) => s.setRightPanelDragging)

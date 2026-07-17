@@ -36,7 +36,9 @@ export const ProviderPicker = ({
               disabled={disabled}
               onClick={() => onChange(p.id)}
               className={cn(
-                "flex h-9 w-full items-center gap-2 rounded-md border px-2.5 text-left",
+                // Symmetric 8px inset — avoid the old px-2.5 + flex-1 stretch
+                // that left a bright empty pad on the right of short labels.
+                "flex h-9 w-full items-center justify-start gap-2 rounded-md border px-2 text-left",
                 "transition-colors duration-[var(--duration-fast)]",
                 "disabled:pointer-events-none disabled:opacity-50",
                 active
@@ -44,8 +46,8 @@ export const ProviderPicker = ({
                   : "border-stroke-3 bg-surface text-ink-secondary hover:border-stroke-2 hover:bg-fill-4 hover:text-ink",
               )}
             >
-              <ProviderIcon providerId={p.id} label={p.label} size={18} />
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              <ProviderIcon providerId={p.id} label={p.label} size={16} />
+              <span className="min-w-0 truncate text-sm font-medium leading-none">
                 {p.label}
               </span>
             </button>

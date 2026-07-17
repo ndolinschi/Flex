@@ -33,10 +33,10 @@ audit and fix UI against this file.
 
 ```
 ┌─ WindowTitleBar (30px) ──────────────────────────────────────┐
-│ traffic / captions │ menus │ drag region │                   │
+│ traffic / captions │ menus │ sidebar │ drag region │         │
 ├─ body (flex-1, relative) ────────────────────────────────────┤
 │ ┌ SessionSidebar ┐ ┌ ContentWorkspace (flex-1) ─────────────┐ │
-│ │                │ │ AppHeader (sidebar · split)            │ │
+│ │                │ │ AppHeader (split · session)            │ │
 │ │ actions        │ │ ContentPane(s) — tabs + chat/tool body │ │
 │ │ session list   │ │   single OR left | sash | right        │ │
 │ │ footer         │ │                                        │ │
@@ -44,11 +44,14 @@ audit and fix UI against this file.
 └──────────────────────────────────────────────────────────────┘
 ```
 
+In-window File/Edit/View/Help on Windows/Linux only; macOS uses the native
+menu bar (same actions). Sidebar toggle is always in the title bar.
+
 Composition root: `src/App.tsx`.
 
 | Layer | Role |
 |---|---|
-| `WindowTitleBar` | Custom chrome (`decorations: false`); `--titlebar-height` |
+| `WindowTitleBar` | Custom chrome (`decorations: false`); `--titlebar-height`; sidebar toggle; drag-region double-click zooms (macOS → fullscreen); native 10px corner clip on macOS; File/Edit/View/Help in-window on Windows/Linux, native menu bar on macOS |
 | `SessionSidebar` | Agents list; left column (wide) or full overlay (narrow/tight) |
 | `ContentWorkspace` | Header + content panes (chat + tool tabs; optional split) |
 | `ContentPane` | Per-pane tab strip + bodies; `+` / open-to-side |
@@ -79,7 +82,7 @@ survive.
 ### Chat (`ContentWorkspace`)
 
 ```
-AppHeader (30px) — sidebar toggle · split toggle (⌘J) · session menu
+AppHeader (30px) — split toggle (⌘J) · session menu
 ContentPane(s)
   ├── TabStrip — chat sessions + tool tabs (+ / open-to-side)
   └── body — ChatSessionBody or tool tab (Plan/Changes/…)
@@ -230,9 +233,9 @@ Selected row: `bg-fill-2`. Hover: `bg-fill-4`.
 
 ### AppHeader
 
-`h-[var(--header-height)] px-3` · left: sidebar toggle · center: scrollable
-`ChatSessionTabBar` (`flex-1 min-w-0 overflow-x-auto`, no second border) ·
-right: panel toggle + session menu. Quiet `h-6` icon buttons.
+`h-[var(--header-height)] px-3` · right: split toggle + session menu.
+Sidebar open/close lives on `WindowTitleBar` (after traffic lights on macOS;
+after File/Edit/View/Help on Windows/Linux). Quiet `h-6` icon buttons.
 
 ### Composer
 
@@ -271,6 +274,17 @@ FilesChangedCard) sits **outside** the virtual window. Scroll-down FAB:
 
 Nav sticky `pt-6`. Cards use `--radius-card` + `bg-settings-card`. Rows
 `px-3.5 py-3 gap-4`. Field grids switch at `@container` 640px.
+
+**Models & Connections:** list screen (connections + secret storage) vs
+dedicated editor screen (New connection / row click). Provider tile grid is
+full-width with symmetric `px-2` insets — not a two-column FieldRow.
+
+**Open tab (`+`):** popover lists Chat + primary tools first; ~5 rows visible,
+remainder scrolls.
+
+**Tab reorder / split move:** pointer events (not HTML5 DnD — broken in
+Tauri WKWebView). Idle cursor is pointer; grabbing only after the drag
+threshold. Drop markers work within a strip and across split panes.
 
 ---
 

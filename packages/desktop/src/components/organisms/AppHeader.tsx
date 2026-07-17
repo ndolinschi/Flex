@@ -1,4 +1,4 @@
-import { Columns2, PanelLeft } from "lucide-react"
+import { Columns2 } from "lucide-react"
 import { sessionLabel } from "../../lib/types"
 import { useSessions } from "../../hooks/useSessions"
 import { useAppStore } from "../../stores/appStore"
@@ -10,12 +10,10 @@ const isMac =
   typeof navigator !== "undefined" &&
   /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
 
-/** Chat header — sidebar toggle, split toggle, session menu.
- * Content tabs live on each ContentPane strip. */
+/** Chat header — split toggle and session menu.
+ * Sidebar toggle lives on WindowTitleBar. Content tabs live on each ContentPane. */
 export const AppHeader = () => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
-  const collapsed = useAppStore((s) => s.sidebarCollapsed)
-  const toggleSidebar = useAppStore((s) => s.toggleSidebarCollapsed)
   const contentLayout = useAppStore((s) => s.contentLayout)
   const toggleSplit = useAppStore((s) => s.toggleSplit)
   const viewport = useAppStore((s) => s.viewport)
@@ -26,15 +24,6 @@ export const AppHeader = () => {
 
   return (
     <header className="flex h-[var(--header-height)] shrink-0 items-center gap-0.5 border-b border-stroke-3 bg-bg px-3">
-      <IconButton
-        label={`${collapsed ? "Show" : "Hide"} sidebar (${isMac ? "⌘B" : "Ctrl+B"})`}
-        onClick={toggleSidebar}
-        quiet
-        className="h-6 w-6 shrink-0"
-      >
-        <PanelLeft className="h-3.5 w-3.5" aria-hidden />
-      </IconButton>
-
       <div className="min-w-0 flex-1" aria-hidden />
 
       <div className="flex shrink-0 items-center gap-0.5">

@@ -6,7 +6,8 @@ type TitleTabProps = {
 }
 
 /** Chat title for the top bar — plain label, not a second panel control.
- * Right-panel open/close lives solely on AppHeader's PanelRight (⌘J). */
+ * Right-panel open/close lives solely on AppHeader's split toggle (⌘J).
+ * Sidebar open/close lives on WindowTitleBar. */
 export const TitleTab = ({ title, className }: TitleTabProps) => {
   return (
     <div

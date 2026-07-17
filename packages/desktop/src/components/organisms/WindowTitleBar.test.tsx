@@ -7,6 +7,8 @@ vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     minimize: vi.fn(),
     toggleMaximize: vi.fn(),
+    setFullscreen: vi.fn(),
+    isFullscreen: vi.fn(async () => false),
     close: vi.fn(),
     isMaximized: vi.fn(async () => false),
     onResized: vi.fn(async () => () => undefined),
@@ -39,7 +41,7 @@ describe("WindowControls", () => {
     const html = renderToStaticMarkup(<WindowControls host="macos" />)
     expect(html).toContain('aria-label="Close"')
     expect(html).toContain('aria-label="Minimize"')
-    expect(html).toContain('aria-label="Zoom"')
+    expect(html).toContain('aria-label="Full Screen"')
   })
 
   it("renders caption buttons on Windows", () => {

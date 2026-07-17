@@ -3,7 +3,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type DragEvent,
   type MouseEvent as ReactMouseEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react"
@@ -12,15 +11,11 @@ import { MessageSquare, Plus, X } from "lucide-react"
 import { IconButton, Tab, TabStrip, Tooltip } from "../../atoms"
 import { OpenTabModal } from "../../molecules"
 import { useSessions } from "../../../hooks/useSessions"
-import { gitPrStatus } from "../../../lib/tauri"
 import {
-  FLEX_TAB_DND_MIME,
-  beginTabDrag,
-  endTabDrag,
-  getActiveTabDrag,
-  isFlexTabDrag,
-  readTabIdFromDataTransfer,
-} from "../../../lib/tabDnD"
+  startContentTabPointerDrag,
+  useTabDragUi,
+} from "../../../hooks/useContentTabPointerDnD"
+import { gitPrStatus } from "../../../lib/tauri"
 import { sessionLabel, type SessionId } from "../../../lib/types"
 import {
   useAppStore,
@@ -61,11 +56,10 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   const closePane = useAppStore((s) => s.closePane)
   const openChatInPane = useAppStore((s) => s.openChatInPane)
   const openToolInPane = useAppStore((s) => s.openToolInPane)
-  const reorderTabInPane = useAppStore((s) => s.reorderTabInPane)
-  const moveTabBetweenPanes = useAppStore((s) => s.moveTabBetweenPanes)
   const setFocusedPane = useAppStore((s) => s.setFocusedPane)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const { sessions } = useSessions()
+  const dragUi = useTabDragUi()
   const [openTabModal, setOpenTabModal] = useState(false)
   const [openTabAnchor, setOpenTabAnchor] = useState<{
     x: number
@@ -73,9 +67,6 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     width: number
     height: number
   } | null>(null)
-  const [dragTabId, setDragTabId] = useState<string | null>(null)
-  const [dropInsertAt, setDropInsertAt] = useState<number | null>(null)
-  const suppressClickRef = useRef(false)
   const tabsScrollRef = useRef<HTMLDivElement>(null)
 
   const sessionsById = useMemo(
@@ -108,79 +99,6 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   const split = contentLayout.mode === "split"
   const paneFocused = focusedPane === paneIndex
 
-  const clearDnD = () => {
-    setDragTabId(null)
-    setDropInsertAt(null)
-  }
-
-  const handleTabDragStart = (e: DragEvent<HTMLElement>, tabId: string) => {
-    suppressClickRef.current = false
-    beginTabDrag({ tabId, fromPane: paneIndex })
-    setDragTabId(tabId)
-    e.dataTransfer.effectAllowed = "move"
-    e.dataTransfer.setData(FLEX_TAB_DND_MIME, tabId)
-    e.dataTransfer.setData("text/plain", tabId)
-  }
-
-  const syncDropTarget = (insertAt: number) => {
-    const session = getActiveTabDrag()
-    if (session) setDragTabId(session.tabId)
-    setDropInsertAt(insertAt)
-  }
-
-  const handleTabDragOver = (e: DragEvent<HTMLElement>, index: number) => {
-    if (!isFlexTabDrag(e.dataTransfer)) return
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-    const rect = e.currentTarget.getBoundingClientRect()
-    const before = e.clientX < rect.left + rect.width / 2
-    syncDropTarget(before ? index : index + 1)
-  }
-
-  const handleStripDragOver = (e: DragEvent<HTMLDivElement>) => {
-    if (!isFlexTabDrag(e.dataTransfer)) return
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-    // Dropping on empty strip trailing space → append.
-    if (e.target === e.currentTarget) {
-      syncDropTarget(pane.tabs.length)
-    }
-  }
-
-  const commitDrop = (e: DragEvent<HTMLElement>, insertAt: number | null) => {
-    e.preventDefault()
-    const session = getActiveTabDrag()
-    const id =
-      readTabIdFromDataTransfer(e.dataTransfer) ||
-      session?.tabId ||
-      dragTabId
-    const fromPane = session?.fromPane ?? paneIndex
-    const at = insertAt ?? dropInsertAt ?? pane.tabs.length
-    if (id) {
-      if (fromPane === paneIndex) {
-        reorderTabInPane(paneIndex, id, at)
-      } else {
-        moveTabBetweenPanes(fromPane, paneIndex, id, at)
-      }
-      suppressClickRef.current = true
-    }
-    endTabDrag()
-    clearDnD()
-  }
-
-  const handleTabDrop = (e: DragEvent<HTMLElement>) => {
-    commitDrop(e, dropInsertAt)
-  }
-
-  const handleStripDrop = (e: DragEvent<HTMLDivElement>) => {
-    commitDrop(e, dropInsertAt ?? pane.tabs.length)
-  }
-
-  const handleTabDragEnd = () => {
-    endTabDrag()
-    clearDnD()
-  }
-
   // Vertical wheel → horizontal scroll over the tab strip (trackpad/mouse).
   const handleTabsWheel = (e: ReactWheelEvent<HTMLDivElement>) => {
     const el = tabsScrollRef.current
@@ -201,6 +119,10 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     el?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }, [pane.activeTabId, pane.tabs.length])
 
+  const dragTabId = dragUi?.dragging ? dragUi.tabId : null
+  const dropInsertAt =
+    dragUi?.dragging && dragUi.toPane === paneIndex ? dragUi.insertAt : null
+
   return (
     <div
       className={cn(
@@ -216,9 +138,8 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
         <div
           ref={tabsScrollRef}
           role="presentation"
+          data-content-tab-strip={paneIndex}
           onWheel={handleTabsWheel}
-          onDragOver={handleStripDragOver}
-          onDrop={handleStripDrop}
           className={cn(
             "flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto",
             "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
@@ -254,21 +175,14 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                 )}
                 title={tabLabel(t, sessionsById)}
                 tabId={t.id}
-                onSelect={() => {
-                  if (suppressClickRef.current) {
-                    suppressClickRef.current = false
-                    return
-                  }
-                  activateTabInPane(paneIndex, t.id)
-                }}
+                onSelect={() => activateTabInPane(paneIndex, t.id)}
                 onClose={() => closeTabInPane(paneIndex, t.id)}
                 closeLabel={`Close ${tabLabel(t, sessionsById)}`}
                 draggable
                 dropEdge={dropEdge}
-                onDragStart={(e) => handleTabDragStart(e, t.id)}
-                onDragEnd={handleTabDragEnd}
-                onDragOver={(e) => handleTabDragOver(e, index)}
-                onDrop={handleTabDrop}
+                onPointerDown={(e) =>
+                  startContentTabPointerDrag(e, paneIndex, t.id)
+                }
               >
                 {tabLabel(t, sessionsById)}
               </Tab>

@@ -4,7 +4,7 @@ import {
   detectWindowHost,
   isWindowMaximized,
   minimizeWindow,
-  toggleMaximizeWindow,
+  toggleZoomWindow,
   type WindowHost,
 } from "../../lib/windowChrome"
 import { cn } from "../../lib/utils"
@@ -78,9 +78,9 @@ export const TrafficLights = ({ className }: { className?: string }) => (
       }
     />
     <TrafficButton
-      label="Zoom"
+      label="Full Screen"
       tone="zoom"
-      onClick={() => void toggleMaximizeWindow()}
+      onClick={() => void toggleZoomWindow()}
       icon={
         <svg width="6" height="6" viewBox="0 0 6 6" aria-hidden>
           <path
@@ -156,7 +156,7 @@ export const CaptionButtons = ({ className }: { className?: string }) => {
         type="button"
         aria-label={maximized ? "Restore" : "Maximize"}
         title={maximized ? "Restore" : "Maximize"}
-        onClick={() => void toggleMaximizeWindow().then(() => isWindowMaximized().then(setMaximized))}
+        onClick={() => void toggleZoomWindow().then(() => isWindowMaximized().then(setMaximized))}
         className="flex h-full w-10 items-center justify-center text-ink-secondary transition-colors duration-[var(--duration-fast)] hover:bg-fill-3 hover:text-ink"
       >
         {maximized ? (

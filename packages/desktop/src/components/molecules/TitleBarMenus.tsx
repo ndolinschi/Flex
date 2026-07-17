@@ -1,13 +1,7 @@
 import { useEffect, useRef, useState } from "react"
-import { open as openDialog } from "@tauri-apps/plugin-dialog"
-import { openUrl } from "@tauri-apps/plugin-opener"
-import { useSessions } from "../../hooks/useSessions"
-import { closeWindow, detectWindowHost } from "../../lib/windowChrome"
-import { newAgentCreateInput } from "../../lib/sessions"
-import { createSession, toInvokeError } from "../../lib/tauri"
-import { useAppStore } from "../../stores/appStore"
+import type { TitleBarActionHandlers } from "../../hooks/useTitleBarActions"
+import { detectWindowHost } from "../../lib/windowChrome"
 import { cn } from "../../lib/utils"
-import { BugReportDialog } from "./BugReportDialog"
 import { PopoverItem, PopoverTray } from "./PopoverTray"
 
 type MenuId = "file" | "edit" | "view" | "help"
@@ -22,30 +16,24 @@ type MenuItem = {
 }
 
 type TitleBarMenusProps = {
-  onOpenCommandPalette?: () => void
-  onOpenSearch?: () => void
+  handlers: TitleBarActionHandlers
+  isBootstrapped: boolean
+  canSearch: boolean
+  canCommandPalette: boolean
 }
 
 const isMac = () => detectWindowHost() === "macos"
 const mod = () => (isMac() ? "⌘" : "Ctrl+")
 
-/** Cursor-style File / Edit / View / Help menus in the custom title bar. */
+/** Cursor-style File / Edit / View / Help menus in the custom title bar (Windows/Linux). */
 export const TitleBarMenus = ({
-  onOpenCommandPalette,
-  onOpenSearch,
+  handlers,
+  isBootstrapped,
+  canSearch,
+  canCommandPalette,
 }: TitleBarMenusProps) => {
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null)
-  const [bugOpen, setBugOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
-  const { newAgent } = useSessions()
-  const setRoute = useAppStore((s) => s.setRoute)
-  const toggleSidebarCollapsed = useAppStore((s) => s.toggleSidebarCollapsed)
-  const toggleRightPanel = useAppStore((s) => s.toggleRightPanel)
-  const toggleTheme = useAppStore((s) => s.toggleTheme)
-  const pushRecentCwd = useAppStore((s) => s.pushRecentCwd)
-  const pushToast = useAppStore((s) => s.pushToast)
-  const setActiveSessionId = useAppStore((s) => s.setActiveSessionId)
-  const isBootstrapped = useAppStore((s) => s.isBootstrapped)
 
   useEffect(() => {
     if (!openMenu) return
@@ -63,20 +51,6 @@ export const TitleBarMenus = ({
     fn()
   }
 
-  const openFolder = async () => {
-    if (!isBootstrapped) return
-    try {
-      const path = await openDialog({ directory: true, multiple: false })
-      if (!path || Array.isArray(path)) return
-      pushRecentCwd(path)
-      const meta = await createSession(newAgentCreateInput(path))
-      setActiveSessionId(meta.id, { panel: "closed" })
-      setRoute("chat")
-    } catch (err) {
-      pushToast(`Could not open folder: ${toInvokeError(err)}`, "error")
-    }
-  }
-
   const menus: Record<MenuId, { label: string; items: MenuItem[] }> = {
     file: {
       label: "File",
@@ -86,27 +60,27 @@ export const TitleBarMenus = ({
           label: "New Agent",
           hint: `${mod()}N`,
           disabled: !isBootstrapped,
-          run: () => void newAgent(),
+          run: () => handlers.newAgent(),
         },
         {
           id: "open-folder",
           label: "Open Folder…",
           disabled: !isBootstrapped,
-          run: () => void openFolder(),
+          run: () => handlers.openFolder(),
         },
         { id: "sep-1", label: "", separator: true },
         {
           id: "settings",
           label: "Settings…",
           disabled: !isBootstrapped,
-          run: () => setRoute("settings"),
+          run: () => handlers.settings(),
         },
         { id: "sep-2", label: "", separator: true },
         {
           id: "quit",
           label: "Quit",
           hint: isMac() ? "⌘Q" : "Alt+F4",
-          run: () => void closeWindow(),
+          run: () => handlers.quit(),
         },
       ],
     },
@@ -117,15 +91,15 @@ export const TitleBarMenus = ({
           id: "search",
           label: "Search Agents…",
           hint: `${mod()}K`,
-          disabled: !onOpenSearch,
-          run: () => onOpenSearch?.(),
+          disabled: !canSearch,
+          run: () => handlers.search(),
         },
         {
           id: "command-palette",
           label: "Command Palette…",
           hint: `${mod()}⇧P`,
-          disabled: !onOpenCommandPalette,
-          run: () => onOpenCommandPalette?.(),
+          disabled: !canCommandPalette,
+          run: () => handlers.commandPalette(),
         },
       ],
     },
@@ -137,20 +111,20 @@ export const TitleBarMenus = ({
           label: "Toggle Sidebar",
           hint: `${mod()}B`,
           disabled: !isBootstrapped,
-          run: () => toggleSidebarCollapsed(),
+          run: () => handlers.toggleSidebar(),
         },
         {
           id: "toggle-panel",
           label: "Toggle Panel",
           hint: `${mod()}J`,
           disabled: !isBootstrapped,
-          run: () => toggleRightPanel(),
+          run: () => handlers.togglePanel(),
         },
         { id: "sep-v", label: "", separator: true },
         {
           id: "toggle-theme",
           label: "Toggle Theme",
-          run: () => toggleTheme(),
+          run: () => handlers.toggleTheme(),
         },
       ],
     },
@@ -160,30 +134,23 @@ export const TitleBarMenus = ({
         {
           id: "docs",
           label: "Documentation",
-          run: () =>
-            void openUrl("https://github.com/ndolinschi/Flex#readme").catch(
-              () => undefined,
-            ),
+          run: () => handlers.docs(),
         },
         {
           id: "submit-bug",
           label: "Submit Bug…",
-          run: () => setBugOpen(true),
+          run: () => handlers.submitBug(),
         },
         {
           id: "issues",
           label: "Open Issues on GitHub",
-          run: () =>
-            void openUrl("https://github.com/ndolinschi/Flex/issues").catch(
-              () => undefined,
-            ),
+          run: () => handlers.issues(),
         },
       ],
     },
   }
 
   return (
-    <>
     <div ref={rootRef} className="flex h-full items-center gap-px px-0.5">
       {(Object.keys(menus) as MenuId[]).map((id) => {
         const menu = menus[id]
@@ -240,8 +207,6 @@ export const TitleBarMenus = ({
         )
       })}
     </div>
-    <BugReportDialog open={bugOpen} onClose={() => setBugOpen(false)} />
-    </>
   )
 }
 
