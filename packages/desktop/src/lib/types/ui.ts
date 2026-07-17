@@ -1,5 +1,6 @@
 import type { SessionMeta, ContentBlock } from "./wire"
 import type { BrowserDomElement } from "../browserDesign"
+import type { ComponentStyleEditPayload } from "../componentDesign"
 
 export type ComposerMode = "agent" | "plan" | "ask" | "flex"
 
@@ -17,7 +18,17 @@ export type DomComposerAttachment = {
   payload: BrowserDomElement
 }
 
-export type ComposerAttachment = FileComposerAttachment | DomComposerAttachment
+export type ComponentStyleComposerAttachment = {
+  id: string
+  kind: "component-style"
+  name: string
+  payload: ComponentStyleEditPayload
+}
+
+export type ComposerAttachment =
+  | FileComposerAttachment
+  | DomComposerAttachment
+  | ComponentStyleComposerAttachment
 
 export const isFileAttachment = (
   att: ComposerAttachment,
@@ -27,6 +38,10 @@ export const isFileAttachment = (
 export const isDomAttachment = (
   att: ComposerAttachment,
 ): att is DomComposerAttachment => att.kind === "dom"
+
+export const isComponentStyleAttachment = (
+  att: ComposerAttachment,
+): att is ComponentStyleComposerAttachment => att.kind === "component-style"
 
 export type AppRoute =
   | "chat"

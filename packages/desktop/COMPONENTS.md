@@ -113,6 +113,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `AppHeader` | Sidebar toggle, split toggle (⌘J), session menu | — | ContentWorkspace |
 | `MemoryTab` | Memory surface; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | ToolTabBody |
 | `DatabaseTab` | UI plugin (Terminal-style 2-col): 180px sidebar (connections + tables) + SQL/results main pane. **Connections are scoped per project cwd** (`projectKey` on each saved spec in `db_connections.json`; list/upsert/connect/mention/active filter by the active session's cwd). Switching sessions clears selection and restores that project's last active connection. Legacy unscoped entries (`projectKey: ""`) stay in the store but are hidden until re-saved under a project. Empty state has no duplicate chrome (Add CTA only); with connections, slim count + refresh/add. Result grid paginates (50/page; table preview via `limit`/`offset`, query results client-side). | `active`, `session` | ToolTabBody (plugin registry) |
+| `ComponentsTab` | UI plugin (Terminal-style 2-col): 180px component tree (React TSX/JSX PascalCase exports + import edges) + detail pane (neutral preview canvas, read-only props, CSS property editor). **Save** attaches a `component-style` composer chip; send merges a structured style-diff into the prompt (same pattern as Design Mode DOM chips). Live CSS overrides inject into the embedded browser when a Design Mode selection is present. Non-React cwd shows an empty gate. | `active`, `session` | ToolTabBody (plugin registry) |
 | `FilesTab` | Open-file strip (close-on-hover like panel tabs) + Monaco editor; `.md`/`.mdx` default to `MarkdownBody` preview (Code/Eye toggle); empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children`, search with `includeIgnored`). Dir/file queries invalidate on turn settle, FS-mutating tool completion (Write/Edit/Bash/…), and project cwd change (`invalidateWorkspaceQueries`, same pattern as `invalidateGitQueries`). | `active` | ToolTabBody |
 | `PromptTab` | Session prompt pad: write with `@`/`/` + optional ghost-text completion → **Verify** (session model grill) → apply/dismiss findings without ending review; coach questions + re-verify; synced to `draftsBySession` | `sessionId`, `active` | ToolTabBody |
 | `StatusTab` | OpenCode-style session status: model, context approx, tokens, queue, per-model usage | `session`, `active` | ToolTabBody |
@@ -145,6 +146,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `SettingsPage` | Settings shell; sections from `pages/settings/` |
 | `CustomizeSection` / `MemorySection` / `IndexingSection` / `AutomationsSection` / `DiagnosticsSection` | Settings nav sections (`pages/settings/`) |
 | `plugins/prompt-completion/` | UI plugin: `CompletionSetupModal` (Ollama pull guidance or existing provider) + `InlineCompletionSettingsCard` (Customize) |
+| `plugins/components/` | UI plugin: `ComponentsTab` (React inventory + CSS edit → agent) |
 | `WelcomePage` | First-run wizard: provider key → model → optional project |
 
 ### Page subfolders
@@ -168,6 +170,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/lib/sessionSideEffects/` | Global-event side effects (`applyGlobalEvent`, `agentTerminal`, `devServerToast`) |
 | `src/lib/browserPreview.ts` | Tiny `isBrowserPreview` + `NATIVE_APP_REQUIRED` gate (no mock backend) |
 | `src/lib/browserDesign.ts` | Design Mode DOM payload + markdown serializer for composer chips |
+| `src/lib/componentDesign.ts` | Components-tab CSS style-edit payload + markdown serializer for composer chips |
 | `src/lib/nativeWebviewGate.ts` | Hide native browser webview only when an `aria-modal` / `data-suppress-native-webview` surface intersects the webview slot (center modals stay clear of the Browser panel). ToastHost uses the same marker — DOM z-index cannot stack above a Tauri child webview. |
 | `e2e/` + `playwright.config.ts` | Asserts Vite preview shows native-app-required (no IPC mock) |
 | `scripts/soak.mjs` | Soak skeleton — exits unless real Tauri is available |
@@ -233,6 +236,7 @@ spacing changes, update [DESIGN.md](./DESIGN.md).
 | `FLEX_MODE_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_FLEX_MODE=true` | Shows composer Flex mode in the ModePicker (orchestrator across plan / review / workers) |
 | `MEMORY_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_MEMORY_TAB=true` | Shows Memory in the right-panel tab strip / `+` menu / command palette (Settings → Memory stays available either way) |
 | `DATABASE_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `true` | `VITE_DATABASE_TAB=false` | Shows Database UI plugin tab (connections / schemas / tables / query) |
+| `COMPONENTS_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `true` | `VITE_COMPONENTS_TAB=false` | Shows Components UI plugin tab (React inventory / CSS edit → agent) |
 | `INLINE_COMPLETION_ENABLED` (`src/lib/featureFlags.ts`) | `true` | `VITE_INLINE_COMPLETION=false` | Registers the `prompt-completion` UI plugin (ghost-text in composer + Prompt tab; setup under Settings → Tools) |
 
 ## Perf notes (Wave 3)

@@ -1,5 +1,5 @@
 import { memo } from "react"
-import { MousePointer2 } from "lucide-react"
+import { MousePointer2, Palette } from "lucide-react"
 import {
   CompactionCard,
   ErrorBanner,
@@ -13,6 +13,7 @@ import {
 } from "../../molecules"
 import type { TimelineRow } from "../../../lib/types"
 import { parseDomContextMessage } from "../../../lib/browserDesign"
+import { parseComponentStyleMessage } from "../../../lib/componentDesign"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
 import { ThinkingBlock } from "./ThinkingBlock"
@@ -55,13 +56,16 @@ export const TimelineRowView = memo(({
 }) => {
   switch (row.type) {
     case "user": {
-      // Design-Mode messages carry an injected DOM-context block (reads like a
-      // system prompt). Show only the typed instruction + a compact chip for
-      // the selected element(s); the full context still went to the model.
-      const dom = parseDomContextMessage(row.text)
-      const displayText = dom ? dom.instruction : row.text
-      if (!dom && !row.text.trim()) return null
-      const copyText = dom ? dom.instruction || row.text : row.text
+      // Design-Mode / Components-tab messages carry injected context blocks.
+      // Show only the typed instruction + compact chips; full context still
+      // went to the model.
+      const style = parseComponentStyleMessage(row.text)
+      const afterStyle = style ? style.instruction : row.text
+      const dom = parseDomContextMessage(afterStyle)
+      const displayText = dom ? dom.instruction : afterStyle
+      if (!style && !dom && !row.text.trim()) return null
+      const copyText =
+        displayText.trim() || (style || dom ? displayText : row.text)
       return (
         <div className="group/row ml-auto flex w-fit max-w-full min-w-[150px] flex-col items-stretch">
           <div
@@ -72,6 +76,12 @@ export const TimelineRowView = memo(({
               dimmed ? "opacity-50 hover:opacity-100" : "opacity-100",
             )}
           >
+            {style ? (
+              <span className="mb-1.5 mr-1 inline-flex h-5 items-center gap-1 rounded-[4px] border border-stroke-3 bg-fill-3 px-1 text-sm text-ink-secondary">
+                <Palette className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
+                {style.editCount} style edit{style.editCount > 1 ? "s" : ""}
+              </span>
+            ) : null}
             {dom ? (
               <span className="mb-1.5 inline-flex h-5 items-center gap-1 rounded-[4px] border border-stroke-3 bg-fill-3 px-1 text-sm text-ink-secondary">
                 <MousePointer2 className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />

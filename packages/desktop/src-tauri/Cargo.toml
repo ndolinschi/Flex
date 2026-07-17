@@ -46,6 +46,8 @@ portable-pty = "0.9"
 rusqlite = { version = "0.32", features = ["bundled"] }
 tokio-postgres = "0.7"
 mysql_async = "0.34"
+# Components UI plugin — TSX export / import heuristics.
+regex = "1"
 
 # Composition root — never call EngineService::native or providers::resolve_* here.
 agentloop-sdk = { path = "../../sdk/crates/sdk", features = ["search", "index", "learning", "verifier"] }
@@ -79,3 +81,5 @@ tauri = { version = "2", features = ["unstable", "devtools", "test"] }
 # Needed to implement the `agentloop_core::Agent` trait for a test-only stub
 # (the trait itself is `#[async_trait]`, so an impl of it must be too).
 async-trait = "0.1"
+# Components plugin scanner unit tests.
+tempfile = "3"

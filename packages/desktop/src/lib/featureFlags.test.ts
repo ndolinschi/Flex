@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   AUTOMATIONS_UI_ENABLED,
+  COMPONENTS_TAB_ENABLED,
   DATABASE_TAB_ENABLED,
   FLEX_MODE_ENABLED,
   INLINE_COMPLETION_ENABLED,
@@ -61,6 +62,16 @@ describe("DATABASE_TAB_ENABLED", () => {
     expect(DATABASE_TAB_ENABLED).toBe(true)
     expect(isRightPanelTabEnabled("database")).toBe(true)
     expect(visibleRightPanelTabs().map((t) => t.id)).toContain("database")
+  })
+})
+
+describe("COMPONENTS_TAB_ENABLED", () => {
+  it("defaults on and appears via the UI plugin registry", () => {
+    resetUiPluginsForTests()
+    registerBuiltinUiPlugins()
+    expect(COMPONENTS_TAB_ENABLED).toBe(true)
+    expect(isRightPanelTabEnabled("components")).toBe(true)
+    expect(visibleRightPanelTabs().map((t) => t.id)).toContain("components")
   })
 })
 

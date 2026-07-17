@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_MEMORY_TAB?: string
   /** When `"false"` / `"0"`, hide Database UI plugin tab. Default: on. */
   readonly VITE_DATABASE_TAB?: string
+  /** When `"false"` / `"0"`, hide Components UI plugin tab. Default: on. */
+  readonly VITE_COMPONENTS_TAB?: string
   /** When `"false"` / `"0"`, disable inline prompt completion plugin. Default: on. */
   readonly VITE_INLINE_COMPLETION?: string
 }

@@ -1,5 +1,6 @@
 mod browser;
 mod commands;
+mod components_plugin;
 mod compose;
 mod config;
 mod db_plugin;
@@ -306,6 +307,9 @@ pub fn run() {
             db_plugin::db_preview_table,
             db_plugin::db_query,
             db_plugin::db_mention_tables,
+            components_plugin::components_detect,
+            components_plugin::components_list,
+            components_plugin::components_detail,
             commands::is_isolated,
             commands::workspace_status,
             commands::integrate_session,
@@ -358,6 +362,7 @@ pub fn run() {
             browser::browser_clear_data,
             browser::browser_screenshot,
             browser::browser_set_design_mode,
+            browser::browser_apply_style_overrides,
         ])
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { .. } => {

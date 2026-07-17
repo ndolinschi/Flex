@@ -18,11 +18,11 @@
 
 use std::sync::{Arc, Mutex};
 
+use tauri::utils::config::Color;
 use tauri::{
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Rect, State, Url, WebviewBuilder,
     WebviewUrl,
 };
-use tauri::utils::config::Color;
 
 use crate::error::{DesktopError, DesktopResult};
 use crate::state::AppState;
@@ -1033,6 +1033,46 @@ pub async fn browser_set_design_mode(
             teardown_design_mode(webview);
         }
     }
+    Ok(())
+}
+
+/// Apply temporary CSS property overrides to an element matched by `selector`
+/// in the embedded browser. Used by the Components tab CSS panel for live
+/// preview — does not write source files.
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn browser_apply_style_overrides(
+    state: State<'_, AppState>,
+    selector: String,
+    styles: std::collections::HashMap<String, String>,
+) -> DesktopResult<()> {
+    let guard = state.browser_webview.lock().await;
+    let webview = guard
+        .as_ref()
+        .ok_or_else(|| DesktopError::Message("browser is not open".into()))?;
+    let selector_json = serde_json::to_string(&selector)
+        .map_err(|e| DesktopError::Message(format!("selector encode: {e}")))?;
+    let styles_json = serde_json::to_string(&styles)
+        .map_err(|e| DesktopError::Message(format!("styles encode: {e}")))?;
+    let js = format!(
+        r#"(function(){{
+  try {{
+    var sel = {selector_json};
+    var styles = {styles_json};
+    var el = document.querySelector(sel);
+    if (!el) return;
+    Object.keys(styles).forEach(function(k) {{
+      var v = styles[k];
+      if (v === null || v === undefined || v === "") {{
+        el.style.removeProperty(k);
+      }} else {{
+        el.style.setProperty(k, String(v));
+      }}
+    }});
+  }} catch (e) {{}}
+}})()"#
+    );
+    let _ = webview.eval(&js);
     Ok(())
 }
 

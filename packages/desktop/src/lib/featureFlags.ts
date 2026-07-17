@@ -28,6 +28,10 @@ export const MEMORY_TAB_ENABLED = envBool("VITE_MEMORY_TAB", false)
  * Disable with `VITE_DATABASE_TAB=false`. */
 export const DATABASE_TAB_ENABLED = envBool("VITE_DATABASE_TAB", true)
 
+/** Right-panel Components UI plugin (React inventory + CSS edit → agent).
+ * Default on. Disable with `VITE_COMPONENTS_TAB=false`. */
+export const COMPONENTS_TAB_ENABLED = envBool("VITE_COMPONENTS_TAB", true)
+
 /** Inline (ghost-text) prompt completion UI plugin. Default on.
  * Disable with `VITE_INLINE_COMPLETION=false`. */
 export const INLINE_COMPLETION_ENABLED = envBool("VITE_INLINE_COMPLETION", true)
@@ -37,5 +41,6 @@ export const INLINE_COMPLETION_ENABLED = envBool("VITE_INLINE_COMPLETION", true)
 export const isRightPanelTabEnabled = (tab: string): boolean => {
   if (tab === "memory") return MEMORY_TAB_ENABLED
   if (tab === "database") return DATABASE_TAB_ENABLED
+  if (tab === "components") return COMPONENTS_TAB_ENABLED
   return true
 }
