@@ -1,7 +1,14 @@
-import { useEffect, useRef, type ReactNode } from "react"
-import { createPortal } from "react-dom"
+import type { ReactNode } from "react"
 import { Button } from "../atoms"
-import { cn } from "../../lib/utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
 
 type ConfirmDialogProps = {
   open: boolean
@@ -18,7 +25,7 @@ type ConfirmDialogProps = {
   children?: ReactNode
 }
 
-/** In-app modal shell for rename / delete (replaces window.prompt/confirm).
+/** Controlled confirm/form modal over shadcn Dialog.
  * Portaled to `document.body` so virtualized timeline rows (and other
  * remounting parents) cannot unmount an open dialog mid-stream. */
 export const ConfirmDialog = ({
@@ -34,58 +41,35 @@ export const ConfirmDialog = ({
   onCancel,
   children,
 }: ConfirmDialogProps) => {
-  const panelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        onCancel()
-      }
-    }
-
-    document.addEventListener("keydown", handleKey)
-    const el = panelRef.current?.querySelector<HTMLElement>(
-      "input, textarea, button:not([disabled])",
-    )
-    el?.focus()
-
-    return () => document.removeEventListener("keydown", handleKey)
-  }, [open, onCancel])
-
-  if (!open) return null
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex items-start justify-center bg-black/20 pt-[10vh] animate-backdrop-in"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onCancel()
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onCancel()
       }}
     >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
+      <DialogContent
+        showCloseButton={false}
+        data-suppress-native-webview=""
         className={cn(
-          "w-full max-w-[500px] rounded-xl border border-stroke-2 bg-panel p-4 shadow-lg",
-          "animate-modal-in",
+          /* Top-biased placement (was pt-[10vh]); wider than nova default */
+          "top-[10vh] max-w-[500px] translate-y-0 gap-0 sm:max-w-[500px]",
         )}
       >
-        <h2
-          id="confirm-dialog-title"
-          className="text-base font-semibold text-ink"
-        >
-          {title}
-        </h2>
-        {description ? (
-          <p className="mt-1 text-sm text-ink-muted">{description}</p>
-        ) : null}
+        <DialogHeader className="gap-1 text-left">
+          <DialogTitle className="text-base font-semibold text-ink">
+            {title}
+          </DialogTitle>
+          {description ? (
+            <DialogDescription className="text-sm text-ink-muted">
+              {description}
+            </DialogDescription>
+          ) : (
+            <DialogDescription className="sr-only">{title}</DialogDescription>
+          )}
+        </DialogHeader>
         {children ? <div className="mt-3">{children}</div> : null}
-        <div className="mt-4 flex justify-end gap-2">
+        <DialogFooter className="mx-0 mb-0 mt-4 border-0 bg-transparent p-0 sm:justify-end">
           <Button
             size="sm"
             variant="secondary"
@@ -103,9 +87,8 @@ export const ConfirmDialog = ({
           >
             {confirmLabel}
           </Button>
-        </div>
-      </div>
-    </div>,
-    document.body,
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

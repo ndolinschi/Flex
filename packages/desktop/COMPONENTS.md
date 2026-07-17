@@ -285,7 +285,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Context Menu | yes | `ContextMenu` molecule | Keep timeline-scroll / webview-blur ignore behavior |
 | Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
 | Date Picker | skip | — | |
-| Dialog | yes | `ConfirmDialog`, auth/PR/bug/MCP dialogs | Portal + focus already hand-rolled |
+| Dialog | yes | `ConfirmDialog`, auth/PR/bug/MCP dialogs | **ConfirmDialog migrated** (shadcn Dialog; AlertDialog installed for later pure confirms) |
 | Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
 | Drawer | maybe | `SubagentViewer` (bottom overlay) | Spike vs keep custom |
 | Dropdown Menu | yes | `SessionMenu`, `PlusMenu`, overflow menus | |
