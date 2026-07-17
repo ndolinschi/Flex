@@ -11,13 +11,16 @@ import {
 } from "../../lib/tauri"
 import { openExternalUrl } from "../../lib/openExternalUrl"
 import { PickerTrigger } from "../atoms"
-import { PopoverItem, PopoverSearch } from "./PopoverTray"
 import { cn } from "../../lib/utils"
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxTrigger,
+} from "@/components/ui/combobox"
 
 type BranchPickerProps = {
   cwd?: string
@@ -31,7 +34,6 @@ export const BranchPicker = ({
   onError,
 }: BranchPickerProps) => {
   const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState("")
   const [busy, setBusy] = useState(false)
   const queryClient = useQueryClient()
 
@@ -68,22 +70,20 @@ export const BranchPicker = ({
   })
   const branchPr = prStatus?.pr ?? null
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return branches
-    return branches.filter((b) => b.toLowerCase().includes(q))
-  }, [branches, query])
-
   const label = current ?? "No branch"
   const canOpen = !!cwd && !disabled
+  const items = useMemo(() => branches, [branches])
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next)
-    if (!next) setQuery("")
   }
 
-  const handleSelect = async (branch: string) => {
-    if (!cwd || branch === current) {
+  const handleSelect = async (branch: string | null) => {
+    if (!branch || !cwd) {
+      handleOpenChange(false)
+      return
+    }
+    if (branch === current) {
       handleOpenChange(false)
       return
     }
@@ -103,69 +103,58 @@ export const BranchPicker = ({
 
   return (
     <div className="relative flex items-center gap-1">
-      <Popover open={open} onOpenChange={handleOpenChange}>
-        <PopoverTrigger asChild>
-          <PickerTrigger
-            leadingIcon={<GitBranch className="h-3 w-3 shrink-0" aria-hidden />}
-            label={label}
-            open={open}
-            disabled={!canOpen || busy}
-            ariaLabel={`Branch: ${label}`}
-            className="max-w-[12rem]"
-          />
-        </PopoverTrigger>
-
-        <PopoverContent
+      <Combobox
+        items={items}
+        value={current ?? null}
+        onValueChange={(value) => void handleSelect(value)}
+        open={open}
+        onOpenChange={handleOpenChange}
+        disabled={!canOpen || busy}
+      >
+        <ComboboxTrigger
+          disabled={!canOpen || busy}
+          className="border-0 bg-transparent p-0 shadow-none hover:bg-transparent data-pressed:bg-transparent"
+          render={
+            <PickerTrigger
+              leadingIcon={<GitBranch className="h-3 w-3 shrink-0" aria-hidden />}
+              label={label}
+              open={open}
+              disabled={!canOpen || busy}
+              ariaLabel={`Branch: ${label}`}
+              className="max-w-[12rem]"
+            />
+          }
+        />
+        <ComboboxContent
           side="top"
           align="start"
           sideOffset={6}
-          role="listbox"
-          aria-label="Branches"
-          className={cn(
-            "w-72 gap-0 rounded-md border-0 bg-panel p-0 shadow-[var(--shadow-popover)]",
-            "ring-0",
-          )}
-          onOpenAutoFocus={(e) => e.preventDefault()}
+          className="w-72 min-w-72"
         >
-          <PopoverSearch
-            value={query}
-            onChange={setQuery}
+          <ComboboxInput
             placeholder="Search branches…"
+            showTrigger={false}
+            disabled={busy}
+            className="w-full"
           />
-          <ul className="max-h-56 overflow-y-auto py-0.5">
-            {isFetching && filtered.length === 0 ? (
-              <li className="px-2.5 py-3 text-center text-xs text-ink-faint">
-                Loading branches…
-              </li>
-            ) : filtered.length === 0 ? (
-              <li className="px-2.5 py-3 text-center text-xs text-ink-faint">
-                No branches found
-              </li>
-            ) : (
-              filtered.map((branch) => {
-                const active = branch === current
-                return (
-                  <li key={branch}>
-                    <PopoverItem
-                      active={active}
-                      disabled={busy}
-                      onClick={() => void handleSelect(branch)}
-                    >
-                      <span className="min-w-0 flex-1 truncate">{branch}</span>
-                      {active ? (
-                        <span className="flex shrink-0 items-center gap-1 text-xs text-ink-faint">
-                          Current
-                          <Check className="h-3 w-3 text-accent" aria-hidden />
-                        </span>
-                      ) : null}
-                    </PopoverItem>
-                  </li>
-                )
-              })
+          <ComboboxEmpty>
+            {isFetching ? "Loading branches…" : "No branches found"}
+          </ComboboxEmpty>
+          <ComboboxList>
+            {(branch) => (
+              <ComboboxItem key={String(branch)} value={branch} disabled={busy}>
+                <span className="min-w-0 flex-1 truncate">{String(branch)}</span>
+                {branch === current ? (
+                  <span className="flex shrink-0 items-center gap-1 text-xs text-ink-faint">
+                    Current
+                    <Check className="h-3 w-3 text-accent" aria-hidden />
+                  </span>
+                ) : null}
+              </ComboboxItem>
             )}
-          </ul>
-        </PopoverContent>
-      </Popover>
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
 
       {branchPr ? (
         <button

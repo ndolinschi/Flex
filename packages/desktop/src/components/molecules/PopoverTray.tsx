@@ -6,6 +6,11 @@ import {
 } from "react"
 import { Search } from "@/components/icons"
 import { cn } from "../../lib/utils"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group"
 
 type PopoverTrayProps = {
   open: boolean
@@ -157,16 +162,18 @@ export const PopoverSearch = ({
   placeholder,
   "aria-label": ariaLabel,
 }: PopoverSearchProps) => (
-  <div className="flex items-center gap-1.5 border-b border-stroke-3 px-2.5 py-1.5">
-    <Search className="h-3 w-3 shrink-0 text-ink-faint" aria-hidden />
-    <input
+  <InputGroup className="h-auto rounded-none border-0 border-b border-stroke-3 bg-transparent shadow-none has-[[data-slot=input-group-control]:focus-visible]:border-stroke-3">
+    <InputGroupAddon align="inline-start" className="pl-2.5 text-ink-faint">
+      <Search className="size-3" aria-hidden />
+    </InputGroupAddon>
+    <InputGroupInput
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       aria-label={ariaLabel ?? placeholder}
-      className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
+      className="h-8 px-0 text-sm text-ink placeholder:text-ink-faint"
     />
-  </div>
+  </InputGroup>
 )
 
 type PopoverSectionProps = {

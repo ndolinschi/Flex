@@ -25,6 +25,11 @@ import { basename, cn, fileIconForPath } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
 import { IconButton, Spinner, TextInput } from "../../atoms"
 import { ConfirmDialog, ContextMenu, type ContextMenuItem } from "../../molecules"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group"
 
 type FileExplorerProps = {
   sessionId: string
@@ -386,15 +391,19 @@ export const FileExplorer = ({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5">
-        <Search className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search files…"
-          className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
-          aria-label="Search workspace files"
-        />
+        <InputGroup className="h-7 min-w-0 flex-1 rounded-md border-0 bg-transparent shadow-none has-[[data-slot=input-group-control]:focus-visible]:border-0">
+          <InputGroupAddon align="inline-start" className="pl-0 text-ink-faint">
+            <Search className="size-3.5" aria-hidden />
+          </InputGroupAddon>
+          <InputGroupInput
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search files…"
+            aria-label="Search workspace files"
+            className="h-7 px-0 text-sm text-ink placeholder:text-ink-faint"
+          />
+        </InputGroup>
         {searchFetching ? <Spinner size="sm" /> : null}
         <IconButton label="New file" onClick={() => openCreate()} className="h-6 w-6">
           <FilePlus className="h-3.5 w-3.5" aria-hidden />

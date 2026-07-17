@@ -11,10 +11,15 @@ import {
   Search,
   X,
 } from "@/components/icons"
-import { TextInput } from "../atoms"
 import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import type { SettingsSearchEntry, SettingsSectionId } from "../../lib/settingsSearchIndex"
 import { cn } from "../../lib/utils"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group"
 
 export type SettingsNavItem = {
   id: SettingsSectionId
@@ -106,29 +111,34 @@ export const SettingsNav = ({
       className="sticky top-0 flex max-h-full shrink-0 flex-col gap-3 self-start pt-6"
       style={{ width: "clamp(100px, 25%, 200px)" }}
     >
-      <div className="relative px-1">
-        <Search
-          className="pointer-events-none absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-ink-faint"
-          aria-hidden
-        />
-        <TextInput
-          value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Search Settings"
-          aria-label="Search Settings"
-          className="h-7 pl-7 pr-7 text-xs"
-        />
-        {searching ? (
-          <button
-            type="button"
-            aria-label="Clear search"
-            onClick={() => onQueryChange("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink"
-          >
-            <X className="h-3 w-3" aria-hidden />
-          </button>
-        ) : null}
+      <div className="px-1">
+        <InputGroup className="h-7">
+          <InputGroupAddon align="inline-start" className="pl-2 text-ink-faint">
+            <Search className="size-3" aria-hidden />
+          </InputGroupAddon>
+          <InputGroupInput
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Search Settings"
+            aria-label="Search Settings"
+            className="h-7 px-0 text-xs"
+          />
+          {searching ? (
+            <InputGroupAddon align="inline-end" className="pr-1">
+              <InputGroupButton
+                type="button"
+                size="icon-xs"
+                variant="ghost"
+                aria-label="Clear search"
+                onClick={() => onQueryChange("")}
+                className="size-5 text-ink-faint hover:text-ink"
+              >
+                <X className="size-3" aria-hidden />
+              </InputGroupButton>
+            </InputGroupAddon>
+          ) : null}
+        </InputGroup>
       </div>
 
       {searching ? (

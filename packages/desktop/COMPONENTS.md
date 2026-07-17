@@ -287,7 +287,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Chart | skip | — | No dashboards |
 | Checkbox | yes | `Checkbox` atom | Restyle round + indeterminate |
 | Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader`, WorkGroup | **Sidebar section headers wired** |
-| Combobox | yes | Model/Branch/Project pickers | Prefer over PopoverTray search trays; Popover interim done |
+| Combobox | yes | Model/Branch/Project pickers | **BranchPicker migrated** (`@base-ui/react`); Model/Project still Popover |
 | Command | yes | `CommandPalette`, `SearchModal`, `OpenTabModal` | **CommandPalette + SearchModal** (CommandDialog); **OpenTabModal** (anchored Command portal) |
 | Context Menu | yes | `ContextMenu` molecule | **Migrated** — keep timeline-scroll / webview-blur dismiss |
 | Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
@@ -300,7 +300,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Field | yes | `FormField` + settings forms | **FormField migrated** (`Field`/`FieldLabel`/`FieldError`) |
 | Hover Card | later | — | Optional enrichment on chips |
 | Input | yes | `TextInput` | Alias export during cutover |
-| Input Group | yes | composer / search fields with addons | |
+| Input Group | yes | composer / search fields with addons | **PopoverSearch, SettingsNav, FileExplorer** wired |
 | Input OTP | skip | — | OAuth shows codes; users don’t type OTP |
 | Item | later | sidebar / palette rows | Only if it simplifies without fighting density |
 | Kbd | yes | `Kbd` atom | **done** |
@@ -312,7 +312,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Native Select | later | simple settings enums | Prefer Select/Combobox; ModelSelect stays searchable Popover |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
 | Pagination | later | DatabaseTab paging | Icons-only Previous/Next |
-| Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker, IsolationPicker, ModelSelect, ModelMultiSelect, PlanModelPill, BranchPicker, ProjectPicker**; Combobox next for ModelPicker |
+| Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker, IsolationPicker, ModelSelect, ModelMultiSelect, PlanModelPill, ProjectPicker**; BranchPicker → Combobox |
 | Progress | later | indexing / update UX | Soft need |
 | Radio Group | yes | `QuestionPrompt` choices | **QuestionPrompt** single-select migrated (multi stays pressed toggles) |
 | Resizable | yes | content split sash | **ContentWorkspace migrated** |
@@ -332,7 +332,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Toast | n/a | — | Use **Sonner**, not legacy Toast component |
 | Toggle | careful | pressed toolbar buttons | Name clash: Flex `Toggle` = Switch (done); use Toggle Group for Code/Eye |
 | Toggle Group | yes | Files Code/Eye, filter chips | **Files markdown Eye/Code migrated**; **Not** ModePicker |
-| Tooltip | yes | `Tooltip` atom | Deferred — timeline scroll dismiss |
+| Tooltip | yes | `Tooltip` atom | **Migrated** — App `TooltipProvider` + scroll dismiss (timeline/programmatic ignored) |
 | Typography | selective | prose in settings / empty states | Do not replace `MarkdownBody` |
 
 Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
@@ -343,9 +343,9 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | Phase | Scope | Exit criteria |
 |---|---|---|
 | **0 — Foundation** | `shadcn init` in `packages/desktop` (Vite, Tailwind v4, **radix** base, `lucide`, css variables); path alias `@/`; upgrade `cn` to `clsx` + `tailwind-merge`; map shadcn semantic tokens → Flex tokens in `src/index.css` / `tokens.css` without breaking `data-theme` | `components.json` present; `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
-| **1 — Atom adapters** | Add Button, Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Spinner, Avatar, Tooltip, ScrollArea; re-export from `components/atoms` with temporary compat props | Atom unit tests + vitest green; call sites compile via barrel. **Done:** Button, TextInput, TextArea, Label, Badge, Kbd, Divider←Separator, Skeleton, Spinner, Checkbox (round), Toggle←Switch (green ON), Avatar, ScrollArea. **Deferred:** Tooltip (timeline scroll / programmatic-scroll coupling — keep custom until Provider + scroll policy ported). |
+| **1 — Atom adapters** | Add Button, Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Spinner, Avatar, Tooltip, ScrollArea; re-export from `components/atoms` with temporary compat props | Atom unit tests + vitest green; call sites compile via barrel. **Done:** Button, TextInput, TextArea, Label, Badge, Kbd, Divider←Separator, Skeleton, Spinner, Checkbox (round), Toggle←Switch (green ON), Avatar, ScrollArea, Tooltip (Provider + scroll dismiss). |
 | **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog + auth/bug/MCP dialogs, ToastHost/Sonner, Mode/Isolation/Model/Branch/Project pickers (Popover), PlusMenu+SessionMenu+BrowserOverflow (DropdownMenu), TitleBarMenus (Menubar), ContextMenu (scroll/webview dismiss preserved). |
-| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select; searchable Popovers (incl. ModelMultiSelect); Toggle Group (Files); CommandPalette/SearchModal/OpenTabModal; RadioGroup (QuestionPrompt). **Next:** Combobox (optional), Input Group |
+| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select; searchable Popovers; Toggle Group; Command*; RadioGroup; Input Group (PopoverSearch/Settings/Files); Combobox (BranchPicker). **Next:** ModelSelect/ProjectPicker → Combobox |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner→Alert; Collapsible sidebar headers; ContentWorkspace Resizable; PlanToolbar Breadcrumb. **Next:** optional Sidebar spike |
 | **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | **Done:** AttachmentChip; user Bubble; user/assistant Message; Compaction/Indexing Markers. **Next:** MessageScroller spike only (keep `@tanstack/react-virtual`) |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |

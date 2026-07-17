@@ -16,6 +16,7 @@ function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
         "transition-colors outline-none",
         "has-[[data-slot=input-group-control]:focus-visible]:border-stroke-2",
         "has-disabled:opacity-50",
+        "in-data-[slot=combobox-content]:focus-within:border-inherit in-data-[slot=combobox-content]:focus-within:ring-0",
         className,
       )}
       {...props}
@@ -53,6 +54,12 @@ function InputGroupAddon({
       data-slot="input-group-addon"
       data-align={align}
       className={cn(inputGroupAddonVariants({ align }), className)}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("button")) return
+        e.currentTarget.parentElement
+          ?.querySelector<HTMLElement>("[data-slot=input-group-control]")
+          ?.focus()
+      }}
       {...props}
     />
   )
