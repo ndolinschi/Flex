@@ -1,3 +1,4 @@
+import { Badge } from "./Badge"
 import { cn } from "../../lib/utils"
 
 type NewBadgeProps = {
@@ -8,14 +9,14 @@ type NewBadgeProps = {
  * sparingly used, cyan-on-tinted-badge. */
 export const NewBadge = ({ className }: NewBadgeProps) => {
   return (
-    <span
+    <Badge
+      variant="muted"
       className={cn(
-        "inline-flex h-3.5 shrink-0 items-center justify-center rounded-[3px] px-1 text-[10px] leading-3 tracking-[0.12px]",
-        "bg-accent-subtle text-cyan",
+        "h-3.5 rounded-[3px] border-0 bg-accent-subtle px-1 text-[10px] leading-3 tracking-[0.12px] text-cyan",
         className,
       )}
     >
       NEW
-    </span>
+    </Badge>
   )
 }

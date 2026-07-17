@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { GitMerge, GitPullRequest } from "@/components/icons"
 import {
@@ -14,8 +14,12 @@ import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
 import { CreatePrDialog } from "../../molecules/CreatePrDialog"
-import { PopoverTray } from "../../molecules/PopoverTray"
 import { Button, DiffStat, TextInput } from "../../atoms"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 
 /** Right-aligned "N changes" pill + Commit button, shown above the
  * composer for non-isolated sessions with a dirty working tree (design:
@@ -37,7 +41,6 @@ export const CommitBar = ({
   const [prDialogOpen, setPrDialogOpen] = useState(false)
   const [message, setMessage] = useState("Update from agent session")
   const [busy, setBusy] = useState<"commit" | "push" | "pr" | null>(null)
-  const rootRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const pushToast = useAppStore((s) => s.pushToast)
   const openToolBesideChat = useAppStore((s) => s.openToolBesideChat)
@@ -134,7 +137,7 @@ export const CommitBar = ({
   if (totalCount === 0) return null
 
   return (
-    <div ref={rootRef} className="relative flex shrink-0 items-center gap-1.5">
+    <div className="relative flex shrink-0 items-center gap-1.5">
       <button
         type="button"
         onClick={() => {
@@ -152,41 +155,72 @@ export const CommitBar = ({
         <DiffStat summary={totals} />
       </button>
 
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className={cn(
-          "flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md",
-          "bg-accent px-2 text-xs text-accent-text",
-          "transition-colors duration-[var(--duration-fast)] hover:bg-accent-hover",
-        )}
-      >
-        <GitMerge className="h-3 w-3 shrink-0" aria-hidden />
-        {primaryLabel}
-      </button>
-
-      <PopoverTray
-        open={open}
-        onClose={() => setOpen(false)}
-        anchorRef={rootRef}
-        placement="above"
-        role="dialog"
-        aria-label="Commit changes"
-        className="right-0 w-72 p-2.5"
-      >
-        <TextInput
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Commit message"
-          aria-label="Commit message"
-          autoFocus
-        />
-        <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
-          {hasRemote ? (
-            <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-expanded={open}
+            className={cn(
+              "flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md",
+              "bg-accent px-2 text-xs text-accent-text",
+              "transition-colors duration-[var(--duration-fast)] hover:bg-accent-hover",
+            )}
+          >
+            <GitMerge className="h-3 w-3 shrink-0" aria-hidden />
+            {primaryLabel}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          side="top"
+          align="end"
+          sideOffset={6}
+          className="w-72 gap-2 p-2.5"
+          data-suppress-native-webview=""
+        >
+          <TextInput
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Commit message"
+            aria-label="Commit message"
+            autoFocus
+          />
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            {hasRemote ? (
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  isLoading={busy === "commit"}
+                  disabled={busy !== null || !trimmed}
+                  onClick={() => void handleCommit(false)}
+                >
+                  Commit
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  isLoading={busy === "push"}
+                  disabled={busy !== null || !trimmed}
+                  onClick={() => void handleCommit(true)}
+                >
+                  Commit & Push
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={busy !== null || !trimmed}
+                  onClick={() => {
+                    setOpen(false)
+                    setPrDialogOpen(true)
+                  }}
+                >
+                  <GitPullRequest className="h-3 w-3" aria-hidden />
+                  Create PR
+                </Button>
+              </>
+            ) : (
               <Button
-                variant="secondary"
+                variant="primary"
                 size="sm"
                 isLoading={busy === "commit"}
                 disabled={busy !== null || !trimmed}
@@ -194,41 +228,10 @@ export const CommitBar = ({
               >
                 Commit
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                isLoading={busy === "push"}
-                disabled={busy !== null || !trimmed}
-                onClick={() => void handleCommit(true)}
-              >
-                Commit & Push
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={busy !== null || !trimmed}
-                onClick={() => {
-                  setOpen(false)
-                  setPrDialogOpen(true)
-                }}
-              >
-                <GitPullRequest className="h-3 w-3" aria-hidden />
-                Create PR
-              </Button>
-            </>
-          ) : (
-            <Button
-              variant="primary"
-              size="sm"
-              isLoading={busy === "commit"}
-              disabled={busy !== null || !trimmed}
-              onClick={() => void handleCommit(false)}
-            >
-              Commit
-            </Button>
-          )}
-        </div>
-      </PopoverTray>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
 
       <CreatePrDialog
         open={prDialogOpen}

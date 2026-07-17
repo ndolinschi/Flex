@@ -1,9 +1,8 @@
-import { useRef, useState } from "react"
+import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ChevronDown, GitBranch, GitMerge, GitPullRequest } from "@/components/icons"
 import { Button, TextArea } from "../../atoms"
 import { CreatePrDialog } from "../../molecules/CreatePrDialog"
-import { PopoverItem, PopoverTray } from "../../molecules/PopoverTray"
 import {
   gitCommitAndPush,
   gitCommitPaths,
@@ -16,6 +15,13 @@ import { toastPrOutcome } from "../../../lib/prOutcomeToast"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 type CommitMode = "commit" | "commit-push" | "branch-commit" | "commit-pr"
 
@@ -58,7 +64,6 @@ export const CommitCenter = ({
   const [prDialogOpen, setPrDialogOpen] = useState(false)
   // null = use the remote-aware default until the user picks a mode.
   const [lastMode, setLastMode] = useState<CommitMode | null>(null)
-  const rootRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const pushToast = useAppStore((s) => s.pushToast)
 
@@ -182,7 +187,7 @@ export const CommitCenter = ({
           disabled={busy}
           className="min-h-[2.5rem] resize-none rounded-[var(--radius-md)] text-sm"
         />
-        <div ref={rootRef} className="relative flex items-center justify-between gap-2">
+        <div className="relative flex items-center justify-between gap-2">
           <span
             className={cn(
               "min-w-0 truncate text-xs",
@@ -203,75 +208,67 @@ export const CommitCenter = ({
               <GitMerge className="h-3 w-3" aria-hidden />
               {MODE_LABEL[effectivePrimary]}
             </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              aria-label="Commit options"
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              className="w-7 rounded-none px-0"
-              disabled={disabled}
-              onClick={() => setMenuOpen((v) => !v)}
-            >
-              <ChevronDown
-                className={cn("h-3 w-3", menuOpen && "rotate-180")}
-                aria-hidden
-              />
-            </Button>
-          </div>
-
-          <PopoverTray
-            open={menuOpen}
-            onClose={() => setMenuOpen(false)}
-            anchorRef={rootRef}
-            placement="above"
-            role="menu"
-            aria-label="Commit options"
-            className="right-0 w-56"
-          >
-            <ul className="py-1">
-              <li>
-                <PopoverItem role="menuitem" onClick={() => void run("commit")}>
-                  <GitMerge className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-                  Commit
-                </PopoverItem>
-              </li>
-              {hasRemote ? (
-                <li>
-                  <PopoverItem
-                    role="menuitem"
-                    onClick={() => void run("commit-push")}
-                  >
-                    <GitMerge className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-                    Commit &amp; Push
-                  </PopoverItem>
-                </li>
-              ) : null}
-              <li>
-                <PopoverItem
-                  role="menuitem"
-                  onClick={() => void run("branch-commit")}
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  aria-label="Commit options"
+                  className="w-7 rounded-none px-0"
+                  disabled={disabled}
                 >
-                  <GitBranch className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-                  Create Branch &amp; Commit
-                </PopoverItem>
-              </li>
-              {hasRemote ? (
-                <li>
-                  <PopoverItem
-                    role="menuitem"
-                    onClick={() => void run("commit-pr")}
+                  <ChevronDown
+                    className={cn("h-3 w-3", menuOpen && "rotate-180")}
+                    aria-hidden
+                  />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side="top"
+                align="end"
+                sideOffset={6}
+                className="w-56 min-w-56 rounded-md border-0 bg-panel p-0 shadow-[var(--shadow-popover)] ring-0"
+              >
+                <DropdownMenuGroup className="py-1">
+                  <DropdownMenuItem
+                    className="gap-2 px-2.5 py-1.5"
+                    onSelect={() => void run("commit")}
                   >
-                    <GitPullRequest
-                      className="h-3.5 w-3.5 text-icon-3"
-                      aria-hidden
-                    />
-                    Commit &amp; Create PR
-                  </PopoverItem>
-                </li>
-              ) : null}
-            </ul>
-          </PopoverTray>
+                    <GitMerge className="size-3.5 text-icon-3" aria-hidden />
+                    Commit
+                  </DropdownMenuItem>
+                  {hasRemote ? (
+                    <DropdownMenuItem
+                      className="gap-2 px-2.5 py-1.5"
+                      onSelect={() => void run("commit-push")}
+                    >
+                      <GitMerge className="size-3.5 text-icon-3" aria-hidden />
+                      Commit &amp; Push
+                    </DropdownMenuItem>
+                  ) : null}
+                  <DropdownMenuItem
+                    className="gap-2 px-2.5 py-1.5"
+                    onSelect={() => void run("branch-commit")}
+                  >
+                    <GitBranch className="size-3.5 text-icon-3" aria-hidden />
+                    Create Branch &amp; Commit
+                  </DropdownMenuItem>
+                  {hasRemote ? (
+                    <DropdownMenuItem
+                      className="gap-2 px-2.5 py-1.5"
+                      onSelect={() => void run("commit-pr")}
+                    >
+                      <GitPullRequest
+                        className="size-3.5 text-icon-3"
+                        aria-hidden
+                      />
+                      Commit &amp; Create PR
+                    </DropdownMenuItem>
+                  ) : null}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 

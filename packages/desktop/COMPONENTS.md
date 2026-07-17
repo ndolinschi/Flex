@@ -47,7 +47,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `SessionRowSubtitle` | Diff + relative-time under a session title | `updatedAtMs`, `workspaceStatus?`, `gitStatus?` | SessionListItem |
 | `SessionRowActions` | Hover pin / archive / more trailing actions | `pinned`, `archived`, `onTogglePin`, … | SessionListItem |
 | `SidebarFooter` | Theme + settings chrome (+ optional creating spinner) | `theme`, `onToggleTheme`, `onOpenSettings`, `isCreating?` | SessionSidebar |
-| `SidebarResumeError` | Resume-failure Retry / Dismiss banner | `message`, `onRetry`, `onDismiss` | SessionSidebar |
+| `SidebarResumeError` | Resume-failure Retry / Dismiss banner (shadcn Alert) | `message`, `onRetry`, `onDismiss` | SessionSidebar |
 | `ArchivedSectionHeader` | Collapsible Archived group header | `count`, `collapsed`, `onToggle` | SessionSidebar |
 | `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays + optional ghost-text inline completion (isolates keystrokes from ModelPicker/ContextBar) | `composerMode`, `anchorRef`, `attachments`, `onSend` | Composer |
 | `ModelSelect` | Searchable model picker (shadcn Combobox) | `models`, `value`, `onChange` | ProviderSettingsForm |
@@ -57,7 +57,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `PlanCard` | Checklist from `plan_updated` (Plan tool tab; not inlined in timeline) | `entries` | PlanTab |
 | `PlanList` | Multi-plan “Review plans” list for a session | `plans`, `onSelect` | PlanTab |
 | `PlanCommentButton` | Floating Comment control on plan text selection | `selection`, `onComment` | PlanTab |
-| `PlanCommentPopover` | Selection → comment form (Save / Save & send) | `draft`, `onSave`, `onSaveAndSend` | PlanTab |
+| `PlanCommentPopover` | Selection → comment form (Save / Save & send); shadcn Popover + anchor | `draft`, `onSave`, `onSaveAndSend` | PlanTab |
 | `PlanCommentList` | Annotations on the open plan | `comments`, `onFocus`, `onRemove` | PlanTab |
 | `OpenTabModal` | Searchable open-tab picker anchored near ContentPane `+` | `open`, `onClose`, `anchor`, `paneIndex`, `sessionId`, `tabs`, `onOpenChat`, `onOpenTool` | ContentPane |
 | `PermissionActions` | Composer-footer Allow once / Always allow / Deny (replaces Send) | `permission` | Composer |
@@ -66,11 +66,11 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `BranchPicker` | List/checkout branches (shadcn Combobox); PR # + checks when present | `cwd`, `onError?` | ContextBar |
 | `BranchPrStatusChip` | Current-branch PR # + title + CI summary; opens PR in browser | `pr` | ChangesTab header |
 | `CreatePrDialog` | Editable title/body modal before `gh pr create` | `open`, `initialTitle?`, `initialBody?`, `onConfirm` | ChangesTab, CommitCenter, CommitBar |
-| `PopoverTray` | Shared Esc/click-outside/↑↓ tray; `onClose` via ref so stream re-renders don't rebind listeners | `open`, `onClose`, `placement`, `children` | Model/Mode/Plus/Project/Branch pickers |
+| `PopoverTray` | Shared Esc/click-outside/↑↓ tray for composer slash/@ (`autoFocus={false}`); other menus use Popover/Dropdown | `open`, `onClose`, `placement`, `children` | Slash/At trays; `PopoverItem` helpers |
 | `ContextMenu` | Portal menu; ignores timeline scroll + webview-induced `window.blur` so it stays open mid-stream | `position`, `items`, `onClose` | ContentPane `+`, SessionListItem, FileExplorer, PlanToolbar |
 | `ConfirmDialog` | In-app modal: AlertDialog for pure confirms, Dialog when hosting fields | `open`, `title`, `onConfirm`, `onCancel`, `confirmDisabled?` | SessionMenu, CreatePrDialog |
 | `AttachmentChip` | Pending attachment pill (file/image/directory/dom) | `attachment`, `onRemove` | Composer |
-| `SendButton` | Circular send / stop / queue | `isStreaming`, `canQueue?`, `onSend`, `onStop` | Composer |
+| `SendButton` | Circular send / stop / queue (shadcn Button shell) | `isStreaming`, `canQueue?`, `onSend`, `onStop` | Composer |
 | `MarkdownBody` | GFM + lazy highlight.js language pack; `live` plain pre-wrap fast-path; `diff` fences → `ChatDiffCard` | `content`, `live?` | TurnTimeline (`TimelineRowView`) |
 | `ChatDiffCard` | Cursor-style file diff card (ext chip + basename + DiffStat + gutter bars); used by markdown fences and Edit/Write expand | `diff?`, `path?`, `added?`, `removed?`, `onOpenFile?`, `maxHeight?` | MarkdownBody, DetailRow |
 | `MentionText` | Plain text with `@mention` accent pills (composer-matching cue) | `text`, `knownNames?` | TurnTimeline user bubble |
@@ -86,7 +86,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `StreamingCaret` | Streaming caret | — | TurnTimeline |
 | `SubagentGroup` | Nested subagent work block — status glyph, live activity, tool-count · duration; click opens `SubagentViewer` | `task`, `role?`, `phase`, `nestedRows?`, `compact?`, `onOpenViewer?` | TurnTimeline, WorkersGroup, WorkflowGroup |
 | `WorkersGroup` | Parallel Agent fan-out card ("Working with N agents") expanding to enriched worker rows | `workers`, `onOpenViewer`, `anchorId?` | TurnTimeline (via ToolStepList) |
-| `WorkingAgentsPill` | Composer-adjacent "N Working" glance — menu of running worker titles + jump to group | `rows`, `onScrollToWorkers?` | ChatSessionBody → Composer `workersSlot` |
+| `WorkingAgentsPill` | Composer-adjacent "N Working" glance — DropdownMenu of running worker titles + jump to group | `rows`, `onScrollToWorkers?` | ChatSessionBody → Composer `workersSlot` |
 | `WorkGroup` | "Worked for Xs" / live "Working" XOR "Thinking" XOR "Compacting…"; molecule `Collapsible` (grid-rows — keep); `memo` | `isOpen`, `liveStatus?`, `durationMs?` | TurnTimeline |
 | `WorkflowGroup` | Multi-step workflow block (steps + nested subagents); organism-scale but kept in `molecules/` since it nests inside `TimelineRowView` like `SubagentGroup`/`WorkGroup` | `steps`, `subagents`, `status` | TurnTimeline (via `TimelineRowView`) |
 | `SidebarSkeleton` | Sidebar loading placeholder (headers + rows) | — | SessionSidebar |
@@ -271,18 +271,18 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | shadcn | Migrate? | Current Flex surface | Notes |
 |---|---|---|---|
 | Accordion | later | none as primitive | Optional for settings groups; prefer `Collapsible` first |
-| Alert | yes | `ErrorBanner`, resume banners | **ErrorBanner migrated** |
+| Alert | yes | `ErrorBanner`, resume banners | **ErrorBanner + SidebarResumeError migrated** |
 | Alert Dialog | yes | `ConfirmDialog` (no-children confirms) | **Done** — pure confirms → AlertDialog; forms (rename/PR/etc.) stay Dialog |
 | Aspect Ratio | skip | — | No first-class need |
 | Attachment | yes (chat kit) | `AttachmentChip` | **AttachmentChip migrated** (`size=xs` composer density) |
 | Avatar | yes | `Avatar` atom | Thin wrap + `AvatarFallback` |
-| Badge | yes | `Badge`, `NewBadge`, `VerdictBadge` | Keep tone mapping via variants/`className` |
+| Badge | yes | `Badge`, `NewBadge`, `VerdictBadge` | Badge + NewBadge wrap; VerdictBadge stays expandable status (not a chip) |
 | Breadcrumb | yes | `PlanToolbar` crumbs | **PlanToolbar migrated** |
 | Bubble | yes (chat kit) | user/assistant bubbles in timeline | **User rows migrated** (Flex `bg-user-bubble`); assistant stays ghost/markdown |
-| Button | yes | `Button`, `IconButton`, `SendButton` shell | Drop custom `isLoading` — compose `Spinner` + `disabled` |
-| Button Group | yes | composer toolbar clusters | Optional; `ToggleGroup` covers ModePicker |
+| Button | yes | `Button`, `IconButton`, `SendButton` shell | **SendButton** composes Button; drop custom `isLoading` at call sites over time |
+| Button Group | later | CommitCenter split chrome | Optional; split primary+chevron already works; ToggleGroup covers Mode-like sets |
 | Calendar | skip | — | No date UX today |
-| Card | selective | settings cards, catalog cards | Use full Card composition only where DESIGN allows cards |
+| Card | skip (Settings) | settings cards, catalog cards | DESIGN label-outside / `bg-settings-card` ≠ shadcn Card; keep custom |
 | Carousel | skip | — | |
 | Chart | skip | — | No dashboards |
 | Checkbox | yes | `Checkbox` atom | Restyle round + indeterminate |
@@ -295,7 +295,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Dialog | yes | `ConfirmDialog` (forms), auth/PR/bug/MCP dialogs | **ConfirmDialog forms**, Copilot/ChatGPT sign-in, BugReport, McpInstall migrated |
 | Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
 | Drawer | maybe | `SubagentViewer` (bottom overlay) | Spike vs keep custom (Vaul + virtualized timeline) |
-| Dropdown Menu | yes | `SessionMenu`, `PlusMenu`, overflow menus | **PlusMenu, SessionMenu, BrowserOverflowMenu migrated** |
+| Dropdown Menu | yes | `SessionMenu`, `PlusMenu`, overflow menus, workers, commit options | **PlusMenu, SessionMenu, BrowserOverflow, WorkingAgentsPill, CommitCenter** migrated |
 | Empty | yes | `EmptyState` | **EmptyState migrated** |
 | Field | yes | `FormField` + settings forms | **FormField migrated** (`Field`/`FieldLabel`/`FieldError`) |
 | Hover Card | later | — | Optional enrichment on chips |
@@ -312,8 +312,8 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Native Select | later | simple settings enums | Prefer Select/Combobox; ModelSelect is Combobox |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
 | Pagination | later | DatabaseTab paging | Icons-only Previous/Next |
-| Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker, IsolationPicker**; searchable model/project/branch → Combobox |
-| Progress | later | indexing / update UX | Soft need |
+| Popover | yes | mode/isolation/commit/plan comment + trays | **Mode/Isolation pickers, IsolationBadge, CommitBar, PlanCommentPopover**; slash/@ keep PopoverTray (`autoFocus={false}`) |
+| Progress | later | indexing / update UX | No determinate % UI yet (Spinner + status text) |
 | Radio Group | yes | `QuestionPrompt` choices | **QuestionPrompt** single-select RadioGroup + multi-select Checkbox |
 | Resizable | yes | content split sash | **ContentWorkspace migrated** |
 | Scroll Area | yes | `ScrollArea` atom | Sidebar / overlays; **not** the virtualized timeline |
@@ -327,7 +327,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Spinner | yes | `Spinner` | **done** |
 | Switch | yes | `Toggle` atom | **done** (green ON) |
 | Table | later | Database results | With Pagination first |
-| Tabs | careful | panel/file tabs | Prefer keep custom `Tab*` for chrome chips; shadcn Tabs for settings sections only |
+| Tabs | careful | panel/file tabs | Prefer keep custom `Tab*` for chrome chips; Settings nav is vertical list (not Tabs) |
 | Textarea | yes | `TextArea`, composer draft | **done** |
 | Toast | n/a | — | Use **Sonner**, not legacy Toast component |
 | Toggle | careful | pressed toolbar buttons | Name clash: Flex `Toggle` = Switch (done); use Toggle Group for Code/Eye |
@@ -344,9 +344,9 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 |---|---|---|
 | **0 — Foundation** | `shadcn init` in `packages/desktop` (Vite, Tailwind v4, **radix** base, `lucide`, css variables); path alias `@/`; upgrade `cn` to `clsx` + `tailwind-merge`; map shadcn semantic tokens → Flex tokens in `src/index.css` / `tokens.css` without breaking `data-theme` | `components.json` present; `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
 | **1 — Atom adapters** | Add Button, Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Spinner, Avatar, Tooltip, ScrollArea; re-export from `components/atoms` with temporary compat props | Atom unit tests + vitest green; call sites compile via barrel. **Done:** Button, TextInput, TextArea, Label, Badge, Kbd, Divider←Separator, Skeleton, Spinner, Checkbox (round), Toggle←Switch (green ON), Avatar, ScrollArea, Tooltip (Provider + scroll dismiss). |
-| **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog (AlertDialog when no children; Dialog for forms) + auth/bug/MCP dialogs, ToastHost/Sonner, Mode/Isolation pickers (Popover), model/branch/project (Combobox), PlusMenu+SessionMenu+BrowserOverflow (DropdownMenu), TitleBarMenus (Menubar), ContextMenu (scroll/webview dismiss preserved). |
+| **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog (AlertDialog when no children; Dialog for forms) + auth/bug/MCP dialogs, ToastHost/Sonner, Mode/Isolation/IsolationBadge/CommitBar/PlanComment (Popover), WorkingAgentsPill+CommitCenter (DropdownMenu), PlusMenu+SessionMenu+BrowserOverflow, TitleBarMenus, ContextMenu. Slash/@ keep PopoverTray. |
 | **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select (permission/trigger enums); Toggle Group; Command*; RadioGroup + multi Checkbox; Input Group; Combobox (all model/project/branch pickers incl. ModelPicker). |
-| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner→Alert; Collapsible sidebar headers (WorkGroup keeps molecule Collapsible); ContentWorkspace Resizable; PlanToolbar Breadcrumb. **Next:** optional Sidebar spike |
+| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner+SidebarResumeError→Alert; Collapsible sidebar headers (WorkGroup keeps molecule Collapsible); ContentWorkspace Resizable; PlanToolbar Breadcrumb. **Deferred spikes:** Sidebar / Drawer / MessageScroller. |
 | **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | **Done:** AttachmentChip; user Bubble; user/assistant Message; Compaction/Indexing Markers. **Next:** MessageScroller spike only (keep `@tanstack/react-virtual`) |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
 
