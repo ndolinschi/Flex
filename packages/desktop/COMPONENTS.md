@@ -37,9 +37,9 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `FormField` | Label + control + hint/error | `label`, `htmlFor`, `error?`, `hint?` | ProviderSettingsForm |
 | `CommandPaletteRow` | Palette list row (icon + label + hint) | `index`, `active`, `label`, `hint?`, `icon?`, `onActivate`, `onHover` | CommandPalette |
 | `FuzzySessionRow` | Search-modal session row with highlight + relative time | `index`, `active`, `label`, `query`, `updatedAtMs`, `onActivate`, `onHover` | SearchModal |
-| `ProviderProfileList` | Connections list (select / activate / delete) | `profiles`, `editingId`, `onSelect`, … | ProviderSettingsForm |
-| `ProviderConnectionForm` | Connection create/edit form + models + isolation; Copilot/ChatGPT branches use OAuth sign-in | form field props + `onValidate` / `onSave` / `onCopilotSignIn?` / `onChatgptSignIn?` | ProviderSettingsForm |
-| `ProviderPicker` | Icon tile grid for choosing a builtin provider | `providers`, `value`, `onChange` | WelcomePage, ProviderConnectionForm |
+| `ProviderProfileList` | Connections list (select / activate / delete); New connection opens the editor screen | `profiles`, `editingId`, `onSelect`, … | ProviderSettingsForm |
+| `ProviderConnectionForm` | Dedicated create/edit screen (Back returns to list) + models + isolation; Copilot/ChatGPT branches use OAuth sign-in | form field props + `onValidate` / `onSave` / `onCancel?` / `onCopilotSignIn?` / `onChatgptSignIn?` | ProviderSettingsForm |
+| `ProviderPicker` | Icon tile grid for choosing a builtin provider (symmetric 8px inset) | `providers`, `value`, `onChange` | WelcomePage, ProviderConnectionForm |
 | `CopilotSignInDialog` | GitHub Copilot device-flow modal (user code + Open GitHub + poll) | `open`, `start` / `wait` / `cancel`, `onSuccess` | ProviderSettingsForm, WelcomePage |
 | `ChatgptSignInDialog` | ChatGPT Plus/Pro headless OAuth modal (user code + Open OpenAI + poll) | `open`, `start` / `wait` / `cancel`, `onSuccess` | ProviderSettingsForm, WelcomePage |
 | `SecretStorageSection` | Security: secret-storage backend select | `secretStorage`, `isMac`, `onChange`, `error?` | ProviderSettingsForm |
@@ -59,7 +59,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `PlanCommentButton` | Floating Comment control on plan text selection | `selection`, `onComment` | PlanTab |
 | `PlanCommentPopover` | Selection → comment form (Save / Save & send) | `draft`, `onSave`, `onSaveAndSend` | PlanTab |
 | `PlanCommentList` | Annotations on the open plan | `comments`, `onFocus`, `onRemove` | PlanTab |
-| `OpenTabModal` | Searchable open-tab picker anchored near ContentPane `+` | `open`, `onClose`, `anchor`, `paneIndex`, `sessionId`, `tabs`, `onOpenChat`, `onOpenTool` | ContentPane |
+| `OpenTabModal` | Searchable open-tab picker anchored near ContentPane `+`; ~5 primary tabs visible, rest scroll | `open`, `onClose`, `anchor`, `paneIndex`, `sessionId`, `tabs`, `onOpenChat`, `onOpenTool` | ContentPane |
 | `PermissionActions` | Composer-footer Allow once / Always allow / Deny (replaces Send) | `permission` | Composer |
 | `PlusMenu` | Attach + mode shortcuts (Plan/Ask) | `onAttachFile`, `onAttachImage`, `onSetMode?` | Composer |
 | `ProjectPicker` | Recent cwds + Open Folder | `sessionId`, `cwd`, `onError?` | ContextBar |
@@ -102,7 +102,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | Component | Purpose | Key props | Used by |
 |---|---|---|---|
 | `SessionSidebar` | New Agent + Search + Agents list; groups via `useSessionSidebarGroups`; footer/resume/archive molecules | (hooks) | App shell |
-| `ProviderSettingsForm` | Provider / key / model; pieces: `ProviderProfileList`, `ProviderConnectionForm`, `SecretStorageSection` | — | SettingsPage, WelcomePage |
+| `ProviderSettingsForm` | Connections list ↔ dedicated connection editor (`list`/`editor` screens); pieces: `ProviderProfileList`, `ProviderConnectionForm`, `SecretStorageSection` | — | SettingsPage, WelcomePage |
 | `Composer` | Prompt + ContextBar; draft in `ComposerInput`; trays/queue under `organisms/composer/`; optional `dockedOverlay` stacks Permission/Question flush above the bubble; optional `workersSlot` for WorkingAgentsPill | `isHero?`, `dockedOverlay?`, `workersSlot?`, `sessionId?` | ChatSessionBody |
 | `ContextBar` | Project · branch · context % | `cwd`, `sessionId` | Composer |
 | `TurnTimeline` | Turns + tools + plans + streaming; `@tanstack/react-virtual` over `displayItems` + live tail; pieces under `organisms/timeline/` (`WorkGroupBody` owns stable `renderOther`; `ToolStepList` clusters tools + parallel workers via `clusterWorkRows`) | `sessionId`, `onLiveRows?` | ChatSessionBody |

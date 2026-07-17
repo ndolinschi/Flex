@@ -41,6 +41,24 @@ type OpenTabModalProps = {
 
 const MENU_WIDTH = 280
 const MARGIN = 8
+/** Row height ≈ CommandPaletteRow py-1.5 + icon line (~32px). Show ~5, rest scroll. */
+const ROW_HEIGHT_PX = 32
+const VISIBLE_ROWS = 5
+const LIST_MAX_HEIGHT_PX = ROW_HEIGHT_PX * VISIBLE_ROWS
+
+/** Prefer everyday workspace tabs first; everything else follows catalog order. */
+const PRIMARY_TOOL_ORDER: readonly RightPanelTab[] = [
+  "plan",
+  "changes",
+  "files",
+  "terminal",
+  "browser",
+] as const
+
+const primaryRank = (id: RightPanelTab): number => {
+  const i = PRIMARY_TOOL_ORDER.indexOf(id)
+  return i === -1 ? PRIMARY_TOOL_ORDER.length + 1 : i
+}
 
 const buildEntries = (
   catalog: OpenTabDef[],
@@ -55,7 +73,12 @@ const buildEntries = (
       kind: "chat",
     })
   }
-  for (const t of catalog) {
+  const sorted = [...catalog].sort((a, b) => {
+    const d = primaryRank(a.id) - primaryRank(b.id)
+    if (d !== 0) return d
+    return a.label.localeCompare(b.label)
+  })
+  for (const t of sorted) {
     out.push({
       id: `tool:${t.id}`,
       label: t.label,
@@ -67,7 +90,8 @@ const buildEntries = (
   return out
 }
 
-/** Searchable open-tab picker for ContentPane `+` (catalog-driven). */
+/** Searchable open-tab picker for ContentPane `+` (catalog-driven).
+ * Idle list shows ~5 primary tabs; the rest stay a short scroll away. */
 export const OpenTabModal = ({
   open,
   onClose,
@@ -135,7 +159,7 @@ export const OpenTabModal = ({
       return
     }
     const el = panelRef.current
-    const h = el?.offsetHeight ?? 320
+    const h = el?.offsetHeight ?? 220
     const w = el?.offsetWidth ?? MENU_WIDTH
     const aw = anchor.width ?? 0
     const ah = anchor.height ?? 0
@@ -205,7 +229,7 @@ export const OpenTabModal = ({
     <div
       ref={panelRef}
       className={cn(
-        "fixed z-[300] flex max-h-[min(50vh,360px)] w-[280px] flex-col overflow-hidden",
+        "fixed z-[300] flex w-[280px] flex-col overflow-hidden",
         "rounded-lg bg-panel shadow-[var(--shadow-popover)] animate-tray-in",
         !coords && "invisible",
       )}
@@ -230,7 +254,8 @@ export const OpenTabModal = ({
       </div>
       <div
         ref={listRef}
-        className="min-h-0 flex-1 overflow-y-auto py-1"
+        className="overflow-y-auto py-1"
+        style={{ maxHeight: LIST_MAX_HEIGHT_PX }}
         role="listbox"
         aria-label="Tabs"
       >

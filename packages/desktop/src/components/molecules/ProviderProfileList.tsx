@@ -37,7 +37,7 @@ export const ProviderProfileList = ({
     >
       {profiles.length === 0 ? (
         <div className="px-3.5 py-3 text-sm text-ink-muted">
-          No connections yet — fill out the form below and save to create one.
+          No connections yet — use New connection to add one.
         </div>
       ) : (
         profiles.map((p) => (
@@ -55,15 +55,23 @@ export const ProviderProfileList = ({
             )}
           >
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-1.5">
                 <ProviderIcon providerId={p.provider} size={16} />
-                <span className="truncate text-sm font-medium text-ink">
+                <span className="min-w-0 truncate text-sm font-medium text-ink">
                   {p.label}
                 </span>
-                <Badge variant="muted">{p.provider}</Badge>
-                {p.isActive ? <Badge variant="success">Active</Badge> : null}
+                <Badge variant="muted" className="shrink-0 px-1">
+                  {p.provider}
+                </Badge>
+                {p.isActive ? (
+                  <Badge variant="success" className="shrink-0 px-1">
+                    Active
+                  </Badge>
+                ) : null}
                 {!p.hasKey && p.provider !== "ollama" ? (
-                  <Badge variant="warning">No key</Badge>
+                  <Badge variant="warning" className="shrink-0 px-1">
+                    No key
+                  </Badge>
                 ) : null}
               </div>
               {p.region || p.baseUrl ? (

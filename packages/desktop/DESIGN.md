@@ -272,6 +272,13 @@ FilesChangedCard) sits **outside** the virtual window. Scroll-down FAB:
 Nav sticky `pt-6`. Cards use `--radius-card` + `bg-settings-card`. Rows
 `px-3.5 py-3 gap-4`. Field grids switch at `@container` 640px.
 
+**Models & Connections:** list screen (connections + secret storage) vs
+dedicated editor screen (New connection / row click). Provider tile grid is
+full-width with symmetric `px-2` insets — not a two-column FieldRow.
+
+**Open tab (`+`):** popover lists Chat + primary tools first; ~5 rows visible,
+remainder scrolls.
+
 ---
 
 ## Overlay z-index

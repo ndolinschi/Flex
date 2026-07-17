@@ -71,6 +71,9 @@ export const ProviderSettingsForm = () => {
 
   // `editingId` is `null` in "create" mode (form cleared, "New connection"),
   // or a profile id in "edit" mode (row clicked, form hydrated from it).
+  // `screen` swaps the connections list for a dedicated editor surface so the
+  // form is not stacked under the list on the same page.
+  const [screen, setScreen] = useState<"list" | "editor">("list")
   const [editingId, setEditingId] = useState<string | null>(null)
   const [label, setLabel] = useState("")
   const [provider, setProvider] = useState("")
@@ -132,9 +135,26 @@ export const ProviderSettingsForm = () => {
     setApiKey("")
     setFormError(null)
     setValidateMessage(null)
+    setScreen("editor")
   }
 
   const clearToCreateMode = () => {
+    setEditingId(null)
+    setLabel("")
+    setProvider("")
+    setBaseUrl("")
+    setRegion("")
+    setApiKey("")
+    setDefaultModel("")
+    setFallbackModels([])
+    setDefaultIsolation("never")
+    setFormError(null)
+    setValidateMessage(null)
+    setScreen("editor")
+  }
+
+  const returnToList = () => {
+    setScreen("list")
     setEditingId(null)
     setLabel("")
     setProvider("")
@@ -266,7 +286,7 @@ export const ProviderSettingsForm = () => {
     setFormError(null)
     try {
       await remove(pendingDeleteId)
-      if (editingId === pendingDeleteId) clearToCreateMode()
+      if (editingId === pendingDeleteId) returnToList()
       setPendingDeleteId(null)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : String(err))
@@ -288,71 +308,76 @@ export const ProviderSettingsForm = () => {
     // below cancels its own `mb-8` so the parent SettingsShell's `gap-3` is
     // the only spacing applied between them, instead of stacking both.
     <div className="flex flex-col gap-3">
-      <ProviderProfileList
-        profiles={profiles}
-        editingId={editingId}
-        isActivating={isActivating}
-        onNewConnection={clearToCreateMode}
-        onSelect={hydrateFromProfile}
-        onActivate={(id) => void handleActivate(id)}
-        onDelete={setPendingDeleteId}
-      />
+      {screen === "list" ? (
+        <>
+          <ProviderProfileList
+            profiles={profiles}
+            editingId={null}
+            isActivating={isActivating}
+            onNewConnection={clearToCreateMode}
+            onSelect={hydrateFromProfile}
+            onActivate={(id) => void handleActivate(id)}
+            onDelete={setPendingDeleteId}
+          />
 
-      <ProviderConnectionForm
-        editingId={editingId}
-        editingLabel={editingProfile?.label}
-        label={label}
-        provider={provider}
-        apiKey={apiKey}
-        baseUrl={baseUrl}
-        region={region}
-        defaultModel={defaultModel}
-        fallbackModels={fallbackModels}
-        defaultIsolation={defaultIsolation}
-        hasStoredKey={hasStoredKey}
-        isBedrock={isBedrock}
-        copilotSignedIn={copilotSignedIn}
-        chatgptSignedIn={chatgptSignedIn}
-        models={models}
-        defaultModelOptions={defaultModelOptions}
-        builtinProviders={builtinProviders}
-        modelsLoading={modelsLoading}
-        formError={formError}
-        validateMessage={validateMessage}
-        isValidating={isValidating}
-        isSaving={isUpserting || isActivating}
-        onLabelChange={setLabel}
-        onProviderChange={(value) => {
-          setProvider(value)
-          // Auto-fill the connection Name from the provider so it isn't a
-          // hidden required field. Users (esp. right after a Copilot sign-in,
-          // which has no name prompt of its own) otherwise hit
-          // "Connection name is required" on save with nothing pointing at the
-          // empty Name field up top. Still fully editable.
-          if (!label.trim() && value) {
-            const preset = builtinProviders.find((p) => p.id === value)?.label
-            if (preset) setLabel(preset)
-          }
-        }}
-        onApiKeyChange={setApiKey}
-        onBaseUrlChange={setBaseUrl}
-        onRegionChange={setRegion}
-        onDefaultModelChange={setDefaultModel}
-        onFallbackModelsChange={setFallbackModels}
-        onDefaultIsolationChange={setDefaultIsolation}
-        onValidate={() => void handleValidate()}
-        onSave={() => void handleSave()}
-        onCopilotSignIn={() => setCopilotSignInOpen(true)}
-        onChatgptSignIn={() => setChatgptSignInOpen(true)}
-      />
-
-      <SecretStorageSection
-        secretStorage={config?.secretStorage}
-        isMac={isMac}
-        disabled={isSettingSecretStorage || !config}
-        error={secretStorageFormError ?? secretStorageError ?? null}
-        onChange={(mode) => void handleSecretStorageChange(mode)}
-      />
+          <SecretStorageSection
+            secretStorage={config?.secretStorage}
+            isMac={isMac}
+            disabled={isSettingSecretStorage || !config}
+            error={secretStorageFormError ?? secretStorageError ?? null}
+            onChange={(mode) => void handleSecretStorageChange(mode)}
+          />
+        </>
+      ) : (
+        <ProviderConnectionForm
+          editingId={editingId}
+          editingLabel={editingProfile?.label}
+          label={label}
+          provider={provider}
+          apiKey={apiKey}
+          baseUrl={baseUrl}
+          region={region}
+          defaultModel={defaultModel}
+          fallbackModels={fallbackModels}
+          defaultIsolation={defaultIsolation}
+          hasStoredKey={hasStoredKey}
+          isBedrock={isBedrock}
+          copilotSignedIn={copilotSignedIn}
+          chatgptSignedIn={chatgptSignedIn}
+          models={models}
+          defaultModelOptions={defaultModelOptions}
+          builtinProviders={builtinProviders}
+          modelsLoading={modelsLoading}
+          formError={formError}
+          validateMessage={validateMessage}
+          isValidating={isValidating}
+          isSaving={isUpserting || isActivating}
+          onLabelChange={setLabel}
+          onProviderChange={(value) => {
+            setProvider(value)
+            // Auto-fill the connection Name from the provider so it isn't a
+            // hidden required field. Users (esp. right after a Copilot sign-in,
+            // which has no name prompt of its own) otherwise hit
+            // "Connection name is required" on save with nothing pointing at the
+            // empty Name field up top. Still fully editable.
+            if (!label.trim() && value) {
+              const preset = builtinProviders.find((p) => p.id === value)?.label
+              if (preset) setLabel(preset)
+            }
+          }}
+          onApiKeyChange={setApiKey}
+          onBaseUrlChange={setBaseUrl}
+          onRegionChange={setRegion}
+          onDefaultModelChange={setDefaultModel}
+          onFallbackModelsChange={setFallbackModels}
+          onDefaultIsolationChange={setDefaultIsolation}
+          onValidate={() => void handleValidate()}
+          onSave={() => void handleSave()}
+          onCancel={returnToList}
+          onCopilotSignIn={() => setCopilotSignInOpen(true)}
+          onChatgptSignIn={() => setChatgptSignInOpen(true)}
+        />
+      )}
 
       <ConfirmDialog
         open={pendingDeleteId !== null}
