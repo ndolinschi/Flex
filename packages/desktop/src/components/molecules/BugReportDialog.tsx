@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react"
-import { createPortal } from "react-dom"
 import { openUrl } from "@tauri-apps/plugin-opener"
-import { X } from "lucide-react"
-import { Button, IconButton, TextArea } from "../atoms"
+import { Button, TextArea } from "../atoms"
 import {
   BUG_REPORT_PRIVACY_URL,
   BUG_REPORT_TERMS_URL,
@@ -11,7 +9,15 @@ import {
 } from "../../lib/bugReport"
 import { appVersion, toInvokeError } from "../../lib/tauri"
 import { useAppStore } from "../../stores/appStore"
-import { cn } from "../../lib/utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
 
 type BugReportDialogProps = {
   open: boolean
@@ -52,20 +58,6 @@ export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
       .catch(() => setVersion("unknown"))
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        onClose()
-      }
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [open, onClose])
-
-  if (!open) return null
-
   const canSubmit = note.trim().length > 0 && !busy
 
   const handleSubmit = async () => {
@@ -89,40 +81,34 @@ export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
     }
   }
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/30 px-4 pt-[12vh] animate-backdrop-in"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !busy) onClose()
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !busy) onClose()
       }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="bug-report-title"
+      <DialogContent
+        showCloseButton
+        data-suppress-native-webview=""
         className={cn(
-          "flex w-full max-w-[440px] flex-col overflow-hidden rounded-2xl",
-          "border border-stroke-2 bg-panel shadow-lg animate-modal-in",
+          "top-[12vh] max-w-[440px] translate-y-0 gap-0 rounded-2xl p-0 sm:max-w-[440px]",
         )}
+        onEscapeKeyDown={(e) => {
+          if (busy) e.preventDefault()
+        }}
+        onPointerDownOutside={(e) => {
+          if (busy) e.preventDefault()
+        }}
       >
-        <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-1">
-          <h2
-            id="bug-report-title"
-            className="text-[18px] font-medium tracking-tight text-ink"
-          >
+        <DialogHeader className="gap-1 px-5 pt-5 pb-1 text-left">
+          <DialogTitle className="text-[18px] font-medium tracking-tight text-ink">
             Submit Bug
-          </h2>
-          <IconButton
-            label="Close"
-            quiet
-            className="h-7 w-7 -mr-1 -mt-1"
-            onClick={onClose}
-            disabled={busy}
-          >
-            <X className="h-3.5 w-3.5" aria-hidden />
-          </IconButton>
-        </div>
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            Submit a bug report with session context
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="flex flex-col gap-3 px-5 pb-5 pt-2">
           <div className="rounded-lg bg-fill-4/80 px-3.5 py-3 text-base leading-relaxed text-ink-secondary">
@@ -186,7 +172,7 @@ export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
             </p>
           ) : null}
 
-          <div className="flex items-center justify-end gap-2 pt-1">
+          <DialogFooter className="mx-0 mb-0 border-0 bg-transparent p-0 pt-1 sm:justify-end">
             <Button
               size="sm"
               variant="secondary"
@@ -204,10 +190,9 @@ export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
             >
               Submit
             </Button>
-          </div>
+          </DialogFooter>
         </div>
-      </div>
-    </div>,
-    document.body,
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -51,7 +51,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `ArchivedSectionHeader` | Collapsible Archived group header | `count`, `collapsed`, `onToggle` | SessionSidebar |
 | `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays + optional ghost-text inline completion (isolates keystrokes from ModelPicker/ContextBar) | `composerMode`, `anchorRef`, `attachments`, `onSend` | Composer |
 | `ModelSelect` | Searchable model picker (shadcn Popover) | `models`, `value`, `onChange` | ProviderSettingsForm |
-| `ModelPicker` | Searchable model tray (PopoverTray) | `models`, `value`, `onChange` | Composer |
+| `ModelPicker` | Searchable model tray (shadcn Popover + effort submenu) | `models`, `value`, `onChange` | Composer |
 | `ModePicker` | Agent / Plan / Ask pill switcher | `value`, `onChange` | Composer |
 | `PlanBuildBar` | Cursor-style Build CTA after ExitPlanMode | `onBuild`, `onKeepPlanning?`, `variant` | Plan tab, ChatSessionBody |
 | `PlanCard` | Checklist from `plan_updated` (Plan tool tab; not inlined in timeline) | `entries` | PlanTab |
@@ -285,7 +285,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Context Menu | yes | `ContextMenu` molecule | Keep timeline-scroll / webview-blur ignore behavior |
 | Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
 | Date Picker | skip | — | |
-| Dialog | yes | `ConfirmDialog`, auth/PR/bug/MCP dialogs | **ConfirmDialog migrated**; next: auth/MCP/bug modals |
+| Dialog | yes | `ConfirmDialog`, auth/PR/bug/MCP dialogs | **ConfirmDialog, Copilot/ChatGPT sign-in, BugReport, McpInstall migrated** |
 | Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
 | Drawer | maybe | `SubagentViewer` (bottom overlay) | Spike vs keep custom (Vaul + virtualized timeline) |
 | Dropdown Menu | yes | `SessionMenu`, `PlusMenu`, overflow menus | **PlusMenu, SessionMenu, BrowserOverflowMenu migrated** |
@@ -337,8 +337,8 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 |---|---|---|
 | **0 — Foundation** | `shadcn init` in `packages/desktop` (Vite, Tailwind v4, **radix** base, `lucide`, css variables); path alias `@/`; upgrade `cn` to `clsx` + `tailwind-merge`; map shadcn semantic tokens → Flex tokens in `src/index.css` / `tokens.css` without breaking `data-theme` | `components.json` present; `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
 | **1 — Atom adapters** | Add Button, Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Spinner, Avatar, Tooltip, ScrollArea; re-export from `components/atoms` with temporary compat props | Atom unit tests + vitest green; call sites compile via barrel. **Done:** Button, TextInput, TextArea, Label, Badge, Kbd, Divider←Separator, Skeleton, Spinner, Checkbox (round), Toggle←Switch (green ON), Avatar, ScrollArea. **Deferred:** Tooltip (timeline scroll / programmatic-scroll coupling — keep custom until Provider + scroll policy ported). |
-| **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog, ToastHost/Sonner, ModePicker+IsolationPicker (Popover), PlusMenu+SessionMenu+BrowserOverflow (DropdownMenu). **Next:** TitleBarMenus, auth/MCP dialogs; ContextMenu last |
-| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select primitive; ModelSelect/Branch/Project→Popover (search). **Next:** Combobox for ModelPicker/ModelMultiSelect; Command palette |
+| **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog + auth/bug/MCP dialogs, ToastHost/Sonner, Mode/Isolation/Model/Branch/Project pickers (Popover), PlusMenu+SessionMenu+BrowserOverflow (DropdownMenu). **Next:** TitleBarMenus (Menubar); ContextMenu last |
+| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select primitive; ModelSelect/ModelPicker/Branch/Project→Popover (search). **Next:** Combobox (optional), Toggle Group, Command palette |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner→Alert; Collapsible installed. **Next:** Resizable sash; Collapsible headers |
 | **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Adopt Attachment→Bubble→Message→Marker *inside* virtual rows; MessageScroller only after measured spike with react-virtual |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |

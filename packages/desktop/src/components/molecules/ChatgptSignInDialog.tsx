@@ -2,8 +2,16 @@ import { useEffect, useRef, useState } from "react"
 import { Button } from "../atoms"
 import { ErrorBanner } from "./ErrorBanner"
 import { isBrowserPreview } from "../../lib/browserPreview"
-import { cn } from "../../lib/utils"
 import type { ChatgptAuthStart } from "../../lib/types"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
 
 type ChatgptSignInDialogProps = {
   open: boolean
@@ -24,7 +32,6 @@ export const ChatgptSignInDialog = ({
   wait,
   cancel,
 }: ChatgptSignInDialogProps) => {
-  const panelRef = useRef<HTMLDivElement>(null)
   const sessionIdRef = useRef<string | null>(null)
   const startRef = useRef(start)
   const waitRef = useRef(wait)
@@ -89,18 +96,6 @@ export const ChatgptSignInDialog = ({
     }
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        void handleClose()
-      }
-    }
-    document.addEventListener("keydown", handleKey)
-    return () => document.removeEventListener("keydown", handleKey)
-  }, [open])
-
   const handleClose = async () => {
     const id = sessionIdRef.current
     sessionIdRef.current = null
@@ -135,36 +130,29 @@ export const ChatgptSignInDialog = ({
     }
   }
 
-  if (!open) return null
-
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 p-4 animate-backdrop-in"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) void handleClose()
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) void handleClose()
       }}
     >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="chatgpt-signin-dialog-title"
+      <DialogContent
+        showCloseButton={false}
+        data-suppress-native-webview=""
         className={cn(
-          "w-full max-w-[440px] rounded-xl border border-stroke-2 bg-panel p-4 shadow-lg",
-          "animate-modal-in",
+          "top-[10vh] max-w-[440px] translate-y-0 gap-0 sm:max-w-[440px]",
         )}
       >
-        <h2
-          id="chatgpt-signin-dialog-title"
-          className="text-base font-semibold text-ink"
-        >
-          Sign in to ChatGPT
-        </h2>
-        <p className="mt-1 text-sm text-ink-muted">
-          Enter this code on OpenAI, then return here. Uses your ChatGPT
-          Plus/Pro subscription via Codex.
-        </p>
+        <DialogHeader className="gap-1 text-left">
+          <DialogTitle className="text-base font-semibold text-ink">
+            Sign in to ChatGPT
+          </DialogTitle>
+          <DialogDescription className="text-sm text-ink-muted">
+            Enter this code on OpenAI, then return here. Uses your ChatGPT
+            Plus/Pro subscription via Codex.
+          </DialogDescription>
+        </DialogHeader>
 
         {error ? (
           <div className="mt-3">
@@ -202,7 +190,7 @@ export const ChatgptSignInDialog = ({
           </div>
         ) : null}
 
-        <div className="mt-4 flex justify-end gap-2">
+        <DialogFooter className="mx-0 mb-0 mt-4 border-0 bg-transparent p-0 sm:justify-end">
           <Button variant="ghost" onClick={() => void handleClose()}>
             Cancel
           </Button>
@@ -233,8 +221,8 @@ export const ChatgptSignInDialog = ({
               Try again
             </Button>
           ) : null}
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

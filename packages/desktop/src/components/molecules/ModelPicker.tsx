@@ -4,8 +4,13 @@ import { Check, ChevronDown, ChevronRight, Gauge } from "lucide-react"
 import { EFFORT_LEVELS, effortLabel } from "../../lib/types"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
-import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
+import { PopoverItem, PopoverSearch, PopoverSection } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 
 type ModelPickerProps = {
   models: ModelInfoDto[]
@@ -153,7 +158,6 @@ export const ModelPicker = ({
     modelId: string
     rect: DOMRect
   } | null>(null)
-  const rootRef = useRef<HTMLDivElement>(null)
 
   const selected = models.find((m) => m.id === value)
   const selectedEffort = value && effortFor ? effortFor(value) : null
@@ -161,10 +165,25 @@ export const ModelPicker = ({
 
   const { groups } = useGroupedModels(models, query, builtinProviders)
 
-  const handleClose = () => {
-    setOpen(false)
-    setQuery("")
-    setEffortMenuFor(null)
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next)
+    if (!next) {
+      setQuery("")
+      setEffortMenuFor(null)
+    }
+  }
+
+  const handleClose = () => handleOpenChange(false)
+
+  /** Effort submenu is portaled outside PopoverContent — don't dismiss on it. */
+  const ignoreEffortOutside = (e: {
+    preventDefault: () => void
+    target: EventTarget | null
+  }) => {
+    const target = e.target as HTMLElement | null
+    if (target?.closest?.("[data-popover-outside-ignore]")) {
+      e.preventDefault()
+    }
   }
 
   const openEffortMenu = (modelId: string, el: HTMLElement) => {
@@ -254,42 +273,48 @@ export const ModelPicker = ({
   }
 
   return (
-    <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        disabled={isLoading || disabled}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className={cn(
-          "inline-flex h-6 max-w-[14rem] items-center gap-1 rounded-full border border-stroke-3 bg-fill-4 px-2",
-          "text-xs tracking-[var(--tracking-caption)] text-ink-secondary",
-          "transition-[color,opacity,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-          "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink disabled:opacity-50",
-          open && "border-stroke-2 bg-fill-2 text-ink",
-        )}
-      >
-        <span className="min-w-0 flex-1 truncate">{label}</span>
-        {selectedEffort ? (
-          <span className="shrink-0 text-ink-muted">
-            · {effortLabel(selectedEffort)}
-          </span>
-        ) : null}
-        <ChevronDown
-          className="h-2.5 w-2.5 shrink-0 text-icon-3"
-          strokeWidth={2.5}
-          aria-hidden
-        />
-      </button>
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={isLoading || disabled}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className={cn(
+            "inline-flex h-6 max-w-[14rem] items-center gap-1 rounded-full border border-stroke-3 bg-fill-4 px-2",
+            "text-xs tracking-[var(--tracking-caption)] text-ink-secondary",
+            "transition-[color,opacity,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+            "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink disabled:opacity-50",
+            open && "border-stroke-2 bg-fill-2 text-ink",
+          )}
+        >
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          {selectedEffort ? (
+            <span className="shrink-0 text-ink-muted">
+              · {effortLabel(selectedEffort)}
+            </span>
+          ) : null}
+          <ChevronDown
+            className="h-2.5 w-2.5 shrink-0 text-icon-3"
+            strokeWidth={2.5}
+            aria-hidden
+          />
+        </button>
+      </PopoverTrigger>
 
-      <PopoverTray
-        open={open}
-        onClose={handleClose}
-        anchorRef={rootRef}
-        placement="above"
+      <PopoverContent
+        side="top"
+        align="start"
+        sideOffset={6}
         role="listbox"
         aria-label="Models"
-        className="left-0 w-72"
+        className={cn(
+          "w-72 gap-0 rounded-md border-0 bg-panel p-0 shadow-[var(--shadow-popover)]",
+          "ring-0",
+        )}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onInteractOutside={ignoreEffortOutside}
+        onPointerDownOutside={ignoreEffortOutside}
       >
         <PopoverSearch
           value={query}
@@ -309,7 +334,7 @@ export const ModelPicker = ({
             ))
           )}
         </div>
-      </PopoverTray>
-    </div>
+      </PopoverContent>
+    </Popover>
   )
 }
