@@ -21,6 +21,7 @@ import { ContentWorkspace } from "./components/organisms/content/ContentWorkspac
 import { ToastHost } from "./components/molecules"
 import { Spinner } from "./components/atoms"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { DirectionProvider } from "@/components/ui/direction"
 import { WelcomePage } from "./pages/WelcomePage"
 import { sessionScopeKey, useAppStore } from "./stores/appStore"
 import { cn } from "./lib/utils"
@@ -345,11 +346,13 @@ const App = () => {
   if (isBrowserPreview()) return <NativeAppRequired />
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider delayDuration={500}>
-        <div className="h-full">
-          <AppRoutes />
-        </div>
-      </TooltipProvider>
+      <DirectionProvider dir="ltr">
+        <TooltipProvider delayDuration={500}>
+          <div className="h-full">
+            <AppRoutes />
+          </div>
+        </TooltipProvider>
+      </DirectionProvider>
     </QueryClientProvider>
   )
 }

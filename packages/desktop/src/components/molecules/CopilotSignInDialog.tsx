@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "../atoms"
 import { ErrorBanner } from "./ErrorBanner"
+import { DeviceCodeDisplay } from "./DeviceCodeDisplay"
 import { isBrowserPreview } from "../../lib/browserPreview"
 import type { CopilotAuthStart } from "../../lib/types"
 import {
@@ -170,9 +171,9 @@ export const CopilotSignInDialog = ({
               <p className="text-xs font-medium uppercase tracking-widest text-ink-faint">
                 User code
               </p>
-              <p className="mt-1 font-mono text-2xl font-semibold tracking-widest text-ink">
-                {auth.userCode}
-              </p>
+              <div className="mt-2 flex justify-center">
+                <DeviceCodeDisplay code={auth.userCode} />
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" size="sm" onClick={() => void handleCopy()}>

@@ -1,9 +1,10 @@
 import { ErrorBanner } from "./ErrorBanner"
 import { FieldRow, SettingsSection } from "./SettingsSection"
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select"
 import type { SecretStorageMode } from "../../lib/types"
-
-const selectClassName =
-  "h-8 w-full rounded-md border border-border bg-surface px-2.5 text-sm text-ink focus:border-stroke-2 focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
 
 type SecretStorageSectionProps = {
   secretStorage: SecretStorageMode | undefined
@@ -39,18 +40,21 @@ export const SecretStorageSection = ({
               : "Local file stores the encryption key on disk, readable by your user account — no system prompts, ever. System Keychain is only available on macOS."
         }
       >
-        <select
+        <NativeSelect
           id="secretStorage"
           value={secretStorage ?? "file"}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value as SecretStorageMode)}
-          className={selectClassName}
         >
-          <option value="file">Local file (no system prompts)</option>
+          <NativeSelectOption value="file">
+            Local file (no system prompts)
+          </NativeSelectOption>
           {isMac ? (
-            <option value="keychain">System Keychain (OS-protected)</option>
+            <NativeSelectOption value="keychain">
+              System Keychain (OS-protected)
+            </NativeSelectOption>
           ) : null}
-        </select>
+        </NativeSelect>
       </FieldRow>
       {error ? (
         <div className="px-4 py-3">

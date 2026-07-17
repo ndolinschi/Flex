@@ -33,7 +33,8 @@ export const MemoryContent = () => {
     invalidateKey: MEMORY_KEY,
   }
 
-  const isEmpty = !memoryQuery.isLoading && !memoryQuery.isError && memories.length === 0
+  const isEmpty =
+    !memoryQuery.isLoading && !memoryQuery.isError && memories.length === 0
 
   return (
     <div className="flex flex-col gap-3">

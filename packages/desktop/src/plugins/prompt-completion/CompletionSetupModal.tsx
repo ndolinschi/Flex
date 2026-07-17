@@ -20,6 +20,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select"
 
 type Path = "ollama" | "provider"
 
@@ -349,8 +353,7 @@ export const CompletionSetupModal = ({
               <>
                 <label className="flex flex-col gap-1.5">
                   <span className="text-xs text-ink-muted">Provider</span>
-                  <select
-                    className="h-9 w-full rounded-md border border-stroke-3 bg-elevated px-3 text-sm text-ink outline-none focus:border-stroke-2"
+                  <NativeSelect
                     value={providerId}
                     onChange={(e) => {
                       setProviderId(e.target.value)
@@ -358,11 +361,11 @@ export const CompletionSetupModal = ({
                     }}
                   >
                     {otherProviders.map((id) => (
-                      <option key={id} value={id}>
+                      <NativeSelectOption key={id} value={id}>
                         {id}
-                      </option>
+                      </NativeSelectOption>
                     ))}
-                  </select>
+                  </NativeSelect>
                 </label>
                 <ModelSelect
                   id="completion-provider-model"

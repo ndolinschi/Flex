@@ -4,6 +4,13 @@ import { cacheTotalsFromModelUsage } from "../../../lib/modelUsage"
 import { sessionLabel, type SessionMeta } from "../../../lib/types"
 import { cn, formatTokens } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart"
+import { Bar, BarChart, XAxis, YAxis } from "recharts"
 
 const CONTEXT_BUDGET_TOKENS = 200_000
 /** Stable empty — inline `?? []` in a Zustand selector re-renders forever. */
@@ -13,6 +20,10 @@ type StatusTabProps = {
   session: SessionMeta
   active: boolean
 }
+
+const usageChartConfig = {
+  tokens: { label: "Tokens", color: "var(--color-accent)" },
+} satisfies ChartConfig
 
 const Metric = ({ label, value }: { label: string; value: string }) => (
   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -98,6 +109,11 @@ export const StatusTab = ({ session, active }: StatusTabProps) => {
       ? `${formatTokens(contextUsed)} / ${formatTokens(maxTokens)}`
       : `— / ${formatTokens(maxTokens)}`
 
+  const chartData = modelRows.map(([id, bucket]) => ({
+    model: id.includes("/") ? (id.split("/").pop() ?? id) : id,
+    tokens: bucket.input + bucket.output,
+  }))
+
   return (
     <div
       className={cn(
@@ -149,22 +165,50 @@ export const StatusTab = ({ session, active }: StatusTabProps) => {
         {modelRows.length === 0 ? (
           <p className="text-sm text-ink-muted">No model usage yet</p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {modelRows.map(([id, bucket]) => (
-              <li
-                key={id}
-                className="rounded-md border border-stroke-3 px-2.5 py-1.5"
+          <div className="flex flex-col gap-3">
+            <ChartContainer
+              config={usageChartConfig}
+              className="aspect-auto h-28 w-full"
+              initialDimension={{ width: 280, height: 112 }}
+            >
+              <BarChart
+                data={chartData}
+                layout="vertical"
+                margin={{ left: 0, right: 8, top: 4, bottom: 4 }}
               >
-                <p className="truncate text-sm text-ink" title={id}>
-                  {id}
-                </p>
-                <p className="mt-0.5 text-xs text-ink-muted [font-variant-numeric:tabular-nums]">
-                  {formatTokens(bucket.input)} in · {formatTokens(bucket.output)}{" "}
-                  out · {bucket.calls} call{bucket.calls === 1 ? "" : "s"}
-                </p>
-              </li>
-            ))}
-          </ul>
+                <XAxis type="number" hide />
+                <YAxis
+                  type="category"
+                  dataKey="model"
+                  width={72}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 10, fill: "var(--color-ink-muted)" }}
+                />
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent hideLabel />}
+                />
+                <Bar dataKey="tokens" fill="var(--color-tokens)" radius={2} />
+              </BarChart>
+            </ChartContainer>
+            <ul className="flex flex-col gap-2">
+              {modelRows.map(([id, bucket]) => (
+                <li
+                  key={id}
+                  className="rounded-md border border-stroke-3 px-2.5 py-1.5"
+                >
+                  <p className="truncate text-sm text-ink" title={id}>
+                    {id}
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink-muted [font-variant-numeric:tabular-nums]">
+                    {formatTokens(bucket.input)} in · {formatTokens(bucket.output)}{" "}
+                    out · {bucket.calls} call{bucket.calls === 1 ? "" : "s"}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     </div>

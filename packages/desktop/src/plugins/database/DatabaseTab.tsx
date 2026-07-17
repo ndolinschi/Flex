@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  ChevronLeft,
-  ChevronRight,
   Play,
   Plus,
   RefreshCw,
@@ -12,6 +10,25 @@ import {
 } from "@/components/icons"
 import { Button, IconButton, ScrollArea, TextArea, TextInput } from "../../components/atoms"
 import { ConfirmDialog, EmptyState, FormField } from "../../components/molecules"
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import {
   dbActiveConnection,
   dbConnect,
@@ -513,18 +530,17 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
             />
           </FormField>
           <FormField label="Engine" htmlFor="db-engine">
-            <select
+            <NativeSelect
               id="db-engine"
               value={form.engine}
               onChange={(e) => setEngine(e.target.value as DbEngine)}
-              className="h-9 w-full rounded-md border border-stroke-2 bg-bg px-2 text-sm text-ink"
             >
               {ENGINE_OPTIONS.map((o) => (
-                <option key={o.id} value={o.id}>
+                <NativeSelectOption key={o.id} value={o.id}>
                   {o.label}
-                </option>
+                </NativeSelectOption>
               ))}
-            </select>
+            </NativeSelect>
           </FormField>
           <FormField
             label={form.engine === "sqlite" ? "File path" : "Connection URL"}
@@ -660,35 +676,38 @@ const ResultGrid = ({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ScrollArea className="min-h-0 flex-1">
-        <table className="w-max min-w-full border-collapse text-left text-xs">
-          <thead className="sticky top-0 bg-fill-5">
-            <tr>
+        <Table className="w-max min-w-full border-collapse text-left text-xs">
+          <TableHeader className="sticky top-0 bg-fill-5 [&_tr]:border-stroke-3">
+            <TableRow className="border-stroke-3 hover:bg-transparent">
               {result.columns.map((col) => (
-                <th
+                <TableHead
                   key={col}
-                  className="border-b border-stroke-3 px-2 py-1.5 font-medium text-ink-secondary"
+                  className="h-auto border-b border-stroke-3 px-2 py-1.5 font-medium text-ink-secondary"
                 >
                   {col}
-                </th>
+                </TableHead>
               ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {pageRows.map((row, ri) => (
-              <tr key={start + ri} className="odd:bg-fill-5/40">
+              <TableRow
+                key={start + ri}
+                className="border-stroke-3/60 hover:bg-transparent odd:bg-fill-5/40"
+              >
                 {row.map((cell, ci) => (
-                  <td
+                  <TableCell
                     key={ci}
                     className="max-w-[16rem] truncate border-b border-stroke-3/60 px-2 py-1 font-mono text-ink"
                     title={cellLabel(cell)}
                   >
                     {cellLabel(cell)}
-                  </td>
+                  </TableCell>
                 ))}
-              </tr>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </ScrollArea>
       <div className="flex shrink-0 items-center gap-1 border-t border-stroke-3 px-2.5 py-1.5">
         <span className="min-w-0 flex-1 truncate text-[10px] text-ink-faint">
@@ -700,22 +719,42 @@ const ResultGrid = ({
           {result.truncated ? " (truncated)" : ""}
           {kind === "preview" && canNext ? "+" : ""}
         </span>
-        <IconButton
-          label="Previous page"
-          className="h-5 w-5"
-          disabled={!canPrev}
-          onClick={() => onPageChange(page - 1)}
-        >
-          <ChevronLeft className="h-3 w-3" aria-hidden />
-        </IconButton>
-        <IconButton
-          label="Next page"
-          className="h-5 w-5"
-          disabled={!canNext}
-          onClick={() => onPageChange(page + 1)}
-        >
-          <ChevronRight className="h-3 w-3" aria-hidden />
-        </IconButton>
+        <Pagination className="mx-0 w-auto justify-end">
+          <PaginationContent className="gap-0.5">
+            <PaginationItem>
+              <PaginationPrevious
+                href="#"
+                text=""
+                size="icon"
+                className={cn(
+                  "size-5 px-0!",
+                  !canPrev && "pointer-events-none opacity-40",
+                )}
+                aria-disabled={!canPrev}
+                onClick={(e) => {
+                  e.preventDefault()
+                  if (canPrev) onPageChange(page - 1)
+                }}
+              />
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                text=""
+                size="icon"
+                className={cn(
+                  "size-5 px-0!",
+                  !canNext && "pointer-events-none opacity-40",
+                )}
+                aria-disabled={!canNext}
+                onClick={(e) => {
+                  e.preventDefault()
+                  if (canNext) onPageChange(page + 1)
+                }}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       </div>
     </div>
   )

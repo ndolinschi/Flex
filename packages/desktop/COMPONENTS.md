@@ -42,7 +42,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `ProviderPicker` | Icon tile grid for choosing a builtin provider | `providers`, `value`, `onChange` | WelcomePage, ProviderConnectionForm |
 | `CopilotSignInDialog` | GitHub Copilot device-flow modal (user code + Open GitHub + poll) | `open`, `start` / `wait` / `cancel`, `onSuccess` | ProviderSettingsForm, WelcomePage |
 | `ChatgptSignInDialog` | ChatGPT Plus/Pro headless OAuth modal (user code + Open OpenAI + poll) | `open`, `start` / `wait` / `cancel`, `onSuccess` | ProviderSettingsForm, WelcomePage |
-| `SecretStorageSection` | Security: secret-storage backend select | `secretStorage`, `isMac`, `onChange`, `error?` | ProviderSettingsForm |
+| `SecretStorageSection` | Security: secret-storage backend NativeSelect | `secretStorage`, `isMac`, `onChange`, `error?` | ProviderSettingsForm |
 | `SessionListItem` | Agent row + rename/delete + running/unread via per-id store selectors | `session`, `isActive`, `memo` | SessionSidebar |
 | `SessionRowSubtitle` | Diff + relative-time under a session title | `updatedAtMs`, `workspaceStatus?`, `gitStatus?` | SessionListItem |
 | `SessionRowActions` | Hover pin / archive / more trailing actions | `pinned`, `archived`, `onTogglePin`, … | SessionListItem |
@@ -90,7 +90,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `WorkGroup` | "Worked for Xs" / live "Working" XOR "Thinking" XOR "Compacting…"; molecule `Collapsible` (grid-rows — keep); `memo` | `isOpen`, `liveStatus?`, `durationMs?` | TurnTimeline |
 | `WorkflowGroup` | Multi-step workflow block (steps + nested subagents); organism-scale but kept in `molecules/` since it nests inside `TimelineRowView` like `SubagentGroup`/`WorkGroup` | `steps`, `subagents`, `status` | TurnTimeline (via `TimelineRowView`) |
 | `SidebarSkeleton` | Sidebar loading placeholder (headers + rows) | — | SessionSidebar |
-| `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?`, `disabled?` | SessionSidebar |
+| `SidebarActionRow` | New Agent / Search row (shadcn Item) | `icon`, `label`, `kbd?`, `disabled?` | SessionSidebar |
 | `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle` | SessionSidebar |
 | `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions | `title`, `status`, `onBuild`, `onAddComment?` | PlanTab |
 | `AppMark` / `TitleBarMenus` | Wireframe mark + File/Edit/View/Help for custom window chrome; Help → **Submit Bug…** opens `BugReportDialog` | `onOpenCommandPalette?`, `onOpenSearch?` | WindowTitleBar |
@@ -270,10 +270,10 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 
 | shadcn | Migrate? | Current Flex surface | Notes |
 |---|---|---|---|
-| Accordion | later | none as primitive | Optional for settings groups; prefer `Collapsible` first |
+| Accordion | yes | Tools & MCP settings groups | **CustomizeContent** Plugins / MCP Accordion |
 | Alert | yes | `ErrorBanner`, resume banners | **ErrorBanner + SidebarResumeError migrated** |
 | Alert Dialog | yes | `ConfirmDialog` (no-children confirms) | **Done** — pure confirms → AlertDialog; forms (rename/PR/etc.) stay Dialog |
-| Aspect Ratio | skip | — | No first-class need |
+| Aspect Ratio | yes | provider brand chips | **ProviderIcon** chip wraps `AspectRatio` 1:1 |
 | Attachment | yes (chat kit) | `AttachmentChip` | **AttachmentChip migrated** (`size=xs` composer density) |
 | Avatar | yes | `Avatar` atom | Thin wrap + `AvatarFallback` |
 | Badge | yes | `Badge`, `NewBadge`, `VerdictBadge` | Badge + NewBadge wrap; VerdictBadge stays expandable status (not a chip) |
@@ -281,19 +281,19 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Bubble | yes (chat kit) | user bubbles in timeline | **User rows migrated** (Flex `bg-user-bubble`); assistant stays Message ghost/markdown (no Bubble) |
 | Button | yes | `Button`, `IconButton`, `SendButton` shell | **SendButton** composes Button; drop custom `isLoading` at call sites over time |
 | Button Group | yes | CommitCenter split chrome | **CommitCenter** uses `ButtonGroup` + DropdownMenu chevron |
-| Calendar | skip | — | No date UX today |
+| Calendar | installed | — | Installed (`react-day-picker`); no date-picker product surface yet |
 | Card | yes (Settings) | `SettingsCard` | **SettingsCard** composes Card/Header/Title/Description/Content; Flex look via `bg-settings-card` + `ring-0` + outside-looking title |
-| Carousel | skip | — | |
-| Chart | skip | — | No dashboards |
+| Carousel | installed | — | Installed (`embla`); no gallery/slider surface yet |
+| Chart | yes | Status per-model usage | **StatusTab** BarChart (recharts) when model usage present |
 | Checkbox | yes | `Checkbox` atom | Restyle round + indeterminate |
 | Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader`, WorkGroup | **Sidebar section headers** use radix Collapsible; **WorkGroup** keeps molecule `Collapsible` (grid-rows expand animation) |
 | Combobox | yes | Model/Branch/Project pickers | **All pickers**; ModelPicker effort = nested DropdownMenu (`data-popover-outside-ignore`) |
 | Command | yes | `CommandPalette`, `SearchModal`, `OpenTabModal` | **CommandPalette + SearchModal** (CommandDialog); **OpenTabModal** (anchored Command portal) |
 | Context Menu | yes | `ContextMenu` molecule | **Migrated** — keep timeline-scroll / webview-blur dismiss |
-| Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
-| Date Picker | skip | — | |
+| Data Table | yes | DatabaseTab result grid | **ResultGrid** → Table + Pagination (no `@tanstack/react-table` — no sort/filter UX yet) |
+| Date Picker | later | — | Compose Calendar + Popover when a date field ships |
 | Dialog | yes | `ConfirmDialog` (forms), auth/PR/bug/MCP dialogs | **ConfirmDialog forms**, Copilot/ChatGPT sign-in, BugReport, McpInstall migrated |
-| Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
+| Direction | yes | app root LTR | **DirectionProvider** wraps App (`dir=ltr`); path-ellipsis local `rtl` stays unrelated |
 | Drawer | yes | `SubagentViewer` (bottom overlay) | **SubagentViewer** — vaul Drawer (`direction=bottom`, nested `container`, ~70dvh) + `TurnTimeline` |
 | Dropdown Menu | yes | `SessionMenu`, `PlusMenu`, overflow, workers, commit, prompt insert | **PlusMenu, SessionMenu, BrowserOverflow (+webview suppress), WorkingAgentsPill, CommitCenter, PromptTab insert** |
 | Empty | yes | `EmptyState` | **EmptyState migrated** |
@@ -301,17 +301,17 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Hover Card | yes | PR status enrichment | **BranchPrStatusChip** HoverCard |
 | Input | yes | `TextInput` | Alias export during cutover |
 | Input Group | yes | composer / search fields with addons | **SettingsNav, FileExplorer, Combobox** wired |
-| Input OTP | skip | — | OAuth shows codes; users don’t type OTP |
-| Item | later | sidebar / palette rows | Only if it simplifies without fighting density |
+| Input OTP | yes | OAuth device codes (display) | **DeviceCodeDisplay** read-only OTP slots in Copilot/ChatGPT sign-in |
+| Item | yes | sidebar action rows | **SidebarActionRow** → Item (`size=xs`) |
 | Kbd | yes | `Kbd` atom | **done** |
 | Label | yes | `Label` atom | Prefer `FieldLabel` inside forms |
 | Marker | yes (chat kit) | `CompactionCard` / `IndexingCard` dividers | **IndexingCard** (separator) + **CompactionCard** (border) migrated |
 | Menubar | yes | `TitleBarMenus` | **TitleBarMenus migrated** |
 | Message | yes (chat kit) | timeline message rows | **User** Message+Bubble; **assistant** Message only; keep MessageActions |
 | Message Scroller | spike | `TurnTimeline` + `useStickToBottom` | **Spike landed:** Provider/Root/Viewport wrap timeline; keep virtualizer + `useStickToBottom` (`autoScroll` off — see TurnTimeline comment) |
-| Native Select | later | simple settings enums | Prefer Select/Combobox; ModelSelect is Combobox |
-| Navigation Menu | skip | — | Sidebar ≠ marketing nav |
-| Pagination | later | DatabaseTab paging | Icons-only Previous/Next |
+| Native Select | yes | tiny settings enums | **Database engine, secret storage, isolation, completion provider** |
+| Navigation Menu | installed | — | Installed; title-bar chrome stays **Menubar** (not marketing nav) |
+| Pagination | yes | DatabaseTab paging | **ResultGrid** icons-only Previous/Next |
 | Popover | yes | mode/isolation/commit/plan/slash/@ | **Mode/Isolation/IsolationBadge/CommitBar/PlanComment + ComposerSuggestionPopover** (slash/@, focus preserved) |
 | Progress | yes | indexing rebuild | **IndexingSection** indeterminate Progress while rebuilding; track `bg-fill-3`, indicator `bg-primary` |
 | Radio Group | yes | `QuestionPrompt` choices | **QuestionPrompt** single-select RadioGroup + multi-select Checkbox |
@@ -326,14 +326,14 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Sonner | yes | `Toast` / ToastHost | **ToastHost migrated** — `pushToast` → `sonner` |
 | Spinner | yes | `Spinner` | **done** |
 | Switch | yes | `Toggle` atom | **done** (green ON) |
-| Table | later | Database results | With Pagination first |
+| Table | yes | Database results | **ResultGrid** (with Pagination) |
 | Tabs | careful | panel/file tabs + Settings | **Settings nav** = vertical Tabs; **Appearance theme** = horizontal Tabs; content-pane `Tab*`/`TabStrip`/`WindowTitleBar` remain domain chrome (DnD chips / OS window) |
 | Textarea | yes | `TextArea`, composer draft | **done** |
 | Toast | n/a | — | Use **Sonner**, not legacy Toast component |
 | Toggle | careful | pressed toolbar buttons | Name clash: Flex `Toggle` = Switch (done); use Toggle Group for Code/Eye |
 | Toggle Group | yes | Files Code/Eye, filter chips | **Files markdown Eye/Code migrated**; **Not** ModePicker |
 | Tooltip | yes | `Tooltip` atom + UsageRing | **Migrated** — App `TooltipProvider` + scroll dismiss; **UsageRing** rich tooltip |
-| Typography | selective | prose in settings / empty states | Do not replace `MarkdownBody` |
+| Typography | selective | settings headers | **TypographyH1/P** on SettingsShell; do not replace `MarkdownBody` |
 
 Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 `attachment`, `marker` — the “\*New” suffixes in some docs are naming noise.
@@ -348,7 +348,7 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select; Toggle Group; Command*; RadioGroup + multi Checkbox; Input Group; Combobox (ModelPicker effort → DropdownMenu). |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; Sidebar/Drawer; Card; Tabs; Progress | **Done:** Empty/Alert; Collapsible headers; Resizable; Breadcrumb; Drawer→SubagentViewer; Sidebar spike; SettingsCard→Card; Settings Tabs; Indexing Progress. |
 | **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller | **Done:** chat kit + MessageScroller Provider/Viewport composed with `@tanstack/react-virtual` (`autoScroll` deferred — stick-to-bottom kept). |
-| **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them. Hover Card **done** (PR chip). Domain chrome `Tab*`/`WindowTitleBar` kept intentionally. |
+| **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Accordion, Navigation Menu, Typography-as-prose; Item; Native Select | **Done:** Table+Pagination→DatabaseTab; Chart→StatusTab; Input OTP→device codes; AspectRatio→ProviderIcon; DirectionProvider; Accordion→Tools&MCP; Item→SidebarActionRow; NativeSelect→remaining enums; Typography→SettingsShell. Calendar/Carousel/Navigation Menu **installed** (no product surface — Date Picker / gallery / marketing nav not needed; title bar stays Menubar). |
 
 ### Docs investigation (radix-nova)
 
@@ -363,7 +363,7 @@ produced these binding decisions:
 | CommandDialog | custom palette | CommandPalette / SearchModal (keep z-300 + webview suppress) |
 | Field | FormField | Label + hint + `data-invalid` |
 | Empty / Alert | custom callouts | EmptyState / ErrorBanner |
-| Collapsible | Accordion | Sidebar section headers |
+| Collapsible | Accordion | Sidebar section headers (exclusive groups use Accordion in Tools & MCP) |
 | Attachment→Bubble→Message→Marker | MessageScroller first | Keep `@tanstack/react-virtual`; scroller is spike-only |
 | Keep custom | Sheet for Settings | Chat must stay mounted under absolute overlay |
 | ContextMenu last | early swap | Timeline scroll + WebView2 blur defenses |

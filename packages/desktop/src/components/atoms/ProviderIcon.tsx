@@ -1,3 +1,4 @@
+import { AspectRatio } from "@/components/ui/aspect-ratio"
 import { useState } from "react"
 import {
   providerIconCandidates,
@@ -90,13 +91,15 @@ export const ProviderIcon = ({
     <span
       aria-hidden
       title={title}
-      className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-sm bg-fill-3",
-        className,
-      )}
-      style={{ width: size, height: size }}
+      className={cn("inline-block shrink-0", className)}
+      style={{ width: size }}
     >
-      {img}
+      <AspectRatio
+        ratio={1}
+        className="flex items-center justify-center overflow-hidden rounded-sm bg-fill-3"
+      >
+        {img}
+      </AspectRatio>
     </span>
   )
 }

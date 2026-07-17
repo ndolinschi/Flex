@@ -6,9 +6,10 @@ import { ModelMultiSelect } from "./ModelMultiSelect"
 import { ModelSelect } from "./ModelSelect"
 import { ProviderPicker } from "./ProviderPicker"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
-
-const selectClassName =
-  "h-8 w-full rounded-md border border-border bg-surface px-2.5 text-sm text-ink focus:border-stroke-2 focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select"
 
 type ProviderConnectionFormProps = {
   editingId: string | null
@@ -331,16 +332,17 @@ export const ProviderConnectionForm = ({
           htmlFor="defaultIsolation"
           hint="Sessions can override this when created — this only sets the starting default"
         >
-          <select
+          <NativeSelect
             id="defaultIsolation"
             value={defaultIsolation}
             onChange={(e) => onDefaultIsolationChange(e.target.value)}
-            className={selectClassName}
           >
-            <option value="never">Never</option>
-            <option value="optional">Optional (when git allows)</option>
-            <option value="required">Required</option>
-          </select>
+            <NativeSelectOption value="never">Never</NativeSelectOption>
+            <NativeSelectOption value="optional">
+              Optional (when git allows)
+            </NativeSelectOption>
+            <NativeSelectOption value="required">Required</NativeSelectOption>
+          </NativeSelect>
         </FieldRow>
       </SettingsSection>
 

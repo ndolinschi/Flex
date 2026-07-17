@@ -8,6 +8,7 @@ import type { SettingsSectionId } from "../../lib/settingsSearchIndex"
 import { searchSettings, type SettingsSearchEntry } from "../../lib/settingsSearchIndex"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
+import { TypographyH1, TypographyP } from "@/components/ui/typography"
 
 type SettingsShellProps = {
   /** Section content keyed by id — the shell renders whichever one is
@@ -108,13 +109,11 @@ export const SettingsShell = ({
         <div className="min-w-0 flex-1">
           <div className="mb-5 flex items-start gap-5 pt-6">
             <div className="min-w-0">
-              <h1 className="text-[17px] font-medium leading-[21px] text-ink">
-                {titleFor(activeSection)}
-              </h1>
+              <TypographyH1>{titleFor(activeSection)}</TypographyH1>
               {descriptionFor?.(activeSection) ? (
-                <p className="mt-1 text-base leading-[18px] text-ink-secondary">
+                <TypographyP className="mt-1">
                   {descriptionFor(activeSection)}
-                </p>
+                </TypographyP>
               ) : null}
             </div>
           </div>
