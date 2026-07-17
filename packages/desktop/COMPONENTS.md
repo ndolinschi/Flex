@@ -264,7 +264,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | shadcn | Migrate? | Current Flex surface | Notes |
 |---|---|---|---|
 | Accordion | later | none as primitive | Optional for settings groups; prefer `Collapsible` first |
-| Alert | yes | `ErrorBanner`, resume banners | Replace callout markup |
+| Alert | yes | `ErrorBanner`, resume banners | **ErrorBanner migrated** |
 | Alert Dialog | yes | `ConfirmDialog` (danger paths) | Rename/delete session, discard |
 | Aspect Ratio | skip | — | No first-class need |
 | Attachment | yes (chat kit) | `AttachmentChip` | Registry name `attachment` (not `AttachmentNew`) |
@@ -279,8 +279,8 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Carousel | skip | — | |
 | Chart | skip | — | No dashboards |
 | Checkbox | yes | `Checkbox` atom | Restyle round + indeterminate |
-| Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader`, WorkGroup | |
-| Combobox | yes | `ModelPicker`, branch/project trays | Prefer over bespoke `PopoverTray` search |
+| Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader`, WorkGroup | Primitive installed; wire headers next |
+| Combobox | yes | Model/Branch/Project pickers | Prefer over PopoverTray search trays |
 | Command | yes | `CommandPalette`, `SearchModal`, `OpenTabModal` | Command-in-Dialog pattern |
 | Context Menu | yes | `ContextMenu` molecule | Keep timeline-scroll / webview-blur ignore behavior |
 | Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
@@ -327,9 +327,6 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Toggle Group | yes | Files Code/Eye, filter chips | **Not** ModePicker (Popover+descriptions) |
 | Tooltip | yes | `Tooltip` atom | Deferred — timeline scroll dismiss |
 | Typography | selective | prose in settings / empty states | Do not replace `MarkdownBody` |
-| Alert | yes | `ErrorBanner`, resume banners | **ErrorBanner migrated** |
-| Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader` | Primitive installed; wire headers next |
-| Combobox | yes | Model/Branch/Project pickers | Prefer over PopoverTray search trays |
 
 Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 `attachment`, `marker` — the “\*New” suffixes in some docs are naming noise.
