@@ -1106,10 +1106,14 @@ pub async fn browser_open_devtools(state: State<'_, AppState>) -> DesktopResult<
                 if delay > 0 {
                     std::thread::sleep(std::time::Duration::from_millis(delay));
                 }
-                let detached = webview
-                    .with_webview(|platform| detach_macos_inspector(platform.inner()))
-                    .unwrap_or(false);
-                if detached {
+                let detached = std::sync::atomic::AtomicBool::new(false);
+                let _ = webview.with_webview(|platform| {
+                    detached.store(
+                        detach_macos_inspector(platform.inner()),
+                        std::sync::atomic::Ordering::Relaxed,
+                    );
+                });
+                if detached.load(std::sync::atomic::Ordering::Relaxed) {
                     return;
                 }
                 last_nil = true;
