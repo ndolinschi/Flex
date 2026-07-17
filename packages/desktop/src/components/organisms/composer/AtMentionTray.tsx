@@ -1,7 +1,8 @@
 import { useEffect, useRef, type RefObject } from "react"
 import { FileIcon, Folder, Plug, Table2 } from "@/components/icons"
-import { PopoverItem, PopoverTray } from "../../molecules"
+import { PopoverItem } from "../../molecules"
 import type { AtMentionHit } from "../../../lib/atMentionHits"
+import { ComposerSuggestionPopover } from "./ComposerSuggestionPopover"
 
 type AtMentionTrayProps = {
   open: boolean
@@ -40,15 +41,11 @@ export const AtMentionTray = ({
   }, [open, highlight, hits])
 
   return (
-    <PopoverTray
+    <ComposerSuggestionPopover
       open={open}
-      autoFocus={false}
       onClose={onClose}
       anchorRef={anchorRef}
-      placement="above"
-      role="listbox"
       aria-label="Mention a file, folder, table, or MCP server"
-      className="left-0 right-0 w-full"
     >
       <ul ref={listRef} className="max-h-56 overflow-y-auto py-0.5">
         {hits.map((hit, i) => (
@@ -63,6 +60,6 @@ export const AtMentionTray = ({
           </li>
         ))}
       </ul>
-    </PopoverTray>
+    </ComposerSuggestionPopover>
   )
 }

@@ -22,6 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ButtonGroup } from "@/components/ui/button-group"
 
 type CommitMode = "commit" | "commit-push" | "branch-commit" | "commit-pr"
 
@@ -196,7 +197,7 @@ export const CommitCenter = ({
           >
             {selectionLabel}
           </span>
-          <div className="flex shrink-0 items-center overflow-hidden rounded-md">
+          <ButtonGroup className="shrink-0 overflow-hidden rounded-md">
             <Button
               variant="primary"
               size="sm"
@@ -268,7 +269,7 @@ export const CommitCenter = ({
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
+          </ButtonGroup>
         </div>
       </div>
 

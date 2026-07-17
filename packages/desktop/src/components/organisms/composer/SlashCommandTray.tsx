@@ -1,6 +1,7 @@
 import { useEffect, useRef, type RefObject } from "react"
-import { PopoverItem, PopoverTray } from "../../molecules"
+import { PopoverItem } from "../../molecules"
 import type { CommandInfoDto } from "../../../lib/types"
+import { ComposerSuggestionPopover } from "./ComposerSuggestionPopover"
 
 type SlashCommandTrayProps = {
   open: boolean
@@ -28,17 +29,12 @@ export const SlashCommandTray = ({
   }, [open, highlight, matches])
 
   return (
-    <PopoverTray
+    <ComposerSuggestionPopover
       open={open}
-      autoFocus={false}
-      onClose={() => {
-        /* keep draft; Esc handled in textarea keydown */
-      }}
+      /* Parent owns open from draft `/…`; Esc handled in textarea keydown. */
+      onClose={() => {}}
       anchorRef={anchorRef}
-      placement="above"
-      role="listbox"
       aria-label="Slash commands"
-      className="left-0 right-0 w-full"
     >
       <ul ref={listRef} className="max-h-48 overflow-y-auto py-0.5">
         {matches.map((cmd, i) => (
@@ -55,6 +51,6 @@ export const SlashCommandTray = ({
           </li>
         ))}
       </ul>
-    </PopoverTray>
+    </ComposerSuggestionPopover>
   )
 }
