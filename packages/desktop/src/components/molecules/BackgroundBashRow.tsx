@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from "react"
-import { ListEnd, Square } from "lucide-react"
+import { ListEnd, Square } from "@/components/icons"
 import { backgroundKill } from "../../lib/tauri"
 import { useAppStore } from "../../stores/appStore"
 import { getExecTail, subscribeExecTail } from "../../lib/execTailBus"

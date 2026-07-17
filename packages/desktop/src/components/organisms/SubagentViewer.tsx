@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import { Bot, X } from "lucide-react"
+import { Bot, X } from "@/components/icons"
 import { TurnTimeline } from "./TurnTimeline"
 import { useAppStore } from "../../stores/appStore"
 

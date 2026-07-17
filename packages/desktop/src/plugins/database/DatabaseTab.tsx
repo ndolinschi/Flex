@@ -9,7 +9,7 @@ import {
   Table2,
   Trash2,
   Unplug,
-} from "lucide-react"
+} from "@/components/icons"
 import { Button, IconButton, ScrollArea, TextArea, TextInput } from "../../components/atoms"
 import { ConfirmDialog, EmptyState, FormField } from "../../components/molecules"
 import {

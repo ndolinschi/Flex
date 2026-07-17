@@ -1,12 +1,12 @@
 import type { ReactNode } from "react"
-import type { LucideIcon } from "lucide-react"
+import type { Icon } from "@/components/icons"
 import type { SessionMeta } from "../lib/types"
 
 /** A right-sidebar tab contributed by a UI plugin (not the agent engine). */
 export type UiPluginTab = {
   id: string
   label: string
-  icon: LucideIcon
+  icon: Icon
   /** When false, the tab is omitted from the strip / "+" menu. Default true. */
   enabled?: boolean
   /** Render the tab body. `active` is true when this tab is selected and the panel is open. */

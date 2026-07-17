@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Bot, ChevronDown, Network } from "lucide-react"
+import { Bot, ChevronDown, Network } from "@/components/icons"
 import type { TimelineRow } from "../../lib/types"
 import {
   collectRunningWorkers,

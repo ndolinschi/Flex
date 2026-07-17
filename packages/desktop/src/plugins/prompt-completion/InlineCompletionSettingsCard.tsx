@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Sparkles } from "lucide-react"
+import { Sparkles } from "@/components/icons"
 import { Button, Spinner, Toggle } from "../../components/atoms"
 import {
   ErrorBanner,

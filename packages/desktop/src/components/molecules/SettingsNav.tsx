@@ -10,7 +10,7 @@ import {
   Plug,
   Search,
   X,
-} from "lucide-react"
+} from "@/components/icons"
 import { TextInput } from "../atoms"
 import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import type { SettingsSearchEntry, SettingsSectionId } from "../../lib/settingsSearchIndex"
@@ -40,7 +40,7 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = ALL_SETTINGS_NAV_ITEMS.filt
 )
 
 /** Icon per section — mapped from the reference `Bii` icon dictionary
- * (§7) onto lucide-react equivalents already used elsewhere in this app. */
+ * (§7) onto local Lucide icons (`@/components/icons`) already used elsewhere. */
 const NAV_ICONS: Record<SettingsSectionId, typeof Cog> = {
   general: Cog,
   appearance: Palette,

@@ -1,4 +1,4 @@
-import { Activity } from "lucide-react"
+import { Activity } from "@/components/icons"
 import { useModels } from "../../../hooks/useModels"
 import { cacheTotalsFromModelUsage } from "../../../lib/modelUsage"
 import { sessionLabel, type SessionMeta } from "../../../lib/types"

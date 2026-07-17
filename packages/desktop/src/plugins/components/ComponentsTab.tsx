@@ -12,7 +12,7 @@ import {
   List,
   RefreshCw,
   Send,
-} from "lucide-react"
+} from "@/components/icons"
 import {
   IconButton,
   ScrollArea,

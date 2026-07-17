@@ -1,4 +1,4 @@
-import { MessageSquareText, X } from "lucide-react"
+import { MessageSquareText, X } from "@/components/icons"
 import type { PlanComment } from "../../stores/types"
 import { IconButton } from "../atoms"
 import { formatRelativeTime, cn } from "../../lib/utils"

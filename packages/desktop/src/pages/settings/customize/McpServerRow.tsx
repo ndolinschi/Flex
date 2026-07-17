@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plug, Settings2, Trash2 } from "lucide-react"
+import { Plug, Settings2, Trash2 } from "@/components/icons"
 import { Badge, Button } from "../../../components/atoms"
 import { ConfirmDialog, McpInstallDialog } from "../../../components/molecules"
 import { buildCatalogServerDto, prefillCatalogValues } from "../../../lib/mcp"

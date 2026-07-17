@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ChevronRight, LoaderCircle } from "lucide-react"
+import { ChevronRight, LoaderCircle } from "@/components/icons"
 import type { VerificationVerdict } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Collapsible } from "./Collapsible"

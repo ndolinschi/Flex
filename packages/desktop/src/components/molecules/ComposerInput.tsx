@@ -1,5 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent, type RefObject } from "react"
-import { Maximize2 } from "lucide-react"
+import { Maximize2 } from "@/components/icons"
 import { useAutoGrowTextarea } from "../../hooks/useAutoGrowTextarea"
 import { useComposerAutocomplete } from "../../hooks/useComposerAutocomplete"
 import { useInlineCompletion } from "../../hooks/useInlineCompletion"

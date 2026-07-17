@@ -1,23 +1,30 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { MessageSquare } from "lucide-react"
-import type { LucideIcon } from "lucide-react"
-import { CommandPaletteRow } from "./CommandPaletteRow"
+import { MessageSquare } from "@/components/icons"
+import type { Icon } from "@/components/icons"
 import { fuzzyScore } from "../../lib/fuzzySearch"
 import type { SessionId } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import type { RightPanelTab } from "../../stores/appStore"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 
 type OpenTabDef = {
   id: RightPanelTab
   label: string
-  icon: LucideIcon
+  icon: Icon
 }
 
 type OpenTabEntry = {
   id: string
   label: string
-  icon: LucideIcon
+  icon: Icon
   kind: "chat" | "tool"
   tool?: RightPanelTab
 }
@@ -79,12 +86,9 @@ export const OpenTabModal = ({
   onOpenTool,
 }: OpenTabModalProps) => {
   const [query, setQuery] = useState("")
-  const [activeIndex, setActiveIndex] = useState(0)
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(
     null,
   )
-  const inputRef = useRef<HTMLInputElement>(null)
-  const listRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
@@ -115,17 +119,7 @@ export const OpenTabModal = ({
   }
 
   useEffect(() => {
-    setActiveIndex(0)
-  }, [query, open])
-
-  useEffect(() => {
     if (open) setQuery("")
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const el = inputRef.current
-    if (el) requestAnimationFrame(() => el.focus())
   }, [open])
 
   // Anchor below the `+` button; flip/clamp to stay in the viewport.
@@ -153,51 +147,24 @@ export const OpenTabModal = ({
 
   useEffect(() => {
     if (!open) return
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        onCloseRef.current()
-        return
-      }
-      if (e.key === "ArrowDown") {
-        e.preventDefault()
-        setActiveIndex((i) => Math.min(i + 1, filtered.length - 1))
-        return
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault()
-        setActiveIndex((i) => Math.max(i - 1, 0))
-        return
-      }
-      if (e.key === "Enter") {
-        e.preventDefault()
-        const entry = filtered[activeIndex]
-        if (entry) activate(entry)
-      }
-    }
-
     const handlePointerDown = (e: PointerEvent) => {
       const target = e.target as Node
       if (panelRef.current?.contains(target)) return
       onCloseRef.current()
     }
-
-    window.addEventListener("keydown", handleKey)
-    window.addEventListener("pointerdown", handlePointerDown, true)
-    return () => {
-      window.removeEventListener("keydown", handleKey)
-      window.removeEventListener("pointerdown", handlePointerDown, true)
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        onCloseRef.current()
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, filtered, activeIndex, sessionId, paneIndex])
-
-  useEffect(() => {
-    const el = listRef.current?.querySelector<HTMLElement>(
-      `[data-index="${activeIndex}"]`,
-    )
-    el?.scrollIntoView({ block: "nearest" })
-  }, [activeIndex])
+    window.addEventListener("pointerdown", handlePointerDown, true)
+    window.addEventListener("keydown", handleKey)
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown, true)
+      window.removeEventListener("keydown", handleKey)
+    }
+  }, [open])
 
   if (!open || !anchor) return null
 
@@ -217,39 +184,38 @@ export const OpenTabModal = ({
       role="dialog"
       aria-modal="true"
       aria-label="Open tab"
+      data-suppress-native-webview=""
     >
-      <div className="flex shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5 py-2">
-        <input
-          ref={inputRef}
+      <Command
+        shouldFilter={false}
+        className="max-h-[min(50vh,360px)] rounded-lg bg-panel"
+      >
+        <CommandInput
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onValueChange={setQuery}
           placeholder="Open a tab…"
           aria-label="Open tab search"
-          className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
+          className="text-sm"
         />
-      </div>
-      <div
-        ref={listRef}
-        className="min-h-0 flex-1 overflow-y-auto py-1"
-        role="listbox"
-        aria-label="Tabs"
-      >
-        {filtered.length === 0 ? (
-          <p className="px-2.5 py-2 text-sm text-ink-muted">No matching tabs</p>
-        ) : (
-          filtered.map((entry, i) => (
-            <CommandPaletteRow
-              key={entry.id}
-              index={i}
-              active={i === activeIndex}
-              label={entry.label}
-              icon={entry.icon}
-              onActivate={() => activate(entry)}
-              onHover={() => setActiveIndex(i)}
-            />
-          ))
-        )}
-      </div>
+        <CommandList className="max-h-[min(40vh,300px)] py-1">
+          <CommandEmpty>No matching tabs</CommandEmpty>
+          <CommandGroup>
+            {filtered.map((entry) => {
+              const ItemIcon = entry.icon
+              return (
+                <CommandItem
+                  key={entry.id}
+                  value={entry.id}
+                  onSelect={() => activate(entry)}
+                >
+                  <ItemIcon className="size-3.5 text-ink-muted" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                </CommandItem>
+              )
+            })}
+          </CommandGroup>
+        </CommandList>
+      </Command>
     </div>,
     document.body,
   )

@@ -1,5 +1,5 @@
 import { useEffect, useState, type MouseEvent } from "react"
-import { ChevronRight, FileCode2, ListEnd, LoaderCircle } from "lucide-react"
+import { ChevronRight, FileCode2, ListEnd, LoaderCircle } from "@/components/icons"
 import { backgroundDemote, reviewFileDiff, toInvokeError } from "../../lib/tauri"
 import { cn, toSessionRelativePath } from "../../lib/utils"
 import { sessionScopeKey, useAppStore } from "../../stores/appStore"

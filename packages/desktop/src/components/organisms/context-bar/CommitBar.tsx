@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { GitMerge, GitPullRequest } from "lucide-react"
+import { GitMerge, GitPullRequest } from "@/components/icons"
 import {
   gitCommit,
   gitCreatePrForBranch,

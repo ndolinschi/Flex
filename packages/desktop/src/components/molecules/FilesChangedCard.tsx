@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowRight, ChevronDown, ChevronRight } from "lucide-react"
+import { ArrowRight, ChevronDown, ChevronRight } from "@/components/icons"
 import { gitStatusSinceBaseline } from "../../lib/tauri"
 import { useIsGitRepo } from "../../hooks/useIsGitRepo"
 import { sessionScopeKey, useAppStore } from "../../stores/appStore"

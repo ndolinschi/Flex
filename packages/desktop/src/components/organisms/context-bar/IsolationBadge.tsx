@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { GitMerge, XCircle } from "lucide-react"
+import { GitMerge, XCircle } from "@/components/icons"
 import { workspaceStatus } from "../../../lib/tauri"
 import { useWorkspaceActions } from "../../../hooks/useWorkspaceActions"
 import { cn } from "../../../lib/utils"

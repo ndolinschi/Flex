@@ -1,4 +1,4 @@
-import { Moon, Sun } from "lucide-react"
+import { Moon, Sun } from "@/components/icons"
 import { SettingsShell } from "../components/templates"
 import { SettingsCard, SettingRow, SETTINGS_NAV_ITEMS, AccentColorPicker } from "../components/molecules"
 import { Toggle } from "../components/atoms"

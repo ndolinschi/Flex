@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { ChevronRight, Workflow } from "lucide-react"
+import { ChevronRight, Workflow } from "@/components/icons"
 import type {
   PlanStatus,
   ToolCallStatus,

@@ -1,4 +1,4 @@
-import { ArrowUp, Square } from "lucide-react"
+import { ArrowUp, Square } from "@/components/icons"
 import { cn } from "../../lib/utils"
 
 type SendButtonProps = {

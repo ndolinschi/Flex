@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Brain, ChevronDown, Clock, MoreHorizontal, Trash2 } from "lucide-react"
+import { Brain, ChevronDown, Clock, MoreHorizontal, Trash2 } from "@/components/icons"
 import { IconButton, Spinner, Tooltip } from "../../../components/atoms"
 import {
   Collapsible,

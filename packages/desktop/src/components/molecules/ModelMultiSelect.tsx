@@ -1,10 +1,15 @@
-import { useRef, useState } from "react"
-import { ChevronDown, ChevronUp, Plus, X } from "lucide-react"
+import { useState } from "react"
+import { ChevronDown, ChevronUp, Plus, X } from "@/components/icons"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Label } from "../atoms"
-import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
+import { PopoverItem, PopoverSearch, PopoverSection } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 
 type ModelMultiSelectProps = {
   id: string
@@ -41,14 +46,13 @@ export const ModelMultiSelect = ({
 }: ModelMultiSelectProps) => {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
-  const addRef = useRef<HTMLDivElement>(null)
 
   const available = models.filter((m) => !value.includes(m.id))
   const { groups } = useGroupedModels(available, query, builtinProviders)
 
-  const handleClose = () => {
-    setOpen(false)
-    setQuery("")
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next)
+    if (!next) setQuery("")
   }
 
   const moveUp = (index: number) => {
@@ -71,7 +75,7 @@ export const ModelMultiSelect = ({
 
   const add = (modelId: string) => {
     onChange([...value, modelId])
-    handleClose()
+    handleOpenChange(false)
   }
 
   return (
@@ -129,31 +133,33 @@ export const ModelMultiSelect = ({
         <p className="text-xs text-ink-faint">No fallbacks configured</p>
       )}
 
-      <div ref={addRef} className="relative self-start">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          disabled={disabled || isLoading || available.length === 0}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          className={cn(
-            "flex h-7 items-center gap-1 rounded-md border border-dashed border-stroke-2 px-2",
-            "text-xs text-ink-muted transition-colors duration-[var(--duration-fast)] hover:border-stroke-1 hover:text-ink-secondary",
-            "disabled:pointer-events-none disabled:opacity-40",
-          )}
-        >
-          <Plus className="h-3 w-3" aria-hidden />
-          Add fallback
-        </button>
-
-        <PopoverTray
-          open={open}
-          onClose={handleClose}
-          anchorRef={addRef}
-          placement="below"
+      <Popover open={open} onOpenChange={handleOpenChange}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            disabled={disabled || isLoading || available.length === 0}
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            className={cn(
+              "flex h-7 items-center gap-1 rounded-md border border-dashed border-stroke-2 px-2",
+              "text-xs text-ink-muted transition-colors duration-[var(--duration-fast)] hover:border-stroke-1 hover:text-ink-secondary",
+              "disabled:pointer-events-none disabled:opacity-40",
+            )}
+          >
+            <Plus className="h-3 w-3" aria-hidden />
+            Add fallback
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          sideOffset={4}
           role="listbox"
           aria-label="Add fallback model"
-          className="left-0 w-72"
+          className={cn(
+            "w-72 gap-0 rounded-md border-0 bg-panel p-0 shadow-[var(--shadow-popover)]",
+            "ring-0",
+          )}
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <PopoverSearch
             value={query}
@@ -183,8 +189,8 @@ export const ModelMultiSelect = ({
               ))
             )}
           </div>
-        </PopoverTray>
-      </div>
+        </PopoverContent>
+      </Popover>
     </div>
   )
 }

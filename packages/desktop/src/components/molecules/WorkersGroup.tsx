@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react"
-import { Bot, ChevronRight, Network } from "lucide-react"
+import { Bot, ChevronRight, Network } from "@/components/icons"
 import type { SubagentTimelineRow } from "../../lib/workerPresentation"
 import { workersHeaderLabel } from "../../lib/workerPresentation"
 import { cn } from "../../lib/utils"

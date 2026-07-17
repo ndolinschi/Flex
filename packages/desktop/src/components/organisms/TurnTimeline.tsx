@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { ArrowDown } from "lucide-react"
+import { ArrowDown } from "@/components/icons"
 import { RunningDot, Skeleton } from "../atoms"
 import {
   EmptyState,

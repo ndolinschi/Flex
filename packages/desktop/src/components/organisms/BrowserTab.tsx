@@ -3,7 +3,7 @@ import {
   AlertTriangle,
   Globe,
   Loader2,
-} from "lucide-react"
+} from "@/components/icons"
 import { Button } from "../atoms"
 import { useBrowserSession } from "../../hooks/useBrowserSession"
 import { NATIVE_APP_REQUIRED } from "../../lib/browserPreview"

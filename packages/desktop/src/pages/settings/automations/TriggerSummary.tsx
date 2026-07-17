@@ -1,4 +1,4 @@
-import { Clock, Webhook } from "lucide-react"
+import { Clock, Webhook } from "@/components/icons"
 import { humanizeCron } from "../../../lib/cron"
 import type { RoutineTriggerDto } from "../../../lib/types"
 

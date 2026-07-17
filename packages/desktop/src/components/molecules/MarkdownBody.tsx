@@ -9,7 +9,7 @@ import {
 } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { Check, Copy } from "lucide-react"
+import { Check, Copy } from "@/components/icons"
 import { cn } from "../../lib/utils"
 import {
   parseFenceMeta,

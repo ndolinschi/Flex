@@ -8,8 +8,8 @@ import {
   GitPullRequest,
   SquarePen,
   Terminal as TerminalIcon,
-  type LucideIcon,
-} from "lucide-react"
+  type Icon,
+} from "@/components/icons"
 import {
   isRightPanelTabEnabled,
   MEMORY_TAB_ENABLED,
@@ -22,7 +22,7 @@ import type { RightPanelTab } from "../../../stores/appStore"
 export type RightPanelTabDef = {
   id: RightPanelTab
   label: string
-  icon: LucideIcon
+  icon: Icon
   /** Present only for plugin-contributed tabs. */
   pluginId?: string
 }

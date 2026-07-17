@@ -1,5 +1,5 @@
 import type { MouseEvent as ReactMouseEvent, DragEvent as ReactDragEvent } from "react"
-import { X } from "lucide-react"
+import { X } from "@/components/icons"
 import { cn } from "../../lib/utils"
 
 type TabCloseProps = {

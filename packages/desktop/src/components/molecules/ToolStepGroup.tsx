@@ -13,7 +13,7 @@ import {
   LoaderCircle,
   Terminal,
   Wrench,
-} from "lucide-react"
+} from "@/components/icons"
 import type { ToolCall } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Collapsible } from "./Collapsible"

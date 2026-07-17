@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { BookOpen, Check, Globe, ShieldCheck, Search } from "lucide-react"
+import { BookOpen, Check, Globe, ShieldCheck, Search } from "@/components/icons"
 import { Button, Spinner, TextInput, Toggle } from "../../../components/atoms"
 import { ErrorBanner, SettingsSection } from "../../../components/molecules"
 import { useProviderConfig } from "../../../hooks/useProviderConfig"

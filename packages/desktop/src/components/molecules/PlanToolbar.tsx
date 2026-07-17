@@ -11,13 +11,21 @@ import {
   Save,
   Search,
   X,
-} from "lucide-react"
+} from "@/components/icons"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Button, IconButton, RunningDot } from "../atoms"
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu"
 import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 
 export type PlanBuildStatus = "draft" | "ready" | "building" | "built"
 
@@ -257,23 +265,32 @@ export const PlanToolbar = ({
   return (
     <div className={cn("flex shrink-0 flex-col border-b border-stroke-3", className)}>
       <div className="flex h-[var(--header-height)] items-center gap-1.5 px-2.5 text-sm">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
-          <span className="min-w-0 truncate text-ink-muted">{repo}</span>
-          <span className="shrink-0 text-ink-faint">›</span>
-          {showPlansListCrumb && onBackToPlans ? (
-            <button
-              type="button"
-              onClick={onBackToPlans}
-              className="shrink-0 text-ink-muted transition-colors duration-[var(--duration-fast)] hover:text-ink"
-            >
-              Plans
-            </button>
-          ) : (
-            <span className="shrink-0 text-ink-muted">Plans</span>
-          )}
-          <span className="shrink-0 text-ink-faint">›</span>
-          <span className="min-w-0 truncate text-ink-secondary">{title}</span>
-        </div>
+        <Breadcrumb className="min-w-0 flex-1 overflow-hidden">
+          <BreadcrumbList className="flex-nowrap gap-1.5 overflow-hidden">
+            <BreadcrumbItem className="min-w-0">
+              <span className="truncate text-ink-muted">{repo}</span>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem className="shrink-0">
+              {showPlansListCrumb && onBackToPlans ? (
+                <BreadcrumbLink
+                  asChild
+                  className="text-ink-muted hover:text-ink"
+                >
+                  <button type="button" onClick={onBackToPlans}>
+                    Plans
+                  </button>
+                </BreadcrumbLink>
+              ) : (
+                <BreadcrumbPage className="text-ink-muted">Plans</BreadcrumbPage>
+              )}
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem className="min-w-0">
+              <BreadcrumbPage className="truncate">{title}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
         <span className="flex shrink-0 items-center gap-1.5">
           <PlanModelPill

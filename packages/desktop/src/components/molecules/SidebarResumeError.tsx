@@ -1,4 +1,4 @@
-import { RotateCw, X } from "lucide-react"
+import { RotateCw, X } from "@/components/icons"
 import { Button, IconButton } from "../atoms"
 import { cn } from "../../lib/utils"
 

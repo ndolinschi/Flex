@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Play, Trash2 } from "lucide-react"
+import { Play, Trash2 } from "@/components/icons"
 import { Badge, Button, Spinner } from "../../../components/atoms"
 import {
   Collapsible,

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Check, Copy } from "lucide-react"
+import { Check, Copy } from "@/components/icons"
 import { IconButton, Tooltip } from "../../atoms"
 import { useAppStore } from "../../../stores/appStore"
 import { formatDuration, formatRelativeTime } from "../../../lib/utils"

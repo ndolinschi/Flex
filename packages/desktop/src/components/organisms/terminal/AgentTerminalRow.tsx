@@ -1,4 +1,4 @@
-import { Infinity as InfinityIcon } from "lucide-react"
+import { Infinity as InfinityIcon } from "@/components/icons"
 import { cn } from "../../../lib/utils"
 
 export const AgentTerminalRow = ({

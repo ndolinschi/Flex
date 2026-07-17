@@ -6,6 +6,7 @@ import type { PendingQuestion, Question } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
 import { log } from "../../lib/debug/log"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 type QuestionPromptProps = {
   question: PendingQuestion
@@ -55,6 +56,16 @@ const StepBody = ({
     onOptionSelected()
   }
 
+  const optionCardClass = (active: boolean) =>
+    cn(
+      "w-full rounded-md border text-left text-sm leading-snug",
+      OPTION_PAD,
+      "transition-colors duration-[var(--duration-fast)]",
+      active
+        ? "border-accent bg-accent-subtle text-ink"
+        : "border-stroke-3 bg-fill-5 text-ink-secondary hover:border-stroke-2 hover:bg-fill-4",
+    )
+
   return (
     <fieldset className={cn("flex min-w-0 flex-col", STACK_GAP)}>
       <legend className="flex w-full min-w-0 flex-col gap-1">
@@ -66,32 +77,63 @@ const StepBody = ({
         </span>
       </legend>
       <div className={cn("flex flex-col", STACK_GAP)}>
-        {q.options.map((opt) => {
-          const active = draft.selected.includes(opt.label)
-          return (
-            <button
-              key={opt.label}
-              type="button"
-              aria-pressed={active}
-              onClick={() => handleToggle(opt.label)}
-              className={cn(
-                "w-full rounded-md border text-left text-sm leading-snug",
-                OPTION_PAD,
-                "transition-colors duration-[var(--duration-fast)]",
-                active
-                  ? "border-accent bg-accent-subtle text-ink"
-                  : "border-stroke-3 bg-fill-5 text-ink-secondary hover:border-stroke-2 hover:bg-fill-4",
-              )}
-            >
-              <span className="block font-medium leading-snug">{opt.label}</span>
-              {opt.description ? (
-                <span className="mt-1 block text-xs leading-snug text-ink-muted">
-                  {opt.description}
+        {multi ? (
+          q.options.map((opt) => {
+            const active = draft.selected.includes(opt.label)
+            return (
+              <button
+                key={opt.label}
+                type="button"
+                aria-pressed={active}
+                onClick={() => handleToggle(opt.label)}
+                className={optionCardClass(active)}
+              >
+                <span className="block font-medium leading-snug">
+                  {opt.label}
                 </span>
-              ) : null}
-            </button>
-          )
-        })}
+                {opt.description ? (
+                  <span className="mt-1 block text-xs leading-snug text-ink-muted">
+                    {opt.description}
+                  </span>
+                ) : null}
+              </button>
+            )
+          })
+        ) : (
+          <RadioGroup
+            value={draft.selected[0] ?? ""}
+            onValueChange={(label) => handleToggle(label)}
+            className={cn("grid w-full", STACK_GAP)}
+            aria-label={q.question}
+          >
+            {q.options.map((opt) => {
+              const active = draft.selected.includes(opt.label)
+              return (
+                <label
+                  key={opt.label}
+                  className={cn(
+                    optionCardClass(active),
+                    "relative flex cursor-pointer flex-col",
+                  )}
+                >
+                  <RadioGroupItem
+                    value={opt.label}
+                    className="sr-only"
+                    aria-label={opt.label}
+                  />
+                  <span className="block font-medium leading-snug">
+                    {opt.label}
+                  </span>
+                  {opt.description ? (
+                    <span className="mt-1 block text-xs leading-snug text-ink-muted">
+                      {opt.description}
+                    </span>
+                  ) : null}
+                </label>
+              )
+            })}
+          </RadioGroup>
+        )}
         {allowCustom ? (
           <TextInput
             value={draft.custom}

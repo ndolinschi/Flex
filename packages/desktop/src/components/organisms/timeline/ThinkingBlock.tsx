@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight } from "@/components/icons"
 import { Tooltip } from "../../atoms"
 import { Collapsible } from "../../molecules"
 import { cn } from "../../../lib/utils"

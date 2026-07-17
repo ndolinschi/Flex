@@ -8,7 +8,7 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { MessageSquare, Plus, X } from "lucide-react"
+import { MessageSquare, Plus, X } from "@/components/icons"
 import { IconButton, Tab, TabStrip, Tooltip } from "../../atoms"
 import { OpenTabModal } from "../../molecules"
 import { useSessions } from "../../../hooks/useSessions"

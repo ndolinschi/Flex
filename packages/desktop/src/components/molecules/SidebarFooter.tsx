@@ -1,4 +1,4 @@
-import { Moon, Settings, Sun } from "lucide-react"
+import { Moon, Settings, Sun } from "@/components/icons"
 import { IconButton, Spinner } from "../atoms"
 
 type SidebarFooterProps = {

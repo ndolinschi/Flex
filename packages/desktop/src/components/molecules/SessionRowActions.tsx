@@ -4,7 +4,7 @@ import {
   Archive as ArchiveIcon,
   MoreHorizontal,
   Pin,
-} from "lucide-react"
+} from "@/components/icons"
 import { cn } from "../../lib/utils"
 import { IconButton, Tooltip } from "../atoms"
 

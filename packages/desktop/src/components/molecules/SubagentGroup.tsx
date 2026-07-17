@@ -6,7 +6,7 @@ import {
   LoaderCircle,
   PanelBottomOpen,
   X,
-} from "lucide-react"
+} from "@/components/icons"
 import type { TimelineRow, TurnSummary } from "../../lib/types"
 import {
   filterWorkerDisplayChildren,

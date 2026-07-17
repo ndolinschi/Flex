@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Check, Copy, FolderOpen } from "lucide-react"
+import { Check, Copy, FolderOpen } from "@/components/icons"
 import { Button, Toggle } from "../../components/atoms"
 import { SettingsCard, SettingRow } from "../../components/molecules"
 import { exportDebugLog, exportDiagnostics, log } from "../../lib/debug/log"

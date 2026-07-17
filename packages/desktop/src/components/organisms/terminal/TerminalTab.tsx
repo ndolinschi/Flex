@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { List, Plus, Terminal as TerminalIcon } from "lucide-react"
+import { List, Plus, Terminal as TerminalIcon } from "@/components/icons"
 import { IconButton, ScrollArea } from "../../atoms"
 import { ConfirmDialog, EmptyState } from "../../molecules"
 import { agentTerminalId } from "../../../hooks/useGlobalSessionEvents"

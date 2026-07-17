@@ -1,4 +1,4 @@
-import { GitPullRequest } from "lucide-react"
+import { GitPullRequest } from "@/components/icons"
 import type { BranchPrInfo } from "../../lib/tauri"
 import { openExternalUrl } from "../../lib/openExternalUrl"
 import { cn } from "../../lib/utils"

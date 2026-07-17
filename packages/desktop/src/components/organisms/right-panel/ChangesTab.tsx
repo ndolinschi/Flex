@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { GitMerge, RefreshCw, XCircle } from "lucide-react"
+import { GitMerge, RefreshCw, XCircle } from "@/components/icons"
 import { Button, Checkbox, DiffStat, IconButton, ScrollArea } from "../../atoms"
 import { BranchPrStatusChip, ConfirmDialog, CreatePrDialog } from "../../molecules"
 import { useWorkspaceActions } from "../../../hooks/useWorkspaceActions"

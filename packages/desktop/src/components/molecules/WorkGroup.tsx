@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from "react"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight } from "@/components/icons"
 import { RunningDot } from "../atoms"
 import { Collapsible } from "./Collapsible"
 import type { VerificationVerdict } from "../../lib/types"

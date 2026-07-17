@@ -1,4 +1,4 @@
-import { Check, Circle, LoaderCircle } from "lucide-react"
+import { Check, Circle, LoaderCircle } from "@/components/icons"
 import type { PlanEntry } from "../../lib/types"
 import { cn } from "../../lib/utils"
 

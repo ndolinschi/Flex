@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft } from "@/components/icons"
 import { IconButton } from "../atoms"
 import { SettingsNav } from "../molecules"
 import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"

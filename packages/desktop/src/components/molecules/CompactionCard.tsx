@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight } from "@/components/icons"
 import { cn, formatTokens } from "../../lib/utils"
 import { Collapsible } from "./Collapsible"
 import { MarkdownBody } from "./MarkdownBody"

@@ -1,4 +1,4 @@
-import { FileIcon, Folder, ImageIcon, MousePointer2, Palette, X } from "lucide-react"
+import { FileIcon, Folder, ImageIcon, MousePointer2, Palette, X } from "@/components/icons"
 import type { ComposerAttachment } from "../../lib/types"
 import { cn } from "../../lib/utils"
 

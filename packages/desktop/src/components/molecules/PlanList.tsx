@@ -1,4 +1,4 @@
-import { Check, MessageSquareText } from "lucide-react"
+import { Check, MessageSquareText } from "@/components/icons"
 import type { SessionPlan } from "../../stores/types"
 import { formatRelativeTime, cn } from "../../lib/utils"
 

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown } from "@/components/icons"
 import { Collapsible } from "../../../components/molecules"
 import type { MemoryEntryDto } from "../../../lib/types"
 import { cn } from "../../../lib/utils"

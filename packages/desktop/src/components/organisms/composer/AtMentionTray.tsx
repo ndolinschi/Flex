@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react"
-import { FileIcon, Folder, Plug, Table2 } from "lucide-react"
+import { FileIcon, Folder, Plug, Table2 } from "@/components/icons"
 import { PopoverItem, PopoverTray } from "../../molecules"
 import type { AtMentionHit } from "../../../lib/atMentionHits"
 

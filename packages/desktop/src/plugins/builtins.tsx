@@ -1,4 +1,4 @@
-import { Boxes, Database } from "lucide-react"
+import { Boxes, Database } from "@/components/icons"
 import { DatabaseTab } from "./database/DatabaseTab"
 import { ComponentsTab } from "./components/ComponentsTab"
 import { searchDatabaseMentions } from "./database/mentions"

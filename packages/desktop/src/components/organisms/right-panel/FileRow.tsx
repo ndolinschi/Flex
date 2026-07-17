@@ -1,6 +1,6 @@
 import { memo, useState, type MouseEvent as ReactMouseEvent } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, ChevronRight, FileCode2, Undo2 } from "lucide-react"
+import { Check, ChevronRight, FileCode2, Undo2 } from "@/components/icons"
 import { Checkbox, DiffStat, IconButton, Spinner } from "../../atoms"
 import { Collapsible, ConfirmDialog, DiffView } from "../../molecules"
 import { invalidateReviewQueries } from "../../../hooks/useWorkspaceActions"

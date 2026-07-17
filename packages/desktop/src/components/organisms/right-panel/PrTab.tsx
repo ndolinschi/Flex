@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { ExternalLink, GitPullRequest, Loader2 } from "lucide-react"
+import { ExternalLink, GitPullRequest, Loader2 } from "@/components/icons"
 import type { SessionMeta } from "../../../lib/types"
 import { gitPrDiff, gitPrStatus } from "../../../lib/tauri"
 import { openExternalUrl } from "../../../lib/openExternalUrl"

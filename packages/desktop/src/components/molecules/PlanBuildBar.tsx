@@ -1,4 +1,4 @@
-import { Hammer } from "lucide-react"
+import { Hammer } from "@/components/icons"
 import { Button } from "../atoms"
 import { cn } from "../../lib/utils"
 

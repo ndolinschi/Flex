@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { RefreshCw } from "lucide-react"
+import { RefreshCw } from "@/components/icons"
 import { Button, Spinner, Toggle } from "../../components/atoms"
 import { ErrorBanner, SettingsCard, SettingRow } from "../../components/molecules"
 import { useProviderConfig } from "../../hooks/useProviderConfig"

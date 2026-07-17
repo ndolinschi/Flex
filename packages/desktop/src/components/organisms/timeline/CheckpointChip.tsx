@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight } from "@/components/icons"
 import { ConfirmDialog, ErrorBanner } from "../../molecules"
 import { revertSnapshot } from "../../../lib/tauri"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Check, Pipette } from "lucide-react"
+import { Check, Pipette } from "@/components/icons"
 import {
   ACCENT_PRESETS,
   type AccentId,

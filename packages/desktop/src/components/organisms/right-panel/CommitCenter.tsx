@@ -1,6 +1,6 @@
 import { useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { ChevronDown, GitBranch, GitMerge, GitPullRequest } from "lucide-react"
+import { ChevronDown, GitBranch, GitMerge, GitPullRequest } from "@/components/icons"
 import { Button, TextArea } from "../../atoms"
 import { CreatePrDialog } from "../../molecules/CreatePrDialog"
 import { PopoverItem, PopoverTray } from "../../molecules/PopoverTray"

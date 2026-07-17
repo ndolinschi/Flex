@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react"
+import type { Icon } from "@/components/icons"
 import { cn } from "../../lib/utils"
 
 type CommandPaletteRowProps = {
@@ -6,7 +6,7 @@ type CommandPaletteRowProps = {
   active: boolean
   label: string
   hint?: string
-  icon?: LucideIcon
+  icon?: Icon
   onActivate: () => void
   onHover: () => void
 }

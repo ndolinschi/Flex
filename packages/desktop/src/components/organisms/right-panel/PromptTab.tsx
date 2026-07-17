@@ -13,7 +13,7 @@ import {
   Pencil,
   Send,
   ShieldCheck,
-} from "lucide-react"
+} from "@/components/icons"
 import { IconButton, Tooltip } from "../../atoms"
 import { AtMentionTray } from "../composer/AtMentionTray"
 import { SlashCommandTray } from "../composer/SlashCommandTray"

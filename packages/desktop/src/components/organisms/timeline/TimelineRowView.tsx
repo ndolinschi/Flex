@@ -1,5 +1,5 @@
 import { memo } from "react"
-import { MousePointer2, Palette } from "lucide-react"
+import { MousePointer2, Palette } from "@/components/icons"
 import {
   CompactionCard,
   ErrorBanner,

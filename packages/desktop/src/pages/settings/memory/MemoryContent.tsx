@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { FileText } from "lucide-react"
+import { FileText } from "@/components/icons"
 import { Spinner } from "../../../components/atoms"
 import { EmptyState, ErrorBanner } from "../../../components/molecules"
 import {

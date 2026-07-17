@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Plus } from "lucide-react"
+import { Plus } from "@/components/icons"
 import { Button, Spinner } from "../../../components/atoms"
 import { ErrorBanner, EmptyState, SettingsSection } from "../../../components/molecules"
 import { routinesList, toInvokeError } from "../../../lib/tauri"

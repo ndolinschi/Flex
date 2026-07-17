@@ -1,4 +1,4 @@
-import { Shield } from "lucide-react"
+import { Shield } from "@/components/icons"
 import { cn } from "../../lib/utils"
 import { Tooltip } from "./Tooltip"
 

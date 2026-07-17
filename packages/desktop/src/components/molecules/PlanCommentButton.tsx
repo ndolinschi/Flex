@@ -1,4 +1,4 @@
-import { MessageSquareText } from "lucide-react"
+import { MessageSquareText } from "@/components/icons"
 import { Button } from "../atoms"
 import { cn } from "../../lib/utils"
 import type { PlanSelectionAnchor } from "../../hooks/usePlanSelectionComment"

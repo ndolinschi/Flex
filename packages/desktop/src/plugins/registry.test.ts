@@ -5,7 +5,7 @@ import {
   resetUiPluginsForTests,
   pluginRightPanelTabs,
 } from "./registry"
-import { Database } from "lucide-react"
+import { Database } from "@/components/icons"
 
 describe("UI plugin registry", () => {
   it("registers tabs without hardcoding into the builtins list", () => {

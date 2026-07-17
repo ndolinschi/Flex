@@ -263,9 +263,8 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
   `@/components/icons` / `@/icons` alias). Same shape as the shadcn.io CLI
   install (`size` / `color` / `strokeWidth` / `className`). Registry downloads
   need a Pro token (`https://www.shadcn.io/r/lucide-{name}.json?token=…`);
-  without a token we vendor Lucide SVGs into that layout. Migrated surfaces
-  import from `@/components/icons` — do not add new `lucide-react` imports
-  there. Remaining call sites may still use `lucide-react` until cut over.
+  without a token we vendor Lucide SVGs into that layout. Desktop surfaces
+  import from `@/components/icons` — do not add new `lucide-react` imports.
 
 ### Target registry inventory (user list → migrate?)
 
@@ -278,7 +277,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Attachment | yes (chat kit) | `AttachmentChip` | Registry name `attachment` (not `AttachmentNew`) |
 | Avatar | yes | `Avatar` atom | Thin wrap + `AvatarFallback` |
 | Badge | yes | `Badge`, `NewBadge`, `VerdictBadge` | Keep tone mapping via variants/`className` |
-| Breadcrumb | yes | `PlanToolbar` crumbs | Small win |
+| Breadcrumb | yes | `PlanToolbar` crumbs | **PlanToolbar migrated** |
 | Bubble | yes (chat kit) | user/assistant bubbles in timeline | After Message spike |
 | Button | yes | `Button`, `IconButton`, `SendButton` shell | Drop custom `isLoading` — compose `Spinner` + `disabled` |
 | Button Group | yes | composer toolbar clusters | Optional; `ToggleGroup` covers ModePicker |
@@ -289,7 +288,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Checkbox | yes | `Checkbox` atom | Restyle round + indeterminate |
 | Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader`, WorkGroup | **Sidebar section headers wired** |
 | Combobox | yes | Model/Branch/Project pickers | Prefer over PopoverTray search trays; Popover interim done |
-| Command | yes | `CommandPalette`, `SearchModal`, `OpenTabModal` | **CommandPalette + SearchModal migrated** (CommandDialog) |
+| Command | yes | `CommandPalette`, `SearchModal`, `OpenTabModal` | **CommandPalette + SearchModal** (CommandDialog); **OpenTabModal** (anchored Command portal) |
 | Context Menu | yes | `ContextMenu` molecule | **Migrated** — keep timeline-scroll / webview-blur dismiss |
 | Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
 | Date Picker | skip | — | |
@@ -313,9 +312,9 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Native Select | later | simple settings enums | Prefer Select/Combobox; ModelSelect stays searchable Popover |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
 | Pagination | later | DatabaseTab paging | Icons-only Previous/Next |
-| Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker, IsolationPicker, ModelSelect, BranchPicker, ProjectPicker**; Combobox next for ModelPicker |
+| Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker, IsolationPicker, ModelSelect, ModelMultiSelect, BranchPicker, ProjectPicker**; Combobox next for ModelPicker |
 | Progress | later | indexing / update UX | Soft need |
-| Radio Group | yes | `QuestionPrompt` choices | |
+| Radio Group | yes | `QuestionPrompt` choices | **QuestionPrompt** single-select migrated (multi stays pressed toggles) |
 | Resizable | yes | content split sash | **ContentWorkspace migrated** |
 | Scroll Area | yes | `ScrollArea` atom | Sidebar / overlays; **not** the virtualized timeline |
 | Select | yes | settings enums without search | Primitive installed; searchable ModelSelect uses Popover interim |
@@ -346,8 +345,8 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | **0 — Foundation** | `shadcn init` in `packages/desktop` (Vite, Tailwind v4, **radix** base, `lucide`, css variables); path alias `@/`; upgrade `cn` to `clsx` + `tailwind-merge`; map shadcn semantic tokens → Flex tokens in `src/index.css` / `tokens.css` without breaking `data-theme` | `components.json` present; `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
 | **1 — Atom adapters** | Add Button, Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Spinner, Avatar, Tooltip, ScrollArea; re-export from `components/atoms` with temporary compat props | Atom unit tests + vitest green; call sites compile via barrel. **Done:** Button, TextInput, TextArea, Label, Badge, Kbd, Divider←Separator, Skeleton, Spinner, Checkbox (round), Toggle←Switch (green ON), Avatar, ScrollArea. **Deferred:** Tooltip (timeline scroll / programmatic-scroll coupling — keep custom until Provider + scroll policy ported). |
 | **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog + auth/bug/MCP dialogs, ToastHost/Sonner, Mode/Isolation/Model/Branch/Project pickers (Popover), PlusMenu+SessionMenu+BrowserOverflow (DropdownMenu), TitleBarMenus (Menubar), ContextMenu (scroll/webview dismiss preserved). |
-| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select; searchable Popovers; Toggle Group (Files); CommandPalette/SearchModal. **Next:** Combobox (optional), Radio Group |
-| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner→Alert; Collapsible sidebar headers; ContentWorkspace Resizable. **Next:** optional Sidebar spike |
+| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select; searchable Popovers (incl. ModelMultiSelect); Toggle Group (Files); CommandPalette/SearchModal/OpenTabModal; RadioGroup (QuestionPrompt). **Next:** Combobox (optional), Input Group |
+| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner→Alert; Collapsible sidebar headers; ContentWorkspace Resizable; PlanToolbar Breadcrumb. **Next:** optional Sidebar spike |
 | **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Adopt Attachment→Bubble→Message→Marker *inside* virtual rows; MessageScroller only after measured spike with react-virtual |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
 

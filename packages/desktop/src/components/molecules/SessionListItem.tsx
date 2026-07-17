@@ -8,7 +8,7 @@ import {
   Plus,
   Trash2,
   TriangleAlert,
-} from "lucide-react"
+} from "@/components/icons"
 import type { GitStatusSummary, SessionMeta, WorkspaceStatusDto } from "../../lib/types"
 import { sessionLabel } from "../../lib/types"
 import { formatCompactTime, cn } from "../../lib/utils"

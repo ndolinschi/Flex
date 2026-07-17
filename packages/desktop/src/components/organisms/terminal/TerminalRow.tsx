@@ -1,4 +1,4 @@
-import { Terminal as TerminalIcon, X } from "lucide-react"
+import { Terminal as TerminalIcon, X } from "@/components/icons"
 import { cn } from "../../../lib/utils"
 import { formatElapsed } from "./time"
 
