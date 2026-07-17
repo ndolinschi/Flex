@@ -1,16 +1,15 @@
-import {
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from "react"
+import { useMemo, useRef } from "react"
 import { useAppStore } from "../../../stores/appStore"
 import { CHAT_MIN_WIDTH } from "../../../stores/layoutConstants"
-import { clampSplitRatio } from "../../../stores/contentLayoutModel"
 import { AppHeader } from "../AppHeader"
 import { ContentPane } from "./ContentPane"
-import { cn } from "../../../lib/utils"
 import { useContentTabLifecycle } from "../../../hooks/useContentTabLifecycle"
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable"
+import { cn } from "@/lib/utils"
 
 /** Main content host: AppHeader + one or two ContentPanes with a sash. */
 export const ContentWorkspace = () => {
@@ -19,8 +18,7 @@ export const ContentWorkspace = () => {
   const setSplitRatio = useAppStore((s) => s.setSplitRatio)
   const setRightPanelDragging = useAppStore((s) => s.setRightPanelDragging)
   const viewport = useAppStore((s) => s.viewport)
-  const [dragging, setDragging] = useState(false)
-  const rowRef = useRef<HTMLDivElement>(null)
+  const draggingRef = useRef(false)
 
   const keepAliveTools = useMemo(() => {
     const set = new Set<string>()
@@ -45,75 +43,74 @@ export const ContentWorkspace = () => {
     viewport === "wide" &&
     contentLayout.panes.length > 1
 
-  const handleSashDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    const row = rowRef.current
-    if (!row) return
-    setDragging(true)
-    setRightPanelDragging(true)
-    const startX = e.clientX
-    const startRatio = contentLayout.splitRatio
-    const width = row.getBoundingClientRect().width
-
-    const onMove = (ev: globalThis.PointerEvent) => {
-      if (width <= 0) return
-      const delta = (ev.clientX - startX) / width
-      const minRatio = CHAT_MIN_WIDTH / width
-      const maxRatio = 1 - minRatio
-      const next = clampSplitRatio(
-        Math.min(maxRatio, Math.max(minRatio, startRatio + delta)),
-      )
-      setSplitRatio(next, false)
-    }
-    const onUp = () => {
-      setDragging(false)
-      setRightPanelDragging(false)
-      setSplitRatio(useAppStore.getState().contentLayout.splitRatio, true)
-      window.removeEventListener("pointermove", onMove)
-      window.removeEventListener("pointerup", onUp)
-    }
-    window.addEventListener("pointermove", onMove)
-    window.addEventListener("pointerup", onUp)
-  }
+  const defaultLayout = useMemo(
+    () => ({
+      "content-pane-0": contentLayout.splitRatio * 100,
+      "content-pane-1": (1 - contentLayout.splitRatio) * 100,
+    }),
+    // Only seed when entering split — drag updates the store separately.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [split],
+  )
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
       <AppHeader />
-      <div
-        ref={rowRef}
-        className="relative flex min-h-0 min-w-0 flex-1"
-      >
-        <div
-          className="flex min-h-0 min-w-0 flex-col overflow-hidden"
-          style={
-            split
-              ? { width: `${contentLayout.splitRatio * 100}%`, flex: "none" }
-              : { flex: 1 }
-          }
+      {split ? (
+        <ResizablePanelGroup
+          id="content-workspace"
+          orientation="horizontal"
+          className="relative min-h-0 min-w-0 flex-1"
+          defaultLayout={defaultLayout}
+          onLayoutChange={(layout) => {
+            const left = layout["content-pane-0"]
+            if (typeof left !== "number") return
+            if (!draggingRef.current) {
+              draggingRef.current = true
+              setRightPanelDragging(true)
+            }
+            setSplitRatio(left / 100, false)
+          }}
+          onLayoutChanged={(layout) => {
+            const left = layout["content-pane-0"]
+            draggingRef.current = false
+            setRightPanelDragging(false)
+            if (typeof left === "number") {
+              setSplitRatio(left / 100, true)
+            }
+          }}
         >
-          <ContentPane paneIndex={0} keepAliveTools={keepAliveTools} />
+          <ResizablePanel
+            id="content-pane-0"
+            minSize={CHAT_MIN_WIDTH}
+            className="flex min-h-0 min-w-0 flex-col overflow-hidden"
+          >
+            <ContentPane paneIndex={0} keepAliveTools={keepAliveTools} />
+          </ResizablePanel>
+          <ResizableHandle
+            aria-label="Resize content panes"
+            className={cn(
+              "sash-line-transition relative z-10 w-1.5 bg-transparent",
+              "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-stroke-3 after:translate-x-0",
+              "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_15%,transparent)]",
+              "data-[separator=active]:after:bg-stroke-1",
+            )}
+          />
+          <ResizablePanel
+            id="content-pane-1"
+            minSize={CHAT_MIN_WIDTH}
+            className="flex min-h-0 min-w-0 flex-col overflow-hidden"
+          >
+            <ContentPane paneIndex={1} keepAliveTools={keepAliveTools} />
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      ) : (
+        <div className="relative flex min-h-0 min-w-0 flex-1">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <ContentPane paneIndex={0} keepAliveTools={keepAliveTools} />
+          </div>
         </div>
-        {split ? (
-          <>
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="Resize content panes"
-              tabIndex={0}
-              onPointerDown={handleSashDown}
-              className={cn(
-                "sash-line-transition relative z-10 w-1.5 shrink-0 cursor-col-resize",
-                "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-stroke-3",
-                "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_15%,transparent)]",
-                dragging && "after:bg-stroke-1",
-              )}
-            />
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-              <ContentPane paneIndex={1} keepAliveTools={keepAliveTools} />
-            </div>
-          </>
-        ) : null}
-      </div>
+      )}
     </div>
   )
 }

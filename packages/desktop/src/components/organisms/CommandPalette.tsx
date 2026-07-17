@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { createPortal } from "react-dom"
+import { useEffect, useMemo, useState } from "react"
 import {
   Bot,
   Brain,
@@ -14,7 +13,6 @@ import {
   MessagesSquare,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-import { CommandPaletteRow } from "../molecules"
 import { useSessions } from "../../hooks/useSessions"
 import {
   AUTOMATIONS_UI_ENABLED,
@@ -27,6 +25,16 @@ import { basename, cn } from "../../lib/utils"
 import { useAppStore, type RightPanelTab } from "../../stores/appStore"
 import { visibleRightPanelTabs } from "./right-panel/tabs"
 import { log } from "../../lib/debug/log"
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandShortcut,
+} from "@/components/ui/command"
 
 type CommandEntry = {
   id: string
@@ -45,9 +53,6 @@ type CommandPaletteProps = {
 /** Centered top overlay (the reference design/VS Code-style) — fuzzy command + session switcher. */
 export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
   const [query, setQuery] = useState("")
-  const [activeIndex, setActiveIndex] = useState(0)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const listRef = useRef<HTMLDivElement>(null)
 
   const { sessions, newAgent } = useSessions()
   const setRoute = useAppStore((s) => s.setRoute)
@@ -227,133 +232,77 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
   }, [commands, query])
 
   useEffect(() => {
-    setActiveIndex(0)
-  }, [query, open])
-
-  useEffect(() => {
     if (open) setQuery("")
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
-    const el = inputRef.current
-    if (el) requestAnimationFrame(() => el.focus())
-  }, [open])
+  const groups: Array<{ label: CommandEntry["group"]; items: CommandEntry[] }> =
+    (
+      [
+        {
+          label: "Commands",
+          items: filtered.filter((c) => c.group === "Commands"),
+        },
+        {
+          label: "Sessions",
+          items: filtered.filter((c) => c.group === "Sessions"),
+        },
+      ] as const
+    ).filter((g) => g.items.length > 0)
 
-  useEffect(() => {
-    if (!open) return
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        onClose()
-        return
-      }
-      if (e.key === "ArrowDown") {
-        e.preventDefault()
-        setActiveIndex((i) => Math.min(i + 1, filtered.length - 1))
-        return
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault()
-        setActiveIndex((i) => Math.max(i - 1, 0))
-        return
-      }
-      if (e.key === "Enter") {
-        e.preventDefault()
-        const entry = filtered[activeIndex]
-        if (entry) {
-          entry.run()
-          onClose()
-        }
-      }
-    }
-
-    window.addEventListener("keydown", handleKey)
-    return () => window.removeEventListener("keydown", handleKey)
-  }, [open, onClose, filtered, activeIndex])
-
-  useEffect(() => {
-    const el = listRef.current?.querySelector<HTMLElement>(
-      `[data-index="${activeIndex}"]`,
-    )
-    el?.scrollIntoView({ block: "nearest" })
-  }, [activeIndex])
-
-  if (!open) return null
-
-  const groups: Array<{ label: CommandEntry["group"]; items: CommandEntry[] }> = (
-    [
-      { label: "Commands", items: filtered.filter((c) => c.group === "Commands") },
-      { label: "Sessions", items: filtered.filter((c) => c.group === "Sessions") },
-    ] as const
-  ).filter((g) => g.items.length > 0)
-
-  let runningIndex = -1
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex justify-center bg-black/20 animate-backdrop-in"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
+  return (
+    <CommandDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose()
       }}
+      title="Command palette"
+      description="Type a command or search sessions"
+      className={cn("shadow-[var(--shadow-popover)]")}
     >
-      <div
-        className={cn(
-          "mt-[10vh] flex h-fit w-[560px] max-w-[90vw] flex-col overflow-hidden",
-          "rounded-lg bg-panel shadow-[var(--shadow-popover)] animate-tray-in",
-        )}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Command palette"
+      <Command
+        shouldFilter={false}
+        className="rounded-lg bg-panel"
       >
-        <div className="flex items-center gap-1.5 border-b border-stroke-3 px-3 py-2.5">
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type a command or search sessions…"
-            aria-label="Command palette input"
-            className="w-full bg-transparent text-base text-ink outline-none placeholder:text-ink-faint"
-          />
-        </div>
-
-        <div ref={listRef} className="max-h-[320px] overflow-y-auto py-1">
-          {groups.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-ink-faint">
-              No matching commands
-            </p>
-          ) : (
-            groups.map((group) => (
-              <div key={group.label} className="py-1">
-                <p className="px-3 py-1 text-xs font-medium text-ink-faint">
-                  {group.label}
-                </p>
-                {group.items.map((entry) => {
-                  runningIndex += 1
-                  const index = runningIndex
-                  return (
-                    <CommandPaletteRow
-                      key={entry.id}
-                      index={index}
-                      active={index === activeIndex}
-                      label={entry.label}
-                      hint={entry.hint}
-                      icon={entry.icon}
-                      onHover={() => setActiveIndex(index)}
-                      onActivate={() => {
-                        entry.run()
-                        onClose()
-                      }}
-                    />
-                  )
-                })}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>,
-    document.body,
+        <CommandInput
+          value={query}
+          onValueChange={setQuery}
+          placeholder="Type a command or search sessions…"
+          aria-label="Command palette input"
+        />
+        <CommandList className="py-1">
+          <CommandEmpty>No matching commands</CommandEmpty>
+          {groups.map((group) => (
+            <CommandGroup key={group.label} heading={group.label}>
+              {group.items.map((entry) => {
+                const Icon = entry.icon
+                return (
+                  <CommandItem
+                    key={entry.id}
+                    value={entry.id}
+                    onSelect={() => {
+                      entry.run()
+                      onClose()
+                    }}
+                  >
+                    {Icon ? (
+                      <Icon
+                        className="size-3.5 shrink-0 text-ink-muted"
+                        aria-hidden
+                      />
+                    ) : (
+                      <span className="size-3.5 shrink-0" />
+                    )}
+                    <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                    {entry.hint ? (
+                      <CommandShortcut>{entry.hint}</CommandShortcut>
+                    ) : null}
+                  </CommandItem>
+                )
+              })}
+            </CommandGroup>
+          ))}
+        </CommandList>
+      </Command>
+    </CommandDialog>
   )
 }

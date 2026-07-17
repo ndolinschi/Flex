@@ -10,13 +10,17 @@ import {
   saveTextFile,
   toInvokeError,
 } from "../../../lib/tauri"
-import { basename, cn } from "../../../lib/utils"
+import { basename } from "../../../lib/utils"
 import {
   sessionScopeKey,
   useAppStore,
 } from "../../../stores/appStore"
 import { useSessions } from "../../../hooks/useSessions"
 import { FileExplorer } from "./FileExplorer"
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group"
 
 type FilesTabProps = {
   /** True when the Files panel body is the visible right-panel tab. */
@@ -312,17 +316,34 @@ export const FilesTab = ({ active }: FilesTabProps) => {
         {fileChips}
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
           {isMarkdown && path ? (
-            <IconButton
-              label={previewMode ? "Edit markdown" : "Preview markdown"}
-              onClick={toggleMarkdownPreview}
-              className={cn("h-6 w-6", previewMode && "bg-fill-3 text-ink")}
+            <ToggleGroup
+              type="single"
+              size="sm"
+              spacing={0}
+              value={previewMode ? "preview" : "edit"}
+              onValueChange={(value) => {
+                if (!value) return
+                const wantPreview = value === "preview"
+                if (wantPreview !== previewMode) toggleMarkdownPreview()
+              }}
+              className="rounded-sm"
+              aria-label="Markdown view"
             >
-              {previewMode ? (
-                <Code2 className="h-3 w-3" aria-hidden />
-              ) : (
+              <ToggleGroupItem
+                value="preview"
+                aria-label="Preview markdown"
+                className="h-6 w-6 p-0"
+              >
                 <Eye className="h-3 w-3" aria-hidden />
-              )}
-            </IconButton>
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="edit"
+                aria-label="Edit markdown"
+                className="h-6 w-6 p-0"
+              >
+                <Code2 className="h-3 w-3" aria-hidden />
+              </ToggleGroupItem>
+            </ToggleGroup>
           ) : null}
           <IconButton
             label={dirty ? "Save" : "Save (no changes)"}
