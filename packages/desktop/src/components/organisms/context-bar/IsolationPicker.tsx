@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Check, GitFork } from "lucide-react"
+import { Check, GitFork } from "@/components/icons"
 import type { IsolationPolicy } from "../../../lib/types"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Check, ChevronDown } from "lucide-react"
+import { Check, ChevronDown } from "@/components/icons"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Label, Spinner } from "../atoms"

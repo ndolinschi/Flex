@@ -1,4 +1,4 @@
-import { Columns2, PanelLeft } from "lucide-react"
+import { Columns2, PanelLeft } from "@/components/icons"
 import { sessionLabel } from "../../lib/types"
 import { useSessions } from "../../hooks/useSessions"
 import { useAppStore } from "../../stores/appStore"

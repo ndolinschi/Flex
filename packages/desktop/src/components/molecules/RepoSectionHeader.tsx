@@ -1,4 +1,4 @@
-import { ChevronDown, Folder, Plus } from "lucide-react"
+import { ChevronDown, Folder, Plus } from "@/components/icons"
 import { cn } from "../../lib/utils"
 import { IconButton } from "../atoms"
 import { CollapsibleTrigger } from "@/components/ui/collapsible"

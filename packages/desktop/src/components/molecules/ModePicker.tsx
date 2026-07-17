@@ -6,7 +6,7 @@ import {
   MessageCircle,
   Network,
   Sparkles,
-} from "lucide-react"
+} from "@/components/icons"
 import type { ComposerMode, PermissionMode } from "../../lib/types"
 import { FLEX_MODE_ENABLED } from "../../lib/featureFlags"
 import { cn } from "../../lib/utils"

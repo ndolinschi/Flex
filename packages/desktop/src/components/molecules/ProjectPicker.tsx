@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { Check, Folder, FolderOpen } from "lucide-react"
+import { Check, Folder, FolderOpen } from "@/components/icons"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
 import { createSession, toInvokeError, updateSession } from "../../lib/tauri"
 import { isBrowserPreview, NATIVE_APP_REQUIRED } from "../../lib/browserPreview"

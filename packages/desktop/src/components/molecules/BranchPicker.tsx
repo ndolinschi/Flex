@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, GitBranch, GitPullRequest } from "lucide-react"
+import { Check, GitBranch, GitPullRequest } from "@/components/icons"
 import {
   gitBranch,
   gitCheckout,

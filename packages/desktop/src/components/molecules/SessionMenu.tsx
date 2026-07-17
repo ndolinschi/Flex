@@ -7,7 +7,7 @@ import {
   Trash2,
   Undo2,
   XCircle,
-} from "lucide-react"
+} from "@/components/icons"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   discardIsolatedSession,

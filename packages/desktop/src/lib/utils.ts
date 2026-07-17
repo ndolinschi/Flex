@@ -6,7 +6,7 @@ import {
   FileImage,
   FileJson,
   FileText,
-} from "lucide-react"
+} from "@/components/icons"
 
 /** Tailwind-aware class merger (shadcn convention). */
 export const cn = (...inputs: ClassValue[]): string => twMerge(clsx(inputs))

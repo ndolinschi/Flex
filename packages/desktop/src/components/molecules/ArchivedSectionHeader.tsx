@@ -1,4 +1,4 @@
-import { Archive, ChevronDown } from "lucide-react"
+import { Archive, ChevronDown } from "@/components/icons"
 import { cn } from "../../lib/utils"
 import { CollapsibleTrigger } from "@/components/ui/collapsible"
 

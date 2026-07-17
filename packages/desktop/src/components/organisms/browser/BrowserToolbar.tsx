@@ -13,7 +13,7 @@ import {
   RotateCw,
   Smartphone,
   Tablet,
-} from "lucide-react"
+} from "@/components/icons"
 import { IconButton, Tooltip } from "../../atoms"
 import { VIEWPORT_PRESETS as VIEWPORT_PRESETS_BASE } from "../../../hooks/useBrowserSession"
 import type { BrowserViewportPreset } from "../../../stores/appStore"

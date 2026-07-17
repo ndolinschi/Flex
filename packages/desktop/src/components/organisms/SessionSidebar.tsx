@@ -14,7 +14,7 @@ import {
   SquarePen,
   Trash2,
   X,
-} from "lucide-react"
+} from "@/components/icons"
 import { IconButton, ScrollArea } from "../atoms"
 import {
   ArchivedSectionHeader,

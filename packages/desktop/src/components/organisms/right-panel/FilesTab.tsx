@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Editor from "@monaco-editor/react"
-import { Code2, Eye, FolderTree, Save } from "lucide-react"
+import { Code2, Eye, FolderTree, Save } from "@/components/icons"
 import { IconButton, ScrollArea, Spinner, Tab } from "../../atoms"
 import { ConfirmDialog, MarkdownBody } from "../../molecules"
 import { ensureMonaco, languageForPath } from "../../../lib/monacoEnv"

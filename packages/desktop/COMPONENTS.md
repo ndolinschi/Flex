@@ -258,6 +258,14 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
   `--primary`; shadcn hover fill is `--accent` → Flex `--color-fill-4`.
   After `add`, patch any `ui/*` `bg-accent` hovers to `bg-muted` if they fight
   Flex `bg-accent` (product accent).
+- **Icons ([shadcn.io/icons](https://www.shadcn.io/icons)):** Prefer local Lucide
+  components under `src/components/icons/` (`lucide-{name}.tsx`,
+  `@/components/icons` / `@/icons` alias). Same shape as the shadcn.io CLI
+  install (`size` / `color` / `strokeWidth` / `className`). Registry downloads
+  need a Pro token (`https://www.shadcn.io/r/lucide-{name}.json?token=…`);
+  without a token we vendor Lucide SVGs into that layout. Migrated surfaces
+  import from `@/components/icons` — do not add new `lucide-react` imports
+  there. Remaining call sites may still use `lucide-react` until cut over.
 
 ### Target registry inventory (user list → migrate?)
 
@@ -282,7 +290,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader`, WorkGroup | **Sidebar section headers wired** |
 | Combobox | yes | Model/Branch/Project pickers | Prefer over PopoverTray search trays; Popover interim done |
 | Command | yes | `CommandPalette`, `SearchModal`, `OpenTabModal` | **CommandPalette + SearchModal migrated** (CommandDialog) |
-| Context Menu | yes | `ContextMenu` molecule | Keep timeline-scroll / webview-blur ignore behavior |
+| Context Menu | yes | `ContextMenu` molecule | **Migrated** — keep timeline-scroll / webview-blur dismiss |
 | Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
 | Date Picker | skip | — | |
 | Dialog | yes | `ConfirmDialog`, auth/PR/bug/MCP dialogs | **ConfirmDialog, Copilot/ChatGPT sign-in, BugReport, McpInstall migrated** |
@@ -337,7 +345,7 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 |---|---|---|
 | **0 — Foundation** | `shadcn init` in `packages/desktop` (Vite, Tailwind v4, **radix** base, `lucide`, css variables); path alias `@/`; upgrade `cn` to `clsx` + `tailwind-merge`; map shadcn semantic tokens → Flex tokens in `src/index.css` / `tokens.css` without breaking `data-theme` | `components.json` present; `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
 | **1 — Atom adapters** | Add Button, Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Spinner, Avatar, Tooltip, ScrollArea; re-export from `components/atoms` with temporary compat props | Atom unit tests + vitest green; call sites compile via barrel. **Done:** Button, TextInput, TextArea, Label, Badge, Kbd, Divider←Separator, Skeleton, Spinner, Checkbox (round), Toggle←Switch (green ON), Avatar, ScrollArea. **Deferred:** Tooltip (timeline scroll / programmatic-scroll coupling — keep custom until Provider + scroll policy ported). |
-| **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog + auth/bug/MCP dialogs, ToastHost/Sonner, Mode/Isolation/Model/Branch/Project pickers (Popover), PlusMenu+SessionMenu+BrowserOverflow (DropdownMenu), TitleBarMenus (Menubar). **Next:** ContextMenu last |
+| **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog + auth/bug/MCP dialogs, ToastHost/Sonner, Mode/Isolation/Model/Branch/Project pickers (Popover), PlusMenu+SessionMenu+BrowserOverflow (DropdownMenu), TitleBarMenus (Menubar), ContextMenu (scroll/webview dismiss preserved). |
 | **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select; searchable Popovers; Toggle Group (Files); CommandPalette/SearchModal. **Next:** Combobox (optional), Radio Group |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner→Alert; Collapsible sidebar headers; ContentWorkspace Resizable. **Next:** optional Sidebar spike |
 | **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Adopt Attachment→Bubble→Message→Marker *inside* virtual rows; MessageScroller only after measured spike with react-virtual |

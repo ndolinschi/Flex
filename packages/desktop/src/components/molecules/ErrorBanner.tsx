@@ -1,4 +1,4 @@
-import { TriangleAlert, X } from "lucide-react"
+import { TriangleAlert, X } from "@/components/icons"
 import { IconButton } from "../atoms"
 import {
   Alert,

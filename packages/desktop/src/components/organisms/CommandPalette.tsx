@@ -11,8 +11,8 @@ import {
   SquarePen,
   Settings as SettingsIcon,
   MessagesSquare,
-} from "lucide-react"
-import type { LucideIcon } from "lucide-react"
+} from "@/components/icons"
+import type { Icon } from "@/components/icons"
 import { useSessions } from "../../hooks/useSessions"
 import {
   AUTOMATIONS_UI_ENABLED,
@@ -39,7 +39,7 @@ import {
 type CommandEntry = {
   id: string
   label: string
-  icon?: LucideIcon
+  icon?: Icon
   group: "Commands" | "Sessions"
   hint?: string
   run: () => void

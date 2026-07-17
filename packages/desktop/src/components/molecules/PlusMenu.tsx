@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { FileIcon, ImageIcon, Plus } from "lucide-react"
+import { FileIcon, ImageIcon, Plus } from "@/components/icons"
 import { cn } from "../../lib/utils"
 import {
   DropdownMenu,

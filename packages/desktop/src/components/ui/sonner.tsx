@@ -6,7 +6,7 @@ import {
   Loader2Icon,
   OctagonXIcon,
   TriangleAlertIcon,
-} from "lucide-react"
+} from "@/components/icons"
 import { useAppStore } from "@/stores/appStore"
 import { cn } from "@/lib/utils"
 

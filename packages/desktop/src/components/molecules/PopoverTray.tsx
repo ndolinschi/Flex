@@ -4,7 +4,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react"
-import { Search } from "lucide-react"
+import { Search } from "@/components/icons"
 import { cn } from "../../lib/utils"
 
 type PopoverTrayProps = {

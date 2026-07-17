@@ -5,7 +5,7 @@ import {
   History,
   MoreHorizontal,
   RotateCw,
-} from "lucide-react"
+} from "@/components/icons"
 import { IconButton } from "../../atoms"
 import {
   DropdownMenu,
