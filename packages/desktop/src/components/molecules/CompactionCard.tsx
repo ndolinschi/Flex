@@ -3,6 +3,7 @@ import { ChevronRight } from "@/components/icons"
 import { cn, formatTokens } from "../../lib/utils"
 import { Collapsible } from "./Collapsible"
 import { MarkdownBody } from "./MarkdownBody"
+import { Marker, MarkerContent } from "@/components/ui/marker"
 
 type CompactionCardProps = {
   summaryMarkdown: string
@@ -43,33 +44,40 @@ export const CompactionCard = ({
 
   return (
     <div className="animate-row-fade flex flex-col gap-1.5 py-1">
-      <div className="border-t border-stroke-3" aria-hidden />
-      <button
-        type="button"
-        onClick={handleToggle}
-        aria-expanded={hasSummary ? expanded : undefined}
-        disabled={!hasSummary}
-        className={cn(
-          "group flex w-full items-center gap-1.5 text-left text-sm text-ink-muted",
-          hasSummary && "cursor-pointer hover:text-ink",
-        )}
+      <Marker
+        variant="border"
+        asChild
+        className="border-stroke-3 text-ink-muted"
       >
-        {hasSummary ? (
-          <ChevronRight
-            className={cn(
-              "h-2.5 w-2.5 shrink-0 text-icon-3 transition-transform duration-[var(--duration-fast)]",
-              expanded && "rotate-90",
-            )}
-            aria-hidden
-          />
-        ) : null}
-        <span className="min-w-0 font-medium text-ink-secondary">{title}</span>
-        {sizes ? (
-          <span className="shrink-0 text-ink-faint [font-variant-numeric:tabular-nums]">
-            · {sizes}
-          </span>
-        ) : null}
-      </button>
+        <button
+          type="button"
+          onClick={handleToggle}
+          aria-expanded={hasSummary ? expanded : undefined}
+          disabled={!hasSummary}
+          className={cn(
+            "group flex w-full items-center gap-1.5 text-left",
+            hasSummary && "cursor-pointer hover:text-ink",
+          )}
+        >
+          {hasSummary ? (
+            <ChevronRight
+              className={cn(
+                "h-2.5 w-2.5 shrink-0 text-icon-3 transition-transform duration-[var(--duration-fast)]",
+                expanded && "rotate-90",
+              )}
+              aria-hidden
+            />
+          ) : null}
+          <MarkerContent className="min-w-0 font-medium text-ink-secondary">
+            {title}
+          </MarkerContent>
+          {sizes ? (
+            <span className="shrink-0 text-ink-faint [font-variant-numeric:tabular-nums]">
+              · {sizes}
+            </span>
+          ) : null}
+        </button>
+      </Marker>
       {hasSummary ? (
         <Collapsible open={expanded}>
           <div className="pl-4 text-ink-muted">

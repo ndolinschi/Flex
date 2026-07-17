@@ -1,3 +1,5 @@
+import { Marker, MarkerContent } from "@/components/ui/marker"
+
 type IndexingCardProps = {
   added: number
   changed: number
@@ -20,13 +22,14 @@ export const IndexingCard = ({
   const detail = parts.length > 0 ? parts.join(" · ") : `${unchanged} unchanged`
 
   return (
-    <div className="animate-row-fade flex items-center gap-2 py-1 text-sm text-ink-muted">
-      <span className="h-px flex-1 bg-stroke-3" aria-hidden />
-      <span className="shrink-0">
+    <Marker
+      variant="separator"
+      className="animate-row-fade py-1 text-ink-muted before:bg-stroke-3 after:bg-stroke-3"
+    >
+      <MarkerContent className="shrink-0">
         Indexed {total.toLocaleString()} file{total === 1 ? "" : "s"}
         {detail ? ` · ${detail}` : ""}
-      </span>
-      <span className="h-px flex-1 bg-stroke-3" aria-hidden />
-    </div>
+      </MarkerContent>
+    </Marker>
   )
 }

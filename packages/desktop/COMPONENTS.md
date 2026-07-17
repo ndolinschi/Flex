@@ -305,9 +305,9 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Item | later | sidebar / palette rows | Only if it simplifies without fighting density |
 | Kbd | yes | `Kbd` atom | **done** |
 | Label | yes | `Label` atom | Prefer `FieldLabel` inside forms |
-| Marker | yes (chat kit) | `CompactionCard` / `IndexingCard` dividers | System notes — Phase 5 |
+| Marker | yes (chat kit) | `CompactionCard` / `IndexingCard` dividers | **IndexingCard** (separator) + **CompactionCard** (border) migrated |
 | Menubar | yes | `TitleBarMenus` | **TitleBarMenus migrated** |
-| Message | yes (chat kit) | timeline message rows | Compose with Bubble; keep actions — Phase 5 |
+| Message | yes (chat kit) | timeline message rows | **User + assistant rows** compose Message + Bubble; keep MessageActions |
 | Message Scroller | spike | `TurnTimeline` + `useStickToBottom` | **Do not swap blindly** — compose *with* `@tanstack/react-virtual` |
 | Native Select | later | simple settings enums | Prefer Select/Combobox; ModelSelect stays searchable Popover |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
@@ -347,7 +347,7 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog + auth/bug/MCP dialogs, ToastHost/Sonner, Mode/Isolation/Model/Branch/Project pickers (Popover), PlusMenu+SessionMenu+BrowserOverflow (DropdownMenu), TitleBarMenus (Menubar), ContextMenu (scroll/webview dismiss preserved). |
 | **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select; searchable Popovers (incl. ModelMultiSelect); Toggle Group (Files); CommandPalette/SearchModal/OpenTabModal; RadioGroup (QuestionPrompt). **Next:** Combobox (optional), Input Group |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner→Alert; Collapsible sidebar headers; ContentWorkspace Resizable; PlanToolbar Breadcrumb. **Next:** optional Sidebar spike |
-| **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | **Done:** AttachmentChip→Attachment; timeline user rows→Bubble. **Next:** Message→Marker *inside* virtual rows; MessageScroller only after measured spike with react-virtual |
+| **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | **Done:** AttachmentChip; user Bubble; user/assistant Message; Compaction/Indexing Markers. **Next:** MessageScroller spike only (keep `@tanstack/react-virtual`) |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
 
 ### Docs investigation (radix-nova)
