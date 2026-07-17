@@ -143,4 +143,19 @@ describe("WorkGroup", () => {
     expect(html).toContain("Stopped")
     expect(html).not.toContain("Worked")
   })
+
+  it("keeps molecule Collapsible grid-rows expand (not display toggle)", () => {
+    const collapsed = renderToStaticMarkup(
+      <WorkGroup isOpen={false}>
+        <div>tool row</div>
+      </WorkGroup>,
+    )
+    const open = renderToStaticMarkup(
+      <WorkGroup isOpen>
+        <div>tool row</div>
+      </WorkGroup>,
+    )
+    expect(collapsed).toContain("grid-rows-[0fr]")
+    expect(open).toContain("grid-rows-[1fr]")
+  })
 })

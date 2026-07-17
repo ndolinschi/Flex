@@ -84,4 +84,36 @@ describe("QuestionPrompt layout", () => {
     expect(html).toContain("gap-2")
     expect(html).toContain("mt-2.5")
   })
+
+  it("uses RadioGroup for single-select options", () => {
+    const html = renderToStaticMarkup(
+      <QuestionPrompt question={baseQuestion()} />,
+    )
+    expect(html).toContain('data-slot="radio-group"')
+    expect(html).not.toContain('data-slot="checkbox"')
+  })
+
+  it("uses Checkbox for multi-select options and shows Next", () => {
+    const html = renderToStaticMarkup(
+      <QuestionPrompt
+        question={baseQuestion({
+          questions: [
+            {
+              header: "Features",
+              question: "Which features?",
+              options: [{ label: "Auth" }, { label: "Billing" }],
+              multi_select: true,
+              allow_custom: false,
+            },
+          ],
+        })}
+      />,
+    )
+
+    expect(html.match(/data-slot="checkbox"/g)?.length ?? 0).toBe(2)
+    expect(html).not.toContain('data-slot="radio-group"')
+    expect(html).toContain(">Submit<")
+    expect(html).toContain("Auth")
+    expect(html).toContain("Billing")
+  })
 })

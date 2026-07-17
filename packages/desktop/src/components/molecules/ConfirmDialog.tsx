@@ -98,9 +98,15 @@ export const ConfirmDialog = ({
             <AlertDialogTitle className="text-base font-semibold text-ink">
               {title}
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm text-ink-muted">
-              {description ?? title}
-            </AlertDialogDescription>
+            {description ? (
+              <AlertDialogDescription className="text-sm text-ink-muted">
+                {description}
+              </AlertDialogDescription>
+            ) : (
+              <AlertDialogDescription className="sr-only">
+                {title}
+              </AlertDialogDescription>
+            )}
           </AlertDialogHeader>
           <AlertDialogFooter className={footerClass}>{actions}</AlertDialogFooter>
         </AlertDialogContent>
