@@ -100,7 +100,7 @@ function SelectLabel({
   return (
     <SelectPrimitive.Label
       data-slot="select-label"
-      className={cn("px-1.5 py-1 text-xs text-muted-foreground", className)}
+      className={cn("px-1.5 py-1 text-xs text-ink-faint", className)}
       {...props}
     />
   )

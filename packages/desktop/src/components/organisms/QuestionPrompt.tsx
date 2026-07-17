@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { Button, TextInput } from "../atoms"
+import { Button, Checkbox, TextInput } from "../atoms"
 import { ErrorBanner } from "../molecules"
 import { respondQuestion, toInvokeError } from "../../lib/tauri"
 import type { PendingQuestion, Question } from "../../lib/types"
@@ -81,22 +81,30 @@ const StepBody = ({
           q.options.map((opt) => {
             const active = draft.selected.includes(opt.label)
             return (
-              <button
+              <label
                 key={opt.label}
-                type="button"
-                aria-pressed={active}
-                onClick={() => handleToggle(opt.label)}
-                className={optionCardClass(active)}
+                className={cn(
+                  optionCardClass(active),
+                  "flex cursor-pointer items-start gap-2",
+                )}
               >
-                <span className="block font-medium leading-snug">
-                  {opt.label}
-                </span>
-                {opt.description ? (
-                  <span className="mt-1 block text-xs leading-snug text-ink-muted">
-                    {opt.description}
+                <Checkbox
+                  checked={active}
+                  onChange={() => handleToggle(opt.label)}
+                  label={opt.label}
+                  className="mt-0.5"
+                />
+                <span className="min-w-0 flex-1" aria-hidden>
+                  <span className="block font-medium leading-snug">
+                    {opt.label}
                   </span>
-                ) : null}
-              </button>
+                  {opt.description ? (
+                    <span className="mt-1 block text-xs leading-snug text-ink-muted">
+                      {opt.description}
+                    </span>
+                  ) : null}
+                </span>
+              </label>
             )
           })
         ) : (

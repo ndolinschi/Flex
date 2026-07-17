@@ -53,7 +53,12 @@ const EffortSubmenu = ({
   onClose: () => void
 }) => {
   const menuRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null)
+
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   useLayoutEffect(() => {
     const el = menuRef.current
@@ -71,24 +76,33 @@ const EffortSubmenu = ({
   }, [anchorRect])
 
   useEffect(() => {
-    const handlePointer = (e: MouseEvent) => {
-      if (menuRef.current?.contains(e.target as Node)) return
-      onClose()
+    const handlePointer = (e: PointerEvent) => {
+      const target = e.target
+      if (!(target instanceof Node)) return
+      if (menuRef.current?.contains(target)) return
+      // Gauge / effort triggers also carry the ignore marker so a toggle
+      // click does not race-close then reopen against a stale listener.
+      if (
+        target instanceof Element &&
+        target.closest("[data-popover-outside-ignore]")
+      ) {
+        return
+      }
+      onCloseRef.current()
     }
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        e.stopPropagation()
-        onClose()
-      }
+      if (e.key !== "Escape") return
+      e.preventDefault()
+      e.stopPropagation()
+      onCloseRef.current()
     }
-    document.addEventListener("mousedown", handlePointer, true)
+    document.addEventListener("pointerdown", handlePointer, true)
     document.addEventListener("keydown", handleKey, true)
     return () => {
-      document.removeEventListener("mousedown", handlePointer, true)
+      document.removeEventListener("pointerdown", handlePointer, true)
       document.removeEventListener("keydown", handleKey, true)
     }
-  }, [onClose])
+  }, [])
 
   return createPortal(
     <div
@@ -197,14 +211,15 @@ export const ModelPicker = ({
       }}
       open={open}
       onOpenChange={(next, details) => {
-        if (
-          !next &&
-          details.reason === "outside-press" &&
-          details.event.target instanceof Element &&
-          details.event.target.closest("[data-popover-outside-ignore]")
-        ) {
-          details.cancel()
-          return
+        if (!next && details.reason === "outside-press") {
+          const target = details.event?.target
+          if (
+            target instanceof Element &&
+            target.closest("[data-popover-outside-ignore]")
+          ) {
+            details.cancel()
+            return
+          }
         }
         handleOpenChange(next)
       }}
@@ -286,6 +301,7 @@ export const ModelPicker = ({
                         <span
                           role="button"
                           tabIndex={0}
+                          data-popover-outside-ignore
                           aria-label={`Effort for ${m.displayName ?? m.id}`}
                           aria-haspopup="menu"
                           aria-expanded={effortMenuFor?.modelId === m.id}
