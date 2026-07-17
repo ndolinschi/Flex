@@ -17,7 +17,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `TextArea` | Multi-line text field | standard textarea props | Composer |
 | `Label` | Accessible form label | `htmlFor`, `children` | FormField, ModelSelect |
 | `Spinner` | Indeterminate loading | `size` | SessionSidebar, ProviderSettingsForm |
-| `Tab` | Pill tab / open-buffer chip; optional Chrome-style DnD | `selected`, `size?`, `variant?`, `icon?`, `badge?`, `onSelect`, `onClose?`, `draggable?`, `dropEdge?` | ContentPane, FilesTab (`FileChip`) |
+| `Tab` | Pill tab / open-buffer chip; pointer DnD reorder/move (idle `cursor-pointer`, grabbing only while dragging — HTML5 DnD broken in Tauri webviews) | `selected`, `size?`, `variant?`, `icon?`, `badge?`, `onSelect`, `onClose?`, `draggable?`, `onPointerDown?`, `dropEdge?` | ContentPane, FilesTab (`FileChip`) |
 | `TabClose` | Hover-collapse close control for tabs/chips | `label`, `onClose`, `revealOnFocusWithin?` | `Tab` |
 | `TabStrip` | Horizontal open-tabs strip; content panes scroll tabs and pin trailing actions | `children`, `className?` | ContentPane, ChatSessionTabBar |
 | `Badge` | Status / meta chip | `tone`, `children` | ToolCallChip |

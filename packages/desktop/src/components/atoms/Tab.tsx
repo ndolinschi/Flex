@@ -1,4 +1,4 @@
-import type { ReactNode, DragEvent } from "react"
+import type { ReactNode, DragEvent, PointerEvent } from "react"
 import { cn } from "../../lib/utils"
 import { TabClose } from "./TabClose"
 
@@ -23,12 +23,21 @@ type TabProps = {
   className?: string
   /** Stable id for scroll-into-view / DnD (rendered as data-tab-id). */
   tabId?: string
-  /** Chrome-style reorder (content pane strip only). */
+  /**
+   * When true, tab is a reorder/move target. Idle cursor stays pointer;
+   * grabbing is applied on `document.body` only after the drag threshold.
+   */
   draggable?: boolean
+  onPointerDown?: (e: PointerEvent<HTMLElement>) => void
+  /** @deprecated HTML5 DnD — unused; pointer DnD replaced it for Tauri webviews. */
   onDragStart?: (e: DragEvent<HTMLElement>) => void
+  /** @deprecated HTML5 DnD */
   onDragEnd?: (e: DragEvent<HTMLElement>) => void
+  /** @deprecated HTML5 DnD */
   onDragOver?: (e: DragEvent<HTMLElement>) => void
+  /** @deprecated HTML5 DnD */
   onDrop?: (e: DragEvent<HTMLElement>) => void
+  /** @deprecated HTML5 DnD */
   onDragLeave?: (e: DragEvent<HTMLElement>) => void
   /** Visual drop target: line before / after this tab. */
   dropEdge?: "before" | "after" | null
@@ -55,11 +64,7 @@ export const Tab = ({
   className,
   tabId,
   draggable = false,
-  onDragStart,
-  onDragEnd,
-  onDragOver,
-  onDrop,
-  onDragLeave,
+  onPointerDown,
   dropEdge = null,
 }: TabProps) => {
   const shell = cn(
@@ -69,7 +74,8 @@ export const Tab = ({
     selected
       ? "bg-fill-2 text-ink"
       : "text-ink-muted hover:bg-fill-3 hover:text-ink-secondary",
-    draggable && "cursor-grab active:cursor-grabbing",
+    // Pointer until an active drag sets body cursor to grabbing.
+    draggable ? "cursor-pointer touch-none" : null,
     className,
   )
 
@@ -126,17 +132,12 @@ export const Tab = ({
     <button
       type="button"
       onClick={onSelect}
+      onPointerDown={onPointerDown}
       aria-selected={selected}
       role="tab"
       title={title}
       data-tab-id={tabId}
       className={shell}
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onDragLeave={onDragLeave}
     >
       {dropMarker}
       {label}

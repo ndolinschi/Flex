@@ -43,6 +43,7 @@ export const TabClose = ({
           "group-focus-within:ml-0.5 group-focus-within:max-w-[1rem] group-focus-within:p-0.5 group-focus-within:opacity-100",
         className,
       )}
+      data-tab-no-drag
     >
       <X className="h-3 w-3" aria-hidden />
     </span>
