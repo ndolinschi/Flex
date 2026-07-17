@@ -246,8 +246,18 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 - Round Changes-panel `Checkbox` and green settings `Toggle` (`--color-switch-on`)
   are intentional product visuals; restyle shadcn primitives after install — do
   not silently flip to square/primary defaults.
-- `packages/desktop` only (Vite + React 19 + Tailwind v4). No `components.json`
-  yet — Phase 0 creates it under `packages/desktop/`.
+- `packages/desktop` only (Vite + React 19 + Tailwind v4). Phase 0 landed:
+  `components.json` (radix-nova), `@/` alias, `cn` via clsx/tailwind-merge,
+  Flex←shadcn token bridge in `src/index.css`. Primitives live in
+  `src/components/ui/`; Atomic Design folders keep stable re-exports.
+- **CLI note:** `shadcn init` is interactive (preset picker) unless you pass
+  `--preset <name> --base radix` *and* path aliases already exist. Prefer
+  explicit flags over prompts. `init` will clobber `src/lib/utils.ts` — restore
+  app helpers after. Do not let `@theme inline` redefine `--color-accent` /
+  `--radius-*` / `--font-sans` (Flex owns those). shadcn product accent is
+  `--primary`; shadcn hover fill is `--accent` → Flex `--color-fill-4`.
+  After `add`, patch any `ui/*` `bg-accent` hovers to `bg-muted` if they fight
+  Flex `bg-accent` (product accent).
 
 ### Target registry inventory (user list → migrate?)
 

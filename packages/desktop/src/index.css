@@ -2,6 +2,11 @@
 @import "./styles/tokens.css";
 @import "./styles/terminal.css";
 @import "./styles/highlight.css";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* App themes via data-theme on <html>, not .dark class. */
+@custom-variant dark (&:is([data-theme="dark"] *, :root:not([data-theme="light"]) *));
 
 @theme {
   /* reference canon: semibold = 590 (see DESIGN.md Feel principles) */
@@ -584,4 +589,86 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   [data-composer] {
     transition: none !important;
   }
+}
+
+/* ── shadcn semantic theme bridge ──────────────────────────────────────────
+ * Register only names Flex does not already own. Do NOT remamap
+ * --color-accent / --color-border / --radius-* / --font-sans here — those
+ * stay Flex-canonical (DESIGN.md). shadcn components use --primary for the
+ * product accent; Flex molecules keep using bg-accent / text-accent-text. */
+@theme inline {
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-destructive: var(--destructive);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  /* shadcn "accent" = whisper hover fill (not Flex product accent) */
+  --color-shadcn-accent: var(--shadcn-accent);
+  --color-shadcn-accent-foreground: var(--shadcn-accent-foreground);
+}
+
+/* Map shadcn CSS variables onto Flex tokens. Theme switches via data-theme. */
+:root,
+[data-theme="dark"],
+[data-theme="light"] {
+  --background: var(--color-chrome);
+  --foreground: var(--color-text-1);
+  --card: var(--color-elevated);
+  --card-foreground: var(--color-text-1);
+  --popover: var(--color-panel);
+  --popover-foreground: var(--color-text-1);
+  --primary: var(--color-accent);
+  --primary-foreground: var(--color-accent-text);
+  --secondary: var(--color-fill-3);
+  --secondary-foreground: var(--color-text-1);
+  --muted: var(--color-fill-3);
+  --muted-foreground: var(--color-text-2);
+  /* Hover/muted fill for shadcn ghost/secondary — not product accent */
+  --shadcn-accent: var(--color-fill-4);
+  --shadcn-accent-foreground: var(--color-text-1);
+  --accent: var(--shadcn-accent);
+  --accent-foreground: var(--shadcn-accent-foreground);
+  --destructive: var(--color-danger);
+  --border: var(--color-stroke-3);
+  --input: var(--color-stroke-2);
+  /* Neutral focus ring — never accent glow (DESIGN.md) */
+  --ring: var(--color-stroke-2);
+  --chart-1: var(--color-blue);
+  --chart-2: var(--color-cyan);
+  --chart-3: var(--color-green);
+  --chart-4: var(--color-yellow);
+  --chart-5: var(--color-magenta);
+  --radius: var(--radius-md);
+  --sidebar: var(--color-panel);
+  --sidebar-foreground: var(--color-text-1);
+  --sidebar-primary: var(--color-accent);
+  --sidebar-primary-foreground: var(--color-accent-text);
+  --sidebar-accent: var(--color-fill-4);
+  --sidebar-accent-foreground: var(--color-text-1);
+  --sidebar-border: var(--color-stroke-3);
+  --sidebar-ring: var(--color-stroke-2);
 }

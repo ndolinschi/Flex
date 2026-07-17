@@ -1,3 +1,5 @@
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
 import {
   File,
   FileCode2,
@@ -6,8 +8,8 @@ import {
   FileText,
 } from "lucide-react"
 
-export const cn = (...parts: (string | false | undefined | null)[]): string =>
-  parts.filter(Boolean).join(" ")
+/** Tailwind-aware class merger (shadcn convention). */
+export const cn = (...inputs: ClassValue[]): string => twMerge(clsx(inputs))
 
 export const formatRelativeTime = (tsMs: number): string => {
   const diff = Date.now() - tsMs

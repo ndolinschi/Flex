@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react"
-import { cn } from "../../lib/utils"
+import { Button as UiButton } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { Spinner } from "./Spinner"
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger"
@@ -12,24 +13,20 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode
 }
 
-const variantClasses: Record<ButtonVariant, string> = {
-  primary:
-    "bg-accent text-accent-text hover:bg-accent-hover border border-transparent",
-  secondary:
-    "bg-surface-muted text-ink border border-border hover:bg-surface-raised",
-  ghost:
-    "bg-transparent text-ink-secondary hover:bg-surface-muted border border-transparent",
-  danger:
-    "bg-danger-subtle text-danger border border-danger/20 hover:bg-danger/10",
-}
+/** Map legacy Flex variants/sizes onto shadcn `Button`. Keep `isLoading` as a
+ * compat shim (compose Spinner) until call sites drop it. */
+const variantMap = {
+  primary: "default",
+  secondary: "secondary",
+  ghost: "ghost",
+  danger: "destructive",
+} as const
 
-const sizeClasses: Record<ButtonSize, string> = {
-  // Use explicit length utilities — never `text-base`/`text-sm` alone for
-  // color-bearing buttons: those names can resolve to color tokens.
-  sm: "h-7 px-2.5 text-[length:var(--text-sm)] leading-[var(--text-sm--line-height)] gap-1.5",
-  md: "h-8 px-3 text-[length:var(--text-sm)] leading-[var(--text-sm--line-height)] gap-1.5",
-  lg: "h-9 px-4 text-[length:var(--text-base)] leading-[var(--text-base--line-height)] gap-2",
-}
+const sizeMap = {
+  sm: "sm",
+  md: "default",
+  lg: "lg",
+} as const
 
 export const Button = ({
   variant = "primary",
@@ -38,24 +35,24 @@ export const Button = ({
   disabled,
   className,
   children,
+  type = "button",
   ...props
 }: ButtonProps) => {
   return (
-    <button
-      type="button"
+    <UiButton
+      type={type}
+      variant={variantMap[variant]}
+      size={sizeMap[size]}
       disabled={disabled || isLoading}
       className={cn(
-        "inline-flex items-center justify-center rounded-md font-medium",
-        "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-        "disabled:opacity-50 disabled:pointer-events-none",
-        variantClasses[variant],
-        sizeClasses[size],
+        /* DESIGN.md: controls use rounded-md (8), not nova's rounded-lg */
+        "rounded-md",
         className,
       )}
       {...props}
     >
       {isLoading ? <Spinner size="sm" /> : null}
       {children}
-    </button>
+    </UiButton>
   )
 }
