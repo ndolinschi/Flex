@@ -1,6 +1,14 @@
 import type { ReactNode } from "react"
-import { cn } from "../../lib/utils"
 import { Button } from "../atoms"
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
+import { cn } from "@/lib/utils"
 
 type EmptyStateProps = {
   title: string
@@ -11,6 +19,7 @@ type EmptyStateProps = {
   className?: string
 }
 
+/** Empty async surface — shadcn Empty composition. */
 export const EmptyState = ({
   title,
   description,
@@ -20,26 +29,32 @@ export const EmptyState = ({
   className,
 }: EmptyStateProps) => {
   return (
-    <div
+    <Empty
       className={cn(
-        "flex flex-col items-center justify-center gap-2 px-4 py-8 text-center",
+        "gap-2 rounded-none border-0 p-4 py-8",
         className,
       )}
     >
-      {icon ? (
-        <div className="text-2xl text-ink-faint" aria-hidden="true">
-          {icon}
-        </div>
-      ) : null}
-      <h3 className="text-sm font-medium text-ink">{title}</h3>
-      {description ? (
-        <p className="max-w-sm text-xs text-ink-muted">{description}</p>
-      ) : null}
+      <EmptyHeader className="gap-2">
+        {icon ? (
+          <EmptyMedia className="mb-0 text-2xl text-ink-faint">{icon}</EmptyMedia>
+        ) : null}
+        <EmptyTitle className="text-sm font-medium text-ink tracking-normal">
+          {title}
+        </EmptyTitle>
+        {description ? (
+          <EmptyDescription className="max-w-sm text-xs text-ink-muted">
+            {description}
+          </EmptyDescription>
+        ) : null}
+      </EmptyHeader>
       {actionLabel && onAction ? (
-        <Button size="sm" onClick={onAction} className="mt-1">
-          {actionLabel}
-        </Button>
+        <EmptyContent>
+          <Button size="sm" onClick={onAction}>
+            {actionLabel}
+          </Button>
+        </EmptyContent>
       ) : null}
-    </div>
+    </Empty>
   )
 }

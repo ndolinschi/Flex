@@ -285,48 +285,51 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Context Menu | yes | `ContextMenu` molecule | Keep timeline-scroll / webview-blur ignore behavior |
 | Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
 | Date Picker | skip | — | |
-| Dialog | yes | `ConfirmDialog`, auth/PR/bug/MCP dialogs | **ConfirmDialog migrated** (shadcn Dialog; AlertDialog installed for later pure confirms) |
+| Dialog | yes | `ConfirmDialog`, auth/PR/bug/MCP dialogs | **ConfirmDialog migrated**; next: auth/MCP/bug modals |
 | Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
-| Drawer | maybe | `SubagentViewer` (bottom overlay) | Spike vs keep custom |
-| Dropdown Menu | yes | `SessionMenu`, `PlusMenu`, overflow menus | |
-| Empty | yes | `EmptyState` | |
-| Field | yes | `FormField` + settings forms | `FieldGroup` / `FieldLabel` / validation attrs |
+| Drawer | maybe | `SubagentViewer` (bottom overlay) | Spike vs keep custom (Vaul + virtualized timeline) |
+| Dropdown Menu | yes | `SessionMenu`, `PlusMenu`, overflow menus | **PlusMenu migrated**; next: SessionMenu / BrowserOverflow |
+| Empty | yes | `EmptyState` | **EmptyState migrated** |
+| Field | yes | `FormField` + settings forms | **FormField migrated** (`Field`/`FieldLabel`/`FieldError`) |
 | Hover Card | later | — | Optional enrichment on chips |
 | Input | yes | `TextInput` | Alias export during cutover |
 | Input Group | yes | composer / search fields with addons | |
-| Input OTP | skip | — | |
+| Input OTP | skip | — | OAuth shows codes; users don’t type OTP |
 | Item | later | sidebar / palette rows | Only if it simplifies without fighting density |
-| Kbd | yes | `Kbd` atom | |
+| Kbd | yes | `Kbd` atom | **done** |
 | Label | yes | `Label` atom | Prefer `FieldLabel` inside forms |
-| Marker | yes (chat kit) | `CompactionCard` / `IndexingCard` dividers | System notes |
+| Marker | yes (chat kit) | `CompactionCard` / `IndexingCard` dividers | System notes — Phase 5 |
 | Menubar | yes | `TitleBarMenus` | Native-feeling File/Edit/View/Help |
-| Message | yes (chat kit) | timeline message rows | Compose with Bubble; keep actions |
-| Message Scroller | spike | `TurnTimeline` + `useStickToBottom` | **Do not swap blindly** — virtualizer is required at scale |
+| Message | yes (chat kit) | timeline message rows | Compose with Bubble; keep actions — Phase 5 |
+| Message Scroller | spike | `TurnTimeline` + `useStickToBottom` | **Do not swap blindly** — compose *with* `@tanstack/react-virtual` |
 | Native Select | yes | `ModelSelect` | Settings simple selects |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
-| Pagination | later | DatabaseTab paging | |
-| Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker migrated** to Popover; other trays still on `PopoverTray` |
+| Pagination | later | DatabaseTab paging | Icons-only Previous/Next |
+| Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker + IsolationPicker**; retire trays gradually |
 | Progress | later | indexing / update UX | Soft need |
 | Radio Group | yes | `QuestionPrompt` choices | |
 | Resizable | yes | content split sash | `ContentWorkspace` dual pane |
 | Scroll Area | yes | `ScrollArea` atom | Sidebar / overlays; **not** the virtualized timeline |
-| Select | yes | model/settings selects | |
-| Separator | yes | `Divider` | |
-| Sheet | maybe | settings overlay | Today settings is absolute over kept-mounted chat — Sheet may fight that |
-| Sidebar | spike | `SessionSidebar` | High value, high risk — density + grouping + DnD later |
-| Skeleton | yes | `Skeleton`, `SidebarSkeleton` | |
+| Select | yes | model/settings selects | Next after Field |
+| Separator | yes | `Divider` | **done** |
+| Sheet | skip for Settings | settings overlay | Keep absolute kept-mounted chat overlay |
+| Sidebar | spike | `SessionSidebar` | Steal primitives only; don’t full-adopt kit |
+| Skeleton | yes | `Skeleton`, `SidebarSkeleton` | **done** |
 | Slider | skip | — | |
-| Sonner | yes | `Toast` / ToastHost | **ToastHost migrated** — `pushToast` → `sonner`; theme via Flex store |
-| Spinner | yes | `Spinner` | |
-| Switch | yes | `Toggle` atom | Keep green ON track |
-| Table | later | Database results | With Data Table |
+| Sonner | yes | `Toast` / ToastHost | **ToastHost migrated** — `pushToast` → `sonner` |
+| Spinner | yes | `Spinner` | **done** |
+| Switch | yes | `Toggle` atom | **done** (green ON) |
+| Table | later | Database results | With Pagination first |
 | Tabs | careful | panel/file tabs | Prefer keep custom `Tab*` for chrome chips; shadcn Tabs for settings sections only |
-| Textarea | yes | `TextArea`, composer draft | Composer may stay specialized |
+| Textarea | yes | `TextArea`, composer draft | **done** |
 | Toast | n/a | — | Use **Sonner**, not legacy Toast component |
-| Toggle | yes | ModePicker pills if not ToggleGroup | Distinct from Switch |
-| Toggle Group | yes | `ModePicker` (Agent/Plan/Ask[/Flex]) | Ideal fit |
-| Tooltip | yes | `Tooltip` atom | |
+| Toggle | careful | pressed toolbar buttons | Name clash: Flex `Toggle` = Switch (done); use Toggle Group for Code/Eye |
+| Toggle Group | yes | Files Code/Eye, filter chips | **Not** ModePicker (Popover+descriptions) |
+| Tooltip | yes | `Tooltip` atom | Deferred — timeline scroll dismiss |
 | Typography | selective | prose in settings / empty states | Do not replace `MarkdownBody` |
+| Alert | yes | `ErrorBanner`, resume banners | **ErrorBanner migrated** |
+| Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader` | Primitive installed; wire headers next |
+| Combobox | yes | Model/Branch/Project pickers | Prefer over PopoverTray search trays |
 
 Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 `attachment`, `marker` — the “\*New” suffixes in some docs are naming noise.
@@ -337,11 +340,32 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 |---|---|---|
 | **0 — Foundation** | `shadcn init` in `packages/desktop` (Vite, Tailwind v4, **radix** base, `lucide`, css variables); path alias `@/`; upgrade `cn` to `clsx` + `tailwind-merge`; map shadcn semantic tokens → Flex tokens in `src/index.css` / `tokens.css` without breaking `data-theme` | `components.json` present; `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
 | **1 — Atom adapters** | Add Button, Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Spinner, Avatar, Tooltip, ScrollArea; re-export from `components/atoms` with temporary compat props | Atom unit tests + vitest green; call sites compile via barrel. **Done:** Button, TextInput, TextArea, Label, Badge, Kbd, Divider←Separator, Skeleton, Spinner, Checkbox (round), Toggle←Switch (green ON), Avatar, ScrollArea. **Deferred:** Tooltip (timeline scroll / programmatic-scroll coupling — keep custom until Provider + scroll policy ported). |
-| **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | Confirm/auth/PR/bug dialogs + ToastHost + TitleBarMenus on primitives |
-| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | Settings forms, ModePicker, ModelPicker, CommandPalette/SearchModal |
-| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | Split sash + empty/error callouts; sidebar spike documented go/no-go |
-| **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Chip/bubble/marker parity; scroller decision recorded here |
+| **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog, ToastHost/Sonner, ModePicker+IsolationPicker (Popover), PlusMenu (DropdownMenu). **Next:** SessionMenu, TitleBarMenus, ContextMenu last |
+| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field. **Next:** Select/Combobox for Model/Branch/Project |
+| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner→Alert; Collapsible installed. **Next:** Resizable sash; Collapsible headers |
+| **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Adopt Attachment→Bubble→Message→Marker *inside* virtual rows; MessageScroller only after measured spike with react-virtual |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
+
+### Docs investigation (radix-nova)
+
+Mini-agent review of https://ui.shadcn.com/docs/components (radix variants)
+produced these binding decisions:
+
+| Prefer | Over | Why |
+|---|---|---|
+| DropdownMenu | Popover | Pure action lists (`PlusMenu`, SessionMenu) |
+| Popover | DropdownMenu | Choice lists with descriptions (`ModePicker`) |
+| Combobox | PopoverTray search | Model/Branch/Project searchable pickers |
+| CommandDialog | custom palette | CommandPalette / SearchModal (keep z-300 + webview suppress) |
+| Field | FormField | Label + hint + `data-invalid` |
+| Empty / Alert | custom callouts | EmptyState / ErrorBanner |
+| Collapsible | Accordion | Sidebar section headers |
+| Attachment→Bubble→Message→Marker | MessageScroller first | Keep `@tanstack/react-virtual`; scroller is spike-only |
+| Keep custom | Sheet for Settings | Chat must stay mounted under absolute overlay |
+| ContextMenu last | early swap | Timeline scroll + WebView2 blur defenses |
+
+**CLI note:** `add` still prompts to overwrite `separator.tsx` when Field pulls it —
+decline overwrite (`--dry-run` / `--view` + hand-copy) so Flex Separator stays.
 
 ### Adapter strategy (avoid big-bang breakage)
 

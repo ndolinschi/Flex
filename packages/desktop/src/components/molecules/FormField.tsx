@@ -1,6 +1,11 @@
 import type { ReactNode } from "react"
-import { Label } from "../atoms"
-import { cn } from "../../lib/utils"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field"
+import { cn } from "@/lib/utils"
 
 type FormFieldProps = {
   label: string
@@ -11,6 +16,7 @@ type FormFieldProps = {
   className?: string
 }
 
+/** Label + control + hint/error — shadcn Field composition. */
 export const FormField = ({
   label,
   htmlFor,
@@ -20,17 +26,20 @@ export const FormField = ({
   className,
 }: FormFieldProps) => {
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label htmlFor={htmlFor}>{label}</Label>
+    <Field
+      data-invalid={error ? true : undefined}
+      className={cn("gap-1.5", className)}
+    >
+      <FieldLabel htmlFor={htmlFor} className="text-ink-secondary">
+        {label}
+      </FieldLabel>
       {children}
       {hint && !error ? (
-        <p className="text-xs text-ink-faint">{hint}</p>
+        <FieldDescription className="text-xs text-ink-faint">
+          {hint}
+        </FieldDescription>
       ) : null}
-      {error ? (
-        <p className="text-xs text-danger" role="alert">
-          {error}
-        </p>
-      ) : null}
-    </div>
+      {error ? <FieldError className="text-xs">{error}</FieldError> : null}
+    </Field>
   )
 }

@@ -1,6 +1,12 @@
-import { X } from "lucide-react"
-import { cn } from "../../lib/utils"
+import { TriangleAlert, X } from "lucide-react"
 import { IconButton } from "../atoms"
+import {
+  Alert,
+  AlertAction,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert"
+import { cn } from "@/lib/utils"
 
 type ErrorBannerProps = {
   message: string
@@ -8,23 +14,28 @@ type ErrorBannerProps = {
   className?: string
 }
 
+/** Inline error callout — shadcn Alert (destructive). */
 export const ErrorBanner = ({ message, onDismiss, className }: ErrorBannerProps) => {
   if (!message) return null
 
   return (
-    <div
-      role="alert"
+    <Alert
+      variant="destructive"
       className={cn(
-        "flex items-start gap-2 rounded-md border border-danger/20 bg-danger-subtle px-3 py-2",
+        "border-danger/20 bg-danger-subtle text-danger",
         className,
       )}
     >
-      <p className="flex-1 text-sm text-danger">{message}</p>
+      <TriangleAlert aria-hidden />
+      <AlertTitle className="sr-only">Error</AlertTitle>
+      <AlertDescription className="text-sm text-danger">{message}</AlertDescription>
       {onDismiss ? (
-        <IconButton label="Dismiss error" onClick={onDismiss}>
-          <X className="h-3.5 w-3.5" aria-hidden />
-        </IconButton>
+        <AlertAction>
+          <IconButton label="Dismiss error" onClick={onDismiss}>
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </IconButton>
+        </AlertAction>
       ) : null}
-    </div>
+    </Alert>
   )
 }

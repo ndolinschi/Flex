@@ -1,9 +1,14 @@
-import { useRef, useState } from "react"
+import { useState } from "react"
 import { Check, GitFork } from "lucide-react"
 import type { IsolationPolicy } from "../../../lib/types"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
-import { PopoverItem, PopoverTray } from "../../molecules/PopoverTray"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { PopoverItem } from "../../molecules/PopoverTray"
 
 const ISOLATION_OPTIONS: {
   value: IsolationPolicy
@@ -42,7 +47,6 @@ export const IsolationPicker = ({
   disabled?: boolean
 }) => {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
   const selectedIsolation = useAppStore((s) => s.selectedIsolation)
   const setSelectedIsolation = useAppStore((s) => s.setSelectedIsolation)
   // Both selectors must run unconditionally on every render — `||` short-
@@ -75,34 +79,34 @@ export const IsolationPicker = ({
   }
 
   return (
-    <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        disabled={disabled}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={`Isolation: ${currentLabel}`}
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "ml-1 flex h-6 items-center gap-1 rounded-md px-1.5",
-          "text-sm text-ink-muted opacity-80",
-          "transition-[color,opacity] duration-[var(--duration-fast)]",
-          "hover:text-ink-secondary hover:opacity-100 disabled:opacity-50",
-          open && "opacity-100",
-        )}
-      >
-        <GitFork className="h-3 w-3 shrink-0" aria-hidden />
-        <span className="min-w-0 truncate">{currentLabel}</span>
-      </button>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-label={`Isolation: ${currentLabel}`}
+          className={cn(
+            "ml-1 flex h-6 items-center gap-1 rounded-md px-1.5",
+            "text-sm text-ink-muted opacity-80",
+            "transition-[color,opacity] duration-[var(--duration-fast)]",
+            "hover:text-ink-secondary hover:opacity-100 disabled:opacity-50",
+            open && "opacity-100",
+          )}
+        >
+          <GitFork className="h-3 w-3 shrink-0" aria-hidden />
+          <span className="min-w-0 truncate">{currentLabel}</span>
+        </button>
+      </PopoverTrigger>
 
-      <PopoverTray
-        open={open}
-        onClose={() => setOpen(false)}
-        anchorRef={rootRef}
-        placement="above"
+      <PopoverContent
+        side="top"
+        align="start"
+        sideOffset={6}
         role="listbox"
         aria-label="Session isolation"
-        className="left-0 w-72"
+        className="w-72 gap-0 rounded-md border-0 bg-panel p-0 shadow-[var(--shadow-popover)] ring-0"
       >
         <ul className="py-0.5">
           {ISOLATION_OPTIONS.map((opt) => {
@@ -132,7 +136,7 @@ export const IsolationPicker = ({
             )
           })}
         </ul>
-      </PopoverTray>
-    </div>
+      </PopoverContent>
+    </Popover>
   )
 }
