@@ -1,21 +1,12 @@
 import { useRef } from "react"
-import { useQueryClient } from "@tanstack/react-query"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
 import { openUrl } from "@tauri-apps/plugin-opener"
 import { closeWindow } from "../lib/windowChrome"
-import {
-  findDraftSession,
-  newAgentCreateInput,
-  resolveCreateCwd,
-} from "../lib/sessions"
-import {
-  createSession,
-  resumeSession,
-  toInvokeError,
-} from "../lib/tauri"
-import type { SessionMeta } from "../lib/types"
+import { newAgentCreateInput } from "../lib/sessions"
+import { createSession, toInvokeError } from "../lib/tauri"
 import { useAppStore } from "../stores/appStore"
 import { SESSIONS_KEY } from "./useSessions"
+import { useQueryClient } from "@tanstack/react-query"
 
 const DOCS_URL = "https://github.com/ndolinschi/Flex#readme"
 const ISSUES_URL = "https://github.com/ndolinschi/Flex/issues"
@@ -36,6 +27,8 @@ export type TitleBarActionHandlers = {
 }
 
 type UseTitleBarActionsOpts = {
+  /** From `useSessions().newAgent` — single source of draft-reuse logic. */
+  newAgent: (cwd?: string) => Promise<unknown>
   onOpenCommandPalette?: () => void
   onOpenSearch?: () => void
   onOpenBugReport: () => void
@@ -43,10 +36,11 @@ type UseTitleBarActionsOpts = {
 
 /**
  * Shared File/Edit/View/Help actions for in-window menus and the native macOS
- * menu bar. Handlers are referentially stable (refs) so the title bar does not
- * thrash child menus on every chat/tab switch.
+ * menu bar. Handler object is built once (refs) so chat/tab switches do not
+ * thrash menu children.
  */
 export const useTitleBarActions = ({
+  newAgent,
   onOpenCommandPalette,
   onOpenSearch,
   onOpenBugReport,
@@ -58,16 +52,20 @@ export const useTitleBarActions = ({
   const isBootstrapped = useAppStore((s) => s.isBootstrapped)
 
   const optsRef = useRef({
+    newAgent,
     onOpenCommandPalette,
     onOpenSearch,
     onOpenBugReport,
     isBootstrapped,
+    queryClient,
   })
   optsRef.current = {
+    newAgent,
     onOpenCommandPalette,
     onOpenSearch,
     onOpenBugReport,
     isBootstrapped,
+    queryClient,
   }
 
   const handlersRef = useRef<TitleBarActionHandlers | null>(null)
@@ -75,44 +73,11 @@ export const useTitleBarActions = ({
     handlersRef.current = {
       newAgent: () => {
         if (!optsRef.current.isBootstrapped) return
-        void (async () => {
-          const state = useAppStore.getState()
-          const sessions =
-            queryClient.getQueryData<SessionMeta[]>(SESSIONS_KEY) ?? []
-          const cwd = resolveCreateCwd(
-            sessions,
-            state.activeSessionId,
-            state.recentCwds,
-          )
-          const draft = findDraftSession(sessions, cwd)
-          if (draft) {
-            try {
-              await resumeSession(draft.id)
-            } catch {
-              // Still select locally if resume fails (session already warm).
-            }
-            state.setActiveSessionId(draft.id, { panel: "closed" })
-            state.setRoute("chat")
-            return
-          }
-          try {
-            const meta = await createSession(
-              newAgentCreateInput(
-                cwd,
-                state.selectedModelId,
-                state.selectedIsolation,
-              ),
-            )
-            void queryClient.invalidateQueries({ queryKey: SESSIONS_KEY })
-            state.setActiveSessionId(meta.id, { panel: "closed" })
-            state.setRoute("chat")
-          } catch (err) {
-            state.pushToast(
-              `Could not create agent: ${toInvokeError(err)}`,
-              "error",
-            )
-          }
-        })()
+        void optsRef.current.newAgent().catch((err: unknown) => {
+          useAppStore
+            .getState()
+            .pushToast(`Could not create agent: ${toInvokeError(err)}`, "error")
+        })
       },
       openFolder: () => {
         void (async () => {
@@ -123,7 +88,9 @@ export const useTitleBarActions = ({
             if (!path || Array.isArray(path)) return
             state.pushRecentCwd(path)
             const meta = await createSession(newAgentCreateInput(path))
-            void queryClient.invalidateQueries({ queryKey: SESSIONS_KEY })
+            void optsRef.current.queryClient.invalidateQueries({
+              queryKey: SESSIONS_KEY,
+            })
             state.setActiveSessionId(meta.id, { panel: "closed" })
             state.setRoute("chat")
           } catch (err) {

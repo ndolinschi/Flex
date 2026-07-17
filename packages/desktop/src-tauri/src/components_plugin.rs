@@ -685,6 +685,15 @@ pub fn component_detail(cwd: &Path, id: &str) -> DesktopResult<ComponentDetail> 
     })
 }
 
+fn cwd_not_a_directory_msg(cwd: &str) -> String {
+    let shown = cwd.trim();
+    if shown.is_empty() {
+        "cwd is not a directory (empty)".into()
+    } else {
+        format!("cwd is not a directory ({shown})")
+    }
+}
+
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip_all, err)]
 pub async fn components_detect(
@@ -693,14 +702,9 @@ pub async fn components_detect(
 ) -> DesktopResult<ComponentsDetectResult> {
     let Some(path) = crate::path_resolve::resolve_existing_dir(&cwd, fallback_cwd.as_deref())
     else {
-        let shown = cwd.trim();
         return Ok(ComponentsDetectResult {
             is_react: false,
-            reason: if shown.is_empty() {
-                "cwd is not a directory (empty)".into()
-            } else {
-                format!("cwd is not a directory ({shown})")
-            },
+            reason: cwd_not_a_directory_msg(&cwd),
             package_name: None,
         });
     };
@@ -715,12 +719,7 @@ pub async fn components_list(
 ) -> DesktopResult<ComponentsListResult> {
     let Some(path) = crate::path_resolve::resolve_existing_dir(&cwd, fallback_cwd.as_deref())
     else {
-        let shown = cwd.trim();
-        return Err(message(if shown.is_empty() {
-            "cwd is not a directory (empty)".into()
-        } else {
-            format!("cwd is not a directory ({shown})")
-        }));
+        return Err(message(cwd_not_a_directory_msg(&cwd)));
     };
     Ok(list_components(&path))
 }
@@ -734,12 +733,7 @@ pub async fn components_detail(
 ) -> DesktopResult<ComponentDetail> {
     let Some(path) = crate::path_resolve::resolve_existing_dir(&cwd, fallback_cwd.as_deref())
     else {
-        let shown = cwd.trim();
-        return Err(message(if shown.is_empty() {
-            "cwd is not a directory (empty)".into()
-        } else {
-            format!("cwd is not a directory ({shown})")
-        }));
+        return Err(message(cwd_not_a_directory_msg(&cwd)));
     };
     component_detail(&path, id.trim())
 }

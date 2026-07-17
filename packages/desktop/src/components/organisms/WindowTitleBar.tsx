@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useState } from "react"
 import { Columns2, PanelLeft } from "lucide-react"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { AppMark, TitleBarMenus } from "../molecules/TitleBarMenus"
@@ -38,26 +38,28 @@ const WindowTitleBarImpl = ({
   const host = detectWindowHost()
   const isMac = host === "macos"
   const [bugOpen, setBugOpen] = useState(false)
+  const openBugReport = useCallback(() => setBugOpen(true), [])
+  const closeBugReport = useCallback(() => setBugOpen(false), [])
+
   const collapsed = useAppStore((s) => s.sidebarCollapsed)
   const isBootstrapped = useAppStore((s) => s.isBootstrapped)
   const route = useAppStore((s) => s.route)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
-  // Narrow selectors — full `contentLayout` changes on every tab switch and
-  // would re-render this chrome (menus + session query) for no reason.
+  // Narrow — full `contentLayout` changes on every tab switch.
   const split = useAppStore((s) => s.contentLayout.mode === "split")
   const toggleSplit = useAppStore((s) => s.toggleSplit)
   const viewport = useAppStore((s) => s.viewport)
-  const { sessions, renameSession, deleteSession } = useSessions()
+
+  const { sessions, newAgent, renameSession, deleteSession } = useSessions()
   const active = sessions.find((s) => s.id === activeSessionId)
   const title = active ? sessionLabel(active) : "Agent"
   const showChatChrome = isBootstrapped && route !== "welcome"
 
-  const bugOpenRef = useRef(setBugOpen)
-  bugOpenRef.current = setBugOpen
   const { handlers } = useTitleBarActions({
+    newAgent,
     onOpenCommandPalette,
     onOpenSearch,
-    onOpenBugReport: () => bugOpenRef.current(true),
+    onOpenBugReport: openBugReport,
   })
 
   useNativeAppMenu({
@@ -68,8 +70,6 @@ const WindowTitleBarImpl = ({
     handlers,
   })
 
-  // Frontend belt-and-suspenders: if window-state (or a stale launch path)
-  // left the native frame on, strip it once the title bar mounts.
   useEffect(() => {
     void getCurrentWindow()
       .setDecorations(false)
@@ -121,9 +121,6 @@ const WindowTitleBarImpl = ({
           className="h-full min-w-[48px] flex-1"
           data-tauri-drag-region
           aria-hidden
-          // Custom chrome has no native title-bar double-click. Prefer
-          // mousedown `detail === 2` because `data-tauri-drag-region` can
-          // swallow the second click before `onDoubleClick` fires.
           onMouseDown={(e) => {
             if (e.button === 0 && e.detail === 2) {
               e.preventDefault()
@@ -158,7 +155,7 @@ const WindowTitleBarImpl = ({
 
         {!isMac ? <CaptionButtons /> : null}
       </header>
-      <BugReportDialog open={bugOpen} onClose={() => setBugOpen(false)} />
+      <BugReportDialog open={bugOpen} onClose={closeBugReport} />
     </>
   )
 }

@@ -132,6 +132,25 @@ mod tests {
     }
 
     #[test]
+    fn collapse_extra_backslashes_normalizes_double_escaped_unc() {
+        assert_eq!(
+            collapse_extra_backslashes(r"\\\\server\\share\\dir"),
+            r"\\server\share\dir"
+        );
+    }
+
+    #[test]
+    fn collapse_extra_backslashes_leaves_extended_paths() {
+        let extended = r"\\?\C:\Users\foo";
+        assert_eq!(collapse_extra_backslashes(extended), extended);
+    }
+
+    #[test]
+    fn collapse_extra_backslashes_leaves_forward_slashes() {
+        assert_eq!(collapse_extra_backslashes(r"C:/Users/foo"), r"C:/Users/foo");
+    }
+
+    #[test]
     fn normalize_strips_file_url_and_quotes() {
         assert_eq!(
             normalize_cwd_input("  \"/tmp/project\"  "),
