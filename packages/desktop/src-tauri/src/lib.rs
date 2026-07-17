@@ -8,6 +8,7 @@ mod debug;
 mod error;
 #[cfg(target_os = "macos")]
 mod macos_window;
+mod path_resolve;
 mod secrets;
 mod state;
 mod terminal;
@@ -303,6 +304,7 @@ pub fn run() {
             commands::review_file_diff,
             commands::list_files,
             commands::list_dir_children,
+            commands::resolve_workspace_cwd,
             commands::list_commands,
             db_plugin::db_list_connections,
             db_plugin::db_upsert_connection,

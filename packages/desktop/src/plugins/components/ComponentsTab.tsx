@@ -113,6 +113,7 @@ const triggerComposerSend = (): void => {
  * local mini-prompt that packages component context + CSS diffs for the agent. */
 export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
   const cwd = session?.cwd?.trim() ?? ""
+  const fallbackCwd = session?.base_cwd?.trim() || undefined
   const addAttachment = useAppStore((s) => s.addAttachment)
   const clearAttachments = useAppStore((s) => s.clearAttachments)
   const attachments = useAppStore((s) => s.attachments)
@@ -144,11 +145,11 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
     setBaselineById({})
     setPromptById({})
     setError(null)
-  }, [cwd])
+  }, [cwd, fallbackCwd])
 
   const { data: detect, isFetching: detectFetching } = useQuery({
-    queryKey: ["components-detect", cwd],
-    queryFn: () => componentsDetect(cwd),
+    queryKey: ["components-detect", cwd, fallbackCwd ?? ""],
+    queryFn: () => componentsDetect(cwd, fallbackCwd),
     enabled: active && !!cwd,
     staleTime: 30_000,
   })
@@ -158,15 +159,15 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
     isFetching: listFetching,
     refetch: refetchList,
   } = useQuery({
-    queryKey: ["components-list", cwd],
-    queryFn: () => componentsList(cwd),
+    queryKey: ["components-list", cwd, fallbackCwd ?? ""],
+    queryFn: () => componentsList(cwd, fallbackCwd),
     enabled: active && !!cwd && !!detect?.isReact,
     staleTime: 15_000,
   })
 
   const { data: detail } = useQuery({
-    queryKey: ["components-detail", cwd, activeId],
-    queryFn: () => componentsDetail(cwd, activeId!),
+    queryKey: ["components-detail", cwd, fallbackCwd ?? "", activeId],
+    queryFn: () => componentsDetail(cwd, activeId!, fallbackCwd),
     enabled: active && !!cwd && !!activeId,
   })
 

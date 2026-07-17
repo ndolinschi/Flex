@@ -80,31 +80,7 @@ fn default_cwd() -> String {
 /// Double-escaped UNC arrives as four leading backslashes (`\\\\server\\…`);
 /// the leading run is normalized to exactly `\\` before collapsing the rest.
 fn collapse_extra_backslashes(path: &str) -> String {
-    if path.starts_with(r"\\?\") {
-        return path.to_owned();
-    }
-    let unc = path.starts_with(r"\\");
-    let mut out = String::with_capacity(path.len());
-    let mut chars = path.chars().peekable();
-    if unc {
-        out.push('\\');
-        out.push('\\');
-        // Skip the whole leading `\` run (2 from real UNC, 4+ from double-escape).
-        while chars.peek() == Some(&'\\') {
-            let _ = chars.next();
-        }
-    }
-    while let Some(c) = chars.next() {
-        if c == '\\' {
-            out.push('\\');
-            while chars.peek() == Some(&'\\') {
-                let _ = chars.next();
-            }
-        } else {
-            out.push(c);
-        }
-    }
-    out
+    crate::path_resolve::collapse_extra_backslashes(path)
 }
 
 /// Pick an existing directory for the PTY shell. Prefers the requested cwd,
