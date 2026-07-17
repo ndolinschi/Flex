@@ -1,4 +1,5 @@
 import type { StateCreator } from "zustand"
+import { toast } from "sonner"
 import type { AppState, UiSliceState, UiTheme } from "../types"
 import type { AccentId } from "../../lib/accent"
 import {
@@ -23,8 +24,6 @@ const syncAccentToDom = (state: {
 }) => {
   applyAccentToDom(state.accentId, state.accentCustomHex, state.theme)
 }
-
-let toastCounter = 0
 
 export const createUiSlice: StateCreator<
   AppState,
@@ -212,10 +211,18 @@ export const createUiSlice: StateCreator<
       },
     })),
   pushToast: (text, kind, action) => {
-    toastCounter += 1
-    const id = `toast-${toastCounter}`
-    set((state) => ({ toasts: [...state.toasts, { id, text, kind, action }] }))
+    const opts = action
+      ? {
+          action: {
+            label: action.label,
+            onClick: () => action.onAction(),
+          },
+        }
+      : undefined
+    if (kind === "success") toast.success(text, opts)
+    else toast.error(text, opts)
   },
-  dismissToast: (id) =>
-    set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) })),
+  dismissToast: (id) => {
+    toast.dismiss(id)
+  },
 })

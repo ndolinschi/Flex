@@ -316,7 +316,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Sidebar | spike | `SessionSidebar` | High value, high risk — density + grouping + DnD later |
 | Skeleton | yes | `Skeleton`, `SidebarSkeleton` | |
 | Slider | skip | — | |
-| Sonner | yes | `Toast` / ToastHost | Bridge Zustand toast API → `toast()` |
+| Sonner | yes | `Toast` / ToastHost | **ToastHost migrated** — `pushToast` → `sonner`; theme via Flex store |
 | Spinner | yes | `Spinner` | |
 | Switch | yes | `Toggle` atom | Keep green ON track |
 | Table | later | Database results | With Data Table |

@@ -1,88 +1,12 @@
-import { useEffect } from "react"
-import { Check, TriangleAlert } from "lucide-react"
-import { useAppStore } from "../../stores/appStore"
-import { cn } from "../../lib/utils"
+import { Toaster } from "@/components/ui/sonner"
 
-const TOAST_TIMEOUT_MS = 4000
-
-type ToastRowProps = {
-  id: string
-  text: string
-  kind: "success" | "error"
-  action?: { label: string; onAction: () => void }
-  onDismiss: (id: string) => void
-}
-
-const ToastRow = ({ id, text, kind, action, onDismiss }: ToastRowProps) => {
-  useEffect(() => {
-    const timer = window.setTimeout(() => onDismiss(id), TOAST_TIMEOUT_MS)
-    return () => window.clearTimeout(timer)
-  }, [id, onDismiss])
-
-  const Icon = kind === "success" ? Check : TriangleAlert
-
-  return (
-    <div
-      className={cn(
-        "animate-toast-in flex items-center gap-2 rounded-md border border-stroke-3 px-3 py-2 text-left text-sm",
-        "bg-panel/80 backdrop-blur-[40px]",
-      )}
-    >
-      <button
-        type="button"
-        onClick={() => onDismiss(id)}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left"
-      >
-        <Icon
-          className={cn(
-            "h-3.5 w-3.5 shrink-0",
-            kind === "success" ? "text-green" : "text-red",
-          )}
-          aria-hidden
-        />
-        <span className="min-w-0 flex-1 text-ink">{text}</span>
-      </button>
-      {action ? (
-        <button
-          type="button"
-          onClick={() => {
-            action.onAction()
-            onDismiss(id)
-          }}
-          className="shrink-0 rounded-sm bg-accent px-2 py-1 text-xs font-medium text-accent-text transition-colors duration-[var(--duration-fast)] hover:bg-accent-hover"
-        >
-          {action.label}
-        </button>
-      ) : null}
-    </div>
-  )
-}
-
-/** in-app toast host — bottom-right, stacked, auto-dismissing.
+/** in-app toast host — Sonner bottom-right.
  * Marks `data-suppress-native-webview` so the Browser child webview hides
  * when a toast intersects its slot (native webviews paint above all DOM). */
 export const ToastHost = () => {
-  const toasts = useAppStore((s) => s.toasts)
-  const dismissToast = useAppStore((s) => s.dismissToast)
-
-  if (toasts.length === 0) return null
-
   return (
-    <div
-      data-suppress-native-webview=""
-      className="pointer-events-none fixed bottom-4 right-4 z-[1000] flex flex-col gap-2"
-    >
-      {toasts.map((t) => (
-        <div key={t.id} className="pointer-events-auto">
-          <ToastRow
-            id={t.id}
-            text={t.text}
-            kind={t.kind}
-            action={t.action}
-            onDismiss={dismissToast}
-          />
-        </div>
-      ))}
+    <div data-suppress-native-webview="" className="contents">
+      <Toaster className="!z-[1000]" />
     </div>
   )
 }
