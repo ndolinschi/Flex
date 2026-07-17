@@ -142,6 +142,9 @@ const EffortSubmenu = ({
   )
 }
 
+/** Composer model pill with provider groups + per-row effort submenu.
+ * Stays on Popover (not Combobox) so the portaled effort menu can use
+ * interact-outside ignore via `data-popover-outside-ignore`. */
 export const ModelPicker = ({
   models,
   value,
