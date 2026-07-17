@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { Check, Folder, FolderOpen } from "lucide-react"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
@@ -13,8 +13,13 @@ import {
   PopoverItem,
   PopoverSearch,
   PopoverSection,
-  PopoverTray,
 } from "./PopoverTray"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 
 type ProjectPickerProps = {
   sessionId: string | null
@@ -34,7 +39,6 @@ export const ProjectPicker = ({
   const [openMenu, setOpenMenu] = useState(false)
   const [query, setQuery] = useState("")
   const [busy, setBusy] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const recentCwds = useAppStore((s) => s.recentCwds)
   const pushRecentCwd = useAppStore((s) => s.pushRecentCwd)
@@ -78,9 +82,9 @@ export const ProjectPicker = ({
     )
   }, [recents, query])
 
-  const handleClose = () => {
-    setOpenMenu(false)
-    setQuery("")
+  const handleOpenChange = (next: boolean) => {
+    setOpenMenu(next)
+    if (!next) setQuery("")
   }
 
   const applyCwd = async (nextCwd: string) => {
@@ -112,7 +116,7 @@ export const ProjectPicker = ({
         setActiveSessionId(meta.id, { panel: "closed" })
         setRoute("chat")
       }
-      handleClose()
+      handleOpenChange(false)
     } catch (err) {
       onError?.(toInvokeError(err))
     } finally {
@@ -139,25 +143,29 @@ export const ProjectPicker = ({
   }
 
   return (
-    <div ref={rootRef} className="relative">
-      <PickerTrigger
-        leadingIcon={<Folder className="h-3 w-3 shrink-0" aria-hidden />}
-        label={label}
-        open={openMenu}
-        onClick={() => setOpenMenu((v) => !v)}
-        disabled={disabled || busy}
-        ariaLabel={`Project: ${label}`}
-        className="max-w-[10rem]"
-      />
+    <Popover open={openMenu} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <PickerTrigger
+          leadingIcon={<Folder className="h-3 w-3 shrink-0" aria-hidden />}
+          label={label}
+          open={openMenu}
+          disabled={disabled || busy}
+          ariaLabel={`Project: ${label}`}
+          className="max-w-[10rem]"
+        />
+      </PopoverTrigger>
 
-      <PopoverTray
-        open={openMenu}
-        onClose={handleClose}
-        anchorRef={rootRef}
-        placement="above"
+      <PopoverContent
+        side="top"
+        align="start"
+        sideOffset={6}
         role="listbox"
         aria-label="Projects"
-        className="left-0 w-80"
+        className={cn(
+          "w-80 gap-0 rounded-md border-0 bg-panel p-0 shadow-[var(--shadow-popover)]",
+          "ring-0",
+        )}
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <PopoverSearch
           value={query}
@@ -215,7 +223,7 @@ export const ProjectPicker = ({
             Open Folder
           </PopoverItem>
         </div>
-      </PopoverTray>
-    </div>
+      </PopoverContent>
+    </Popover>
   )
 }

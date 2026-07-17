@@ -62,8 +62,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `OpenTabModal` | Searchable open-tab picker anchored near ContentPane `+` | `open`, `onClose`, `anchor`, `paneIndex`, `sessionId`, `tabs`, `onOpenChat`, `onOpenTool` | ContentPane |
 | `PermissionActions` | Composer-footer Allow once / Always allow / Deny (replaces Send) | `permission` | Composer |
 | `PlusMenu` | Attach + mode shortcuts (Plan/Ask) | `onAttachFile`, `onAttachImage`, `onSetMode?` | Composer |
-| `ProjectPicker` | Recent cwds + Open Folder | `sessionId`, `cwd`, `onError?` | ContextBar |
-| `BranchPicker` | List/checkout local git branches; shows current-branch PR # + checks when present | `cwd`, `onError?` | ContextBar |
+| `ProjectPicker` | Recent cwds + Open Folder (shadcn Popover) | `sessionId`, `cwd`, `onError?` | ContextBar |
+| `BranchPicker` | List/checkout branches (shadcn Popover); PR # + checks when present | `cwd`, `onError?` | ContextBar |
 | `BranchPrStatusChip` | Current-branch PR # + title + CI summary; opens PR in browser | `pr` | ChangesTab header |
 | `CreatePrDialog` | Editable title/body modal before `gh pr create` | `open`, `initialTitle?`, `initialBody?`, `onConfirm` | ChangesTab, CommitCenter, CommitBar |
 | `PopoverTray` | Shared Esc/click-outside/↑↓ tray; `onClose` via ref so stream re-renders don't rebind listeners | `open`, `onClose`, `placement`, `children` | Model/Mode/Plus/Project/Branch pickers |
@@ -305,7 +305,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Native Select | later | simple settings enums | Prefer Select/Combobox; ModelSelect stays searchable Popover |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
 | Pagination | later | DatabaseTab paging | Icons-only Previous/Next |
-| Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker, IsolationPicker, ModelSelect**; Combobox next for Branch/Project |
+| Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker, IsolationPicker, ModelSelect, BranchPicker, ProjectPicker**; Combobox next for ModelPicker |
 | Progress | later | indexing / update UX | Soft need |
 | Radio Group | yes | `QuestionPrompt` choices | |
 | Resizable | yes | content split sash | `ContentWorkspace` dual pane |
@@ -338,7 +338,7 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | **0 — Foundation** | `shadcn init` in `packages/desktop` (Vite, Tailwind v4, **radix** base, `lucide`, css variables); path alias `@/`; upgrade `cn` to `clsx` + `tailwind-merge`; map shadcn semantic tokens → Flex tokens in `src/index.css` / `tokens.css` without breaking `data-theme` | `components.json` present; `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
 | **1 — Atom adapters** | Add Button, Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Spinner, Avatar, Tooltip, ScrollArea; re-export from `components/atoms` with temporary compat props | Atom unit tests + vitest green; call sites compile via barrel. **Done:** Button, TextInput, TextArea, Label, Badge, Kbd, Divider←Separator, Skeleton, Spinner, Checkbox (round), Toggle←Switch (green ON), Avatar, ScrollArea. **Deferred:** Tooltip (timeline scroll / programmatic-scroll coupling — keep custom until Provider + scroll policy ported). |
 | **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog, ToastHost/Sonner, ModePicker+IsolationPicker (Popover), PlusMenu+SessionMenu+BrowserOverflow (DropdownMenu). **Next:** TitleBarMenus, auth/MCP dialogs; ContextMenu last |
-| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select primitive; ModelSelect→Popover (search). **Next:** Combobox for Branch/Project/ModelPicker |
+| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select primitive; ModelSelect/Branch/Project→Popover (search). **Next:** Combobox for ModelPicker/ModelMultiSelect; Command palette |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner→Alert; Collapsible installed. **Next:** Resizable sash; Collapsible headers |
 | **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Adopt Attachment→Bubble→Message→Marker *inside* virtual rows; MessageScroller only after measured spike with react-virtual |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
