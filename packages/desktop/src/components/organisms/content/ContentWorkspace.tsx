@@ -7,13 +7,13 @@ import {
 import { useAppStore } from "../../../stores/appStore"
 import { CHAT_MIN_WIDTH } from "../../../stores/layoutConstants"
 import { clampSplitRatio } from "../../../stores/contentLayoutModel"
-import { AppHeader } from "../AppHeader"
 import { ContentPane } from "./ContentPane"
 import { cn } from "../../../lib/utils"
 import { useContentTabLifecycle } from "../../../hooks/useContentTabLifecycle"
 import { useInstallContentTabPointerDnD } from "../../../hooks/useContentTabPointerDnD"
 
-/** Main content host: AppHeader + one or two ContentPanes with a sash. */
+/** Main content host: one or two ContentPanes with a sash.
+ * Chat chrome (sidebar / split / session) lives on WindowTitleBar. */
 export const ContentWorkspace = () => {
   useContentTabLifecycle()
   useInstallContentTabPointerDnD()
@@ -80,7 +80,6 @@ export const ContentWorkspace = () => {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-      <AppHeader />
       <div
         ref={rowRef}
         className="relative flex min-h-0 min-w-0 flex-1"

@@ -68,7 +68,6 @@ export const ChatSessionBody = ({ sessionId, active }: ChatSessionBodyProps) => 
     <div className={cn("flex h-full min-h-0 flex-1 flex-col", !active && "opacity-90")}>
       <ChatShell
         hideSidebar
-        showHeader={false}
         timeline={
           <>
             <TurnTimeline

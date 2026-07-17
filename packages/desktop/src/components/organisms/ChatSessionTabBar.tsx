@@ -6,7 +6,7 @@ import { useSessions } from "../../hooks/useSessions"
 import { useAppStore } from "../../stores/appStore"
 import { Tab, TabStrip, Tooltip } from "../atoms"
 
-/** Open-chat pills for AppHeader — same `Tab`/`TabStrip` as the right panel.
+/** Open-chat pills for content pane strips — same `Tab`/`TabStrip` as tool tabs.
  * Horizontal scroll when tabs overflow; closing a tab does not delete the session. */
 export const ChatSessionTabBar = () => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
