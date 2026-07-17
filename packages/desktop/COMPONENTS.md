@@ -120,8 +120,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `WindowTitleBar` | Compact custom window chrome (`decorations: false`, 30px): traffic lights / caption buttons + File/Edit/View/Help + drag region | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
 | `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | ToolTabBody |
 | `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/`. Opening the tab with zero workspace PTYs auto-creates one shell. | — | ToolTabBody |
-| `CommandPalette` | ⌘K-style action palette (nav, theme, new agent); rows via `CommandPaletteRow`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell |
-| `SearchModal` | Fuzzy session search overlay; rows via `FuzzySessionRow` + `HighlightedLabel`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell (via SessionSidebar's `onOpenSearch`) |
+| `CommandPalette` | ⌘K-style action palette (shadcn CommandDialog + cmdk); scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell |
+| `SearchModal` | Fuzzy session search (CommandDialog); highlight via `HighlightedLabel` | `open`, `onClose` | App shell (via SessionSidebar's `onOpenSearch`) |
 | `SubagentViewer` | Bottom-anchored overlay replaying a subagent's inner session feed | (reads `useAppStore` `subagentViewer`) | App shell; opened from `TimelineRowView` |
 
 ### Organism subfolders
@@ -281,7 +281,9 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Checkbox | yes | `Checkbox` atom | Restyle round + indeterminate |
 | Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader`, WorkGroup | **Sidebar section headers wired** |
 | Combobox | yes | Model/Branch/Project pickers | Prefer over PopoverTray search trays; Popover interim done |
-| Command | yes | `CommandPalette`, `SearchModal`, `OpenTabModal` | Command-in-Dialog pattern |
+| Command | yes | `CommandPalette`, `SearchModal`, `OpenTabModal` | **CommandPalette + SearchModal migrated** (CommandDialog) |
+| Resizable | yes | content split sash | **ContentWorkspace migrated** |
+| Toggle Group | yes | Files Code/Eye, filter chips | **Files markdown Eye/Code migrated** |
 | Context Menu | yes | `ContextMenu` molecule | Keep timeline-scroll / webview-blur ignore behavior |
 | Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
 | Date Picker | skip | — | |
@@ -308,7 +310,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker, IsolationPicker, ModelSelect, BranchPicker, ProjectPicker**; Combobox next for ModelPicker |
 | Progress | later | indexing / update UX | Soft need |
 | Radio Group | yes | `QuestionPrompt` choices | |
-| Resizable | yes | content split sash | `ContentWorkspace` dual pane |
+| Resizable | yes | content split sash | **ContentWorkspace migrated** |
 | Scroll Area | yes | `ScrollArea` atom | Sidebar / overlays; **not** the virtualized timeline |
 | Select | yes | settings enums without search | Primitive installed; searchable ModelSelect uses Popover interim |
 | Separator | yes | `Divider` | **done** |
@@ -324,7 +326,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Textarea | yes | `TextArea`, composer draft | **done** |
 | Toast | n/a | — | Use **Sonner**, not legacy Toast component |
 | Toggle | careful | pressed toolbar buttons | Name clash: Flex `Toggle` = Switch (done); use Toggle Group for Code/Eye |
-| Toggle Group | yes | Files Code/Eye, filter chips | **Not** ModePicker (Popover+descriptions) |
+| Toggle Group | yes | Files Code/Eye, filter chips | **Files markdown Eye/Code migrated**; **Not** ModePicker |
 | Tooltip | yes | `Tooltip` atom | Deferred — timeline scroll dismiss |
 | Typography | selective | prose in settings / empty states | Do not replace `MarkdownBody` |
 
@@ -338,8 +340,8 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | **0 — Foundation** | `shadcn init` in `packages/desktop` (Vite, Tailwind v4, **radix** base, `lucide`, css variables); path alias `@/`; upgrade `cn` to `clsx` + `tailwind-merge`; map shadcn semantic tokens → Flex tokens in `src/index.css` / `tokens.css` without breaking `data-theme` | `components.json` present; `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
 | **1 — Atom adapters** | Add Button, Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Spinner, Avatar, Tooltip, ScrollArea; re-export from `components/atoms` with temporary compat props | Atom unit tests + vitest green; call sites compile via barrel. **Done:** Button, TextInput, TextArea, Label, Badge, Kbd, Divider←Separator, Skeleton, Spinner, Checkbox (round), Toggle←Switch (green ON), Avatar, ScrollArea. **Deferred:** Tooltip (timeline scroll / programmatic-scroll coupling — keep custom until Provider + scroll policy ported). |
 | **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog + auth/bug/MCP dialogs, ToastHost/Sonner, Mode/Isolation/Model/Branch/Project pickers (Popover), PlusMenu+SessionMenu+BrowserOverflow (DropdownMenu), TitleBarMenus (Menubar). **Next:** ContextMenu last |
-| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select primitive; ModelSelect/ModelPicker/Branch/Project→Popover (search). **Next:** Combobox (optional), Toggle Group, Command palette |
-| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner→Alert; Collapsible sidebar headers. **Next:** Resizable sash |
+| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select; searchable Popovers; Toggle Group (Files); CommandPalette/SearchModal. **Next:** Combobox (optional), Radio Group |
+| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner→Alert; Collapsible sidebar headers; ContentWorkspace Resizable. **Next:** optional Sidebar spike |
 | **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Adopt Attachment→Bubble→Message→Marker *inside* virtual rows; MessageScroller only after measured spike with react-virtual |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
 
