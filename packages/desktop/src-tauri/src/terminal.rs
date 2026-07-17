@@ -73,40 +73,6 @@ fn default_cwd() -> String {
     }
 }
 
-/// Collapse doubled `\` separators that appear when a Windows path was
-/// JSON/shell double-escaped (`C:\\Users\\foo` as the filesystem string).
-/// Preserves UNC (`\\server\share`) and extended (`\\?\…`) prefixes.
-///
-/// Double-escaped UNC arrives as four leading backslashes (`\\\\server\\…`);
-/// the leading run is normalized to exactly `\\` before collapsing the rest.
-fn collapse_extra_backslashes(path: &str) -> String {
-    if path.starts_with(r"\\?\") {
-        return path.to_owned();
-    }
-    let unc = path.starts_with(r"\\");
-    let mut out = String::with_capacity(path.len());
-    let mut chars = path.chars().peekable();
-    if unc {
-        out.push('\\');
-        out.push('\\');
-        // Skip the whole leading `\` run (2 from real UNC, 4+ from double-escape).
-        while chars.peek() == Some(&'\\') {
-            let _ = chars.next();
-        }
-    }
-    while let Some(c) = chars.next() {
-        if c == '\\' {
-            out.push('\\');
-            while chars.peek() == Some(&'\\') {
-                let _ = chars.next();
-            }
-        } else {
-            out.push(c);
-        }
-    }
-    out
-}
-
 /// Pick an existing directory for the PTY shell. Prefers the requested cwd,
 /// then a collapsed-backslash variant (Windows double-escape), then home.
 fn resolve_cwd(cwd: Option<String>) -> DesktopResult<String> {
@@ -115,7 +81,7 @@ fn resolve_cwd(cwd: Option<String>) -> DesktopResult<String> {
         return Ok(raw);
     }
 
-    let collapsed = collapse_extra_backslashes(&raw);
+    let collapsed = crate::path_resolve::collapse_extra_backslashes(&raw);
     if collapsed != raw && Path::new(&collapsed).is_dir() {
         tracing::warn!(
             requested = %raw,
@@ -369,43 +335,6 @@ pub fn kill_all_terminals(state: &AppState) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn collapse_extra_backslashes_collapses_doubled_seps() {
-        assert_eq!(
-            collapse_extra_backslashes(r"C:\\Users\\foo"),
-            r"C:\Users\foo"
-        );
-        assert_eq!(collapse_extra_backslashes(r"C:\Users\foo"), r"C:\Users\foo");
-    }
-
-    #[test]
-    fn collapse_extra_backslashes_preserves_unc_prefix() {
-        assert_eq!(
-            collapse_extra_backslashes(r"\\server\share\\dir"),
-            r"\\server\share\dir"
-        );
-    }
-
-    #[test]
-    fn collapse_extra_backslashes_normalizes_double_escaped_unc() {
-        // Each `\` JSON/shell-doubled: `\\server\share\dir` → `\\\\server\\share\\dir`.
-        assert_eq!(
-            collapse_extra_backslashes(r"\\\\server\\share\\dir"),
-            r"\\server\share\dir"
-        );
-    }
-
-    #[test]
-    fn collapse_extra_backslashes_leaves_extended_paths() {
-        let extended = r"\\?\C:\Users\foo";
-        assert_eq!(collapse_extra_backslashes(extended), extended);
-    }
-
-    #[test]
-    fn collapse_extra_backslashes_leaves_forward_slashes() {
-        assert_eq!(collapse_extra_backslashes(r"C:/Users/foo"), r"C:/Users/foo");
-    }
 
     #[test]
     fn default_cwd_is_non_empty() {

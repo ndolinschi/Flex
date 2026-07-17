@@ -1,4 +1,3 @@
-export { AppHeader } from "./AppHeader"
 export { BrowserTab } from "./BrowserTab"
 export { CommandPalette } from "./CommandPalette"
 export { WindowTitleBar } from "./WindowTitleBar"

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import type { TitleBarActionHandlers } from "../../hooks/useTitleBarActions"
 import { detectWindowHost } from "../../lib/windowChrome"
 import { cn } from "../../lib/utils"
@@ -33,7 +33,6 @@ export const TitleBarMenus = ({
   canCommandPalette,
 }: TitleBarMenusProps) => {
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null)
-  const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!openMenu) return
@@ -151,7 +150,7 @@ export const TitleBarMenus = ({
   }
 
   return (
-    <div ref={rootRef} className="flex h-full items-center gap-px px-0.5">
+    <div className="flex h-full items-center gap-px px-0.5">
       {(Object.keys(menus) as MenuId[]).map((id) => {
         const menu = menus[id]
         const open = openMenu === id

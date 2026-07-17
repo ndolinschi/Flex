@@ -52,19 +52,27 @@ export type UiPersisted = {
 export const UI_STORE_FILE = "ui.json"
 const UI_KEY = "state"
 
+/** Coalesce rapid tab/chat switches into one disk write. */
+const PERSIST_DEBOUNCE_MS = 280
+
 let storeReady: Promise<void> | null = null
 let cachedStore: Awaited<ReturnType<typeof load>> | null = null
+let pendingPartial: Partial<UiPersisted> = {}
+let persistTimer: ReturnType<typeof setTimeout> | null = null
+let flushChain: Promise<void> = Promise.resolve()
 
 const ensureStore = async () => {
   if (!storeReady) {
     storeReady = (async () => {
-      cachedStore = await load(UI_STORE_FILE, { autoSave: true, defaults: {} })
+      // autoSave off — we own coalesced explicit saves so tab switches don't
+      // each hit the disk (plugin-store set+save was a noticeable UI hitch).
+      cachedStore = await load(UI_STORE_FILE, { autoSave: false, defaults: {} })
     })()
   }
   await storeReady
 }
 
-export const persistUiState = async (partial: Partial<UiPersisted>) => {
+const flushPersist = async (partial: Partial<UiPersisted>) => {
   try {
     await ensureStore()
     if (!cachedStore) return
@@ -83,6 +91,41 @@ export const persistUiState = async (partial: Partial<UiPersisted>) => {
       error: err instanceof Error ? err.message : String(err),
     })
   }
+}
+
+const scheduleFlush = () => {
+  if (persistTimer !== null) return
+  persistTimer = setTimeout(() => {
+    persistTimer = null
+    const toWrite = pendingPartial
+    pendingPartial = {}
+    if (Object.keys(toWrite).length === 0) return
+    flushChain = flushChain
+      .then(() => flushPersist(toWrite))
+      .catch(() => undefined)
+  }, PERSIST_DEBOUNCE_MS)
+}
+
+/** Persist UI prefs. Debounced — safe to call on every tab/chat switch. */
+export const persistUiState = async (partial: Partial<UiPersisted>) => {
+  pendingPartial = { ...pendingPartial, ...partial }
+  scheduleFlush()
+}
+
+/** Flush any pending write immediately (tests / before quit). */
+export const flushPersistUiState = async () => {
+  if (persistTimer !== null) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+  }
+  const toWrite = pendingPartial
+  pendingPartial = {}
+  if (Object.keys(toWrite).length > 0) {
+    flushChain = flushChain
+      .then(() => flushPersist(toWrite))
+      .catch(() => undefined)
+  }
+  await flushChain
 }
 
 export const restoreUiState = async (): Promise<UiPersisted> => {

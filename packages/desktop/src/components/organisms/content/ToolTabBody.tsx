@@ -95,7 +95,7 @@ export const ToolTabBody = ({
           active || keepAlive ? (active ? "flex" : "hidden") : "hidden",
         )}
       >
-        <FilesTab active={active} />
+        <FilesTab active={active} session={session} />
       </div>
     )
   }

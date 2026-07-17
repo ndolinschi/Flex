@@ -33,27 +33,28 @@ audit and fix UI against this file.
 
 ```
 ┌─ WindowTitleBar (30px) ──────────────────────────────────────┐
-│ traffic / captions │ menus │ sidebar │ drag region │         │
+│ traffic/menus │ sidebar │ drag │ split · session │ captions  │
 ├─ body (flex-1, relative) ────────────────────────────────────┤
 │ ┌ SessionSidebar ┐ ┌ ContentWorkspace (flex-1) ─────────────┐ │
-│ │                │ │ AppHeader (split · session)            │ │
-│ │ actions        │ │ ContentPane(s) — tabs + chat/tool body │ │
-│ │ session list   │ │   single OR left | sash | right        │ │
+│ │                │ │ ContentPane(s) — tabs + chat/tool body │ │
+│ │ actions        │ │   single OR left | sash | right        │ │
+│ │ session list   │ │                                        │ │
 │ │ footer         │ │                                        │ │
 │ └────────────────┘ └────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 In-window File/Edit/View/Help on Windows/Linux only; macOS uses the native
-menu bar (same actions). Sidebar toggle is always in the title bar.
+menu bar (same actions). All former AppHeader chrome (sidebar, split, session
+menu) lives in the title bar — there is no second header row.
 
 Composition root: `src/App.tsx`.
 
 | Layer | Role |
 |---|---|
-| `WindowTitleBar` | Custom chrome (`decorations: false`); `--titlebar-height`; sidebar toggle; drag-region double-click zooms (macOS → fullscreen); native 10px corner clip on macOS; File/Edit/View/Help in-window on Windows/Linux, native menu bar on macOS |
+| `WindowTitleBar` | Custom chrome (`decorations: false`); `--titlebar-height`; sidebar / split / session controls; drag-region double-click zooms (macOS → fullscreen); native 10px corner clip on macOS; File/Edit/View/Help in-window on Windows/Linux, native menu bar on macOS |
 | `SessionSidebar` | Agents list; left column (wide) or full overlay (narrow/tight) |
-| `ContentWorkspace` | Header + content panes (chat + tool tabs; optional split) |
+| `ContentWorkspace` | Content panes (chat + tool tabs; optional split) — no secondary header |
 | `ContentPane` | Per-pane tab strip + bodies; `+` / open-to-side |
 | Overlays | CommandPalette, SearchModal, ToastHost — app-level |
 
@@ -68,7 +69,7 @@ survive.
 | Route | Page | Layout |
 |---|---|---|
 | `welcome` | `WelcomePage` | Title bar + centered rail (`--welcome-rail`); no sidebars |
-| `chat` | `ContentWorkspace` | Sidebar + header + content panes (chat + tools; optional split) |
+| `chat` | `ContentWorkspace` | Sidebar + content panes (chat + tools; optional split); chrome in title bar |
 | `settings` | `SettingsPage` → `SettingsShell` | Absolute overlay over chat; back header + sticky nav + cards |
 | `customize` / `memory` / `automations` | Same shell, different section | Same as settings |
 
@@ -82,7 +83,7 @@ survive.
 ### Chat (`ContentWorkspace`)
 
 ```
-AppHeader (30px) — split toggle (⌘J) · session menu
+WindowTitleBar — sidebar · split (⌘J) · session menu (no second header row)
 ContentPane(s)
   ├── TabStrip — chat sessions + tool tabs (+ / open-to-side)
   └── body — ChatSessionBody or tool tab (Plan/Changes/…)
@@ -146,7 +147,7 @@ Use these gutters unless a surface documents an exception.
 
 | Surface | Horizontal | Vertical / rhythm |
 |---|---|---|
-| **Chat chrome** (AppHeader, timeline, composer outer) | `px-3` (12px) | Timeline `py-3`; composer `pt-1.5 pb-0.5`; stack `pb-2` |
+| **Chat chrome** (timeline, composer outer) | `px-3` (12px) | Timeline `py-3`; composer `pt-1.5 pb-0.5`; stack `pb-2` |
 | **Content pane chrome** (TabStrip, tool tab headers, banners, CommitCenter) | `px-2.5` (10px) | Rows = `--header-height` (30px) |
 | **Session sidebar** (actions, list, section headers) | `px-2` (8px) | Actions `pt-2 pb-2 gap-0.5`; sections `gap-2` |
 | **Sidebar footer** | `px-2.5` | `py-1.5` |
@@ -170,7 +171,7 @@ Use these gutters unless a surface documents an exception.
 | Token | Value | Surfaces |
 |---|---|---|
 | `--titlebar-height` | 30px | `WindowTitleBar` |
-| `--header-height` | 30px | AppHeader, content TabStrip, tool tab subheaders |
+| `--header-height` | 30px | Content TabStrip, tool tab subheaders |
 | `--status-bar-height` | 1.75rem (28px) | ContextBar min height |
 | `--composer-min/max-height` | 1.75rem / 10rem | Textarea grow |
 
@@ -178,7 +179,7 @@ Use these gutters unless a surface documents an exception.
 
 | Cluster | Gap |
 |---|---|
-| AppHeader control clusters | `gap-0.5` |
+| Title bar control clusters | `gap-0.5` |
 | TabStrip tabs | `gap-1.5` |
 | Composer left (Plus / Mode / Model) | `gap-1` |
 | Composer right (Bypass ↔ Send) | `gap-1.5` |
@@ -231,11 +232,12 @@ read flush against the border. Use `h-6` (3px inset each side).
 
 Selected row: `bg-fill-2`. Hover: `bg-fill-4`.
 
-### AppHeader
+### WindowTitleBar chrome
 
-`h-[var(--header-height)] px-3` · right: split toggle + session menu.
-Sidebar open/close lives on `WindowTitleBar` (after traffic lights on macOS;
-after File/Edit/View/Help on Windows/Linux). Quiet `h-6` icon buttons.
+`h-[var(--titlebar-height)]` · left: traffic / menus / sidebar toggle ·
+center: drag region · right: split toggle + session menu (before caption
+buttons on Windows/Linux). Quiet `h-6` icon buttons. Chat controls only
+when bootstrapped and not on the welcome route.
 
 ### Composer
 

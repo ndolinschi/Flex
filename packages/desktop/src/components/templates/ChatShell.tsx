@@ -1,5 +1,4 @@
 import type { CSSProperties, ReactNode } from "react"
-import { AppHeader } from "../organisms"
 import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
 
@@ -12,8 +11,6 @@ const QUICKSTART_SUGGESTIONS = [
 type ChatShellProps = {
   sidebar?: ReactNode
   hideSidebar?: boolean
-  /** When false, omit AppHeader (content panes own chrome). Default true. */
-  showHeader?: boolean
   timeline: ReactNode
   composer: ReactNode
   overlay?: ReactNode
@@ -29,7 +26,6 @@ type ChatShellProps = {
 export const ChatShell = ({
   sidebar,
   hideSidebar = false,
-  showHeader = true,
   timeline,
   composer,
   overlay,
@@ -62,7 +58,6 @@ export const ChatShell = ({
       )}
       style={Object.keys(paneStyle).length > 0 ? paneStyle : undefined}
     >
-      {showHeader ? <AppHeader /> : null}
       <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div
           className={cn(

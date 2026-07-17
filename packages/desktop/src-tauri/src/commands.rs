@@ -3925,11 +3925,16 @@ fn score_file(rel_path: &str, name: &str, needle: &str) -> Option<i32> {
 /// pruned so typing stays snappy).
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
-pub fn list_files(cwd: String, query: String, include_ignored: Option<bool>) -> Vec<FileHit> {
-    let root = PathBuf::from(&cwd);
-    if !root.is_dir() {
+pub fn list_files(
+    cwd: String,
+    query: String,
+    include_ignored: Option<bool>,
+    fallback_cwd: Option<String>,
+) -> Vec<FileHit> {
+    let Some(root) = crate::path_resolve::resolve_existing_dir(&cwd, fallback_cwd.as_deref())
+    else {
         return Vec::new();
-    }
+    };
     let needle = query.trim().to_lowercase();
     let include_ignored = include_ignored.unwrap_or(false);
 
@@ -4049,6 +4054,16 @@ pub fn list_files(cwd: String, query: String, include_ignored: Option<bool>) -> 
     hits.into_iter().map(|(_, h)| h).collect()
 }
 
+/// Resolve a usable workspace directory from `cwd`, falling back to
+/// `fallback_cwd` (typically `base_cwd`) when the primary path is missing.
+/// Returns the absolute/normalized path string, or `None` when neither exists.
+#[tracing::instrument(level = "debug", skip_all)]
+#[tauri::command]
+pub fn resolve_workspace_cwd(cwd: String, fallback_cwd: Option<String>) -> Option<String> {
+    crate::path_resolve::resolve_existing_dir(&cwd, fallback_cwd.as_deref())
+        .map(|p| p.to_string_lossy().into_owned())
+}
+
 /// Immediate children of `relative_dir` under `cwd` (empty = workspace root).
 /// Human Files tree: shows **everything** at this level — including `.env`,
 /// gitignored paths, and heavy dirs like `node_modules` — so the panel matches
@@ -4056,11 +4071,15 @@ pub fn list_files(cwd: String, query: String, include_ignored: Option<bool>) -> 
 /// gitignore-aware [`list_files`].) Soft-capped; dirs-first then name.
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
-pub fn list_dir_children(cwd: String, relative_dir: String) -> Vec<FileHit> {
-    let root = PathBuf::from(&cwd);
-    if !root.is_dir() {
+pub fn list_dir_children(
+    cwd: String,
+    relative_dir: String,
+    fallback_cwd: Option<String>,
+) -> Vec<FileHit> {
+    let Some(root) = crate::path_resolve::resolve_existing_dir(&cwd, fallback_cwd.as_deref())
+    else {
         return Vec::new();
-    }
+    };
 
     let rel = relative_dir.trim().trim_matches('/').replace('\\', "/");
     if rel.contains("..") {

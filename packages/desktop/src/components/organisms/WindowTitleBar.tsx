@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react"
-import { PanelLeft } from "lucide-react"
+import { memo, useCallback, useEffect, useState } from "react"
+import { Columns2, PanelLeft } from "lucide-react"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { AppMark, TitleBarMenus } from "../molecules/TitleBarMenus"
 import { BugReportDialog } from "../molecules/BugReportDialog"
+import { SessionMenu } from "../molecules/SessionMenu"
 import {
   CaptionButtons,
   TrafficLights,
@@ -10,7 +11,9 @@ import {
 import { IconButton } from "../atoms"
 import { useNativeAppMenu } from "../../hooks/useNativeAppMenu"
 import { useTitleBarActions } from "../../hooks/useTitleBarActions"
+import { useSessions } from "../../hooks/useSessions"
 import { detectWindowHost, toggleZoomWindow } from "../../lib/windowChrome"
+import { sessionLabel } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
 
@@ -23,10 +26,11 @@ type WindowTitleBarProps = {
 /**
  * Custom window chrome: traffic lights (macOS) or caption buttons
  * (Windows/Linux), optional in-window File/Edit/View/Help (non-macOS),
- * sidebar toggle, and a drag region. macOS uses the native menu bar instead.
+ * sidebar / split / session controls, and a drag region. macOS uses the
+ * native menu bar instead of in-window menus.
  * Requires an undecorated Tauri window (`decorations: false`).
  */
-export const WindowTitleBar = ({
+const WindowTitleBarImpl = ({
   onOpenCommandPalette,
   onOpenSearch,
   className,
@@ -34,13 +38,28 @@ export const WindowTitleBar = ({
   const host = detectWindowHost()
   const isMac = host === "macos"
   const [bugOpen, setBugOpen] = useState(false)
+  const openBugReport = useCallback(() => setBugOpen(true), [])
+  const closeBugReport = useCallback(() => setBugOpen(false), [])
+
   const collapsed = useAppStore((s) => s.sidebarCollapsed)
   const isBootstrapped = useAppStore((s) => s.isBootstrapped)
+  const route = useAppStore((s) => s.route)
+  const activeSessionId = useAppStore((s) => s.activeSessionId)
+  // Narrow — full `contentLayout` changes on every tab switch.
+  const split = useAppStore((s) => s.contentLayout.mode === "split")
+  const toggleSplit = useAppStore((s) => s.toggleSplit)
+  const viewport = useAppStore((s) => s.viewport)
+
+  const { sessions, newAgent, renameSession, deleteSession } = useSessions()
+  const active = sessions.find((s) => s.id === activeSessionId)
+  const title = active ? sessionLabel(active) : "Agent"
+  const showChatChrome = isBootstrapped && route !== "welcome"
 
   const { handlers } = useTitleBarActions({
+    newAgent,
     onOpenCommandPalette,
     onOpenSearch,
-    onOpenBugReport: () => setBugOpen(true),
+    onOpenBugReport: openBugReport,
   })
 
   useNativeAppMenu({
@@ -51,8 +70,6 @@ export const WindowTitleBar = ({
     handlers,
   })
 
-  // Frontend belt-and-suspenders: if window-state (or a stale launch path)
-  // left the native frame on, strip it once the title bar mounts.
   useEffect(() => {
     void getCurrentWindow()
       .setDecorations(false)
@@ -60,17 +77,6 @@ export const WindowTitleBar = ({
   }, [])
 
   const mod = isMac ? "⌘" : "Ctrl+"
-  const sidebarToggle = (
-    <IconButton
-      label={`${collapsed ? "Show" : "Hide"} sidebar (${mod}B)`}
-      onClick={handlers.toggleSidebar}
-      disabled={!isBootstrapped}
-      quiet
-      className="h-6 w-6 shrink-0"
-    >
-      <PanelLeft className="h-3.5 w-3.5" aria-hidden />
-    </IconButton>
-  )
 
   return (
     <>
@@ -99,16 +105,22 @@ export const WindowTitleBar = ({
               canCommandPalette={Boolean(onOpenCommandPalette)}
             />
           ) : null}
-          {sidebarToggle}
+          {showChatChrome ? (
+            <IconButton
+              label={`${collapsed ? "Show" : "Hide"} sidebar (${mod}B)`}
+              onClick={handlers.toggleSidebar}
+              quiet
+              className="h-6 w-6 shrink-0"
+            >
+              <PanelLeft className="h-3.5 w-3.5" aria-hidden />
+            </IconButton>
+          ) : null}
         </div>
 
         <div
           className="h-full min-w-[48px] flex-1"
           data-tauri-drag-region
           aria-hidden
-          // Custom chrome has no native title-bar double-click. Prefer
-          // mousedown `detail === 2` because `data-tauri-drag-region` can
-          // swallow the second click before `onDoubleClick` fires.
           onMouseDown={(e) => {
             if (e.button === 0 && e.detail === 2) {
               e.preventDefault()
@@ -118,9 +130,34 @@ export const WindowTitleBar = ({
           onDoubleClick={() => void toggleZoomWindow()}
         />
 
+        {showChatChrome ? (
+          <div className="flex h-full shrink-0 items-center gap-0.5 pr-1">
+            {viewport === "wide" ? (
+              <IconButton
+                label={`${split ? "Close split" : "Split view"} (${mod}J)`}
+                onClick={toggleSplit}
+                quiet
+                className={cn("h-6 w-6", split ? undefined : "opacity-60")}
+              >
+                <Columns2 className="h-3.5 w-3.5" aria-hidden />
+              </IconButton>
+            ) : null}
+            {active ? (
+              <SessionMenu
+                sessionId={active.id}
+                label={title}
+                onRename={renameSession}
+                onDelete={deleteSession}
+              />
+            ) : null}
+          </div>
+        ) : null}
+
         {!isMac ? <CaptionButtons /> : null}
       </header>
-      <BugReportDialog open={bugOpen} onClose={() => setBugOpen(false)} />
+      <BugReportDialog open={bugOpen} onClose={closeBugReport} />
     </>
   )
 }
+
+export const WindowTitleBar = memo(WindowTitleBarImpl)

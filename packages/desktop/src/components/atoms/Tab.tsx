@@ -48,7 +48,7 @@ const sizeClasses: Record<TabSize, string> = {
   sm: "h-6 max-w-[160px] rounded-md pl-1.5 pr-0.5 text-xs",
 }
 
-/** Pill tab — primary chrome for right-panel tabs and AppHeader chat tabs.
+/** Pill tab — primary chrome for content pane tabs and tool strips.
  * File open-buffers use `size="sm"` / `variant="chip"`. */
 export const Tab = ({
   selected,

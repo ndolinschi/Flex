@@ -1,10 +1,12 @@
+import { useRef } from "react"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
 import { openUrl } from "@tauri-apps/plugin-opener"
-import { useSessions } from "./useSessions"
 import { closeWindow } from "../lib/windowChrome"
 import { newAgentCreateInput } from "../lib/sessions"
 import { createSession, toInvokeError } from "../lib/tauri"
 import { useAppStore } from "../stores/appStore"
+import { SESSIONS_KEY } from "./useSessions"
+import { useQueryClient } from "@tanstack/react-query"
 
 const DOCS_URL = "https://github.com/ndolinschi/Flex#readme"
 const ISSUES_URL = "https://github.com/ndolinschi/Flex/issues"
@@ -25,13 +27,20 @@ export type TitleBarActionHandlers = {
 }
 
 type UseTitleBarActionsOpts = {
+  /** From `useSessions().newAgent` — single source of draft-reuse logic. */
+  newAgent: (cwd?: string) => Promise<unknown>
   onOpenCommandPalette?: () => void
   onOpenSearch?: () => void
   onOpenBugReport: () => void
 }
 
-/** Shared File/Edit/View/Help actions for in-window menus and the native macOS menu bar. */
+/**
+ * Shared File/Edit/View/Help actions for in-window menus and the native macOS
+ * menu bar. Handler object is built once (refs) so chat/tab switches do not
+ * thrash menu children.
+ */
 export const useTitleBarActions = ({
+  newAgent,
   onOpenCommandPalette,
   onOpenSearch,
   onOpenBugReport,
@@ -39,73 +48,97 @@ export const useTitleBarActions = ({
   isBootstrapped: boolean
   handlers: TitleBarActionHandlers
 } => {
-  const { newAgent } = useSessions()
-  const setRoute = useAppStore((s) => s.setRoute)
-  const toggleSidebarCollapsed = useAppStore((s) => s.toggleSidebarCollapsed)
-  const toggleRightPanel = useAppStore((s) => s.toggleRightPanel)
-  const toggleTheme = useAppStore((s) => s.toggleTheme)
-  const pushRecentCwd = useAppStore((s) => s.pushRecentCwd)
-  const pushToast = useAppStore((s) => s.pushToast)
-  const setActiveSessionId = useAppStore((s) => s.setActiveSessionId)
+  const queryClient = useQueryClient()
   const isBootstrapped = useAppStore((s) => s.isBootstrapped)
 
-  const openFolder = async () => {
-    if (!isBootstrapped) return
-    try {
-      const path = await openDialog({ directory: true, multiple: false })
-      if (!path || Array.isArray(path)) return
-      pushRecentCwd(path)
-      const meta = await createSession(newAgentCreateInput(path))
-      setActiveSessionId(meta.id, { panel: "closed" })
-      setRoute("chat")
-    } catch (err) {
-      pushToast(`Could not open folder: ${toInvokeError(err)}`, "error")
-    }
+  const optsRef = useRef({
+    newAgent,
+    onOpenCommandPalette,
+    onOpenSearch,
+    onOpenBugReport,
+    isBootstrapped,
+    queryClient,
+  })
+  optsRef.current = {
+    newAgent,
+    onOpenCommandPalette,
+    onOpenSearch,
+    onOpenBugReport,
+    isBootstrapped,
+    queryClient,
   }
 
-  return {
-    isBootstrapped,
-    handlers: {
+  const handlersRef = useRef<TitleBarActionHandlers | null>(null)
+  if (!handlersRef.current) {
+    handlersRef.current = {
       newAgent: () => {
-        if (!isBootstrapped) return
-        void newAgent()
+        if (!optsRef.current.isBootstrapped) return
+        void optsRef.current.newAgent().catch((err: unknown) => {
+          useAppStore
+            .getState()
+            .pushToast(`Could not create agent: ${toInvokeError(err)}`, "error")
+        })
       },
       openFolder: () => {
-        void openFolder()
+        void (async () => {
+          if (!optsRef.current.isBootstrapped) return
+          const state = useAppStore.getState()
+          try {
+            const path = await openDialog({ directory: true, multiple: false })
+            if (!path || Array.isArray(path)) return
+            state.pushRecentCwd(path)
+            const meta = await createSession(newAgentCreateInput(path))
+            void optsRef.current.queryClient.invalidateQueries({
+              queryKey: SESSIONS_KEY,
+            })
+            state.setActiveSessionId(meta.id, { panel: "closed" })
+            state.setRoute("chat")
+          } catch (err) {
+            state.pushToast(
+              `Could not open folder: ${toInvokeError(err)}`,
+              "error",
+            )
+          }
+        })()
       },
       settings: () => {
-        if (!isBootstrapped) return
-        setRoute("settings")
+        if (!optsRef.current.isBootstrapped) return
+        useAppStore.getState().setRoute("settings")
       },
       quit: () => {
         void closeWindow()
       },
       search: () => {
-        onOpenSearch?.()
+        optsRef.current.onOpenSearch?.()
       },
       commandPalette: () => {
-        onOpenCommandPalette?.()
+        optsRef.current.onOpenCommandPalette?.()
       },
       toggleSidebar: () => {
-        if (!isBootstrapped) return
-        toggleSidebarCollapsed()
+        if (!optsRef.current.isBootstrapped) return
+        useAppStore.getState().toggleSidebarCollapsed()
       },
       togglePanel: () => {
-        if (!isBootstrapped) return
-        toggleRightPanel()
+        if (!optsRef.current.isBootstrapped) return
+        useAppStore.getState().toggleRightPanel()
       },
       toggleTheme: () => {
-        toggleTheme()
+        useAppStore.getState().toggleTheme()
       },
       docs: () => {
         void openUrl(DOCS_URL).catch(() => undefined)
       },
       submitBug: () => {
-        onOpenBugReport()
+        optsRef.current.onOpenBugReport()
       },
       issues: () => {
         void openUrl(ISSUES_URL).catch(() => undefined)
       },
-    },
+    }
+  }
+
+  return {
+    isBootstrapped,
+    handlers: handlersRef.current,
   }
 }

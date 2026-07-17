@@ -16,6 +16,7 @@ import {
   listDirChildren,
   listFiles,
   renamePath,
+  resolveWorkspaceCwd,
   toInvokeError,
 } from "../../../lib/tauri"
 import { sortFileHits } from "../../../lib/fileTree"
@@ -30,6 +31,8 @@ type FileExplorerProps = {
   sessionId: string
   sessionKey: string
   cwd: string
+  /** Prefer when `cwd` is a missing isolated worktree (`session.base_cwd`). */
+  fallbackCwd?: string
   /** Called with a repo-relative file path (never a directory). */
   onOpenFile: (path: string) => void
 }
@@ -65,6 +68,7 @@ const INDENT_PX = 12
 
 type TreeBranchProps = {
   cwd: string
+  fallbackCwd?: string
   dirPath: string
   depth: number
   expanded: Set<string>
@@ -76,6 +80,7 @@ type TreeBranchProps = {
 /** One directory level — loads children on demand when expanded (or root). */
 const TreeBranch = ({
   cwd,
+  fallbackCwd,
   dirPath,
   depth,
   expanded,
@@ -87,8 +92,8 @@ const TreeBranch = ({
   const shouldLoad = isRoot || expanded.has(dirPath)
 
   const { data: children = [], isLoading, isFetching } = useQuery({
-    queryKey: ["workspace-dir-children", cwd, dirPath],
-    queryFn: () => listDirChildren(cwd, dirPath),
+    queryKey: ["workspace-dir-children", cwd, fallbackCwd ?? "", dirPath],
+    queryFn: () => listDirChildren(cwd, dirPath, fallbackCwd),
     enabled: !!cwd && shouldLoad,
     staleTime: 15_000,
   })
@@ -186,6 +191,7 @@ const TreeBranch = ({
             {isDir && isOpen ? (
               <TreeBranch
                 cwd={cwd}
+                fallbackCwd={fallbackCwd}
                 dirPath={hit.path}
                 depth={depth + 1}
                 expanded={expanded}
@@ -209,6 +215,7 @@ export const FileExplorer = ({
   sessionId,
   sessionKey,
   cwd,
+  fallbackCwd,
   onOpenFile,
 }: FileExplorerProps) => {
   const queryClient = useQueryClient()
@@ -230,7 +237,14 @@ export const FileExplorer = ({
   // Fresh tree when the workspace root changes.
   useEffect(() => {
     setExpanded(new Set())
-  }, [cwd])
+  }, [cwd, fallbackCwd])
+
+  const { data: resolvedCwd, isLoading: resolvingCwd } = useQuery({
+    queryKey: ["workspace-cwd-resolve", cwd, fallbackCwd ?? ""],
+    queryFn: () => resolveWorkspaceCwd(cwd, fallbackCwd),
+    enabled: !!cwd,
+    staleTime: 30_000,
+  })
 
   const [menu, setMenu] = useState<{
     hit: FileHit
@@ -246,9 +260,9 @@ export const FileExplorer = ({
     isLoading: searchLoading,
     isFetching: searchFetching,
   } = useQuery({
-    queryKey: ["workspace-file-list", cwd, debounced],
-    queryFn: () => listFiles(cwd, debounced, true),
-    enabled: !!cwd && searching,
+    queryKey: ["workspace-file-list", cwd, fallbackCwd ?? "", debounced],
+    queryFn: () => listFiles(cwd, debounced, true, fallbackCwd),
+    enabled: !!cwd && !!resolvedCwd && searching,
     staleTime: 15_000,
   })
 
@@ -456,9 +470,35 @@ export const FileExplorer = ({
               })}
             </ul>
           )
+        ) : resolvingCwd ? (
+          <div className="flex items-center gap-2 px-4 py-8 text-xs text-ink-muted">
+            <Spinner size="sm" />
+            Opening folder…
+          </div>
+        ) : !resolvedCwd ? (
+          <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
+            <Folder className="h-6 w-6 text-ink-faint" aria-hidden />
+            <p className="text-sm text-ink-secondary">Workspace folder missing</p>
+            <p className="max-w-sm text-xs text-ink-muted">
+              Could not open{" "}
+              <span className="break-all text-ink-secondary">{cwd}</span>
+              {fallbackCwd ? (
+                <>
+                  {" "}
+                  (or fallback{" "}
+                  <span className="break-all text-ink-secondary">
+                    {fallbackCwd}
+                  </span>
+                  )
+                </>
+              ) : null}
+              . Re-open the project folder for this agent.
+            </p>
+          </div>
         ) : (
           <TreeBranch
             cwd={cwd}
+            fallbackCwd={fallbackCwd}
             dirPath=""
             depth={0}
             expanded={expanded}

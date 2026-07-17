@@ -685,30 +685,56 @@ pub fn component_detail(cwd: &Path, id: &str) -> DesktopResult<ComponentDetail> 
     })
 }
 
+fn cwd_not_a_directory_msg(cwd: &str) -> String {
+    let shown = cwd.trim();
+    if shown.is_empty() {
+        "cwd is not a directory (empty)".into()
+    } else {
+        format!("cwd is not a directory ({shown})")
+    }
+}
+
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip_all, err)]
-pub async fn components_detect(cwd: String) -> DesktopResult<ComponentsDetectResult> {
-    let path = PathBuf::from(cwd.trim());
+pub async fn components_detect(
+    cwd: String,
+    fallback_cwd: Option<String>,
+) -> DesktopResult<ComponentsDetectResult> {
+    let Some(path) = crate::path_resolve::resolve_existing_dir(&cwd, fallback_cwd.as_deref())
+    else {
+        return Ok(ComponentsDetectResult {
+            is_react: false,
+            reason: cwd_not_a_directory_msg(&cwd),
+            package_name: None,
+        });
+    };
     Ok(detect_react(&path))
 }
 
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip_all, err)]
-pub async fn components_list(cwd: String) -> DesktopResult<ComponentsListResult> {
-    let path = PathBuf::from(cwd.trim());
-    if !path.is_dir() {
-        return Err(message("cwd is not a directory"));
-    }
+pub async fn components_list(
+    cwd: String,
+    fallback_cwd: Option<String>,
+) -> DesktopResult<ComponentsListResult> {
+    let Some(path) = crate::path_resolve::resolve_existing_dir(&cwd, fallback_cwd.as_deref())
+    else {
+        return Err(message(cwd_not_a_directory_msg(&cwd)));
+    };
     Ok(list_components(&path))
 }
 
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip_all, err)]
-pub async fn components_detail(cwd: String, id: String) -> DesktopResult<ComponentDetail> {
-    let path = PathBuf::from(cwd.trim());
-    if !path.is_dir() {
-        return Err(message("cwd is not a directory"));
-    }
+pub async fn components_detail(
+    cwd: String,
+    id: String,
+    fallback_cwd: Option<String>,
+) -> DesktopResult<ComponentDetail> {
+    let Some(path) = crate::path_resolve::resolve_existing_dir(&cwd, fallback_cwd.as_deref())
+    else {
+        return Err(message(cwd_not_a_directory_msg(&cwd)));
+    };
     component_detail(&path, id.trim())
 }
 

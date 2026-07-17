@@ -15,12 +15,14 @@ import {
   sessionScopeKey,
   useAppStore,
 } from "../../../stores/appStore"
-import { useSessions } from "../../../hooks/useSessions"
 import { FileExplorer } from "./FileExplorer"
+import type { SessionMeta } from "../../../lib/types"
 
 type FilesTabProps = {
   /** True when the Files panel body is the visible right-panel tab. */
   active: boolean
+  /** Session that owns this Files tab (not the global active chat). */
+  session: SessionMeta | undefined
 }
 
 type FileChipProps = {
@@ -52,9 +54,9 @@ const FileChip = ({ path, active, dirty, onSelect, onClose }: FileChipProps) => 
  * and dirty drafts survive switching to Changes/Terminal. Empty Files tab
  * shows a workspace file browser (not auto-closed). Markdown files can
  * toggle a rendered preview via `MarkdownBody`. */
-export const FilesTab = ({ active }: FilesTabProps) => {
-  const activeSessionId = useAppStore((s) => s.activeSessionId)
-  const sessionKey = sessionScopeKey(activeSessionId)
+export const FilesTab = ({ active, session }: FilesTabProps) => {
+  const activeSessionId = session?.id
+  const sessionKey = sessionScopeKey(activeSessionId ?? null)
   const theme = useAppStore((s) => s.theme)
   const openFiles = useAppStore(
     (s) => s.openFilesBySession[sessionKey] ?? EMPTY_PATHS,
@@ -73,9 +75,8 @@ export const FilesTab = ({ active }: FilesTabProps) => {
   const contentLayout = useAppStore((s) => s.contentLayout)
   const pushToast = useAppStore((s) => s.pushToast)
   const queryClient = useQueryClient()
-  const { sessions } = useSessions()
-  const activeSession = sessions.find((s) => s.id === activeSessionId)
-  const cwd = activeSession?.cwd ?? ""
+  const cwd = session?.cwd ?? ""
+  const fallbackCwd = session?.base_cwd
   const [saving, setSaving] = useState(false)
   const [confirmClosePath, setConfirmClosePath] = useState<string | null>(null)
   const [browseMode, setBrowseMode] = useState(false)
@@ -275,6 +276,7 @@ export const FilesTab = ({ active }: FilesTabProps) => {
             sessionId={activeSessionId!}
             sessionKey={sessionKey}
             cwd={cwd}
+            fallbackCwd={fallbackCwd}
             onOpenFile={(p) => {
               // Always leave browse mode — openWorkspaceFile is a no-op on
               // openFiles when `p` is already open, so the length-based effect

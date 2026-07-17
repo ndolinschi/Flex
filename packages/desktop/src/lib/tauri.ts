@@ -472,20 +472,44 @@ export const suggestCommitMessage = (
   invoke("suggest_commit_message", { sessionId, diffSummary })
 
 /** Fuzzy file/folder search. Pass `includeIgnored` for the human Files search
- * so `.env` and other gitignored paths appear; omit for composer `@` (default). */
+ * so `.env` and other gitignored paths appear; omit for composer `@` (default).
+ * `fallbackCwd` is typically `session.base_cwd` when an isolated worktree is gone. */
 export const listFiles = (
   cwd: string,
   query: string,
   includeIgnored = false,
+  fallbackCwd?: string | null,
 ): Promise<FileHit[]> =>
-  invoke("list_files", { cwd, query, includeIgnored })
+  invoke("list_files", {
+    cwd,
+    query,
+    includeIgnored,
+    fallbackCwd: fallbackCwd || null,
+  })
 
 /** Immediate children of `relativeDir` under `cwd` ("" = workspace root).
- * Human Files tree: shows hidden + gitignored entries (e.g. `.env`). */
+ * Human Files tree: shows hidden + gitignored entries (e.g. `.env`).
+ * `fallbackCwd` is typically `session.base_cwd` when an isolated worktree is gone. */
 export const listDirChildren = (
   cwd: string,
   relativeDir: string,
-): Promise<FileHit[]> => invoke("list_dir_children", { cwd, relativeDir })
+  fallbackCwd?: string | null,
+): Promise<FileHit[]> =>
+  invoke("list_dir_children", {
+    cwd,
+    relativeDir,
+    fallbackCwd: fallbackCwd || null,
+  })
+
+/** Resolve a live workspace directory (cwd, else fallbackCwd / base_cwd). */
+export const resolveWorkspaceCwd = (
+  cwd: string,
+  fallbackCwd?: string | null,
+): Promise<string | null> =>
+  invoke("resolve_workspace_cwd", {
+    cwd,
+    fallbackCwd: fallbackCwd || null,
+  })
 
 export type DbEngine = "sqlite" | "postgres" | "mysql"
 
@@ -606,15 +630,22 @@ export type ComponentDetail = {
 
 export const componentsDetect = (
   cwd: string,
-): Promise<ComponentsDetectResult> => invoke("components_detect", { cwd })
+  fallbackCwd?: string | null,
+): Promise<ComponentsDetectResult> =>
+  invoke("components_detect", { cwd, fallbackCwd: fallbackCwd || null })
 
-export const componentsList = (cwd: string): Promise<ComponentsListResult> =>
-  invoke("components_list", { cwd })
+export const componentsList = (
+  cwd: string,
+  fallbackCwd?: string | null,
+): Promise<ComponentsListResult> =>
+  invoke("components_list", { cwd, fallbackCwd: fallbackCwd || null })
 
 export const componentsDetail = (
   cwd: string,
   id: string,
-): Promise<ComponentDetail> => invoke("components_detail", { cwd, id })
+  fallbackCwd?: string | null,
+): Promise<ComponentDetail> =>
+  invoke("components_detail", { cwd, id, fallbackCwd: fallbackCwd || null })
 
 /** Apply temporary CSS overrides to a selector in the embedded browser. */
 export const browserApplyStyleOverrides = (

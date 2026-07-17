@@ -56,7 +56,9 @@ export const SessionMenu = ({
   const { data: isolated = false, refetch: refetchIsolated } = useQuery({
     queryKey: ["is-isolated", sessionId],
     queryFn: () => isIsolated(sessionId),
-    staleTime: 5_000,
+    staleTime: 30_000,
+    // Don't hit IPC on every chat switch — only when the menu opens.
+    enabled: open,
   })
 
   useEffect(() => {
