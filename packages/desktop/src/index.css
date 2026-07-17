@@ -544,6 +544,21 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   animation: settings-row-highlight 1.5s cubic-bezier(0, 0, 0.2, 1) 1;
 }
 
+/* Indeterminate progress bar (indexing rebuild, etc.) — a short indicator
+ * slides across the track while value is unknown. */
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.animate-progress-indeterminate {
+  animation: progress-indeterminate 1.2s ease-in-out infinite;
+}
+
 /* sash hover-highlight transition — shared utility so RightPanel's
  * (and, as a follow-up, SessionSidebar's) drag-sash hover-line can pick up
  * the same timing without duplicating the value. Targets the sash's own
@@ -566,6 +581,7 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   .animate-subagent-viewer-in,
   .animate-subagent-viewer-out,
   .animate-settings-row-highlight,
+  .animate-progress-indeterminate,
   .animate-tool-step-in {
     animation: none;
   }

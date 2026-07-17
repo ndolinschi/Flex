@@ -51,7 +51,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `ArchivedSectionHeader` | Collapsible Archived group header | `count`, `collapsed`, `onToggle` | SessionSidebar |
 | `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays + optional ghost-text inline completion (isolates keystrokes from ModelPicker/ContextBar) | `composerMode`, `anchorRef`, `attachments`, `onSend` | Composer |
 | `ModelSelect` | Searchable model picker (shadcn Combobox) | `models`, `value`, `onChange` | ProviderSettingsForm |
-| `ModelPicker` | Searchable model tray (Combobox + effort submenu) | `models`, `value`, `onChange` | Composer |
+| `ModelPicker` | Searchable model tray (Combobox + nested effort DropdownMenu, `data-popover-outside-ignore`) | `models`, `value`, `onChange`, `effortFor?`, `onEffortChange?` | Composer |
 | `ModePicker` | Agent / Plan / Ask pill switcher | `value`, `onChange` | Composer |
 | `PlanBuildBar` | Cursor-style Build CTA after ExitPlanMode | `onBuild`, `onKeepPlanning?`, `variant` | Plan tab, ChatSessionBody |
 | `PlanCard` | Checklist from `plan_updated` (Plan tool tab; not inlined in timeline) | `entries` | PlanTab |
@@ -64,7 +64,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `PlusMenu` | Attach + mode shortcuts (Plan/Ask) | `onAttachFile`, `onAttachImage`, `onSetMode?` | Composer |
 | `ProjectPicker` | Recent cwds + Open Folder (shadcn Combobox) | `sessionId`, `cwd`, `onError?` | ContextBar |
 | `BranchPicker` | List/checkout branches (shadcn Combobox); PR # + checks when present | `cwd`, `onError?` | ContextBar |
-| `BranchPrStatusChip` | Current-branch PR # + title + CI summary; opens PR in browser | `pr` | ChangesTab header |
+| `BranchPrStatusChip` | Current-branch PR # + title + CI summary; HoverCard preview; opens PR in browser | `pr` | ChangesTab header |
 | `CreatePrDialog` | Editable title/body modal before `gh pr create` | `open`, `initialTitle?`, `initialBody?`, `onConfirm` | ChangesTab, CommitCenter, CommitBar |
 | `PopoverItem` | Shared selectable row for Popover / effort menus | `active?`, `onClick`, `children` | Mode/Isolation pickers, ModelPicker effort, slash/@ trays |
 | `ContextMenu` | Portal menu; ignores timeline scroll + webview-induced `window.blur` so it stays open mid-stream | `position`, `items`, `onClose` | ContentPane `+`, SessionListItem, FileExplorer, PlanToolbar |
@@ -122,7 +122,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/`. Opening the tab with zero workspace PTYs auto-creates one shell. | — | ToolTabBody |
 | `CommandPalette` | ⌘K-style action palette (shadcn CommandDialog + cmdk); scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell |
 | `SearchModal` | Fuzzy session search (CommandDialog); highlight via `HighlightedLabel` | `open`, `onClose` | App shell (via SessionSidebar's `onOpenSearch`) |
-| `SubagentViewer` | Bottom-anchored overlay replaying a subagent's inner session feed | (reads `useAppStore` `subagentViewer`) | App shell; opened from `TimelineRowView` |
+| `SubagentViewer` | Bottom Drawer (vaul) replaying a subagent's inner session feed | (reads `useAppStore` `subagentViewer`) | `ChatSessionBody`; opened from `TimelineRowView` / workers |
 
 ### Organism subfolders
 
@@ -282,23 +282,23 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Button | yes | `Button`, `IconButton`, `SendButton` shell | **SendButton** composes Button; drop custom `isLoading` at call sites over time |
 | Button Group | yes | CommitCenter split chrome | **CommitCenter** uses `ButtonGroup` + DropdownMenu chevron |
 | Calendar | skip | — | No date UX today |
-| Card | skip (Settings) | settings cards, catalog cards | DESIGN label-outside / `bg-settings-card` ≠ shadcn Card; keep custom |
+| Card | yes (Settings) | `SettingsCard` | **SettingsCard** composes Card/Header/Title/Description/Content; Flex look via `bg-settings-card` + `ring-0` + outside-looking title |
 | Carousel | skip | — | |
 | Chart | skip | — | No dashboards |
 | Checkbox | yes | `Checkbox` atom | Restyle round + indeterminate |
 | Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader`, WorkGroup | **Sidebar section headers** use radix Collapsible; **WorkGroup** keeps molecule `Collapsible` (grid-rows expand animation) |
-| Combobox | yes | Model/Branch/Project pickers | **All model/project/branch pickers** incl. ModelPicker (effort submenu + outside-press cancel) |
+| Combobox | yes | Model/Branch/Project pickers | **All pickers**; ModelPicker effort = nested DropdownMenu (`data-popover-outside-ignore`) |
 | Command | yes | `CommandPalette`, `SearchModal`, `OpenTabModal` | **CommandPalette + SearchModal** (CommandDialog); **OpenTabModal** (anchored Command portal) |
 | Context Menu | yes | `ContextMenu` molecule | **Migrated** — keep timeline-scroll / webview-blur dismiss |
 | Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
 | Date Picker | skip | — | |
 | Dialog | yes | `ConfirmDialog` (forms), auth/PR/bug/MCP dialogs | **ConfirmDialog forms**, Copilot/ChatGPT sign-in, BugReport, McpInstall migrated |
 | Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
-| Drawer | maybe | `SubagentViewer` (bottom overlay) | Spike vs keep custom (Vaul + virtualized timeline) |
+| Drawer | yes | `SubagentViewer` (bottom overlay) | **SubagentViewer** — vaul Drawer (`direction=bottom`, nested `container`, ~70dvh) + `TurnTimeline` |
 | Dropdown Menu | yes | `SessionMenu`, `PlusMenu`, overflow, workers, commit, prompt insert | **PlusMenu, SessionMenu, BrowserOverflow (+webview suppress), WorkingAgentsPill, CommitCenter, PromptTab insert** |
 | Empty | yes | `EmptyState` | **EmptyState migrated** |
 | Field | yes | `FormField` + settings forms | **FormField migrated** (`Field`/`FieldLabel`/`FieldError`) |
-| Hover Card | later | — | Optional enrichment on chips |
+| Hover Card | yes | PR status enrichment | **BranchPrStatusChip** HoverCard |
 | Input | yes | `TextInput` | Alias export during cutover |
 | Input Group | yes | composer / search fields with addons | **SettingsNav, FileExplorer, Combobox** wired |
 | Input OTP | skip | — | OAuth shows codes; users don’t type OTP |
@@ -308,26 +308,26 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Marker | yes (chat kit) | `CompactionCard` / `IndexingCard` dividers | **IndexingCard** (separator) + **CompactionCard** (border) migrated |
 | Menubar | yes | `TitleBarMenus` | **TitleBarMenus migrated** |
 | Message | yes (chat kit) | timeline message rows | **User** Message+Bubble; **assistant** Message only; keep MessageActions |
-| Message Scroller | spike | `TurnTimeline` + `useStickToBottom` | **Do not swap blindly** — compose *with* `@tanstack/react-virtual` |
+| Message Scroller | spike | `TurnTimeline` + `useStickToBottom` | **Spike landed:** Provider/Root/Viewport wrap timeline; keep virtualizer + `useStickToBottom` (`autoScroll` off — see TurnTimeline comment) |
 | Native Select | later | simple settings enums | Prefer Select/Combobox; ModelSelect is Combobox |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
 | Pagination | later | DatabaseTab paging | Icons-only Previous/Next |
 | Popover | yes | mode/isolation/commit/plan/slash/@ | **Mode/Isolation/IsolationBadge/CommitBar/PlanComment + ComposerSuggestionPopover** (slash/@, focus preserved) |
-| Progress | later | indexing / update UX | No determinate % UI yet (Spinner + status text) |
+| Progress | yes | indexing rebuild | **IndexingSection** indeterminate Progress while rebuilding; track `bg-fill-3`, indicator `bg-primary` |
 | Radio Group | yes | `QuestionPrompt` choices | **QuestionPrompt** single-select RadioGroup + multi-select Checkbox |
 | Resizable | yes | content split sash | **ContentWorkspace migrated** |
 | Scroll Area | yes | `ScrollArea` atom | Sidebar / overlays; **not** the virtualized timeline |
 | Select | yes | settings enums without search | **Permission mode + routine trigger** wired; ModelSelect is Combobox |
 | Separator | yes | `Divider` | **done** |
 | Sheet | skip for Settings | settings overlay | Keep absolute kept-mounted chat overlay |
-| Sidebar | spike | `SessionSidebar` | Steal primitives only; don’t full-adopt kit |
+| Sidebar | spike | `SessionSidebar` | **Spike landed:** Provider + `collapsible="none"` Sidebar + Header/Content/Footer/Group; sash + layoutConstants clamps kept; kit fixed/Sheet layout not adopted |
 | Skeleton | yes | `Skeleton`, `SidebarSkeleton` | **done** |
 | Slider | skip | — | |
 | Sonner | yes | `Toast` / ToastHost | **ToastHost migrated** — `pushToast` → `sonner` |
 | Spinner | yes | `Spinner` | **done** |
 | Switch | yes | `Toggle` atom | **done** (green ON) |
 | Table | later | Database results | With Pagination first |
-| Tabs | careful | panel/file tabs | Prefer keep custom `Tab*` for chrome chips; Settings nav is vertical list (not Tabs) |
+| Tabs | careful | panel/file tabs + Settings | **Settings nav** = vertical Tabs; **Appearance theme** = horizontal Tabs; content-pane `Tab*`/`TabStrip`/`WindowTitleBar` remain domain chrome (DnD chips / OS window) |
 | Textarea | yes | `TextArea`, composer draft | **done** |
 | Toast | n/a | — | Use **Sonner**, not legacy Toast component |
 | Toggle | careful | pressed toolbar buttons | Name clash: Flex `Toggle` = Switch (done); use Toggle Group for Code/Eye |
@@ -345,10 +345,10 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | **0 — Foundation** | `shadcn init` in `packages/desktop` (Vite, Tailwind v4, **radix** base, `lucide`, css variables); path alias `@/`; upgrade `cn` to `clsx` + `tailwind-merge`; map shadcn semantic tokens → Flex tokens in `src/index.css` / `tokens.css` without breaking `data-theme` | `components.json` present; `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
 | **1 — Atom adapters** | Add Button, Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Spinner, Avatar, Tooltip, ScrollArea; re-export from `components/atoms` with temporary compat props | Atom unit tests + vitest green; call sites compile via barrel. **Done:** Button, TextInput, TextArea, Label, Badge, Kbd, Divider←Separator, Skeleton, Spinner, Checkbox (round), Toggle←Switch (green ON), Avatar, ScrollArea, Tooltip (Provider + scroll dismiss). |
 | **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog (AlertDialog when no children; Dialog for forms) + auth/bug/MCP dialogs, ToastHost/Sonner, Mode/Isolation/IsolationBadge/CommitBar/PlanComment + slash/@ ComposerSuggestionPopover, WorkingAgentsPill+CommitCenter (DropdownMenu + ButtonGroup), PlusMenu+SessionMenu+BrowserOverflow, TitleBarMenus, ContextMenu. |
-| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select (permission/trigger enums); Toggle Group; Command*; RadioGroup + multi Checkbox; Input Group; Combobox (all model/project/branch pickers incl. ModelPicker). |
-| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner+SidebarResumeError→Alert; Collapsible sidebar headers (WorkGroup keeps molecule Collapsible); ContentWorkspace Resizable; PlanToolbar Breadcrumb. **Deferred spikes:** Sidebar / Drawer / MessageScroller. |
-| **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | **Done:** AttachmentChip; user Bubble; user/assistant Message; Compaction/Indexing Markers. **Next:** MessageScroller spike only (keep `@tanstack/react-virtual`) |
-| **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
+| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select; Toggle Group; Command*; RadioGroup + multi Checkbox; Input Group; Combobox (ModelPicker effort → DropdownMenu). |
+| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; Sidebar/Drawer; Card; Tabs; Progress | **Done:** Empty/Alert; Collapsible headers; Resizable; Breadcrumb; Drawer→SubagentViewer; Sidebar spike; SettingsCard→Card; Settings Tabs; Indexing Progress. |
+| **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller | **Done:** chat kit + MessageScroller Provider/Viewport composed with `@tanstack/react-virtual` (`autoScroll` deferred — stick-to-bottom kept). |
+| **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them. Hover Card **done** (PR chip). Domain chrome `Tab*`/`WindowTitleBar` kept intentionally. |
 
 ### Docs investigation (radix-nova)
 
@@ -393,9 +393,10 @@ npx shadcn@latest add button input textarea label checkbox switch badge kbd \
 ### Out of scope for “migrate everything”
 
 Organisms that stay product-specific even after primitives land: `TurnTimeline`,
-`Composer`, `SessionSidebar` (until Sidebar spike), tool tabs (Files/Terminal/Browser/
+`Composer`, tool tabs (Files/Terminal/Browser/
 Database/Components), `WindowTitleBar`, `MarkdownBody` / diff cards, HITL
-Permission/Question docks, plugin surfaces.
+Permission/Question docks, plugin surfaces. `SessionSidebar` chrome now uses
+Sidebar primitives (`collapsible="none"`); list/sash behavior stays product-owned.
 
 Keep this file in sync when adding or renaming components. For layout and
 spacing changes, update [DESIGN.md](./DESIGN.md).

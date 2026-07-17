@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { ArrowLeft } from "@/components/icons"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { IconButton } from "../atoms"
-import { SettingsNav } from "../molecules"
+import { SettingsNav, SETTINGS_NAV_ITEMS } from "../molecules"
 import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import type { SettingsSectionId } from "../../lib/settingsSearchIndex"
 import { searchSettings, type SettingsSearchEntry } from "../../lib/settingsSearchIndex"
@@ -26,7 +27,8 @@ type SettingsShellProps = {
  * Models & Connections / Behavior / Memory / Tools & MCP / Automations, with
  * a Search Settings box at the top of the nav that navigates to (and
  * pulse-highlights) a row in another section rather than filtering in
- * place. */
+ * place. Section switching uses vertical shadcn Tabs; search still swaps
+ * the nav list for results without fighting Tabs value control. */
 export const SettingsShell = ({
   sections,
   titleFor,
@@ -79,8 +81,6 @@ export const SettingsShell = ({
     }
   }, [])
 
-  const activeContent = sections[activeSection]
-
   const body = (
     <>
       <header className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-4">
@@ -88,13 +88,16 @@ export const SettingsShell = ({
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
         </IconButton>
       </header>
-      <main className="flex flex-1 items-stretch gap-6 overflow-y-auto px-4">
+      <Tabs
+        orientation="vertical"
+        value={activeSection}
+        onValueChange={(value) => {
+          setActiveSection(value as SettingsSectionId)
+          setQuery("")
+        }}
+        className="flex flex-1 items-stretch gap-6 overflow-y-auto px-4"
+      >
         <SettingsNav
-          active={activeSection}
-          onSelect={(id) => {
-            setActiveSection(id)
-            setQuery("")
-          }}
           query={query}
           onQueryChange={setQuery}
           results={results}
@@ -122,10 +125,22 @@ export const SettingsShell = ({
               "[&_[data-settings-row]]:transition-shadow",
             )}
           >
-            <HighlightScope rowId={highlightRowId}>{activeContent}</HighlightScope>
+            {SETTINGS_NAV_ITEMS.map((item) => {
+              const content = sections[item.id]
+              if (!content) return null
+              return (
+                <TabsContent
+                  key={item.id}
+                  value={item.id}
+                  className="mt-0 outline-none"
+                >
+                  <HighlightScope rowId={highlightRowId}>{content}</HighlightScope>
+                </TabsContent>
+              )
+            })}
           </div>
         </div>
-      </main>
+      </Tabs>
     </>
   )
 

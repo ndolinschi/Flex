@@ -1,4 +1,11 @@
 import type { ReactNode } from "react"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { cn } from "../../lib/utils"
 
 /* ── Settings shell primitives (see DESIGN.md Settings) ──────────
@@ -18,7 +25,8 @@ type SettingsCardProps = {
 }
 
 /** Group card — flat panel-tier background, no border, rows separated by
- * inset dividers (see `SettingRow`). */
+ * inset dividers (see `SettingRow`). Composes shadcn Card with Flex
+ * overrides (`bg-settings-card`, `ring-0`, outside-looking title). */
 export const SettingsCard = ({
   label,
   description,
@@ -26,17 +34,32 @@ export const SettingsCard = ({
   className,
 }: SettingsCardProps) => {
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
+    <Card
+      className={cn(
+        "gap-2 overflow-visible rounded-none bg-transparent py-0 text-inherit shadow-none ring-0",
+        className,
+      )}
+    >
       {label ? (
-        <div className="flex flex-col gap-0.5 pl-3.5 pr-3.5">
-          <h3 className="text-sm leading-4 text-ink-secondary">{label}</h3>
+        <CardHeader className="gap-0.5 px-3.5 py-0">
+          <CardTitle className="font-normal text-sm leading-4 text-ink-secondary">
+            {label}
+          </CardTitle>
           {description ? (
-            <p className="text-sm leading-4 text-ink-muted">{description}</p>
+            <CardDescription className="text-sm leading-4 text-ink-muted">
+              {description}
+            </CardDescription>
           ) : null}
-        </div>
+        </CardHeader>
       ) : null}
-      <div className="flex flex-col rounded-[var(--radius-card)] bg-settings-card">{children}</div>
-    </div>
+      <CardContent
+        className={cn(
+          "flex flex-col rounded-[var(--radius-card)] bg-settings-card px-0",
+        )}
+      >
+        {children}
+      </CardContent>
+    </Card>
   )
 }
 

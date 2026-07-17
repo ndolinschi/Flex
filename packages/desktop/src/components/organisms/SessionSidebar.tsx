@@ -2,6 +2,7 @@ import {
   useCallback,
   useMemo,
   useState,
+  type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react"
@@ -25,7 +26,7 @@ import {
   RepoSectionHeader,
   SessionListItem,
   SidebarActionRow,
-  SidebarFooter,
+  SidebarFooter as SessionSidebarFooter,
   SidebarResumeError,
   SidebarSkeleton,
   type ContextMenuItem,
@@ -34,6 +35,16 @@ import {
   Collapsible,
   CollapsibleContent,
 } from "@/components/ui/collapsible"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarProvider,
+} from "@/components/ui/sidebar"
 import { useQueryClient } from "@tanstack/react-query"
 import { SESSIONS_KEY, useSessions } from "../../hooks/useSessions"
 import { useWorkspaceStatuses } from "../../hooks/useWorkspaceStatuses"
@@ -371,7 +382,20 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
 
   const expanded = !collapsed
   return (
-    <>
+    <SidebarProvider
+      open={expanded}
+      onOpenChange={(open) => setSidebarCollapsed(!open)}
+      // App shell owns ⌘/Ctrl+B via useKeyboardShortcuts — avoid double-toggle.
+      enableKeyboardShortcut={false}
+      // `contents` keeps this a non-box so the flex row still hosts the
+      // backdrop + column as siblings (layoutConstants clamps stay on Sidebar).
+      className="contents"
+      style={
+        {
+          "--sidebar-width": `${sidebarWidth}px`,
+        } as CSSProperties
+      }
+    >
       {narrow && expanded ? (
         <div
           className="absolute inset-0 z-20 bg-black/30 animate-backdrop-in"
@@ -379,10 +403,13 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
           onClick={() => setSidebarCollapsed(true)}
         />
       ) : null}
-      <aside
+      {/* collapsible="none": steal Header/Content/Footer chrome without the
+       * kit's fixed/offcanvas/Sheet layout — width + narrow overlay stay ours. */}
+      <Sidebar
+        collapsible="none"
         style={!collapsed && !narrow ? { width: sidebarWidth } : undefined}
         className={cn(
-          "relative flex h-full shrink-0 flex-col overflow-hidden bg-surface",
+          "relative flex h-full shrink-0 flex-col overflow-hidden bg-surface text-sidebar-foreground",
           !dragging &&
             "transition-[width,opacity] duration-[var(--duration-normal)] ease-[var(--easing-default)]",
           collapsed
@@ -418,245 +445,253 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
           />
         ) : null}
 
-      {narrow && expanded ? (
-        // Full-width overlay only — wide mode keeps the existing header
-        // (backdrop click is enough at side-by-side width; discoverability
-        // requires an explicit close control once the sidebar fills the
-        // chat area).
-        <div className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b border-stroke-3 px-4">
-          <span className="text-sm text-ink-secondary">Sessions</span>
-          <IconButton
-            label="Close sidebar"
-            onClick={() => setSidebarCollapsed(true)}
-            className="h-6 w-6"
-          >
-            <X className="h-3.5 w-3.5" aria-hidden />
-          </IconButton>
-        </div>
-      ) : null}
+        {narrow && expanded ? (
+          // Full-width overlay only — wide mode keeps the existing header
+          // (backdrop click is enough at side-by-side width; discoverability
+          // requires an explicit close control once the sidebar fills the
+          // chat area).
+          <SidebarHeader className="h-[var(--header-height)] shrink-0 flex-row items-center justify-between gap-0 border-b border-stroke-3 px-4 py-0">
+            <span className="text-sm text-ink-secondary">Sessions</span>
+            <IconButton
+              label="Close sidebar"
+              onClick={() => setSidebarCollapsed(true)}
+              className="h-6 w-6"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden />
+            </IconButton>
+          </SidebarHeader>
+        ) : null}
 
-      <div className="flex flex-col gap-0.5 px-2 pt-2 pb-2">
-        <SidebarActionRow
-          icon={SquarePen}
-          label="New Agent"
-          kbd={isMac ? "⌘N" : "Ctrl+N"}
-          onClick={() => void handleCreate()}
-          disabled={isCreating}
-        />
-        <SidebarActionRow
-          icon={Search}
-          label="Search"
-          kbd={isMac ? "⌘K" : "Ctrl+K"}
-          onClick={() => {
-            onOpenSearch()
-            if (narrow) setSidebarCollapsed(true)
-          }}
-        />
-        {AUTOMATIONS_UI_ENABLED ? (
+        <SidebarHeader className="gap-0.5 px-2 pt-2 pb-2">
           <SidebarActionRow
-            icon={Bot}
-            label="Automations"
-            trailingIcon={ArrowUpRight}
+            icon={SquarePen}
+            label="New Agent"
+            kbd={isMac ? "⌘N" : "Ctrl+N"}
+            onClick={() => void handleCreate()}
+            disabled={isCreating}
+          />
+          <SidebarActionRow
+            icon={Search}
+            label="Search"
+            kbd={isMac ? "⌘K" : "Ctrl+K"}
             onClick={() => {
-              setRoute("automations")
+              onOpenSearch()
               if (narrow) setSidebarCollapsed(true)
             }}
           />
-        ) : null}
-        <SidebarActionRow
-          icon={Brain}
-          label="Memory"
-          trailingIcon={ArrowUpRight}
-          onClick={() => {
-            setRoute("memory")
-            if (narrow) setSidebarCollapsed(true)
-          }}
-        />
-        <SidebarActionRow
-          icon={SlidersHorizontal}
-          label="Customize"
-          onClick={() => {
-            setRoute("customize")
-            if (narrow) setSidebarCollapsed(true)
-          }}
-        />
-      </div>
-
-      <div className="group/label flex items-center gap-1 px-2 pb-1">
-        <span className="min-w-0 flex-1 truncate text-xs tracking-[var(--tracking-caption)] text-ink-muted">
-          Repositories
-        </span>
-        <IconButton
-          label="Search agents"
-          className={cn(
-            "h-6 w-6 opacity-0 transition-opacity duration-[var(--duration-fast)]",
-            "group-hover/label:opacity-100",
-          )}
-          onClick={onOpenSearch}
-        >
-          <Search className="h-3 w-3" aria-hidden />
-        </IconButton>
-      </div>
-
-      {error ? (
-        <div className="px-2 pb-2">
-          <ErrorBanner message={error} />
-        </div>
-      ) : null}
-
-      <ScrollArea className="flex-1 px-2 pb-2">
-        {isLoading ? (
-          <SidebarSkeleton />
-        ) : sessions.length === 0 ? (
-          <EmptyState
-            title="No agents yet"
-            description="Create an agent to start working on tasks."
-            actionLabel="New Agent"
-            onAction={() => void handleCreate()}
+          {AUTOMATIONS_UI_ENABLED ? (
+            <SidebarActionRow
+              icon={Bot}
+              label="Automations"
+              trailingIcon={ArrowUpRight}
+              onClick={() => {
+                setRoute("automations")
+                if (narrow) setSidebarCollapsed(true)
+              }}
+            />
+          ) : null}
+          <SidebarActionRow
+            icon={Brain}
+            label="Memory"
+            trailingIcon={ArrowUpRight}
+            onClick={() => {
+              setRoute("memory")
+              if (narrow) setSidebarCollapsed(true)
+            }}
           />
-        ) : (
-          <div className="flex flex-col gap-2">
-            {pinnedSessions.length > 0 ? (
-              <section className="flex flex-col gap-px">
-                <div className="flex h-6 w-full items-center gap-1.5 px-2 text-xs text-ink-secondary">
-                  <span className="min-w-0 flex-1 truncate">Pinned</span>
-                </div>
-                {pinnedSessions.map((session) => (
-                  <SessionListItem
-                    key={session.id}
-                    session={session}
-                    isActive={session.id === activeSessionId}
-                    errorMessage={rowErrors[session.id]}
-                    workspaceStatus={workspaceStatuses[session.id]}
-                    gitStatus={gitStatuses[session.id]}
-                    pinned
-                    onSelect={handleSelectRow}
-                    onRename={renameSession}
-                    onDelete={deleteSession}
-                    onNewAgentInRepo={handleNewAgentInRepo}
-                    onTogglePin={toggleSessionPinned}
-                    onSetArchived={setSessionArchived}
-                  />
-                ))}
-              </section>
+          <SidebarActionRow
+            icon={SlidersHorizontal}
+            label="Customize"
+            onClick={() => {
+              setRoute("customize")
+              if (narrow) setSidebarCollapsed(true)
+            }}
+          />
+        </SidebarHeader>
+
+        <SidebarContent className="gap-0 overflow-hidden p-0">
+          <SidebarGroup className="flex min-h-0 flex-1 flex-col gap-0 p-0">
+            <div className="group/label flex items-center gap-1 px-2 pb-1">
+              <SidebarGroupLabel className="min-w-0 flex-1 truncate px-0">
+                Repositories
+              </SidebarGroupLabel>
+              <IconButton
+                label="Search agents"
+                className={cn(
+                  "h-6 w-6 opacity-0 transition-opacity duration-[var(--duration-fast)]",
+                  "group-hover/label:opacity-100",
+                )}
+                onClick={onOpenSearch}
+              >
+                <Search className="h-3 w-3" aria-hidden />
+              </IconButton>
+            </div>
+
+            {error ? (
+              <div className="px-2 pb-2">
+                <ErrorBanner message={error} />
+              </div>
             ) : null}
 
-            {repoGroups.map((group) => (
-              <Collapsible
-                key={group.cwd}
-                open={!collapsedRepos[group.cwd]}
-                onOpenChange={(open) =>
-                  setCollapsedRepos((prev) => ({
-                    ...prev,
-                    [group.cwd]: !open,
-                  }))
-                }
-                className="flex flex-col gap-px"
-              >
-                <div
-                  onContextMenu={(e) => handleRepoContextMenu(e, group.cwd)}
-                >
-                  <RepoSectionHeader
-                    label={group.label}
-                    onNewSession={() => void handleCreate(group.cwd)}
-                    indexed={!!indexedRepos[group.cwd]}
+            <SidebarGroupContent className="flex min-h-0 flex-1 flex-col">
+              <ScrollArea className="min-h-0 flex-1 px-2 pb-2">
+                {isLoading ? (
+                  <SidebarSkeleton />
+                ) : sessions.length === 0 ? (
+                  <EmptyState
+                    title="No agents yet"
+                    description="Create an agent to start working on tasks."
+                    actionLabel="New Agent"
+                    onAction={() => void handleCreate()}
                   />
-                </div>
-                <CollapsibleContent className="flex flex-col gap-px">
-                  {group.sessions.map((session) => (
-                    <SessionListItem
-                      key={session.id}
-                      session={session}
-                      isActive={session.id === activeSessionId}
-                      errorMessage={rowErrors[session.id]}
-                      workspaceStatus={workspaceStatuses[session.id]}
-                      gitStatus={gitStatuses[session.id]}
-                      onSelect={handleSelectRow}
-                      onRename={renameSession}
-                      onDelete={deleteSession}
-                      onNewAgentInRepo={handleNewAgentInRepo}
-                      onTogglePin={toggleSessionPinned}
-                      onSetArchived={setSessionArchived}
-                    />
-                  ))}
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {pinnedSessions.length > 0 ? (
+                      <section className="flex flex-col gap-px">
+                        <div className="flex h-6 w-full items-center gap-1.5 px-2 text-xs text-ink-secondary">
+                          <span className="min-w-0 flex-1 truncate">Pinned</span>
+                        </div>
+                        {pinnedSessions.map((session) => (
+                          <SessionListItem
+                            key={session.id}
+                            session={session}
+                            isActive={session.id === activeSessionId}
+                            errorMessage={rowErrors[session.id]}
+                            workspaceStatus={workspaceStatuses[session.id]}
+                            gitStatus={gitStatuses[session.id]}
+                            pinned
+                            onSelect={handleSelectRow}
+                            onRename={renameSession}
+                            onDelete={deleteSession}
+                            onNewAgentInRepo={handleNewAgentInRepo}
+                            onTogglePin={toggleSessionPinned}
+                            onSetArchived={setSessionArchived}
+                          />
+                        ))}
+                      </section>
+                    ) : null}
 
-            {archivedSessions.length > 0 ? (
-              <Collapsible
-                open={!archivedCollapsed}
-                onOpenChange={(open) => setArchivedCollapsed(!open)}
-                className="flex flex-col gap-px"
-              >
-                <ArchivedSectionHeader count={archivedSessions.length} />
-                <CollapsibleContent className="flex flex-col gap-px">
-                  {archivedSessions.map((session) => (
-                    <SessionListItem
-                      key={session.id}
-                      session={session}
-                      isActive={session.id === activeSessionId}
-                      errorMessage={rowErrors[session.id]}
-                      workspaceStatus={workspaceStatuses[session.id]}
-                      gitStatus={gitStatuses[session.id]}
-                      archived
-                      onSelect={handleSelectRow}
-                      onRename={renameSession}
-                      onDelete={deleteSession}
-                      onNewAgentInRepo={handleNewAgentInRepo}
-                      onTogglePin={toggleSessionPinned}
-                      onSetArchived={setSessionArchived}
-                    />
-                  ))}
-                </CollapsibleContent>
-              </Collapsible>
-            ) : null}
-          </div>
-        )}
-      </ScrollArea>
+                    {repoGroups.map((group) => (
+                      <Collapsible
+                        key={group.cwd}
+                        open={!collapsedRepos[group.cwd]}
+                        onOpenChange={(open) =>
+                          setCollapsedRepos((prev) => ({
+                            ...prev,
+                            [group.cwd]: !open,
+                          }))
+                        }
+                        className="flex flex-col gap-px"
+                      >
+                        <div
+                          onContextMenu={(e) => handleRepoContextMenu(e, group.cwd)}
+                        >
+                          <RepoSectionHeader
+                            label={group.label}
+                            onNewSession={() => void handleCreate(group.cwd)}
+                            indexed={!!indexedRepos[group.cwd]}
+                          />
+                        </div>
+                        <CollapsibleContent className="flex flex-col gap-px">
+                          {group.sessions.map((session) => (
+                            <SessionListItem
+                              key={session.id}
+                              session={session}
+                              isActive={session.id === activeSessionId}
+                              errorMessage={rowErrors[session.id]}
+                              workspaceStatus={workspaceStatuses[session.id]}
+                              gitStatus={gitStatuses[session.id]}
+                              onSelect={handleSelectRow}
+                              onRename={renameSession}
+                              onDelete={deleteSession}
+                              onNewAgentInRepo={handleNewAgentInRepo}
+                              onTogglePin={toggleSessionPinned}
+                              onSetArchived={setSessionArchived}
+                            />
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    ))}
 
-      {selectError ? (
-        <SidebarResumeError
-          message={selectError}
-          onRetry={handleRetrySelect}
-          onDismiss={handleDismissSelectError}
+                    {archivedSessions.length > 0 ? (
+                      <Collapsible
+                        open={!archivedCollapsed}
+                        onOpenChange={(open) => setArchivedCollapsed(!open)}
+                        className="flex flex-col gap-px"
+                      >
+                        <ArchivedSectionHeader count={archivedSessions.length} />
+                        <CollapsibleContent className="flex flex-col gap-px">
+                          {archivedSessions.map((session) => (
+                            <SessionListItem
+                              key={session.id}
+                              session={session}
+                              isActive={session.id === activeSessionId}
+                              errorMessage={rowErrors[session.id]}
+                              workspaceStatus={workspaceStatuses[session.id]}
+                              gitStatus={gitStatuses[session.id]}
+                              archived
+                              onSelect={handleSelectRow}
+                              onRename={renameSession}
+                              onDelete={deleteSession}
+                              onNewAgentInRepo={handleNewAgentInRepo}
+                              onTogglePin={toggleSessionPinned}
+                              onSetArchived={setSessionArchived}
+                            />
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    ) : null}
+                  </div>
+                )}
+              </ScrollArea>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+
+        {selectError ? (
+          <SidebarResumeError
+            message={selectError}
+            onRetry={handleRetrySelect}
+            onDismiss={handleDismissSelectError}
+          />
+        ) : null}
+
+        <SidebarFooter>
+          <SessionSidebarFooter
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onOpenSettings={() => {
+              setRoute("settings")
+              if (narrow) setSidebarCollapsed(true)
+            }}
+            isCreating={isCreating}
+          />
+        </SidebarFooter>
+
+        <ContextMenu
+          position={repoMenu?.position ?? null}
+          items={repoMenuItems}
+          onClose={() => setRepoMenu(null)}
         />
-      ) : null}
-
-      <SidebarFooter
-        theme={theme}
-        onToggleTheme={toggleTheme}
-        onOpenSettings={() => {
-          setRoute("settings")
-          if (narrow) setSidebarCollapsed(true)
-        }}
-        isCreating={isCreating}
-      />
-
-      <ContextMenu
-        position={repoMenu?.position ?? null}
-        items={repoMenuItems}
-        onClose={() => setRepoMenu(null)}
-      />
-      <ConfirmDialog
-        open={!!deleteProject}
-        title="Delete project & chats?"
-        description={
-          deleteProject
-            ? `Delete “${deleteProject.label}” and its ${deleteProject.sessions.length} chat${
-                deleteProject.sessions.length === 1 ? "" : "s"
-              }? This cannot be undone.`
-            : undefined
-        }
-        confirmLabel="Delete"
-        danger
-        isLoading={deletingProject}
-        onConfirm={() => void handleDeleteProject()}
-        onCancel={() => {
-          if (!deletingProject) setDeleteProject(null)
-        }}
-      />
-      </aside>
-    </>
+        <ConfirmDialog
+          open={!!deleteProject}
+          title="Delete project & chats?"
+          description={
+            deleteProject
+              ? `Delete “${deleteProject.label}” and its ${deleteProject.sessions.length} chat${
+                  deleteProject.sessions.length === 1 ? "" : "s"
+                }? This cannot be undone.`
+              : undefined
+          }
+          confirmLabel="Delete"
+          danger
+          isLoading={deletingProject}
+          onConfirm={() => void handleDeleteProject()}
+          onCancel={() => {
+            if (!deletingProject) setDeleteProject(null)
+          }}
+        />
+      </Sidebar>
+    </SidebarProvider>
   )
 }

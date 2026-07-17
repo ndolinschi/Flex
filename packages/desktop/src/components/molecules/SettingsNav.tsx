@@ -11,6 +11,7 @@ import {
   Search,
   X,
 } from "@/components/icons"
+import { TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import type { SettingsSearchEntry, SettingsSectionId } from "../../lib/settingsSearchIndex"
 import { cn } from "../../lib/utils"
@@ -59,8 +60,6 @@ const NAV_ICONS: Record<SettingsSectionId, typeof Cog> = {
 }
 
 type SettingsNavProps = {
-  active: SettingsSectionId
-  onSelect: (id: SettingsSectionId) => void
   query: string
   onQueryChange: (query: string) => void
   results: SettingsSearchEntry[]
@@ -72,10 +71,10 @@ type SettingsNavProps = {
 /** Persistent left nav (see DESIGN.md Settings shell / nav): width
  * clamp(100px,25%,200px), search-at-top that swaps the whole nav list for a
  * flat result list once the query is non-empty (navigate-to-result, not
- * inline filtering). */
+ * inline filtering). Section list is a vertical shadcn `TabsList` (must sit
+ * under `SettingsShell`'s `Tabs` root); search results replace the list and
+ * leave Tabs value control to the shell. */
 export const SettingsNav = ({
-  active,
-  onSelect,
   query,
   onQueryChange,
   results,
@@ -170,30 +169,32 @@ export const SettingsNav = ({
           )}
         </div>
       ) : (
-        <div className="flex flex-col gap-1.5 px-1">
+        <TabsList
+          variant="line"
+          aria-label="Settings sections"
+          className="h-auto w-full flex-col items-stretch gap-1.5 rounded-none bg-transparent p-0 px-1"
+        >
           {SETTINGS_NAV_ITEMS.map((item) => {
             const Icon = NAV_ICONS[item.id]
-            const isActive = item.id === active
             return (
-              <button
+              <TabsTrigger
                 key={item.id}
-                type="button"
-                onClick={() => onSelect(item.id)}
-                aria-current={isActive ? "page" : undefined}
+                value={item.id}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-sm leading-4",
+                  "h-auto flex-none justify-start gap-1.5 rounded-sm border-transparent px-1.5 py-1 text-sm leading-4 font-normal",
+                  "text-ink-secondary after:hidden",
                   "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-                  isActive
-                    ? "bg-fill-2 text-ink"
-                    : "text-ink-secondary hover:bg-fill-4",
+                  "hover:bg-fill-4 hover:text-ink-secondary",
+                  "data-active:bg-fill-2 data-active:text-ink data-active:shadow-none",
+                  "dark:data-active:border-transparent dark:data-active:bg-fill-2",
                 )}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 <span className="truncate">{item.label}</span>
-              </button>
+              </TabsTrigger>
             )
           })}
-        </div>
+        </TabsList>
       )}
     </nav>
   )

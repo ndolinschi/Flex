@@ -1,10 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
-import { createPortal } from "react-dom"
+import { useState } from "react"
 import { Check, ChevronDown, ChevronRight, Gauge } from "@/components/icons"
 import { EFFORT_LEVELS, effortLabel } from "../../lib/types"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
-import { PopoverItem } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
 import {
   Combobox,
@@ -18,6 +16,13 @@ import {
   ComboboxList,
   ComboboxTrigger,
 } from "@/components/ui/combobox"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 type ModelPickerProps = {
   models: ModelInfoDto[]
@@ -36,131 +41,6 @@ type ModelPickerProps = {
   builtinProviders?: BuiltinProvider[]
 }
 
-const SUBMENU_WIDTH = 144
-
-/** Effort submenu — portal-mounted (combobox popup clips overflow) and
- * viewport-clamped like ContextMenu. Marked `data-popover-outside-ignore` so
- * Combobox outside-press does not dismiss while picking effort. */
-const EffortSubmenu = ({
-  anchorRect,
-  value,
-  onChange,
-  onClose,
-}: {
-  anchorRect: DOMRect
-  value: string | null
-  onChange: (effort: string | null) => void
-  onClose: () => void
-}) => {
-  const menuRef = useRef<HTMLDivElement>(null)
-  const onCloseRef = useRef(onClose)
-  const [coords, setCoords] = useState<{ x: number; y: number } | null>(null)
-
-  useLayoutEffect(() => {
-    onCloseRef.current = onClose
-  }, [onClose])
-
-  useLayoutEffect(() => {
-    const el = menuRef.current
-    const margin = 8
-    const height = el?.getBoundingClientRect().height ?? 0
-    let x = anchorRect.right + 4
-    let y = anchorRect.top
-    if (x + SUBMENU_WIDTH + margin > window.innerWidth) {
-      x = Math.max(margin, anchorRect.left - SUBMENU_WIDTH - 4)
-    }
-    if (y + height + margin > window.innerHeight) {
-      y = Math.max(margin, window.innerHeight - height - margin)
-    }
-    setCoords({ x, y })
-  }, [anchorRect])
-
-  useEffect(() => {
-    const handlePointer = (e: PointerEvent) => {
-      const target = e.target
-      if (!(target instanceof Node)) return
-      if (menuRef.current?.contains(target)) return
-      // Gauge / effort triggers also carry the ignore marker so a toggle
-      // click does not race-close then reopen against a stale listener.
-      if (
-        target instanceof Element &&
-        target.closest("[data-popover-outside-ignore]")
-      ) {
-        return
-      }
-      onCloseRef.current()
-    }
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return
-      e.preventDefault()
-      e.stopPropagation()
-      onCloseRef.current()
-    }
-    document.addEventListener("pointerdown", handlePointer, true)
-    document.addEventListener("keydown", handleKey, true)
-    return () => {
-      document.removeEventListener("pointerdown", handlePointer, true)
-      document.removeEventListener("keydown", handleKey, true)
-    }
-  }, [])
-
-  return createPortal(
-    <div
-      ref={menuRef}
-      role="menu"
-      aria-label="Effort"
-      data-popover-outside-ignore
-      style={{
-        position: "fixed",
-        left: coords?.x ?? anchorRect.right,
-        top: coords?.y ?? anchorRect.top,
-        width: SUBMENU_WIDTH,
-        visibility: coords ? "visible" : "hidden",
-      }}
-      className={cn(
-        "z-[200] overflow-hidden rounded-md py-0.5",
-        "bg-panel shadow-[var(--shadow-popover)] animate-tray-in",
-      )}
-    >
-      <PopoverItem
-        role="menuitem"
-        active={value === null}
-        onClick={() => {
-          onChange(null)
-          onClose()
-        }}
-      >
-        <span className="min-w-0 flex-1 truncate text-ink">Default</span>
-        {value === null ? (
-          <Check className="h-3 w-3 shrink-0 text-accent" aria-hidden />
-        ) : null}
-      </PopoverItem>
-      {EFFORT_LEVELS.map((level) => {
-        const active = level === value
-        return (
-          <PopoverItem
-            key={level}
-            role="menuitem"
-            active={active}
-            onClick={() => {
-              onChange(level)
-              onClose()
-            }}
-          >
-            <span className="min-w-0 flex-1 truncate text-ink">
-              {effortLabel(level)}
-            </span>
-            {active ? (
-              <Check className="h-3 w-3 shrink-0 text-accent" aria-hidden />
-            ) : null}
-          </PopoverItem>
-        )
-      })}
-    </div>,
-    document.body,
-  )
-}
-
 /** Composer model pill: Combobox with provider groups + per-row effort submenu. */
 export const ModelPicker = ({
   models,
@@ -173,10 +53,7 @@ export const ModelPicker = ({
   builtinProviders = [],
 }: ModelPickerProps) => {
   const [open, setOpen] = useState(false)
-  const [effortMenuFor, setEffortMenuFor] = useState<{
-    modelId: string
-    rect: DOMRect
-  } | null>(null)
+  const [effortOpenFor, setEffortOpenFor] = useState<string | null>(null)
 
   const selected = models.find((m) => m.id === value) ?? null
   const selectedEffort = value && effortFor ? effortFor(value) : null
@@ -190,14 +67,7 @@ export const ModelPicker = ({
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next)
-    if (!next) setEffortMenuFor(null)
-  }
-
-  const openEffortMenu = (modelId: string, el: HTMLElement) => {
-    const rect = el.getBoundingClientRect()
-    setEffortMenuFor((cur) =>
-      cur?.modelId === modelId ? null : { modelId, rect },
-    )
+    if (!next) setEffortOpenFor(null)
   }
 
   return (
@@ -298,38 +168,89 @@ export const ModelPicker = ({
                         ) : null}
                       </span>
                       {onEffortChange ? (
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          data-popover-outside-ignore
-                          aria-label={`Effort for ${m.displayName ?? m.id}`}
-                          aria-haspopup="menu"
-                          aria-expanded={effortMenuFor?.modelId === m.id}
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            openEffortMenu(m.id, e.currentTarget)
+                        <DropdownMenu
+                          modal={false}
+                          open={effortOpenFor === m.id}
+                          onOpenChange={(next) => {
+                            setEffortOpenFor(next ? m.id : null)
                           }}
-                          onPointerDown={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key !== "Enter" && e.key !== " ") return
-                            e.preventDefault()
-                            e.stopPropagation()
-                            openEffortMenu(m.id, e.currentTarget)
-                          }}
-                          className={cn(
-                            "flex w-8 shrink-0 cursor-pointer items-center justify-end gap-0.5 rounded px-0.5 py-0.5",
-                            "text-xs text-ink-faint transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink",
-                            effortMenuFor?.modelId === m.id &&
-                              "bg-fill-2 text-ink",
-                          )}
                         >
-                          <Gauge className="h-3 w-3" aria-hidden />
-                          <ChevronRight className="h-2.5 w-2.5" aria-hidden />
-                        </span>
+                          <DropdownMenuTrigger asChild>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              data-popover-outside-ignore
+                              aria-label={`Effort for ${m.displayName ?? m.id}`}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                              }}
+                              onPointerDown={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                              }}
+                              className={cn(
+                                "flex w-8 shrink-0 cursor-pointer items-center justify-end gap-0.5 rounded px-0.5 py-0.5",
+                                "text-xs text-ink-faint transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink",
+                                effortOpenFor === m.id && "bg-fill-2 text-ink",
+                              )}
+                            >
+                              <Gauge className="h-3 w-3" aria-hidden />
+                              <ChevronRight
+                                className="h-2.5 w-2.5"
+                                aria-hidden
+                              />
+                            </span>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            side="right"
+                            align="start"
+                            sideOffset={4}
+                            data-popover-outside-ignore
+                            className="w-36 min-w-36 rounded-md border-0 bg-panel p-0.5 shadow-[var(--shadow-popover)] ring-0"
+                            onCloseAutoFocus={(e) => e.preventDefault()}
+                          >
+                            <DropdownMenuGroup>
+                              <DropdownMenuItem
+                                className="gap-2 px-2 py-1.5"
+                                onSelect={() => {
+                                  onEffortChange(m.id, null)
+                                  onChange(m.id)
+                                  handleOpenChange(false)
+                                }}
+                              >
+                                <span className="min-w-0 flex-1">Default</span>
+                                {modelEffort === null ? (
+                                  <Check
+                                    className="size-3 text-accent"
+                                    aria-hidden
+                                  />
+                                ) : null}
+                              </DropdownMenuItem>
+                              {EFFORT_LEVELS.map((level) => (
+                                <DropdownMenuItem
+                                  key={level}
+                                  className="gap-2 px-2 py-1.5"
+                                  onSelect={() => {
+                                    onEffortChange(m.id, level)
+                                    onChange(m.id)
+                                    handleOpenChange(false)
+                                  }}
+                                >
+                                  <span className="min-w-0 flex-1">
+                                    {effortLabel(level)}
+                                  </span>
+                                  {modelEffort === level ? (
+                                    <Check
+                                      className="size-3 text-accent"
+                                      aria-hidden
+                                    />
+                                  ) : null}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       ) : null}
                     </ComboboxItem>
                   )
@@ -338,18 +259,6 @@ export const ModelPicker = ({
             </ComboboxGroup>
           )}
         </ComboboxList>
-        {effortMenuFor && onEffortChange ? (
-          <EffortSubmenu
-            anchorRect={effortMenuFor.rect}
-            value={effortFor ? effortFor(effortMenuFor.modelId) : null}
-            onChange={(effort) => {
-              onEffortChange(effortMenuFor.modelId, effort)
-              onChange(effortMenuFor.modelId)
-              handleOpenChange(false)
-            }}
-            onClose={() => setEffortMenuFor(null)}
-          />
-        ) : null}
       </ComboboxContent>
     </Combobox>
   )

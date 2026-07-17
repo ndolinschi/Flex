@@ -9,6 +9,11 @@ import {
   FilesChangedCard,
   WorkGroup,
 } from "../molecules"
+import {
+  MessageScroller,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@/components/ui/message-scroller"
 import { useSessionEvents } from "../../hooks/useSessionEvents"
 import { useSessions } from "../../hooks/useSessions"
 import { useStickToBottom } from "../../hooks/useStickToBottom"
@@ -343,154 +348,165 @@ export const TurnTimeline = ({
 
   const virtualItems = virtualizer.getVirtualItems()
 
+  // MessageScroller spike: Provider + Root + Viewport wrap the timeline scroll
+  // surface while `@tanstack/react-virtual` keeps absolute rows inside the
+  // Viewport. Stick behavior stays on useStickToBottom + virtualizer
+  // `followOnAppend` / `anchorTo: "end"` (programmaticScroll latch for
+  // ContextMenu). MessageScroller `autoScroll` is left off — it assumes flow
+  // MessageScrollerItem children via Content MutationObserver and would fight
+  // remasure / double-stick if enabled alongside the virtualizer. Threshold
+  // mirrors useStickToBottom's 80px near-bottom band for a future cutover.
   return (
-    <div className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-      <div
-        ref={scrollRef}
-        data-timeline-scroll=""
-        onScroll={handleScrollAndRemeasure}
-        className={cn(
-          "min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3",
-          "[scrollbar-width:thin] [scrollbar-color:var(--color-stroke-3)_transparent]",
-        )}
-      >
-        <div className="mx-auto mt-auto flex w-full max-w-[var(--content-rail)] flex-col pb-2">
-          <div
-            className="relative w-full"
-            style={{ height: virtualizer.getTotalSize() }}
-          >
-            {virtualItems.map((vItem) => {
-              const item = displayItems[vItem.index]
-              const isFirst = vItem.index === 0
-              return (
-                <div
-                  key={vItem.key}
-                  data-index={vItem.index}
-                  ref={virtualizer.measureElement}
-                  className={cn(
-                    "absolute top-0 left-0 w-full",
-                    marginForItem(item, isFirst),
-                  )}
-                  // Integer px avoids subpixel stacking on Windows fractional DPI.
-                  style={{
-                    transform: `translateY(${Math.round(vItem.start)}px)`,
-                  }}
-                >
-                  {item.kind === "group" ? (
-                    <>
-                      <WorkGroup
-                        isOpen={item.isOpen}
-                        isStreaming={isStreaming}
-                        liveStatus={
-                          item.isOpen && compactingStatus
-                            ? "compacting"
-                            : item.isOpen && indexingStatus
-                              ? "indexing"
-                              : item.isOpen && item.hasLiveThinking
-                                ? "thinking"
-                                : "working"
-                        }
-                        durationMs={item.summary?.duration_ms}
-                        costUsd={item.summary?.cost_usd}
-                        totalTokens={
-                          item.summary
-                            ? item.summary.usage.input + item.summary.usage.output
-                            : undefined
-                        }
-                        verdict={item.verdict}
-                        resumeLine={item.resumeLine}
-                        stopped={item.summary?.stop_reason === "cancelled"}
-                        onLayoutChange={onLayoutChange}
-                      >
-                        <WorkGroupBody
-                          rows={item.rows}
-                          progress={streaming.toolProgress}
-                          forceOpenDetails={item.isOpen}
+    <MessageScrollerProvider
+      autoScroll={false}
+      defaultScrollPosition="end"
+      scrollEdgeThreshold={80}
+    >
+      <MessageScroller className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+        <MessageScrollerViewport
+          ref={scrollRef}
+          data-timeline-scroll=""
+          onScroll={handleScrollAndRemeasure}
+          className="min-h-0 flex-1 px-3 py-3"
+        >
+          <div className="mx-auto mt-auto flex w-full max-w-[var(--content-rail)] flex-col pb-2">
+            <div
+              className="relative w-full"
+              style={{ height: virtualizer.getTotalSize() }}
+            >
+              {virtualItems.map((vItem) => {
+                const item = displayItems[vItem.index]
+                const isFirst = vItem.index === 0
+                return (
+                  <div
+                    key={vItem.key}
+                    data-index={vItem.index}
+                    ref={virtualizer.measureElement}
+                    className={cn(
+                      "absolute top-0 left-0 w-full",
+                      marginForItem(item, isFirst),
+                    )}
+                    // Integer px avoids subpixel stacking on Windows fractional DPI.
+                    style={{
+                      transform: `translateY(${Math.round(vItem.start)}px)`,
+                    }}
+                  >
+                    {item.kind === "group" ? (
+                      <>
+                        <WorkGroup
+                          isOpen={item.isOpen}
+                          isStreaming={isStreaming}
+                          liveStatus={
+                            item.isOpen && compactingStatus
+                              ? "compacting"
+                              : item.isOpen && indexingStatus
+                                ? "indexing"
+                                : item.isOpen && item.hasLiveThinking
+                                  ? "thinking"
+                                  : "working"
+                          }
+                          durationMs={item.summary?.duration_ms}
+                          costUsd={item.summary?.cost_usd}
+                          totalTokens={
+                            item.summary
+                              ? item.summary.usage.input + item.summary.usage.output
+                              : undefined
+                          }
+                          verdict={item.verdict}
+                          resumeLine={item.resumeLine}
+                          stopped={item.summary?.stop_reason === "cancelled"}
+                          onLayoutChange={onLayoutChange}
+                        >
+                          <WorkGroupBody
+                            rows={item.rows}
+                            progress={streaming.toolProgress}
+                            forceOpenDetails={item.isOpen}
+                            thinkingDurations={thinkingDurations}
+                            sessionId={sessionId}
+                            checkpointsDisabled={isStreaming}
+                          />
+                        </WorkGroup>
+                        {/* Sibling, not a WorkGroup child — the group's children live
+                         * inside its own collapsible body, which stays collapsed for
+                         * a completed turn until the user expands it. The footer must
+                         * stay visible regardless of that collapsed state. */}
+                        {item.footer ? <TurnFooter {...item.footer} /> : null}
+                      </>
+                    ) : (
+                      <>
+                        <TimelineRowView
+                          row={item.row}
+                          dimmed={
+                            item.row.type === "user" && item.row.id !== latestUserId
+                          }
+                          showActions={
+                            (item.row.type === "assistant" ||
+                              item.row.type === "user") &&
+                            !item.row.id.startsWith("live-")
+                          }
                           thinkingDurations={thinkingDurations}
                           sessionId={sessionId}
                           checkpointsDisabled={isStreaming}
+                          // `TimelineRowView` renders its own `TurnFooter` (right
+                          // after the message actions, see MessageActions'
+                          // `hideTimestamp`) so the two never stack a duplicate
+                          // relative-time label — do not ALSO render one here as a
+                          // sibling.
+                          footer={item.footer}
                         />
-                      </WorkGroup>
-                      {/* Sibling, not a WorkGroup child — the group's children live
-                       * inside its own collapsible body, which stays collapsed for
-                       * a completed turn until the user expands it. The footer must
-                       * stay visible regardless of that collapsed state. */}
-                      {item.footer ? <TurnFooter {...item.footer} /> : null}
-                    </>
-                  ) : (
-                    <>
-                      <TimelineRowView
-                        row={item.row}
-                        dimmed={
-                          item.row.type === "user" && item.row.id !== latestUserId
-                        }
-                        showActions={
-                          (item.row.type === "assistant" ||
-                            item.row.type === "user") &&
-                          !item.row.id.startsWith("live-")
-                        }
-                        thinkingDurations={thinkingDurations}
-                        sessionId={sessionId}
-                        checkpointsDisabled={isStreaming}
-                        // `TimelineRowView` renders its own `TurnFooter` (right
-                        // after the message actions, see MessageActions'
-                        // `hideTimestamp`) so the two never stack a duplicate
-                        // relative-time label — do not ALSO render one here as a
-                        // sibling.
-                        footer={item.footer}
-                      />
-                    </>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-          {/* Live tail — always mounted below the virtual window so stick-
-           * to-bottom and end-of-turn chrome stay correct. */}
-          {showReconnectBanner && reconnectStatus ? (
-            <ReconnectBanner status={reconnectStatus} />
-          ) : showCompactingIndicator ? (
-            <div className="mt-1 flex min-h-6 items-center gap-1.5 text-base">
-              <RunningDot className="-ml-1 h-4 w-4" />
-              <span className="animate-shimmer-text">Compacting context…</span>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-          ) : showIndexingIndicator ? (
-            <div className="mt-1 flex min-h-6 items-center gap-1.5 text-base">
-              <RunningDot className="-ml-1 h-4 w-4" />
-              <span className="animate-shimmer-text">Indexing repository…</span>
-            </div>
-          ) : showWorkingIndicator ? (
-            <div className="mt-1 flex min-h-6 items-center gap-1.5 text-base">
-              <RunningDot className="-ml-1 h-4 w-4" />
-              <span className="animate-shimmer-text">Working</span>
-            </div>
-          ) : null}
-          {/* Reserved end-of-turn slot — holds height during streaming so the
-           * FilesChangedCard / summary enter doesn't jump the feed. */}
-          <div className="mt-2 min-h-[var(--end-of-turn-reserved-height)]">
-            {!isStreaming ? (
-              <FilesChangedCard cwd={activeCwd} sessionId={sessionId} />
+            {/* Live tail — always mounted below the virtual window so stick-
+             * to-bottom and end-of-turn chrome stay correct. */}
+            {showReconnectBanner && reconnectStatus ? (
+              <ReconnectBanner status={reconnectStatus} />
+            ) : showCompactingIndicator ? (
+              <div className="mt-1 flex min-h-6 items-center gap-1.5 text-base">
+                <RunningDot className="-ml-1 h-4 w-4" />
+                <span className="animate-shimmer-text">Compacting context…</span>
+              </div>
+            ) : showIndexingIndicator ? (
+              <div className="mt-1 flex min-h-6 items-center gap-1.5 text-base">
+                <RunningDot className="-ml-1 h-4 w-4" />
+                <span className="animate-shimmer-text">Indexing repository…</span>
+              </div>
+            ) : showWorkingIndicator ? (
+              <div className="mt-1 flex min-h-6 items-center gap-1.5 text-base">
+                <RunningDot className="-ml-1 h-4 w-4" />
+                <span className="animate-shimmer-text">Working</span>
+              </div>
             ) : null}
+            {/* Reserved end-of-turn slot — holds height during streaming so the
+             * FilesChangedCard / summary enter doesn't jump the feed. */}
+            <div className="mt-2 min-h-[var(--end-of-turn-reserved-height)]">
+              {!isStreaming ? (
+                <FilesChangedCard cwd={activeCwd} sessionId={sessionId} />
+              ) : null}
+            </div>
+            <div ref={bottomRef} aria-hidden className="h-px w-full shrink-0" />
           </div>
-          <div ref={bottomRef} aria-hidden className="h-px w-full shrink-0" />
-        </div>
-      </div>
+        </MessageScrollerViewport>
 
-      {showScrollDown ? (
-        <button
-          type="button"
-          onClick={handleScrollToBottom}
-          aria-label="Scroll to bottom"
-          className={cn(
-            "absolute bottom-3 left-1/2 z-20 flex h-7 w-7 -translate-x-1/2",
-            "items-center justify-center rounded-full border border-stroke-2",
-            "bg-panel text-ink-secondary transition-colors duration-[var(--duration-fast)] hover:text-ink",
-            "animate-tray-in",
-          )}
-        >
-          <ArrowDown className="h-3 w-3" aria-hidden />
-        </button>
-      ) : null}
-    </div>
+        {showScrollDown ? (
+          <button
+            type="button"
+            onClick={handleScrollToBottom}
+            aria-label="Scroll to bottom"
+            className={cn(
+              "absolute bottom-3 left-1/2 z-20 flex h-7 w-7 -translate-x-1/2",
+              "items-center justify-center rounded-full border border-stroke-2",
+              "bg-panel text-ink-secondary transition-colors duration-[var(--duration-fast)] hover:text-ink",
+              "animate-tray-in",
+            )}
+          >
+            <ArrowDown className="h-3 w-3" aria-hidden />
+          </button>
+        ) : null}
+      </MessageScroller>
+    </MessageScrollerProvider>
   )
 }

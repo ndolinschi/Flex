@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { RefreshCw } from "@/components/icons"
+import { Progress } from "@/components/ui/progress"
 import { Button, Spinner, Toggle } from "../../components/atoms"
 import { ErrorBanner, SettingsCard, SettingRow } from "../../components/molecules"
 import { useProviderConfig } from "../../hooks/useProviderConfig"
@@ -244,30 +245,53 @@ export const IndexingContent = () => {
               description={
                 row.error
                   ? row.error
-                  : row.loading
-                    ? "Loading status…"
-                    : row.status?.ready
-                      ? `${row.status.fileCount} files · ${row.status.symbolCount} symbols`
-                      : "Not indexed yet"
+                  : row.rebuilding
+                    ? "Rebuilding index…"
+                    : row.loading
+                      ? "Loading status…"
+                      : row.status?.ready
+                        ? `${row.status.fileCount} files · ${row.status.symbolCount} symbols`
+                        : "Not indexed yet"
               }
               first={i === 0}
+              stacked={row.rebuilding}
             >
-              <div className="flex items-center gap-2">
-                {row.status?.ready ? (
-                  <span className="text-xs text-green">indexed</span>
-                ) : null}
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  isLoading={row.rebuilding}
-                  disabled={row.rebuilding || row.loading}
-                  onClick={() => void handleRebuild(row.cwd)}
-                  aria-label={`Rebuild index for ${row.label}`}
-                >
-                  <RefreshCw className="h-3 w-3" aria-hidden />
-                  Rebuild
-                </Button>
-              </div>
+              {row.rebuilding ? (
+                <div className="flex w-full flex-col gap-2">
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      isLoading
+                      disabled
+                      aria-label={`Rebuild index for ${row.label}`}
+                    >
+                      <RefreshCw className="h-3 w-3" aria-hidden />
+                      Rebuild
+                    </Button>
+                  </div>
+                  <Progress
+                    aria-label={`Rebuilding index for ${row.label}`}
+                    className="h-1"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  {row.status?.ready ? (
+                    <span className="text-xs text-green">indexed</span>
+                  ) : null}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={row.loading}
+                    onClick={() => void handleRebuild(row.cwd)}
+                    aria-label={`Rebuild index for ${row.label}`}
+                  >
+                    <RefreshCw className="h-3 w-3" aria-hidden />
+                    Rebuild
+                  </Button>
+                </div>
+              )}
             </SettingRow>
           ))
         )}

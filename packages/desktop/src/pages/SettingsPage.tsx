@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const PERMISSION_MODE_OPTIONS: Array<{ value: PermissionMode; label: string }> = [
   { value: "default", label: "Ask (default)" },
@@ -83,13 +84,13 @@ const GeneralContent = () => {
   )
 }
 
-/** Appearance section — theme toggle moved here from the sidebar footer
+/** Appearance section — theme tabs moved here from the sidebar footer
  * icon-button (see DESIGN.md Settings). The sidebar's quick-access icon stays as a convenience
  * shortcut; this is now the canonical settings location. Accent color
  * (neutral by default, or a hue / custom hex) lives here too. */
 const AppearanceContent = () => {
   const theme = useAppStore((s) => s.theme)
-  const toggleTheme = useAppStore((s) => s.toggleTheme)
+  const setTheme = useAppStore((s) => s.setTheme)
 
   return (
     <div className="flex flex-col gap-3">
@@ -100,20 +101,23 @@ const AppearanceContent = () => {
           description="Switch between dark and light"
           first
         >
-          <div className="flex items-center gap-2 text-ink-muted">
-            {theme === "dark" ? (
-              <Moon className="h-3.5 w-3.5" aria-hidden />
-            ) : (
-              <Sun className="h-3.5 w-3.5" aria-hidden />
-            )}
-            <Toggle
-              checked={theme === "light"}
-              onChange={() => toggleTheme()}
-              label={
-                theme === "dark" ? "Switch to light theme" : "Switch to dark theme"
-              }
-            />
-          </div>
+          <Tabs
+            value={theme}
+            onValueChange={(value) => {
+              if (value === "dark" || value === "light") setTheme(value)
+            }}
+          >
+            <TabsList aria-label="Color theme" className="h-8">
+              <TabsTrigger value="dark" className="gap-1.5 px-2.5">
+                <Moon className="size-3.5" aria-hidden />
+                Dark
+              </TabsTrigger>
+              <TabsTrigger value="light" className="gap-1.5 px-2.5">
+                <Sun className="size-3.5" aria-hidden />
+                Light
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </SettingRow>
       </SettingsCard>
 
