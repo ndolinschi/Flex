@@ -48,7 +48,7 @@ Composition root: `src/App.tsx`.
 
 | Layer | Role |
 |---|---|
-| `WindowTitleBar` | Custom chrome (`decorations: false`); `--titlebar-height` |
+| `WindowTitleBar` | Custom chrome (`decorations: false`); `--titlebar-height`; drag-region double-click zooms (macOS → fullscreen); native 10px corner clip on macOS |
 | `SessionSidebar` | Agents list; left column (wide) or full overlay (narrow/tight) |
 | `ContentWorkspace` | Header + content panes (chat + tool tabs; optional split) |
 | `ContentPane` | Per-pane tab strip + bodies; `+` / open-to-side |

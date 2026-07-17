@@ -25,10 +25,33 @@ export const toggleMaximizeWindow = async (): Promise<void> => {
   await appWindow().toggleMaximize()
 }
 
+/** Toggle native fullscreen (macOS spaces). Prefer this over maximize on Mac. */
+export const toggleFullscreenWindow = async (): Promise<void> => {
+  const win = appWindow()
+  const fullscreen = await win.isFullscreen()
+  await win.setFullscreen(!fullscreen)
+}
+
+/**
+ * Platform zoom affordance: macOS green / title-bar double-click → fullscreen;
+ * Windows/Linux caption maximize → toggleMaximize.
+ */
+export const toggleZoomWindow = async (): Promise<void> => {
+  if (detectWindowHost() === "macos") {
+    await toggleFullscreenWindow()
+    return
+  }
+  await toggleMaximizeWindow()
+}
+
 export const closeWindow = async (): Promise<void> => {
   await appWindow().close()
 }
 
 export const isWindowMaximized = async (): Promise<boolean> => {
   return appWindow().isMaximized()
+}
+
+export const isWindowFullscreen = async (): Promise<boolean> => {
+  return appWindow().isFullscreen()
 }

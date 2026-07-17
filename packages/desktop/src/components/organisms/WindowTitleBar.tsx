@@ -5,7 +5,7 @@ import {
   CaptionButtons,
   TrafficLights,
 } from "../molecules/WindowControls"
-import { detectWindowHost } from "../../lib/windowChrome"
+import { detectWindowHost, toggleZoomWindow } from "../../lib/windowChrome"
 import { cn } from "../../lib/utils"
 
 type WindowTitleBarProps = {
@@ -63,6 +63,9 @@ export const WindowTitleBar = ({
         className="h-full min-w-[48px] flex-1"
         data-tauri-drag-region
         aria-hidden
+        // Custom chrome has no native title-bar double-click; mirror macOS /
+        // Windows zoom on the drag region (fullscreen on Mac, maximize elsewhere).
+        onDoubleClick={() => void toggleZoomWindow()}
       />
 
       {!isMac ? <CaptionButtons /> : null}
