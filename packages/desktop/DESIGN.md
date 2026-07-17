@@ -254,7 +254,7 @@ FilesChangedCard) sits **outside** the virtual window. Scroll-down FAB:
 1. **TabStrip** — `px-2.5 gap-1.5`, tabs `h-6`
 2. Tab chrome rows — same `px-2.5` / 30px height
 3. Body — `relative flex-1` + absolute tab hosts
-4. Terminal / Database — optional **180px** left list (`px-2.5 py-1.5 text-xs` rows)
+4. Terminal / Database / Components — optional **180px** left list (`px-2.5 py-1.5 text-xs` rows)
 
 | Tab | Header notes |
 |---|---|
@@ -263,6 +263,7 @@ FilesChangedCard) sits **outside** the virtual window. Scroll-down FAB:
 | Pull Request | Title / # / state / checks; Open in browser; DiffView of `gh pr diff` (tab only when branch has a PR) |
 | Files | Open-buffer chips (`Tab` sm) + Monaco / explorer |
 | Terminal | Title + New / List; agent subtitle separate bordered row |
+| Components | Count + List/Refresh; Files-style open chips; bottom mini-prompt + Send |
 | Browser | Toolbar `z-20` over webview slot |
 | Database | Connection count chrome; schema chips `py-1.5` |
 

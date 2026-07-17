@@ -13,6 +13,10 @@ export type ComponentStyleEditPayload = {
   /** CSS selector when a live Design Mode / Browser target is known. */
   targetSelector?: string | null
   propsSummary?: string[]
+  /** Dependent component ids / names discovered from imports. */
+  dependencies?: string[]
+  /** Short source excerpt for the agent (optional). */
+  sourceSnippet?: string | null
   changes: ComponentStyleChange[]
 }
 
@@ -34,13 +38,29 @@ export const formatComponentStyleMarkdown = (
   if (payload.propsSummary && payload.propsSummary.length > 0) {
     lines.push(`- Props: ${payload.propsSummary.join(", ")}`)
   }
-  lines.push("- Changes:")
-  for (const change of payload.changes) {
-    lines.push(`  - ${change.property}: ${change.from || "(unset)"} → ${change.to}`)
+  if (payload.dependencies && payload.dependencies.length > 0) {
+    lines.push(`- Dependencies: ${payload.dependencies.join(", ")}`)
+  }
+  if (payload.changes.length > 0) {
+    lines.push("- Style changes:")
+    for (const change of payload.changes) {
+      lines.push(
+        `  - ${change.property}: ${change.from || "(unset)"} → ${change.to}`,
+      )
+    }
+  } else {
+    lines.push("- Style changes: (none — follow the instruction only)")
+  }
+  if (payload.sourceSnippet?.trim()) {
+    lines.push("")
+    lines.push("### Source excerpt")
+    lines.push("```tsx")
+    lines.push(payload.sourceSnippet.trim())
+    lines.push("```")
   }
   lines.push("")
   lines.push(
-    "Please update the source so these styles apply (CSS module / Tailwind / styled / inline — whichever the component already uses).",
+    "Update the source so the instruction and any style changes apply (CSS module / Tailwind / styled / inline — whichever the component already uses). Prefer editing this component and its listed dependencies only.",
   )
   return lines.join("\n")
 }
@@ -68,6 +88,23 @@ export const parseComponentStyleMessage = (
     sepIndex === -1 ? "" : text.slice(sepIndex + STYLE_EDIT_SEPARATOR.length)
   const editCount = (context.match(/^## Component style edit/gm) ?? []).length
   return { instruction: instruction.trim(), editCount: Math.max(editCount, 1) }
+}
+
+/** Diff baseline vs draft CSS maps into change rows. */
+export const diffStyleDrafts = (
+  baseline: Record<string, string>,
+  draft: Record<string, string>,
+): ComponentStyleChange[] => {
+  const changes: ComponentStyleChange[] = []
+  const keys = new Set([...Object.keys(baseline), ...Object.keys(draft)])
+  for (const property of keys) {
+    const from = baseline[property] ?? ""
+    const to = draft[property] ?? ""
+    if (from.trim() === to.trim()) continue
+    if (!to.trim() && !from.trim()) continue
+    changes.push({ property, from, to })
+  }
+  return changes
 }
 
 /** CSS properties editable in the Components panel (subset aligned with Design Mode). */

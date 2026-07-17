@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  diffStyleDrafts,
   formatComponentStyleMarkdown,
   mergeComponentStyleWithDraft,
   parseComponentStyleMessage,
@@ -14,6 +15,7 @@ const sample = (
   exportName: "Button",
   targetSelector: "button.primary",
   propsSummary: ["label: string", "disabled?: boolean"],
+  dependencies: ["Icon"],
   changes: [
     { property: "background-color", from: "#fff", to: "#1a1a1a" },
     { property: "border-radius", from: "4px", to: "12px" },
@@ -22,13 +24,28 @@ const sample = (
 })
 
 describe("formatComponentStyleMarkdown", () => {
-  it("includes component path and property diffs", () => {
+  it("includes component path, deps, and property diffs", () => {
     const md = formatComponentStyleMarkdown(sample())
     expect(md).toContain("## Component style edit")
     expect(md).toContain("Button (src/components/Button.tsx)")
     expect(md).toContain("background-color: #fff → #1a1a1a")
     expect(md).toContain("border-radius: 4px → 12px")
     expect(md).toContain("button.primary")
+    expect(md).toContain("Dependencies: Icon")
+  })
+})
+
+describe("diffStyleDrafts", () => {
+  it("returns only changed properties", () => {
+    expect(
+      diffStyleDrafts(
+        { color: "red", padding: "4px" },
+        { color: "blue", padding: "4px", margin: "8px" },
+      ),
+    ).toEqual([
+      { property: "color", from: "red", to: "blue" },
+      { property: "margin", from: "", to: "8px" },
+    ])
   })
 })
 
