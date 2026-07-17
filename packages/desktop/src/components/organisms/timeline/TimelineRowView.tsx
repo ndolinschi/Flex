@@ -21,6 +21,7 @@ import { MessageActions } from "./MessageActions"
 import { CheckpointChip } from "./CheckpointChip"
 import { TurnFooter } from "./TurnFooter"
 import type { TurnFooterInfo } from "./buildDisplayItems"
+import { Bubble, BubbleContent } from "@/components/ui/bubble"
 
 export const TimelineRowView = memo(({
   row,
@@ -68,32 +69,40 @@ export const TimelineRowView = memo(({
         displayText.trim() || (style || dom ? displayText : row.text)
       return (
         <div className="group/row ml-auto flex w-fit max-w-full min-w-[150px] flex-col items-stretch">
-          <div
+          <Bubble
+            align="end"
+            variant="outline"
             className={cn(
-              "rounded-[var(--radius-bubble)] border border-stroke-2 bg-user-bubble px-2.5 py-2",
-              "transition-[opacity,background-color,border-color] duration-[var(--duration-fast)]",
-              "hover:border-stroke-1 hover:bg-[color-mix(in_srgb,var(--color-user-bubble)_96%,white)]",
+              "max-w-full min-w-[150px]",
               dimmed ? "opacity-50 hover:opacity-100" : "opacity-100",
             )}
           >
-            {style ? (
-              <span className="mb-1.5 mr-1 inline-flex h-5 items-center gap-1 rounded-[4px] border border-stroke-3 bg-fill-3 px-1 text-sm text-ink-secondary">
-                <Palette className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
-                {style.editCount} style edit{style.editCount > 1 ? "s" : ""}
-              </span>
-            ) : null}
-            {dom ? (
-              <span className="mb-1.5 inline-flex h-5 items-center gap-1 rounded-[4px] border border-stroke-3 bg-fill-3 px-1 text-sm text-ink-secondary">
-                <MousePointer2 className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
-                {dom.elementCount} element{dom.elementCount > 1 ? "s" : ""} selected
-              </span>
-            ) : null}
-            {displayText.trim() ? (
-              <p className="text-base leading-snug text-ink">
-                <MentionText text={displayText} />
-              </p>
-            ) : null}
-          </div>
+            <BubbleContent
+              className={cn(
+                "rounded-[var(--radius-bubble)] border-stroke-2 bg-user-bubble px-2.5 py-2 text-base leading-snug text-ink",
+                "transition-[opacity,background-color,border-color] duration-[var(--duration-fast)]",
+                "hover:border-stroke-1 hover:bg-[color-mix(in_srgb,var(--color-user-bubble)_96%,white)]",
+              )}
+            >
+              {style ? (
+                <span className="mb-1.5 mr-1 inline-flex h-5 items-center gap-1 rounded-[4px] border border-stroke-3 bg-fill-3 px-1 text-sm text-ink-secondary">
+                  <Palette className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
+                  {style.editCount} style edit{style.editCount > 1 ? "s" : ""}
+                </span>
+              ) : null}
+              {dom ? (
+                <span className="mb-1.5 inline-flex h-5 items-center gap-1 rounded-[4px] border border-stroke-3 bg-fill-3 px-1 text-sm text-ink-secondary">
+                  <MousePointer2 className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
+                  {dom.elementCount} element{dom.elementCount > 1 ? "s" : ""} selected
+                </span>
+              ) : null}
+              {displayText.trim() ? (
+                <p className="text-base leading-snug text-ink">
+                  <MentionText text={displayText} />
+                </p>
+              ) : null}
+            </BubbleContent>
+          </Bubble>
           {showActions && !footer ? (
             <MessageActions text={copyText} tsMs={row.tsMs} />
           ) : null}

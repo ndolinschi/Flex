@@ -278,7 +278,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Avatar | yes | `Avatar` atom | Thin wrap + `AvatarFallback` |
 | Badge | yes | `Badge`, `NewBadge`, `VerdictBadge` | Keep tone mapping via variants/`className` |
 | Breadcrumb | yes | `PlanToolbar` crumbs | **PlanToolbar migrated** |
-| Bubble | yes (chat kit) | user/assistant bubbles in timeline | After Message spike |
+| Bubble | yes (chat kit) | user/assistant bubbles in timeline | **User rows migrated** (Flex `bg-user-bubble`); assistant stays ghost/markdown |
 | Button | yes | `Button`, `IconButton`, `SendButton` shell | Drop custom `isLoading` — compose `Spinner` + `disabled` |
 | Button Group | yes | composer toolbar clusters | Optional; `ToggleGroup` covers ModePicker |
 | Calendar | skip | — | No date UX today |
@@ -347,7 +347,7 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | **Done:** ConfirmDialog + auth/bug/MCP dialogs, ToastHost/Sonner, Mode/Isolation/Model/Branch/Project pickers (Popover), PlusMenu+SessionMenu+BrowserOverflow (DropdownMenu), TitleBarMenus (Menubar), ContextMenu (scroll/webview dismiss preserved). |
 | **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | **Done:** FormField→Field; Select; searchable Popovers (incl. ModelMultiSelect); Toggle Group (Files); CommandPalette/SearchModal/OpenTabModal; RadioGroup (QuestionPrompt). **Next:** Combobox (optional), Input Group |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | **Done:** EmptyState, ErrorBanner→Alert; Collapsible sidebar headers; ContentWorkspace Resizable; PlanToolbar Breadcrumb. **Next:** optional Sidebar spike |
-| **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | **Done:** AttachmentChip→Attachment. **Next:** Bubble→Message→Marker *inside* virtual rows; MessageScroller only after measured spike with react-virtual |
+| **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | **Done:** AttachmentChip→Attachment; timeline user rows→Bubble. **Next:** Message→Marker *inside* virtual rows; MessageScroller only after measured spike with react-virtual |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
 
 ### Docs investigation (radix-nova)
