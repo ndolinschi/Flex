@@ -230,7 +230,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 Goal: replace hand-rolled atoms/molecules with [shadcn/ui](https://ui.shadcn.com/docs/components)
 source components, while keeping Atomic Design folders, DESIGN.md density, and the
 existing `data-theme` token system. Agents: load the **shadcn** skill
-(`.claude/skills/shadcn` / `.agents/skills/shadcn`) before adding or rewriting UI.
+(`.claude/skills/shadcn`) before adding or rewriting UI.
 
 ### Non-goals / hard constraints
 
