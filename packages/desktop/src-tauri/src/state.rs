@@ -8,9 +8,9 @@ use std::sync::Arc;
 // import used everywhere else in this struct.
 use std::sync::Mutex as SyncMutex;
 
-use agentloop_sdk::EngineService;
 use agentloop_sdk::providers::copilot::DeviceAuthorization;
 use agentloop_sdk::providers::openai::OpenAiOAuthStart;
+use agentloop_sdk::EngineService;
 use agentloop_session::JsonlStore;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;

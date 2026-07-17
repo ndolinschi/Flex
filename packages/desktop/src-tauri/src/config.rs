@@ -8,7 +8,7 @@ use keyring::Entry;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{DesktopError, DesktopResult};
-use crate::secrets::{SecretStorageMode, SecretsStore, resolve_mode, set_configured_mode};
+use crate::secrets::{resolve_mode, set_configured_mode, SecretStorageMode, SecretsStore};
 
 const SERVICE: &str = "agentloop.desktop";
 /// Keychain account that *used to* hold the legacy single-provider key map
@@ -115,7 +115,7 @@ impl Default for PluginPrefs {
 
 /// Desktop UI prefs for inline (ghost-text) prompt completion — not an engine
 /// plugin. Model is any connected provider (often a small Ollama model).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct InlineCompletionPrefs {
     /// Master switch. Default off until the user configures a model.
@@ -128,17 +128,6 @@ pub struct InlineCompletionPrefs {
     /// User closed the setup modal without connecting — stop auto-prompting.
     #[serde(default)]
     pub setup_dismissed: bool,
-}
-
-impl Default for InlineCompletionPrefs {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            provider_id: None,
-            model_id: None,
-            setup_dismissed: false,
-        }
-    }
 }
 
 /// Strip a redundant `provider/` prefix from a model id (e.g. UI dropdown values).
@@ -155,9 +144,7 @@ pub fn normalize_inline_model_id(provider_id: &str, model_id: &str) -> String {
 impl InlineCompletionPrefs {
     /// True when a provider/model pair is saved (ready to complete).
     pub fn is_configured(&self) -> bool {
-        self.provider_id
-            .as_deref()
-            .is_some_and(|p| !p.is_empty())
+        self.provider_id.as_deref().is_some_and(|p| !p.is_empty())
             && self.model_id.as_deref().is_some_and(|m| !m.is_empty())
     }
 
@@ -1004,10 +991,7 @@ mod tests {
             model_id: Some("ollama/qwen2.5:0.5b".into()),
             setup_dismissed: false,
         };
-        assert_eq!(
-            doubled.model_ref().as_deref(),
-            Some("ollama/qwen2.5:0.5b")
-        );
+        assert_eq!(doubled.model_ref().as_deref(), Some("ollama/qwen2.5:0.5b"));
     }
 
     #[test]

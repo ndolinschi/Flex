@@ -377,6 +377,12 @@ export const createSessionSlice: StateCreator<
   revealPlanPanel: () => {
     const sessionId = get().activeSessionId
     if (!sessionId) return
+    // Opening the Plan surface must un-collapse the legacy right-panel
+    // chrome flag (still persisted / asserted) even though layout now
+    // lives in content panes.
+    if (get().rightPanelCollapsed) {
+      get().setRightPanelCollapsed(false)
+    }
     get().openToolBesideChat(sessionId, "plan")
   },
   setPlanEntries: (sessionId, entries) =>

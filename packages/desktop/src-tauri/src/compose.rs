@@ -12,7 +12,7 @@ use agentloop_sdk::{
 use agentloop_session::JsonlStore;
 use agentloop_workspace::GitWorktrees;
 
-use crate::config::{ProviderConfig, sessions_dir, worktrees_dir};
+use crate::config::{sessions_dir, worktrees_dir, ProviderConfig};
 use crate::error::{DesktopError, DesktopResult};
 
 /// Read every enabled MCP server spec from `~/.config/agentloop/mcp/*.toml`
@@ -325,9 +325,7 @@ pub fn build_service(cfg: &ProviderConfig, store: Arc<JsonlStore>) -> DesktopRes
                         );
                     builder = builder.plugin(plugin);
                 } else {
-                    tracing::warn!(
-                        "learning plugin enabled but home dir unresolved; skipping"
-                    );
+                    tracing::warn!("learning plugin enabled but home dir unresolved; skipping");
                 }
             }
             if cfg.prefs.plugins.verifier {

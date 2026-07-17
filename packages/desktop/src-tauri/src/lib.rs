@@ -364,8 +364,8 @@ pub fn run() {
             browser::browser_set_design_mode,
             browser::browser_apply_style_overrides,
         ])
-        .on_window_event(|window, event| match event {
-            tauri::WindowEvent::CloseRequested { .. } => {
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let state = window.state::<AppState>();
                 crate::terminal::kill_all_terminals(&state);
                 // Reap every background bash process any session started
@@ -387,7 +387,6 @@ pub fn run() {
             // (updated on every `set_bounds`). Do NOT re-apply stored absolute
             // pixels here — that freezes the browser at the pre-resize height
             // and leaves a black gap under the page on macOS.
-            _ => {}
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
