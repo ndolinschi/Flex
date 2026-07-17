@@ -21,7 +21,7 @@ export type {
   ContentTab,
 } from "./types"
 export { sessionScopeKey, sessionHasActivity } from "./types"
-export { persistUiState, restoreUiState } from "./persist"
+export { persistUiState, flushPersistUiState, restoreUiState } from "./persist"
 export type { UiPersisted } from "./persist"
 
 export const useAppStore = create<AppState>()((...a) => ({

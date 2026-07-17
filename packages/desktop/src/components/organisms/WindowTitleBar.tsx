@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { memo, useEffect, useRef, useState } from "react"
 import { Columns2, PanelLeft } from "lucide-react"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { AppMark, TitleBarMenus } from "../molecules/TitleBarMenus"
@@ -30,7 +30,7 @@ type WindowTitleBarProps = {
  * native menu bar instead of in-window menus.
  * Requires an undecorated Tauri window (`decorations: false`).
  */
-export const WindowTitleBar = ({
+const WindowTitleBarImpl = ({
   onOpenCommandPalette,
   onOpenSearch,
   className,
@@ -42,19 +42,22 @@ export const WindowTitleBar = ({
   const isBootstrapped = useAppStore((s) => s.isBootstrapped)
   const route = useAppStore((s) => s.route)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
-  const contentLayout = useAppStore((s) => s.contentLayout)
+  // Narrow selectors — full `contentLayout` changes on every tab switch and
+  // would re-render this chrome (menus + session query) for no reason.
+  const split = useAppStore((s) => s.contentLayout.mode === "split")
   const toggleSplit = useAppStore((s) => s.toggleSplit)
   const viewport = useAppStore((s) => s.viewport)
   const { sessions, renameSession, deleteSession } = useSessions()
   const active = sessions.find((s) => s.id === activeSessionId)
   const title = active ? sessionLabel(active) : "Agent"
-  const split = contentLayout.mode === "split"
   const showChatChrome = isBootstrapped && route !== "welcome"
 
+  const bugOpenRef = useRef(setBugOpen)
+  bugOpenRef.current = setBugOpen
   const { handlers } = useTitleBarActions({
     onOpenCommandPalette,
     onOpenSearch,
-    onOpenBugReport: () => setBugOpen(true),
+    onOpenBugReport: () => bugOpenRef.current(true),
   })
 
   useNativeAppMenu({
@@ -159,3 +162,5 @@ export const WindowTitleBar = ({
     </>
   )
 }
+
+export const WindowTitleBar = memo(WindowTitleBarImpl)

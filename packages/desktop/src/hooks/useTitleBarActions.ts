@@ -1,10 +1,21 @@
+import { useRef } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
 import { openUrl } from "@tauri-apps/plugin-opener"
-import { useSessions } from "./useSessions"
 import { closeWindow } from "../lib/windowChrome"
-import { newAgentCreateInput } from "../lib/sessions"
-import { createSession, toInvokeError } from "../lib/tauri"
+import {
+  findDraftSession,
+  newAgentCreateInput,
+  resolveCreateCwd,
+} from "../lib/sessions"
+import {
+  createSession,
+  resumeSession,
+  toInvokeError,
+} from "../lib/tauri"
+import type { SessionMeta } from "../lib/types"
 import { useAppStore } from "../stores/appStore"
+import { SESSIONS_KEY } from "./useSessions"
 
 const DOCS_URL = "https://github.com/ndolinschi/Flex#readme"
 const ISSUES_URL = "https://github.com/ndolinschi/Flex/issues"
@@ -30,7 +41,11 @@ type UseTitleBarActionsOpts = {
   onOpenBugReport: () => void
 }
 
-/** Shared File/Edit/View/Help actions for in-window menus and the native macOS menu bar. */
+/**
+ * Shared File/Edit/View/Help actions for in-window menus and the native macOS
+ * menu bar. Handlers are referentially stable (refs) so the title bar does not
+ * thrash child menus on every chat/tab switch.
+ */
 export const useTitleBarActions = ({
   onOpenCommandPalette,
   onOpenSearch,
@@ -39,73 +54,124 @@ export const useTitleBarActions = ({
   isBootstrapped: boolean
   handlers: TitleBarActionHandlers
 } => {
-  const { newAgent } = useSessions()
-  const setRoute = useAppStore((s) => s.setRoute)
-  const toggleSidebarCollapsed = useAppStore((s) => s.toggleSidebarCollapsed)
-  const toggleRightPanel = useAppStore((s) => s.toggleRightPanel)
-  const toggleTheme = useAppStore((s) => s.toggleTheme)
-  const pushRecentCwd = useAppStore((s) => s.pushRecentCwd)
-  const pushToast = useAppStore((s) => s.pushToast)
-  const setActiveSessionId = useAppStore((s) => s.setActiveSessionId)
+  const queryClient = useQueryClient()
   const isBootstrapped = useAppStore((s) => s.isBootstrapped)
 
-  const openFolder = async () => {
-    if (!isBootstrapped) return
-    try {
-      const path = await openDialog({ directory: true, multiple: false })
-      if (!path || Array.isArray(path)) return
-      pushRecentCwd(path)
-      const meta = await createSession(newAgentCreateInput(path))
-      setActiveSessionId(meta.id, { panel: "closed" })
-      setRoute("chat")
-    } catch (err) {
-      pushToast(`Could not open folder: ${toInvokeError(err)}`, "error")
-    }
+  const optsRef = useRef({
+    onOpenCommandPalette,
+    onOpenSearch,
+    onOpenBugReport,
+    isBootstrapped,
+  })
+  optsRef.current = {
+    onOpenCommandPalette,
+    onOpenSearch,
+    onOpenBugReport,
+    isBootstrapped,
   }
 
-  return {
-    isBootstrapped,
-    handlers: {
+  const handlersRef = useRef<TitleBarActionHandlers | null>(null)
+  if (!handlersRef.current) {
+    handlersRef.current = {
       newAgent: () => {
-        if (!isBootstrapped) return
-        void newAgent()
+        if (!optsRef.current.isBootstrapped) return
+        void (async () => {
+          const state = useAppStore.getState()
+          const sessions =
+            queryClient.getQueryData<SessionMeta[]>(SESSIONS_KEY) ?? []
+          const cwd = resolveCreateCwd(
+            sessions,
+            state.activeSessionId,
+            state.recentCwds,
+          )
+          const draft = findDraftSession(sessions, cwd)
+          if (draft) {
+            try {
+              await resumeSession(draft.id)
+            } catch {
+              // Still select locally if resume fails (session already warm).
+            }
+            state.setActiveSessionId(draft.id, { panel: "closed" })
+            state.setRoute("chat")
+            return
+          }
+          try {
+            const meta = await createSession(
+              newAgentCreateInput(
+                cwd,
+                state.selectedModelId,
+                state.selectedIsolation,
+              ),
+            )
+            void queryClient.invalidateQueries({ queryKey: SESSIONS_KEY })
+            state.setActiveSessionId(meta.id, { panel: "closed" })
+            state.setRoute("chat")
+          } catch (err) {
+            state.pushToast(
+              `Could not create agent: ${toInvokeError(err)}`,
+              "error",
+            )
+          }
+        })()
       },
       openFolder: () => {
-        void openFolder()
+        void (async () => {
+          if (!optsRef.current.isBootstrapped) return
+          const state = useAppStore.getState()
+          try {
+            const path = await openDialog({ directory: true, multiple: false })
+            if (!path || Array.isArray(path)) return
+            state.pushRecentCwd(path)
+            const meta = await createSession(newAgentCreateInput(path))
+            void queryClient.invalidateQueries({ queryKey: SESSIONS_KEY })
+            state.setActiveSessionId(meta.id, { panel: "closed" })
+            state.setRoute("chat")
+          } catch (err) {
+            state.pushToast(
+              `Could not open folder: ${toInvokeError(err)}`,
+              "error",
+            )
+          }
+        })()
       },
       settings: () => {
-        if (!isBootstrapped) return
-        setRoute("settings")
+        if (!optsRef.current.isBootstrapped) return
+        useAppStore.getState().setRoute("settings")
       },
       quit: () => {
         void closeWindow()
       },
       search: () => {
-        onOpenSearch?.()
+        optsRef.current.onOpenSearch?.()
       },
       commandPalette: () => {
-        onOpenCommandPalette?.()
+        optsRef.current.onOpenCommandPalette?.()
       },
       toggleSidebar: () => {
-        if (!isBootstrapped) return
-        toggleSidebarCollapsed()
+        if (!optsRef.current.isBootstrapped) return
+        useAppStore.getState().toggleSidebarCollapsed()
       },
       togglePanel: () => {
-        if (!isBootstrapped) return
-        toggleRightPanel()
+        if (!optsRef.current.isBootstrapped) return
+        useAppStore.getState().toggleRightPanel()
       },
       toggleTheme: () => {
-        toggleTheme()
+        useAppStore.getState().toggleTheme()
       },
       docs: () => {
         void openUrl(DOCS_URL).catch(() => undefined)
       },
       submitBug: () => {
-        onOpenBugReport()
+        optsRef.current.onOpenBugReport()
       },
       issues: () => {
         void openUrl(ISSUES_URL).catch(() => undefined)
       },
-    },
+    }
+  }
+
+  return {
+    isBootstrapped,
+    handlers: handlersRef.current,
   }
 }

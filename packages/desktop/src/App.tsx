@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { listen } from "@tauri-apps/api/event"
 import { useBootstrap } from "./hooks/useBootstrap"
@@ -247,10 +247,13 @@ const AppRoutes = () => {
   useBootstrap(setRoute, setTheme)
   useUpdaterCheck(isBootstrapped && route !== "welcome")
 
+  const openCommandPalette = useCallback(() => setCommandPaletteOpen(true), [])
+  const openSearch = useCallback(() => setSearchModalOpen(true), [])
+
   const titleBar = (
     <WindowTitleBar
-      onOpenCommandPalette={() => setCommandPaletteOpen(true)}
-      onOpenSearch={() => setSearchModalOpen(true)}
+      onOpenCommandPalette={openCommandPalette}
+      onOpenSearch={openSearch}
     />
   )
 
