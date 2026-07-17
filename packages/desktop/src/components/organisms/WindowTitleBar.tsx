@@ -63,8 +63,15 @@ export const WindowTitleBar = ({
         className="h-full min-w-[48px] flex-1"
         data-tauri-drag-region
         aria-hidden
-        // Custom chrome has no native title-bar double-click; mirror macOS /
-        // Windows zoom on the drag region (fullscreen on Mac, maximize elsewhere).
+        // Custom chrome has no native title-bar double-click. Prefer
+        // mousedown `detail === 2` because `data-tauri-drag-region` can
+        // swallow the second click before `onDoubleClick` fires.
+        onMouseDown={(e) => {
+          if (e.button === 0 && e.detail === 2) {
+            e.preventDefault()
+            void toggleZoomWindow()
+          }
+        }}
         onDoubleClick={() => void toggleZoomWindow()}
       />
 
