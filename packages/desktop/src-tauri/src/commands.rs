@@ -12,9 +12,9 @@ use agentloop_contracts::{
     SessionMetaPatch, TurnOptions, TurnSummary,
 };
 use agentloop_core::{BackgroundEntrySummary, ChatRequest, ProviderStreamEvent, WorkspaceStatus};
-use agentloop_sdk::EngineService;
 use agentloop_sdk::mcp::McpToolClient;
-use agentloop_sdk::routines::{FileRoutineStore, RoutineRunner, default_routines_dir};
+use agentloop_sdk::routines::{default_routines_dir, FileRoutineStore, RoutineRunner};
+use agentloop_sdk::EngineService;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
@@ -22,9 +22,9 @@ use tokio_util::sync::CancellationToken;
 
 use crate::compose::build_service;
 use crate::config::{
-    InlineCompletionPrefs, ProviderConfig, ProviderConfigView, ProviderProfile,
-    ProviderProfileInput, ProviderProfileView, SaveProviderConfigInput, normalize_inline_model_id,
-    persist_config,
+    normalize_inline_model_id, persist_config, InlineCompletionPrefs, ProviderConfig,
+    ProviderConfigView, ProviderProfile, ProviderProfileInput, ProviderProfileView,
+    SaveProviderConfigInput,
 };
 use crate::error::{DesktopError, DesktopResult};
 use crate::secrets::SecretStorageMode;
@@ -458,8 +458,7 @@ fn provider_credentials_present(cfg: &ProviderConfig, provider_id: &str) -> bool
     if provider_id == "ollama" {
         return true;
     }
-    if provider_id == "copilot"
-        && agentloop_sdk::providers::copilot::CopilotConfig::discoverable()
+    if provider_id == "copilot" && agentloop_sdk::providers::copilot::CopilotConfig::discoverable()
     {
         return true;
     }
@@ -474,9 +473,10 @@ fn provider_credentials_present(cfg: &ProviderConfig, provider_id: &str) -> bool
             return true;
         }
     }
-    cfg.prefs.profiles.iter().any(|p| {
-        p.provider == provider_id && cfg.profile_keys.contains_key(&p.id)
-    })
+    cfg.prefs
+        .profiles
+        .iter()
+        .any(|p| p.provider == provider_id && cfg.profile_keys.contains_key(&p.id))
 }
 
 fn apply_save_input(
@@ -866,9 +866,7 @@ pub async fn save_inline_completion_prefs(
     state: State<'_, AppState>,
     mut prefs: InlineCompletionPrefs,
 ) -> DesktopResult<InlineCompletionPrefs> {
-    if let (Some(provider_id), Some(model_id)) =
-        (&prefs.provider_id, &mut prefs.model_id)
-    {
+    if let (Some(provider_id), Some(model_id)) = (&prefs.provider_id, &mut prefs.model_id) {
         *model_id = normalize_inline_model_id(provider_id, model_id);
     }
     let mut cfg = state.config.lock().await.clone();
@@ -943,7 +941,7 @@ pub async fn check_inline_completion_connection(
     input: CheckInlineCompletionInput,
 ) -> DesktopResult<CheckInlineCompletionResult> {
     let provider_id = input.provider_id.trim().to_string();
-    let model_id = normalize_inline_model_id(&provider_id, &input.model_id.trim());
+    let model_id = normalize_inline_model_id(&provider_id, input.model_id.trim());
     if provider_id.is_empty() || model_id.is_empty() {
         return Ok(CheckInlineCompletionResult {
             ok: false,
@@ -988,8 +986,9 @@ pub async fn check_inline_completion_connection(
             respawn_cron_loop(&state).await;
             Ok(CheckInlineCompletionResult {
                 ok: false,
-                message: "Connected, but the model returned an empty completion — try another model."
-                    .into(),
+                message:
+                    "Connected, but the model returned an empty completion — try another model."
+                        .into(),
                 sample: None,
             })
         }
@@ -1082,11 +1081,7 @@ fn sanitize_inline_completion(raw: &str) -> String {
     let mut t = raw.trim().to_string();
     if t.starts_with("```") {
         // Drop opening fence line (` ``` ` or ` ```lang `), then closing fence.
-        let after_fence = t
-            .find('\n')
-            .map(|i| &t[i + 1..])
-            .unwrap_or("")
-            .to_string();
+        let after_fence = t.find('\n').map(|i| &t[i + 1..]).unwrap_or("").to_string();
         t = after_fence
             .rsplit_once("```")
             .map(|(before, _)| before.trim().to_string())
@@ -1198,14 +1193,10 @@ pub async fn review_prompt(
         and only ask new questions when still blocked."
         .to_string();
 
-    let mut user_body = format!(
-        "Critique this agent prompt:\n\n----- PROMPT -----\n{truncated}\n----- END -----"
-    );
+    let mut user_body =
+        format!("Critique this agent prompt:\n\n----- PROMPT -----\n{truncated}\n----- END -----");
     if let Some(ans) = answers.as_ref() {
-        let answered: Vec<_> = ans
-            .iter()
-            .filter(|a| !a.answer.trim().is_empty())
-            .collect();
+        let answered: Vec<_> = ans.iter().filter(|a| !a.answer.trim().is_empty()).collect();
         if !answered.is_empty() {
             user_body.push_str("\n\n----- ANSWERS TO YOUR QUESTIONS -----\n");
             for a in answered {
@@ -1236,9 +1227,8 @@ pub async fn review_prompt(
         }
     }
 
-    let json_slice = extract_json_object(&raw).ok_or_else(|| {
-        DesktopError::Message("prompt review returned no JSON".into())
-    })?;
+    let json_slice = extract_json_object(&raw)
+        .ok_or_else(|| DesktopError::Message("prompt review returned no JSON".into()))?;
     let parsed: PromptReviewModelPayload = serde_json::from_str(json_slice)
         .map_err(|e| DesktopError::Message(format!("prompt review JSON parse: {e}")))?;
 
@@ -2027,7 +2017,7 @@ pub async fn copilot_auth_wait(
     state: State<'_, AppState>,
     session_id: String,
 ) -> DesktopResult<CopilotAuthStatus> {
-    use agentloop_sdk::providers::copilot::{DeviceFlow, store_github_token};
+    use agentloop_sdk::providers::copilot::{store_github_token, DeviceFlow};
 
     let session_id = session_id.trim().to_owned();
     let (auth, cancel) = {
@@ -2101,7 +2091,7 @@ pub async fn chatgpt_auth_status() -> DesktopResult<ChatgptAuthStatus> {
 #[tauri::command]
 pub async fn chatgpt_auth_start(state: State<'_, AppState>) -> DesktopResult<ChatgptAuthStart> {
     use crate::state::PendingChatgptAuth;
-    use agentloop_sdk::providers::openai::{OpenAiOAuthMethod, start_oauth};
+    use agentloop_sdk::providers::openai::{start_oauth, OpenAiOAuthMethod};
 
     let started = start_oauth(OpenAiOAuthMethod::Headless)
         .await
@@ -4076,10 +4066,8 @@ pub fn list_dir_children(cwd: String, relative_dir: String) -> Vec<FileHit> {
     if rel.contains("..") {
         return Vec::new();
     }
-    if !rel.is_empty() {
-        if let Err(_) = validate_repo_relative_path(&rel) {
-            return Vec::new();
-        }
+    if !rel.is_empty() && validate_repo_relative_path(&rel).is_err() {
+        return Vec::new();
     }
 
     let dir = if rel.is_empty() {

@@ -568,6 +568,60 @@ export const dbMentionTables = (
 ): Promise<DbMentionHit[]> =>
   invoke("db_mention_tables", { query, projectKey })
 
+export type ComponentsDetectResult = {
+  isReact: boolean
+  reason: string
+  packageName: string | null
+}
+
+export type ComponentNode = {
+  id: string
+  name: string
+  file: string
+  exportName: string
+  children: string[]
+}
+
+export type ComponentsListResult = {
+  isReact: boolean
+  components: ComponentNode[]
+  roots: string[]
+}
+
+export type ComponentPropSummary = {
+  name: string
+  optional: boolean
+  typeHint: string | null
+}
+
+export type ComponentDetail = {
+  id: string
+  name: string
+  file: string
+  exportName: string
+  props: ComponentPropSummary[]
+  sourceSnippet: string
+  children: string[]
+}
+
+export const componentsDetect = (
+  cwd: string,
+): Promise<ComponentsDetectResult> => invoke("components_detect", { cwd })
+
+export const componentsList = (cwd: string): Promise<ComponentsListResult> =>
+  invoke("components_list", { cwd })
+
+export const componentsDetail = (
+  cwd: string,
+  id: string,
+): Promise<ComponentDetail> => invoke("components_detail", { cwd, id })
+
+/** Apply temporary CSS overrides to a selector in the embedded browser. */
+export const browserApplyStyleOverrides = (
+  selector: string,
+  styles: Record<string, string>,
+): Promise<void> => invoke("browser_apply_style_overrides", { selector, styles })
+
 export const isIsolated = (sessionId: string): Promise<boolean> =>
   invoke("is_isolated", { sessionId })
 

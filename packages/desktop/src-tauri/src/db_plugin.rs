@@ -158,7 +158,7 @@ pub async fn db_list_connections(
         .filter(|s| matches_project(s, &key))
         .cloned()
         .collect();
-    list.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    list.sort_by_key(|a| a.name.to_lowercase());
     Ok(list)
 }
 
@@ -174,7 +174,9 @@ pub async fn db_upsert_connection(
         return Err(DesktopError::Message("connection name is required".into()));
     }
     if target.is_empty() {
-        return Err(DesktopError::Message("connection target is required".into()));
+        return Err(DesktopError::Message(
+            "connection target is required".into(),
+        ));
     }
     let project_key = normalize_project_key(&spec.project_key);
     if project_key.is_empty() {
@@ -212,7 +214,12 @@ pub async fn db_remove_connection(state: State<'_, AppState>, id: String) -> Des
         .unwrap_or_default();
     guard.specs.remove(&id);
     guard.live.remove(&id);
-    if guard.active_by_project.get(&project_key).map(String::as_str) == Some(id.as_str()) {
+    if guard
+        .active_by_project
+        .get(&project_key)
+        .map(String::as_str)
+        == Some(id.as_str())
+    {
         guard.active_by_project.remove(&project_key);
     }
     guard.save();
@@ -221,10 +228,7 @@ pub async fn db_remove_connection(state: State<'_, AppState>, id: String) -> Des
 
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip_all, err)]
-pub async fn db_connect(
-    state: State<'_, AppState>,
-    id: String,
-) -> DesktopResult<DbConnectionSpec> {
+pub async fn db_connect(state: State<'_, AppState>, id: String) -> DesktopResult<DbConnectionSpec> {
     let spec = {
         let guard = db_state(&state).lock().await;
         guard
@@ -254,9 +258,7 @@ pub async fn db_connect(
     let mut guard = db_state(&state).lock().await;
     guard.live.insert(id.clone(), live);
     if !spec.project_key.is_empty() {
-        guard
-            .active_by_project
-            .insert(spec.project_key.clone(), id);
+        guard.active_by_project.insert(spec.project_key.clone(), id);
     }
     Ok(spec)
 }
@@ -271,7 +273,12 @@ pub async fn db_disconnect(state: State<'_, AppState>, id: String) -> DesktopRes
         .map(|s| s.project_key.clone())
         .unwrap_or_default();
     guard.live.remove(&id);
-    if guard.active_by_project.get(&project_key).map(String::as_str) == Some(id.as_str()) {
+    if guard
+        .active_by_project
+        .get(&project_key)
+        .map(String::as_str)
+        == Some(id.as_str())
+    {
         guard.active_by_project.remove(&project_key);
     }
     Ok(())
@@ -573,7 +580,11 @@ fn run_sqlite_query(path: &PathBuf, sql: &str) -> DesktopResult<DbQueryResult> {
     let mut stmt = conn
         .prepare(sql)
         .map_err(|e| DesktopError::Message(format!("sqlite prepare failed: {e}")))?;
-    let columns: Vec<String> = stmt.column_names().iter().map(|s| (*s).to_string()).collect();
+    let columns: Vec<String> = stmt
+        .column_names()
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect();
     let col_count = columns.len();
     let mut rows_out: Vec<Vec<serde_json::Value>> = Vec::new();
     let mut truncated = false;

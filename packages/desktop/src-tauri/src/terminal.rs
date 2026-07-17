@@ -376,10 +376,7 @@ mod tests {
             collapse_extra_backslashes(r"C:\\Users\\foo"),
             r"C:\Users\foo"
         );
-        assert_eq!(
-            collapse_extra_backslashes(r"C:\Users\foo"),
-            r"C:\Users\foo"
-        );
+        assert_eq!(collapse_extra_backslashes(r"C:\Users\foo"), r"C:\Users\foo");
     }
 
     #[test]
@@ -407,10 +404,7 @@ mod tests {
 
     #[test]
     fn collapse_extra_backslashes_leaves_forward_slashes() {
-        assert_eq!(
-            collapse_extra_backslashes(r"C:/Users/foo"),
-            r"C:/Users/foo"
-        );
+        assert_eq!(collapse_extra_backslashes(r"C:/Users/foo"), r"C:/Users/foo");
     }
 
     #[test]

@@ -14,6 +14,7 @@ import {
   isRightPanelTabEnabled,
   MEMORY_TAB_ENABLED,
   DATABASE_TAB_ENABLED,
+  COMPONENTS_TAB_ENABLED,
 } from "../../../lib/featureFlags"
 import { pluginRightPanelTabs } from "../../../plugins/registry"
 import type { RightPanelTab } from "../../../stores/appStore"
@@ -75,4 +76,9 @@ export const visibleRightPanelTabs = (opts?: {
   return [...builtins, ...pluginOnly]
 }
 
-export { isRightPanelTabEnabled, MEMORY_TAB_ENABLED, DATABASE_TAB_ENABLED }
+export {
+  isRightPanelTabEnabled,
+  MEMORY_TAB_ENABLED,
+  DATABASE_TAB_ENABLED,
+  COMPONENTS_TAB_ENABLED,
+}

@@ -1,9 +1,11 @@
-import { Database } from "lucide-react"
+import { Boxes, Database } from "lucide-react"
 import { DatabaseTab } from "./database/DatabaseTab"
+import { ComponentsTab } from "./components/ComponentsTab"
 import { searchDatabaseMentions } from "./database/mentions"
 import { searchMcpMentions } from "./mcp/mentions"
 import { registerUiPlugin } from "./registry"
 import {
+  COMPONENTS_TAB_ENABLED,
   DATABASE_TAB_ENABLED,
   INLINE_COMPLETION_ENABLED,
 } from "../lib/featureFlags"
@@ -27,6 +29,21 @@ export const registerBuiltinUiPlugins = (): void => {
       {
         id: "database-tables",
         search: searchDatabaseMentions,
+      },
+    ],
+  })
+
+  registerUiPlugin({
+    id: "components",
+    tabs: [
+      {
+        id: "components",
+        label: "Components",
+        icon: Boxes,
+        enabled: COMPONENTS_TAB_ENABLED,
+        render: ({ active, session }) => (
+          <ComponentsTab active={active} session={session} />
+        ),
       },
     ],
   })

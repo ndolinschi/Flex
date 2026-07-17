@@ -9,8 +9,10 @@ import {
 } from "../lib/tauri"
 import { isBrowserPreview } from "../lib/browserPreview"
 import { mergeDomContextWithDraft } from "../lib/browserDesign"
+import { mergeComponentStyleWithDraft } from "../lib/componentDesign"
 import {
   effortLabel,
+  isComponentStyleAttachment,
   isDefaultSessionTitle,
   isDomAttachment,
   isFileAttachment,
@@ -276,8 +278,13 @@ export const useComposerSend = ({
         mode === "agent" && !!store.sessionBypassBySession[activeSessionId]
 
       const domPending = pending.filter(isDomAttachment)
+      const stylePending = pending.filter(isComponentStyleAttachment)
       const filePending = pending.filter(isFileAttachment)
       let sendText = mergeDomContextWithDraft(text, domPending)
+      sendText = mergeComponentStyleWithDraft(
+        sendText,
+        stylePending.map((a) => a.payload),
+      )
 
       // Cursor Design Mode sends identity + a viewport screenshot. Best-effort:
       // screenshot failures must not block the text/DOM context send.
