@@ -305,7 +305,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Native Select | yes | `ModelSelect` | Settings simple selects |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
 | Pagination | later | DatabaseTab paging | |
-| Popover | yes | `PopoverTray`, comment/plan popovers | Shared Esc/outside-click |
+| Popover | yes | `PopoverTray`, comment/plan popovers | **ModePicker migrated** to Popover; other trays still on `PopoverTray` |
 | Progress | later | indexing / update UX | Soft need |
 | Radio Group | yes | `QuestionPrompt` choices | |
 | Resizable | yes | content split sash | `ContentWorkspace` dual pane |
