@@ -1106,9 +1106,12 @@ pub async fn browser_open_devtools(state: State<'_, AppState>) -> DesktopResult<
                 if delay > 0 {
                     std::thread::sleep(std::time::Duration::from_millis(delay));
                 }
-                let detached = std::sync::atomic::AtomicBool::new(false);
-                let _ = webview.with_webview(|platform| {
-                    detached.store(
+                // with_webview requires a 'static Send closure, so share the
+                // flag via Arc rather than borrowing a stack AtomicBool.
+                let detached = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+                let detached_flag = std::sync::Arc::clone(&detached);
+                let _ = webview.with_webview(move |platform| {
+                    detached_flag.store(
                         detach_macos_inspector(platform.inner()),
                         std::sync::atomic::Ordering::Relaxed,
                     );
