@@ -1,24 +1,26 @@
 import { forwardRef, type ReactNode } from "react"
-import { cn } from "../../lib/utils"
+import { ScrollArea as UiScrollArea } from "@/components/ui/scroll-area"
+import { cn } from "@/lib/utils"
 
 type ScrollAreaProps = {
   children: ReactNode
   className?: string
 }
 
+/** Thin wrap over shadcn ScrollArea (Radix viewport + scrollbar). */
 export const ScrollArea = forwardRef<HTMLDivElement, ScrollAreaProps>(
   ({ children, className }, ref) => {
     return (
-      <div
+      <UiScrollArea
         ref={ref}
         className={cn(
-          "min-h-0 overflow-y-auto overscroll-contain",
+          "min-h-0 overscroll-contain",
           "[scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent]",
           className,
         )}
       >
         {children}
-      </div>
+      </UiScrollArea>
     )
   },
 )

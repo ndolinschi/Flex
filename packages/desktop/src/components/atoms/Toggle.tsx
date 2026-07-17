@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes } from "react"
-import { cn } from "../../lib/utils"
+import { Switch } from "@/components/ui/switch"
+import { cn } from "@/lib/utils"
 
 type ToggleProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onChange"> & {
   checked: boolean
@@ -8,9 +9,7 @@ type ToggleProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onChange"> & {
   small?: boolean
 }
 
-/** Settings switch (see DESIGN.md Settings). Track
- * 30x18 / radius 9, knob 14x14 inset 2px, .2s ease on both — ON is GREEN
- * (`--color-switch-on`), not the accent blue used elsewhere in the app. */
+/** Settings switch — shadcn Switch with green ON track (`--color-switch-on`). */
 export const Toggle = ({
   checked,
   onChange,
@@ -21,36 +20,19 @@ export const Toggle = ({
   ...props
 }: ToggleProps) => {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
+    <Switch
+      checked={checked}
+      onCheckedChange={onChange}
+      disabled={disabled}
+      size={small ? "sm" : "default"}
       aria-label={label}
       title={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
       className={cn(
-        "relative inline-flex shrink-0 items-center rounded-full transition-colors duration-[0.2s] ease-[ease]",
-        small ? "h-3.5 w-6" : "h-[18px] w-[30px]",
-        checked ? "bg-switch-on" : "bg-fill-2",
+        "data-checked:bg-switch-on data-unchecked:bg-fill-2",
         checked && "shadow-[0_0_0_1px_var(--color-border)]",
-        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
         className,
       )}
       {...props}
-    >
-      <span
-        aria-hidden
-        className={cn(
-          "absolute rounded-full bg-white transition-transform duration-[0.2s] ease-[ease]",
-          small ? "left-0.5 h-2.5 w-2.5" : "left-0.5 h-3.5 w-3.5",
-          checked
-            ? small
-              ? "translate-x-2.5"
-              : "translate-x-3"
-            : "translate-x-0",
-        )}
-      />
-    </button>
+    />
   )
 }
