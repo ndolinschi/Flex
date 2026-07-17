@@ -15,6 +15,13 @@ import {
   ShieldCheck,
 } from "@/components/icons"
 import { IconButton, Tooltip } from "../../atoms"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { AtMentionTray } from "../composer/AtMentionTray"
 import { SlashCommandTray } from "../composer/SlashCommandTray"
 import { useComposerAutocomplete } from "../../../hooks/useComposerAutocomplete"
@@ -312,36 +319,32 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
         <span className="shrink-0 text-xs text-ink-muted [font-variant-numeric:tabular-nums]">
           {chars.toLocaleString()} · ~{tokens.toLocaleString()} tok
         </span>
-        <div className="relative">
-          <IconButton
-            label="Insert section"
-            quiet
-            className="h-6 w-6"
-            onClick={() => setInsertOpen((v) => !v)}
+        <DropdownMenu open={insertOpen} onOpenChange={setInsertOpen}>
+          <DropdownMenuTrigger asChild>
+            <IconButton label="Insert section" quiet className="h-6 w-6">
+              <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+            </IconButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            sideOffset={4}
+            className="w-44 min-w-44 rounded-md border-0 bg-panel p-0 shadow-[var(--shadow-popover)] ring-0"
           >
-            <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-          </IconButton>
-          {insertOpen ? (
-            <div
-              className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md bg-panel shadow-[var(--shadow-popover)]"
-              data-popover-outside-ignore
-            >
+            <DropdownMenuGroup className="py-0.5">
               {PROMPT_SECTION_TEMPLATES.map((t) => (
-                <button
+                <DropdownMenuItem
                   key={t.id}
-                  type="button"
-                  className="flex w-full px-2.5 py-1.5 text-left text-xs text-ink-secondary hover:bg-fill-4 hover:text-ink"
-                  onClick={() => {
+                  className="px-2.5 py-1.5 text-xs"
+                  onSelect={() => {
                     setDraft(appendPromptSection(draft, t.markdown))
-                    setInsertOpen(false)
                   }}
                 >
                   {t.label}
-                </button>
+                </DropdownMenuItem>
               ))}
-            </div>
-          ) : null}
-        </div>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
         {annotations.length > 0 ? (
           <Tooltip label={showMarks ? "Edit text (@ /)" : "Show highlighted marks"}>
             <IconButton

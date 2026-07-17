@@ -26,7 +26,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `Divider` | Horizontal rule | `label?` | SettingsShell |
 | `HighlightedLabel` | Fuzzy-match accent spans in a label | `label`, `query` | FuzzySessionRow |
 | `Skeleton` | Placeholder shimmer | `className` | SessionSidebar, TurnTimeline |
-| `ScrollArea` | Scrollable region | `children`, `className` | SessionSidebar, TurnTimeline |
+| `ScrollArea` | Scrollable region | `children`, `className` | SessionSidebar, overlays (not virtualized timeline) |
 | `ProviderIcon` | Brand mark from `public/providers/{id}.{svg,png,webp}` (letter fallback); omitted from model pickers until assets are reliable | `providerId`, `size?` | ProviderPicker, Welcome, Connections |
 
 ## Molecules
@@ -35,8 +35,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 |---|---|---|---|
 | `AccentColorPicker` | Appearance accent swatches + custom hex/color input | — | Settings Appearance |
 | `FormField` | Label + control + hint/error | `label`, `htmlFor`, `error?`, `hint?` | ProviderSettingsForm |
-| `CommandPaletteRow` | Palette list row (icon + label + hint) | `index`, `active`, `label`, `hint?`, `icon?`, `onActivate`, `onHover` | CommandPalette |
-| `FuzzySessionRow` | Search-modal session row with highlight + relative time | `index`, `active`, `label`, `query`, `updatedAtMs`, `onActivate`, `onHover` | SearchModal |
+| `CommandPaletteRow` | *(legacy)* Palette list row — unused after Command* migration; prefer CommandItem | `index`, `active`, `label`, `hint?`, `icon?`, `onActivate`, `onHover` | — |
+| `FuzzySessionRow` | *(legacy)* Search-modal session row — unused after CommandDialog migration | `index`, `active`, `label`, `query`, `updatedAtMs`, `onActivate`, `onHover` | — |
 | `ProviderProfileList` | Connections list (select / activate / delete) | `profiles`, `editingId`, `onSelect`, … | ProviderSettingsForm |
 | `ProviderConnectionForm` | Connection create/edit form + models + isolation; Copilot/ChatGPT branches use OAuth sign-in | form field props + `onValidate` / `onSave` / `onCopilotSignIn?` / `onChatgptSignIn?` | ProviderSettingsForm |
 | `ProviderPicker` | Icon tile grid for choosing a builtin provider | `providers`, `value`, `onChange` | WelcomePage, ProviderConnectionForm |
@@ -66,7 +66,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `BranchPicker` | List/checkout branches (shadcn Combobox); PR # + checks when present | `cwd`, `onError?` | ContextBar |
 | `BranchPrStatusChip` | Current-branch PR # + title + CI summary; opens PR in browser | `pr` | ChangesTab header |
 | `CreatePrDialog` | Editable title/body modal before `gh pr create` | `open`, `initialTitle?`, `initialBody?`, `onConfirm` | ChangesTab, CommitCenter, CommitBar |
-| `PopoverTray` | Shared tray helpers (`PopoverItem`/`PopoverSearch`/`PopoverSection`); absolute tray kept for rare non-portal cases | `open`, `onClose`, `placement`, `children` | Mode/Isolation list rows; slash/@ use ComposerSuggestionPopover |
+| `PopoverItem` | Shared selectable row for Popover / effort menus | `active?`, `onClick`, `children` | Mode/Isolation pickers, ModelPicker effort, slash/@ trays |
 | `ContextMenu` | Portal menu; ignores timeline scroll + webview-induced `window.blur` so it stays open mid-stream | `position`, `items`, `onClose` | ContentPane `+`, SessionListItem, FileExplorer, PlanToolbar |
 | `ConfirmDialog` | In-app modal: AlertDialog for pure confirms, Dialog when hosting fields | `open`, `title`, `onConfirm`, `onCancel`, `confirmDisabled?` | SessionMenu, CreatePrDialog |
 | `AttachmentChip` | Pending attachment pill (file/image/directory/dom) | `attachment`, `onRemove` | Composer |
@@ -278,7 +278,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Avatar | yes | `Avatar` atom | Thin wrap + `AvatarFallback` |
 | Badge | yes | `Badge`, `NewBadge`, `VerdictBadge` | Badge + NewBadge wrap; VerdictBadge stays expandable status (not a chip) |
 | Breadcrumb | yes | `PlanToolbar` crumbs | **PlanToolbar migrated** |
-| Bubble | yes (chat kit) | user/assistant bubbles in timeline | **User rows migrated** (Flex `bg-user-bubble`); assistant stays ghost/markdown |
+| Bubble | yes (chat kit) | user bubbles in timeline | **User rows migrated** (Flex `bg-user-bubble`); assistant stays Message ghost/markdown (no Bubble) |
 | Button | yes | `Button`, `IconButton`, `SendButton` shell | **SendButton** composes Button; drop custom `isLoading` at call sites over time |
 | Button Group | yes | CommitCenter split chrome | **CommitCenter** uses `ButtonGroup` + DropdownMenu chevron |
 | Calendar | skip | — | No date UX today |
@@ -295,19 +295,19 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Dialog | yes | `ConfirmDialog` (forms), auth/PR/bug/MCP dialogs | **ConfirmDialog forms**, Copilot/ChatGPT sign-in, BugReport, McpInstall migrated |
 | Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
 | Drawer | maybe | `SubagentViewer` (bottom overlay) | Spike vs keep custom (Vaul + virtualized timeline) |
-| Dropdown Menu | yes | `SessionMenu`, `PlusMenu`, overflow menus, workers, commit options | **PlusMenu, SessionMenu, BrowserOverflow, WorkingAgentsPill, CommitCenter** migrated |
+| Dropdown Menu | yes | `SessionMenu`, `PlusMenu`, overflow, workers, commit, prompt insert | **PlusMenu, SessionMenu, BrowserOverflow (+webview suppress), WorkingAgentsPill, CommitCenter, PromptTab insert** |
 | Empty | yes | `EmptyState` | **EmptyState migrated** |
 | Field | yes | `FormField` + settings forms | **FormField migrated** (`Field`/`FieldLabel`/`FieldError`) |
 | Hover Card | later | — | Optional enrichment on chips |
 | Input | yes | `TextInput` | Alias export during cutover |
-| Input Group | yes | composer / search fields with addons | **PopoverSearch, SettingsNav, FileExplorer** wired |
+| Input Group | yes | composer / search fields with addons | **SettingsNav, FileExplorer, Combobox** wired |
 | Input OTP | skip | — | OAuth shows codes; users don’t type OTP |
 | Item | later | sidebar / palette rows | Only if it simplifies without fighting density |
 | Kbd | yes | `Kbd` atom | **done** |
 | Label | yes | `Label` atom | Prefer `FieldLabel` inside forms |
 | Marker | yes (chat kit) | `CompactionCard` / `IndexingCard` dividers | **IndexingCard** (separator) + **CompactionCard** (border) migrated |
 | Menubar | yes | `TitleBarMenus` | **TitleBarMenus migrated** |
-| Message | yes (chat kit) | timeline message rows | **User + assistant rows** compose Message + Bubble; keep MessageActions |
+| Message | yes (chat kit) | timeline message rows | **User** Message+Bubble; **assistant** Message only; keep MessageActions |
 | Message Scroller | spike | `TurnTimeline` + `useStickToBottom` | **Do not swap blindly** — compose *with* `@tanstack/react-virtual` |
 | Native Select | later | simple settings enums | Prefer Select/Combobox; ModelSelect is Combobox |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
@@ -332,7 +332,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Toast | n/a | — | Use **Sonner**, not legacy Toast component |
 | Toggle | careful | pressed toolbar buttons | Name clash: Flex `Toggle` = Switch (done); use Toggle Group for Code/Eye |
 | Toggle Group | yes | Files Code/Eye, filter chips | **Files markdown Eye/Code migrated**; **Not** ModePicker |
-| Tooltip | yes | `Tooltip` atom | **Migrated** — App `TooltipProvider` + scroll dismiss (timeline/programmatic ignored) |
+| Tooltip | yes | `Tooltip` atom + UsageRing | **Migrated** — App `TooltipProvider` + scroll dismiss; **UsageRing** rich tooltip |
 | Typography | selective | prose in settings / empty states | Do not replace `MarkdownBody` |
 
 Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,

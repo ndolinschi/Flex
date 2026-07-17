@@ -39,12 +39,7 @@ export type { PlanCommentDraft } from "./PlanCommentPopover"
 export { PlanList } from "./PlanList"
 export { PlanToolbar } from "./PlanToolbar"
 export type { PlanBuildStatus } from "./PlanToolbar"
-export {
-  PopoverItem,
-  PopoverSearch,
-  PopoverSection,
-  PopoverTray,
-} from "./PopoverTray"
+export { PopoverItem } from "./PopoverTray"
 export { OpenTabModal } from "./OpenTabModal"
 export { PermissionActions } from "./PermissionActions"
 export { PlusMenu } from "./PlusMenu"

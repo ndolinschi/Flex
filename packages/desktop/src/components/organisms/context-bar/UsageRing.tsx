@@ -1,6 +1,12 @@
 import { useAppStore } from "../../../stores/appStore"
 import { useModels } from "../../../hooks/useModels"
 import { cn, formatCost, formatTokens } from "../../../lib/utils"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 /** Fallback context budget used for the usage ring when the selected
  * model's own context window isn't known (the reference design shows a similar %). */
@@ -47,7 +53,7 @@ const UsageDetailRow = ({ label, value }: { label: string; value: string }) => (
   </div>
 )
 
-/** Context ring + % with a hover popover breaking down the last turn's usage. */
+/** Context ring + % with a hover tooltip breaking down the last turn's usage. */
 export const UsageRing = ({ sessionId }: { sessionId?: string | null }) => {
   const summary = useAppStore((s) =>
     sessionId ? s.lastTurnSummary[sessionId] : undefined,
@@ -95,74 +101,79 @@ export const UsageRing = ({ sessionId }: { sessionId?: string | null }) => {
         : "text-ink-muted"
 
   return (
-    <div className="group/usage relative">
-      <button
-        type="button"
-        className={cn(
-          "flex h-6 items-center gap-1 rounded-md px-1.5 text-sm transition-colors duration-[var(--duration-fast)] hover:text-ink-secondary",
-          nearLimitClass,
-        )}
-        aria-label="Context usage"
-      >
-        <ContextRing fraction={fraction} />
-        <span className="[font-variant-numeric:tabular-nums]">
-          {isOverLimit ? ">99%" : `${Math.round(fraction * 100)}%`}
-        </span>
-      </button>
-
-      <div
-        role="tooltip"
-        className={cn(
-          "pointer-events-none absolute bottom-full right-0 z-50 mb-1.5 w-52",
-          "rounded-lg border border-stroke-2 bg-panel p-2.5 text-sm shadow-[var(--shadow-md)]",
-          "opacity-0 transition-opacity duration-[var(--duration-fast)]",
-          "group-hover/usage:opacity-100 group-focus-within/usage:opacity-100",
-        )}
-      >
-        <p className="mb-1.5 text-xs text-ink-faint">Last turn</p>
-        <div className="flex flex-col gap-1">
-          <UsageDetailRow label="Input" value={formatTokens(usage.input)} />
-          <UsageDetailRow label="Output" value={formatTokens(usage.output)} />
-          {usage.cache_read ? (
-            <UsageDetailRow
-              label="Cache read"
-              value={formatTokens(usage.cache_read)}
-            />
-          ) : null}
-          {usage.cache_write ? (
-            <UsageDetailRow
-              label="Cache write"
-              value={formatTokens(usage.cache_write)}
-            />
-          ) : null}
-          {usage.reasoning ? (
-            <UsageDetailRow
-              label="Reasoning"
-              value={formatTokens(usage.reasoning)}
-            />
-          ) : null}
-          <UsageDetailRow label="Budget" value={formatTokens(budget)} />
-          {summary && typeof summary.cost_usd === "number" ? (
-            <>
-              <div className="my-0.5 border-t border-stroke-3" />
-              <UsageDetailRow label="Cost" value={formatCost(summary.cost_usd)} />
-            </>
-          ) : null}
-          {totals ? (
-            <>
-              <div className="my-0.5 border-t border-stroke-3" />
-              <p className="text-xs text-ink-faint">Session total</p>
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "flex h-6 items-center gap-1 rounded-md px-1.5 text-sm transition-colors duration-[var(--duration-fast)] hover:text-ink-secondary",
+              nearLimitClass,
+            )}
+            aria-label="Context usage"
+          >
+            <ContextRing fraction={fraction} />
+            <span className="[font-variant-numeric:tabular-nums]">
+              {isOverLimit ? ">99%" : `${Math.round(fraction * 100)}%`}
+            </span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="top"
+          align="end"
+          className="w-52 max-w-none flex-col items-stretch gap-0 whitespace-normal p-2.5 text-sm shadow-[var(--shadow-md)]"
+        >
+          <p className="mb-1.5 text-xs text-ink-faint">Last turn</p>
+          <div className="flex flex-col gap-1">
+            <UsageDetailRow label="Input" value={formatTokens(usage.input)} />
+            <UsageDetailRow label="Output" value={formatTokens(usage.output)} />
+            {usage.cache_read ? (
               <UsageDetailRow
-                label="Tokens"
-                value={formatTokens(totals.input + totals.output)}
+                label="Cache read"
+                value={formatTokens(usage.cache_read)}
               />
-              {totals.costUsd > 0 ? (
-                <UsageDetailRow label="Cost" value={formatCost(totals.costUsd)} />
-              ) : null}
-            </>
-          ) : null}
-        </div>
-      </div>
-    </div>
+            ) : null}
+            {usage.cache_write ? (
+              <UsageDetailRow
+                label="Cache write"
+                value={formatTokens(usage.cache_write)}
+              />
+            ) : null}
+            {usage.reasoning ? (
+              <UsageDetailRow
+                label="Reasoning"
+                value={formatTokens(usage.reasoning)}
+              />
+            ) : null}
+            <UsageDetailRow label="Budget" value={formatTokens(budget)} />
+            {summary && typeof summary.cost_usd === "number" ? (
+              <>
+                <div className="my-0.5 border-t border-stroke-3" />
+                <UsageDetailRow
+                  label="Cost"
+                  value={formatCost(summary.cost_usd)}
+                />
+              </>
+            ) : null}
+            {totals ? (
+              <>
+                <div className="my-0.5 border-t border-stroke-3" />
+                <p className="text-xs text-ink-faint">Session total</p>
+                <UsageDetailRow
+                  label="Tokens"
+                  value={formatTokens(totals.input + totals.output)}
+                />
+                {totals.costUsd > 0 ? (
+                  <UsageDetailRow
+                    label="Cost"
+                    value={formatCost(totals.costUsd)}
+                  />
+                ) : null}
+              </>
+            ) : null}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }

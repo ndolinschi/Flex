@@ -57,6 +57,7 @@ export const BrowserOverflowMenu = ({
       <DropdownMenuContent
         align="end"
         sideOffset={4}
+        data-suppress-native-webview=""
         className="w-56 min-w-56 rounded-lg border border-stroke-2 bg-panel p-0.5 shadow-lg ring-0"
       >
         <DropdownMenuGroup>
