@@ -4,13 +4,20 @@ import { Check, ChevronDown, ChevronRight, Gauge } from "@/components/icons"
 import { EFFORT_LEVELS, effortLabel } from "../../lib/types"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
-import { PopoverItem, PopoverSearch, PopoverSection } from "./PopoverTray"
+import { PopoverItem } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+  Combobox,
+  ComboboxCollection,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxLabel,
+  ComboboxList,
+  ComboboxTrigger,
+} from "@/components/ui/combobox"
 
 type ModelPickerProps = {
   models: ModelInfoDto[]
@@ -31,11 +38,9 @@ type ModelPickerProps = {
 
 const SUBMENU_WIDTH = 144
 
-/** Effort submenu — a chevron/"Edit" affordance on EVERY model row expands
- * Default + the 5 contract effort levels (reference design lets you set
- * effort for any model, not just the active one). Portal-mounted (the model
- * tray clips overflow) and viewport-clamped like ContextMenu, anchored to the
- * trigger row's rect. */
+/** Effort submenu — portal-mounted (combobox popup clips overflow) and
+ * viewport-clamped like ContextMenu. Marked `data-popover-outside-ignore` so
+ * Combobox outside-press does not dismiss while picking effort. */
 const EffortSubmenu = ({
   anchorRect,
   value,
@@ -142,9 +147,7 @@ const EffortSubmenu = ({
   )
 }
 
-/** Composer model pill with provider groups + per-row effort submenu.
- * Stays on Popover (not Combobox) so the portaled effort menu can use
- * interact-outside ignore via `data-popover-outside-ignore`. */
+/** Composer model pill: Combobox with provider groups + per-row effort submenu. */
 export const ModelPicker = ({
   models,
   value,
@@ -156,37 +159,24 @@ export const ModelPicker = ({
   builtinProviders = [],
 }: ModelPickerProps) => {
   const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState("")
   const [effortMenuFor, setEffortMenuFor] = useState<{
     modelId: string
     rect: DOMRect
   } | null>(null)
 
-  const selected = models.find((m) => m.id === value)
+  const selected = models.find((m) => m.id === value) ?? null
   const selectedEffort = value && effortFor ? effortFor(value) : null
   const label = selected?.displayName ?? selected?.id ?? "Select model"
 
-  const { groups } = useGroupedModels(models, query, builtinProviders)
+  const { groups, providerLabel } = useGroupedModels(
+    models,
+    "",
+    builtinProviders,
+  )
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next)
-    if (!next) {
-      setQuery("")
-      setEffortMenuFor(null)
-    }
-  }
-
-  const handleClose = () => handleOpenChange(false)
-
-  /** Effort submenu is portaled outside PopoverContent — don't dismiss on it. */
-  const ignoreEffortOutside = (e: {
-    preventDefault: () => void
-    target: EventTarget | null
-  }) => {
-    const target = e.target as HTMLElement | null
-    if (target?.closest?.("[data-popover-outside-ignore]")) {
-      e.preventDefault()
-    }
+    if (!next) setEffortMenuFor(null)
   }
 
   const openEffortMenu = (modelId: string, el: HTMLElement) => {
@@ -196,148 +186,155 @@ export const ModelPicker = ({
     )
   }
 
-  const renderRow = (m: ModelInfoDto) => {
-    const active = m.id === value
-    const modelEffort = effortFor ? effortFor(m.id) : null
-    return (
-      <li key={m.id} className="relative">
-        <PopoverItem
-          active={active}
-          onClick={() => {
-            onChange(m.id)
-            handleClose()
-          }}
-          className="gap-1.5"
-        >
-          <span className="min-w-0 flex-1 truncate text-left">
-            {m.displayName ?? m.id}
+  return (
+    <Combobox
+      items={groups}
+      value={selected}
+      onValueChange={(next: ModelInfoDto | null) => {
+        if (!next) return
+        onChange(next.id)
+        handleOpenChange(false)
+      }}
+      open={open}
+      onOpenChange={(next, details) => {
+        if (
+          !next &&
+          details.reason === "outside-press" &&
+          details.event.target instanceof Element &&
+          details.event.target.closest("[data-popover-outside-ignore]")
+        ) {
+          details.cancel()
+          return
+        }
+        handleOpenChange(next)
+      }}
+      disabled={isLoading || disabled}
+      itemToStringLabel={(m: ModelInfoDto) => m.displayName ?? m.id}
+      isItemEqualToValue={(a: ModelInfoDto, b: ModelInfoDto) => a.id === b.id}
+      filter={(item, query) => {
+        const q = query.trim().toLowerCase()
+        if (!q) return true
+        const m = item as ModelInfoDto
+        return (
+          m.id.toLowerCase().includes(q) ||
+          (m.displayName?.toLowerCase().includes(q) ?? false) ||
+          m.providerId.toLowerCase().includes(q) ||
+          providerLabel(m.providerId).toLowerCase().includes(q)
+        )
+      }}
+    >
+      <ComboboxTrigger
+        hideIcon
+        disabled={isLoading || disabled}
+        className={cn(
+          "inline-flex h-6 max-w-[14rem] items-center gap-1 rounded-full border border-stroke-3 bg-fill-4 px-2",
+          "text-xs tracking-[var(--tracking-caption)] text-ink-secondary shadow-none",
+          "transition-[color,opacity,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+          "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink disabled:opacity-50",
+          open && "border-stroke-2 bg-fill-2 text-ink",
+        )}
+      >
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {selectedEffort ? (
+          <span className="shrink-0 text-ink-muted">
+            · {effortLabel(selectedEffort)}
           </span>
-          {modelEffort ? (
-            <span className="max-w-[4.5rem] shrink-0 truncate text-xs text-ink-muted">
-              {effortLabel(modelEffort)}
-            </span>
-          ) : null}
-          {/* Fixed trailing slots so rows don't jump: check, then effort. */}
-          <span className="flex w-3 shrink-0 items-center justify-center">
-            {active ? (
-              <Check className="h-3 w-3 text-accent" aria-hidden />
-            ) : null}
-          </span>
-          {onEffortChange ? (
-            // Not a nested <button> — PopoverItem's row is itself a
-            // <button>, and HTML forbids button-in-button. A role="button"
-            // span keeps the same a11y/interaction contract without the
-            // invalid nesting. Sits AFTER the check so selection stays
-            // stable and effort is the rightmost affordance.
-            <span
-              role="button"
-              tabIndex={0}
-              aria-label={`Effort for ${m.displayName ?? m.id}`}
-              aria-haspopup="menu"
-              aria-expanded={effortMenuFor?.modelId === m.id}
-              onClick={(e) => {
-                e.stopPropagation()
-                openEffortMenu(m.id, e.currentTarget)
-              }}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter" && e.key !== " ") return
-                e.preventDefault()
-                e.stopPropagation()
-                openEffortMenu(m.id, e.currentTarget)
-              }}
-              className={cn(
-                "flex w-8 shrink-0 cursor-pointer items-center justify-end gap-0.5 rounded px-0.5 py-0.5",
-                "text-xs text-ink-faint transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink",
-                effortMenuFor?.modelId === m.id && "bg-fill-2 text-ink",
-              )}
-            >
-              <Gauge className="h-3 w-3" aria-hidden />
-              <ChevronRight className="h-2.5 w-2.5" aria-hidden />
-            </span>
-          ) : null}
-        </PopoverItem>
-        {effortMenuFor?.modelId === m.id && onEffortChange ? (
+        ) : null}
+        <ChevronDown
+          className="h-2.5 w-2.5 shrink-0 text-icon-3"
+          strokeWidth={2.5}
+          aria-hidden
+        />
+      </ComboboxTrigger>
+
+      <ComboboxContent
+        side="top"
+        align="start"
+        sideOffset={6}
+        className="w-72 min-w-72"
+      >
+        <ComboboxInput
+          placeholder="Search models"
+          showTrigger={false}
+          className="w-full"
+        />
+        <ComboboxEmpty>No models found</ComboboxEmpty>
+        <ComboboxList className="max-h-56">
+          {(group) => (
+            <ComboboxGroup key={group.providerId} items={group.items}>
+              <ComboboxLabel>{group.label}</ComboboxLabel>
+              <ComboboxCollection>
+                {(m: ModelInfoDto) => {
+                  const active = m.id === value
+                  const modelEffort = effortFor ? effortFor(m.id) : null
+                  return (
+                    <ComboboxItem key={m.id} value={m} className="gap-1.5 pr-1.5">
+                      <span className="min-w-0 flex-1 truncate text-left">
+                        {m.displayName ?? m.id}
+                      </span>
+                      {modelEffort ? (
+                        <span className="max-w-[4.5rem] shrink-0 truncate text-xs text-ink-muted">
+                          {effortLabel(modelEffort)}
+                        </span>
+                      ) : null}
+                      <span className="flex w-3 shrink-0 items-center justify-center">
+                        {active ? (
+                          <Check className="h-3 w-3 text-accent" aria-hidden />
+                        ) : null}
+                      </span>
+                      {onEffortChange ? (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Effort for ${m.displayName ?? m.id}`}
+                          aria-haspopup="menu"
+                          aria-expanded={effortMenuFor?.modelId === m.id}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            openEffortMenu(m.id, e.currentTarget)
+                          }}
+                          onPointerDown={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter" && e.key !== " ") return
+                            e.preventDefault()
+                            e.stopPropagation()
+                            openEffortMenu(m.id, e.currentTarget)
+                          }}
+                          className={cn(
+                            "flex w-8 shrink-0 cursor-pointer items-center justify-end gap-0.5 rounded px-0.5 py-0.5",
+                            "text-xs text-ink-faint transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink",
+                            effortMenuFor?.modelId === m.id &&
+                              "bg-fill-2 text-ink",
+                          )}
+                        >
+                          <Gauge className="h-3 w-3" aria-hidden />
+                          <ChevronRight className="h-2.5 w-2.5" aria-hidden />
+                        </span>
+                      ) : null}
+                    </ComboboxItem>
+                  )
+                }}
+              </ComboboxCollection>
+            </ComboboxGroup>
+          )}
+        </ComboboxList>
+        {effortMenuFor && onEffortChange ? (
           <EffortSubmenu
             anchorRect={effortMenuFor.rect}
-            value={modelEffort}
+            value={effortFor ? effortFor(effortMenuFor.modelId) : null}
             onChange={(effort) => {
-              // One gesture: picking an effort on any row also selects that
-              // model at that effort (reference design), then close so the
-              // composer chip shows the new label.
-              onEffortChange(m.id, effort)
-              onChange(m.id)
-              handleClose()
+              onEffortChange(effortMenuFor.modelId, effort)
+              onChange(effortMenuFor.modelId)
+              handleOpenChange(false)
             }}
             onClose={() => setEffortMenuFor(null)}
           />
         ) : null}
-      </li>
-    )
-  }
-
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          disabled={isLoading || disabled}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          className={cn(
-            "inline-flex h-6 max-w-[14rem] items-center gap-1 rounded-full border border-stroke-3 bg-fill-4 px-2",
-            "text-xs tracking-[var(--tracking-caption)] text-ink-secondary",
-            "transition-[color,opacity,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-            "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink disabled:opacity-50",
-            open && "border-stroke-2 bg-fill-2 text-ink",
-          )}
-        >
-          <span className="min-w-0 flex-1 truncate">{label}</span>
-          {selectedEffort ? (
-            <span className="shrink-0 text-ink-muted">
-              · {effortLabel(selectedEffort)}
-            </span>
-          ) : null}
-          <ChevronDown
-            className="h-2.5 w-2.5 shrink-0 text-icon-3"
-            strokeWidth={2.5}
-            aria-hidden
-          />
-        </button>
-      </PopoverTrigger>
-
-      <PopoverContent
-        side="top"
-        align="start"
-        sideOffset={6}
-        role="listbox"
-        aria-label="Models"
-        className={cn(
-          "w-72 gap-0 rounded-md border-0 bg-panel p-0 shadow-[var(--shadow-popover)]",
-          "ring-0",
-        )}
-        onOpenAutoFocus={(e) => e.preventDefault()}
-        onInteractOutside={ignoreEffortOutside}
-        onPointerDownOutside={ignoreEffortOutside}
-      >
-        <PopoverSearch
-          value={query}
-          onChange={setQuery}
-          placeholder="Search models"
-        />
-        <div className="max-h-56 overflow-y-auto py-0.5">
-          {groups.length === 0 ? (
-            <p className="px-2.5 py-3 text-center text-xs text-ink-faint">
-              No models found
-            </p>
-          ) : (
-            groups.map((group) => (
-              <PopoverSection key={group.providerId} label={group.label}>
-                <ul>{group.items.map(renderRow)}</ul>
-              </PopoverSection>
-            ))
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
+      </ComboboxContent>
+    </Combobox>
   )
 }

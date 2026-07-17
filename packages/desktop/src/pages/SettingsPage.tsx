@@ -12,6 +12,13 @@ import { MemoryContent } from "./settings/MemorySection"
 import type { SettingsSectionId } from "../lib/settingsSearchIndex"
 import type { PermissionMode } from "../lib/types"
 import { useAppStore } from "../stores/appStore"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const PERMISSION_MODE_OPTIONS: Array<{ value: PermissionMode; label: string }> = [
   { value: "default", label: "Ask (default)" },
@@ -146,20 +153,25 @@ const BehaviorContent = () => {
         description="Bypass applies in Agent mode; AskUserQuestion still appears. Plan, Ask, and Flex keep their own safeguards."
         first
       >
-        <select
+        <Select
           value={defaultPermissionMode}
-          onChange={(e) =>
-            setDefaultPermissionMode(e.target.value as PermissionMode)
-          }
-          aria-label="Default permission mode"
-          className="h-8 rounded-md border border-border bg-surface px-2.5 text-sm text-ink focus:border-stroke-2 focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
+          onValueChange={(v) => setDefaultPermissionMode(v as PermissionMode)}
         >
-          {PERMISSION_MODE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger
+            size="sm"
+            aria-label="Default permission mode"
+            className="h-8 min-w-[10rem]"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper" align="start">
+            {PERMISSION_MODE_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </SettingRow>
       <SettingRow
         rowId="behavior-isolation"

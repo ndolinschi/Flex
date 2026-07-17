@@ -10,7 +10,14 @@ import {
 import { useModels } from "../../../hooks/useModels"
 import { routinesUpsert, toInvokeError } from "../../../lib/tauri"
 import type { RoutineDto } from "../../../lib/types"
-import { KEBAB_RE, selectClasses } from "./constants"
+import { KEBAB_RE } from "./constants"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 type FormState = {
   id: string
@@ -132,15 +139,24 @@ export const CreateRoutineForm = ({
 
       <FieldRow label="Trigger" htmlFor="routine-trigger-kind">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <select
-            id="routine-trigger-kind"
+          <Select
             value={form.triggerKind}
-            onChange={(e) => patch({ triggerKind: e.target.value as "cron" | "webhook" })}
-            className={selectClasses}
+            onValueChange={(v) =>
+              patch({ triggerKind: v as "cron" | "webhook" })
+            }
           >
-            <option value="cron">Cron</option>
-            <option value="webhook">Webhook</option>
-          </select>
+            <SelectTrigger
+              id="routine-trigger-kind"
+              size="sm"
+              className="h-8 w-full min-w-0"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" align="start">
+              <SelectItem value="cron">Cron</SelectItem>
+              <SelectItem value="webhook">Webhook</SelectItem>
+            </SelectContent>
+          </Select>
 
           <TextInput
             id="routine-trigger-value"
