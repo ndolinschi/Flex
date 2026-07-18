@@ -423,11 +423,11 @@ pub async fn validate_profile(
         .filter(|s| !s.is_empty())
     {
         cfg.profile_keys.insert(id.clone(), key.to_owned());
-    } else if built.provider != "ollama"
-        && !(built.provider == "copilot"
+    } else if !(built.provider == "ollama"
+        || cfg.profile_keys.contains_key(&id)
+        || (built.provider == "copilot"
             && agentloop_sdk::providers::copilot::CopilotConfig::discoverable())
-        && !(built.provider == "chatgpt" && chatgpt_oauth_discoverable())
-        && !cfg.profile_keys.contains_key(&id)
+        || (built.provider == "chatgpt" && chatgpt_oauth_discoverable()))
     {
         return Err(DesktopError::Message(
             "API key is required for this provider".into(),
@@ -1793,7 +1793,10 @@ async fn resolve_model_vision(service: &EngineService, model: &str) -> Option<bo
     let model_ref = ModelRef(model.to_owned());
     let (provider, model_id) = service.provider_registry().resolve(&model_ref)?;
     let models = provider.list_models().await.ok()?;
-    models.into_iter().find(|m| m.id == model_id).map(|m| m.vision)
+    models
+        .into_iter()
+        .find(|m| m.id == model_id)
+        .map(|m| m.vision)
 }
 
 fn append_system(existing: Option<String>, fragment: &str) -> Option<String> {
@@ -1846,10 +1849,10 @@ async fn prompt_inner(
     }
     if input.composer_mode.as_deref() == Some("debug") {
         system_append = append_system(system_append, DEBUG_MODE_PROMPT);
-        let model_key = input
-            .model
-            .as_deref()
-            .or_else(|| meta.as_ref().and_then(|m| m.model.as_ref().map(|r| r.0.as_str())));
+        let model_key = input.model.as_deref().or_else(|| {
+            meta.as_ref()
+                .and_then(|m| m.model.as_ref().map(|r| r.0.as_str()))
+        });
         let vision = match model_key {
             Some(key) => resolve_model_vision(&service, key).await,
             None => None,
@@ -4800,9 +4803,8 @@ async fn rebuild_service_after_mcp_change(app: &AppHandle, state: &AppState) {
     }
 }
 
-#[tracing::instrument(level = "debug", skip_all, err)]
-#[tauri::command]
-pub async fn mcp_list() -> DesktopResult<Vec<McpServerDto>> {
+/// Shared with the desktop Remote Access HTTP API.
+pub async fn mcp_list_internal() -> DesktopResult<Vec<McpServerDto>> {
     let store = mcp_store()?;
     let mut servers = store
         .list()
@@ -4814,9 +4816,14 @@ pub async fn mcp_list() -> DesktopResult<Vec<McpServerDto>> {
 
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
-pub async fn mcp_upsert(
-    app: AppHandle,
-    state: State<'_, AppState>,
+pub async fn mcp_list() -> DesktopResult<Vec<McpServerDto>> {
+    mcp_list_internal().await
+}
+
+/// Shared with the desktop Remote Access HTTP API.
+pub async fn mcp_upsert_internal(
+    app: &AppHandle,
+    state: &AppState,
     server: McpServerDto,
 ) -> DesktopResult<()> {
     validate_mcp_id(&server.id)?;
@@ -4863,15 +4870,24 @@ pub async fn mcp_upsert(
         .upsert(config)
         .await
         .map_err(|e| DesktopError::Message(e.to_string()))?;
-    rebuild_service_after_mcp_change(&app, &state).await;
+    rebuild_service_after_mcp_change(app, state).await;
     Ok(())
 }
 
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
-pub async fn mcp_remove(
+pub async fn mcp_upsert(
     app: AppHandle,
     state: State<'_, AppState>,
+    server: McpServerDto,
+) -> DesktopResult<()> {
+    mcp_upsert_internal(&app, &state, server).await
+}
+
+/// Shared with the desktop Remote Access HTTP API.
+pub async fn mcp_remove_internal(
+    app: &AppHandle,
+    state: &AppState,
     id: String,
 ) -> DesktopResult<()> {
     let id = validate_mcp_id(&id)?;
@@ -4883,8 +4899,18 @@ pub async fn mcp_remove(
     if let Err(err) = crate::config::clear_mcp_server_secrets(id) {
         tracing::warn!(server = %id, error = %err, "failed to clear MCP secrets on remove");
     }
-    rebuild_service_after_mcp_change(&app, &state).await;
+    rebuild_service_after_mcp_change(app, state).await;
     Ok(())
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn mcp_remove(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> DesktopResult<()> {
+    mcp_remove_internal(&app, &state, id).await
 }
 
 /// Connect to a saved server and list its tools — the "Test" button in the
@@ -4892,9 +4918,9 @@ pub async fn mcp_remove(
 /// keys server lookups off its own config snapshot) and never touches
 /// `state.service`, so testing never disturbs the live engine or requires a
 /// provider to be configured yet.
-#[tracing::instrument(level = "debug", skip_all, err)]
-#[tauri::command]
-pub async fn mcp_test(id: String) -> DesktopResult<Vec<String>> {
+///
+/// Shared with the desktop Remote Access HTTP API.
+pub async fn mcp_test_internal(id: String) -> DesktopResult<Vec<String>> {
     let id = validate_mcp_id(&id)?;
     let store = mcp_store()?;
     let server = store
@@ -4911,6 +4937,12 @@ pub async fn mcp_test(id: String) -> DesktopResult<Vec<String>> {
         .map_err(|e| DesktopError::Message(e.to_string()))?;
     client.shutdown().await;
     Ok(tools.into_iter().map(|tool| tool.name).collect())
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn mcp_test(id: String) -> DesktopResult<Vec<String>> {
+    mcp_test_internal(id).await
 }
 
 // ---------------------------------------------------------------------------

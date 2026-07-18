@@ -10,6 +10,7 @@ mod error;
 mod macos_window;
 mod path_resolve;
 mod plugins;
+mod remote;
 mod screen_capture;
 mod secrets;
 mod state;
@@ -220,6 +221,21 @@ pub fn run() {
                 commands::respawn_cron_loop(&state).await;
             });
 
+            // Auto-start Remote Access if the user left it enabled.
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let state = handle.state::<AppState>();
+                let remote = state.remote.lock().await.clone();
+                if let Some(server) = remote {
+                    let cfg = server.snapshot_config().await;
+                    if cfg.enabled {
+                        if let Err(err) = server.start(handle.clone()).await {
+                            tracing::warn!(error = %err, "failed to start remote access on launch");
+                        }
+                    }
+                }
+            });
+
             // Dev-only layout probe: open Browser to google after launch so we
             // can validate child-webview bounds without UI automation.
             if std::env::var("FLEX_BROWSER_QA").is_ok() {
@@ -336,6 +352,10 @@ pub fn run() {
             commands::mcp_upsert,
             commands::mcp_remove,
             commands::mcp_test,
+            remote::remote_access_get,
+            remote::remote_access_save,
+            remote::remote_access_rotate_token,
+            remote::remote_access_restart,
             commands::memory_list,
             commands::memory_get,
             commands::memory_remove,
@@ -380,16 +400,10 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let state = window.state::<AppState>();
                 crate::terminal::kill_all_terminals(&state);
-                // Reap every background bash process any session started
-                // (`run_in_background`/demoted foreground calls) — otherwise
-                // a dev server or long-running script left running by an
-                // agent outlives the app entirely, since its detached
-                // reader/wait tasks have no `Drop` impl that can kill them
-                // (see `EngineService::shutdown`'s doc comment). Blocking is
-                // deliberate: killing is best-effort and typically
-                // near-instant, and doing it before the process actually
-                // exits is the only way to guarantee it happens at all.
                 tauri::async_runtime::block_on(async {
+                    if let Some(remote) = state.remote.lock().await.as_ref() {
+                        let _ = remote.stop().await;
+                    }
                     if let Some(service) = state.service.lock().await.as_ref() {
                         service.shutdown().await;
                     }

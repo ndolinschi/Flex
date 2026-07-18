@@ -158,6 +158,8 @@ pub struct AppState {
     pub pending_chatgpt_auth: Mutex<HashMap<String, PendingChatgptAuth>>,
     /// Database UI plugin — saved connection specs + live handles.
     pub db_plugin: Mutex<crate::db_plugin::DbPluginState>,
+    /// Desktop Remote Access HTTP server + connection-method adapters.
+    pub remote: Mutex<Option<crate::remote::RemoteServerHandle>>,
 }
 
 impl AppState {
@@ -181,6 +183,7 @@ impl AppState {
             pending_copilot_auth: Mutex::new(HashMap::new()),
             pending_chatgpt_auth: Mutex::new(HashMap::new()),
             db_plugin: Mutex::new(crate::db_plugin::DbPluginState::load()),
+            remote: Mutex::new(crate::remote::init_remote_server().ok()),
         }
     }
 }

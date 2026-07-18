@@ -197,9 +197,7 @@ fn is_angular_source(path: &Path) -> bool {
         .and_then(|n| n.to_str())
         .unwrap_or("")
         .to_ascii_lowercase();
-    !name.ends_with(".d.ts")
-        && !name.ends_with(".spec.ts")
-        && !name.ends_with(".test.ts")
+    !name.ends_with(".d.ts") && !name.ends_with(".spec.ts") && !name.ends_with(".test.ts")
 }
 
 fn read_capped(path: &Path) -> Option<String> {
@@ -346,9 +344,7 @@ fn frameworks_from_dir_markers(dir: &Path) -> Vec<(Framework, String)> {
             Framework::React,
             format!(
                 "next.config in {}",
-                dir.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or(".")
+                dir.file_name().and_then(|n| n.to_str()).unwrap_or(".")
             ),
         ));
     }
@@ -357,9 +353,7 @@ fn frameworks_from_dir_markers(dir: &Path) -> Vec<(Framework, String)> {
             Framework::Vue,
             format!(
                 "nuxt.config in {}",
-                dir.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or(".")
+                dir.file_name().and_then(|n| n.to_str()).unwrap_or(".")
             ),
         ));
     }
@@ -368,9 +362,7 @@ fn frameworks_from_dir_markers(dir: &Path) -> Vec<(Framework, String)> {
             Framework::Angular,
             format!(
                 "angular.json in {}",
-                dir.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or(".")
+                dir.file_name().and_then(|n| n.to_str()).unwrap_or(".")
             ),
         ));
     }
@@ -380,7 +372,9 @@ fn frameworks_from_dir_markers(dir: &Path) -> Vec<(Framework, String)> {
 /// Scan one level of common monorepo / app folders when the root package.json
 /// is a workspace shell without UI deps.
 fn detect_in_children(root: &Path) -> Option<ComponentsDetectResult> {
-    const CHILD_DIRS: &[&str] = &["apps", "packages", "web", "frontend", "client", "app", "src"];
+    const CHILD_DIRS: &[&str] = &[
+        "apps", "packages", "web", "frontend", "client", "app", "src",
+    ];
     let Ok(entries) = fs::read_dir(root) else {
         return None;
     };
@@ -413,11 +407,7 @@ fn detect_in_children(root: &Path) -> Option<ComponentsDetectResult> {
         }
         if let Some((fw, reason, package_name)) = try_package_json(&dir.join("package.json")) {
             if !fw.is_empty() {
-                return Some(make_detect(
-                    &fw,
-                    format!("{reason} ({name})"),
-                    package_name,
-                ));
+                return Some(make_detect(&fw, format!("{reason} ({name})"), package_name));
             }
         }
 
@@ -432,16 +422,13 @@ fn detect_in_children(root: &Path) -> Option<ComponentsDetectResult> {
                 .collect();
             nested_dirs.sort();
             for child in nested_dirs {
-                let child_name = child
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("app");
+                let child_name = child.file_name().and_then(|n| n.to_str()).unwrap_or("app");
                 let markers = frameworks_from_dir_markers(&child);
                 if !markers.is_empty() {
                     let frameworks: Vec<Framework> = markers.iter().map(|(f, _)| *f).collect();
                     let reason = markers
                         .iter()
-                        .map(|(_, r)| format!("{r}"))
+                        .map(|(_, r)| r.to_string())
                         .collect::<Vec<_>>()
                         .join("; ");
                     let package_name =
@@ -501,9 +488,8 @@ pub fn detect_ui_frameworks(cwd: &Path) -> ComponentsDetectResult {
     }
 
     let Some(pkg_path) = find_package_json(cwd) else {
-        return detect_in_children(cwd).unwrap_or_else(|| {
-            make_detect(&[], "no package.json found", None)
-        });
+        return detect_in_children(cwd)
+            .unwrap_or_else(|| make_detect(&[], "no package.json found", None));
     };
     let Ok(raw) = fs::read_to_string(&pkg_path) else {
         return make_detect(&[], "could not read package.json", None);
@@ -630,9 +616,9 @@ fn resolve_import(from_file: &Path, spec: &str, _root: &Path) -> Option<PathBuf>
         base.join("index.vue"),
         base.join("index.ts"),
     ];
-    candidates.into_iter().find(|c| {
-        c.is_file() && (is_react_source(c) || is_vue_source(c) || is_angular_source(c))
-    })
+    candidates
+        .into_iter()
+        .find(|c| c.is_file() && (is_react_source(c) || is_vue_source(c) || is_angular_source(c)))
 }
 
 fn extract_component_imports(source: &str, from_file: &Path, root: &Path) -> Vec<PathBuf> {

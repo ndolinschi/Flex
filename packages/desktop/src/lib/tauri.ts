@@ -970,6 +970,91 @@ export const indexRebuild = (cwd: string): Promise<IndexRebuildResult> =>
 
 export const appVersion = (): Promise<string> => invoke("app_version")
 
+// ---------------------------------------------------------------------------
+// Desktop Remote Access — in-process HTTP/SSE transport for mobile clients.
+// ---------------------------------------------------------------------------
+
+export type CloudflarePrefs = {
+  enabled: boolean
+  hostname?: string | null
+}
+
+export type MethodPrefs = {
+  manual: boolean
+  lan: boolean
+  bonjour: boolean
+  publicPort: boolean
+  cloudflare: CloudflarePrefs
+  bluetooth: boolean
+}
+
+export type RemoteAccessConfig = {
+  enabled: boolean
+  deviceName: string
+  deviceId: string
+  port: number
+  methods: MethodPrefs
+}
+
+export type PairingEndpoint = {
+  method: string
+  url?: string | null
+  host?: string | null
+  port?: number | null
+  service_type?: string | null
+  tunnel_hostname?: string | null
+  status?: string | null
+  note?: string | null
+}
+
+export type PairingInfo = {
+  protocol_version: number
+  app_version: string
+  device_name: string
+  device_id: string
+  auth: { type: string; token?: string | null }
+  endpoints: PairingEndpoint[]
+  capabilities: string[]
+  openapi_url: string
+}
+
+export type MethodNote = {
+  id: string
+  status: string
+  note?: string | null
+}
+
+export type RemoteAccessStatus = {
+  config: RemoteAccessConfig
+  running: boolean
+  bindAddr?: string | null
+  token?: string | null
+  pairing?: PairingInfo | null
+  pairingJson?: string | null
+  pairingQrSvg?: string | null
+  methodNotes: MethodNote[]
+}
+
+export type SaveRemoteAccessInput = {
+  enabled: boolean
+  deviceName?: string | null
+  port?: number | null
+  methods?: MethodPrefs | null
+}
+
+export const remoteAccessGet = (): Promise<RemoteAccessStatus> =>
+  invoke("remote_access_get")
+
+export const remoteAccessSave = (
+  input: SaveRemoteAccessInput,
+): Promise<RemoteAccessStatus> => invoke("remote_access_save", { input })
+
+export const remoteAccessRotateToken = (): Promise<RemoteAccessStatus> =>
+  invoke("remote_access_rotate_token")
+
+export const remoteAccessRestart = (): Promise<RemoteAccessStatus> =>
+  invoke("remote_access_restart")
+
 /** Persists a pasted/dropped image blob's raw bytes to a uniquely-named file
  * in the OS temp dir and returns the absolute path — the only way to turn an
  * in-memory clipboard blob into a `PromptAttachment.path` the engine can read
