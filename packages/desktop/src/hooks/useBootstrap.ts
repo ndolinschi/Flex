@@ -155,16 +155,27 @@ export const useBootstrap = (
         if (ui.archivedSessionIds) {
           useAppStore.getState().setArchivedSessionIds(ui.archivedSessionIds)
         }
-        if (ui.sidebarProjectSort === "recency" || ui.sidebarProjectSort === "alpha") {
-          useAppStore.getState().setSidebarProjectSort(ui.sidebarProjectSort)
-        }
-        if (
-          ui.sidebarProjectVisibility === "active" ||
-          ui.sidebarProjectVisibility === "all"
-        ) {
-          useAppStore
-            .getState()
-            .setSidebarProjectVisibility(ui.sidebarProjectVisibility)
+        // Hydrate via setState (like pin/archive) — setters would re-persist.
+        {
+          const sidebarPatch: {
+            sidebarProjectSort?: "recency" | "alpha"
+            sidebarProjectVisibility?: "active" | "all"
+          } = {}
+          if (
+            ui.sidebarProjectSort === "recency" ||
+            ui.sidebarProjectSort === "alpha"
+          ) {
+            sidebarPatch.sidebarProjectSort = ui.sidebarProjectSort
+          }
+          if (
+            ui.sidebarProjectVisibility === "active" ||
+            ui.sidebarProjectVisibility === "all"
+          ) {
+            sidebarPatch.sidebarProjectVisibility = ui.sidebarProjectVisibility
+          }
+          if (Object.keys(sidebarPatch).length > 0) {
+            useAppStore.setState(sidebarPatch)
+          }
         }
 
         if (ui.sidebarCollapsed) {

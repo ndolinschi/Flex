@@ -103,6 +103,18 @@ describe("groupByRepo", () => {
     })
     expect(groups.map((g) => g.cwd)).toEqual(["/stale"])
   })
+
+  it("treats the active window boundary as inclusive", () => {
+    const now = 1_700_000_000_000
+    const sessions = [
+      makeSession("edge", now - ACTIVE_PROJECT_WINDOW_MS, "/edge"),
+    ]
+    const groups = groupByRepo(sessions, {
+      visibility: "active",
+      nowMs: now,
+    })
+    expect(groups.map((g) => g.label)).toEqual(["edge"])
+  })
 })
 
 describe("orderByPinnedIds", () => {

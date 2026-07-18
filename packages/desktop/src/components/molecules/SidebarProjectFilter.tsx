@@ -37,7 +37,8 @@ const VISIBILITY_OPTIONS: Array<{
   },
 ]
 
-/** Quiet filter control for the Repositories label row — sort + visibility. */
+/** Quiet filter control for the Repositories label row — sort + visibility.
+ * Stays open after a pick so both dimensions can be set in one pass. */
 export const SidebarProjectFilter = ({
   sort,
   visibility,
@@ -52,11 +53,13 @@ export const SidebarProjectFilter = ({
     <div ref={rootRef} className="relative">
       <IconButton
         label="Filter projects"
+        aria-haspopup="menu"
+        aria-expanded={open}
         className={cn(
           "h-6 w-6 transition-opacity duration-[var(--duration-fast)]",
           isFiltered || open
             ? "opacity-100"
-            : "opacity-0 group-hover/label:opacity-100",
+            : "opacity-0 group-hover/label:opacity-100 focus-visible:opacity-100",
           open && "bg-fill-3",
         )}
         onClick={() => setOpen((v) => !v)}
@@ -71,7 +74,7 @@ export const SidebarProjectFilter = ({
         placement="below"
         role="menu"
         aria-label="Filter projects"
-        className="right-0 left-auto w-56"
+        className="right-0 left-auto z-[60] w-56"
       >
         <PopoverSection label="Sort">
           {SORT_OPTIONS.map((option) => {
@@ -81,10 +84,7 @@ export const SidebarProjectFilter = ({
                 key={option.id}
                 role="menuitem"
                 active={isActive}
-                onClick={() => {
-                  onSortChange(option.id)
-                  setOpen(false)
-                }}
+                onClick={() => onSortChange(option.id)}
               >
                 <span className="min-w-0 flex-1 truncate">{option.label}</span>
                 {isActive ? (
@@ -103,17 +103,17 @@ export const SidebarProjectFilter = ({
                 key={option.id}
                 role="menuitem"
                 active={isActive}
-                onClick={() => {
-                  onVisibilityChange(option.id)
-                  setOpen(false)
-                }}
+                onClick={() => onVisibilityChange(option.id)}
                 className="items-start py-2"
               >
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5 text-sm text-ink">
-                    {option.label}
+                    <span className="min-w-0 flex-1 truncate">{option.label}</span>
                     {isActive ? (
-                      <Check className="h-3 w-3 text-accent" aria-hidden />
+                      <Check
+                        className="h-3 w-3 shrink-0 text-accent"
+                        aria-hidden
+                      />
                     ) : null}
                   </span>
                   <span className="block text-xs text-ink-muted">

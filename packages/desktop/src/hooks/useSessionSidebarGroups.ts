@@ -75,16 +75,19 @@ export const useSessionSidebarGroups = (
 
   // Freeze repo-group and row order once shown under recency (bug #36).
   // Alphabetical sort is name-stable already — applying the freeze would
-  // pin a stale order after the user switches sort mode.
+  // pin a stale order after the user switches sort mode. Visibility changes
+  // must also clear the freeze: otherwise groups reappearing under "All"
+  // look "fresh" and jump to the front of the list.
   const groupOrderRef = useRef<string[]>([])
   const rowOrderByGroupRef = useRef<Map<string, string[]>>(new Map())
-  const lastSortRef = useRef(sort)
+  const lastPrefsRef = useRef(`${sort}:${visibility}`)
 
   const repoGroups = useMemo(() => {
-    if (lastSortRef.current !== sort) {
+    const prefsKey = `${sort}:${visibility}`
+    if (lastPrefsRef.current !== prefsKey) {
       groupOrderRef.current = []
       rowOrderByGroupRef.current = new Map()
-      lastSortRef.current = sort
+      lastPrefsRef.current = prefsKey
     }
 
     if (sort === "alpha") {
@@ -120,7 +123,7 @@ export const useSessionSidebarGroups = (
     })
     rowOrderByGroupRef.current = nextRowOrders
     return ordered
-  }, [sortedGroups, sort])
+  }, [sortedGroups, sort, visibility])
 
   return { pinnedSessions, archivedSessions, repoGroups }
 }
