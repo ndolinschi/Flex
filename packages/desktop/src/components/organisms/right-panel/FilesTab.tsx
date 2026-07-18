@@ -365,7 +365,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
               )}
             </div>
           </ScrollArea>
-        ) : path ? (
+        ) : path && active ? (
           <Editor
             height="100%"
             path={path}
@@ -391,6 +391,10 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
               </div>
             }
           />
+        ) : path ? (
+          // Keep-alive host is hidden — skip Monaco so automaticLayout / workers
+          // do not run off-screen. Drafts stay in the store.
+          <div className="h-full" aria-hidden />
         ) : null}
       </div>
 

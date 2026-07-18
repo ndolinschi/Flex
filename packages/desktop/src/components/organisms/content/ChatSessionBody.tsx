@@ -87,6 +87,7 @@ export const ChatSessionBody = ({ sessionId, active }: ChatSessionBodyProps) => 
           <>
             <TurnTimeline
               sessionId={sessionId}
+              active={active}
               onConversationEmpty={handleConversationEmpty}
               onLiveRows={handleLiveRows}
             />
@@ -96,6 +97,7 @@ export const ChatSessionBody = ({ sessionId, active }: ChatSessionBodyProps) => 
         composer={
           <Composer
             sessionId={sessionId}
+            interactive={active}
             isHero={composerHero}
             dockedOverlay={dockedOverlay}
             workersSlot={

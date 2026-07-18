@@ -232,11 +232,6 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     if (selectErrorId) void handleSelect(selectErrorId)
   }
 
-  const sessionIds = useMemo(() => sessions.map((s) => s.id), [sessions])
-  const sessionCwds = useMemo(
-    () => sessions.map((s) => ({ id: s.id, cwd: s.cwd })),
-    [sessions],
-  )
   // Poll only sessions the user can see (plus active + pinned), and pause
   // intervals entirely while the sidebar is collapsed — Changes tab keeps its
   // own observer on the shared git-status query key for the active session.
@@ -260,6 +255,17 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     archivedCollapsed,
     archivedSessions,
   ])
+  const sessionIdsForPoll = useMemo(
+    () => [...statusPollIds],
+    [statusPollIds],
+  )
+  const sessionCwdsForPoll = useMemo(
+    () =>
+      sessions
+        .filter((s) => statusPollIds.has(s.id))
+        .map((s) => ({ id: s.id, cwd: s.cwd })),
+    [sessions, statusPollIds],
+  )
   const statusPollOptions = useMemo(
     () => ({
       pollingEnabled: !collapsed,
@@ -267,8 +273,8 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     }),
     [collapsed, statusPollIds],
   )
-  const workspaceStatuses = useWorkspaceStatuses(sessionIds, statusPollOptions)
-  const gitStatuses = useGitStatuses(sessionCwds, statusPollOptions)
+  const workspaceStatuses = useWorkspaceStatuses(sessionIdsForPoll, statusPollOptions)
+  const gitStatuses = useGitStatuses(sessionCwdsForPoll, statusPollOptions)
   const repoCwds = useMemo(() => repoGroups.map((g) => g.cwd), [repoGroups])
   const indexedRepos = useIndexedRepos(repoCwds)
 

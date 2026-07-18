@@ -46,11 +46,18 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     refetch: refetchIsRepo,
   } = useIsGitRepo(cwd || undefined)
 
+  // Agent turns usually touch files — refresh when this session stops streaming.
+  const isStreaming = useAppStore((s) =>
+    sessionId ? !!s.streamingSessions[sessionId] : false,
+  )
+
   const { data: summary, refetch, isFetching } = useQuery({
     queryKey: ["git-status", cwd, sessionId],
     queryFn: () => gitStatusSinceBaseline(sessionId!),
     enabled: !!cwd && !!sessionId && isRepo,
-    refetchInterval: 5_000,
+    // Hot while this session streams (agent edits); cool down when idle —
+    // turn-end invalidate still refreshes immediately.
+    refetchInterval: isStreaming ? 5_000 : 30_000,
     refetchOnWindowFocus: true,
   })
 
@@ -107,8 +114,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     queryKey: ["git-pr-status", cwd],
     queryFn: () => gitPrStatus(cwd),
     enabled: !!cwd && isRepo && hasRemote,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    staleTime: 60_000,
     refetchOnWindowFocus: true,
   })
   const branchPr = prStatus?.pr ?? null
@@ -149,10 +155,6 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
 
   const workspace = useWorkspaceActions(sessionId, setError)
 
-  // Agent turns usually touch files — refresh when this session stops streaming.
-  const isStreaming = useAppStore((s) =>
-    sessionId ? !!s.streamingSessions[sessionId] : false,
-  )
   const prevStreaming = useRef(isStreaming)
   useEffect(() => {
     if (prevStreaming.current && !isStreaming) {

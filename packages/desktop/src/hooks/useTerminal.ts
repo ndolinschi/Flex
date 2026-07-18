@@ -69,6 +69,10 @@ type FitAddonLike = { fit: () => void }
  *
  * xterm + CSS are dynamic-imported inside the effect so the chat shell does
  * not pay for the terminal vendor chunk until a terminal tab mounts.
+ *
+ * When `active` is false the bus subscription is dropped (the singleton bus
+ * still buffers output). Re-activating clears the screen and resubscribes so
+ * scrollback replays without writing into a hidden canvas every chunk.
  */
 export const useTerminal = (
   id: string,
@@ -79,6 +83,9 @@ export const useTerminal = (
   const readOnly = options?.readOnly ?? false
   const fitRef = useRef<FitAddonLike | null>(null)
   const termRef = useRef<Terminal | null>(null)
+  const busUnsubRef = useRef<(() => void) | null>(null)
+  const activeRef = useRef(active)
+  activeRef.current = active
 
   useEffect(() => {
     const container = containerRef.current
@@ -89,7 +96,14 @@ export const useTerminal = (
     let dataDisposable: { dispose: () => void } | null = null
     let themeObserver: MutationObserver | null = null
     let resizeObserver: ResizeObserver | null = null
-    let unsubscribe: (() => void) | null = null
+
+    const attachBus = (t: Terminal) => {
+      busUnsubRef.current?.()
+      busUnsubRef.current = null
+      if (!activeRef.current) return
+      t.reset()
+      busUnsubRef.current = subscribeTerminal(id, (data) => t.write(data))
+    }
 
     void (async () => {
       const [{ Terminal: TerminalCtor }, { FitAddon }] = await Promise.all([
@@ -143,31 +157,26 @@ export const useTerminal = (
       })
 
       resizeObserver = new ResizeObserver(() => {
+        if (!activeRef.current) return
         if (container.clientWidth === 0 || container.clientHeight === 0) return
         fitAddon.fit()
         if (!readOnly && term) void terminalResize(id, term.cols, term.rows)
       })
       resizeObserver.observe(container)
 
-      // Synchronous subscribe via the bus: replays buffered scrollback first,
-      // so output emitted before this instance mounted (shell prompt, StrictMode
-      // remount gaps) is never lost.
-      unsubscribe = subscribeTerminal(id, (data) => term?.write(data))
+      attachBus(term)
+      if (activeRef.current) term.focus()
 
       if (cancelled) {
         themeObserver.disconnect()
         resizeObserver.disconnect()
         dataDisposable?.dispose()
-        unsubscribe()
+        busUnsubRef.current?.()
+        busUnsubRef.current = null
         fitRef.current = null
         termRef.current = null
         term.dispose()
         term = null
-        return
-      }
-
-      if (active) {
-        term.focus()
       }
     })()
 
@@ -176,7 +185,8 @@ export const useTerminal = (
       themeObserver?.disconnect()
       resizeObserver?.disconnect()
       dataDisposable?.dispose()
-      unsubscribe?.()
+      busUnsubRef.current?.()
+      busUnsubRef.current = null
       fitRef.current = null
       termRef.current = null
       term?.dispose()
@@ -184,12 +194,23 @@ export const useTerminal = (
   }, [id, containerRef, readOnly])
 
   useEffect(() => {
-    if (!active) return
-    termRef.current?.focus()
+    const term = termRef.current
+    if (!term) return
+    if (!active) {
+      busUnsubRef.current?.()
+      busUnsubRef.current = null
+      return
+    }
+    busUnsubRef.current?.()
+    term.reset()
+    busUnsubRef.current = subscribeTerminal(id, (data) => term.write(data))
+    term.focus()
     const container = containerRef.current
-    if (!container || container.clientWidth === 0) return
-    fitRef.current?.fit()
-  }, [active, containerRef])
+    if (container && container.clientWidth > 0) {
+      fitRef.current?.fit()
+      if (!readOnly) void terminalResize(id, term.cols, term.rows)
+    }
+  }, [active, id, containerRef, readOnly])
 
   const fit = () => {
     const container = containerRef.current
