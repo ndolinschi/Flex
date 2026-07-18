@@ -4,6 +4,10 @@
   "description": "Per-turn options.",
   "type": "object",
   "properties": {
+    "disable_tools": {
+      "description": "When true, this turn is offered **no tools** to the model and any\ntool call is denied at the permission gate. Used by isolated remote\nchat clients that must not read the filesystem or mutate state.\nDefault `false` keeps existing callers byte-identical.",
+      "type": "boolean"
+    },
     "effort": {
       "description": "How hard to work this turn: scales the thinking budget, the\nreasoning-guidance prompt text, and (at xhigh/max) the orchestration\nposture. `None` leaves behavior unchanged (engine default); the CLI\nalways sets it.",
       "anyOf": [

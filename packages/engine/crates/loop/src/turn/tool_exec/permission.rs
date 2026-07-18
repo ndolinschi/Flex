@@ -49,12 +49,21 @@ pub(super) async fn gate_permission(
             .ok()
     };
 
-    let verdict = deps.policy.evaluate(
-        &descriptor,
-        &request.input,
-        &meta.cwd,
-        handle.turn_permission_mode(),
-    );
+    let verdict = if handle.turn_disable_tools() {
+        Verdict::Deny {
+            reason: format!(
+                "`{}` is unavailable: this turn has tools disabled (chat-only)",
+                descriptor.name
+            ),
+        }
+    } else {
+        deps.policy.evaluate(
+            descriptor,
+            &request.input,
+            &meta.cwd,
+            handle.turn_permission_mode(),
+        )
+    };
     match verdict {
         Verdict::Deny { reason } => {
             tracing::info!(
@@ -158,7 +167,7 @@ pub(super) async fn gate_permission(
                 }
                 PermissionDecision::AllowAlways => {
                     deps.policy.add_rule(PermissionPolicy::rule_for_always(
-                        &descriptor,
+                        descriptor,
                         &request.input,
                     ));
                 }

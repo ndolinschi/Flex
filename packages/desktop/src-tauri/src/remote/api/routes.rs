@@ -1,12 +1,12 @@
 //! Route handlers for the desktop Remote Access `/v1` API.
 //!
 //! **Least privilege (non-negotiable):** a remote client may only
-//! - list / get session titles,
+//! - list / get root session titles,
 //! - read chat message events (filtered SSE),
-//! - send a text prompt (tools auto-denied via `DontAsk`).
+//! - send a text prompt (`disable_tools` + `DontAsk`).
 //!
 //! No session create/delete/update, no MCP, no providers, no HITL resolve,
-//! no permission_mode override, no cancel.
+//! no permission_mode override, no cancel, no subagent sessions, no tools.
 
 use std::sync::Arc;
 
@@ -113,8 +113,13 @@ async fn list_sessions(
 ) -> Result<Json<Vec<SessionSummary>>, ApiError> {
     let service = require_service(&state.app).await?;
     let sessions = service.list_sessions().await?;
+    // Root chats only — subagent sessions are not a remote chat target.
     Ok(Json(
-        sessions.into_iter().map(SessionSummary::from).collect(),
+        sessions
+            .into_iter()
+            .filter(|m| m.depth == 0 && m.parent_id.is_none())
+            .map(SessionSummary::from)
+            .collect(),
     ))
 }
 
@@ -124,6 +129,12 @@ async fn get_session(
 ) -> Result<Json<SessionSummary>, ApiError> {
     let service = require_service(&state.app).await?;
     let meta = service.session_meta(&SessionId::from(id)).await?;
+    if meta.depth != 0 || meta.parent_id.is_some() {
+        return Err(ApiError::from((
+            StatusCode::FORBIDDEN,
+            "remote chat may only target root sessions".into(),
+        )));
+    }
     Ok(Json(SessionSummary::from(meta)))
 }
 
@@ -148,9 +159,17 @@ async fn prompt(
     let prompt = text.to_owned();
     let service = require_service(&state.app).await?;
     let session = SessionId::from(id);
-    // Isolation: remote turns never choose a permission mode. Tools are
-    // auto-denied (`DontAsk`) so a phone client cannot drive Bash/Write/MCP
-    // or spam the desktop with permission dialogs.
+    // Verify the target is a root chat session — never a subagent child.
+    let meta = service.session_meta(&session).await?;
+    if meta.depth != 0 || meta.parent_id.is_some() {
+        return Err(ApiError::from((
+            StatusCode::FORBIDDEN,
+            "remote chat may only target root sessions".into(),
+        )));
+    }
+    // Isolation: no tools offered to the model, and any tool call is denied.
+    // DontAsk alone is insufficient — PermissionHint::Never tools (Read/Grep)
+    // would still run and could exfiltrate files into the assistant reply.
     tokio::spawn(async move {
         let _ = service
             .prompt(
@@ -158,6 +177,12 @@ async fn prompt(
                 PromptInput::text(prompt),
                 TurnOptions {
                     permission_mode: Some(PermissionMode::DontAsk),
+                    disable_tools: true,
+                    system_append: Some(
+                        "You are responding to a remote chat companion. Reply in text only. \
+                         You have no tools on this turn — do not attempt tool calls."
+                            .into(),
+                    ),
                     ..TurnOptions::default()
                 },
             )
@@ -178,6 +203,14 @@ async fn events(
     Query(query): Query<EventsQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
     let service = require_service(&state.app).await?;
-    let stream = session_events_stream(&service, SessionId::from(id), query.from_seq).await?;
+    let session = SessionId::from(id);
+    let meta = service.session_meta(&session).await?;
+    if meta.depth != 0 || meta.parent_id.is_some() {
+        return Err(ApiError::from((
+            StatusCode::FORBIDDEN,
+            "remote chat may only target root sessions".into(),
+        )));
+    }
+    let stream = session_events_stream(&service, session, query.from_seq).await?;
     Ok(stream)
 }

@@ -127,11 +127,26 @@ mod tests {
     }
 
     #[test]
+    fn hides_tool_thinking_and_exec_events() {
+        assert!(!event_visible(&AgentEvent::ThinkingDelta {
+            message_id: agentloop_contracts::MessageId::from("m".to_string()),
+            text: "secret".into(),
+        }));
+        assert!(!event_visible(&AgentEvent::ToolArgsDelta {
+            call_id: agentloop_contracts::ToolCallId::from("c".to_string()),
+            json_fragment: "{\"command\":".into(),
+        }));
+        assert!(!event_visible(&AgentEvent::ExecChunk {
+            call_id: agentloop_contracts::ToolCallId::from("c".to_string()),
+            stream: agentloop_contracts::ExecStream::Stdout,
+            text: "leaked".into(),
+        }));
+    }
+
+    #[test]
     fn scrub_drops_tool_use_and_local_paths() {
         let scrubbed = scrub_blocks(vec![
-            ContentBlock::Markdown {
-                text: "hi".into(),
-            },
+            ContentBlock::Markdown { text: "hi".into() },
             ContentBlock::ToolUse {
                 id: agentloop_contracts::ToolCallId::from("c".to_string()),
                 name: "Bash".into(),

@@ -8,7 +8,7 @@ pub fn openapi_json() -> serde_json::Value {
         "info": {
             "title": "Desktop Remote Access API",
             "version": "1",
-            "description": "Least-privilege chat companion for the desktop app. A remote client may only list sessions, read message events, and send text prompts. Tools are auto-denied on remote turns. No MCP, session mutation, permissions, or providers."
+            "description": "Least-privilege chat companion for the desktop app. A remote client may only list root sessions, read scrubbed message events, and send text prompts with tools fully disabled. No MCP, session mutation, permissions, providers, or subagent access."
         },
         "paths": {
             "/health": {

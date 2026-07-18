@@ -193,6 +193,11 @@ pub fn ensure_remote_token() -> DesktopResult<String> {
 /// Generate a new token and persist it, replacing any prior value.
 pub fn rotate_remote_token() -> DesktopResult<String> {
     let token = super::auth::AuthToken::generate().as_str().to_owned();
+    if token.is_empty() {
+        return Err(DesktopError::Config(
+            "generated remote access token was empty".into(),
+        ));
+    }
     let dir = secrets_dir()?;
     let mut all = SecretsStore::load_all(&dir, &[])?;
     all.insert(REMOTE_TOKEN_SECRET_KEY.to_owned(), token.clone());

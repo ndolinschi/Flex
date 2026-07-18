@@ -186,10 +186,12 @@ to unlock the native `chatgpt` provider.
 listener and pluggable connection methods (manual, LAN, Bonjour/mDNS, public
 port; Cloudflare Tunnel and Bluetooth are adapter stubs). Clients pair with a
 versioned JSON document (host/port/token or Bonjour) and may only
-`sessions.list` / `messages.read` / `messages.send`. Remote prompts force
-`DontAsk` (tools auto-denied); SSE filters out tool/permission/control events.
-No MCP, session mutation, HITL resolve, or providers over this surface. Distinct
-from `agentloop-transport-http` / `flex serve`.
+`sessions.list` / `messages.read` / `messages.send` against **root** sessions.
+Remote prompts set `TurnOptions.disable_tools` (no tools offered; any call
+denied) plus `DontAsk`. SSE filters out tool/permission/control events and
+scrubs ToolUse/paths from message payloads. No MCP, session mutation, HITL
+resolve, providers, or subagent access over this surface. Distinct from
+`agentloop-transport-http` / `flex serve`.
 
 ## packages/gateway
 

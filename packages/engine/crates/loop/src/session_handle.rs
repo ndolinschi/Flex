@@ -30,6 +30,8 @@ pub(crate) struct SessionHandle {
     /// Live permission mode for the in-flight turn; updated when the client
     /// changes `/permissions` mid-turn.
     turn_permission_mode: Mutex<Option<PermissionMode>>,
+    /// When true, the in-flight turn must not offer or execute any tools.
+    turn_disable_tools: Mutex<bool>,
     /// Effort level for the in-flight turn, so the Task intercept can pass the
     /// parent's effort down to spawned subagents.
     turn_effort: Mutex<Option<Effort>>,
@@ -52,6 +54,7 @@ impl SessionHandle {
             turn_gate: tokio::sync::Mutex::new(()),
             current_cancel: Mutex::new(None),
             turn_permission_mode: Mutex::new(None),
+            turn_disable_tools: Mutex::new(false),
             turn_effort: Mutex::new(None),
         }
     }
@@ -78,6 +81,20 @@ impl SessionHandle {
     pub(crate) fn turn_permission_mode(&self) -> Option<PermissionMode> {
         *self
             .turn_permission_mode
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+    }
+
+    pub(crate) fn set_turn_disable_tools(&self, disable: bool) {
+        *self
+            .turn_disable_tools
+            .lock()
+            .unwrap_or_else(|p| p.into_inner()) = disable;
+    }
+
+    pub(crate) fn turn_disable_tools(&self) -> bool {
+        *self
+            .turn_disable_tools
             .lock()
             .unwrap_or_else(|p| p.into_inner())
     }
