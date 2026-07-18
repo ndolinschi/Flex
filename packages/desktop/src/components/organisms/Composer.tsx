@@ -204,7 +204,8 @@ export const Composer = ({
   }
 
   const handleToggleBypass = () => {
-    if (!activeSessionId || composerMode !== "agent") return
+    if (!activeSessionId || (composerMode !== "agent" && composerMode !== "debug"))
+      return
     const next = !sessionBypass
     setSessionBypass(activeSessionId, next)
     const sessionId = activeSessionId

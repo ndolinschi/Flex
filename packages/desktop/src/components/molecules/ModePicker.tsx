@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
+  Bug,
   Check,
   ChevronDown,
   ListTodo,
@@ -42,6 +43,14 @@ const MODES: ModeOption[] = [
     description: "Questions without making changes",
     icon: MessageCircle,
     accent: "text-cyan",
+  },
+  {
+    id: "debug",
+    label: "Debug",
+    description:
+      "Reproduce → probe → fix → clean: temporary debug code, then remove it",
+    icon: Bug,
+    accent: "text-orange",
   },
   {
     id: "flex",
@@ -152,16 +161,19 @@ export const modePlaceholder = (mode: ComposerMode, isHero: boolean): string => 
   if (!isHero) {
     if (mode === "plan") return "Refine the plan…"
     if (mode === "ask") return "Ask a follow-up…"
+    if (mode === "debug") return "Describe the failure or next probe…"
     if (mode === "flex") return "Direct the orchestrator…"
     return "Send follow-up"
   }
   if (mode === "plan") return "Plan and design before coding…"
   if (mode === "ask") return "Ask questions without making changes…"
+  if (mode === "debug")
+    return "Describe the bug — Debug reproduces, probes, fixes, then cleans up…"
   if (mode === "flex") return "Describe the task — Flex plans, reviews, and executes it…"
   return "Plan, search, build anything"
 }
 
-/** Agent mode defers to the user's configured default (Settings → Behavior →
+/** Agent/Debug defer to the user's configured default (Settings → Behavior →
  * Permissions, `appStore.defaultPermissionMode`) — read live via
  * `getState()` since this is a plain function, not a component/hook, and
  * callers (Composer.tsx, usePlanBuild.ts) invoke it at turn-submit time, not
@@ -173,3 +185,7 @@ export const modeToPermission = (mode: ComposerMode): PermissionMode => {
   if (mode === "flex") return "dont_ask"
   return useAppStore.getState().defaultPermissionMode
 }
+
+/** Bypass-permissions shield applies in Agent and Debug (full-tool modes). */
+export const modeAllowsBypass = (mode: ComposerMode | string): boolean =>
+  mode === "agent" || mode === "debug"

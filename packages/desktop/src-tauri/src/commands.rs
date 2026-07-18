@@ -1481,10 +1481,10 @@ pub struct PromptCommandInput {
     /// rather than erroring — see `parse_effort`.
     #[serde(default)]
     pub effort: Option<String>,
-    /// The composer mode picked in the UI ("agent" | "plan" | "ask" | "flex"),
-    /// distinct from `permission_mode` (its derived wire value — see
-    /// `ModePicker.tsx::modeToPermission`). Only `"flex"` currently changes
-    /// backend behavior: it appends the orchestrator system prompt below.
+    /// The composer mode picked in the UI ("agent" | "plan" | "ask" | "flex" |
+    /// "debug"), distinct from `permission_mode` (its derived wire value — see
+    /// `ModePicker.tsx::modeToPermission`). `"flex"` / `"plan"` / `"debug"`
+    /// append mode-specific system prompts below.
     #[serde(default)]
     pub composer_mode: Option<String>,
 }
@@ -1652,6 +1652,86 @@ checklist of investigative steps (e.g. \"locate the code\", \"identify the \
 logic\") — that investigation is your job to do now, before answering. Present \
 a concrete, grounded plan only after you have actually explored the code.";
 
+/// Appended in Debug mode (`composer_mode == "debug"`). Same agent, full tools:
+/// reproduce → localize → temporary probes → rerun → remove probes → deliver.
+/// Vision-aware appendices are composed separately in `prompt_inner`.
+const DEBUG_MODE_PROMPT: &str = "\
+# Debug mode
+
+You are debugging — same tools as Agent mode, different discipline. Do not \
+guess-and-patch. Follow this loop and narrate which step you are on:
+
+1. **Gather evidence** — collect the maximum useful signal before editing: \
+error messages, stack traces, failing tests, logs, network/console output, \
+relevant source, and (when available) Browser/Computer tools for UI bugs.
+2. **Reproduce first** — make the failure happen on demand. Explicitly confirm \
+\"reproduced: yes\" (or \"cannot reproduce yet\" with what you still need). \
+Do not claim a fix until reproduction is solid.
+3. **Localize** — narrow WHERE it fails (file/symbol/layer). Prefer bisection \
+and reading over speculative rewrites.
+4. **Probe** — inject the SMALLEST temporary instrumentation that teaches you \
+something: logs, assertions, counters, feature flags. Mark every probe so it \
+is greppable and removable:
+   - Prefer comments/tags containing exactly `AGENT-DEBUG` (e.g. \
+`// AGENT-DEBUG`, `# AGENT-DEBUG`, `{/* AGENT-DEBUG */}`).
+   - Never commit or leave probes in the final answer.
+5. **Rerun** — re-run the failing path (tests, CLI, Browser flow, app). Keep \
+probes only while they earn their keep.
+6. **Fix the root cause** — one clear fix grounded in evidence from steps 1–5.
+7. **Clean up** — when verification passes, REMOVE every `AGENT-DEBUG` probe \
+and any other temporary scaffolding. Grep the tree for `AGENT-DEBUG` before \
+you stop. The delivered result must be the real fix only — no leftover debug \
+noise.
+8. **Verify clean** — re-run once more after cleanup so you did not remove \
+something load-bearing.
+
+## UI / frontend / desktop bugs
+
+When Browser tools are registered (`BrowserNavigate`, `BrowserScreenshot`, \
+`BrowserEval`, `BrowserClick`, `BrowserConsole`, `BrowserOpenDevtools`), prefer \
+them for live page failures — console dumps and DOM/source via eval often beat \
+guessing from static files alone.
+
+When Computer tools are registered (`ComputerScreenshot`, `ComputerMove`, \
+`ComputerClick`, `ComputerType`, `ComputerOpenApp`), use them for OS/desktop \
+repros (open the app, drive UI, capture state). Respect permission prompts.
+
+## What NOT to do
+
+- Do not ship speculative multi-file refactors while the bug is unreproduced.
+- Do not leave `AGENT-DEBUG` (or equivalent) instrumentation in the final diff.
+- Do not treat a single green run with probes still present as done.
+- IDE-native debuggers (e.g. attaching IntelliJ to a running process) are out \
+of scope for this mode — stick to in-repo probes + tools above.";
+
+/// Text-evidence appendix when the active model advertises vision.
+const DEBUG_VISION_YES: &str = "\
+## Vision: ENABLED for this model
+
+Screenshots from Browser/Computer tools (and user image attachments) are \
+first-class evidence — use them when a visual or layout bug is suspected. \
+Still pair images with console/DOM/text so the fix is grounded in code.";
+
+/// Text-evidence appendix when the active model does NOT support images.
+const DEBUG_VISION_NO: &str = "\
+## Vision: DISABLED for this model
+
+Do NOT rely on screenshots as primary evidence — this model cannot see images. \
+Prefer text channels instead:
+- `BrowserConsole` / console dumps
+- `BrowserEval` to read DOM, computed styles, React/Vue props, error objects
+- page HTML/source excerpts, network/log files, stack traces
+- describe UI state in words after probing the DOM
+If a screenshot tool returns a path, treat it as opaque unless the user can \
+interpret it; extract facts via eval/logs instead.";
+
+/// When we could not resolve ModelInfo.vision for the selected model.
+const DEBUG_VISION_UNKNOWN: &str = "\
+## Vision: UNKNOWN for this model
+
+Prefer text evidence (console, DOM via eval, logs, source). Use screenshots \
+only as a supplement — never as the sole proof of a visual bug.";
+
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn prompt(
@@ -1701,6 +1781,22 @@ fn session_cwd_notice(cwd: &std::path::Path) -> String {
     )
 }
 
+/// Look up `ModelInfo.vision` for a model id (`provider/model` or bare).
+/// Returns `None` when the model cannot be resolved or `list_models` fails.
+async fn resolve_model_vision(service: &EngineService, model: &str) -> Option<bool> {
+    let model_ref = ModelRef(model.to_owned());
+    let (provider, model_id) = service.provider_registry().resolve(&model_ref)?;
+    let models = provider.list_models().await.ok()?;
+    models.into_iter().find(|m| m.id == model_id).map(|m| m.vision)
+}
+
+fn append_system(existing: Option<String>, fragment: &str) -> Option<String> {
+    Some(match existing {
+        Some(prior) => format!("{prior}\n\n{fragment}"),
+        None => fragment.to_owned(),
+    })
+}
+
 #[tracing::instrument(level = "debug", skip_all)]
 async fn prompt_inner(
     state: State<'_, AppState>,
@@ -1737,16 +1833,27 @@ async fn prompt_inner(
         (None, None) => None,
     };
     if input.composer_mode.as_deref() == Some("flex") {
-        system_append = Some(match system_append {
-            Some(existing) => format!("{existing}\n\n{FLEX_ORCHESTRATOR_PROMPT}"),
-            None => FLEX_ORCHESTRATOR_PROMPT.to_owned(),
-        });
+        system_append = append_system(system_append, FLEX_ORCHESTRATOR_PROMPT);
     }
     if input.composer_mode.as_deref() == Some("plan") {
-        system_append = Some(match system_append {
-            Some(existing) => format!("{existing}\n\n{FLEX_PLAN_PROMPT}"),
-            None => FLEX_PLAN_PROMPT.to_owned(),
-        });
+        system_append = append_system(system_append, FLEX_PLAN_PROMPT);
+    }
+    if input.composer_mode.as_deref() == Some("debug") {
+        system_append = append_system(system_append, DEBUG_MODE_PROMPT);
+        let model_key = input
+            .model
+            .as_deref()
+            .or_else(|| meta.as_ref().and_then(|m| m.model.as_ref().map(|r| r.0.as_str())));
+        let vision = match model_key {
+            Some(key) => resolve_model_vision(&service, key).await,
+            None => None,
+        };
+        let vision_frag = match vision {
+            Some(true) => DEBUG_VISION_YES,
+            Some(false) => DEBUG_VISION_NO,
+            None => DEBUG_VISION_UNKNOWN,
+        };
+        system_append = append_system(system_append, vision_frag);
     }
     let opts = TurnOptions {
         model: input.model.clone().map(ModelRef),
