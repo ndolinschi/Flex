@@ -262,40 +262,42 @@ export const PluginCatalog = () => {
   }
 
   const loadingOrEmpty = isLoading || !plugins
+  const showEngine =
+    loadingOrEmpty || visible.length === 0 || engineVisible.length > 0
+  const showDesktop = !loadingOrEmpty && desktopVisible.length > 0
 
   return (
     <div className="flex flex-col gap-3">
       {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}
 
-      <SettingsSection
-        title="Engine plugins"
-        description="Native tool bundles the engine can load into a session."
-        rowId="tools-plugins"
-        actions={searchInput}
-        className="mb-0"
-      >
-        {loadingOrEmpty ? (
-          <div className="flex items-center gap-2 px-3.5 py-3 text-sm text-ink-muted">
-            <Spinner size="sm" /> Loading configuration…
-          </div>
-        ) : visible.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-ink-muted">
-            No plugins match “{query}”.
-          </p>
-        ) : engineVisible.length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-ink-muted">
-            No engine plugins match “{query}”.
-          </p>
-        ) : (
-          engineVisible.map(renderPluginRow)
-        )}
-      </SettingsSection>
+      {showEngine ? (
+        <SettingsSection
+          title="Engine plugins"
+          description="Native tool bundles the engine can load into a session."
+          rowId="tools-plugins"
+          actions={searchInput}
+          className="mb-0"
+        >
+          {loadingOrEmpty ? (
+            <div className="flex items-center gap-2 px-3.5 py-3 text-sm text-ink-muted">
+              <Spinner size="sm" /> Loading configuration…
+            </div>
+          ) : visible.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-ink-muted">
+              No plugins match “{query}”.
+            </p>
+          ) : (
+            engineVisible.map(renderPluginRow)
+          )}
+        </SettingsSection>
+      ) : null}
 
-      {!loadingOrEmpty && visible.length > 0 && desktopVisible.length > 0 ? (
+      {showDesktop ? (
         <SettingsSection
           title="Desktop plugins"
           description="Tools that drive the embedded Browser panel or the host OS. Desktop app only."
           rowId="tools-desktop-plugins"
+          actions={showEngine ? undefined : searchInput}
           className="mb-0"
         >
           {desktopVisible.map(renderPluginRow)}

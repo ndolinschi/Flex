@@ -190,7 +190,9 @@ impl Tool for BrowserScreenshotTool {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
             name: "BrowserScreenshot".into(),
-            description: "Capture a PNG of the embedded Browser panel viewport (macOS).".into(),
+            description: "Capture a PNG of the embedded Browser panel viewport \
+                          (macOS; other platforms not yet supported)."
+                .into(),
             input_schema: schema_of::<BrowserScreenshotInput>(),
             read_only: true,
             category: ToolCategory::Web,
