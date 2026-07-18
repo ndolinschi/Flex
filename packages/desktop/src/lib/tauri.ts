@@ -594,6 +594,8 @@ export const dbMentionTables = (
 
 export type ComponentsDetectResult = {
   isReact: boolean
+  /** Detected UI frameworks: "react" | "vue" | "angular". */
+  frameworks?: string[]
   reason: string
   packageName: string | null
 }
@@ -608,6 +610,7 @@ export type ComponentNode = {
 
 export type ComponentsListResult = {
   isReact: boolean
+  frameworks?: string[]
   components: ComponentNode[]
   roots: string[]
 }

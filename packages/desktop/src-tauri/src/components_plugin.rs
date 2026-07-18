@@ -1,10 +1,10 @@
-//! Desktop Components UI plugin — React detection + TSX/JSX inventory.
+//! Desktop Components UI plugin — React / Vue / Angular detection + inventory.
 //!
 //! Not part of the agent engine: Tauri IPC only, consumed by the right-panel
 //! Components tab registered through the frontend UI plugin registry.
 //!
-//! Discovery is heuristic (PascalCase exports + relative import edges), not a
-//! React DevTools / Fiber bridge.
+//! Discovery is heuristic (exports / SFC names / `@Component` classes + relative
+//! import edges), not a DevTools / Fiber / compiler bridge.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -58,11 +58,46 @@ static RE_PROPS_INTERFACE: LazyLock<Regex> = LazyLock::new(|| {
 static RE_PROP_FIELD: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?m)^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(\?)?\s*:").expect("prop field")
 });
+static RE_VUE_DEFINE_OPTIONS_NAME: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"defineOptions\s*\(\s*\{[^}]*\bname\s*:\s*['"]([^'"]+)['"]"#)
+        .expect("vue defineOptions name")
+});
+static RE_VUE_COMPONENT_NAME: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?:defineComponent|component)\s*\(\s*\{[^}]*\bname\s*:\s*['"]([^'"]+)['"]"#)
+        .expect("vue component name")
+});
+static RE_ANGULAR_COMPONENT: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?s)@Component\s*\([^)]*\)\s*(?:export\s+)?(?:default\s+)?class\s+([A-Z][A-Za-z0-9_]*)",
+    )
+    .expect("angular @Component class")
+});
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Framework {
+    React,
+    Vue,
+    Angular,
+}
+
+impl Framework {
+    fn id(self) -> &'static str {
+        match self {
+            Self::React => "react",
+            Self::Vue => "vue",
+            Self::Angular => "angular",
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ComponentsDetectResult {
+    /// True when React is among `frameworks` (compat with older UI).
     pub is_react: bool,
+    /// Detected UI frameworks: `"react"`, `"vue"`, `"angular"`.
+    #[serde(default)]
+    pub frameworks: Vec<String>,
     /// Short reason shown in the empty state (e.g. "react in package.json").
     pub reason: String,
     pub package_name: Option<String>,
@@ -84,6 +119,8 @@ pub struct ComponentNode {
 #[serde(rename_all = "camelCase")]
 pub struct ComponentsListResult {
     pub is_react: bool,
+    #[serde(default)]
+    pub frameworks: Vec<String>,
     pub components: Vec<ComponentNode>,
     /// Root ids (not imported by any other discovered component).
     pub roots: Vec<String>,
@@ -120,11 +157,49 @@ fn normalize_rel(path: &Path, root: &Path) -> String {
         .replace('\\', "/")
 }
 
-fn is_component_source(path: &Path) -> bool {
-    matches!(
-        path.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()),
-        Some(ref e) if e == "tsx" || e == "jsx"
-    )
+fn make_detect(
+    frameworks: &[Framework],
+    reason: impl Into<String>,
+    package_name: Option<String>,
+) -> ComponentsDetectResult {
+    let ids: Vec<String> = frameworks.iter().map(|f| f.id().to_string()).collect();
+    ComponentsDetectResult {
+        is_react: frameworks.contains(&Framework::React),
+        frameworks: ids,
+        reason: reason.into(),
+        package_name,
+    }
+}
+
+fn ext_lower(path: &Path) -> Option<String> {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+}
+
+fn is_react_source(path: &Path) -> bool {
+    matches!(ext_lower(path).as_deref(), Some("tsx" | "jsx"))
+}
+
+fn is_vue_source(path: &Path) -> bool {
+    matches!(ext_lower(path).as_deref(), Some("vue"))
+}
+
+fn is_angular_source(path: &Path) -> bool {
+    let Some(ext) = ext_lower(path) else {
+        return false;
+    };
+    if ext != "ts" {
+        return false;
+    }
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    !name.ends_with(".d.ts")
+        && !name.ends_with(".spec.ts")
+        && !name.ends_with(".test.ts")
 }
 
 fn read_capped(path: &Path) -> Option<String> {
@@ -148,9 +223,9 @@ fn find_package_json(cwd: &Path) -> Option<PathBuf> {
     }
 }
 
-fn package_json_is_react(raw: &str) -> (bool, String, Option<String>) {
+fn package_json_frameworks(raw: &str) -> (Vec<Framework>, String, Option<String>) {
     let Ok(value) = serde_json::from_str::<serde_json::Value>(raw) else {
-        return (false, "unreadable package.json".into(), None);
+        return (Vec::new(), "unreadable package.json".into(), None);
     };
     let name = value
         .get("name")
@@ -171,36 +246,72 @@ fn package_json_is_react(raw: &str) -> (bool, String, Option<String>) {
         })
     };
 
-    if has_dep("react") || has_dep("react-dom") {
-        return (true, "react in package.json".into(), name);
-    }
-    if has_dep("next") || has_dep("@next/swc") || has_dep("eslint-config-next") {
-        return (true, "next in package.json".into(), name);
-    }
-    if has_dep("@vitejs/plugin-react") || has_dep("@vitejs/plugin-react-swc") {
-        return (true, "vite react plugin in package.json".into(), name);
-    }
-    if has_dep("react-scripts") {
-        return (true, "create-react-app (react-scripts)".into(), name);
-    }
-    if has_dep("remix")
+    let mut frameworks = Vec::new();
+    let mut reasons = Vec::new();
+
+    if has_dep("react")
+        || has_dep("react-dom")
+        || has_dep("next")
+        || has_dep("@next/swc")
+        || has_dep("eslint-config-next")
+        || has_dep("@vitejs/plugin-react")
+        || has_dep("@vitejs/plugin-react-swc")
+        || has_dep("react-scripts")
+        || has_dep("remix")
         || has_dep("@remix-run/react")
         || has_dep("@remix-run/node")
         || has_dep("@remix-run/dev")
     {
-        return (true, "remix in package.json".into(), name);
-    }
-    // Scripts often name the framework even when deps are hoisted elsewhere.
-    if let Some(scripts) = value.get("scripts").and_then(|s| s.as_object()) {
+        frameworks.push(Framework::React);
+        reasons.push("react in package.json");
+    } else if let Some(scripts) = value.get("scripts").and_then(|s| s.as_object()) {
         let mentions_next = scripts.values().any(|v| {
             v.as_str()
                 .is_some_and(|s| s.split_whitespace().any(|tok| tok == "next"))
         });
         if mentions_next {
-            return (true, "next script in package.json".into(), name);
+            frameworks.push(Framework::React);
+            reasons.push("next script in package.json");
         }
     }
-    (false, "no React markers in package.json".into(), name)
+
+    if has_dep("vue")
+        || has_dep("nuxt")
+        || has_dep("@nuxt/kit")
+        || has_dep("@nuxt/schema")
+        || has_dep("@vitejs/plugin-vue")
+        || has_dep("vue-router")
+    {
+        frameworks.push(Framework::Vue);
+        reasons.push("vue in package.json");
+    } else if let Some(scripts) = value.get("scripts").and_then(|s| s.as_object()) {
+        let mentions_nuxt = scripts.values().any(|v| {
+            v.as_str()
+                .is_some_and(|s| s.split_whitespace().any(|tok| tok == "nuxt"))
+        });
+        if mentions_nuxt {
+            frameworks.push(Framework::Vue);
+            reasons.push("nuxt script in package.json");
+        }
+    }
+
+    if has_dep("@angular/core")
+        || has_dep("@angular/cli")
+        || has_dep("@angular/compiler")
+        || has_dep("@angular/common")
+    {
+        frameworks.push(Framework::Angular);
+        reasons.push("angular in package.json");
+    }
+
+    frameworks.sort_by_key(|f| f.id());
+    frameworks.dedup();
+    let reason = if reasons.is_empty() {
+        "no React/Vue/Angular markers in package.json".into()
+    } else {
+        reasons.join("; ")
+    };
+    (frameworks, reason, name)
 }
 
 const NEXT_CONFIG_NAMES: &[&str] = &[
@@ -211,20 +322,64 @@ const NEXT_CONFIG_NAMES: &[&str] = &[
     "next.config.mts",
 ];
 
-fn has_next_config(dir: &Path) -> bool {
-    NEXT_CONFIG_NAMES
-        .iter()
-        .any(|name| dir.join(name).is_file())
+const NUXT_CONFIG_NAMES: &[&str] = &[
+    "nuxt.config.js",
+    "nuxt.config.mjs",
+    "nuxt.config.cjs",
+    "nuxt.config.ts",
+    "nuxt.config.mts",
+];
+
+fn has_named_config(dir: &Path, names: &[&str]) -> bool {
+    names.iter().any(|name| dir.join(name).is_file())
 }
 
-fn try_package_json(path: &Path) -> Option<(bool, String, Option<String>)> {
+fn try_package_json(path: &Path) -> Option<(Vec<Framework>, String, Option<String>)> {
     let raw = fs::read_to_string(path).ok()?;
-    Some(package_json_is_react(&raw))
+    Some(package_json_frameworks(&raw))
+}
+
+fn frameworks_from_dir_markers(dir: &Path) -> Vec<(Framework, String)> {
+    let mut out = Vec::new();
+    if has_named_config(dir, NEXT_CONFIG_NAMES) {
+        out.push((
+            Framework::React,
+            format!(
+                "next.config in {}",
+                dir.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(".")
+            ),
+        ));
+    }
+    if has_named_config(dir, NUXT_CONFIG_NAMES) {
+        out.push((
+            Framework::Vue,
+            format!(
+                "nuxt.config in {}",
+                dir.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(".")
+            ),
+        ));
+    }
+    if dir.join("angular.json").is_file() {
+        out.push((
+            Framework::Angular,
+            format!(
+                "angular.json in {}",
+                dir.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(".")
+            ),
+        ));
+    }
+    out
 }
 
 /// Scan one level of common monorepo / app folders when the root package.json
-/// is a workspace shell without React deps (e.g. Next lives in `apps/web`).
-fn detect_react_in_children(root: &Path) -> Option<ComponentsDetectResult> {
+/// is a workspace shell without UI deps.
+fn detect_in_children(root: &Path) -> Option<ComponentsDetectResult> {
     const CHILD_DIRS: &[&str] = &["apps", "packages", "web", "frontend", "client", "app", "src"];
     let Ok(entries) = fs::read_dir(root) else {
         return None;
@@ -240,31 +395,32 @@ fn detect_react_in_children(root: &Path) -> Option<ComponentsDetectResult> {
         let Some(name) = dir.file_name().and_then(|n| n.to_str()) else {
             continue;
         };
-        // Prefer well-known app folders; also accept any immediate child that
-        // ships its own package.json (covers `apps/web`-style layouts when we
-        // recurse one extra level below `apps`/`packages`).
         let interesting = CHILD_DIRS.contains(&name) || dir.join("package.json").is_file();
         if !interesting {
             continue;
         }
 
-        if has_next_config(dir) {
+        let markers = frameworks_from_dir_markers(dir);
+        if !markers.is_empty() {
+            let frameworks: Vec<Framework> = markers.iter().map(|(f, _)| *f).collect();
+            let reason = markers
+                .iter()
+                .map(|(_, r)| r.as_str())
+                .collect::<Vec<_>>()
+                .join("; ");
             let package_name = try_package_json(&dir.join("package.json")).and_then(|r| r.2);
-            return Some(ComponentsDetectResult {
-                is_react: true,
-                reason: format!("next.config in {}", name),
-                package_name,
-            });
+            return Some(make_detect(&frameworks, reason, package_name));
         }
-        if let Some((true, reason, package_name)) = try_package_json(&dir.join("package.json")) {
-            return Some(ComponentsDetectResult {
-                is_react: true,
-                reason: format!("{reason} ({name})"),
-                package_name,
-            });
+        if let Some((fw, reason, package_name)) = try_package_json(&dir.join("package.json")) {
+            if !fw.is_empty() {
+                return Some(make_detect(
+                    &fw,
+                    format!("{reason} ({name})"),
+                    package_name,
+                ));
+            }
         }
 
-        // One more level for `apps/web`, `packages/ui`, etc.
         if matches!(name, "apps" | "packages") {
             let Ok(nested) = fs::read_dir(dir) else {
                 continue;
@@ -280,23 +436,32 @@ fn detect_react_in_children(root: &Path) -> Option<ComponentsDetectResult> {
                     .file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or("app");
-                if has_next_config(&child) {
+                let markers = frameworks_from_dir_markers(&child);
+                if !markers.is_empty() {
+                    let frameworks: Vec<Framework> = markers.iter().map(|(f, _)| *f).collect();
+                    let reason = markers
+                        .iter()
+                        .map(|(_, r)| format!("{r}"))
+                        .collect::<Vec<_>>()
+                        .join("; ");
                     let package_name =
                         try_package_json(&child.join("package.json")).and_then(|r| r.2);
-                    return Some(ComponentsDetectResult {
-                        is_react: true,
-                        reason: format!("next.config in {name}/{child_name}"),
+                    return Some(make_detect(
+                        &frameworks,
+                        format!("{reason} ({name}/{child_name})"),
                         package_name,
-                    });
+                    ));
                 }
-                if let Some((true, reason, package_name)) =
+                if let Some((fw, reason, package_name)) =
                     try_package_json(&child.join("package.json"))
                 {
-                    return Some(ComponentsDetectResult {
-                        is_react: true,
-                        reason: format!("{reason} ({name}/{child_name})"),
-                        package_name,
-                    });
+                    if !fw.is_empty() {
+                        return Some(make_detect(
+                            &fw,
+                            format!("{reason} ({name}/{child_name})"),
+                            package_name,
+                        ));
+                    }
                 }
             }
         }
@@ -304,71 +469,61 @@ fn detect_react_in_children(root: &Path) -> Option<ComponentsDetectResult> {
     None
 }
 
-/// Detect whether `cwd` looks like a React / Next.js application.
-pub fn detect_react(cwd: &Path) -> ComponentsDetectResult {
+/// Detect whether `cwd` looks like a React / Vue / Angular application.
+pub fn detect_ui_frameworks(cwd: &Path) -> ComponentsDetectResult {
     if !cwd.is_dir() {
-        return ComponentsDetectResult {
-            is_react: false,
-            reason: "cwd is not a directory".into(),
-            package_name: None,
-        };
+        return make_detect(&[], "cwd is not a directory", None);
     }
 
-    // next.config.* is decisive even before package.json (covers pnpm workspaces
-    // where `next` is only declared in a nested package).
-    if has_next_config(cwd) {
+    let root_markers = frameworks_from_dir_markers(cwd);
+    if !root_markers.is_empty() {
+        let frameworks: Vec<Framework> = root_markers.iter().map(|(f, _)| *f).collect();
+        let reason = root_markers
+            .iter()
+            .map(|(_, r)| {
+                // Prefer short reasons at root ("next.config present").
+                if r.contains("next.config") {
+                    "next.config present"
+                } else if r.contains("nuxt.config") {
+                    "nuxt.config present"
+                } else if r.contains("angular.json") {
+                    "angular.json present"
+                } else {
+                    r.as_str()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("; ");
         let package_name = find_package_json(cwd)
             .and_then(|p| try_package_json(&p))
             .and_then(|r| r.2);
-        return ComponentsDetectResult {
-            is_react: true,
-            reason: "next.config present".into(),
-            package_name,
-        };
+        return make_detect(&frameworks, reason, package_name);
     }
 
     let Some(pkg_path) = find_package_json(cwd) else {
-        // No package.json up-tree — still try shallow children (opened a
-        // parent folder that isn't itself a JS package).
-        return detect_react_in_children(cwd).unwrap_or(ComponentsDetectResult {
-            is_react: false,
-            reason: "no package.json found".into(),
-            package_name: None,
+        return detect_in_children(cwd).unwrap_or_else(|| {
+            make_detect(&[], "no package.json found", None)
         });
     };
     let Ok(raw) = fs::read_to_string(&pkg_path) else {
-        return ComponentsDetectResult {
-            is_react: false,
-            reason: "could not read package.json".into(),
-            package_name: None,
-        };
+        return make_detect(&[], "could not read package.json", None);
     };
-    let (is_react, reason, package_name) = package_json_is_react(&raw);
-    if is_react {
-        return ComponentsDetectResult {
-            is_react: true,
-            reason,
-            package_name,
-        };
+    let (frameworks, reason, package_name) = package_json_frameworks(&raw);
+    if !frameworks.is_empty() {
+        return make_detect(&frameworks, reason, package_name);
     }
 
-    // Workspace root without React deps — look in apps/packages/web/…
     let search_root = pkg_path.parent().unwrap_or(cwd);
-    if let Some(hit) = detect_react_in_children(search_root) {
+    if let Some(hit) = detect_in_children(search_root) {
         return hit;
     }
-    // Also search from the session cwd when it differs (opened a subfolder).
     if search_root != cwd {
-        if let Some(hit) = detect_react_in_children(cwd) {
+        if let Some(hit) = detect_in_children(cwd) {
             return hit;
         }
     }
 
-    ComponentsDetectResult {
-        is_react: false,
-        reason,
-        package_name,
-    }
+    make_detect(&[], reason, package_name)
 }
 
 fn extract_exports(source: &str) -> Vec<String> {
@@ -405,7 +560,60 @@ fn extract_exports(source: &str) -> Vec<String> {
     out
 }
 
-/// Resolve a relative import specifier to a `.tsx`/`.jsx` file.
+fn to_pascal_case(stem: &str) -> String {
+    let mut out = String::new();
+    let mut cap = true;
+    for ch in stem.chars() {
+        if ch == '-' || ch == '_' || ch == '.' {
+            cap = true;
+            continue;
+        }
+        if cap {
+            out.extend(ch.to_uppercase());
+            cap = false;
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+fn extract_vue_exports(path: &Path, source: &str) -> Vec<String> {
+    if let Some(cap) = RE_VUE_DEFINE_OPTIONS_NAME.captures(source) {
+        if let Some(m) = cap.get(1) {
+            return vec![m.as_str().to_string()];
+        }
+    }
+    if let Some(cap) = RE_VUE_COMPONENT_NAME.captures(source) {
+        if let Some(m) = cap.get(1) {
+            return vec![m.as_str().to_string()];
+        }
+    }
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Component");
+    let name = to_pascal_case(stem);
+    if name.is_empty() {
+        Vec::new()
+    } else {
+        vec![name]
+    }
+}
+
+fn extract_angular_exports(source: &str) -> Vec<String> {
+    let mut names: HashSet<String> = HashSet::new();
+    for cap in RE_ANGULAR_COMPONENT.captures_iter(source) {
+        if let Some(m) = cap.get(1) {
+            names.insert(m.as_str().to_string());
+        }
+    }
+    let mut out: Vec<String> = names.into_iter().collect();
+    out.sort();
+    out
+}
+
+/// Resolve a relative import specifier to a component source file.
 fn resolve_import(from_file: &Path, spec: &str, _root: &Path) -> Option<PathBuf> {
     if !(spec.starts_with("./") || spec.starts_with("../")) {
         return None;
@@ -415,19 +623,22 @@ fn resolve_import(from_file: &Path, spec: &str, _root: &Path) -> Option<PathBuf>
         base.clone(),
         PathBuf::from(format!("{}.tsx", base.display())),
         PathBuf::from(format!("{}.jsx", base.display())),
+        PathBuf::from(format!("{}.vue", base.display())),
+        PathBuf::from(format!("{}.ts", base.display())),
         base.join("index.tsx"),
         base.join("index.jsx"),
+        base.join("index.vue"),
+        base.join("index.ts"),
     ];
-    candidates
-        .into_iter()
-        .find(|c| c.is_file() && is_component_source(c))
+    candidates.into_iter().find(|c| {
+        c.is_file() && (is_react_source(c) || is_vue_source(c) || is_angular_source(c))
+    })
 }
 
 fn extract_component_imports(source: &str, from_file: &Path, root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     for cap in RE_IMPORT.captures_iter(source) {
         let spec = cap.get(4).map(|m| m.as_str()).unwrap_or("");
-        // Default import or namespace — only keep PascalCase (component-like).
         let default_or_ns = cap
             .get(1)
             .or_else(|| cap.get(3))
@@ -453,7 +664,10 @@ fn extract_component_imports(source: &str, from_file: &Path, root: &Path) -> Vec
         });
         let has_component_import =
             default_or_ns.is_some() || named.as_ref().is_some_and(|n| !n.is_empty());
-        if !has_component_import {
+        // Vue often default-imports SFCs with any case alias — still resolve
+        // relative `.vue` specs even without a PascalCase binding.
+        let is_vue_spec = spec.ends_with(".vue");
+        if !has_component_import && !is_vue_spec {
             continue;
         }
         if let Some(resolved) = resolve_import(from_file, spec, root) {
@@ -483,14 +697,10 @@ fn extract_props(source: &str, component_name: &str) -> Vec<ComponentPropSummary
         let mut props = Vec::new();
         for field in RE_PROP_FIELD.captures_iter(body) {
             let name = field.get(1).map(|m| m.as_str()).unwrap_or("").to_string();
-            if name.is_empty() || name == "children" {
-                // Still include children — useful for the LLM.
-            }
             if name.is_empty() {
                 continue;
             }
             let optional = field.get(2).is_some();
-            // Grab a short type hint after the colon until `;` or newline.
             let type_hint = field.get(0).and_then(|whole| {
                 let start = whole.end();
                 let rest = &body[start.min(body.len())..];
@@ -524,7 +734,16 @@ fn source_snippet(source: &str) -> String {
 }
 
 fn preferred_scan_roots(cwd: &Path) -> Vec<PathBuf> {
-    let named = ["src", "app", "components", "pages", "lib", "ui"];
+    let named = [
+        "src",
+        "app",
+        "apps",
+        "components",
+        "pages",
+        "lib",
+        "ui",
+        "views",
+    ];
     let mut roots: Vec<PathBuf> = named
         .iter()
         .map(|n| cwd.join(n))
@@ -536,7 +755,32 @@ fn preferred_scan_roots(cwd: &Path) -> Vec<PathBuf> {
     roots
 }
 
-fn scan_component_files(cwd: &Path) -> Vec<(PathBuf, String, Vec<String>)> {
+fn wants_path(path: &Path, frameworks: &[Framework]) -> bool {
+    let react = frameworks.contains(&Framework::React);
+    let vue = frameworks.contains(&Framework::Vue);
+    let angular = frameworks.contains(&Framework::Angular);
+    (react && is_react_source(path))
+        || (vue && is_vue_source(path))
+        || (angular && is_angular_source(path))
+}
+
+fn exports_for_file(path: &Path, source: &str, frameworks: &[Framework]) -> Vec<String> {
+    if is_vue_source(path) && frameworks.contains(&Framework::Vue) {
+        return extract_vue_exports(path, source);
+    }
+    if is_angular_source(path) && frameworks.contains(&Framework::Angular) {
+        return extract_angular_exports(source);
+    }
+    if is_react_source(path) && frameworks.contains(&Framework::React) {
+        return extract_exports(source);
+    }
+    Vec::new()
+}
+
+fn scan_component_files(
+    cwd: &Path,
+    frameworks: &[Framework],
+) -> Vec<(PathBuf, String, Vec<String>)> {
     let mut files = Vec::new();
     let mut seen = HashSet::new();
     for root in preferred_scan_roots(cwd) {
@@ -550,7 +794,7 @@ fn scan_component_files(cwd: &Path) -> Vec<(PathBuf, String, Vec<String>)> {
                 break;
             }
             let path = entry.path();
-            if !path.is_file() || !is_component_source(path) {
+            if !path.is_file() || !wants_path(path, frameworks) {
                 continue;
             }
             let abs = path.to_path_buf();
@@ -560,7 +804,7 @@ fn scan_component_files(cwd: &Path) -> Vec<(PathBuf, String, Vec<String>)> {
             let Some(source) = read_capped(&abs) else {
                 continue;
             };
-            let exports = extract_exports(&source);
+            let exports = exports_for_file(&abs, &source, frameworks);
             if exports.is_empty() {
                 continue;
             }
@@ -570,19 +814,33 @@ fn scan_component_files(cwd: &Path) -> Vec<(PathBuf, String, Vec<String>)> {
     files
 }
 
-/// Inventory React components under `cwd`.
+fn frameworks_from_detect(detect: &ComponentsDetectResult) -> Vec<Framework> {
+    detect
+        .frameworks
+        .iter()
+        .filter_map(|id| match id.as_str() {
+            "react" => Some(Framework::React),
+            "vue" => Some(Framework::Vue),
+            "angular" => Some(Framework::Angular),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Inventory UI components under `cwd` for detected frameworks.
 pub fn list_components(cwd: &Path) -> ComponentsListResult {
-    let detect = detect_react(cwd);
-    if !detect.is_react {
+    let detect = detect_ui_frameworks(cwd);
+    let frameworks = frameworks_from_detect(&detect);
+    if frameworks.is_empty() {
         return ComponentsListResult {
             is_react: false,
+            frameworks: Vec::new(),
             components: Vec::new(),
             roots: Vec::new(),
         };
     }
 
-    let scanned = scan_component_files(cwd);
-    // file → component ids declared there
+    let scanned = scan_component_files(cwd, &frameworks);
     let mut file_to_ids: HashMap<PathBuf, Vec<String>> = HashMap::new();
     let mut nodes: HashMap<String, ComponentNode> = HashMap::new();
 
@@ -606,7 +864,6 @@ pub fn list_components(cwd: &Path) -> ComponentsListResult {
         file_to_ids.insert(path.clone(), ids);
     }
 
-    // Import edges: parent file → child files → child component ids
     for (path, source, _) in &scanned {
         let Some(parent_ids) = file_to_ids.get(path) else {
             continue;
@@ -641,7 +898,8 @@ pub fn list_components(cwd: &Path) -> ComponentsListResult {
     components.sort_by(|a, b| a.file.cmp(&b.file).then(a.name.cmp(&b.name)));
 
     ComponentsListResult {
-        is_react: true,
+        is_react: detect.is_react,
+        frameworks: detect.frameworks,
         components,
         roots,
     }
@@ -657,13 +915,23 @@ pub fn component_detail(cwd: &Path, id: &str) -> DesktopResult<ComponentDetail> 
         return Err(message(format!("component file not found: {file_rel}")));
     }
     let source = read_capped(&path).ok_or_else(|| message("could not read component file"))?;
-    let props = extract_props(&source, export_name);
+    let props = if is_react_source(&path) {
+        extract_props(&source, export_name)
+    } else {
+        Vec::new()
+    };
     let children = extract_component_imports(&source, &path, cwd)
         .into_iter()
         .filter_map(|p| {
             let rel = normalize_rel(&p, cwd);
             let src = read_capped(&p)?;
-            let exports = extract_exports(&src);
+            let exports = if is_vue_source(&p) {
+                extract_vue_exports(&p, &src)
+            } else if is_angular_source(&p) {
+                extract_angular_exports(&src)
+            } else {
+                extract_exports(&src)
+            };
             Some(
                 exports
                     .into_iter()
@@ -702,13 +970,9 @@ pub async fn components_detect(
 ) -> DesktopResult<ComponentsDetectResult> {
     let Some(path) = crate::path_resolve::resolve_existing_dir(&cwd, fallback_cwd.as_deref())
     else {
-        return Ok(ComponentsDetectResult {
-            is_react: false,
-            reason: cwd_not_a_directory_msg(&cwd),
-            package_name: None,
-        });
+        return Ok(make_detect(&[], cwd_not_a_directory_msg(&cwd), None));
     };
-    Ok(detect_react(&path))
+    Ok(detect_ui_frameworks(&path))
 }
 
 #[tauri::command]
@@ -758,10 +1022,33 @@ mod tests {
             &dir.path().join("package.json"),
             r#"{"name":"demo","dependencies":{"react":"^19.0.0","react-dom":"^19.0.0"}}"#,
         );
-        let r = detect_react(dir.path());
+        let r = detect_ui_frameworks(dir.path());
         assert!(r.is_react);
+        assert!(r.frameworks.iter().any(|f| f == "react"));
         assert!(r.reason.contains("react"));
         assert_eq!(r.package_name.as_deref(), Some("demo"));
+    }
+
+    #[test]
+    fn detects_vue_from_package_json() {
+        let dir = tempfile::tempdir().unwrap();
+        write_file(
+            &dir.path().join("package.json"),
+            r#"{"name":"demo","dependencies":{"vue":"^3.5.0"}}"#,
+        );
+        let r = detect_ui_frameworks(dir.path());
+        assert!(!r.is_react);
+        assert_eq!(r.frameworks, vec!["vue".to_string()]);
+    }
+
+    #[test]
+    fn detects_angular_from_angular_json() {
+        let dir = tempfile::tempdir().unwrap();
+        write_file(&dir.path().join("package.json"), r#"{"name":"ng-app"}"#);
+        write_file(&dir.path().join("angular.json"), r#"{"version":1}"#);
+        let r = detect_ui_frameworks(dir.path());
+        assert!(r.frameworks.iter().any(|f| f == "angular"));
+        assert!(r.reason.contains("angular.json"));
     }
 
     #[test]
@@ -771,7 +1058,8 @@ mod tests {
             &dir.path().join("package.json"),
             r#"{"name":"api","dependencies":{"express":"^4.0.0"}}"#,
         );
-        let r = detect_react(dir.path());
+        let r = detect_ui_frameworks(dir.path());
+        assert!(r.frameworks.is_empty());
         assert!(!r.is_react);
     }
 
@@ -780,7 +1068,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         write_file(&dir.path().join("package.json"), r#"{"name":"web"}"#);
         write_file(&dir.path().join("next.config.mjs"), "export default {}\n");
-        let r = detect_react(dir.path());
+        let r = detect_ui_frameworks(dir.path());
         assert!(r.is_react);
         assert!(r.reason.contains("next.config"));
     }
@@ -796,7 +1084,7 @@ mod tests {
             &dir.path().join("apps/web/package.json"),
             r#"{"name":"web","dependencies":{"next":"15.0.0","react":"19.0.0","react-dom":"19.0.0"}}"#,
         );
-        let r = detect_react(dir.path());
+        let r = detect_ui_frameworks(dir.path());
         assert!(r.is_react, "reason={}", r.reason);
         assert_eq!(r.package_name.as_deref(), Some("web"));
     }
@@ -808,7 +1096,7 @@ mod tests {
             &dir.path().join("package.json"),
             r#"{"name":"web","scripts":{"dev":"next dev","build":"next build"}}"#,
         );
-        let r = detect_react(dir.path());
+        let r = detect_ui_frameworks(dir.path());
         assert!(r.is_react);
         assert!(r.reason.contains("next script"));
     }
@@ -869,7 +1157,48 @@ export const Card = () => <div><Button label="Go" /></div>;
     }
 
     #[test]
-    fn empty_when_not_react() {
+    fn lists_vue_sfc_by_filename() {
+        let dir = tempfile::tempdir().unwrap();
+        write_file(
+            &dir.path().join("package.json"),
+            r#"{"dependencies":{"vue":"3"}}"#,
+        );
+        write_file(
+            &dir.path().join("src/components/HelloWorld.vue"),
+            r#"
+<script setup>
+const msg = 'hi'
+</script>
+<template><p>{{ msg }}</p></template>
+"#,
+        );
+        let list = list_components(dir.path());
+        assert_eq!(list.frameworks, vec!["vue".to_string()]);
+        assert!(list.components.iter().any(|c| c.name == "HelloWorld"));
+    }
+
+    #[test]
+    fn lists_angular_component_class() {
+        let dir = tempfile::tempdir().unwrap();
+        write_file(
+            &dir.path().join("package.json"),
+            r#"{"dependencies":{"@angular/core":"19"}}"#,
+        );
+        write_file(
+            &dir.path().join("src/app/hero.component.ts"),
+            r#"
+import { Component } from '@angular/core';
+@Component({ selector: 'app-hero', template: '<p>hero</p>' })
+export class HeroComponent {}
+"#,
+        );
+        let list = list_components(dir.path());
+        assert!(list.frameworks.iter().any(|f| f == "angular"));
+        assert!(list.components.iter().any(|c| c.name == "HeroComponent"));
+    }
+
+    #[test]
+    fn empty_when_no_ui_framework() {
         let dir = tempfile::tempdir().unwrap();
         write_file(&dir.path().join("package.json"), r#"{"name":"x"}"#);
         write_file(
@@ -878,6 +1207,7 @@ export const Card = () => <div><Button label="Go" /></div>;
         );
         let list = list_components(dir.path());
         assert!(!list.is_react);
+        assert!(list.frameworks.is_empty());
         assert!(list.components.is_empty());
     }
 }

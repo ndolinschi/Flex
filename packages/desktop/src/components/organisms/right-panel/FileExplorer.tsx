@@ -13,6 +13,7 @@ import {
 import {
   createTextFile,
   deletePath,
+  gitStatusSinceBaseline,
   listDirChildren,
   listFiles,
   renamePath,
@@ -26,6 +27,7 @@ import { basename, cn, fileIconForPath } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
 import { IconButton, Spinner, TextInput } from "../../atoms"
 import { ConfirmDialog, ContextMenu, type ContextMenuItem } from "../../molecules"
+import { STATUS_COLOR } from "./FileRow"
 
 type FileExplorerProps = {
   sessionId: string
@@ -66,12 +68,57 @@ const isValidBasename = (name: string): boolean => {
 
 const INDENT_PX = 12
 
+/** Map git porcelain paths → status letter; also index dirty dir prefixes. */
+const buildGitStatusIndex = (
+  files: ReadonlyArray<{ path: string; status: string }> | undefined,
+): {
+  byPath: Map<string, string>
+  dirtyDirs: Set<string>
+} => {
+  const byPath = new Map<string, string>()
+  const dirtyDirs = new Set<string>()
+  if (!files) return { byPath, dirtyDirs }
+  for (const f of files) {
+    const path = f.path.replace(/\\/g, "/")
+    byPath.set(path, f.status)
+    // Untracked dirs arrive with a trailing slash.
+    if (path.endsWith("/")) {
+      dirtyDirs.add(path.replace(/\/+$/, ""))
+    }
+    let rest = path.replace(/\/+$/, "")
+    while (rest.includes("/")) {
+      rest = rest.slice(0, rest.lastIndexOf("/"))
+      if (!rest) break
+      dirtyDirs.add(rest)
+    }
+  }
+  return { byPath, dirtyDirs }
+}
+
+const gitStatusClass = (
+  path: string,
+  isDir: boolean,
+  index: { byPath: Map<string, string>; dirtyDirs: Set<string> },
+): string | undefined => {
+  const normalized = path.replace(/\\/g, "/")
+  if (!isDir) {
+    const status = index.byPath.get(normalized)
+    return status ? (STATUS_COLOR[status] ?? undefined) : undefined
+  }
+  const dirStatus =
+    index.byPath.get(normalized) ??
+    index.byPath.get(`${normalized}/`) ??
+    (index.dirtyDirs.has(normalized) ? "M" : undefined)
+  return dirStatus ? (STATUS_COLOR[dirStatus] ?? undefined) : undefined
+}
+
 type TreeBranchProps = {
   cwd: string
   fallbackCwd?: string
   dirPath: string
   depth: number
   expanded: Set<string>
+  gitIndex: { byPath: Map<string, string>; dirtyDirs: Set<string> }
   onToggle: (dirPath: string) => void
   onOpenFile: (path: string) => void
   onContextMenu: (e: MouseEvent, hit: FileHit) => void
@@ -84,6 +131,7 @@ const TreeBranch = ({
   dirPath,
   depth,
   expanded,
+  gitIndex,
   onToggle,
   onOpenFile,
   onContextMenu,
@@ -149,6 +197,7 @@ const TreeBranch = ({
             ? FolderOpen
             : Folder
           : fileIconForPath(hit.path)
+        const statusClass = gitStatusClass(hit.path, isDir, gitIndex)
         return (
           <li key={hit.path}>
             <button
@@ -162,7 +211,8 @@ const TreeBranch = ({
               aria-expanded={isDir ? isOpen : undefined}
               className={cn(
                 "flex h-7 w-full items-center gap-1 rounded-md pr-2 text-left text-sm",
-                "text-ink-secondary hover:bg-fill-4 hover:text-ink",
+                "hover:bg-fill-4",
+                statusClass ?? "text-ink-secondary hover:text-ink",
               )}
               style={{ paddingLeft: 8 + depth * INDENT_PX }}
             >
@@ -180,7 +230,10 @@ const TreeBranch = ({
                 )}
               </span>
               <Glyph
-                className="h-3.5 w-3.5 shrink-0 text-ink-faint"
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0",
+                  statusClass ?? "text-ink-faint",
+                )}
                 aria-hidden
               />
               <span className="min-w-0 flex-1 truncate">{hit.name}</span>
@@ -195,6 +248,7 @@ const TreeBranch = ({
                 dirPath={hit.path}
                 depth={depth + 1}
                 expanded={expanded}
+                gitIndex={gitIndex}
                 onToggle={onToggle}
                 onOpenFile={onOpenFile}
                 onContextMenu={onContextMenu}
@@ -265,6 +319,18 @@ export const FileExplorer = ({
     enabled: !!cwd && !!resolvedCwd && searching,
     staleTime: 15_000,
   })
+
+  // Shared with Changes / sidebar — color dirty files in the tree.
+  const { data: gitSummary } = useQuery({
+    queryKey: ["git-status", cwd, sessionId],
+    queryFn: () => gitStatusSinceBaseline(sessionId),
+    enabled: !!cwd && !!sessionId,
+    staleTime: 5_000,
+  })
+  const gitIndex = useMemo(
+    () => buildGitStatusIndex(gitSummary?.files),
+    [gitSummary?.files],
+  )
 
   const searchRows = useMemo(
     () => sortFileHits(searchHits.filter((h) => h.name !== "$null")),
@@ -433,6 +499,7 @@ export const FileExplorer = ({
               {searchRows.map((hit) => {
                 const isDir = !!hit.isDir
                 const Glyph = isDir ? Folder : fileIconForPath(hit.path)
+                const statusClass = gitStatusClass(hit.path, isDir, gitIndex)
                 return (
                   <li key={hit.path}>
                     <button
@@ -449,11 +516,15 @@ export const FileExplorer = ({
                       title={hit.path}
                       className={cn(
                         "flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-sm",
-                        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
+                        "hover:bg-fill-4",
+                        statusClass ?? "text-ink-secondary hover:text-ink",
                       )}
                     >
                       <Glyph
-                        className="h-3.5 w-3.5 shrink-0 text-ink-faint"
+                        className={cn(
+                          "h-3.5 w-3.5 shrink-0",
+                          statusClass ?? "text-ink-faint",
+                        )}
                         aria-hidden
                       />
                       <span className="min-w-0 flex-1 truncate">
@@ -502,6 +573,7 @@ export const FileExplorer = ({
             dirPath=""
             depth={0}
             expanded={expanded}
+            gitIndex={gitIndex}
             onToggle={toggleDir}
             onOpenFile={onOpenFile}
             onContextMenu={handleContextMenu}
