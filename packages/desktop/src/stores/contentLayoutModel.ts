@@ -96,6 +96,26 @@ export const reorderContentTabs = <T,>(
 }
 
 /**
+ * Place a tab at `dest` in the list *after* it has been removed (0…length-1
+ * after splice). Used by pointer DnD live-preview hit-testing.
+ */
+export const placeTabAt = <T,>(
+  tabs: T[],
+  fromIndex: number,
+  dest: number,
+): T[] => {
+  if (fromIndex < 0 || fromIndex >= tabs.length) return tabs
+  const next = [...tabs]
+  const [item] = next.splice(fromIndex, 1)
+  if (item === undefined) return tabs
+  const at = Math.max(0, Math.min(dest, next.length))
+  // Removed from fromIndex; inserting back at fromIndex is a no-op.
+  if (at === fromIndex) return tabs
+  next.splice(at, 0, item)
+  return next
+}
+
+/**
  * Move a tab from one pane to another (or reorder if same pane).
  * `insertAt` is Chrome-style (index in the target list before splice).
  * Dedupes by tab id: if the target already has it, activate and drop the
@@ -113,7 +133,8 @@ export const moveTabBetweenPanes = (
     if (!pane) return layout
     const fromIndex = pane.tabs.findIndex((t) => t.id === tabId)
     if (fromIndex < 0) return layout
-    const tabs = reorderContentTabs(pane.tabs, fromIndex, insertAt)
+    // `insertAt` is after-removal index (pointer DnD / placeTabAt).
+    const tabs = placeTabAt(pane.tabs, fromIndex, insertAt)
     if (tabs === pane.tabs) return layout
     const panes = layout.panes.map((p, i) =>
       i === fromPane ? { ...p, tabs, activeTabId: tabId } : { ...p, tabs: [...p.tabs] },

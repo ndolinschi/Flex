@@ -5,6 +5,7 @@ import {
   defaultContentLayout,
   migrateToContentLayout,
   moveTabBetweenPanes,
+  placeTabAt,
   reorderContentTabs,
   toolTabId,
   type ContentLayout,
@@ -16,6 +17,14 @@ describe("reorderContentTabs", () => {
     expect(reorderContentTabs(["a", "b", "c"], 0, 3)).toEqual(["b", "c", "a"])
     expect(reorderContentTabs(["a", "b", "c"], 1, 1)).toEqual(["a", "b", "c"])
     expect(reorderContentTabs(["a", "b", "c"], 1, 2)).toEqual(["a", "b", "c"])
+  })
+})
+
+describe("placeTabAt", () => {
+  it("places at an after-removal index", () => {
+    expect(placeTabAt(["a", "b", "c"], 2, 1)).toEqual(["a", "c", "b"])
+    expect(placeTabAt(["a", "b", "c"], 0, 2)).toEqual(["b", "c", "a"])
+    expect(placeTabAt(["a", "b", "c"], 1, 1)).toEqual(["a", "b", "c"])
   })
 })
 

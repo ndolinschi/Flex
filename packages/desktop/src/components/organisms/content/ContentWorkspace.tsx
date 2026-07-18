@@ -4,13 +4,49 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react"
+import { createPortal } from "react-dom"
 import { useAppStore } from "../../../stores/appStore"
 import { CHAT_MIN_WIDTH } from "../../../stores/layoutConstants"
 import { clampSplitRatio } from "../../../stores/contentLayoutModel"
 import { ContentPane } from "./ContentPane"
 import { cn } from "../../../lib/utils"
 import { useContentTabLifecycle } from "../../../hooks/useContentTabLifecycle"
-import { useInstallContentTabPointerDnD } from "../../../hooks/useContentTabPointerDnD"
+import {
+  useInstallContentTabPointerDnD,
+  useTabDragUi,
+} from "../../../hooks/useContentTabPointerDnD"
+
+/** Floating label that follows the pointer while a tab is dragged. */
+const TabDragGhost = () => {
+  const dragUi = useTabDragUi()
+  const contentLayout = useAppStore((s) => s.contentLayout)
+  if (!dragUi?.dragging) return null
+  const source = contentLayout.panes[dragUi.fromPane]
+  const tab = source?.tabs.find((t) => t.id === dragUi.tabId)
+  if (!tab) return null
+  const label =
+    tab.kind === "chat"
+      ? "Chat"
+      : tab.tool.charAt(0).toUpperCase() + tab.tool.slice(1)
+  return createPortal(
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none fixed z-[9999] h-6 max-w-[180px] truncate rounded-md",
+        "border border-stroke-2 bg-elevated px-2 text-sm text-ink shadow-md",
+        "opacity-90",
+        !dragUi.overTarget && "opacity-40",
+      )}
+      style={{
+        left: dragUi.pointerX + 12,
+        top: dragUi.pointerY + 8,
+      }}
+    >
+      {label}
+    </div>,
+    document.body,
+  )
+}
 
 /** Main content host: one or two ContentPanes with a sash.
  * Chat chrome (sidebar / split / session) lives on WindowTitleBar. */
@@ -80,6 +116,7 @@ export const ContentWorkspace = () => {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+      <TabDragGhost />
       <div
         ref={rowRef}
         className="relative flex min-h-0 min-w-0 flex-1"

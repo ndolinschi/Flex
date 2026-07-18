@@ -41,7 +41,8 @@ export const useInstallContentTabPointerDnD = (): void => {
 
     const finish = (commit: boolean) => {
       const ui = getTabDragUi()
-      if (commit && ui?.dragging) {
+      // Outside a drop zone → no-op (do not sticky-commit the last hit).
+      if (commit && ui?.dragging && ui.overTarget) {
         if (ui.fromPane === ui.toPane) {
           reorderTabInPane(ui.toPane, ui.tabId, ui.insertAt)
         } else {
@@ -71,25 +72,53 @@ export const useInstallContentTabPointerDnD = (): void => {
         }
         document.body.style.cursor = "grabbing"
         document.body.style.userSelect = "none"
-        setTabDragUi({ ...ui, dragging: true })
+        setTabDragUi({
+          ...ui,
+          dragging: true,
+          pointerX: e.clientX,
+          pointerY: e.clientY,
+        })
       }
 
-      const hit = hitTestTabDrop(e.clientX, e.clientY)
-      if (!hit) return
+      const hit = hitTestTabDrop(e.clientX, e.clientY, pendingPointer.tabId)
       const current = getTabDragUi()
       if (!current) return
+
+      if (!hit) {
+        if (
+          current.overTarget ||
+          current.pointerX !== e.clientX ||
+          current.pointerY !== e.clientY
+        ) {
+          setTabDragUi({
+            ...current,
+            dragging: true,
+            overTarget: false,
+            pointerX: e.clientX,
+            pointerY: e.clientY,
+          })
+        }
+        return
+      }
+
       if (
         current.toPane === hit.toPane &&
         current.insertAt === hit.insertAt &&
-        current.dragging
+        current.overTarget &&
+        current.dragging &&
+        current.pointerX === e.clientX &&
+        current.pointerY === e.clientY
       ) {
         return
       }
       setTabDragUi({
         ...current,
         dragging: true,
+        overTarget: true,
         toPane: hit.toPane,
         insertAt: hit.insertAt,
+        pointerX: e.clientX,
+        pointerY: e.clientY,
       })
     }
 
@@ -158,5 +187,8 @@ export const startContentTabPointerDrag = (
     toPane: paneIndex,
     insertAt: 0,
     dragging: false,
+    overTarget: false,
+    pointerX: e.clientX,
+    pointerY: e.clientY,
   })
 }
