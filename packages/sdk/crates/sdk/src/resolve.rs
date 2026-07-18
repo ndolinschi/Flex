@@ -23,6 +23,7 @@ use agentloop_providers::delegator_copilot::{
 use agentloop_providers::delegator_cursor::{
     CursorCliConfig, cursor_agent, ephemeral_cursor_agent,
 };
+use agentloop_providers::delegator_grok::{GrokConfig, ephemeral_grok_agent, grok_agent};
 use agentloop_providers::delegator_opencode::{
     OpencodeConfig, ephemeral_opencode_agent, opencode_agent,
 };
@@ -297,77 +298,46 @@ fn split_agent_cmd(raw: &str) -> (String, Vec<String>) {
     (program, parts.collect())
 }
 
-/// Grok Build via ACP (`grok agent stdio`) — same protocol as `--agent acp`,
-/// with a fixed launch shape so callers need not pass `--agent-cmd`.
+/// Grok Build via headless streaming-json (`grok -p --output-format streaming-json`).
+/// ACP remains available as `--agent acp --agent-cmd "grok agent stdio"`.
 async fn grok_service(
     workdir: Option<&Path>,
     trace: &mut Vec<String>,
 ) -> anyhow::Result<EngineService> {
-    match probe_grok_cli(workdir).await {
-        Ok(version) => {
+    let mut config = GrokConfig {
+        cwd: workdir.map(|p| p.to_path_buf()),
+        ..GrokConfig::default()
+    };
+    if let Ok(api_key) = std::env::var("XAI_API_KEY") {
+        let trimmed = api_key.trim();
+        if !trimmed.is_empty() {
+            config = config.with_api_key(trimmed);
+            trace.push("XAI_API_KEY set — forwarding into grok".to_owned());
+        }
+    }
+    let store = Arc::new(MemoryStore::new());
+    let agent = Arc::new(grok_agent(config, store.clone()));
+    match agent.probe(CancellationToken::new()).await {
+        Ok(DelegatorProbeStatus::Installed { version }) => {
             trace.push(format!(
                 "probed `grok`: installed ({})",
                 version.as_deref().unwrap_or("version unknown")
             ));
+            trace.push("selected delegator grok (streaming-json)".to_owned());
+            Ok(EngineService::new(agent, store))
         }
-        Err(hint) => {
-            trace.push(format!("probed `grok`: not installed ({hint})"));
+        Ok(DelegatorProbeStatus::NotInstalled { hint }) => {
+            trace.push("probed `grok`: not installed".to_owned());
             bail!(
                 "grok is not available: install Grok Build (https://x.ai/cli), run \
                  `grok login` or set XAI_API_KEY; {hint}"
-            );
+            )
+        }
+        Err(err) => {
+            trace.push(format!("probed `grok`: failed ({err})"));
+            bail!("failed to probe grok: {err}")
         }
     }
-
-    let mut env = std::collections::BTreeMap::new();
-    if let Ok(value) = std::env::var("XAI_API_KEY") {
-        if !value.trim().is_empty() {
-            env.insert("XAI_API_KEY".to_owned(), value);
-            trace.push("forwarding XAI_API_KEY into grok ACP child".to_owned());
-        }
-    }
-    let config = AcpLaunchConfig {
-        program: "grok".to_owned(),
-        args: vec!["agent".to_owned(), "stdio".to_owned()],
-        env,
-        cwd: workdir.map(|p| p.to_path_buf()),
-    };
-    let store = Arc::new(MemoryStore::new());
-    let agent = Arc::new(acp_agent(config, store.clone()));
-    trace.push("selected delegator grok (ACP: `grok agent stdio`)".to_owned());
-    Ok(EngineService::new(agent, store))
-}
-
-async fn probe_grok_cli(workdir: Option<&Path>) -> Result<Option<String>, String> {
-    let mut command = tokio::process::Command::new("grok");
-    command.arg("--version");
-    if let Some(cwd) = workdir {
-        command.current_dir(cwd);
-    }
-    command.kill_on_drop(true);
-    let output = command.output().await.map_err(|err| {
-        if err.kind() == std::io::ErrorKind::NotFound {
-            "`grok` not found on PATH".to_owned()
-        } else {
-            format!("failed to spawn `grok --version`: {err}")
-        }
-    })?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!(
-            "`grok --version` exited {:?}: {}",
-            output.status.code(),
-            stderr.trim()
-        ));
-    }
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let version = stdout
-        .lines()
-        .next()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .map(str::to_owned);
-    Ok(version)
 }
 
 async fn opencode_service(
@@ -575,14 +545,18 @@ pub(crate) async fn doctor(workdir: &Path) -> anyhow::Result<()> {
         }
         Err(err) => println!("  cursor: probe failed ({err})"),
     }
-    match probe_grok_cli(workdir).await {
-        Ok(version) => {
+    let grok = ephemeral_grok_agent(GrokConfig::default());
+    match grok.probe(CancellationToken::new()).await {
+        Ok(DelegatorProbeStatus::Installed { version }) => {
             println!(
                 "  grok: installed ({})",
                 version.as_deref().unwrap_or("version unknown")
             );
         }
-        Err(hint) => println!("  grok: not installed ({hint})"),
+        Ok(DelegatorProbeStatus::NotInstalled { hint }) => {
+            println!("  grok: not installed ({hint})");
+        }
+        Err(err) => println!("  grok: probe failed ({err})"),
     }
 
     println!("execution backends:");

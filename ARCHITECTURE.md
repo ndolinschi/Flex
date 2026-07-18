@@ -29,7 +29,7 @@ families:
 - **Native loop** — `NativeAgent` (`packages/engine/crates/loop/src/agent.rs`) calls LLM
   provider APIs directly through the `Provider` trait.
 - **Connectors** — the delegator crates (`packages/providers/crates/delegators/*`) drive
-  external coding agents (acp, claude-code, copilot, cursor, opencode) as subprocesses
+  external coding agents (acp, claude-code, copilot, cursor, grok, opencode) as subprocesses
   behind the same `Agent` interface.
 
 All output is normalized into one canonical event stream (`AgentEvent`). The engine has
