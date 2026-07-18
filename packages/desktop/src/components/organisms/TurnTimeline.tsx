@@ -33,7 +33,8 @@ import { WorkGroupBody } from "./timeline/WorkGroupBody"
 type TurnTimelineProps = {
   sessionId: string | null
   onConversationEmpty?: (empty: boolean) => void
-  /** Live merged rows — used by the composer WorkingAgentsPill. */
+  /** Live merged rows — ChatSessionBody fingerprints running workers off
+   * this and only lifts state when the worker set changes (not every delta). */
   onLiveRows?: (rows: import("../../lib/types").TimelineRow[]) => void
 }
 

@@ -193,6 +193,30 @@ export const collectRunningWorkers = (
   return out
 }
 
+/** Cheap fingerprint for Composer / WorkingAgentsPill — changes on worker
+ * start/stop and nested tool status boundaries, not on every markdown delta. */
+export const runningWorkersSignature = (rows: TimelineRow[]): string => {
+  const workers = collectRunningWorkers(rows)
+  if (workers.length === 0) return ""
+  return workers
+    .map((w) => {
+      let tip = ""
+      for (let i = w.children.length - 1; i >= 0; i--) {
+        const child = w.children[i]
+        if (child.type === "tool") {
+          const state =
+            typeof child.call.status === "object" && child.call.status
+              ? (child.call.status as { state?: string }).state ?? ""
+              : String(child.call.status)
+          tip = `${child.call.id}:${state}`
+          break
+        }
+      }
+      return `${w.childSession}:${w.phase}:${tip}`
+    })
+    .join("|")
+}
+
 export const workerTitle = (role: string | undefined, task: string): string => {
   const first = task.split("\n", 1)[0].trim()
   return role ? `${role} — ${first}` : first

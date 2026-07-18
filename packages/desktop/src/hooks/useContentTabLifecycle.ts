@@ -11,7 +11,9 @@ export const useContentTabLifecycle = () => {
   const pendingPlanApproval = useAppStore((s) => s.pendingPlanApproval)
   const openToolBesideChat = useAppStore((s) => s.openToolBesideChat)
   const closeTabInPane = useAppStore((s) => s.closeTabInPane)
-  const contentLayout = useAppStore((s) => s.contentLayout)
+  const sessionStreaming = useAppStore((s) =>
+    activeSessionId ? !!s.streamingSessions[activeSessionId] : false,
+  )
   const { sessions } = useSessions()
   const active = sessions.find((s) => s.id === activeSessionId)
   const sessionKey = sessionScopeKey(activeSessionId)
@@ -45,11 +47,16 @@ export const useContentTabLifecycle = () => {
     openToolBesideChat,
   ])
 
+  // Poll only while the active session is streaming (PR may appear mid-turn
+  // after a push). Idle sessions refresh on mount / window focus instead of
+  // a permanent 15s IPC loop.
   const prStatusQuery = useQuery({
     queryKey: ["git-pr-status", active?.cwd ?? ""],
     queryFn: () => gitPrStatus(active!.cwd),
     enabled: !!active?.cwd,
-    refetchInterval: 15_000,
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
+    refetchInterval: sessionStreaming ? 30_000 : false,
   })
 
   const prevHadPrRef = useRef<boolean | null>(null)
@@ -70,7 +77,8 @@ export const useContentTabLifecycle = () => {
       openToolBesideChat(activeSessionId, "pr")
     } else if (prev && !has) {
       const id = toolTabId(activeSessionId, "pr")
-      contentLayout.panes.forEach((_, i) => {
+      const panes = useAppStore.getState().contentLayout.panes
+      panes.forEach((_, i) => {
         closeTabInPane(i as 0 | 1, id)
       })
     }
@@ -81,6 +89,5 @@ export const useContentTabLifecycle = () => {
     prStatusQuery.data,
     openToolBesideChat,
     closeTabInPane,
-    contentLayout.panes,
   ])
 }

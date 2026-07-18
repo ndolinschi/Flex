@@ -72,7 +72,6 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
   const setDraft = useAppStore((s) => s.setWorkspaceFileDraft)
   const openWorkspaceFile = useAppStore((s) => s.openWorkspaceFile)
   const closeTabInPane = useAppStore((s) => s.closeTabInPane)
-  const contentLayout = useAppStore((s) => s.contentLayout)
   const pushToast = useAppStore((s) => s.pushToast)
   const queryClient = useQueryClient()
   const cwd = session?.cwd ?? ""
@@ -100,17 +99,15 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
     hadOpenFilesRef.current = openFiles.length > 0
     if (!(had && openFiles.length === 0 && activeSessionId)) return
     const filesTabId = `tool:${activeSessionId}:files`
-    contentLayout.panes.forEach((pane, index) => {
+    // Read panes from the store at effect time — selecting `contentLayout`
+    // here re-rendered Monaco on every unrelated tab activate/reorder.
+    const panes = useAppStore.getState().contentLayout.panes
+    panes.forEach((pane, index) => {
       if (pane.tabs.some((t) => t.id === filesTabId)) {
         closeTabInPane(index as 0 | 1, filesTabId)
       }
     })
-  }, [
-    openFiles.length,
-    activeSessionId,
-    contentLayout.panes,
-    closeTabInPane,
-  ])
+  }, [openFiles.length, activeSessionId, closeTabInPane])
 
   // Opening a file leaves browse mode so the editor is visible. Depend only
   // on length: reopening an already-open path must not rely on this effect

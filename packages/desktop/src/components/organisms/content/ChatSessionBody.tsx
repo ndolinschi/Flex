@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Composer,
   PermissionPrompt,
@@ -10,6 +10,11 @@ import { WorkingAgentsPill } from "../../molecules"
 import { ChatShell } from "../../templates"
 import type { SessionId, TimelineRow } from "../../../lib/types"
 import { sessionLabel } from "../../../lib/types"
+import {
+  collectRunningWorkers,
+  runningWorkersSignature,
+  type SubagentTimelineRow,
+} from "../../../lib/workerPresentation"
 import { useSessions } from "../../../hooks/useSessions"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
@@ -25,19 +30,29 @@ export const ChatSessionBody = ({ sessionId, active }: ChatSessionBodyProps) => 
   const pendingPermission = useAppStore((s) => s.pendingPermission)
   const pendingQuestion = useAppStore((s) => s.pendingQuestion)
   const [conversationEmpty, setConversationEmpty] = useState(false)
-  const [liveRows, setLiveRows] = useState<TimelineRow[]>([])
+  const [runningWorkers, setRunningWorkers] = useState<SubagentTimelineRow[]>(
+    [],
+  )
+  const lastWorkersSigRef = useRef("")
   const { sessions } = useSessions()
 
   useEffect(() => {
-    setLiveRows([])
+    setRunningWorkers([])
+    lastWorkersSigRef.current = ""
   }, [sessionId])
 
   const handleConversationEmpty = useCallback((empty: boolean) => {
     setConversationEmpty(empty)
   }, [])
 
+  // Only lift workers into parent state when the running set (or nested tool
+  // tip) changes — streaming markdown deltas would otherwise re-render
+  // Composer every rAF via a full liveRows copy.
   const handleLiveRows = useCallback((rows: TimelineRow[]) => {
-    setLiveRows(rows)
+    const sig = runningWorkersSignature(rows)
+    if (sig === lastWorkersSigRef.current) return
+    lastWorkersSigRef.current = sig
+    setRunningWorkers(collectRunningWorkers(rows))
   }, [])
 
   const handleScrollToWorkers = useCallback(() => {
@@ -85,7 +100,7 @@ export const ChatSessionBody = ({ sessionId, active }: ChatSessionBodyProps) => 
             dockedOverlay={dockedOverlay}
             workersSlot={
               <WorkingAgentsPill
-                rows={liveRows}
+                workers={runningWorkers}
                 onScrollToWorkers={handleScrollToWorkers}
               />
             }
