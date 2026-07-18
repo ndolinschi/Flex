@@ -283,4 +283,25 @@ describe("contentLayout", () => {
     ])
     expect(layout.panes[0]!.activeTabId).toBe(planId)
   })
+
+  it("activateTabInPane keeps the sibling pane object identity", () => {
+    useAppStore.getState().openChatInPane(0, "sess-a")
+    useAppStore.getState().openToolBesideChat("sess-a", "plan")
+    const planId = toolTabId("sess-a", "plan")
+    // Activate plan on the right so left is unchanged; then switch left tabs.
+    useAppStore.getState().activateTabInPane(1, planId)
+    useAppStore.getState().openToolInPane(0, "sess-a", "status")
+    const before = useAppStore.getState().contentLayout
+    expect(before.mode).toBe("split")
+    const rightBefore = before.panes[1]
+    const statusId = toolTabId("sess-a", "status")
+    expect(before.panes[0]!.activeTabId).toBe(statusId)
+    useAppStore.getState().activateTabInPane(0, chatTabId("sess-a"))
+    const after = useAppStore.getState().contentLayout
+    expect(after.panes[1]).toBe(rightBefore)
+    expect(after.panes[0]).not.toBe(before.panes[0])
+    expect(after.panes[0]!.activeTabId).toBe(chatTabId("sess-a"))
+    // Tabs array identity preserved when only activeTabId changes.
+    expect(after.panes[0]!.tabs).toBe(before.panes[0]!.tabs)
+  })
 })

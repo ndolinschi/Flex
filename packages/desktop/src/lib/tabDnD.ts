@@ -87,6 +87,26 @@ export const tabDragThresholdExceeded = (
 }
 
 /**
+ * Chrome-style insert index from tab geometry. Pure — used by `hitTestTabDrop`
+ * and unit-tested without a DOM.
+ */
+export const insertIndexAtX = (
+  tabs: ReadonlyArray<{ left: number; width: number }>,
+  clientX: number,
+  overIndex: number | null,
+): number => {
+  if (tabs.length === 0) return 0
+  if (overIndex != null && overIndex >= 0 && overIndex < tabs.length) {
+    const rect = tabs[overIndex]!
+    const before = clientX < rect.left + rect.width / 2
+    return before ? overIndex : overIndex + 1
+  }
+  const first = tabs[0]!
+  if (clientX < first.left) return 0
+  return tabs.length
+}
+
+/**
  * Resolve drop target under the pointer. Strips mark themselves with
  * `data-content-tab-strip="{pane}"`; tabs use `data-tab-id`.
  */
@@ -102,26 +122,24 @@ export const hitTestTabDrop = (
   if (paneRaw !== "0" && paneRaw !== "1") return null
   const toPane = Number(paneRaw) as 0 | 1
 
-  const tabs = Array.from(
+  const tabNodes = Array.from(
     strip.querySelectorAll<HTMLElement>("[data-tab-id]"),
   ).filter((node) => strip.contains(node))
-  if (tabs.length === 0) {
+  if (tabNodes.length === 0) {
     return { toPane, insertAt: 0 }
   }
+
+  const geometry = tabNodes.map((node) => {
+    const rect = node.getBoundingClientRect()
+    return { left: rect.left, width: rect.width }
+  })
 
   const overTab = el.closest("[data-tab-id]")
+  let overIndex: number | null = null
   if (overTab instanceof HTMLElement && strip.contains(overTab)) {
-    const index = tabs.indexOf(overTab)
-    if (index < 0) return { toPane, insertAt: tabs.length }
-    const rect = overTab.getBoundingClientRect()
-    const before = clientX < rect.left + rect.width / 2
-    return { toPane, insertAt: before ? index : index + 1 }
+    const index = tabNodes.indexOf(overTab)
+    overIndex = index < 0 ? null : index
   }
 
-  // Empty trailing space (or gap): append, unless pointer is left of first tab.
-  const first = tabs[0]?.getBoundingClientRect()
-  if (first && clientX < first.left) {
-    return { toPane, insertAt: 0 }
-  }
-  return { toPane, insertAt: tabs.length }
+  return { toPane, insertAt: insertIndexAtX(geometry, clientX, overIndex) }
 }

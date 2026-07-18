@@ -33,6 +33,11 @@ type ContentPaneProps = {
   keepAliveTools: Set<string>
 }
 
+/** Labels/icons for the strip — always include PR so open tabs keep a label. */
+const STRIP_CATALOG = visibleRightPanelTabs({ hasBranchPr: true })
+
+const EMPTY_PANE = { tabs: [] as ContentTab[], activeTabId: null as string | null }
+
 const tabLabel = (
   tab: ContentTab,
   sessionsById: Map<string, { id: string; title?: string | null }>,
@@ -41,16 +46,17 @@ const tabLabel = (
     const s = sessionsById.get(tab.sessionId)
     return s ? sessionLabel(s as never) : "Chat"
   }
-  const def = visibleRightPanelTabs({ hasBranchPr: true }).find(
-    (t) => t.id === tab.tool,
-  )
-  return def?.label ?? tab.tool
+  return STRIP_CATALOG.find((c) => c.id === tab.tool)?.label ?? tab.tool
 }
 
 export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => {
-  const contentLayout = useAppStore((s) => s.contentLayout)
-  const focusedPane = contentLayout.focusedPane
-  const pane = contentLayout.panes[paneIndex] ?? { tabs: [], activeTabId: null }
+  // Narrow selectors — avoid re-rendering this pane when only the sibling
+  // pane's tabs change (structural sharing in activate/reorder/close).
+  const pane = useAppStore(
+    (s) => s.contentLayout.panes[paneIndex] ?? EMPTY_PANE,
+  )
+  const split = useAppStore((s) => s.contentLayout.mode === "split")
+  const focusedPane = useAppStore((s) => s.contentLayout.focusedPane)
   const activateTabInPane = useAppStore((s) => s.activateTabInPane)
   const closeTabInPane = useAppStore((s) => s.closeTabInPane)
   const closePane = useAppStore((s) => s.closePane)
@@ -68,6 +74,9 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     height: number
   } | null>(null)
   const tabsScrollRef = useRef<HTMLDivElement>(null)
+  /** Chat bodies stay mounted after first visit (scroll/draft locality). */
+  const visitedChatsRef = useRef(new Set<string>())
+  const [, bumpVisited] = useState(0)
 
   const sessionsById = useMemo(
     () => new Map(sessions.map((s) => [s.id, s])),
@@ -81,10 +90,11 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   })()
 
   const cwd = sessions.find((s) => s.id === contextSession)?.cwd
+  // Only fetch PR status while the + menu is open — strip labels never need it.
   const prQuery = useQuery({
     queryKey: ["git-pr-status", cwd ?? ""],
     queryFn: () => gitPrStatus(cwd!),
-    enabled: !!cwd,
+    enabled: !!cwd && openTabModal,
     staleTime: 15_000,
   })
   const hasBranchPr = !!prQuery.data?.pr
@@ -92,11 +102,6 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     () => visibleRightPanelTabs({ hasBranchPr }),
     [hasBranchPr],
   )
-  const stripCatalog = useMemo(
-    () => visibleRightPanelTabs({ hasBranchPr: true }),
-    [],
-  )
-  const split = contentLayout.mode === "split"
   const paneFocused = focusedPane === paneIndex
 
   // Vertical wheel → horizontal scroll over the tab strip (trackpad/mouse).
@@ -118,6 +123,28 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     )
     el?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }, [pane.activeTabId, pane.tabs.length])
+
+  // Mark the active chat as visited so we keep its body mounted when hidden.
+  useEffect(() => {
+    const active = pane.tabs.find((t) => t.id === pane.activeTabId)
+    if (active?.kind !== "chat") return
+    if (visitedChatsRef.current.has(active.id)) return
+    visitedChatsRef.current.add(active.id)
+    bumpVisited((n) => n + 1)
+  }, [pane.activeTabId, pane.tabs])
+
+  // Drop visit marks for tabs that no longer exist in this pane.
+  useEffect(() => {
+    const ids = new Set(pane.tabs.map((t) => t.id))
+    let changed = false
+    for (const id of visitedChatsRef.current) {
+      if (!ids.has(id)) {
+        visitedChatsRef.current.delete(id)
+        changed = true
+      }
+    }
+    if (changed) bumpVisited((n) => n + 1)
+  }, [pane.tabs])
 
   const dragTabId = dragUi?.dragging ? dragUi.tabId : null
   const dropInsertAt =
@@ -148,7 +175,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
           {pane.tabs.map((t, index) => {
             const def =
               t.kind === "tool"
-                ? stripCatalog.find((c) => c.id === t.tool)
+                ? STRIP_CATALOG.find((c) => c.id === t.tool)
                 : undefined
             const dropEdge =
               dragTabId && dropInsertAt != null && dragTabId !== t.id
@@ -158,6 +185,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                     ? "after"
                     : null
                 : null
+            const label = tabLabel(t, sessionsById)
             return (
               <Tab
                 key={t.id}
@@ -173,18 +201,18 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                   "max-w-[180px] shrink-0",
                   dragTabId === t.id && "opacity-40",
                 )}
-                title={tabLabel(t, sessionsById)}
+                title={label}
                 tabId={t.id}
                 onSelect={() => activateTabInPane(paneIndex, t.id)}
                 onClose={() => closeTabInPane(paneIndex, t.id)}
-                closeLabel={`Close ${tabLabel(t, sessionsById)}`}
+                closeLabel={`Close ${label}`}
                 draggable
                 dropEdge={dropEdge}
                 onPointerDown={(e) =>
                   startContentTabPointerDrag(e, paneIndex, t.id)
                 }
               >
-                {tabLabel(t, sessionsById)}
+                {label}
               </Tab>
             )
           })}
@@ -228,6 +256,9 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
         {pane.tabs.map((t) => {
           const isActive = t.id === pane.activeTabId
           if (t.kind === "chat") {
+            const mount =
+              isActive || visitedChatsRef.current.has(t.id)
+            if (!mount) return null
             return (
               <div
                 key={t.id}

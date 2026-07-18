@@ -285,8 +285,9 @@ full-width with symmetric `px-2` insets — not a two-column FieldRow.
 remainder scrolls.
 
 **Tab reorder / split move:** pointer events (not HTML5 DnD — broken in
-Tauri WKWebView). Idle cursor is pointer; grabbing only after the drag
-threshold. Drop markers work within a strip and across split panes.
+Tauri WKWebView). Idle cursor is pointer; grabbing / drop markers only after
+the drag threshold (ordinary clicks never publish drag UI). Drop markers work
+within a strip and across split panes.
 
 ---
 

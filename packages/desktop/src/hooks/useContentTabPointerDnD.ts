@@ -55,10 +55,9 @@ export const useInstallContentTabPointerDnD = (): void => {
 
     const onMove = (e: PointerEvent) => {
       if (!pendingPointer || e.pointerId !== pendingPointer.pointerId) return
-      const ui = getTabDragUi()
-      if (!ui) return
 
-      if (!ui.dragging) {
+      let current = getTabDragUi()
+      if (!current?.dragging) {
         if (
           !tabDragThresholdExceeded(
             pendingPointer.startX,
@@ -69,25 +68,33 @@ export const useInstallContentTabPointerDnD = (): void => {
         ) {
           return
         }
+        // First publish only after the threshold — ordinary clicks never
+        // notify `useTabDragUi` subscribers (both panes).
         document.body.style.cursor = "grabbing"
         document.body.style.userSelect = "none"
-        setTabDragUi({ ...ui, dragging: true })
+        const hit =
+          hitTestTabDrop(e.clientX, e.clientY) ?? {
+            toPane: pendingPointer.fromPane,
+            insertAt: 0,
+          }
+        current = {
+          tabId: pendingPointer.tabId,
+          fromPane: pendingPointer.fromPane,
+          toPane: hit.toPane,
+          insertAt: hit.insertAt,
+          dragging: true,
+        }
+        setTabDragUi(current)
+        return
       }
 
       const hit = hitTestTabDrop(e.clientX, e.clientY)
       if (!hit) return
-      const current = getTabDragUi()
-      if (!current) return
-      if (
-        current.toPane === hit.toPane &&
-        current.insertAt === hit.insertAt &&
-        current.dragging
-      ) {
+      if (current.toPane === hit.toPane && current.insertAt === hit.insertAt) {
         return
       }
       setTabDragUi({
         ...current,
-        dragging: true,
         toPane: hit.toPane,
         insertAt: hit.insertAt,
       })
@@ -134,14 +141,20 @@ export const useInstallContentTabPointerDnD = (): void => {
 export const useTabDragUi = () =>
   useSyncExternalStore(subscribeTabDragUi, getTabDragUi, () => null)
 
-/** Begin a pending tab drag from a pane's tab (threshold gated). */
+/** Begin a pending tab drag from a pane's tab (threshold gated).
+ * Does not publish drag UI until the pointer moves past the threshold —
+ * clicks must not re-render every content pane via `useTabDragUi`. */
 export const startContentTabPointerDrag = (
   e: ReactPointerEvent<HTMLElement>,
   paneIndex: 0 | 1,
   tabId: string,
 ): void => {
   if (e.button !== 0) return
-  if (e.target instanceof Element && e.target.closest("[data-tab-no-drag]")) {
+  if (
+    typeof Element !== "undefined" &&
+    e.target instanceof Element &&
+    e.target.closest("[data-tab-no-drag]")
+  ) {
     return
   }
   pendingPointer = {
@@ -152,11 +165,4 @@ export const startContentTabPointerDrag = (
     startY: e.clientY,
   }
   beginTabDrag({ tabId, fromPane: paneIndex })
-  setTabDragUi({
-    tabId,
-    fromPane: paneIndex,
-    toPane: paneIndex,
-    insertAt: 0,
-    dragging: false,
-  })
 }

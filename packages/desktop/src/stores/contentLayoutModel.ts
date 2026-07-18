@@ -115,16 +115,18 @@ export const moveTabBetweenPanes = (
     if (fromIndex < 0) return layout
     const tabs = reorderContentTabs(pane.tabs, fromIndex, insertAt)
     if (tabs === pane.tabs) return layout
-    const panes = layout.panes.map((p, i) =>
-      i === fromPane ? { ...p, tabs, activeTabId: tabId } : { ...p, tabs: [...p.tabs] },
-    ) as ContentLayout["panes"]
+    // Preserve the other pane's object identity so inactive panes skip re-render.
+    const nextPane: PaneState = { ...pane, tabs, activeTabId: tabId }
+    const panes: ContentLayout["panes"] =
+      layout.mode === "split"
+        ? fromPane === 0
+          ? [nextPane, layout.panes[1]!]
+          : [layout.panes[0]!, nextPane]
+        : [nextPane]
     return {
       ...layout,
       focusedPane: fromPane,
-      panes:
-        layout.mode === "split"
-          ? ([panes[0]!, panes[1]!] as [PaneState, PaneState])
-          : ([panes[0]!] as [PaneState]),
+      panes,
     }
   }
 
