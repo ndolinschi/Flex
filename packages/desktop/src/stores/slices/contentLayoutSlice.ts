@@ -16,6 +16,7 @@ import {
   normalizeLayout,
   otherPaneIndex,
   reorderContentTabs,
+  replacePane,
   toolTabId,
   upsertToolInPane,
   type ContentLayout,
@@ -27,6 +28,7 @@ const persistLayout = (layout: ContentLayout) => {
   void persistUiState({ contentLayout: layout })
 }
 
+/** Mirror legacy right-panel open flags from the focused pane's active tool. */
 const syncCompatFlags = (
   layout: ContentLayout,
 ): Pick<AppState, "rightPanelOpen" | "rightPanelTab"> => {
@@ -42,20 +44,6 @@ const syncCompatFlags = (
     rightPanelOpen: layout.mode === "split",
     rightPanelTab: tool ?? "plan",
   }
-}
-
-/** Replace one pane; keep the sibling pane's object identity for React. */
-const replacePane = (
-  layout: ContentLayout,
-  pane: 0 | 1,
-  nextPane: PaneState,
-): ContentLayout["panes"] => {
-  if (layout.mode === "split") {
-    return pane === 0
-      ? [nextPane, layout.panes[1]!]
-      : [layout.panes[0]!, nextPane]
-  }
-  return [nextPane]
 }
 
 const clonePanes = (layout: ContentLayout): PaneState[] =>
@@ -298,6 +286,15 @@ export const createContentLayoutSlice: StateCreator<
     const layout = get().contentLayout
     const p = layout.panes[pane]
     if (!p?.tabs.some((t) => t.id === tabId)) return
+    const tab = p.tabs.find((t) => t.id === tabId)
+    if (p.activeTabId === tabId && layout.focusedPane === pane) {
+      // Already active — only sync sidebar highlight if needed.
+      if (tab?.kind === "chat" && get().activeSessionId !== tab.sessionId) {
+        set({ activeSessionId: tab.sessionId })
+        void persistUiState({ activeSessionId: tab.sessionId })
+      }
+      return
+    }
     // Keep the same tabs array when only activeTabId changes so the sibling
     // pane retains object identity and inactive ContentPane skips re-render.
     const nextPane: PaneState =
@@ -307,7 +304,6 @@ export const createContentLayoutSlice: StateCreator<
       focusedPane: pane,
       panes: replacePane(layout, pane, nextPane),
     }
-    const tab = nextPane.tabs.find((t) => t.id === tabId)
     set({
       contentLayout: next,
       ...(tab?.kind === "chat" ? { activeSessionId: tab.sessionId } : {}),

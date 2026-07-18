@@ -7,6 +7,7 @@ import {
   getActiveTabDrag,
   beginTabDrag,
   insertIndexAtX,
+  isTabNoDragTarget,
 } from "./tabDnD"
 import { startContentTabPointerDrag } from "../hooks/useContentTabPointerDnD"
 import type { PointerEvent as ReactPointerEvent } from "react"
@@ -32,7 +33,6 @@ describe("tab drag ui store", () => {
       fromPane: 0,
       toPane: 1,
       insertAt: 2,
-      dragging: true,
     })
     expect(getTabDragUi()?.tabId).toBe("t")
     endTabDrag()
@@ -46,14 +46,19 @@ describe("tab drag ui store", () => {
   })
 })
 
+describe("isTabNoDragTarget", () => {
+  it("is false for null / non-Element targets", () => {
+    expect(isTabNoDragTarget(null)).toBe(false)
+    expect(isTabNoDragTarget(undefined as unknown as EventTarget)).toBe(false)
+  })
+})
+
 describe("startContentTabPointerDrag", () => {
   afterEach(() => {
     endTabDrag()
   })
 
   it("does not publish drag ui on pointerdown (click path)", () => {
-    // Node vitest — no DOM. `instanceof Element` is false for plain targets,
-    // so the no-drag guard is skipped (same as a normal tab press).
     const e = {
       button: 0,
       pointerId: 1,
@@ -66,33 +71,13 @@ describe("startContentTabPointerDrag", () => {
     expect(getTabDragUi()).toBeNull()
   })
 
-  it("ignores close-button presses via data-tab-no-drag", () => {
-    const close = {
-      closest: (sel: string) => (sel === "[data-tab-no-drag]" ? close : null),
-    }
-    // Pretend we are in a DOM so the Element guard passes.
-    const ElementCtor = (globalThis as { Element?: typeof Element }).Element
-    if (!ElementCtor) {
-      // Without Element, closest is never consulted — still assert no-op via
-      // a non-0 button instead.
-      const e = {
-        button: 1,
-        pointerId: 1,
-        clientX: 40,
-        clientY: 12,
-        target: close,
-      } as unknown as ReactPointerEvent<HTMLElement>
-      startContentTabPointerDrag(e, 0, "tab-a")
-      expect(getActiveTabDrag()).toBeNull()
-      return
-    }
-    Object.setPrototypeOf(close, ElementCtor.prototype)
+  it("ignores non-primary buttons", () => {
     const e = {
-      button: 0,
+      button: 1,
       pointerId: 1,
       clientX: 40,
       clientY: 12,
-      target: close,
+      target: {},
     } as unknown as ReactPointerEvent<HTMLElement>
     startContentTabPointerDrag(e, 0, "tab-a")
     expect(getActiveTabDrag()).toBeNull()

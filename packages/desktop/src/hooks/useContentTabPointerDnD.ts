@@ -8,6 +8,7 @@ import {
   endTabDrag,
   getTabDragUi,
   hitTestTabDrop,
+  isTabNoDragTarget,
   setTabDragUi,
   subscribeTabDragUi,
   tabDragThresholdExceeded,
@@ -41,7 +42,7 @@ export const useInstallContentTabPointerDnD = (): void => {
 
     const finish = (commit: boolean) => {
       const ui = getTabDragUi()
-      if (commit && ui?.dragging) {
+      if (commit && ui) {
         if (ui.fromPane === ui.toPane) {
           reorderTabInPane(ui.toPane, ui.tabId, ui.insertAt)
         } else {
@@ -57,7 +58,7 @@ export const useInstallContentTabPointerDnD = (): void => {
       if (!pendingPointer || e.pointerId !== pendingPointer.pointerId) return
 
       let current = getTabDragUi()
-      if (!current?.dragging) {
+      if (!current) {
         if (
           !tabDragThresholdExceeded(
             pendingPointer.startX,
@@ -82,7 +83,6 @@ export const useInstallContentTabPointerDnD = (): void => {
           fromPane: pendingPointer.fromPane,
           toPane: hit.toPane,
           insertAt: hit.insertAt,
-          dragging: true,
         }
         setTabDragUi(current)
         return
@@ -102,8 +102,7 @@ export const useInstallContentTabPointerDnD = (): void => {
 
     const onUp = (e: PointerEvent) => {
       if (!pendingPointer || e.pointerId !== pendingPointer.pointerId) return
-      const ui = getTabDragUi()
-      const didDrag = !!ui?.dragging
+      const didDrag = getTabDragUi() != null
       finish(didDrag)
       if (didDrag) {
         const suppress = (ev: MouseEvent) => {
@@ -150,13 +149,7 @@ export const startContentTabPointerDrag = (
   tabId: string,
 ): void => {
   if (e.button !== 0) return
-  if (
-    typeof Element !== "undefined" &&
-    e.target instanceof Element &&
-    e.target.closest("[data-tab-no-drag]")
-  ) {
-    return
-  }
+  if (isTabNoDragTarget(e.target)) return
   pendingPointer = {
     tabId,
     fromPane: paneIndex,

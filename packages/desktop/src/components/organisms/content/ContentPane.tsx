@@ -16,12 +16,13 @@ import {
   useTabDragUi,
 } from "../../../hooks/useContentTabPointerDnD"
 import { gitPrStatus } from "../../../lib/tauri"
-import { sessionLabel, type SessionId } from "../../../lib/types"
+import { sessionLabel, type SessionId, type SessionMeta } from "../../../lib/types"
 import {
   useAppStore,
   type ContentTab,
   type RightPanelTab,
 } from "../../../stores/appStore"
+import { emptyPane } from "../../../stores/contentLayoutModel"
 import { visibleRightPanelTabs } from "../right-panel/tabs"
 import { ChatSessionBody } from "./ChatSessionBody"
 import { ToolTabBody } from "./ToolTabBody"
@@ -36,17 +37,53 @@ type ContentPaneProps = {
 /** Labels/icons for the strip — always include PR so open tabs keep a label. */
 const STRIP_CATALOG = visibleRightPanelTabs({ hasBranchPr: true })
 
-const EMPTY_PANE = { tabs: [] as ContentTab[], activeTabId: null as string | null }
+/** Stable fallback when a pane index is missing (must keep object identity). */
+const EMPTY_PANE = emptyPane()
 
 const tabLabel = (
   tab: ContentTab,
-  sessionsById: Map<string, { id: string; title?: string | null }>,
+  sessionsById: Map<string, SessionMeta>,
 ): string => {
   if (tab.kind === "chat") {
     const s = sessionsById.get(tab.sessionId)
-    return s ? sessionLabel(s as never) : "Chat"
+    return s ? sessionLabel(s) : "Chat"
   }
   return STRIP_CATALOG.find((c) => c.id === tab.tool)?.label ?? tab.tool
+}
+
+/**
+ * Track which chat tab ids have been shown so we can keep their bodies mounted
+ * after the first visit (scroll/draft locality) without mounting every open chat.
+ */
+const useVisitedChatTabs = (
+  tabs: ContentTab[],
+  activeTabId: string | null,
+): ReadonlySet<string> => {
+  const [visited, setVisited] = useState<ReadonlySet<string>>(() => new Set())
+
+  useEffect(() => {
+    setVisited((prev) => {
+      const openIds = new Set(tabs.map((t) => t.id))
+      let next: Set<string> | null = null
+
+      const active = tabs.find((t) => t.id === activeTabId)
+      if (active?.kind === "chat" && !prev.has(active.id)) {
+        next = new Set(prev)
+        next.add(active.id)
+      }
+
+      for (const id of prev) {
+        if (!openIds.has(id)) {
+          if (!next) next = new Set(prev)
+          next.delete(id)
+        }
+      }
+
+      return next ?? prev
+    })
+  }, [activeTabId, tabs])
+
+  return visited
 }
 
 export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => {
@@ -74,9 +111,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     height: number
   } | null>(null)
   const tabsScrollRef = useRef<HTMLDivElement>(null)
-  /** Chat bodies stay mounted after first visit (scroll/draft locality). */
-  const visitedChatsRef = useRef(new Set<string>())
-  const [, bumpVisited] = useState(0)
+  const visitedChats = useVisitedChatTabs(pane.tabs, pane.activeTabId)
 
   const sessionsById = useMemo(
     () => new Map(sessions.map((s) => [s.id, s])),
@@ -124,31 +159,9 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     el?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }, [pane.activeTabId, pane.tabs.length])
 
-  // Mark the active chat as visited so we keep its body mounted when hidden.
-  useEffect(() => {
-    const active = pane.tabs.find((t) => t.id === pane.activeTabId)
-    if (active?.kind !== "chat") return
-    if (visitedChatsRef.current.has(active.id)) return
-    visitedChatsRef.current.add(active.id)
-    bumpVisited((n) => n + 1)
-  }, [pane.activeTabId, pane.tabs])
-
-  // Drop visit marks for tabs that no longer exist in this pane.
-  useEffect(() => {
-    const ids = new Set(pane.tabs.map((t) => t.id))
-    let changed = false
-    for (const id of visitedChatsRef.current) {
-      if (!ids.has(id)) {
-        visitedChatsRef.current.delete(id)
-        changed = true
-      }
-    }
-    if (changed) bumpVisited((n) => n + 1)
-  }, [pane.tabs])
-
-  const dragTabId = dragUi?.dragging ? dragUi.tabId : null
+  const dragTabId = dragUi?.tabId ?? null
   const dropInsertAt =
-    dragUi?.dragging && dragUi.toPane === paneIndex ? dragUi.insertAt : null
+    dragUi && dragUi.toPane === paneIndex ? dragUi.insertAt : null
 
   return (
     <div
@@ -256,9 +269,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
         {pane.tabs.map((t) => {
           const isActive = t.id === pane.activeTabId
           if (t.kind === "chat") {
-            const mount =
-              isActive || visitedChatsRef.current.has(t.id)
-            if (!mount) return null
+            if (!isActive && !visitedChats.has(t.id)) return null
             return (
               <div
                 key={t.id}
@@ -303,8 +314,8 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
         sessionId={contextSession}
         tabs={catalog}
         onOpenChat={openChatInPane}
-        onOpenTool={(pane, sid, tool) =>
-          openToolInPane(pane, sid, tool as RightPanelTab)
+        onOpenTool={(p, sid, tool) =>
+          openToolInPane(p, sid, tool as RightPanelTab)
         }
       />
     </div>

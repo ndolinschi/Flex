@@ -14,14 +14,13 @@ export type TabDragSession = {
   fromPane: 0 | 1
 }
 
-/** Live drop target while a pointer drag is active (shared across panes). */
+/** Live drop target while a pointer drag is past the threshold (shared across panes).
+ * `null` means idle / below threshold — never publish a non-dragging stub. */
 export type TabDragUi = {
   tabId: string
   fromPane: 0 | 1
   toPane: 0 | 1
   insertAt: number
-  /** False until the pointer moves past the drag threshold. */
-  dragging: boolean
 }
 
 let active: TabDragSession | null = null
@@ -84,6 +83,13 @@ export const tabDragThresholdExceeded = (
   const dx = x - startX
   const dy = y - startY
   return dx * dx + dy * dy >= DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX
+}
+
+/** True when the event target is a tab control that must not start a drag (e.g. close). */
+export const isTabNoDragTarget = (target: EventTarget | null): boolean => {
+  if (typeof Element === "undefined") return false
+  if (!(target instanceof Element)) return false
+  return target.closest("[data-tab-no-drag]") != null
 }
 
 /**
