@@ -3,7 +3,6 @@
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use agentloop_contracts::{BlobSource, ToolOutput, ToolResultBlock};
 use agentloop_core::{
@@ -33,14 +32,6 @@ fn png_output(path: PathBuf, caption: &str) -> ToolOutput {
         is_error: false,
         structured: None,
     }
-}
-
-fn temp_png(prefix: &str) -> PathBuf {
-    let ms = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    std::env::temp_dir().join(format!("{prefix}-{ms}.png"))
 }
 
 pub struct ComputerPlugin {
@@ -313,68 +304,14 @@ impl Tool for ComputerOpenAppTool {
 // ─── OS backends ─────────────────────────────────────────────────────────────
 
 async fn capture_screen() -> Result<PathBuf, ToolError> {
-    let path = temp_png("agent-computer-screenshot");
-    #[cfg(target_os = "macos")]
-    {
-        let status = Command::new("screencapture")
-            .args(["-x", path.to_str().unwrap_or("/tmp/agent-shot.png")])
-            .status()
-            .map_err(|e| ToolError::Execution(format!("screencapture failed: {e}")))?;
-        if !status.success() {
-            return Err(ToolError::Execution(format!(
-                "screencapture exited with {status}"
-            )));
-        }
-        Ok(path)
-    }
-    #[cfg(target_os = "linux")]
-    {
-        // Prefer grim (Wayland) then import (ImageMagick).
-        if Command::new("grim")
-            .arg(&path)
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
-        {
-            return Ok(path);
-        }
-        let status = Command::new("import")
-            .args(["-window", "root"])
-            .arg(&path)
-            .status()
-            .map_err(|e| {
-                ToolError::Execution(format!(
-                    "screen capture failed (install grim or imagemagick): {e}"
-                ))
-            })?;
-        if !status.success() {
-            return Err(ToolError::Execution(
-                "screen capture failed — install grim (Wayland) or ImageMagick".into(),
-            ));
-        }
-        Ok(path)
-    }
-    #[cfg(windows)]
-    {
-        let _ = path;
-        Err(ToolError::Execution(
-            "ComputerScreenshot is not implemented on Windows yet".into(),
-        ))
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
-    {
-        let _ = path;
-        Err(ToolError::Execution(
-            "ComputerScreenshot is not supported on this platform".into(),
-        ))
-    }
+    let path = crate::screen_capture::temp_png("agent-computer-screenshot");
+    crate::screen_capture::capture_primary_to_png(&path).map_err(ToolError::Execution)?;
+    Ok(path)
 }
 
 fn os_move_mouse(x: f64, y: f64) -> Result<(), ToolError> {
     #[cfg(target_os = "macos")]
     {
-        // Prefer cliclick when present; fall back to a tiny Swift CGEvent snippet via osascript is unreliable —
-        // use Python Quartz if available, else cliclick, else clear error.
         if which("cliclick") {
             let status = Command::new("cliclick")
                 .arg(format!("m:{x},{y}"))
@@ -384,8 +321,6 @@ fn os_move_mouse(x: f64, y: f64) -> Result<(), ToolError> {
                 return Ok(());
             }
         }
-        // AppleScript via System Events can't move the mouse freely without Assistive Access;
-        // shell out to a one-shot Swift if `swift` exists.
         if which("swift") {
             let script = format!(
                 r#"import Cocoa
@@ -425,10 +360,7 @@ CGAssociateMouseAndMouseCursorPosition(1)
     }
     #[cfg(windows)]
     {
-        let _ = (x, y);
-        Err(ToolError::Execution(
-            "ComputerMove is not implemented on Windows yet".into(),
-        ))
+        crate::screen_capture::windows_input::move_mouse(x, y).map_err(ToolError::Execution)
     }
     #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
     {
@@ -440,7 +372,10 @@ CGAssociateMouseAndMouseCursorPosition(1)
 }
 
 fn os_click(x: f64, y: f64, button: &str) -> Result<(), ToolError> {
-    os_move_mouse(x, y)?;
+    #[cfg(not(windows))]
+    {
+        os_move_mouse(x, y)?;
+    }
     #[cfg(target_os = "macos")]
     {
         if which("cliclick") {
@@ -480,10 +415,7 @@ fn os_click(x: f64, y: f64, button: &str) -> Result<(), ToolError> {
     }
     #[cfg(windows)]
     {
-        let _ = (x, y, button);
-        Err(ToolError::Execution(
-            "ComputerClick is not implemented on Windows yet".into(),
-        ))
+        crate::screen_capture::windows_input::click(x, y, button).map_err(ToolError::Execution)
     }
     #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
     {
@@ -498,7 +430,6 @@ fn os_type_text(text: &str) -> Result<(), ToolError> {
     #[cfg(target_os = "macos")]
     {
         if which("cliclick") {
-            // cliclick `t:text` types; escape colon.
             let escaped = text.replace(':', "\\:");
             let status = Command::new("cliclick")
                 .arg(format!("t:{escaped}"))
@@ -508,7 +439,6 @@ fn os_type_text(text: &str) -> Result<(), ToolError> {
                 return Ok(());
             }
         }
-        // Fallback: osascript keystroke (limited charset).
         let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
         let script = format!(r#"tell application "System Events" to keystroke "{escaped}""#);
         let status = Command::new("osascript")
@@ -539,10 +469,7 @@ fn os_type_text(text: &str) -> Result<(), ToolError> {
     }
     #[cfg(windows)]
     {
-        let _ = text;
-        Err(ToolError::Execution(
-            "ComputerType is not implemented on Windows yet".into(),
-        ))
+        crate::screen_capture::windows_input::type_text(text).map_err(ToolError::Execution)
     }
     #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
     {
@@ -563,7 +490,6 @@ fn os_open_app(name: &str) -> Result<(), ToolError> {
         if status.success() {
             return Ok(());
         }
-        // Maybe a path.
         let status = Command::new("open")
             .arg(name)
             .status()
@@ -589,16 +515,7 @@ fn os_open_app(name: &str) -> Result<(), ToolError> {
     }
     #[cfg(windows)]
     {
-        let status = Command::new("cmd")
-            .args(["/C", "start", "", name])
-            .status()
-            .map_err(|e| ToolError::Execution(e.to_string()))?;
-        if status.success() {
-            return Ok(());
-        }
-        Err(ToolError::Execution(format!(
-            "Could not open application `{name}`"
-        )))
+        crate::screen_capture::windows_input::open_app(name).map_err(ToolError::Execution)
     }
     #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
     {

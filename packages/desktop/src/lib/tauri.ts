@@ -805,8 +805,8 @@ export const browserHardReload = (): Promise<void> =>
  * `src-tauri/src/browser.rs::browser_clear_data`. */
 export const browserClearData = (): Promise<void> => invoke("browser_clear_data")
 
-/** Captures a screenshot of the embedded browser's on-screen region (macOS
- * `screencapture -R`) and returns the temp PNG path. See
+/** Captures a screenshot of the embedded browser's on-screen region
+ * (macOS / Linux / Windows) and returns the temp PNG path. See
  * `src-tauri/src/browser.rs::browser_screenshot`. */
 export const browserScreenshot = (): Promise<string> => invoke("browser_screenshot")
 

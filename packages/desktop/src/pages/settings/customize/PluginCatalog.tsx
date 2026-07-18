@@ -246,15 +246,16 @@ export const PluginCatalog = () => {
 
         {plugin.key === "browser" && added ? (
           <p className="ml-11 text-xs text-ink-faint">
-            Needs an open Browser tab. Rebuild the engine / start a new session
-            after enabling.
+            Needs an open Browser tab. Screenshots work on macOS, Linux (grim /
+            ImageMagick), and Windows. Rebuild / new session after enabling.
           </p>
         ) : null}
 
         {plugin.key === "computer" && added ? (
           <p className="ml-11 text-xs text-ink-faint">
-            Needs Accessibility (and screen recording where applicable). Click /
-            type / open always ask. Rebuild / new session after enabling.
+            Screenshots + mouse/keyboard on macOS (Accessibility), Linux
+            (xdotool/grim), and Windows. Click / type / open always ask.
+            Rebuild / new session after enabling.
           </p>
         ) : null}
       </div>

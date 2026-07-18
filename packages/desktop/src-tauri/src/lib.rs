@@ -10,6 +10,7 @@ mod error;
 mod macos_window;
 mod path_resolve;
 mod plugins;
+mod screen_capture;
 mod secrets;
 mod state;
 mod terminal;
