@@ -47,7 +47,7 @@ export const RepoSectionHeader = ({
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {indexed ? (
         <span
-          className="shrink-0 text-[10px] tracking-wide text-ink-faint"
+          className="shrink-0 text-xs tracking-wide text-ink-faint"
           title="Code index ready"
           aria-label="Code index ready"
         >

@@ -60,7 +60,7 @@ export const SidebarProjectFilter = ({
           isFiltered || open
             ? "opacity-100"
             : "opacity-0 group-hover/label:opacity-100 focus-visible:opacity-100",
-          open && "bg-fill-3",
+          open && "bg-fill-2",
         )}
         onClick={() => setOpen((v) => !v)}
       >

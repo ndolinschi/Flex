@@ -25,7 +25,13 @@ export const useGitStatuses = (
     queries: sessions.map(({ id, cwd }) => ({
       queryKey: ["git-status", cwd, id] as const,
       queryFn: () => gitStatusSinceBaseline(id),
-      enabled: !!cwd && !!id,
+      // Gate fetch (not only interval) for collapsed / filtered-out rows —
+      // Changes tab keeps its own observer on the shared query key.
+      enabled:
+        !!cwd &&
+        !!id &&
+        options?.pollingEnabled !== false &&
+        (!options?.pollIds || options.pollIds.has(id)),
       staleTime: STALE_TIME_MS,
       refetchInterval: statusRefetchInterval(id, STALE_TIME_MS, options),
     })),

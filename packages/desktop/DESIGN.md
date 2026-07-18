@@ -234,7 +234,10 @@ Selected row: `bg-fill-2`. Hover: `bg-fill-4`.
 
 Filter tray (Repositories row): Sort — Last updated / Name A–Z; Show —
 Active projects (updated within 14 days) / All projects. Prefs persist in
-`ui.json` (`sidebarProjectSort`, `sidebarProjectVisibility`).
+`ui.json` (`sidebarProjectSort`, `sidebarProjectVisibility`). When Active
+hides every group (and nothing is pinned), show an empty state with a
+“Show all projects” action. Filter + Search icons stay paired (both reveal
+on hover / focus, or when a non-default filter is active).
 
 ### WindowTitleBar chrome
 

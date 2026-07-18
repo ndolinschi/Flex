@@ -272,8 +272,9 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   const repoCwds = useMemo(() => repoGroups.map((g) => g.cwd), [repoGroups])
   const indexedRepos = useIndexedRepos(repoCwds)
 
-  const toggleRepo = (cwd: string) =>
+  const toggleRepo = useCallback((cwd: string) => {
     setCollapsedRepos((prev) => ({ ...prev, [cwd]: !prev[cwd] }))
+  }, [])
 
   const handleRepoContextMenu = (
     e: ReactMouseEvent<HTMLDivElement>,
@@ -508,8 +509,11 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         <IconButton
           label="Search agents"
           className={cn(
-            "h-6 w-6 opacity-0 transition-opacity duration-[var(--duration-fast)]",
-            "group-hover/label:opacity-100",
+            "h-6 w-6 transition-opacity duration-[var(--duration-fast)]",
+            sidebarProjectSort !== "recency" ||
+              sidebarProjectVisibility !== "all"
+              ? "opacity-100"
+              : "opacity-0 group-hover/label:opacity-100 focus-visible:opacity-100",
           )}
           onClick={onOpenSearch}
         >
@@ -593,6 +597,17 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
                   : null}
               </section>
             ))}
+
+            {pinnedSessions.length === 0 &&
+            repoGroups.length === 0 &&
+            sidebarProjectVisibility === "active" ? (
+              <EmptyState
+                title="No active projects"
+                description="Nothing updated in the last 14 days. Switch to All projects to see everything."
+                actionLabel="Show all projects"
+                onAction={() => setSidebarProjectVisibility("all")}
+              />
+            ) : null}
 
             {archivedSessions.length > 0 ? (
               <section className="flex flex-col gap-px">
