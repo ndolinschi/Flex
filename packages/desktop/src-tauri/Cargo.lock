@@ -1941,6 +1941,7 @@ dependencies = [
  "rand 0.10.2",
  "regex",
  "rusqlite",
+ "schemars 0.8.22",
  "serde",
  "serde_json",
  "tauri",

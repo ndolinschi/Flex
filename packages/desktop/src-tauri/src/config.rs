@@ -92,6 +92,14 @@ pub struct PluginPrefs {
     pub learning_require_verified_memory: bool,
     #[serde(default)]
     pub verifier: bool,
+    /// Embedded Browser panel tools (navigate / screenshot / eval / console).
+    /// Desktop-only; default off (needs an open Browser tab + permissions).
+    #[serde(default)]
+    pub browser: bool,
+    /// OS computer-use tools with animated agent cursor. Desktop-only;
+    /// default off (Accessibility / screen-recording permissions).
+    #[serde(default)]
+    pub computer: bool,
 }
 
 fn default_true() -> bool {
@@ -109,6 +117,8 @@ impl Default for PluginPrefs {
             learning_require_human_approval: false,
             learning_require_verified_memory: false,
             verifier: false,
+            browser: false,
+            computer: false,
         }
     }
 }
