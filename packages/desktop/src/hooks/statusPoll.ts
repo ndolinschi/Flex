@@ -1,10 +1,11 @@
 /**
  * Shared poll gate for sidebar git/workspace status queries.
  *
- * When `pollingEnabled` is false (e.g. sidebar collapsed), nothing intervals.
- * When `pollIds` is set, only those session ids get a refetch interval; others
- * still fetch once (staleTime / invalidate) but do not poll in the background.
- * Omit `pollIds` to keep legacy "poll every listed session" behavior.
+ * Callers should also set `enabled` from the same options (see
+ * `useGitStatuses` / `useWorkspaceStatuses`): when `pollingEnabled` is false
+ * (sidebar collapsed) or an id is outside `pollIds`, the query stays off —
+ * not merely interval-paused — so collapsed / filtered-out rows do not IPC.
+ * Omit `pollIds` to keep legacy "fetch every listed session" behavior.
  */
 export type StatusPollOptions = {
   pollingEnabled?: boolean

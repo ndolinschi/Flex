@@ -23,8 +23,12 @@ export const useWorkspaceStatuses = (
       queryKey: ["workspace-status", id] as const,
       queryFn: () => workspaceStatus(id),
       staleTime: STALE_TIME_MS,
+      // Gate the query itself (not only the interval) so collapsed / off-screen
+      // rows do not fire IPC every mount — Changes tab owns its own observer.
+      enabled:
+        options?.pollingEnabled !== false &&
+        (!options?.pollIds || options.pollIds.has(id)),
       refetchInterval: statusRefetchInterval(id, STALE_TIME_MS, options),
-      enabled: true,
     })),
   })
 

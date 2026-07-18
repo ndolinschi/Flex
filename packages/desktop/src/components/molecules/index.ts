@@ -67,6 +67,7 @@ export { SettingsSection, FieldRow, SettingsCard, SettingRow } from "./SettingsS
 export { SettingsNav, SETTINGS_NAV_ITEMS } from "./SettingsNav"
 export type { SettingsNavItem } from "./SettingsNav"
 export { SidebarActionRow } from "./SidebarActionRow"
+export { SidebarProjectFilter } from "./SidebarProjectFilter"
 export { SidebarFooter } from "./SidebarFooter"
 export { SidebarResumeError } from "./SidebarResumeError"
 export { SidebarSkeleton } from "./SidebarSkeleton"

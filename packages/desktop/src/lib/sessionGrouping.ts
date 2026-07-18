@@ -1,4 +1,5 @@
 import type { SessionMeta } from "./types"
+import { sessionLabel } from "./types"
 import { basename } from "./utils"
 
 export type RepoGroup = {
@@ -6,6 +7,24 @@ export type RepoGroup = {
   label: string
   sessions: SessionMeta[]
   latestMs: number
+}
+
+/** How repository groups are ordered in the session sidebar. */
+export type SidebarProjectSort = "recency" | "alpha"
+
+/** Which repository groups the sidebar shows (Pinned / Archived are separate). */
+export type SidebarProjectVisibility = "active" | "all"
+
+/** A project is "active" when any of its sessions was updated within this window. */
+export const ACTIVE_PROJECT_WINDOW_MS = 14 * 24 * 60 * 60 * 1000
+
+export type GroupByRepoOptions = {
+  sort?: SidebarProjectSort
+  visibility?: SidebarProjectVisibility
+  /** Clock for the active-window check (tests inject a fixed value). */
+  nowMs?: number
+  /** Always keep this project cwd visible, even when filtering to Active. */
+  keepCwd?: string | null
 }
 
 /** Project root for sidebar/search grouping: isolated sessions keep their
@@ -38,11 +57,24 @@ export const orderByPinnedIds = (
   return ordered
 }
 
-/** Groups sessions by their project root (`base_cwd ?? cwd`), sorted by
+const compareAlpha = (a: string, b: string): number =>
+  a.localeCompare(b, undefined, { sensitivity: "base", numeric: true })
+
+/** Groups sessions by their project root (`base_cwd ?? cwd`). Default sort is
  * most-recently-updated group first, with each group's sessions also sorted
- * most-recent-first. Isolated worktree sessions stay under the real repo
- * instead of appearing as a UUID-named project. */
-export const groupByRepo = (sessions: SessionMeta[]): RepoGroup[] => {
+ * most-recent-first. Optional `sort: "alpha"` orders groups (and sessions) by
+ * name; `visibility: "active"` hides projects idle longer than
+ * {@link ACTIVE_PROJECT_WINDOW_MS} (except `keepCwd`). Isolated worktree
+ * sessions stay under the real repo instead of appearing as a UUID-named
+ * project. */
+export const groupByRepo = (
+  sessions: SessionMeta[],
+  options: GroupByRepoOptions = {},
+): RepoGroup[] => {
+  const sort = options.sort ?? "recency"
+  const visibility = options.visibility ?? "all"
+  const nowMs = options.nowMs ?? Date.now()
+
   const groups = new Map<string, RepoGroup>()
   for (const session of sessions) {
     const key = projectCwd(session)
@@ -54,10 +86,31 @@ export const groupByRepo = (sessions: SessionMeta[]): RepoGroup[] => {
     group.sessions.push(session)
     group.latestMs = Math.max(group.latestMs, session.updated_at_ms)
   }
-  const sorted = [...groups.values()].sort((a, b) => b.latestMs - a.latestMs)
-  for (const group of sorted) {
-    group.sessions.sort((a, b) => b.updated_at_ms - a.updated_at_ms)
+
+  let sorted = [...groups.values()]
+  if (sort === "alpha") {
+    sorted.sort((a, b) => compareAlpha(a.label, b.label))
+    for (const group of sorted) {
+      group.sessions.sort((a, b) =>
+        compareAlpha(sessionLabel(a), sessionLabel(b)),
+      )
+    }
+  } else {
+    sorted.sort((a, b) => b.latestMs - a.latestMs)
+    for (const group of sorted) {
+      group.sessions.sort((a, b) => b.updated_at_ms - a.updated_at_ms)
+    }
   }
+
+  if (visibility === "active") {
+    const keep = options.keepCwd ?? null
+    sorted = sorted.filter(
+      (group) =>
+        group.cwd === keep ||
+        nowMs - group.latestMs <= ACTIVE_PROJECT_WINDOW_MS,
+    )
+  }
+
   return sorted
 }
 
