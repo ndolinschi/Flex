@@ -81,6 +81,9 @@ pub struct CursorCliConfig {
     pub base_args: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub probe_args: Vec<String>,
+    /// Optional Cursor Dashboard API key (also read from `CURSOR_API_KEY`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
 }
 
 impl Default for CursorCliConfig {
@@ -95,24 +98,34 @@ impl Default for CursorCliConfig {
                 "--force".to_owned(),
             ],
             probe_args: vec!["--version".to_owned()],
+            api_key: None,
         }
     }
 }
 
 impl CursorCliConfig {
     pub fn process_spec(&self) -> DelegatorProcessSpec {
-        self.apply_cwd(DelegatorProcessSpec::new(self.program.clone()).args(self.base_args.clone()))
+        self.apply_auth(self.apply_cwd(
+            DelegatorProcessSpec::new(self.program.clone()).args(self.base_args.clone()),
+        ))
     }
 
     pub fn probe_spec(&self) -> DelegatorProcessSpec {
-        self.apply_cwd(
+        self.apply_auth(self.apply_cwd(
             DelegatorProcessSpec::new(self.program.clone()).args(self.probe_args.clone()),
-        )
+        ))
     }
 
     /// The prompt rides as the final positional argument.
     pub fn prompt_request(&self, prompt: impl Into<String>) -> DelegatorRunRequest {
         DelegatorRunRequest::new(self.process_spec().arg(prompt.into()))
+    }
+
+    /// Attach a Cursor Dashboard / service-account API key for headless auth
+    /// (`CURSOR_API_KEY` / `--api-key`).
+    pub fn with_api_key(mut self, api_key: impl Into<String>) -> Self {
+        self.api_key = Some(api_key.into());
+        self
     }
 
     fn apply_cwd(&self, spec: DelegatorProcessSpec) -> DelegatorProcessSpec {
@@ -121,6 +134,27 @@ impl CursorCliConfig {
         } else {
             spec
         }
+    }
+
+    fn apply_auth(&self, mut spec: DelegatorProcessSpec) -> DelegatorProcessSpec {
+        let key = self
+            .api_key
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+            .or_else(|| {
+                std::env::var("CURSOR_API_KEY")
+                    .ok()
+                    .map(|value| value.trim().to_owned())
+                    .filter(|value| !value.is_empty())
+            });
+        if let Some(api_key) = key {
+            // Prefer env (documented for headless scripts) over argv so probe
+            // (`--version`) stays a clean capability check.
+            spec = spec.env("CURSOR_API_KEY", api_key);
+        }
+        spec
     }
 }
 
@@ -215,5 +249,13 @@ mod tests {
             }
             Err(err) => panic!("configured CLI profile should build: {err}"),
         }
+    }
+
+    #[test]
+    fn cli_config_forwards_api_key_env() {
+        let config = CursorCliConfig::default().with_api_key("test-key");
+        let spec = config.process_spec();
+        assert_eq!(spec.env.get("CURSOR_API_KEY"), Some(&"test-key".to_owned()));
+        assert!(!spec.args.iter().any(|arg| arg == "test-key"));
     }
 }
