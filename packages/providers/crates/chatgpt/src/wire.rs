@@ -10,7 +10,7 @@ use agentloop_core::{ChatRequest, ProviderStreamEvent, ToolChoice, ToolSpec};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::models::resolve_model;
+use crate::models::{resolve_model, uses_responses_lite};
 
 #[derive(Debug, Serialize)]
 pub(crate) struct CodexResponsesRequest {
@@ -18,8 +18,8 @@ pub(crate) struct CodexResponsesRequest {
     #[serde(skip_serializing_if = "String::is_empty")]
     instructions: String,
     input: Vec<Value>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    tools: Vec<CodexTool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tools: Option<Vec<CodexTool>>,
     tool_choice: Value,
     parallel_tool_calls: bool,
     store: bool,
@@ -27,6 +27,8 @@ pub(crate) struct CodexResponsesRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     reasoning: Option<CodexReasoning>,
     include: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prompt_cache_key: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -43,6 +45,17 @@ struct CodexReasoning {
     effort: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     summary: Option<String>,
+    /// Responses Lite asks for `all_turns` so prior reasoning stays in context.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    context: Option<String>,
+}
+
+/// Body + optional Lite session headers for the Codex Responses POST.
+#[derive(Debug)]
+pub(crate) struct BuiltCodexRequest {
+    pub body: CodexResponsesRequest,
+    /// When set, the provider must send Responses Lite headers with this id.
+    pub lite_session_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -271,37 +284,90 @@ impl CodexStreamMapper {
     }
 }
 
-pub(crate) fn build_request(request: ChatRequest) -> CodexResponsesRequest {
+pub(crate) fn build_request(request: ChatRequest) -> BuiltCodexRequest {
     let model = resolve_model(&request.model);
+    let lite = uses_responses_lite(&model);
     let instructions = request.system.unwrap_or_default();
-    let input = build_input(request.messages);
+    let message_input = build_input(request.messages);
     let tools = request.tools.into_iter().map(map_tool).collect::<Vec<_>>();
-    let tool_choice = map_tool_choice(request.tool_choice);
-    let reasoning = request.thinking.map(|thinking| {
-        let effort = if thinking.budget_tokens >= 16_000 {
+    let reasoning_effort = request.thinking.map(|thinking| {
+        if thinking.budget_tokens >= 16_000 {
             "high"
         } else if thinking.budget_tokens >= 4_000 {
             "medium"
         } else {
             "low"
-        };
-        CodexReasoning {
-            effort: effort.to_owned(),
-            summary: Some("auto".to_owned()),
         }
+        .to_owned()
     });
 
-    CodexResponsesRequest {
-        model,
-        instructions,
-        input,
-        tools,
-        tool_choice,
-        parallel_tool_calls: true,
-        store: false,
-        stream: true,
-        reasoning,
-        include: vec!["reasoning.encrypted_content".to_owned()],
+    if lite {
+        let session_id = uuid::Uuid::now_v7().to_string();
+        let mut input = Vec::new();
+        if !tools.is_empty() {
+            input.push(serde_json::json!({
+                "type": "additional_tools",
+                "role": "developer",
+                "tools": tools,
+            }));
+        }
+        if !instructions.is_empty() {
+            input.push(serde_json::json!({
+                "type": "message",
+                "role": "developer",
+                "content": [{
+                    "type": "input_text",
+                    "text": instructions,
+                }],
+            }));
+        }
+        input.extend(message_input);
+
+        let reasoning = Some(CodexReasoning {
+            effort: reasoning_effort.unwrap_or_else(|| "medium".to_owned()),
+            summary: Some("auto".to_owned()),
+            context: Some("all_turns".to_owned()),
+        });
+
+        return BuiltCodexRequest {
+            body: CodexResponsesRequest {
+                model,
+                instructions: String::new(),
+                input,
+                tools: None,
+                tool_choice: Value::String("auto".to_owned()),
+                parallel_tool_calls: false,
+                store: false,
+                stream: true,
+                reasoning,
+                include: vec!["reasoning.encrypted_content".to_owned()],
+                prompt_cache_key: Some(session_id.clone()),
+            },
+            lite_session_id: Some(session_id),
+        };
+    }
+
+    let reasoning = reasoning_effort.map(|effort| CodexReasoning {
+        effort,
+        summary: Some("auto".to_owned()),
+        context: None,
+    });
+
+    BuiltCodexRequest {
+        body: CodexResponsesRequest {
+            model,
+            instructions,
+            input: message_input,
+            tools: Some(tools),
+            tool_choice: map_tool_choice(request.tool_choice),
+            parallel_tool_calls: true,
+            store: false,
+            stream: true,
+            reasoning,
+            include: vec!["reasoning.encrypted_content".to_owned()],
+            prompt_cache_key: None,
+        },
+        lite_session_id: None,
     }
 }
 
@@ -460,7 +526,7 @@ mod tests {
         }];
 
         let body = build_request(request);
-        let json = serde_json::to_value(&body).expect("serialize");
+        let json = serde_json::to_value(&body.body).expect("serialize");
         assert_eq!(json["model"], "gpt-5.4");
         assert_eq!(json["store"], false);
         assert_eq!(json["stream"], true);
@@ -469,6 +535,47 @@ mod tests {
         assert_eq!(json["tools"][0]["name"], "Read");
         assert!(json.get("max_output_tokens").is_none());
         assert_eq!(json["input"][0]["role"], "user");
+        assert!(body.lite_session_id.is_none());
+    }
+
+    #[test]
+    fn build_request_lite_moves_tools_and_instructions() {
+        let mut request = ChatRequest::new(
+            "gpt-5.6-luna",
+            vec![Message {
+                role: Role::User,
+                content: vec![ContentBlock::Markdown {
+                    text: "hello".to_owned(),
+                }],
+                cache_hint: false,
+            }],
+        );
+        request.system = Some("You are helpful.".to_owned());
+        request.tools = vec![ToolSpec {
+            name: "Read".to_owned(),
+            description: "Read a file".to_owned(),
+            input_schema: serde_json::json!({"type": "object"}),
+        }];
+
+        let built = build_request(request);
+        let json = serde_json::to_value(&built.body).expect("serialize");
+        assert_eq!(json["model"], "gpt-5.6-luna");
+        assert!(json.get("tools").is_none() || json["tools"].is_null());
+        assert!(json.get("instructions").is_none() || json["instructions"].as_str() == Some(""));
+        assert_eq!(json["parallel_tool_calls"], false);
+        assert_eq!(json["tool_choice"], "auto");
+        assert_eq!(json["input"][0]["type"], "additional_tools");
+        assert_eq!(json["input"][0]["role"], "developer");
+        assert_eq!(json["input"][0]["tools"][0]["name"], "Read");
+        assert_eq!(json["input"][1]["role"], "developer");
+        assert_eq!(json["input"][2]["role"], "user");
+        assert_eq!(json["reasoning"]["context"], "all_turns");
+        assert!(json["prompt_cache_key"].as_str().is_some());
+        assert!(built.lite_session_id.is_some());
+        assert_eq!(
+            built.lite_session_id.as_deref(),
+            json["prompt_cache_key"].as_str()
+        );
     }
 
     #[test]
@@ -500,7 +607,7 @@ mod tests {
         );
         request.system = Some("sys".to_owned());
         let body = build_request(request);
-        let json = serde_json::to_value(&body).expect("serialize");
+        let json = serde_json::to_value(&body.body).expect("serialize");
         assert_eq!(json["input"][0]["type"], "function_call");
         assert_eq!(json["input"][0]["call_id"], "call_1");
         assert_eq!(json["input"][1]["type"], "function_call_output");

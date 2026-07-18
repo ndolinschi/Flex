@@ -183,7 +183,7 @@ pub(crate) const COMPAT_PRESETS: [CompatPreset; 4] = [
         key_env: "XAI_API_KEY",
         model_env: "XAI_MODEL",
         base_url: "https://api.x.ai/v1",
-        default_model: "grok-4",
+        default_model: "grok-4.5",
     },
 ];
 

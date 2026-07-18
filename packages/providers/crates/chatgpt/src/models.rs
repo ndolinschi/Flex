@@ -5,9 +5,12 @@ use agentloop_contracts::ModelInfo;
 use crate::config::DEFAULT_CHATGPT_MODEL;
 
 /// Models the ChatGPT subscription / Codex backend accepts under OAuth.
-/// Aligned with OpenCode's allow-list (gpt-5.2+ family + codex variants).
+/// GPT-5.6 Sol/Terra/Luna need the Responses Lite wire (see `wire.rs`).
 pub fn static_models() -> Vec<ModelInfo> {
     [
+        ("gpt-5.6-sol", "GPT-5.6 Sol", Some(272_000), true),
+        ("gpt-5.6-terra", "GPT-5.6 Terra", Some(272_000), true),
+        ("gpt-5.6-luna", "GPT-5.6 Luna", Some(272_000), true),
         ("gpt-5.5", "GPT-5.5", Some(400_000), true),
         ("gpt-5.4", "GPT-5.4", Some(272_000), true),
         ("gpt-5.4-mini", "GPT-5.4 Mini", Some(272_000), true),
@@ -40,6 +43,13 @@ pub fn static_models() -> Vec<ModelInfo> {
     .collect()
 }
 
+/// Whether this model id speaks the Codex Responses Lite contract
+/// (tools/instructions move into `input`; lite header required).
+pub(crate) fn uses_responses_lite(model: &str) -> bool {
+    let bare = model.rsplit('/').next().unwrap_or(model);
+    bare == "gpt-5.6" || bare.starts_with("gpt-5.6-")
+}
+
 /// Resolve a requested model id to a catalog entry, falling back to the default.
 pub(crate) fn resolve_model(requested: &str) -> String {
     let trimmed = requested.trim();
@@ -47,6 +57,10 @@ pub(crate) fn resolve_model(requested: &str) -> String {
         return DEFAULT_CHATGPT_MODEL.to_owned();
     }
     let bare = trimmed.rsplit('/').next().unwrap_or(trimmed);
+    // Alias: unsuffixed gpt-5.6 routes to Sol (OpenAI's documented default).
+    if bare == "gpt-5.6" {
+        return "gpt-5.6-sol".to_owned();
+    }
     if static_models().iter().any(|m| m.id == bare) {
         bare.to_owned()
     } else {
@@ -69,7 +83,28 @@ mod tests {
     }
 
     #[test]
+    fn catalog_includes_gpt_5_6_family() {
+        let ids: Vec<_> = static_models().into_iter().map(|m| m.id).collect();
+        assert!(ids.contains(&"gpt-5.6-sol".to_owned()));
+        assert!(ids.contains(&"gpt-5.6-terra".to_owned()));
+        assert!(ids.contains(&"gpt-5.6-luna".to_owned()));
+    }
+
+    #[test]
     fn resolve_strips_provider_prefix() {
         assert_eq!(resolve_model("chatgpt/gpt-5.4"), "gpt-5.4");
+    }
+
+    #[test]
+    fn resolve_alias_gpt_5_6_to_sol() {
+        assert_eq!(resolve_model("chatgpt/gpt-5.6"), "gpt-5.6-sol");
+    }
+
+    #[test]
+    fn lite_gate_matches_5_6_family() {
+        assert!(uses_responses_lite("gpt-5.6-luna"));
+        assert!(uses_responses_lite("chatgpt/gpt-5.6-sol"));
+        assert!(!uses_responses_lite("gpt-5.5"));
+        assert!(!uses_responses_lite("gpt-5.4"));
     }
 }
