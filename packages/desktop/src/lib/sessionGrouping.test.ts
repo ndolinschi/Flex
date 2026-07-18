@@ -79,7 +79,7 @@ describe("groupByRepo", () => {
   })
 
   it("hides idle projects when visibility is active", () => {
-    const now = 1_000_000
+    const now = 1_700_000_000_000
     const sessions = [
       makeSession("fresh", now - 1_000, "/fresh"),
       makeSession("stale", now - ACTIVE_PROJECT_WINDOW_MS - 1, "/stale"),
@@ -92,7 +92,7 @@ describe("groupByRepo", () => {
   })
 
   it("keeps keepCwd visible under the active filter", () => {
-    const now = 1_000_000
+    const now = 1_700_000_000_000
     const sessions = [
       makeSession("stale", now - ACTIVE_PROJECT_WINDOW_MS - 1, "/stale"),
     ]
