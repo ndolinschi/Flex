@@ -147,6 +147,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `plugins/prompt-completion/` | UI plugin: `CompletionSetupModal` (Ollama pull guidance or existing provider) + `InlineCompletionSettingsCard` (Customize) |
 | `plugins/components/` | UI plugin: `ComponentsTab` (React/Vue/Angular inventory + CSS edit → agent) |
 | `src-tauri/plugins/` | Desktop-only engine plugins: `BrowserPlugin` (panel navigate/screenshot/eval/click/console/devtools) + `ComputerPlugin` (OS screenshot/move/click/type/open + animated agent cursor overlay) |
+| `src-tauri/screen_capture.rs` | Shared macOS/Linux/Windows screenshot backends used by Browser UI command + Browser/Computer plugins |
 | `WelcomePage` | First-run wizard: provider key → model → optional project |
 
 ### Page subfolders

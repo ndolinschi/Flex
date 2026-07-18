@@ -1196,23 +1196,13 @@ pub async fn browser_clear_data(state: State<'_, AppState>) -> DesktopResult<()>
 
 /// Captures a screenshot of the embedded browser's on-screen region.
 ///
-/// macOS-only v1: shells out to `screencapture -x -R x,y,w,h` against the
-/// webview's absolute screen rect (window `outer_position` + the child
-/// webview's window-relative `position()`/`size()`, converted from physical
-/// pixels to points via the window's scale factor — `screencapture -R` takes
-/// point coordinates). Writes to a temp PNG under `std::env::temp_dir()` and
-/// returns its path.
+/// Uses the shared [`crate::screen_capture`] backends:
+/// - macOS: `screencapture -R` (points)
+/// - Linux: `grim -g` / ImageMagick `import`
+/// - Windows: PowerShell `CopyFromScreen`
 ///
-/// Caveat: if the app window isn't frontmost, this can capture whatever
-/// occludes it — `screencapture -R` has no window-handle-scoped capture mode,
-/// only a screen-region one. Acceptable for v1.
-///
-/// `screencapture` is a macOS-only binary, so the real implementation is
-/// `#[cfg(target_os = "macos")]`-gated; every other platform gets the stub
-/// below, which returns a `DesktopResult` error (surfaced to the frontend as
-/// a toast — see the module's error-path convention) rather than failing to
-/// compile or panicking at runtime.
-#[cfg(target_os = "macos")]
+/// Caveat: if the app window isn't frontmost, region capture can include
+/// whatever occludes it — acceptable for agent tooling.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_screenshot(state: State<'_, AppState>) -> DesktopResult<String> {
@@ -1227,45 +1217,15 @@ pub async fn browser_screenshot(state: State<'_, AppState>) -> DesktopResult<Str
     let view_pos = webview.position()?;
     let view_size = webview.size()?;
 
-    let x = (win_pos.x as f64 + view_pos.x as f64) / scale;
-    let y = (win_pos.y as f64 + view_pos.y as f64) / scale;
-    let w = view_size.width as f64 / scale;
-    let h = view_size.height as f64 / scale;
-
-    let filename = format!(
-        "flex-browser-screenshot-{}.png",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis())
-            .unwrap_or(0)
+    // Physical pixels — macOS backend converts to points via `scale`.
+    let rect = crate::screen_capture::ScreenRect::from_physical(
+        win_pos.x as f64 + view_pos.x as f64,
+        win_pos.y as f64 + view_pos.y as f64,
+        view_size.width as f64,
+        view_size.height as f64,
     );
-    let out_path = std::env::temp_dir().join(filename);
-
-    let status = std::process::Command::new("screencapture")
-        .arg("-x")
-        .arg("-R")
-        .arg(format!("{x},{y},{w},{h}"))
-        .arg(&out_path)
-        .status()
-        .map_err(|e| DesktopError::Message(format!("failed to run screencapture: {e}")))?;
-
-    if !status.success() {
-        return Err(DesktopError::Message(format!(
-            "screencapture exited with status {status}"
-        )));
-    }
-
+    let out_path = crate::screen_capture::temp_png("agent-browser-screenshot");
+    crate::screen_capture::capture_region_to_png(rect, scale, &out_path)
+        .map_err(DesktopError::Message)?;
     Ok(out_path.to_string_lossy().into_owned())
-}
-
-/// Non-macOS stub: no equivalent region-capture binary is wired up yet
-/// (Windows would need a Win32/GDI capture, Linux would need portal/X11
-/// grab). Returns a clear, user-visible error instead of silently no-op'ing.
-#[cfg(not(target_os = "macos"))]
-#[tracing::instrument(level = "debug", skip_all, err)]
-#[tauri::command]
-pub async fn browser_screenshot(_state: State<'_, AppState>) -> DesktopResult<String> {
-    Err(DesktopError::Message(
-        "Screenshots are not supported on this platform yet".into(),
-    ))
 }

@@ -191,7 +191,7 @@ impl Tool for BrowserScreenshotTool {
         ToolDescriptor {
             name: "BrowserScreenshot".into(),
             description: "Capture a PNG of the embedded Browser panel viewport \
-                          (macOS; other platforms not yet supported)."
+                          (macOS / Linux / Windows)."
                 .into(),
             input_schema: schema_of::<BrowserScreenshotInput>(),
             read_only: true,
@@ -213,58 +213,34 @@ impl Tool for BrowserScreenshotTool {
 }
 
 async fn capture_browser_panel(app: &AppHandle) -> Result<PathBuf, ToolError> {
-    #[cfg(target_os = "macos")]
-    {
-        let state = app.state::<AppState>();
-        let guard = state.browser_webview.lock().await;
-        let webview = guard
-            .as_ref()
-            .ok_or_else(|| ToolError::Execution("Browser panel is not open.".into()))?;
-        let window = webview.window();
-        let scale = window
-            .scale_factor()
-            .map_err(|e| ToolError::Execution(e.to_string()))?;
-        let win_pos = window
-            .outer_position()
-            .map_err(|e| ToolError::Execution(e.to_string()))?;
-        let view_pos = webview
-            .position()
-            .map_err(|e| ToolError::Execution(e.to_string()))?;
-        let view_size = webview
-            .size()
-            .map_err(|e| ToolError::Execution(e.to_string()))?;
-        let x = (win_pos.x as f64 + view_pos.x as f64) / scale;
-        let y = (win_pos.y as f64 + view_pos.y as f64) / scale;
-        let w = view_size.width as f64 / scale;
-        let h = view_size.height as f64 / scale;
-        let out = std::env::temp_dir().join(format!(
-            "agent-browser-screenshot-{}.png",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis())
-                .unwrap_or(0)
-        ));
-        let status = std::process::Command::new("screencapture")
-            .arg("-x")
-            .arg("-R")
-            .arg(format!("{x},{y},{w},{h}"))
-            .arg(&out)
-            .status()
-            .map_err(|e| ToolError::Execution(format!("screencapture failed: {e}")))?;
-        if !status.success() {
-            return Err(ToolError::Execution(format!(
-                "screencapture exited with {status}"
-            )));
-        }
-        Ok(out)
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = app;
-        Err(ToolError::Execution(
-            "BrowserScreenshot is only supported on macOS currently.".into(),
-        ))
-    }
+    let state = app.state::<AppState>();
+    let guard = state.browser_webview.lock().await;
+    let webview = guard
+        .as_ref()
+        .ok_or_else(|| ToolError::Execution("Browser panel is not open.".into()))?;
+    let window = webview.window();
+    let scale = window
+        .scale_factor()
+        .map_err(|e| ToolError::Execution(e.to_string()))?;
+    let win_pos = window
+        .outer_position()
+        .map_err(|e| ToolError::Execution(e.to_string()))?;
+    let view_pos = webview
+        .position()
+        .map_err(|e| ToolError::Execution(e.to_string()))?;
+    let view_size = webview
+        .size()
+        .map_err(|e| ToolError::Execution(e.to_string()))?;
+    let rect = crate::screen_capture::ScreenRect::from_physical(
+        win_pos.x as f64 + view_pos.x as f64,
+        win_pos.y as f64 + view_pos.y as f64,
+        view_size.width as f64,
+        view_size.height as f64,
+    );
+    let out = crate::screen_capture::temp_png("agent-browser-screenshot");
+    crate::screen_capture::capture_region_to_png(rect, scale, &out)
+        .map_err(ToolError::Execution)?;
+    Ok(out)
 }
 
 struct BrowserEvalTool {
