@@ -135,10 +135,6 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
       className={cn(
         "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-bg",
         paneFocused ? "z-[1]" : "z-0",
-        dragUi?.dragging &&
-          dragUi.overTarget &&
-          dragUi.toPane === paneIndex &&
-          "ring-1 ring-inset ring-accent/30",
       )}
       data-content-pane={paneIndex}
       onMouseDown={() => setFocusedPane(paneIndex)}
