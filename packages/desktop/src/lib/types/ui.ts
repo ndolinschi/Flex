@@ -2,7 +2,7 @@ import type { SessionMeta, ContentBlock } from "./wire"
 import type { BrowserDomElement } from "../browserDesign"
 import type { ComponentStyleEditPayload } from "../componentDesign"
 
-export type ComposerMode = "agent" | "plan" | "ask" | "flex"
+export type ComposerMode = "agent" | "plan" | "ask" | "flex" | "debug"
 
 export type FileComposerAttachment = {
   id: string

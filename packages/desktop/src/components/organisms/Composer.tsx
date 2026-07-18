@@ -8,6 +8,7 @@ import {
   PermissionActions,
   PlusMenu,
   SendButton,
+  modeAllowsBypass,
 } from "../molecules"
 import { useModels } from "../../hooks/useModels"
 import { useSessions } from "../../hooks/useSessions"
@@ -204,7 +205,7 @@ export const Composer = ({
   }
 
   const handleToggleBypass = () => {
-    if (!activeSessionId || composerMode !== "agent") return
+    if (!activeSessionId || !modeAllowsBypass(composerMode)) return
     const next = !sessionBypass
     setSessionBypass(activeSessionId, next)
     const sessionId = activeSessionId

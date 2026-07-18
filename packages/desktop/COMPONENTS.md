@@ -52,7 +52,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays + optional ghost-text inline completion (isolates keystrokes from ModelPicker/ContextBar) | `composerMode`, `anchorRef`, `attachments`, `onSend` | Composer |
 | `ModelSelect` | Simple model `<select>` | `models`, `value`, `onChange` | ProviderSettingsForm |
 | `ModelPicker` | Searchable model tray (PopoverTray) | `models`, `value`, `onChange` | Composer |
-| `ModePicker` | Agent / Plan / Ask pill switcher | `value`, `onChange` | Composer |
+| `ModePicker` | Agent / Plan / Ask / Debug (/ Flex when flagged) mode pill | `value`, `onChange` | Composer |
 | `PlanBuildBar` | Cursor-style Build CTA after ExitPlanMode | `onBuild`, `onKeepPlanning?`, `variant` | Plan tab, ChatSessionBody |
 | `PlanCard` | Checklist from `plan_updated` (Plan tool tab; not inlined in timeline) | `entries` | PlanTab |
 | `PlanList` | Multi-plan “Review plans” list for a session | `plans`, `onSelect` | PlanTab |

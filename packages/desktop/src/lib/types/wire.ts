@@ -512,11 +512,10 @@ export type PromptCommandInput = {
    * "lowercase")]`): "low" | "medium" | "high" | "xhigh" | "max". Omitted =
    * engine default. */
   effort?: string
-  /** The composer mode the user picked ("agent" | "plan" | "ask" | "flex"),
-   * separate from `permissionMode` (its derived wire value). Backend uses it
-   * only to decide whether to append the Flex orchestrator system prompt
-   * (see `commands.rs::prompt`); it does not affect permission handling on
-   * its own. */
+  /** The composer mode the user picked ("agent" | "plan" | "ask" | "flex" | "debug"),
+   * separate from `permissionMode` (its derived wire value). Backend appends
+   * mode-specific system prompts for flex / plan / debug (see
+   * `commands.rs::prompt`); it does not affect permission handling on its own. */
   composerMode?: string
 }
 

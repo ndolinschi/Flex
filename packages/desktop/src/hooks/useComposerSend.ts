@@ -21,7 +21,7 @@ import {
 import { markRawPromptTitle } from "../lib/sessionSideEffects/autoTitle"
 import type { ComposerAttachment, ModelInfoDto, SessionMeta } from "../lib/types"
 import { useAppStore } from "../stores/appStore"
-import { modeToPermission } from "../components/molecules"
+import { modeToPermission, modeAllowsBypass } from "../components/molecules"
 import { log } from "../lib/debug/log"
 
 export const EMPTY_QUEUE: string[] = []
@@ -275,7 +275,8 @@ export const useComposerSend = ({
       const store = useAppStore.getState()
       const mode = store.composerMode
       const bypass =
-        mode === "agent" && !!store.sessionBypassBySession[activeSessionId]
+        modeAllowsBypass(mode) &&
+        !!store.sessionBypassBySession[activeSessionId]
 
       const domPending = pending.filter(isDomAttachment)
       const stylePending = pending.filter(isComponentStyleAttachment)

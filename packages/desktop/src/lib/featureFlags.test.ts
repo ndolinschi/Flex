@@ -24,6 +24,7 @@ describe("FLEX_MODE_ENABLED", () => {
       "agent",
       "plan",
       "ask",
+      "debug",
     ])
   })
 })

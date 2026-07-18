@@ -3,6 +3,7 @@ import { createPortal } from "react-dom"
 import {
   Bot,
   Brain,
+  Bug,
   Moon,
   Network,
   PanelLeft,
@@ -186,6 +187,16 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
         run: () => {
           setRoute("chat")
           setComposerMode("ask")
+        },
+      },
+      {
+        id: "mode-debug",
+        label: "Mode: Debug",
+        icon: Bug,
+        group: "Commands",
+        run: () => {
+          setRoute("chat")
+          setComposerMode("debug")
         },
       },
       ...(FLEX_MODE_ENABLED
