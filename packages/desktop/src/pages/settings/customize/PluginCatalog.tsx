@@ -143,6 +143,15 @@ export const PluginCatalog = () => {
     await savePlugins({ [key]: !plugins[key] }, key)
   }
 
+  const engineVisible = useMemo(
+    () => visible.filter((p) => p.category === "Engine plugins"),
+    [visible],
+  )
+  const desktopVisible = useMemo(
+    () => visible.filter((p) => p.category === "Desktop plugins"),
+    [visible],
+  )
+
   const searchInput = (
     <TextInput
       value={query}
@@ -152,6 +161,107 @@ export const PluginCatalog = () => {
       className="w-56"
     />
   )
+
+  const renderPluginRow = (plugin: PluginCardSpec) => {
+    if (!plugins) return null
+    const Icon = plugin.icon
+    const added = plugins[plugin.key]
+    const busy = busyKey === plugin.key
+    return (
+      <div key={plugin.key} className="flex flex-col gap-2 px-3.5 py-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-fill-3">
+            <Icon className="h-4 w-4 text-icon-2" aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-base text-ink-secondary">{plugin.name}</p>
+            <p className="mt-0.5 truncate text-base text-ink-muted">
+              {plugin.description}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant={added ? "ghost" : "secondary"}
+              size="sm"
+              isLoading={busy}
+              disabled={busyKey !== null && !busy}
+              onClick={() => void handleToggle(plugin.key)}
+              className={cn("shrink-0", added && "text-green")}
+            >
+              {added ? (
+                <>
+                  <Check className="h-3 w-3" aria-hidden /> Added
+                </>
+              ) : (
+                "Add"
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {plugin.key === "learning" && added ? (
+          <div className="ml-11 flex flex-col gap-2 border-l border-stroke-3 pl-3">
+            <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
+              <span>Require human approval for SkillSave / MemoryWrite</span>
+              <Toggle
+                checked={!!plugins.learningRequireHumanApproval}
+                onChange={(on) =>
+                  void savePlugins(
+                    { learningRequireHumanApproval: on },
+                    "learningRequireHumanApproval",
+                  )
+                }
+                label="Require human approval for SkillSave / MemoryWrite"
+                disabled={busyKey !== null}
+              />
+            </label>
+            <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
+              <span>Require Verify before memory writes</span>
+              <Toggle
+                checked={!!plugins.learningRequireVerifiedMemory}
+                onChange={(on) =>
+                  void savePlugins(
+                    { learningRequireVerifiedMemory: on },
+                    "learningRequireVerifiedMemory",
+                  )
+                }
+                label="Require Verify before memory writes"
+                disabled={busyKey !== null}
+              />
+            </label>
+            {plugins.learningRequireVerifiedMemory && !plugins.verifier ? (
+              <p className="text-xs text-ink-faint">
+                Add Verifier too — otherwise SkillSave / MemoryWrite stay
+                blocked.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {plugin.key === "verifier" && added ? (
+          <p className="ml-11 text-xs text-ink-faint">
+            Adds Verify / SubmitVerdict. Restart sessions after enabling.
+          </p>
+        ) : null}
+
+        {plugin.key === "browser" && added ? (
+          <p className="ml-11 text-xs text-ink-faint">
+            Needs an open Browser tab. Rebuild the engine / start a new session
+            after enabling.
+          </p>
+        ) : null}
+
+        {plugin.key === "computer" && added ? (
+          <p className="ml-11 text-xs text-ink-faint">
+            Needs Accessibility (and screen recording where applicable). Click /
+            type / open always ask. Rebuild / new session after enabling.
+          </p>
+        ) : null}
+      </div>
+    )
+  }
+
+  const loadingOrEmpty = isLoading || !plugins
 
   return (
     <div className="flex flex-col gap-3">
@@ -164,7 +274,7 @@ export const PluginCatalog = () => {
         actions={searchInput}
         className="mb-0"
       >
-        {isLoading || !plugins ? (
+        {loadingOrEmpty ? (
           <div className="flex items-center gap-2 px-3.5 py-3 text-sm text-ink-muted">
             <Spinner size="sm" /> Loading configuration…
           </div>
@@ -172,94 +282,25 @@ export const PluginCatalog = () => {
           <p className="px-4 py-8 text-center text-sm text-ink-muted">
             No plugins match “{query}”.
           </p>
+        ) : engineVisible.length === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-ink-muted">
+            No engine plugins match “{query}”.
+          </p>
         ) : (
-          visible.map((plugin) => {
-            const Icon = plugin.icon
-            const added = plugins[plugin.key]
-            const busy = busyKey === plugin.key
-            return (
-              <div key={plugin.key} className="flex flex-col gap-2 px-3.5 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-fill-3">
-                    <Icon className="h-4 w-4 text-icon-2" aria-hidden />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-base text-ink-secondary">
-                      {plugin.name}
-                    </p>
-                    <p className="mt-0.5 truncate text-base text-ink-muted">
-                      {plugin.description}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Button
-                      variant={added ? "ghost" : "secondary"}
-                      size="sm"
-                      isLoading={busy}
-                      disabled={busyKey !== null && !busy}
-                      onClick={() => void handleToggle(plugin.key)}
-                      className={cn("shrink-0", added && "text-green")}
-                    >
-                      {added ? (
-                        <>
-                          <Check className="h-3 w-3" aria-hidden /> Added
-                        </>
-                      ) : (
-                        "Add"
-                      )}
-                    </Button>
-                  </div>
-                </div>
-
-                {plugin.key === "learning" && added ? (
-                  <div className="ml-11 flex flex-col gap-2 border-l border-stroke-3 pl-3">
-                    <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
-                      <span>Require human approval for SkillSave / MemoryWrite</span>
-                      <Toggle
-                        checked={!!plugins.learningRequireHumanApproval}
-                        onChange={(on) =>
-                          void savePlugins(
-                            { learningRequireHumanApproval: on },
-                            "learningRequireHumanApproval",
-                          )
-                        }
-                        label="Require human approval for SkillSave / MemoryWrite"
-                        disabled={busyKey !== null}
-                      />
-                    </label>
-                    <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
-                      <span>Require Verify before memory writes</span>
-                      <Toggle
-                        checked={!!plugins.learningRequireVerifiedMemory}
-                        onChange={(on) =>
-                          void savePlugins(
-                            { learningRequireVerifiedMemory: on },
-                            "learningRequireVerifiedMemory",
-                          )
-                        }
-                        label="Require Verify before memory writes"
-                        disabled={busyKey !== null}
-                      />
-                    </label>
-                    {plugins.learningRequireVerifiedMemory && !plugins.verifier ? (
-                      <p className="text-xs text-ink-faint">
-                        Add Verifier too — otherwise SkillSave / MemoryWrite stay
-                        blocked.
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {plugin.key === "verifier" && added ? (
-                  <p className="ml-11 text-xs text-ink-faint">
-                    Adds Verify / SubmitVerdict. Restart sessions after enabling.
-                  </p>
-                ) : null}
-              </div>
-            )
-          })
+          engineVisible.map(renderPluginRow)
         )}
       </SettingsSection>
+
+      {!loadingOrEmpty && visible.length > 0 && desktopVisible.length > 0 ? (
+        <SettingsSection
+          title="Desktop plugins"
+          description="Tools that drive the embedded Browser panel or the host OS. Desktop app only."
+          rowId="tools-desktop-plugins"
+          className="mb-0"
+        >
+          {desktopVisible.map(renderPluginRow)}
+        </SettingsSection>
+      ) : null}
     </div>
   )
 }
