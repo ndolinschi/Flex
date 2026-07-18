@@ -152,14 +152,8 @@ mod tests {
 
     #[test]
     fn normalize_strips_file_url_and_quotes() {
-        assert_eq!(
-            normalize_cwd_input("  \"/tmp/project\"  "),
-            "/tmp/project"
-        );
-        assert_eq!(
-            normalize_cwd_input("file:///tmp/project"),
-            "/tmp/project"
-        );
+        assert_eq!(normalize_cwd_input("  \"/tmp/project\"  "), "/tmp/project");
+        assert_eq!(normalize_cwd_input("file:///tmp/project"), "/tmp/project");
     }
 
     #[test]

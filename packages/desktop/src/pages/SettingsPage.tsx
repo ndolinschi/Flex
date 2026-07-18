@@ -31,7 +31,7 @@ const DESCRIPTIONS: Partial<Record<SettingsSectionId, string>> = {
   models: "Configure the preferred native provider for the agent loop.",
   behavior: "Session defaults and where secrets are stored.",
   "remote-access":
-    "Let a mobile client connect to this desktop — sessions, prompts, MCP.",
+    "Chat-only companion for a phone: see messages and send messages. No tools, MCP, or system control.",
   memory: "Durable notes the agent saves as it works.",
   indexing: "Local code index status, rebuild, auto-update, and auto-context.",
   "tools-mcp": "Native plugins and MCP servers the engine can load.",

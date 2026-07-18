@@ -1,4 +1,6 @@
 //! Static OpenAPI document for the desktop Remote Access `/v1` surface.
+//!
+//! Chat-only: list sessions, read filtered message events, send text prompts.
 
 pub fn openapi_json() -> serde_json::Value {
     serde_json::json!({
@@ -6,7 +8,7 @@ pub fn openapi_json() -> serde_json::Value {
         "info": {
             "title": "Desktop Remote Access API",
             "version": "1",
-            "description": "In-process remote control plane for the desktop composition root. Clients pair via Settings (host/port/token or Bonjour) and call these routes with Authorization: Bearer <token>."
+            "description": "Least-privilege chat companion for the desktop app. A remote client may only list sessions, read message events, and send text prompts. Tools are auto-denied on remote turns. No MCP, session mutation, permissions, or providers."
         },
         "paths": {
             "/health": {
@@ -31,57 +33,28 @@ pub fn openapi_json() -> serde_json::Value {
             },
             "/v1/sessions": {
                 "get": {
-                    "summary": "List sessions",
+                    "summary": "List sessions (id + title only; no paths)",
                     "security": [{ "bearer": [] }],
                     "responses": { "200": { "description": "SessionSummary[]" } }
-                },
-                "post": {
-                    "summary": "Create session",
-                    "security": [{ "bearer": [] }],
-                    "responses": { "200": { "description": "CreateSessionResponse" } }
                 }
             },
             "/v1/sessions/{id}": {
                 "get": {
-                    "summary": "Get session",
+                    "summary": "Get session summary (id + title only)",
                     "security": [{ "bearer": [] }],
                     "responses": { "200": { "description": "SessionSummary" } }
-                },
-                "patch": {
-                    "summary": "Update session",
-                    "security": [{ "bearer": [] }],
-                    "responses": { "200": { "description": "SessionSummary" } }
-                },
-                "delete": {
-                    "summary": "Delete session",
-                    "security": [{ "bearer": [] }],
-                    "responses": { "204": { "description": "Deleted" } }
-                }
-            },
-            "/v1/sessions/{id}/resume": {
-                "post": {
-                    "summary": "Resume session",
-                    "security": [{ "bearer": [] }],
-                    "responses": { "204": { "description": "Resumed" } }
                 }
             },
             "/v1/sessions/{id}/prompt": {
                 "post": {
-                    "summary": "Admit a turn (202); watch /events",
+                    "summary": "Send a text message (202). Tools auto-denied. Watch /events.",
                     "security": [{ "bearer": [] }],
                     "responses": { "202": { "description": "Accepted" } }
                 }
             },
-            "/v1/sessions/{id}/cancel": {
-                "post": {
-                    "summary": "Cancel in-flight turn",
-                    "security": [{ "bearer": [] }],
-                    "responses": { "204": { "description": "Cancelled" } }
-                }
-            },
             "/v1/sessions/{id}/events": {
                 "get": {
-                    "summary": "SSE replay-then-tail (includes streaming deltas)",
+                    "summary": "SSE of chat messages only (tool/permission events filtered out)",
                     "security": [{ "bearer": [] }],
                     "parameters": [{
                         "name": "from_seq",
@@ -89,53 +62,6 @@ pub fn openapi_json() -> serde_json::Value {
                         "schema": { "type": "integer", "default": 0 }
                     }],
                     "responses": { "200": { "description": "text/event-stream" } }
-                }
-            },
-            "/v1/sessions/{id}/permissions/{request_id}/resolve": {
-                "post": {
-                    "summary": "Resolve a permission ask",
-                    "security": [{ "bearer": [] }],
-                    "responses": { "204": { "description": "Resolved" } }
-                }
-            },
-            "/v1/sessions/{id}/questions/{request_id}/respond": {
-                "post": {
-                    "summary": "Respond to AskUserQuestion",
-                    "security": [{ "bearer": [] }],
-                    "responses": { "204": { "description": "Answered" } }
-                }
-            },
-            "/v1/mcp/servers": {
-                "get": {
-                    "summary": "List MCP servers",
-                    "security": [{ "bearer": [] }],
-                    "responses": { "200": { "description": "McpServerBody[]" } }
-                },
-                "put": {
-                    "summary": "Upsert MCP server",
-                    "security": [{ "bearer": [] }],
-                    "responses": { "204": { "description": "Saved" } }
-                }
-            },
-            "/v1/mcp/servers/{id}": {
-                "delete": {
-                    "summary": "Remove MCP server",
-                    "security": [{ "bearer": [] }],
-                    "responses": { "204": { "description": "Removed" } }
-                }
-            },
-            "/v1/mcp/servers/{id}/test": {
-                "post": {
-                    "summary": "Test MCP server (list tools)",
-                    "security": [{ "bearer": [] }],
-                    "responses": { "200": { "description": "tool name[]" } }
-                }
-            },
-            "/v1/providers": {
-                "get": {
-                    "summary": "Configured provider ids (no secrets)",
-                    "security": [{ "bearer": [] }],
-                    "responses": { "200": { "description": "string[]" } }
                 }
             }
         },

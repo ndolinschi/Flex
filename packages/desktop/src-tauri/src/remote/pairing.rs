@@ -6,15 +6,8 @@ use super::config::RemoteAccessConfig;
 
 pub const PROTOCOL_VERSION: u32 = 1;
 
-pub const CAPABILITIES: &[&str] = &[
-    "sessions",
-    "prompt",
-    "events",
-    "permissions",
-    "questions",
-    "mcp",
-    "providers",
-];
+/// Advertised capabilities — chat companion only. Anything else is desktop-local.
+pub const CAPABILITIES: &[&str] = &["sessions.list", "messages.read", "messages.send"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthInfo {

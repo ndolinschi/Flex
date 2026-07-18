@@ -29,6 +29,12 @@ impl AuthToken {
     }
 
     pub fn matches(&self, presented: &str) -> bool {
+        // Length mismatch is non-secret (tokens are fixed length) but still
+        // avoid short-circuiting on content bytes: only compare when lengths
+        // match; otherwise return false.
+        if self.0.len() != presented.len() {
+            return false;
+        }
         self.0.as_bytes().ct_eq(presented.as_bytes()).into()
     }
 }

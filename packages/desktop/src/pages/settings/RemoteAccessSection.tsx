@@ -39,9 +39,9 @@ const METHOD_LABELS: Record<keyof MethodPrefs, { title: string; description: str
   },
 }
 
-/** Settings → Remote Access: enable the desktop-owned HTTP/SSE transport and
- * choose connection methods (manual / LAN / Bonjour / public port / Cloudflare
- * stub / Bluetooth stub). Pairing panel exposes what a mobile client needs. */
+/** Settings → Remote Access: enable the desktop-owned chat companion HTTP/SSE
+ * transport. The remote client is least-privilege: list chats, read messages,
+ * send text. Tools/MCP/HITL stay on the desktop only. */
 export const RemoteAccessContent = () => {
   const pushToast = useAppStore((s) => s.pushToast)
   const [status, setStatus] = useState<RemoteAccessStatus | null>(null)
@@ -134,7 +134,7 @@ export const RemoteAccessContent = () => {
         <SettingRow
           rowId="remote-enabled"
           title="Enable remote access"
-          description="Start the desktop Remote API so a mobile client can connect to this app (not a separate engine server)."
+          description="Start a chat-only Remote API so a phone can see and send messages. The client cannot run tools, change MCP, or mutate the system."
           first
         >
           <Toggle

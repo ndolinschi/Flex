@@ -181,13 +181,15 @@ commands (`copilot_auth_*`) that call
 `chatgpt_auth_*` (headless OAuth via `providers::openai::{start_oauth, store_oauth_tokens}`)
 to unlock the native `chatgpt` provider.
 
-**Remote Access** (`src-tauri/src/remote/`): optional in-process HTTP/SSE control
-plane for mobile clients. Settings → Remote Access enables a shared listener and
-pluggable connection methods (manual, LAN, Bonjour/mDNS, public port; Cloudflare
-Tunnel and Bluetooth are adapter stubs). Clients pair with a versioned JSON
-document (host/port/token or Bonjour) and call `/v1/*` (sessions, prompt, SSE
-events including deltas, permissions, questions, MCP, providers). This is
-desktop-owned — not `agentloop-transport-http` / `flex serve`.
+**Remote Access** (`src-tauri/src/remote/`): optional in-process HTTP/SSE
+**chat companion** for mobile clients. Settings → Remote Access enables a shared
+listener and pluggable connection methods (manual, LAN, Bonjour/mDNS, public
+port; Cloudflare Tunnel and Bluetooth are adapter stubs). Clients pair with a
+versioned JSON document (host/port/token or Bonjour) and may only
+`sessions.list` / `messages.read` / `messages.send`. Remote prompts force
+`DontAsk` (tools auto-denied); SSE filters out tool/permission/control events.
+No MCP, session mutation, HITL resolve, or providers over this surface. Distinct
+from `agentloop-transport-http` / `flex serve`.
 
 ## packages/gateway
 

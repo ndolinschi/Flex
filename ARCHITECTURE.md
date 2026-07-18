@@ -22,8 +22,7 @@ packages/desktop    # Tauri 2 + React UI — second composition root via AgentBu
                     # (right panel: Plan / Changes / Files+Monaco / Terminal / Browser /
                     #  Memory behind MEMORY_TAB_ENABLED). Optional desktop-owned Remote
                     # Access transport (`src-tauri/src/remote/`): in-process HTTP/SSE
-                    # for mobile clients, with pluggable connection methods (manual,
-                    # LAN, Bonjour, public port, Cloudflare stub, Bluetooth stub).
+                    # chat companion for mobile (messages read/send only; tools denied).
                     # Distinct from `flex serve` (engine transport).
 ```
 
