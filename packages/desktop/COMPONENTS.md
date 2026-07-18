@@ -109,12 +109,12 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `TurnTimeline` | Turns + tools + plans + streaming; `@tanstack/react-virtual` over `displayItems` + live tail; pieces under `organisms/timeline/` (`WorkGroupBody` owns stable `renderOther`; `ToolStepList` clusters tools + parallel workers via `clusterWorkRows`) | `sessionId`, `onLiveRows?` | ChatSessionBody |
 | `PermissionPrompt` | Tool permission HITL header docked above composer bubble; actions in `PermissionActions` | `permission` | ChatSessionBody → `Composer.dockedOverlay` |
 | `QuestionPrompt` | AskUserQuestion HITL (same dock seam as PermissionPrompt) | `question` | ChatSessionBody → `Composer.dockedOverlay` |
-| `ContentWorkspace` | One or two content panes (optional split sash); tab DnD ghost + cross-pane drop zones | — | App shell |
-| `ContentPane` | Tab strip for chat + tool tabs; live axis reorder preview; `+` menu | `paneIndex` | ContentWorkspace |
+| `ContentWorkspace` | One or two content panes (optional split sash); tab DnD ghost + cross-pane drop zones; no secondary header | — | App shell |
+| `ContentPane` | Tab strip for chat + tool tabs; pointer DnD with live axis reorder preview; `+` menu; chat bodies mount on first visit (not every open tab) | `paneIndex`, `keepAliveTools` | ContentWorkspace |
 | `MemoryTab` | Memory surface; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | ToolTabBody |
 | `DatabaseTab` | UI plugin (Terminal-style 2-col): 180px sidebar (connections + tables) + SQL/results main pane. **Connections are scoped per project cwd** (`projectKey` on each saved spec in `db_connections.json`; list/upsert/connect/mention/active filter by the active session's cwd). Switching sessions clears selection and restores that project's last active connection. Legacy unscoped entries (`projectKey: ""`) stay in the store but are hidden until re-saved under a project. Empty state has no duplicate chrome (Add CTA only); with connections, slim count + refresh/add. Result grid paginates (50/page; table preview via `limit`/`offset`, query results client-side). | `active`, `session` | ToolTabBody (plugin registry) |
-| `ComponentsTab` | UI plugin (Terminal-style workspace): **180px** component inventory (toggleable List), **Files-style mini-tabs** for open components, neutral preview + CSS parameters, and a **local mini-prompt** at the bottom. **Send** packages component context (file, props, dependencies, source excerpt) + CSS diffs as a hidden `component-style` attachment and fires the main composer turn — the timeline shows only the typed instruction + a compact chip. Live CSS overrides inject into the Browser when a Design Mode selection exists. Non-React cwd shows an empty gate. | `active`, `session` | ToolTabBody (plugin registry) |
-| `FilesTab` | Open-file strip (close-on-hover like panel tabs) + Monaco editor; `.md`/`.mdx` default to `MarkdownBody` preview (Code/Eye toggle); empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children`, search with `includeIgnored`). Dir/file queries invalidate on turn settle, FS-mutating tool completion (Write/Edit/Bash/…), and project cwd change (`invalidateWorkspaceQueries`, same pattern as `invalidateGitQueries`). | `active` | ToolTabBody |
+| `ComponentsTab` | UI plugin (Terminal-style workspace): **180px** component inventory (toggleable List), **Files-style mini-tabs** for open components, neutral preview + CSS parameters, and a **local mini-prompt** at the bottom. **Send** packages component context (file, props, dependencies, source excerpt) + CSS diffs as a hidden `component-style` attachment and fires the main composer turn — the timeline shows only the typed instruction + a compact chip. Live CSS overrides inject into the Browser when a Design Mode selection exists. Detects **React / Vue / Angular** (package markers + config files); unsupported cwd shows an empty gate. | `active`, `session` | ToolTabBody (plugin registry) |
+| `FilesTab` | Open-file strip (close-on-hover like panel tabs) + Monaco editor; `.md`/`.mdx` default to `MarkdownBody` preview (Code/Eye toggle); empty/browse shows `FileExplorer` (expandable folder tree via `list_dir_children`, search with `includeIgnored`). Dir/file queries invalidate on turn settle, FS-mutating tool completion (Write/Edit/Bash/…), and project cwd change (`invalidateWorkspaceQueries`, same pattern as `invalidateGitQueries`). FileExplorer tints git-dirty rows (same `STATUS_COLOR` as Changes: M yellow, A/? green, D red, R blue). | `active` | ToolTabBody |
 | `PromptTab` | Session prompt pad: write with `@`/`/` + optional ghost-text completion → **Verify** (session model grill) → apply/dismiss findings without ending review; coach questions + re-verify; synced to `draftsBySession` | `sessionId`, `active` | ToolTabBody |
 | `StatusTab` | OpenCode-style session status: model, context approx, tokens, queue, per-model usage | `session`, `active` | ToolTabBody |
 | `WindowTitleBar` | Compact custom window chrome (`decorations: false`, 30px): traffic lights / caption buttons + sidebar / split / session controls + drag region (double-click zooms — fullscreen on macOS, maximize elsewhere); in-window File/Edit/View/Help on Windows/Linux; native macOS menu bar via `useNativeAppMenu`; macOS corners clipped natively to 10px | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
@@ -226,6 +226,140 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 - Engine settings: plugin toggles (search/index/learning/verifier), Indexing section
   (status/rebuild/auto-update-on-search/auto-context), fallback models, default isolation.
 - Composer `/` opens slash-command tray; SessionMenu supports undo/redo files + integrate/discard when isolated.
+
+## shadcn/ui migration map
+
+Goal: replace hand-rolled atoms/molecules with [shadcn/ui](https://ui.shadcn.com/docs/components)
+source components, while keeping Atomic Design folders, DESIGN.md density, and the
+existing `data-theme` token system. Agents: load the **shadcn** skill
+(`.claude/skills/shadcn`) before adding or rewriting UI.
+
+### Non-goals / hard constraints
+
+- Do **not** adopt shadcn’s default look wholesale. Bridge CSS variables so
+  Flex tokens (`--color-chrome`, `--color-panel`, `--color-accent*`, whisper
+  fills, stroke hierarchy) remain authoritative — see [DESIGN.md](./DESIGN.md).
+- Keep domain chrome that has no registry twin: `Tab` / `TabStrip` / `TabClose`,
+  `WindowTitleBar` / traffic lights, `ProviderIcon`, `DiffStat`, `BypassPermissionsButton`,
+  `HighlightedLabel`, `RunningDot`, Monaco/xterm surfaces, timeline work-group cards.
+- Preserve `@tanstack/react-virtual` on `TurnTimeline` until a measured
+  `MessageScroller` spike proves equal or better (virtualization + stick-to-bottom
+  + mid-stream remasure are load-bearing — Wave 3/4 notes below).
+- Round Changes-panel `Checkbox` and green settings `Toggle` (`--color-switch-on`)
+  are intentional product visuals; restyle shadcn primitives after install — do
+  not silently flip to square/primary defaults.
+- `packages/desktop` only (Vite + React 19 + Tailwind v4). No `components.json`
+  yet — Phase 0 creates it under `packages/desktop/`.
+
+### Target registry inventory (user list → migrate?)
+
+| shadcn | Migrate? | Current Flex surface | Notes |
+|---|---|---|---|
+| Accordion | later | none as primitive | Optional for settings groups; prefer `Collapsible` first |
+| Alert | yes | `ErrorBanner`, resume banners | Replace callout markup |
+| Alert Dialog | yes | `ConfirmDialog` (danger paths) | Rename/delete session, discard |
+| Aspect Ratio | skip | — | No first-class need |
+| Attachment | yes (chat kit) | `AttachmentChip` | Registry name `attachment` (not `AttachmentNew`) |
+| Avatar | yes | `Avatar` atom | Thin wrap + `AvatarFallback` |
+| Badge | yes | `Badge`, `NewBadge`, `VerdictBadge` | Keep tone mapping via variants/`className` |
+| Breadcrumb | yes | `PlanToolbar` crumbs | Small win |
+| Bubble | yes (chat kit) | user/assistant bubbles in timeline | After Message spike |
+| Button | yes | `Button`, `IconButton`, `SendButton` shell | Drop custom `isLoading` — compose `Spinner` + `disabled` |
+| Button Group | yes | composer toolbar clusters | Optional; `ToggleGroup` covers ModePicker |
+| Calendar | skip | — | No date UX today |
+| Card | selective | settings cards, catalog cards | Use full Card composition only where DESIGN allows cards |
+| Carousel | skip | — | |
+| Chart | skip | — | No dashboards |
+| Checkbox | yes | `Checkbox` atom | Restyle round + indeterminate |
+| Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader`, WorkGroup | |
+| Combobox | yes | `ModelPicker`, branch/project trays | Prefer over bespoke `PopoverTray` search |
+| Command | yes | `CommandPalette`, `SearchModal`, `OpenTabModal` | Command-in-Dialog pattern |
+| Context Menu | yes | `ContextMenu` molecule | Keep timeline-scroll / webview-blur ignore behavior |
+| Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
+| Date Picker | skip | — | |
+| Dialog | yes | `ConfirmDialog`, auth/PR/bug/MCP dialogs | Portal + focus already hand-rolled |
+| Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
+| Drawer | maybe | `SubagentViewer` (bottom overlay) | Spike vs keep custom |
+| Dropdown Menu | yes | `SessionMenu`, `PlusMenu`, overflow menus | |
+| Empty | yes | `EmptyState` | |
+| Field | yes | `FormField` + settings forms | `FieldGroup` / `FieldLabel` / validation attrs |
+| Hover Card | later | — | Optional enrichment on chips |
+| Input | yes | `TextInput` | Alias export during cutover |
+| Input Group | yes | composer / search fields with addons | |
+| Input OTP | skip | — | |
+| Item | later | sidebar / palette rows | Only if it simplifies without fighting density |
+| Kbd | yes | `Kbd` atom | |
+| Label | yes | `Label` atom | Prefer `FieldLabel` inside forms |
+| Marker | yes (chat kit) | `CompactionCard` / `IndexingCard` dividers | System notes |
+| Menubar | yes | `TitleBarMenus` | Native-feeling File/Edit/View/Help |
+| Message | yes (chat kit) | timeline message rows | Compose with Bubble; keep actions |
+| Message Scroller | spike | `TurnTimeline` + `useStickToBottom` | **Do not swap blindly** — virtualizer is required at scale |
+| Native Select | yes | `ModelSelect` | Settings simple selects |
+| Navigation Menu | skip | — | Sidebar ≠ marketing nav |
+| Pagination | later | DatabaseTab paging | |
+| Popover | yes | `PopoverTray`, comment/plan popovers | Shared Esc/outside-click |
+| Progress | later | indexing / update UX | Soft need |
+| Radio Group | yes | `QuestionPrompt` choices | |
+| Resizable | yes | content split sash | `ContentWorkspace` dual pane |
+| Scroll Area | yes | `ScrollArea` atom | Sidebar / overlays; **not** the virtualized timeline |
+| Select | yes | model/settings selects | |
+| Separator | yes | `Divider` | |
+| Sheet | maybe | settings overlay | Today settings is absolute over kept-mounted chat — Sheet may fight that |
+| Sidebar | spike | `SessionSidebar` | High value, high risk — density + grouping + DnD later |
+| Skeleton | yes | `Skeleton`, `SidebarSkeleton` | |
+| Slider | skip | — | |
+| Sonner | yes | `Toast` / ToastHost | Bridge Zustand toast API → `toast()` |
+| Spinner | yes | `Spinner` | |
+| Switch | yes | `Toggle` atom | Keep green ON track |
+| Table | later | Database results | With Data Table |
+| Tabs | careful | panel/file tabs | Prefer keep custom `Tab*` for chrome chips; shadcn Tabs for settings sections only |
+| Textarea | yes | `TextArea`, composer draft | Composer may stay specialized |
+| Toast | n/a | — | Use **Sonner**, not legacy Toast component |
+| Toggle | yes | ModePicker pills if not ToggleGroup | Distinct from Switch |
+| Toggle Group | yes | `ModePicker` (Agent/Plan/Ask[/Flex]) | Ideal fit |
+| Tooltip | yes | `Tooltip` atom | |
+| Typography | selective | prose in settings / empty states | Do not replace `MarkdownBody` |
+
+Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
+`attachment`, `marker` — the “\*New” suffixes in some docs are naming noise.
+
+### Phased cutover
+
+| Phase | Scope | Exit criteria |
+|---|---|---|
+| **0 — Foundation** | `shadcn init` in `packages/desktop` (Vite, Tailwind v4, **radix** base, `lucide`, css variables); path alias `@/`; upgrade `cn` to `clsx` + `tailwind-merge`; map shadcn semantic tokens → Flex tokens in `src/index.css` / `tokens.css` without breaking `data-theme` | `components.json` present; `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
+| **1 — Atom adapters** | Add Button, Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Spinner, Avatar, Tooltip, ScrollArea; re-export from `components/atoms` with temporary compat props | Atom unit tests + vitest green; call sites compile via barrel |
+| **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | Confirm/auth/PR/bug dialogs + ToastHost + TitleBarMenus on primitives |
+| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | Settings forms, ModePicker, ModelPicker, CommandPalette/SearchModal |
+| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | Split sash + empty/error callouts; sidebar spike documented go/no-go |
+| **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Chip/bubble/marker parity; scroller decision recorded here |
+| **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
+
+### Adapter strategy (avoid big-bang breakage)
+
+1. Install into `src/components/ui/` (shadcn default) — primitives live there.
+2. Keep Atomic Design imports stable: `atoms/Button.tsx` becomes a thin re-export
+   or styled wrapper over `@/components/ui/button` until call sites migrate.
+3. Prefer **one PR per phase** (or per primitive cluster). Never mix token-bridge
+   breakage with a Sidebar rewrite.
+4. After each add: `npx shadcn@latest docs <name>`, read examples, then restyle
+   with semantic tokens — no raw `bg-blue-500` / purple presets.
+5. Update this catalog when a Flex molecule is deleted or becomes a thin wrap.
+
+### Suggested first install batch (Phase 1)
+
+```bash
+cd packages/desktop
+npx shadcn@latest add button input textarea label checkbox switch badge kbd \
+  separator skeleton spinner avatar tooltip scroll-area
+```
+
+### Out of scope for “migrate everything”
+
+Organisms that stay product-specific even after primitives land: `TurnTimeline`,
+`Composer`, `SessionSidebar` (until Sidebar spike), tool tabs (Files/Terminal/Browser/
+Database/Components), `WindowTitleBar`, `MarkdownBody` / diff cards, HITL
+Permission/Question docks, plugin surfaces.
 
 Keep this file in sync when adding or renaming components. For layout and
 spacing changes, update [DESIGN.md](./DESIGN.md).

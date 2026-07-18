@@ -48,6 +48,27 @@ type ComponentsTabProps = {
 
 type StyleDraft = Record<string, string>
 
+const isComponentsSupported = (
+  detect: { isReact: boolean; frameworks?: string[] } | undefined,
+): boolean => {
+  if (!detect) return false
+  if ((detect.frameworks?.length ?? 0) > 0) return true
+  return detect.isReact
+}
+
+const frameworkLabel = (frameworks: string[] | undefined): string => {
+  const ids = frameworks?.length ? frameworks : ["react"]
+  const names = ids.map((id) => {
+    if (id === "react") return "React"
+    if (id === "vue") return "Vue"
+    if (id === "angular") return "Angular"
+    return id
+  })
+  if (names.length === 1) return names[0]!
+  if (names.length === 2) return `${names[0]} / ${names[1]}`
+  return names.join(", ")
+}
+
 const buildTree = (
   components: ComponentNode[],
   roots: string[],
@@ -161,7 +182,7 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
   } = useQuery({
     queryKey: ["components-list", cwd, fallbackCwd ?? ""],
     queryFn: () => componentsList(cwd, fallbackCwd),
-    enabled: active && !!cwd && !!detect?.isReact,
+    enabled: active && !!cwd && isComponentsSupported(detect),
     staleTime: 15_000,
   })
 
@@ -332,18 +353,18 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
         <EmptyState
           className="min-h-0 flex-1"
           title="No project folder"
-          description="Pick a working directory for this session to discover React components."
+          description="Pick a working directory for this session to discover React, Vue, or Angular components."
         />
       </div>
     )
   }
 
-  if (detect && !detect.isReact) {
+  if (detect && !isComponentsSupported(detect)) {
     return (
       <div className="absolute inset-0 flex flex-col">
         <EmptyState
           className="min-h-0 flex-1"
-          title="No React app detected"
+          title="No UI framework detected"
           description={detect.reason}
         />
       </div>
@@ -358,7 +379,7 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
       <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1 border-b border-stroke-3 px-2.5">
         <span className="min-w-0 flex-1 truncate text-xs text-ink-muted">
           {list
-            ? `${list.components.length} component${list.components.length === 1 ? "" : "s"}`
+            ? `${list.components.length} component${list.components.length === 1 ? "" : "s"} · ${frameworkLabel(list.frameworks ?? detect?.frameworks)}`
             : busy
               ? "Scanning…"
               : "Components"}

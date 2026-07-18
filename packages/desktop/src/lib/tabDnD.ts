@@ -14,7 +14,8 @@ export type TabDragSession = {
   fromPane: 0 | 1
 }
 
-/** Live drop target while a pointer drag is active (shared across panes). */
+/** Live drop target while a pointer drag is past the threshold (shared across panes).
+ * `null` means idle / below threshold — never publish a non-dragging stub. */
 export type TabDragUi = {
   tabId: string
   fromPane: 0 | 1
@@ -99,6 +100,35 @@ export const tabDragThresholdExceeded = (
   return dx * dx + dy * dy >= DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX
 }
 
+/** True when the event target is a tab control that must not start a drag (e.g. close). */
+export const isTabNoDragTarget = (target: EventTarget | null): boolean => {
+  if (typeof Element === "undefined") return false
+  if (!(target instanceof Element)) return false
+  return target.closest("[data-tab-no-drag]") != null
+}
+
+/**
+ * Chrome-style insert index from tab geometry. Pure — used by `hitTestTabDrop`
+ * and unit-tested without a DOM.
+ */
+export const insertIndexAtX = (
+  tabs: ReadonlyArray<{ left: number; width: number }>,
+  clientX: number,
+  overIndex: number | null,
+): number => {
+  if (tabs.length === 0) return 0
+  if (overIndex != null && overIndex >= 0 && overIndex < tabs.length) {
+    const rect = tabs[overIndex]!
+    const before = clientX < rect.left + rect.width / 2
+    return before ? overIndex : overIndex + 1
+  }
+  for (let i = 0; i < tabs.length; i++) {
+    const rect = tabs[i]!
+    if (clientX < rect.left + rect.width / 2) return i
+  }
+  return tabs.length
+}
+
 export type TabDropHit = {
   toPane: 0 | 1
   /** Index after removing the dragged tab from the target list. */
@@ -160,7 +190,7 @@ const hitTestStrip = (
   if (paneRaw !== "0" && paneRaw !== "1") return null
   const toPane = Number(paneRaw) as 0 | 1
 
-  const tabs = Array.from(
+  const tabNodes = Array.from(
     strip.querySelectorAll<HTMLElement>("[data-tab-id]"),
   )
     .filter(
@@ -172,9 +202,14 @@ const hitTestStrip = (
       (a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left,
     )
 
-  if (tabs.length === 0) {
+  if (tabNodes.length === 0) {
     return { toPane, insertAt: 0 }
   }
+
+  const geometry = tabNodes.map((node) => {
+    const rect = node.getBoundingClientRect()
+    return { left: rect.left, width: rect.width }
+  })
 
   const overTab = el.closest("[data-tab-id]")
   if (
@@ -182,20 +217,14 @@ const hitTestStrip = (
     strip.contains(overTab) &&
     overTab.getAttribute("data-tab-id") !== excludeTabId
   ) {
-    const index = tabs.indexOf(overTab)
-    if (index < 0) return { toPane, insertAt: tabs.length }
-    const rect = overTab.getBoundingClientRect()
-    const before = clientX < rect.left + rect.width / 2
-    return { toPane, insertAt: before ? index : index + 1 }
-  }
-
-  for (let i = 0; i < tabs.length; i++) {
-    const rect = tabs[i]!.getBoundingClientRect()
-    if (clientX < rect.left + rect.width / 2) {
-      return { toPane, insertAt: i }
+    const index = tabNodes.indexOf(overTab)
+    return {
+      toPane,
+      insertAt: insertIndexAtX(geometry, clientX, index < 0 ? null : index),
     }
   }
-  return { toPane, insertAt: tabs.length }
+
+  return { toPane, insertAt: insertIndexAtX(geometry, clientX, null) }
 }
 
 /**

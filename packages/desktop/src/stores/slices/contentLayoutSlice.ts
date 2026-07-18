@@ -16,6 +16,7 @@ import {
   normalizeLayout,
   otherPaneIndex,
   placeTabAt,
+  replacePane,
   toolTabId,
   upsertToolInPane,
   type ContentLayout,
@@ -27,6 +28,7 @@ const persistLayout = (layout: ContentLayout) => {
   void persistUiState({ contentLayout: layout })
 }
 
+/** Mirror legacy right-panel open flags from the focused pane's active tool. */
 const syncCompatFlags = (
   layout: ContentLayout,
 ): Pick<AppState, "rightPanelOpen" | "rightPanelTab"> => {
@@ -282,17 +284,26 @@ export const createContentLayoutSlice: StateCreator<
 
   activateTabInPane: (pane, tabId) => {
     const layout = get().contentLayout
-    const panes = clonePanes(layout)
-    const p = panes[pane]
+    const p = layout.panes[pane]
     if (!p?.tabs.some((t) => t.id === tabId)) return
-    p.activeTabId = tabId
+    const tab = p.tabs.find((t) => t.id === tabId)
+    if (p.activeTabId === tabId && layout.focusedPane === pane) {
+      // Already active — only sync sidebar highlight if needed.
+      if (tab?.kind === "chat" && get().activeSessionId !== tab.sessionId) {
+        set({ activeSessionId: tab.sessionId })
+        void persistUiState({ activeSessionId: tab.sessionId })
+      }
+      return
+    }
+    // Keep the same tabs array when only activeTabId changes so the sibling
+    // pane retains object identity and inactive ContentPane skips re-render.
+    const nextPane: PaneState =
+      p.activeTabId === tabId ? p : { ...p, activeTabId: tabId }
     const next: ContentLayout = {
       ...layout,
       focusedPane: pane,
-      panes:
-        layout.mode === "split" ? [panes[0]!, panes[1]!] : [panes[0]!],
+      panes: replacePane(layout, pane, nextPane),
     }
-    const tab = p.tabs.find((t) => t.id === tabId)
     set({
       contentLayout: next,
       ...(tab?.kind === "chat" ? { activeSessionId: tab.sessionId } : {}),
@@ -303,19 +314,17 @@ export const createContentLayoutSlice: StateCreator<
 
   reorderTabInPane: (pane, tabId, insertAt) => {
     const layout = get().contentLayout
-    const panes = clonePanes(layout)
-    const p = panes[pane]
+    const p = layout.panes[pane]
     if (!p) return
     const fromIndex = p.tabs.findIndex((t) => t.id === tabId)
     if (fromIndex < 0) return
     const reordered = placeTabAt(p.tabs, fromIndex, insertAt)
     if (reordered === p.tabs) return
-    p.tabs = reordered
+    const nextPane: PaneState = { ...p, tabs: reordered }
     const next: ContentLayout = {
       ...layout,
       focusedPane: pane,
-      panes:
-        layout.mode === "split" ? [panes[0]!, panes[1]!] : [panes[0]!],
+      panes: replacePane(layout, pane, nextPane),
     }
     set({ contentLayout: next, ...syncCompatFlags(next) })
     persistLayout(next)
@@ -346,24 +355,27 @@ export const createContentLayoutSlice: StateCreator<
 
   closeTabInPane: (pane, tabId) => {
     const layout = get().contentLayout
-    const panes = clonePanes(layout)
-    const p = panes[pane]
+    const p = layout.panes[pane]
     if (!p) return
     const tab = p.tabs.find((t) => t.id === tabId)
-    p.tabs = p.tabs.filter((t) => t.id !== tabId)
-    if (p.activeTabId === tabId) {
-      p.activeTabId = p.tabs[p.tabs.length - 1]?.id ?? null
+    if (!tab) return
+    const tabs = p.tabs.filter((t) => t.id !== tabId)
+    const nextPane: PaneState = {
+      tabs,
+      activeTabId:
+        p.activeTabId === tabId
+          ? (tabs[tabs.length - 1]?.id ?? null)
+          : p.activeTabId,
     }
 
     // Mirror legacy closeTab for tools.
-    if (tab?.kind === "tool") {
+    if (tab.kind === "tool") {
       get().closeTab(tab.sessionId, tab.tool)
     }
 
     let next: ContentLayout = {
       ...layout,
-      panes:
-        layout.mode === "split" ? [panes[0]!, panes[1]!] : [panes[0]!],
+      panes: replacePane(layout, pane, nextPane),
     }
 
     // If side pane emptied, collapse split.
