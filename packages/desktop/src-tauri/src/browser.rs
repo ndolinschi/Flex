@@ -490,6 +490,11 @@ fn normalize_url(raw: &str) -> DesktopResult<Url> {
     Url::parse(&candidate).map_err(|e| DesktopError::Message(format!("invalid url: {e}")))
 }
 
+/// Public wrapper for agent BrowserNavigate tool.
+pub fn normalize_url_public(raw: &str) -> DesktopResult<Url> {
+    normalize_url(raw)
+}
+
 fn host_of(url: &Url) -> String {
     match (url.host_str(), url.port()) {
         (Some(host), Some(port)) => format!("{host}:{port}"),

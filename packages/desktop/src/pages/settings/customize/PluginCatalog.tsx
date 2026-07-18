@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react"
-import { BookOpen, Check, Globe, ShieldCheck, Search } from "lucide-react"
+import {
+  BookOpen,
+  Check,
+  Globe,
+  Monitor,
+  ShieldCheck,
+  Search,
+  AppWindow,
+} from "lucide-react"
 import { Button, Spinner, TextInput, Toggle } from "../../../components/atoms"
 import { ErrorBanner, SettingsSection } from "../../../components/molecules"
 import { useProviderConfig } from "../../../hooks/useProviderConfig"
@@ -52,6 +60,22 @@ const PLUGIN_CATALOG: PluginCardSpec[] = [
     icon: ShieldCheck,
     category: "Engine plugins",
   },
+  {
+    key: "browser",
+    name: "Browser",
+    description:
+      "Drive the embedded Browser tab: navigate, screenshot, eval, click, console, DevTools.",
+    icon: AppWindow,
+    category: "Desktop plugins",
+  },
+  {
+    key: "computer",
+    name: "Computer use",
+    description:
+      "ChatGPT-style desktop control: screenshot, animated agent cursor, click, type, open apps.",
+    icon: Monitor,
+    category: "Desktop plugins",
+  },
 ]
 
 /** Searchable plugin toggle cards backed by the provider config's fixed
@@ -102,6 +126,8 @@ export const PluginCatalog = () => {
             plugins.learningRequireHumanApproval ?? false,
           learningRequireVerifiedMemory:
             plugins.learningRequireVerifiedMemory ?? false,
+          browser: plugins.browser ?? false,
+          computer: plugins.computer ?? false,
           ...patch,
         },
       })

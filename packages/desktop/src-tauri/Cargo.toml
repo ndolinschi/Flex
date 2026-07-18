@@ -65,6 +65,9 @@ agentloop-engine = { path = "../../engine/crates/engine" }
 agentloop-channel = { path = "../../gateway/crates/channel" }
 # load_memory_section/MemoryConfig for per-project memory prompt injection — not re-exported by the SDK.
 agentloop-prompts = { path = "../../engine/crates/prompts" }
+# Desktop Browser / Computer plugins (typed tool inputs).
+async-trait = "0.1"
+schemars = "0.8"
 tracing-appender = "0.2.5"
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"

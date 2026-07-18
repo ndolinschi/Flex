@@ -285,6 +285,10 @@ export type PluginPrefs = {
    */
   learningRequireVerifiedMemory: boolean
   verifier: boolean
+  /** Embedded Browser panel tools (navigate / screenshot / eval / console). Default off. */
+  browser: boolean
+  /** OS computer-use tools with animated agent cursor. Default off. */
+  computer: boolean
 }
 
 /** Desktop UI prefs for ghost-text prompt completion (not an engine plugin). */

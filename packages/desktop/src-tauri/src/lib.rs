@@ -9,6 +9,7 @@ mod error;
 #[cfg(target_os = "macos")]
 mod macos_window;
 mod path_resolve;
+mod plugins;
 mod secrets;
 mod state;
 mod terminal;
@@ -200,7 +201,7 @@ pub fn run() {
             let store = open_session_store().map_err(|e| e.to_string())?;
             let config = load_config().unwrap_or_default();
             let service = if config.is_ready() {
-                match build_service(&config, store.clone()) {
+                match build_service(&config, store.clone(), app.handle().clone()) {
                     Ok(s) => Some(s),
                     Err(err) => {
                         tracing::warn!(error = %err, "failed to build engine on launch");

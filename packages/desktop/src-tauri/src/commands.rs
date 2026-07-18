@@ -117,25 +117,27 @@ impl BuiltinProvider {
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn validate_provider(
+    app: AppHandle,
     state: State<'_, AppState>,
     input: SaveProviderConfigInput,
 ) -> DesktopResult<Vec<ModelInfoDto>> {
     let mut trial = state.config.lock().await.clone();
     apply_save_input(&mut trial, &input)?;
-    let service = build_service(&trial, state.store.clone())?;
+    let service = build_service(&trial, state.store.clone(), app.clone())?;
     list_models_from(&service).await
 }
 
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn save_provider_config(
+    app: AppHandle,
     state: State<'_, AppState>,
     input: SaveProviderConfigInput,
 ) -> DesktopResult<ProviderConfigView> {
     let mut cfg = state.config.lock().await.clone();
     apply_save_input(&mut cfg, &input)?;
 
-    let service = build_service(&cfg, state.store.clone())?;
+    let service = build_service(&cfg, state.store.clone(), app.clone())?;
     let _ = list_models_from(&service).await?;
 
     persist_config(&cfg)?;
@@ -355,6 +357,7 @@ pub async fn profile_remove(state: State<'_, AppState>, id: String) -> DesktopRe
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn profile_activate(
+    app: AppHandle,
     state: State<'_, AppState>,
     id: String,
 ) -> DesktopResult<ProviderConfigView> {
@@ -365,7 +368,7 @@ pub async fn profile_activate(
     }
     cfg.prefs.active_profile_id = Some(id.to_owned());
 
-    let service = build_service(&cfg, state.store.clone())?;
+    let service = build_service(&cfg, state.store.clone(), app.clone())?;
 
     persist_config(&cfg)?;
     *state.config.lock().await = cfg.clone();
@@ -392,6 +395,7 @@ pub async fn profile_activate(
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn validate_profile(
+    app: AppHandle,
     state: State<'_, AppState>,
     input: ProviderProfileInput,
 ) -> DesktopResult<Vec<ModelInfoDto>> {
@@ -437,7 +441,7 @@ pub async fn validate_profile(
     }
     cfg.prefs.active_profile_id = Some(id);
 
-    let service = build_service(&cfg, state.store.clone())?;
+    let service = build_service(&cfg, state.store.clone(), app.clone())?;
     list_models_from(&service).await
 }
 
@@ -863,6 +867,7 @@ pub async fn get_inline_completion_prefs(
 /// provider differs from the active chat profile (so it lands in the registry).
 #[tauri::command]
 pub async fn save_inline_completion_prefs(
+    app: AppHandle,
     state: State<'_, AppState>,
     mut prefs: InlineCompletionPrefs,
 ) -> DesktopResult<InlineCompletionPrefs> {
@@ -875,7 +880,7 @@ pub async fn save_inline_completion_prefs(
     *state.config.lock().await = cfg.clone();
 
     if prefs.is_configured() && cfg.is_ready() {
-        match build_service(&cfg, state.store.clone()) {
+        match build_service(&cfg, state.store.clone(), app.clone()) {
             Ok(service) => {
                 *state.service.lock().await = Some(service);
                 respawn_cron_loop(&state).await;
@@ -937,6 +942,7 @@ pub struct CheckInlineCompletionResult {
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn check_inline_completion_connection(
+    app: AppHandle,
     state: State<'_, AppState>,
     input: CheckInlineCompletionInput,
 ) -> DesktopResult<CheckInlineCompletionResult> {
@@ -966,7 +972,7 @@ pub async fn check_inline_completion_connection(
         setup_dismissed: false,
     };
 
-    let service = match build_service(&cfg, state.store.clone()) {
+    let service = match build_service(&cfg, state.store.clone(), app.clone()) {
         Ok(service) => service,
         Err(err) => {
             return Ok(CheckInlineCompletionResult {
@@ -4676,9 +4682,9 @@ fn mcp_store() -> DesktopResult<agentloop_sdk::mcp_store::FileMcpStore> {
 /// swallowed on purpose: MCP servers are additive and the provider might not
 /// be configured yet (`DesktopError::NotConfigured`), which must not block
 /// saving/removing a server spec.
-async fn rebuild_service_after_mcp_change(state: &AppState) {
+async fn rebuild_service_after_mcp_change(app: &AppHandle, state: &AppState) {
     let cfg = state.config.lock().await.clone();
-    match crate::compose::build_service(&cfg, state.store.clone()) {
+    match crate::compose::build_service(&cfg, state.store.clone(), app.clone()) {
         Ok(service) => *state.service.lock().await = Some(service),
         Err(DesktopError::NotConfigured) => {}
         Err(err) => {
@@ -4701,7 +4707,11 @@ pub async fn mcp_list() -> DesktopResult<Vec<McpServerDto>> {
 
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
-pub async fn mcp_upsert(state: State<'_, AppState>, server: McpServerDto) -> DesktopResult<()> {
+pub async fn mcp_upsert(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    server: McpServerDto,
+) -> DesktopResult<()> {
     validate_mcp_id(&server.id)?;
     if server.command.trim().is_empty() {
         return Err(DesktopError::Message("command is required".into()));
@@ -4746,13 +4756,17 @@ pub async fn mcp_upsert(state: State<'_, AppState>, server: McpServerDto) -> Des
         .upsert(config)
         .await
         .map_err(|e| DesktopError::Message(e.to_string()))?;
-    rebuild_service_after_mcp_change(&state).await;
+    rebuild_service_after_mcp_change(&app, &state).await;
     Ok(())
 }
 
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
-pub async fn mcp_remove(state: State<'_, AppState>, id: String) -> DesktopResult<()> {
+pub async fn mcp_remove(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> DesktopResult<()> {
     let id = validate_mcp_id(&id)?;
     let store = mcp_store()?;
     store
@@ -4762,7 +4776,7 @@ pub async fn mcp_remove(state: State<'_, AppState>, id: String) -> DesktopResult
     if let Err(err) = crate::config::clear_mcp_server_secrets(id) {
         tracing::warn!(server = %id, error = %err, "failed to clear MCP secrets on remove");
     }
-    rebuild_service_after_mcp_change(&state).await;
+    rebuild_service_after_mcp_change(&app, &state).await;
     Ok(())
 }
 

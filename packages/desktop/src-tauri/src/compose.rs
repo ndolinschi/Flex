@@ -11,9 +11,11 @@ use agentloop_sdk::{
 };
 use agentloop_session::JsonlStore;
 use agentloop_workspace::GitWorktrees;
+use tauri::AppHandle;
 
 use crate::config::{sessions_dir, worktrees_dir, ProviderConfig};
 use crate::error::{DesktopError, DesktopResult};
+use crate::plugins::{BrowserPlugin, ComputerPlugin};
 
 /// Read every enabled MCP server spec from `~/.config/agentloop/mcp/*.toml`
 /// (blocking `std::fs`, since `build_service` itself is sync and runs both
@@ -250,7 +252,14 @@ fn resolve_active_connection(cfg: &ProviderConfig) -> DesktopResult<ActiveConnec
 /// `providers::resolve_*`. No connectors/delegators. Reads the active
 /// profile (see `ProviderConfig::active_profile`) as its single source for
 /// provider/key/region/model/fallbacks/isolation.
-pub fn build_service(cfg: &ProviderConfig, store: Arc<JsonlStore>) -> DesktopResult<EngineService> {
+///
+/// `app` is required so desktop-only plugins (Browser / Computer) can hold
+/// a Tauri handle; tools resolve `AppState` at call time.
+pub fn build_service(
+    cfg: &ProviderConfig,
+    store: Arc<JsonlStore>,
+    app: AppHandle,
+) -> DesktopResult<EngineService> {
     let conn = resolve_active_connection(cfg)?;
     let preferred = conn.provider;
 
@@ -330,6 +339,12 @@ pub fn build_service(cfg: &ProviderConfig, store: Arc<JsonlStore>) -> DesktopRes
             }
             if cfg.prefs.plugins.verifier {
                 builder = builder.enable_plugin("verifier");
+            }
+            if cfg.prefs.plugins.browser {
+                builder = builder.plugin(BrowserPlugin::new(app.clone()));
+            }
+            if cfg.prefs.plugins.computer {
+                builder = builder.plugin(ComputerPlugin::new(app.clone()));
             }
 
             {
