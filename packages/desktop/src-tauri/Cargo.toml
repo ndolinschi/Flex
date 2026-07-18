@@ -13,7 +13,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["unstable", "devtools"] }
+# `macos-private-api` gates WebviewWindowBuilder::transparent (agent cursor
+# overlay). Also set app.macOSPrivateApi in tauri.conf.json — the CLI strips
+# this feature when the config flag is false.
+tauri = { version = "2", features = ["unstable", "devtools", "macos-private-api"] }
 tauri-plugin-opener = "2"
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
@@ -89,7 +92,7 @@ objc2 = "0.6"
 [dev-dependencies]
 # tauri's mock runtime — lets command unit tests build a real `State<AppState>`
 # via `tauri::test::mock_app()` instead of a live window.
-tauri = { version = "2", features = ["unstable", "devtools", "test"] }
+tauri = { version = "2", features = ["unstable", "devtools", "macos-private-api", "test"] }
 # Needed to implement the `agentloop_core::Agent` trait for a test-only stub
 # (the trait itself is `#[async_trait]`, so an impl of it must be too).
 async-trait = "0.1"
