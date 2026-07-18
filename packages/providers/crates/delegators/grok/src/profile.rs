@@ -1,0 +1,222 @@
+//! Grok as a [`DelegatorProfile`] over the shared line-oriented runtime.
+
+use std::sync::Arc;
+
+use agentloop_contracts::{
+    AgentCaps, AttachmentCaps, CancelSupport, McpPassthrough, ModelDiscovery, PermissionCaps,
+    PermissionMode, ResumeSupport, StreamingGranularity,
+};
+use agentloop_core::SessionStore;
+use agentloop_delegator_common::{
+    DelegatorProcessSpec, DelegatorProfile, DelegatorRunRequest, LineDelegatorAgent, ProcessHost,
+    TokioCommandHost,
+};
+use agentloop_session::MemoryStore;
+
+use crate::GROK_AGENT_ID;
+use crate::config::GrokConfig;
+use crate::mapper::GrokLineMapper;
+
+/// Grok Build's identity, capabilities, and launch shape.
+pub struct GrokRuntimeProfile {
+    pub config: GrokConfig,
+}
+
+impl DelegatorProfile for GrokRuntimeProfile {
+    type Mapper = GrokLineMapper;
+
+    fn agent_id(&self) -> &str {
+        GROK_AGENT_ID
+    }
+
+    fn display_name(&self) -> &str {
+        "Grok"
+    }
+
+    fn capabilities(&self) -> AgentCaps {
+        AgentCaps {
+            models: ModelDiscovery::None,
+            modes: Vec::new(),
+            permissions: PermissionCaps {
+                interactive: false,
+                modes: vec![PermissionMode::Default],
+                tool_scoping: false,
+            },
+            reasoning_visible: false,
+            // streaming-json is structured, but the one-shot host maps it
+            // post-hoc, so clients see a snapshot replay, not live deltas.
+            streaming: StreamingGranularity::SnapshotOnly,
+            resume: ResumeSupport::Replay,
+            attachments: AttachmentCaps {
+                images: false,
+                files: false,
+            },
+            mcp_passthrough: McpPassthrough::None,
+            subagents: false,
+            cost_reporting: true,
+            cancellation: CancelSupport::KillOnly,
+            emits_structured_events: true,
+            commands: Vec::new(),
+        }
+    }
+
+    fn probe_spec(&self) -> DelegatorProcessSpec {
+        self.config.probe_spec()
+    }
+
+    fn prompt_request(&self, prompt: String) -> DelegatorRunRequest {
+        self.config.prompt_request(prompt)
+    }
+
+    fn mapper(&self) -> Self::Mapper {
+        GrokLineMapper::new()
+    }
+
+    fn resolution_note(&self) -> Vec<String> {
+        vec![format!("configured Grok command `{}`", self.config.program)]
+    }
+}
+
+/// The Grok delegator agent.
+pub type GrokAgent<H = TokioCommandHost> = LineDelegatorAgent<GrokRuntimeProfile, H>;
+
+/// Build a Grok agent with the real process host.
+pub fn grok_agent(config: GrokConfig, store: Arc<dyn SessionStore>) -> GrokAgent {
+    LineDelegatorAgent::new(
+        GrokRuntimeProfile { config },
+        store,
+        Arc::new(TokioCommandHost::new()),
+    )
+}
+
+/// Build a Grok agent with an ephemeral in-memory store (probing, doctor).
+pub fn ephemeral_grok_agent(config: GrokConfig) -> GrokAgent {
+    grok_agent(config, Arc::new(MemoryStore::new()))
+}
+
+/// Build a Grok agent over a custom [`ProcessHost`] (tests).
+pub fn grok_agent_with_host<H: ProcessHost + 'static>(
+    config: GrokConfig,
+    store: Arc<dyn SessionStore>,
+    host: Arc<H>,
+) -> GrokAgent<H> {
+    LineDelegatorAgent::new(GrokRuntimeProfile { config }, store, host)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::sync::Mutex;
+
+    use async_trait::async_trait;
+    use tokio_util::sync::CancellationToken;
+
+    use agentloop_contracts::{
+        AgentEvent, ContentBlock, NewSessionParams, PromptInput, TurnOptions, TurnStopReason,
+    };
+    use agentloop_core::Agent;
+    use agentloop_delegator_common::{
+        DelegatorExitStatus, DelegatorHostError, DelegatorProbeStatus, DelegatorRunOutput,
+        DelegatorRunRequest,
+    };
+
+    struct ScriptedHost {
+        stdout_lines: Vec<String>,
+        requests: Mutex<Vec<DelegatorRunRequest>>,
+    }
+
+    #[async_trait]
+    impl ProcessHost for ScriptedHost {
+        async fn probe(
+            &self,
+            _spec: &DelegatorProcessSpec,
+            _cancel: CancellationToken,
+        ) -> Result<DelegatorProbeStatus, DelegatorHostError> {
+            Ok(DelegatorProbeStatus::Installed {
+                version: Some("0.0-test".to_owned()),
+            })
+        }
+
+        async fn run(
+            &self,
+            request: DelegatorRunRequest,
+            _cancel: CancellationToken,
+        ) -> Result<DelegatorRunOutput, DelegatorHostError> {
+            self.requests
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .push(request);
+            Ok(DelegatorRunOutput {
+                stdout_lines: self.stdout_lines.clone(),
+                stderr: String::new(),
+                status: DelegatorExitStatus::success(),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn streaming_json_output_becomes_assistant_message() {
+        // UNVERIFIED doc-shaped frames (see mapper.rs).
+        let host = Arc::new(ScriptedHost {
+            stdout_lines: vec![
+                r#"{"type":"status","message":"Thinking..."}"#.to_owned(),
+                r#"{"type":"text","text":"pong"}"#.to_owned(),
+                r#"{"type":"complete","tokens_used":42,"success":true}"#.to_owned(),
+            ],
+            requests: Mutex::new(Vec::new()),
+        });
+        let store: Arc<dyn SessionStore> = Arc::new(MemoryStore::new());
+        let agent = grok_agent_with_host(GrokConfig::default(), store.clone(), host.clone());
+
+        let session = agent
+            .create_session(NewSessionParams::default())
+            .await
+            .expect("session");
+        let summary = agent
+            .prompt(
+                &session,
+                PromptInput::text("say pong"),
+                TurnOptions::default(),
+            )
+            .await
+            .expect("turn");
+        assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
+        assert_eq!(summary.usage.output, 42);
+
+        {
+            let requests = host.requests.lock().unwrap();
+            assert_eq!(requests.len(), 1);
+            assert_eq!(
+                requests[0].spec.args,
+                vec![
+                    "--output-format",
+                    "streaming-json",
+                    "--always-approve",
+                    "--no-auto-update",
+                    "-p",
+                    "say pong"
+                ]
+            );
+        }
+
+        let events = store.read(&session, 0).await.expect("events");
+        let assistant: Vec<_> = events
+            .iter()
+            .filter_map(|e| match &e.event {
+                AgentEvent::AssistantMessage { content, .. } => Some(content.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(assistant.len(), 1);
+        assert_eq!(assistant[0], vec![ContentBlock::markdown("pong")]);
+    }
+
+    #[tokio::test]
+    #[ignore = "requires grok on PATH"]
+    async fn live_probe_grok_cli() {
+        let agent = ephemeral_grok_agent(GrokConfig::default());
+        let caps = agent.probe(CancellationToken::new()).await.expect("probe");
+        assert!(matches!(caps, DelegatorProbeStatus::Installed { .. }));
+    }
+}

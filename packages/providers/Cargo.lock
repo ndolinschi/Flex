@@ -120,6 +120,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "agentloop-delegator-grok"
+version = "0.1.0"
+dependencies = [
+ "agentloop-contracts",
+ "agentloop-core",
+ "agentloop-delegator-common",
+ "agentloop-session",
+ "async-trait",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "agentloop-delegator-opencode"
 version = "0.1.0"
 dependencies = [
@@ -378,6 +395,7 @@ dependencies = [
  "agentloop-delegator-claude-code",
  "agentloop-delegator-copilot",
  "agentloop-delegator-cursor",
+ "agentloop-delegator-grok",
  "agentloop-delegator-opencode",
  "agentloop-engine",
  "agentloop-provider-anthropic",

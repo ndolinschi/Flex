@@ -22,7 +22,7 @@ plus a Tauri desktop UI:
   `Plugin` system. No `flex` bin lives here.
 - **`packages/providers`** — the connector umbrella: LLM `Provider` clients (anthropic, openai,
   gemini, ollama, bedrock, copilot) *and* the external-agent connectors (formerly "delegators":
-  acp, claude-code, copilot, cursor, opencode — still `Agent` impls), plus a `providers` facade
+  acp, claude-code, copilot, cursor, grok, opencode — still `Agent` impls), plus a `providers` facade
   crate that holds the provider-resolution logic and hands a registry to the engine.
 - **`packages/search`** — an optional deep-search plugin (`core::Plugin`): `search_web` +
   `scrape_page` tools and a `researcher` role, enabled/disabled by config. Default search
@@ -123,7 +123,7 @@ packages/providers/           # connector umbrella — its own workspace
                               # connect_bedrock, native/native_all; re-exports every connector
     {anthropic,openai,gemini,ollama,bedrock,copilot,chatgpt}/   # LLM Provider clients
     common/                   # shared provider client utilities
-    delegators/{common,acp,claude-code,copilot,cursor,opencode}/   # external-agent Agent impls
+    delegators/{common,acp,claude-code,copilot,cursor,grok,opencode}/   # external-agent Agent impls
 packages/search/              # deep-search plugin — its own workspace
   crates/search/              # SearchPlugin (core::Plugin): search_web + scrape_page + researcher role
 packages/sdk/                 # embeddable SDK + runner — its own workspace

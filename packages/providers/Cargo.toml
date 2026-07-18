@@ -15,6 +15,7 @@ members = [
     "crates/delegators/common",
     "crates/delegators/copilot",
     "crates/delegators/cursor",
+    "crates/delegators/grok",
     "crates/delegators/opencode",
 ]
 
@@ -44,6 +45,7 @@ agentloop-delegator-claude-code = { path = "crates/delegators/claude-code", vers
 agentloop-delegator-common = { path = "crates/delegators/common", version = "0.1.0" }
 agentloop-delegator-copilot = { path = "crates/delegators/copilot", version = "0.1.0" }
 agentloop-delegator-cursor = { path = "crates/delegators/cursor", version = "0.1.0" }
+agentloop-delegator-grok = { path = "crates/delegators/grok", version = "0.1.0" }
 agentloop-delegator-opencode = { path = "crates/delegators/opencode", version = "0.1.0" }
 # engine (path deps into the sibling engine workspace)
 agentloop-contracts = { path = "../engine/crates/contracts", version = "0.1.0" }

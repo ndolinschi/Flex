@@ -32,6 +32,7 @@ pub use agentloop_delegator_acp as delegator_acp;
 pub use agentloop_delegator_claude_code as delegator_claude_code;
 pub use agentloop_delegator_copilot as delegator_copilot;
 pub use agentloop_delegator_cursor as delegator_cursor;
+pub use agentloop_delegator_grok as delegator_grok;
 pub use agentloop_delegator_opencode as delegator_opencode;
 
 /// One client-configured OpenAI-compatible provider, registered alongside the
