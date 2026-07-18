@@ -84,7 +84,11 @@ export const SettingsShell = ({
   const body = (
     <>
       <header className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-4">
-        <IconButton label="Back to chat" onClick={() => setRoute("chat")}>
+        <IconButton
+          label="Back to chat"
+          onClick={() => setRoute("chat")}
+          className="h-6 w-6"
+        >
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
         </IconButton>
       </header>

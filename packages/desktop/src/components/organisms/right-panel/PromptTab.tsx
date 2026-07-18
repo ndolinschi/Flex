@@ -306,7 +306,7 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
         onSelect={handleInsertFile}
       />
 
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
         <Maximize2 className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
         <span className="min-w-0 flex-1 truncate text-sm text-ink">Prompt</span>
         <span className="shrink-0 text-xs text-ink-muted [font-variant-numeric:tabular-nums]">

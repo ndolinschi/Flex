@@ -376,7 +376,7 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
   return (
     <div className="absolute inset-0 flex flex-col">
       {/* Header — Terminal pattern */}
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1 border-b border-stroke-3 px-2.5">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1 px-2.5">
         <span className="min-w-0 flex-1 truncate text-xs text-ink-muted">
           {list
             ? `${list.components.length} component${list.components.length === 1 ? "" : "s"} · ${frameworkLabel(list.frameworks ?? detect?.frameworks)}`
@@ -480,7 +480,7 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
           <main className="flex min-w-0 flex-1 flex-col">
             {/* Mini-tabs — FilesTab chip strip */}
             {openIds.length > 0 ? (
-              <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1 overflow-x-auto border-b border-stroke-3 px-2.5">
+              <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-stroke-3 px-2.5">
                 {openIds.map((id) => {
                   const node = byId.get(id)
                   const dirty =

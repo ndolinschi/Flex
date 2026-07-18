@@ -267,7 +267,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
     return (
       <div className="flex h-full min-h-0 flex-col">
         {openFiles.length > 0 ? (
-          <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1 overflow-x-auto border-b border-stroke-3 px-2.5">
+          <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-stroke-3 px-2.5">
             {fileChips}
           </div>
         ) : null}
@@ -303,7 +303,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1 overflow-x-auto border-b border-stroke-3 px-2.5">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-stroke-3 px-2.5">
         <IconButton
           label="Browse files"
           onClick={() => setBrowseMode(true)}

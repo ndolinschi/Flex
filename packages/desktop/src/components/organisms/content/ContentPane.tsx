@@ -191,7 +191,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     >
       <TabStrip
         aria-label={paneIndex === 0 ? "Left pane tabs" : "Right pane tabs"}
-        className="min-w-0 gap-1"
+        className="min-w-0"
       >
         <div
           ref={tabsScrollRef}
