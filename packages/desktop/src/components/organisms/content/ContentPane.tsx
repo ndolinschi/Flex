@@ -15,6 +15,7 @@ import {
   startContentTabPointerDrag,
   useTabDragUi,
 } from "../../../hooks/useContentTabPointerDnD"
+import { previewTabsForPane } from "../../../lib/tabDnD"
 import { gitPrStatus } from "../../../lib/tauri"
 import { sessionLabel, type SessionId } from "../../../lib/types"
 import {
@@ -120,15 +121,26 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   }, [pane.activeTabId, pane.tabs.length])
 
   const dragTabId = dragUi?.dragging ? dragUi.tabId : null
-  const dropInsertAt =
-    dragUi?.dragging && dragUi.toPane === paneIndex ? dragUi.insertAt : null
+  const sourceTabs =
+    contentLayout.panes[dragUi?.fromPane ?? paneIndex]?.tabs ?? pane.tabs
+  const displayTabs = previewTabsForPane(
+    paneIndex,
+    pane.tabs,
+    sourceTabs,
+    dragUi,
+  )
 
   return (
     <div
       className={cn(
         "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-bg",
         paneFocused ? "z-[1]" : "z-0",
+        dragUi?.dragging &&
+          dragUi.overTarget &&
+          dragUi.toPane === paneIndex &&
+          "ring-1 ring-inset ring-accent/30",
       )}
+      data-content-pane={paneIndex}
       onMouseDown={() => setFocusedPane(paneIndex)}
     >
       <TabStrip
@@ -145,19 +157,12 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
             "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           )}
         >
-          {pane.tabs.map((t, index) => {
+          {displayTabs.map((t) => {
             const def =
               t.kind === "tool"
                 ? stripCatalog.find((c) => c.id === t.tool)
                 : undefined
-            const dropEdge =
-              dragTabId && dropInsertAt != null && dragTabId !== t.id
-                ? dropInsertAt === index
-                  ? "before"
-                  : dropInsertAt === index + 1
-                    ? "after"
-                    : null
-                : null
+            const isDragged = dragTabId === t.id
             return (
               <Tab
                 key={t.id}
@@ -170,8 +175,8 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                   ) : undefined
                 }
                 className={cn(
-                  "max-w-[180px] shrink-0",
-                  dragTabId === t.id && "opacity-40",
+                  "max-w-[180px] shrink-0 transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+                  isDragged && "opacity-40",
                 )}
                 title={tabLabel(t, sessionsById)}
                 tabId={t.id}
@@ -179,7 +184,6 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                 onClose={() => closeTabInPane(paneIndex, t.id)}
                 closeLabel={`Close ${tabLabel(t, sessionsById)}`}
                 draggable
-                dropEdge={dropEdge}
                 onPointerDown={(e) =>
                   startContentTabPointerDrag(e, paneIndex, t.id)
                 }

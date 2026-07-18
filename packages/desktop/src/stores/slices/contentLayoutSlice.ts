@@ -15,7 +15,7 @@ import {
   moveTabBetweenPanes as moveTabBetweenPanesModel,
   normalizeLayout,
   otherPaneIndex,
-  reorderContentTabs,
+  placeTabAt,
   toolTabId,
   upsertToolInPane,
   type ContentLayout,
@@ -308,7 +308,7 @@ export const createContentLayoutSlice: StateCreator<
     if (!p) return
     const fromIndex = p.tabs.findIndex((t) => t.id === tabId)
     if (fromIndex < 0) return
-    const reordered = reorderContentTabs(p.tabs, fromIndex, insertAt)
+    const reordered = placeTabAt(p.tabs, fromIndex, insertAt)
     if (reordered === p.tabs) return
     p.tabs = reordered
     const next: ContentLayout = {

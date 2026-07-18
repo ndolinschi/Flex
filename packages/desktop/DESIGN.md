@@ -286,7 +286,9 @@ remainder scrolls.
 
 **Tab reorder / split move:** pointer events (not HTML5 DnD — broken in
 Tauri WKWebView). Idle cursor is pointer; grabbing only after the drag
-threshold. Drop markers work within a strip and across split panes.
+threshold. Within a strip, tabs **live-shift** on the axis as you drag;
+dropping on the other pane (strip or pane body) **moves and activates**
+the tab. Dropping outside any pane/strip is a no-op.
 
 ---
 
