@@ -106,6 +106,9 @@ async fn ensure_overlay(app: &AppHandle) -> DesktopResult<()> {
         .map_err(|e| DesktopError::Message(format!("agent cursor overlay write: {e}")))?;
     let url = tauri::Url::from_file_path(&html_path)
         .map_err(|_| DesktopError::Message("agent cursor overlay: invalid file url".into()))?;
+    // `.transparent(true)` needs crate feature `macos-private-api` (+
+    // `app.macOSPrivateApi` in tauri.conf.json) on macOS; other platforms
+    // expose the method unconditionally.
     let win = WebviewWindowBuilder::new(app, WINDOW_LABEL, WebviewUrl::CustomProtocol(url))
         .title("Agent cursor")
         .decorations(false)
