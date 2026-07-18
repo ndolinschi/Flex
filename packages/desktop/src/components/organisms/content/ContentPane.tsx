@@ -17,12 +17,13 @@ import {
 } from "../../../hooks/useContentTabPointerDnD"
 import { previewTabsForPane } from "../../../lib/tabDnD"
 import { gitPrStatus } from "../../../lib/tauri"
-import { sessionLabel, type SessionId } from "../../../lib/types"
+import { sessionLabel, type SessionId, type SessionMeta } from "../../../lib/types"
 import {
   useAppStore,
   type ContentTab,
   type RightPanelTab,
 } from "../../../stores/appStore"
+import { emptyPane } from "../../../stores/contentLayoutModel"
 import { visibleRightPanelTabs } from "../right-panel/tabs"
 import { ChatSessionBody } from "./ChatSessionBody"
 import { ToolTabBody } from "./ToolTabBody"
@@ -34,24 +35,66 @@ type ContentPaneProps = {
   keepAliveTools: Set<string>
 }
 
+/** Labels/icons for the strip — always include PR so open tabs keep a label. */
+const STRIP_CATALOG = visibleRightPanelTabs({ hasBranchPr: true })
+
+/** Stable fallback when a pane index is missing (must keep object identity). */
+const EMPTY_PANE = emptyPane()
+
 const tabLabel = (
   tab: ContentTab,
-  sessionsById: Map<string, { id: string; title?: string | null }>,
+  sessionsById: Map<string, SessionMeta>,
 ): string => {
   if (tab.kind === "chat") {
     const s = sessionsById.get(tab.sessionId)
-    return s ? sessionLabel(s as never) : "Chat"
+    return s ? sessionLabel(s) : "Chat"
   }
-  const def = visibleRightPanelTabs({ hasBranchPr: true }).find(
-    (t) => t.id === tab.tool,
-  )
-  return def?.label ?? tab.tool
+  return STRIP_CATALOG.find((c) => c.id === tab.tool)?.label ?? tab.tool
+}
+
+/**
+ * Track which chat tab ids have been shown so we can keep their bodies mounted
+ * after the first visit (scroll/draft locality) without mounting every open chat.
+ */
+const useVisitedChatTabs = (
+  tabs: ContentTab[],
+  activeTabId: string | null,
+): ReadonlySet<string> => {
+  const [visited, setVisited] = useState<ReadonlySet<string>>(() => new Set())
+
+  useEffect(() => {
+    setVisited((prev) => {
+      const openIds = new Set(tabs.map((t) => t.id))
+      let next: Set<string> | null = null
+
+      const active = tabs.find((t) => t.id === activeTabId)
+      if (active?.kind === "chat" && !prev.has(active.id)) {
+        next = new Set(prev)
+        next.add(active.id)
+      }
+
+      for (const id of prev) {
+        if (!openIds.has(id)) {
+          if (!next) next = new Set(prev)
+          next.delete(id)
+        }
+      }
+
+      return next ?? prev
+    })
+  }, [activeTabId, tabs])
+
+  return visited
 }
 
 export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => {
-  const contentLayout = useAppStore((s) => s.contentLayout)
-  const focusedPane = contentLayout.focusedPane
-  const pane = contentLayout.panes[paneIndex] ?? { tabs: [], activeTabId: null }
+  // Narrow selectors — avoid re-rendering this pane when only the sibling
+  // pane's tabs change (structural sharing in activate/reorder/close).
+  const pane = useAppStore(
+    (s) => s.contentLayout.panes[paneIndex] ?? EMPTY_PANE,
+  )
+  const split = useAppStore((s) => s.contentLayout.mode === "split")
+  const focusedPane = useAppStore((s) => s.contentLayout.focusedPane)
   const activateTabInPane = useAppStore((s) => s.activateTabInPane)
   const closeTabInPane = useAppStore((s) => s.closeTabInPane)
   const closePane = useAppStore((s) => s.closePane)
@@ -69,6 +112,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     height: number
   } | null>(null)
   const tabsScrollRef = useRef<HTMLDivElement>(null)
+  const visitedChats = useVisitedChatTabs(pane.tabs, pane.activeTabId)
 
   const sessionsById = useMemo(
     () => new Map(sessions.map((s) => [s.id, s])),
@@ -82,10 +126,11 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   })()
 
   const cwd = sessions.find((s) => s.id === contextSession)?.cwd
+  // Only fetch PR status while the + menu is open — strip labels never need it.
   const prQuery = useQuery({
     queryKey: ["git-pr-status", cwd ?? ""],
     queryFn: () => gitPrStatus(cwd!),
-    enabled: !!cwd,
+    enabled: !!cwd && openTabModal,
     staleTime: 15_000,
   })
   const hasBranchPr = !!prQuery.data?.pr
@@ -93,11 +138,6 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     () => visibleRightPanelTabs({ hasBranchPr }),
     [hasBranchPr],
   )
-  const stripCatalog = useMemo(
-    () => visibleRightPanelTabs({ hasBranchPr: true }),
-    [],
-  )
-  const split = contentLayout.mode === "split"
   const paneFocused = focusedPane === paneIndex
 
   // Vertical wheel → horizontal scroll over the tab strip (trackpad/mouse).
@@ -121,14 +161,24 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   }, [pane.activeTabId, pane.tabs.length])
 
   const dragTabId = dragUi?.dragging ? dragUi.tabId : null
-  const sourceTabs =
-    contentLayout.panes[dragUi?.fromPane ?? paneIndex]?.tabs ?? pane.tabs
+  const sourceTabs = useMemo(() => {
+    if (!dragUi?.dragging) return pane.tabs
+    if (dragUi.fromPane === paneIndex) return pane.tabs
+    return (
+      useAppStore.getState().contentLayout.panes[dragUi.fromPane]?.tabs ??
+      pane.tabs
+    )
+  }, [dragUi, pane.tabs, paneIndex])
   const displayTabs = previewTabsForPane(
     paneIndex,
     pane.tabs,
     sourceTabs,
     dragUi,
   )
+  const dropInsertAt =
+    dragUi?.dragging && dragUi.overTarget && dragUi.toPane === paneIndex
+      ? dragUi.insertAt
+      : null
 
   return (
     <div
@@ -153,12 +203,22 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
             "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           )}
         >
-          {displayTabs.map((t) => {
+          {displayTabs.map((t, index) => {
             const def =
               t.kind === "tool"
-                ? stripCatalog.find((c) => c.id === t.tool)
+                ? STRIP_CATALOG.find((c) => c.id === t.tool)
                 : undefined
             const isDragged = dragTabId === t.id
+            const dropEdge =
+              dropInsertAt != null
+                ? dropInsertAt === index
+                  ? "before"
+                  : dropInsertAt >= displayTabs.length &&
+                      index === displayTabs.length - 1
+                    ? "after"
+                    : null
+                : null
+            const label = tabLabel(t, sessionsById)
             return (
               <Tab
                 key={t.id}
@@ -174,17 +234,18 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                   "max-w-[180px] shrink-0 transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                   isDragged && "opacity-40",
                 )}
-                title={tabLabel(t, sessionsById)}
+                title={label}
                 tabId={t.id}
                 onSelect={() => activateTabInPane(paneIndex, t.id)}
                 onClose={() => closeTabInPane(paneIndex, t.id)}
-                closeLabel={`Close ${tabLabel(t, sessionsById)}`}
+                closeLabel={`Close ${label}`}
                 draggable
+                dropEdge={dropEdge}
                 onPointerDown={(e) =>
                   startContentTabPointerDrag(e, paneIndex, t.id)
                 }
               >
-                {tabLabel(t, sessionsById)}
+                {label}
               </Tab>
             )
           })}
@@ -228,6 +289,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
         {pane.tabs.map((t) => {
           const isActive = t.id === pane.activeTabId
           if (t.kind === "chat") {
+            if (!isActive && !visitedChats.has(t.id)) return null
             return (
               <div
                 key={t.id}
@@ -272,8 +334,8 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
         sessionId={contextSession}
         tabs={catalog}
         onOpenChat={openChatInPane}
-        onOpenTool={(pane, sid, tool) =>
-          openToolInPane(pane, sid, tool as RightPanelTab)
+        onOpenTool={(p, sid, tool) =>
+          openToolInPane(p, sid, tool as RightPanelTab)
         }
       />
     </div>

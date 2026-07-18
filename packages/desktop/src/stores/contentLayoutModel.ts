@@ -28,6 +28,20 @@ export const toolTabId = (sessionId: SessionId, tool: ToolTabId): string =>
 
 export const emptyPane = (): PaneState => ({ tabs: [], activeTabId: null })
 
+/** Replace one pane; keep the sibling pane's object identity for React. */
+export const replacePane = (
+  layout: ContentLayout,
+  pane: 0 | 1,
+  nextPane: PaneState,
+): ContentLayout["panes"] => {
+  if (layout.mode === "split") {
+    return pane === 0
+      ? [nextPane, layout.panes[1]!]
+      : [layout.panes[0]!, nextPane]
+  }
+  return [nextPane]
+}
+
 export const makeChatTab = (sessionId: SessionId): ContentTab => ({
   id: chatTabId(sessionId),
   kind: "chat",
@@ -136,16 +150,12 @@ export const moveTabBetweenPanes = (
     // `insertAt` is after-removal index (pointer DnD / placeTabAt).
     const tabs = placeTabAt(pane.tabs, fromIndex, insertAt)
     if (tabs === pane.tabs) return layout
-    const panes = layout.panes.map((p, i) =>
-      i === fromPane ? { ...p, tabs, activeTabId: tabId } : { ...p, tabs: [...p.tabs] },
-    ) as ContentLayout["panes"]
+    // Preserve the other pane's object identity so inactive panes skip re-render.
+    const nextPane: PaneState = { ...pane, tabs, activeTabId: tabId }
     return {
       ...layout,
       focusedPane: fromPane,
-      panes:
-        layout.mode === "split"
-          ? ([panes[0]!, panes[1]!] as [PaneState, PaneState])
-          : ([panes[0]!] as [PaneState]),
+      panes: replacePane(layout, fromPane, nextPane),
     }
   }
 
