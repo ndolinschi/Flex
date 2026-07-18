@@ -173,11 +173,25 @@ Tauri 2 + React desktop shell. Atomic Design UI catalog:
 spacing / positioning: [`packages/desktop/DESIGN.md`](packages/desktop/DESIGN.md).
 Rust side
 (`src-tauri`) is a thin command layer over `agentloop-sdk::AgentBuilder` (native
-providers only; no delegators). Sessions persist via `JsonlStore`; secrets via OS
-keychain. GitHub Copilot uses device-flow commands (`copilot_auth_*`) that call
+providers only; no delegators). Sessions persist via `JsonlStore` at
+`dirs::data_dir()/agentloop/desktop/sessions/` (engine-owned store, desktop-scoped
+path); secrets via OS keychain / encrypted file. GitHub Copilot uses device-flow
+commands (`copilot_auth_*`) that call
 `providers::copilot::{DeviceFlow, store_github_token}`. ChatGPT subscription uses
 `chatgpt_auth_*` (headless OAuth via `providers::openai::{start_oauth, store_oauth_tokens}`)
 to unlock the native `chatgpt` provider.
+
+**Remote Access** (`src-tauri/src/remote/`): optional in-process HTTP/SSE
+**chat companion** for mobile clients. Settings → Remote Access enables a shared
+listener and pluggable connection methods (manual, LAN, Bonjour/mDNS, public
+port; Cloudflare Tunnel and Bluetooth are adapter stubs). Clients pair with a
+versioned JSON document (host/port/token or Bonjour) and may only
+`sessions.list` / `messages.read` / `messages.send` against **root** sessions.
+Remote prompts set `TurnOptions.disable_tools` (no tools offered; any call
+denied) plus `DontAsk`. SSE filters out tool/permission/control events and
+scrubs ToolUse/paths from message payloads. No MCP, session mutation, HITL
+resolve, providers, or subagent access over this surface. Distinct from
+`agentloop-transport-http` / `flex serve`.
 
 ## packages/gateway
 

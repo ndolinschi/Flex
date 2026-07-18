@@ -20,7 +20,10 @@ packages/sdk        # AgentBuilder composition root + the headless runner bin
 packages/gateway    # chat-channel contract (Channel trait) — adapters not built yet
 packages/desktop    # Tauri 2 + React UI — second composition root via AgentBuilder
                     # (right panel: Plan / Changes / Files+Monaco / Terminal / Browser /
-                    #  Memory behind MEMORY_TAB_ENABLED)
+                    #  Memory behind MEMORY_TAB_ENABLED). Optional desktop-owned Remote
+                    # Access transport (`src-tauri/src/remote/`): in-process HTTP/SSE
+                    # chat companion for mobile (messages read/send only; tools denied).
+                    # Distinct from `flex serve` (engine transport).
 ```
 
 One `Agent` trait (`packages/engine/crates/core/src/agent.rs`) with two implementation

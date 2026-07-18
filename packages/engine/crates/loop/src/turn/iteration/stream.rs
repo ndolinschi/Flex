@@ -121,7 +121,11 @@ pub(super) async fn stream_model_response(
             Some(role) => deps.roles.tool_filter(role, &deps.tools, meta.depth),
             None => Default::default(),
         };
-        request.tools = deps.tools.specs(&tool_filter);
+        request.tools = if opts.disable_tools {
+            Vec::new()
+        } else {
+            deps.tools.specs(&tool_filter)
+        };
 
         let tokens_est = estimate_request_tokens(request.system.as_deref().unwrap_or(""), &request);
         let context_limit = resolve_context_limit(&provider);

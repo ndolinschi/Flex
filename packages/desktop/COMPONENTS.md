@@ -144,7 +144,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `SettingsShell` | Back header + form (`embedded` when App owns sidebar) |
 | `ErrorBoundary` | Top-level render-error fence (`templates/`) |
 | `SettingsPage` | Settings shell; sections from `pages/settings/` |
-| `CustomizeSection` / `MemorySection` / `IndexingSection` / `AutomationsSection` / `DiagnosticsSection` | Settings nav sections (`pages/settings/`) |
+| `CustomizeSection` / `MemorySection` / `IndexingSection` / `AutomationsSection` / `DiagnosticsSection` / `RemoteAccessSection` | Settings nav sections (`pages/settings/`) |
 | `plugins/prompt-completion/` | UI plugin: `CompletionSetupModal` (Ollama pull guidance or existing provider) + `InlineCompletionSettingsCard` (Customize) |
 | `plugins/components/` | UI plugin: `ComponentsTab` (React/Vue/Angular inventory + CSS edit → agent) |
 | `src-tauri/plugins/` | Desktop-only engine plugins: `BrowserPlugin` (panel navigate/screenshot/eval/click/console/devtools) + `ComputerPlugin` (OS screenshot/move/click/type/open + animated agent cursor overlay) |

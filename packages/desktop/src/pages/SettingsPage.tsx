@@ -9,6 +9,7 @@ import { CustomizeContent } from "./settings/CustomizeSection"
 import { DiagnosticsContent } from "./settings/DiagnosticsSection"
 import { IndexingContent } from "./settings/IndexingSection"
 import { MemoryContent } from "./settings/MemorySection"
+import { RemoteAccessContent } from "./settings/RemoteAccessSection"
 import type { SettingsSectionId } from "../lib/settingsSearchIndex"
 import type { PermissionMode } from "../lib/types"
 import { useAppStore } from "../stores/appStore"
@@ -29,6 +30,8 @@ const DESCRIPTIONS: Partial<Record<SettingsSectionId, string>> = {
   appearance: "Theme and display preferences.",
   models: "Configure the preferred native provider for the agent loop.",
   behavior: "Session defaults and where secrets are stored.",
+  "remote-access":
+    "Chat-only companion for a phone: see messages and send messages. No tools, MCP, or system control.",
   memory: "Durable notes the agent saves as it works.",
   indexing: "Local code index status, rebuild, auto-update, and auto-context.",
   "tools-mcp": "Native plugins and MCP servers the engine can load.",
@@ -211,6 +214,7 @@ export const SettingsPage = ({ embedded = false }: SettingsPageProps) => {
         appearance: <AppearanceContent />,
         models: <ProviderSettingsForm />,
         behavior: <BehaviorContent />,
+        "remote-access": <RemoteAccessContent />,
         memory: <MemoryContent />,
         indexing: <IndexingContent />,
         "tools-mcp": <CustomizeContent />,

@@ -114,6 +114,12 @@ pub struct TurnOptions {
     /// per-turn limit.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turn_timeout_ms: Option<u64>,
+    /// When true, this turn is offered **no tools** to the model and any
+    /// tool call is denied at the permission gate. Used by isolated remote
+    /// chat clients that must not read the filesystem or mutate state.
+    /// Default `false` keeps existing callers byte-identical.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub disable_tools: bool,
     /// Namespaced passthrough for agent-specific options.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub extra: BTreeMap<String, serde_json::Value>,

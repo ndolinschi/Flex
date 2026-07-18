@@ -8,6 +8,7 @@ import {
   Database,
   Palette,
   Plug,
+  Radio,
   Search,
   X,
 } from "lucide-react"
@@ -27,6 +28,7 @@ const ALL_SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { id: "appearance", label: "Appearance" },
   { id: "models", label: "Models & Connections" },
   { id: "behavior", label: "Behavior" },
+  { id: "remote-access", label: "Remote Access" },
   { id: "memory", label: "Memory" },
   { id: "indexing", label: "Indexing" },
   { id: "tools-mcp", label: "Tools & MCP" },
@@ -46,6 +48,7 @@ const NAV_ICONS: Record<SettingsSectionId, typeof Cog> = {
   appearance: Palette,
   models: Component,
   behavior: CreditCard,
+  "remote-access": Radio,
   memory: Brain,
   indexing: Database,
   "tools-mcp": Plug,

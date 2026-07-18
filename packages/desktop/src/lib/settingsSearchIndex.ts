@@ -14,6 +14,7 @@ export type SettingsSectionId =
   | "appearance"
   | "models"
   | "behavior"
+  | "remote-access"
   | "memory"
   | "indexing"
   | "tools-mcp"
@@ -93,6 +94,49 @@ const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     rowId: "behavior-secret-storage",
     title: "Secret storage",
     description: "Where the encryption key for your stored API keys lives",
+  },
+  // Remote Access
+  {
+    section: "remote-access",
+    rowId: "remote-enabled",
+    title: "Enable remote access",
+    description: "Start the desktop Remote API for mobile clients",
+  },
+  {
+    section: "remote-access",
+    rowId: "remote-device-name",
+    title: "Device name",
+    description: "Shown in pairing info and Bonjour advertisement",
+  },
+  {
+    section: "remote-access",
+    rowId: "remote-port",
+    title: "Port",
+    description: "TCP port for the shared HTTP listener",
+  },
+  {
+    section: "remote-access",
+    rowId: "remote-method-manual",
+    title: "Manual",
+    description: "Connect with host:port and bearer token",
+  },
+  {
+    section: "remote-access",
+    rowId: "remote-method-lan",
+    title: "LAN",
+    description: "Advertise LAN IPs for same-network clients",
+  },
+  {
+    section: "remote-access",
+    rowId: "remote-method-bonjour",
+    title: "Bonjour",
+    description: "mDNS discovery on the local network",
+  },
+  {
+    section: "remote-access",
+    rowId: "remote-pairing-token",
+    title: "Bearer token",
+    description: "Auth token for remote clients",
   },
   // Memory
   {

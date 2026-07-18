@@ -122,6 +122,7 @@ pub(crate) async fn run_turn(
 
     async {
         handle.set_turn_permission_mode(opts.permission_mode);
+        handle.set_turn_disable_tools(opts.disable_tools);
         handle.set_turn_effort(opts.effort);
 
         // Sink is created before UserPromptSubmit so hooks (e.g. auto-context
