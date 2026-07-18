@@ -26,6 +26,7 @@ import {
   SessionListItem,
   SidebarActionRow,
   SidebarFooter,
+  SidebarProjectFilter,
   SidebarResumeError,
   SidebarSkeleton,
   type ContextMenuItem,
@@ -71,6 +72,12 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   const narrow = viewport !== "wide"
   const pinnedSessionIds = useAppStore((s) => s.pinnedSessionIds)
   const archivedSessionIds = useAppStore((s) => s.archivedSessionIds)
+  const sidebarProjectSort = useAppStore((s) => s.sidebarProjectSort)
+  const sidebarProjectVisibility = useAppStore((s) => s.sidebarProjectVisibility)
+  const setSidebarProjectSort = useAppStore((s) => s.setSidebarProjectSort)
+  const setSidebarProjectVisibility = useAppStore(
+    (s) => s.setSidebarProjectVisibility,
+  )
   const toggleSessionPinned = useAppStore((s) => s.toggleSessionPinned)
   const setSessionArchived = useAppStore((s) => s.setSessionArchived)
   const [selectError, setSelectError] = useState<string | null>(null)
@@ -107,10 +114,20 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     [allSessions],
   )
 
+  const activeSession = useMemo(
+    () => sessions.find((s) => s.id === activeSessionId) ?? null,
+    [sessions, activeSessionId],
+  )
+
   const { pinnedSessions, archivedSessions, repoGroups } = useSessionSidebarGroups(
     sessions,
     pinnedSessionIds,
     archivedSessionIds,
+    {
+      sort: sidebarProjectSort,
+      visibility: sidebarProjectVisibility,
+      activeSession,
+    },
   )
 
   const handleCreate = useCallback(
@@ -482,6 +499,12 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         <span className="min-w-0 flex-1 truncate text-xs tracking-[var(--tracking-caption)] text-ink-muted">
           Repositories
         </span>
+        <SidebarProjectFilter
+          sort={sidebarProjectSort}
+          visibility={sidebarProjectVisibility}
+          onSortChange={setSidebarProjectSort}
+          onVisibilityChange={setSidebarProjectVisibility}
+        />
         <IconButton
           label="Search agents"
           className={cn(

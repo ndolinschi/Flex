@@ -226,11 +226,15 @@ read flush against the border. Use `h-6` (3px inset each side).
 
 1. Optional narrow close header (`px-4`, 30px)
 2. Action rows — New Agent, Search, … (`px-2 pt-2 pb-2`)
-3. “Repositories” label (`px-2 pb-1`)
+3. “Repositories” label (`px-2 pb-1`) + quiet filter / search icons
 4. Scrollable groups — Pinned / repos / Archived (`px-2`)
 5. Footer — theme + settings (`px-2.5 py-1.5 border-t`)
 
 Selected row: `bg-fill-2`. Hover: `bg-fill-4`.
+
+Filter tray (Repositories row): Sort — Last updated / Name A–Z; Show —
+Active projects (updated within 14 days) / All projects. Prefs persist in
+`ui.json` (`sidebarProjectSort`, `sidebarProjectVisibility`).
 
 ### WindowTitleBar chrome
 

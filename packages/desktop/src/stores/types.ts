@@ -461,6 +461,10 @@ export type UiSliceState = {
   recentCwds: string[]
   pinnedSessionIds: string[]
   archivedSessionIds: string[]
+  /** Session-sidebar repository sort — persisted in `ui.json`. */
+  sidebarProjectSort: import("../lib/sessionGrouping").SidebarProjectSort
+  /** Session-sidebar repository visibility — persisted in `ui.json`. */
+  sidebarProjectVisibility: import("../lib/sessionGrouping").SidebarProjectVisibility
   /**
    * Open chat tabs in the center pane (MRU-append order). Distinct from the
    * sidebar's full session list — closing a tab does not delete the session.
@@ -491,6 +495,12 @@ export type UiSliceState = {
   setSessionArchived: (id: SessionId, archived: boolean) => void
   setPinnedSessionIds: (ids: SessionId[]) => void
   setArchivedSessionIds: (ids: SessionId[]) => void
+  setSidebarProjectSort: (
+    sort: import("../lib/sessionGrouping").SidebarProjectSort,
+  ) => void
+  setSidebarProjectVisibility: (
+    visibility: import("../lib/sessionGrouping").SidebarProjectVisibility,
+  ) => void
   /** Ensure `id` is in the center-pane open-tab strip (append if new). */
   openChatTab: (id: SessionId) => void
   /** Remove from the open-tab strip only — does not delete the session.

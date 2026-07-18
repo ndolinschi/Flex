@@ -45,6 +45,8 @@ export const createUiSlice: StateCreator<
   recentCwds: [],
   pinnedSessionIds: [],
   archivedSessionIds: [],
+  sidebarProjectSort: "recency",
+  sidebarProjectVisibility: "all",
   openChatSessionIds: [],
   unreadBySession: {},
   toasts: [],
@@ -177,6 +179,14 @@ export const createUiSlice: StateCreator<
       return { pinnedSessionIds, archivedSessionIds }
     }),
   setPinnedSessionIds: (ids) => set({ pinnedSessionIds: ids }),
+  setSidebarProjectSort: (sort) => {
+    set({ sidebarProjectSort: sort })
+    void persistUiState({ sidebarProjectSort: sort })
+  },
+  setSidebarProjectVisibility: (visibility) => {
+    set({ sidebarProjectVisibility: visibility })
+    void persistUiState({ sidebarProjectVisibility: visibility })
+  },
   setArchivedSessionIds: (ids) => set({ archivedSessionIds: ids }),
   openChatTab: (id) =>
     set((state) => {

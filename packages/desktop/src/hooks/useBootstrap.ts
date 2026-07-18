@@ -155,6 +155,17 @@ export const useBootstrap = (
         if (ui.archivedSessionIds) {
           useAppStore.getState().setArchivedSessionIds(ui.archivedSessionIds)
         }
+        if (ui.sidebarProjectSort === "recency" || ui.sidebarProjectSort === "alpha") {
+          useAppStore.getState().setSidebarProjectSort(ui.sidebarProjectSort)
+        }
+        if (
+          ui.sidebarProjectVisibility === "active" ||
+          ui.sidebarProjectVisibility === "all"
+        ) {
+          useAppStore
+            .getState()
+            .setSidebarProjectVisibility(ui.sidebarProjectVisibility)
+        }
 
         if (ui.sidebarCollapsed) {
           useAppStore.getState().setSidebarCollapsed(true)

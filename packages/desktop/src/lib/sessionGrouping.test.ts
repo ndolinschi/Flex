@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { groupByRepo, orderByPinnedIds, orderStably, projectCwd } from "./sessionGrouping"
+import {
+  ACTIVE_PROJECT_WINDOW_MS,
+  groupByRepo,
+  orderByPinnedIds,
+  orderStably,
+  projectCwd,
+} from "./sessionGrouping"
 import type { SessionMeta } from "./types"
 
 /**
@@ -59,6 +65,43 @@ describe("groupByRepo", () => {
     const project = groups.find((g) => g.label === "my-project")!
     expect(project.cwd).toBe("/Users/me/my-project")
     expect(project.sessions.map((s) => s.id).sort()).toEqual(["a", "b"])
+  })
+
+  it("sorts groups and sessions alphabetically when sort is alpha", () => {
+    const sessions = [
+      { ...makeSession("z", 300, "/zulu"), title: "Zebra" },
+      { ...makeSession("a", 100, "/alpha"), title: "Apple" },
+      { ...makeSession("m", 200, "/alpha"), title: "Mango" },
+    ]
+    const groups = groupByRepo(sessions, { sort: "alpha" })
+    expect(groups.map((g) => g.label)).toEqual(["alpha", "zulu"])
+    expect(groups[0]!.sessions.map((s) => s.id)).toEqual(["a", "m"])
+  })
+
+  it("hides idle projects when visibility is active", () => {
+    const now = 1_000_000
+    const sessions = [
+      makeSession("fresh", now - 1_000, "/fresh"),
+      makeSession("stale", now - ACTIVE_PROJECT_WINDOW_MS - 1, "/stale"),
+    ]
+    const groups = groupByRepo(sessions, {
+      visibility: "active",
+      nowMs: now,
+    })
+    expect(groups.map((g) => g.label)).toEqual(["fresh"])
+  })
+
+  it("keeps keepCwd visible under the active filter", () => {
+    const now = 1_000_000
+    const sessions = [
+      makeSession("stale", now - ACTIVE_PROJECT_WINDOW_MS - 1, "/stale"),
+    ]
+    const groups = groupByRepo(sessions, {
+      visibility: "active",
+      nowMs: now,
+      keepCwd: "/stale",
+    })
+    expect(groups.map((g) => g.cwd)).toEqual(["/stale"])
   })
 })
 

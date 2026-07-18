@@ -91,6 +91,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `WorkflowGroup` | Multi-step workflow block (steps + nested subagents); organism-scale but kept in `molecules/` since it nests inside `TimelineRowView` like `SubagentGroup`/`WorkGroup` | `steps`, `subagents`, `status` | TurnTimeline (via `TimelineRowView`) |
 | `SidebarSkeleton` | Sidebar loading placeholder (headers + rows) | — | SessionSidebar |
 | `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?`, `disabled?` | SessionSidebar |
+| `SidebarProjectFilter` | Repositories sort + visibility tray | `sort`, `visibility`, `onSortChange`, `onVisibilityChange` | SessionSidebar |
 | `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle` | SessionSidebar |
 | `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions | `title`, `status`, `onBuild`, `onAddComment?` | PlanTab |
 | `AppMark` / `TitleBarMenus` | Wireframe mark + in-window File/Edit/View/Help (Windows/Linux); Help → **Submit Bug…** opens `BugReportDialog` | `handlers`, `isBootstrapped`, `canSearch`, `canCommandPalette` | WindowTitleBar (non-macOS) |
@@ -180,7 +181,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/lib/mcpCatalog.ts` | Curated MCP catalog metadata (`MCP_CATALOG`) + `catalogEntryNeedsConfig` |
 | `McpCatalogCard` | Catalog row with Install / Installed + Configure | `entry`, `installed`, `onInstall`, `onConfigure?` | McpCatalogSection |
 | `McpInstallDialog` | Install/configure modal for catalog args + env (secrets keep-if-blank) | `entry`, `mode`, `onInstall` | McpCatalogSection, McpServerRow |
-| `src/lib/sessionGrouping.ts` | Pure `groupByRepo` — groups/sorts sessions by `cwd` for SessionSidebar |
+| `src/lib/sessionGrouping.ts` | Pure `groupByRepo` — groups/sorts/filters sessions by `cwd` for SessionSidebar (`sort`, `visibility`) |
 | `src/lib/fuzzySearch.ts` | Shared `fuzzyScore` / `fuzzyMatchIndices` for CommandPalette + SearchModal |
 | `src/lib/markdownHighlight.ts` | Lazy-loaded rehype-highlight + core language subset (dynamic import from `MarkdownBody`) |
 | `src/stores/appStore.ts` | Composes Zustand slices; public `useAppStore` API |
@@ -190,7 +191,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/stores/layoutConstants.ts` | Sidebar / right-panel / chat width clamps |
 | `src/hooks/useUpdaterCheck.ts` | Post-bootstrap update toast |
 | `src/hooks/useSessions.ts` | Session CRUD |
-| `src/hooks/useSessionSidebarGroups.ts` | Pin/archive/repo grouping + stable order for SessionSidebar |
+| `src/hooks/useSessionSidebarGroups.ts` | Pin/archive/repo grouping + sort/visibility prefs + stable order for SessionSidebar |
 | `src/hooks/useSessionEvents.ts` | Active-session replay + timeline rows (thin over `lib/timeline`) |
 | `src/hooks/useLatestVerdict.ts` | Narrow per-session latest Verify verdict (Plan tab) |
 | `src/hooks/useIsGitRepo.ts` | Shared `git-is-repo` TanStack query (ContextBar / FilesChangedCard / ChangesTab) |
