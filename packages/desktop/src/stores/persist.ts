@@ -43,6 +43,10 @@ export type UiPersisted = {
   browserLastUrl?: string
   pinnedSessionIds?: string[]
   archivedSessionIds?: string[]
+  /** Session-sidebar repository sort (`recency` | `alpha`). */
+  sidebarProjectSort?: import("../lib/sessionGrouping").SidebarProjectSort
+  /** Session-sidebar repository visibility (`active` | `all`). */
+  sidebarProjectVisibility?: import("../lib/sessionGrouping").SidebarProjectVisibility
   /** Center-pane open chat tabs (session ids), open-order left→right. */
   openChatSessionIds?: string[]
   /** Plan-tab annotations + last-opened plan id, keyed by session id. */

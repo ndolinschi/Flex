@@ -1,3 +1,4 @@
+import { useCallback } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   cancel,
@@ -96,62 +97,76 @@ export const useSessions = () => {
     // the error; the row stays exactly as it was so the user can retry.
   })
 
-  const handleCreate = async (
-    input: CreateSessionInput = {},
-  ): Promise<SessionMeta> => {
-    try {
-      return await createMutation.mutateAsync(input)
-    } catch (err) {
-      throw new Error(toInvokeError(err))
-    }
-  }
+  const createAsync = createMutation.mutateAsync
+  const renameAsync = renameMutation.mutateAsync
+  const deleteAsync = deleteMutation.mutateAsync
+
+  const handleCreate = useCallback(
+    async (input: CreateSessionInput = {}): Promise<SessionMeta> => {
+      try {
+        return await createAsync(input)
+      } catch (err) {
+        throw new Error(toInvokeError(err))
+      }
+    },
+    [createAsync],
+  )
 
   /**
    * New Agent: reuse an empty "New Agent" draft for the same
    * project instead of spawning another UUID-titled row.
    */
-  const handleNewAgent = async (
-    explicitCwd?: string,
-  ): Promise<SessionMeta> => {
-    const state = useAppStore.getState()
-    const sessions = query.data ?? []
-    const cwd = resolveCreateCwd(
-      sessions,
-      state.activeSessionId,
-      state.recentCwds,
-      explicitCwd,
-    )
-    const draft = findDraftSession(sessions, cwd)
-    if (draft) {
-      try {
-        await resumeSession(draft.id)
-      } catch {
-        // Still select locally if resume fails (session already warm).
+  const handleNewAgent = useCallback(
+    async (explicitCwd?: string): Promise<SessionMeta> => {
+      const state = useAppStore.getState()
+      const sessions = query.data ?? []
+      const cwd = resolveCreateCwd(
+        sessions,
+        state.activeSessionId,
+        state.recentCwds,
+        explicitCwd,
+      )
+      const draft = findDraftSession(sessions, cwd)
+      if (draft) {
+        try {
+          await resumeSession(draft.id)
+        } catch {
+          // Still select locally if resume fails (session already warm).
+        }
+        setActiveSessionId(draft.id, { panel: "closed" })
+        setRoute("chat")
+        return draft
       }
-      setActiveSessionId(draft.id, { panel: "closed" })
-      setRoute("chat")
-      return draft
-    }
-    return handleCreate(
-      newAgentCreateInput(cwd, state.selectedModelId, state.selectedIsolation),
-    )
-  }
+      return handleCreate(
+        newAgentCreateInput(cwd, state.selectedModelId, state.selectedIsolation),
+      )
+    },
+    [handleCreate, query.data, setActiveSessionId, setRoute],
+  )
 
-  const handleRename = async (id: string, title: string) => {
-    try {
-      await renameMutation.mutateAsync({ id, title })
-    } catch (err) {
-      throw new Error(toInvokeError(err))
-    }
-  }
+  // Stable identities so SessionListItem's memo survives status-poll parent
+  // re-renders (git/workspace tick must not rebuild every row).
+  const handleRename = useCallback(
+    async (id: string, title: string) => {
+      try {
+        await renameAsync({ id, title })
+      } catch (err) {
+        throw new Error(toInvokeError(err))
+      }
+    },
+    [renameAsync],
+  )
 
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteMutation.mutateAsync(id)
-    } catch (err) {
-      throw new Error(toInvokeError(err))
-    }
-  }
+  const handleDelete = useCallback(
+    async (id: string) => {
+      try {
+        await deleteAsync(id)
+      } catch (err) {
+        throw new Error(toInvokeError(err))
+      }
+    },
+    [deleteAsync],
+  )
 
   return {
     sessions: query.data ?? [],

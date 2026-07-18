@@ -3,7 +3,10 @@ import {
   groupByRepo,
   orderByPinnedIds,
   orderStably,
+  projectCwd,
   type RepoGroup,
+  type SidebarProjectSort,
+  type SidebarProjectVisibility,
 } from "../lib/sessionGrouping"
 import type { SessionMeta } from "../lib/types"
 
@@ -13,14 +16,29 @@ export type SessionSidebarGroups = {
   repoGroups: RepoGroup[]
 }
 
+export type SessionSidebarGroupOptions = {
+  sort?: SidebarProjectSort
+  visibility?: SidebarProjectVisibility
+  /** Active session — its project stays visible under the Active filter. */
+  activeSession?: SessionMeta | null
+}
+
 /** Pin / archive / repo grouping for the session sidebar, with stable
- * repo-group and row order (bug #36 — recency reshuffles must not move
- * rows under the cursor mid-hover). */
+ * repo-group and row order under recency sort (bug #36 — recency reshuffles
+ * must not move rows under the cursor mid-hover). Alphabetical sort skips
+ * the freeze so an intentional A–Z order always wins. */
 export const useSessionSidebarGroups = (
   sessions: SessionMeta[],
   pinnedSessionIds: readonly string[],
   archivedSessionIds: readonly string[],
+  options: SessionSidebarGroupOptions = {},
 ): SessionSidebarGroups => {
+  const sort = options.sort ?? "recency"
+  const visibility = options.visibility ?? "all"
+  const keepCwd = options.activeSession
+    ? projectCwd(options.activeSession)
+    : null
+
   const pinnedIdSet = useMemo(() => new Set(pinnedSessionIds), [pinnedSessionIds])
   const archivedIdSet = useMemo(
     () => new Set(archivedSessionIds),
@@ -45,18 +63,48 @@ export const useSessionSidebarGroups = (
     [sessions, pinnedIdSet, archivedIdSet],
   )
 
-  const recencyGroups = useMemo(() => groupByRepo(groupableSessions), [groupableSessions])
+  const sortedGroups = useMemo(
+    () =>
+      groupByRepo(groupableSessions, {
+        sort,
+        visibility,
+        keepCwd,
+      }),
+    [groupableSessions, sort, visibility, keepCwd],
+  )
 
-  // Freeze repo-group and row order once shown (bug #36): `groupByRepo`
-  // resorts groups and rows by recency on every call. Each ref remembers
-  // the last-rendered key order; `orderStably` keeps existing groups/rows
-  // in that order and only inserts genuinely new ones at the front.
+  // Freeze repo-group and row order once shown under recency (bug #36).
+  // Alphabetical sort is name-stable already — applying the freeze would
+  // pin a stale order after the user switches sort mode. Visibility changes
+  // must also clear the freeze: otherwise groups reappearing under "All"
+  // look "fresh" and jump to the front of the list.
   const groupOrderRef = useRef<string[]>([])
   const rowOrderByGroupRef = useRef<Map<string, string[]>>(new Map())
+  const lastPrefsRef = useRef(`${sort}:${visibility}`)
 
   const repoGroups = useMemo(() => {
+    const prefsKey = `${sort}:${visibility}`
+    if (lastPrefsRef.current !== prefsKey) {
+      groupOrderRef.current = []
+      rowOrderByGroupRef.current = new Map()
+      lastPrefsRef.current = prefsKey
+    }
+
+    if (sort === "alpha") {
+      groupOrderRef.current = sortedGroups.map((g) => g.cwd)
+      const nextRowOrders = new Map<string, string[]>()
+      for (const group of sortedGroups) {
+        nextRowOrders.set(
+          group.cwd,
+          group.sessions.map((s) => s.id),
+        )
+      }
+      rowOrderByGroupRef.current = nextRowOrders
+      return sortedGroups
+    }
+
     const stableGroups = orderStably(
-      recencyGroups,
+      sortedGroups,
       (g) => g.cwd,
       groupOrderRef.current,
     )
@@ -75,7 +123,7 @@ export const useSessionSidebarGroups = (
     })
     rowOrderByGroupRef.current = nextRowOrders
     return ordered
-  }, [recencyGroups])
+  }, [sortedGroups, sort, visibility])
 
   return { pinnedSessions, archivedSessions, repoGroups }
 }

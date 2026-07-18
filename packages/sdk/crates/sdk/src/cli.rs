@@ -181,8 +181,8 @@ fn take_value(args: &[String], index: &mut usize, flag: &str) -> anyhow::Result<
 
 pub(crate) fn usage() -> String {
     format!(
-        "usage:\n  {slug} --version\n  {slug} doctor\n  {slug} run [--agent native|claude-code|copilot|opencode|cursor|acp] \
-         [--agent-cmd <program>] \
+        "usage:\n  {slug} --version\n  {slug} doctor\n  {slug} run [--agent native|claude-code|copilot|opencode|cursor|grok|acp] \
+         [--agent-cmd <program [args…]>] \
          [--provider anthropic|openai|gemini|ollama|copilot|chatgpt] [--model <model>] \
          [--fallback-model <model>]... [--plugin <id>]... -p <prompt> \
          [--workdir <path>] [--output-format ndjson]\n  {slug} eval [--task <id>]... \

@@ -19,7 +19,7 @@ use agentloop_provider_openai::{oauth_account_id, resolve_oauth_access_token};
 
 use crate::config::{CHATGPT_PROVIDER_ID, CODEX_ORIGINATOR, ChatgptConfig};
 use crate::models::static_models;
-use crate::wire::{CodexStreamMapper, build_request};
+use crate::wire::{BuiltCodexRequest, CodexStreamMapper, build_request};
 
 const MAX_ATTEMPTS: u32 = 3;
 const BASE_BACKOFF_MS: u64 = 500;
@@ -63,7 +63,13 @@ impl ChatgptProvider {
         }
     }
 
-    fn auth_request(&self, method: Method, url: &str, token: &str) -> reqwest::RequestBuilder {
+    fn auth_request(
+        &self,
+        method: Method,
+        url: &str,
+        token: &str,
+        lite_session_id: Option<&str>,
+    ) -> reqwest::RequestBuilder {
         let mut request = self
             .client
             .request(method, url)
@@ -77,6 +83,14 @@ impl ChatgptProvider {
             request = request
                 .header("ChatGPT-Account-Id", &account)
                 .header("chatgpt-account-id", &account);
+        }
+        if let Some(session_id) = lite_session_id {
+            // Responses Lite (GPT-5.6 family): without this header the backend
+            // 404s with "Model not found" even when the id is valid.
+            request = request
+                .header("x-openai-internal-codex-responses-lite", "true")
+                .header("session-id", session_id)
+                .header("x-session-affinity", session_id);
         }
         request
     }
@@ -116,13 +130,13 @@ impl Provider for ChatgptProvider {
         }
 
         let model = request.model.clone();
-        let body = build_request(request);
+        let built = build_request(request);
 
         let mut attempt: u32 = 0;
         let response = loop {
             attempt += 1;
             match self
-                .send_responses_request(&provider, &model, &body, &cancel)
+                .send_responses_request(&provider, &model, &built, &cancel)
                 .await
             {
                 Ok(response) => break response,
@@ -184,13 +198,18 @@ impl ChatgptProvider {
         &self,
         provider: &ProviderId,
         model: &str,
-        body: &(impl serde::Serialize + Sync),
+        built: &BuiltCodexRequest,
         cancel: &CancellationToken,
     ) -> Result<Response, AttemptError> {
         let token = self.resolve_token().await.map_err(AttemptError::Terminal)?;
         let request = self
-            .auth_request(Method::POST, &self.config.endpoint, &token)
-            .json(body);
+            .auth_request(
+                Method::POST,
+                &self.config.endpoint,
+                &token,
+                built.lite_session_id.as_deref(),
+            )
+            .json(&built.body);
         let response = tokio::select! {
             _ = cancel.cancelled() => {
                 return Err(AttemptError::Terminal(ProviderError::Cancelled {

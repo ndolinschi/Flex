@@ -6,6 +6,10 @@ Native providers only (no external-agent delegators), but with MCP servers,
 engine plugins (Search / Learning / Verifier), and a multi-tier orchestration
 mode wired in.
 
+**Positioning:** agents-first supervision UI for the harness — not a Cursor /
+VS Code replacement. Expect chat + review + terminal/browser panes; do not
+expect LSP, debugger, extension marketplace, or editor-first workflows.
+
 ## Prerequisites
 
 - Rust toolchain (see repo root)

@@ -118,7 +118,7 @@ Extras: `openai/src/compat.rs` (OpenAI-compatible endpoints) and `oauth.rs`;
 ### common (`agentloop-provider-common`) — `crates/common/src/`
 Shared client plumbing: `http.rs`, `sse.rs`, `env.rs`.
 
-### delegators — `crates/delegators/{common,acp,claude-code,copilot,cursor,opencode}/src/`
+### delegators — `crates/delegators/{common,acp,claude-code,copilot,cursor,grok,opencode}/src/`
 External-agent `Agent` impls (connectors). `common`: `line_agent.rs`, `stream_host.rs`,
 `tokio_host.rs` (subprocess scaffolding). Each connector: `mapper.rs` (`EventMapper` →
 `AgentEvent`; unit tests embed raw captured CLI stdout fixtures — see

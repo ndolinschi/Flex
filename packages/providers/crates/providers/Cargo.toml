@@ -24,6 +24,7 @@ agentloop-delegator-acp = { workspace = true }
 agentloop-delegator-claude-code = { workspace = true }
 agentloop-delegator-copilot = { workspace = true }
 agentloop-delegator-cursor = { workspace = true }
+agentloop-delegator-grok = { workspace = true }
 agentloop-delegator-opencode = { workspace = true }
 tracing = { workspace = true }
 

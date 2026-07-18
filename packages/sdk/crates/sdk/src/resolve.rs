@@ -23,6 +23,7 @@ use agentloop_providers::delegator_copilot::{
 use agentloop_providers::delegator_cursor::{
     CursorCliConfig, cursor_agent, ephemeral_cursor_agent,
 };
+use agentloop_providers::delegator_grok::{GrokConfig, ephemeral_grok_agent, grok_agent};
 use agentloop_providers::delegator_opencode::{
     OpencodeConfig, ephemeral_opencode_agent, opencode_agent,
 };
@@ -79,6 +80,11 @@ pub(crate) async fn resolve_service(
             let service = cursor_service(workdir, &mut trace).await?;
             return Ok(Resolution { service, trace });
         }
+        Some("grok") => {
+            trace.push("explicit --agent grok".to_owned());
+            let service = grok_service(workdir, &mut trace).await?;
+            return Ok(Resolution { service, trace });
+        }
         Some("native") | None if provider.is_some() => {
             trace.push(format!(
                 "explicit --provider {}",
@@ -96,7 +102,7 @@ pub(crate) async fn resolve_service(
         }
         Some(other) => bail!(
             "unknown agent `{other}`; available: native, claude-code, copilot, opencode, \
-             cursor, acp"
+             cursor, grok, acp"
         ),
         None => {}
     }
@@ -118,7 +124,10 @@ pub(crate) async fn resolve_service(
             if let Ok(service) = opencode_service(workdir, &mut trace).await {
                 return Ok(Resolution { service, trace });
             }
-            match cursor_service(workdir, &mut trace).await {
+            if let Ok(service) = cursor_service(workdir, &mut trace).await {
+                return Ok(Resolution { service, trace });
+            }
+            match grok_service(workdir, &mut trace).await {
                 Ok(service) => Ok(Resolution { service, trace }),
                 Err(delegator_err) => bail!(
                     "no way to run: {err}\n\
@@ -246,16 +255,89 @@ async fn acp_service(
     workdir: Option<&Path>,
     trace: &mut Vec<String>,
 ) -> anyhow::Result<EngineService> {
+    let (program, args) = split_agent_cmd(program);
+    let mut env = std::collections::BTreeMap::new();
+    // Forward common API-key auth into the ACP child (inherits parent env too;
+    // explicit map makes doctor/trace intent clear for headless CI).
+    for key in [
+        "XAI_API_KEY",
+        "CURSOR_API_KEY",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+    ] {
+        if let Ok(value) = std::env::var(key) {
+            if !value.trim().is_empty() {
+                env.insert(key.to_owned(), value);
+            }
+        }
+    }
     let config = AcpLaunchConfig {
-        program: program.to_owned(),
-        args: Vec::new(),
-        env: Default::default(),
+        program: program.clone(),
+        args: args.clone(),
+        env,
         cwd: workdir.map(|p| p.to_path_buf()),
     };
     let store = Arc::new(MemoryStore::new());
     let agent = Arc::new(acp_agent(config, store.clone()));
-    trace.push(format!("launching ACP agent `{program}` (explicit only)"));
+    if args.is_empty() {
+        trace.push(format!("launching ACP agent `{program}` (explicit only)"));
+    } else {
+        trace.push(format!(
+            "launching ACP agent `{program} {}` (explicit only)",
+            args.join(" ")
+        ));
+    }
     Ok(EngineService::new(agent, store))
+}
+
+/// Split `--agent-cmd` into program + args on whitespace.
+/// Example: `"grok agent stdio"` → (`grok`, [`agent`, `stdio`]).
+fn split_agent_cmd(raw: &str) -> (String, Vec<String>) {
+    let mut parts = raw.split_whitespace().map(str::to_owned);
+    let program = parts.next().unwrap_or_default();
+    (program, parts.collect())
+}
+
+/// Grok Build via headless streaming-json (`grok -p --output-format streaming-json`).
+/// ACP remains available as `--agent acp --agent-cmd "grok agent stdio"`.
+async fn grok_service(
+    workdir: Option<&Path>,
+    trace: &mut Vec<String>,
+) -> anyhow::Result<EngineService> {
+    let mut config = GrokConfig {
+        cwd: workdir.map(|p| p.to_path_buf()),
+        ..GrokConfig::default()
+    };
+    if let Ok(api_key) = std::env::var("XAI_API_KEY") {
+        let trimmed = api_key.trim();
+        if !trimmed.is_empty() {
+            config = config.with_api_key(trimmed);
+            trace.push("XAI_API_KEY set — forwarding into grok".to_owned());
+        }
+    }
+    let store = Arc::new(MemoryStore::new());
+    let agent = Arc::new(grok_agent(config, store.clone()));
+    match agent.probe(CancellationToken::new()).await {
+        Ok(DelegatorProbeStatus::Installed { version }) => {
+            trace.push(format!(
+                "probed `grok`: installed ({})",
+                version.as_deref().unwrap_or("version unknown")
+            ));
+            trace.push("selected delegator grok (streaming-json)".to_owned());
+            Ok(EngineService::new(agent, store))
+        }
+        Ok(DelegatorProbeStatus::NotInstalled { hint }) => {
+            trace.push("probed `grok`: not installed".to_owned());
+            bail!(
+                "grok is not available: install Grok Build (https://x.ai/cli), run \
+                 `grok login` or set XAI_API_KEY; {hint}"
+            )
+        }
+        Err(err) => {
+            trace.push(format!("probed `grok`: failed ({err})"));
+            bail!("failed to probe grok: {err}")
+        }
+    }
 }
 
 async fn opencode_service(
@@ -292,10 +374,20 @@ async fn cursor_service(
     workdir: Option<&Path>,
     trace: &mut Vec<String>,
 ) -> anyhow::Result<EngineService> {
-    let config = CursorCliConfig {
+    let mut config = CursorCliConfig {
         cwd: workdir.map(|p| p.to_path_buf()),
         ..CursorCliConfig::default()
     };
+    // Cursor headless auth: Dashboard API key via CURSOR_API_KEY (or --api-key).
+    // Inherit already works; we also inject into the process spec env map and
+    // surface it in the resolution trace so doctor/logs explain the path.
+    if let Ok(api_key) = std::env::var("CURSOR_API_KEY") {
+        let trimmed = api_key.trim();
+        if !trimmed.is_empty() {
+            config = config.with_api_key(trimmed);
+            trace.push("CURSOR_API_KEY set — forwarding into cursor-agent".to_owned());
+        }
+    }
     let store = Arc::new(MemoryStore::new());
     let agent = Arc::new(cursor_agent(config, store.clone()));
     match agent.probe(CancellationToken::new()).await {
@@ -309,7 +401,10 @@ async fn cursor_service(
         }
         Ok(DelegatorProbeStatus::NotInstalled { hint }) => {
             trace.push("probed `cursor-agent`: not installed".to_owned());
-            bail!("cursor is not available: {hint}")
+            bail!(
+                "cursor is not available: {hint} (install cursor-agent, or set CURSOR_API_KEY \
+                 from Cursor Dashboard → API Keys)"
+            )
         }
         Err(err) => {
             trace.push(format!("probed `cursor-agent`: failed ({err})"));
@@ -372,6 +467,8 @@ pub(crate) async fn doctor(workdir: &Path) -> anyhow::Result<()> {
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
         "GEMINI_API_KEY",
+        "XAI_API_KEY",
+        "CURSOR_API_KEY",
         "OLLAMA_HOST",
         "OLLAMA_MODEL",
     ] {
@@ -448,6 +545,19 @@ pub(crate) async fn doctor(workdir: &Path) -> anyhow::Result<()> {
         }
         Err(err) => println!("  cursor: probe failed ({err})"),
     }
+    let grok = ephemeral_grok_agent(GrokConfig::default());
+    match grok.probe(CancellationToken::new()).await {
+        Ok(DelegatorProbeStatus::Installed { version }) => {
+            println!(
+                "  grok: installed ({})",
+                version.as_deref().unwrap_or("version unknown")
+            );
+        }
+        Ok(DelegatorProbeStatus::NotInstalled { hint }) => {
+            println!("  grok: not installed ({hint})");
+        }
+        Err(err) => println!("  grok: probe failed ({err})"),
+    }
 
     println!("execution backends:");
     {
@@ -518,5 +628,19 @@ mod tests {
         // We don't know what auto-detect will pick, so err on the side of
         // registering every available provider.
         assert!(crosses_provider(None, "openai/gpt-5"));
+    }
+
+    #[test]
+    fn split_agent_cmd_splits_program_and_args() {
+        let (program, args) = split_agent_cmd("grok agent stdio");
+        assert_eq!(program, "grok");
+        assert_eq!(args, vec!["agent", "stdio"]);
+    }
+
+    #[test]
+    fn split_agent_cmd_bare_program() {
+        let (program, args) = split_agent_cmd("my-agent");
+        assert_eq!(program, "my-agent");
+        assert!(args.is_empty());
     }
 }

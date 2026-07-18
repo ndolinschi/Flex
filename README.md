@@ -1,6 +1,11 @@
 # Flex
 
 > **Pre-alpha.** APIs, wire formats, and the project name itself are still moving.
+>
+> **Not a Cursor / VS Code replacement.** Flex is an open-source **agent-loop
+> harness and control plane** — compose providers and external agents, run them
+> headlessly or supervise them in a thin desktop shell. Keep your editor; Flex
+> is the runtime around the model, not a full coding IDE.
 
 An open-source **agent-loop engine** in Rust, split into composable packages:
 a provider-agnostic native engine, a providers umbrella (LLM clients +
@@ -15,6 +20,8 @@ it's what powers them.
   DeepSeek). Delegator implementations drive external coding agents — Claude
   Code, ACP agents (Gemini CLI, Goose), opencode, Copilot — behind the
   exact same interface. Any of them can run as a subagent of any other.
+  Connectors today: Claude Code, Copilot CLI, opencode, Cursor Agent, Grok Build,
+  and ACP (`--agent acp --agent-cmd …`).
 - **One stream format.** Every provider and external agent's output is
   normalized into a single typed, markdown-flavored event stream (text,
   thinking, tool calls, tool results). Consumers render one format, always.
@@ -73,7 +80,7 @@ it's what powers them.
 │   │       ├── bedrock/       # AWS Bedrock client
 │   │       ├── copilot/       # GitHub Copilot device-flow auth + API client
 │   │       └── delegators/    # external-agent connectors (acp, claude-code, copilot,
-│   │                          #   opencode) + shared common
+│   │                          #   cursor, grok, opencode) + shared common
 │   ├── search/                # cargo workspace — deep-search plugin
 │   │   └── crates/search/     # SearchPlugin: search_web + scrape_page + researcher role
 │   └── sdk/                   # cargo workspace — builder API + headless runner
@@ -124,8 +131,10 @@ flex run --provider deepseek -p "..." --key sk-...
 
 `packages/desktop` is a native desktop app (Tauri 2 + React) — a second
 composition root over `AgentBuilder`, alongside the `flex` CLI. It's an
-agents-first chat UI, not an IDE:
+**agents-first supervision UI**, not an IDE and not a Cursor clone:
 
+- Native LLM providers only in-app (external-agent connectors are a `flex`
+  CLI / headless concern today).
 - Multi-provider sessions with named connection profiles (default + fallback
   models), including AWS Bedrock bearer auth, and a cross-provider tier
   orchestration mode.
@@ -134,7 +143,8 @@ agents-first chat UI, not an IDE:
 - A chat feed that stacks tool calls into clusters, streams thinking, and folds
   finished turns into a summary with duration, tokens, and cost.
 - On-demand closable preview tabs: embedded browser, a real PTY terminal, a
-  read-only agent terminal, changes with per-file diffs, and files.
+  read-only agent terminal, changes with per-file diffs, and a Monaco files
+  pane (file open/edit — not LSP / debugger / extension marketplace).
 - Plan mode with approval, a live subagent viewer, per-project and global
   memory, MCP servers, a per-model effort picker, a step-by-step question
   wizard, background bash, and retry-on-network-loss.
@@ -151,7 +161,10 @@ pnpm tauri dev
 ```
 
 See [packages/desktop/README.md](packages/desktop/README.md) for prerequisites,
-provider setup, and keyboard shortcuts.
+provider setup, and keyboard shortcuts. Before installing at all, confirm you
+want a harness/control plane (not a full IDE), have Rust/Node/`pnpm` for
+desktop, and at least one usable provider key or external agent CLI — then run
+`flex doctor`.
 
 ## SDK — embed in your own Rust project
 
