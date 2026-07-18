@@ -6,7 +6,8 @@ use agentloop_provider_openai::oauth_tokens_discoverable;
 
 pub const CHATGPT_PROVIDER_ID: &str = "chatgpt";
 pub const CODEX_RESPONSES_URL: &str = "https://chatgpt.com/backend-api/codex/responses";
-pub const DEFAULT_CHATGPT_MODEL: &str = "gpt-5.4";
+/// Balanced GPT-5.6 tier — strong default for Plus/Pro subscription OAuth.
+pub const DEFAULT_CHATGPT_MODEL: &str = "gpt-5.6-terra";
 
 /// Codex CLI originator the ChatGPT backend expects for CLI-shaped clients.
 pub(crate) const CODEX_ORIGINATOR: &str = "codex_cli_rs";
