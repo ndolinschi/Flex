@@ -282,20 +282,26 @@ FilesChangedCard) sits **outside** the virtual window. Scroll-down FAB:
 ### RightPanel
 
 1. **TabStrip** — `px-2.5 gap-1.5`, tabs `h-6`
-2. Tab chrome rows — same `px-2.5` / 30px height
+2. Tab chrome rows — same `px-2.5` / 30px height; **omit `border-b`** on
+   the first tool subheader under TabStrip (TabStrip already owns the strip
+   border — stacking a second `border-b` with only the hairline between reads
+   as a double rule). `PlanList` is the reference. Keep `border-b` on
+   *secondary* chrome that separates body regions (file/component chip strips,
+   Changes select toolbar, Terminal agent subtitle, BrowserToolbar over the
+   webview, error/status banners, PlanToolbar find bar).
 3. Body — `relative flex-1` + absolute tab hosts
 4. Terminal / Database / Components — optional **180px** left list (`px-2.5 py-1.5 text-xs` rows)
 
 | Tab | Header notes |
 |---|---|
-| Plan | `PlanToolbar` breadcrumbs + Build (`h-6` controls) |
-| Changes | Quiet title row; select toolbar `h-7` (dedicated row, not `--header-height`); file list `px-2` / rows `px-2.5` |
+| Plan | `PlanToolbar` breadcrumbs + Build (`h-6` controls); find bar is a secondary `h-8` row with `border-y` |
+| Changes | Quiet title row (no `border-b`); select toolbar `h-6` (dedicated row, not `--header-height`); file list `px-2` / rows `px-2.5` |
 | Pull Request | Title / # / state / checks; Open in browser; DiffView of `gh pr diff` (tab only when branch has a PR) |
-| Files | Open-buffer chips (`Tab` sm) + Monaco / explorer |
-| Terminal | Title + New / List; agent subtitle separate bordered row |
-| Components | Count + List/Refresh; Files-style open chips; bottom mini-prompt + Send |
-| Browser | Toolbar `z-20` over webview slot |
-| Database | Connection count chrome; schema chips `py-1.5` |
+| Files | Open-buffer chips (`Tab` sm, strip `gap-1.5` + `border-b`) + Monaco / explorer (explorer header borderless under chips/TabStrip) |
+| Terminal | Title row borderless under TabStrip; New / List; agent subtitle separate bordered row |
+| Components | Count + List/Refresh (borderless under TabStrip); Files-style open chips with `gap-1.5` + `border-b`; bottom mini-prompt + Send |
+| Browser | Toolbar `z-20` over webview slot — **keeps** `border-b` (separates chrome from native webview) |
+| Database | Connection count chrome (borderless under TabStrip when present); schema chips `py-1.5` |
 
 ### Settings
 
@@ -367,6 +373,17 @@ Tailwind `p-*` / `gap-*` map through `@theme` in `src/index.css`.
 | Timeline gaps via **padding** | Margin between virtualized rows |
 | Keep Chat mounted under settings overlays | Remount ContentWorkspace on settings round-trips |
 | Update this file when gutters change | Leave docs stale after a spacing PR |
+| Tool subheaders title the body (no `border-b`) | TabStrip `border-b` + immediate tool header `border-b` |
+
+### Intentional exceptions (not on the 4px spacing scale)
+
+| Item | Why |
+|---|---|
+| Content pane / composer `px-2.5` (10px) | Documented gutter on the 4px grid (`--space-2` + half) |
+| Settings title `text-[17px]` / Chat empty hero `text-[28px]` / Plan `text-[22px]` | Display sizes between token steps; keep until a display scale is added |
+| Status / Database / Components micro-captions `text-[10px]`–`text-[11px]` | Capitals under `text-xs` (11px); section labels stay tighter |
+| Window traffic-light cluster `gap-[6px]` | Platform chrome alignment (macOS spacing), not app gutter |
+| SessionMenu error toast `mt-10` | Clears the title-bar control hit target |
 
 **Agent skill:** `.claude/skills/design-audit/SKILL.md` — run that procedure for spacing / layout audits.
 

@@ -298,7 +298,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
           Empty state owns the Add CTA; chrome only appears once there are
           connections (count + refresh/add), so stacked headers stay balanced. */}
       {connections.length > 0 ? (
-        <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5">
+        <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 px-2.5">
           <span className="min-w-0 flex-1 truncate text-sm text-ink-muted">
             {connectionCountLabel}
           </span>

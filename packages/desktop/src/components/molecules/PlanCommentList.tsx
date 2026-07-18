@@ -35,7 +35,7 @@ export const PlanCommentList = ({
               key={comment.id}
               className={cn(
                 "group flex items-start gap-2 border-b border-stroke-4 py-2 last:border-0",
-                active && "bg-fill-3",
+                active && "bg-fill-2",
               )}
             >
               <button
