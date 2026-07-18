@@ -10,7 +10,8 @@ Tokens live in `src/styles/tokens.css`. Width clamps live in
 whisper fills — never inflate gutters without updating this doc.
 
 Agents: use the **design-audit** skill (`.claude/skills/design-audit`) to
-audit and fix UI against this file.
+audit and fix UI against this file. For shadcn adds/rewrites, also load the
+**shadcn** skill and follow the migration map in [COMPONENTS.md](./COMPONENTS.md).
 
 ---
 
@@ -26,6 +27,23 @@ audit and fix UI against this file.
 | Radius by role | Controls `rounded-md` (8); composer/bubbles 14; settings cards 12; pills full |
 | Keyboard focus | Neutral `stroke-2` ring; no accent glow |
 | Semibold = 590 | Plus micro tracking on captions |
+
+### shadcn token bridge (when `components.json` lands)
+
+Phase 0 of the migration maps shadcn semantic variables onto these Flex tokens
+— Flex wins on conflict. Typical aliases (illustrative):
+
+| shadcn semantic | Flex source |
+|---|---|
+| `--background` / `--card` / `--popover` | `--color-chrome` / `--color-elevated` / `--color-panel` |
+| `--foreground` / `--muted-foreground` | `--color-text-1` / `--color-text-2` |
+| `--border` / `--input` / `--ring` | `--color-stroke-3` / `--color-stroke-2` (ring stays neutral — never accent glow) |
+| `--primary` / `--primary-foreground` | `--color-accent` / `--color-accent-text` |
+| `--destructive` | `--color-danger` |
+| `--radius` | keep role radii (`--radius-*`); controls stay `rounded-md` (8) |
+
+Do not introduce a second theme system. Keep `data-theme="dark"|"light"` and
+Settings → Appearance accent overrides as the only runtime theme knobs.
 
 ---
 
