@@ -126,6 +126,7 @@ export const useComposerAutocomplete = ({
     enabled: debouncedAtQuery !== null && !atDismissed,
     staleTime: 10_000,
     placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
   })
 
   const atHits: AtMentionHit[] = useMemo(() => {

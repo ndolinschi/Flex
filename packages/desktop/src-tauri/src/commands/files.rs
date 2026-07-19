@@ -106,8 +106,7 @@ pub async fn list_files(
 
     // Fast path: reuse a fresh warm walk without leaving the async worker.
     // Clone under the lock, score after — never hold SyncMutex across the
-    // sort (sync `invalidate_workspace_path_cache` needs the same lock and
-    // would stall the UI thread if it blocked here).
+    // sort (concurrent invalidate needs the same lock).
     let cached_entries = {
         let cache = state
             .workspace_path_cache

@@ -2,15 +2,16 @@ import type { QueryClient } from "@tanstack/react-query"
 import { invalidateWorkspacePathCache } from "./tauri"
 
 /** Coalesce Rust path-cache clears across a burst of FS-mutating tool results
- * so Attach / `@` do not cold-walk on every Write in a turn. */
+ * so Attach / `@` do not cold-walk on every Write in a turn. Always a full
+ * clear — turn-settle invalidation is not workspace-scoped. */
 const PATH_CACHE_DEBOUNCE_MS = 300
 let pathCacheTimer: ReturnType<typeof setTimeout> | null = null
 
-const schedulePathCacheInvalidate = (cwd?: string): void => {
+const schedulePathCacheInvalidate = (): void => {
   if (pathCacheTimer) clearTimeout(pathCacheTimer)
   pathCacheTimer = setTimeout(() => {
     pathCacheTimer = null
-    void invalidateWorkspacePathCache(cwd)
+    void invalidateWorkspacePathCache()
   }, PATH_CACHE_DEBOUNCE_MS)
 }
 
