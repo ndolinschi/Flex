@@ -92,8 +92,8 @@ pub struct SessionBaseline {
     /// Dirty paths (from `git status --porcelain`) at capture time, mapped
     /// to a `git hash-object` content hash. Deleted paths are recorded with
     /// the sentinel `"deleted"`, and pre-existing untracked directories with
-    /// the sentinel `"dir"` (see `capture_session_baseline` in `commands.rs`
-    /// for why the "dir" sentinel matters).
+    /// the sentinel `"dir"` (see `capture_session_baseline` in
+    /// `commands/git.rs` for why the "dir" sentinel matters).
     pub files: HashMap<String, String>,
 }
 
