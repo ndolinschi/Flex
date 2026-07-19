@@ -272,7 +272,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Chart | skip | — | No dashboards |
 | Checkbox | yes | `Checkbox` atom | Restyle round + indeterminate |
 | Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader`, WorkGroup | |
-| Combobox | yes | `ModelPicker`, branch/project trays | Prefer over bespoke `PopoverTray` search |
+| Combobox | ✅ done | `ProjectPicker`, `BranchPicker` | `@/components/ui/combobox` — searchable + Open Folder (not plain Select) |
 | Command | yes | `CommandPalette`, `SearchModal`, `OpenTabModal` | Command-in-Dialog pattern |
 | Context Menu | ✅ done | `ContextMenu` molecule → `@/components/ui/context-menu` | Imperative position API; timeline-scroll / webview-blur ignore preserved |
 | Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
@@ -294,7 +294,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Menubar | yes | `TitleBarMenus` | Native-feeling File/Edit/View/Help |
 | Message | yes (chat kit) | timeline message rows | Compose with Bubble; keep actions |
 | Message Scroller | spike | `TurnTimeline` + `useStickToBottom` | **Do not swap blindly** — virtualizer is required at scale |
-| Native Select | yes | `ModelSelect` | Settings simple selects |
+| Native Select | skip | migrated to Select | — |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
 | Pagination | later | DatabaseTab paging | |
 | Popover | yes | `PopoverTray`, comment/plan popovers | Shared Esc/outside-click |
@@ -302,7 +302,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Radio Group | yes | `QuestionPrompt` choices | |
 | Resizable | yes | content split sash | `ContentWorkspace` dual pane |
 | Scroll Area | yes | `ScrollArea` atom | Sidebar / overlays; **not** the virtualized timeline |
-| Select | yes | model/settings selects | |
+| Select | ✅ done | Settings/forms + `IsolationPicker` + `ModePicker` | `@/components/ui/select`; ModelSelect still Combobox-candidate |
 | Separator | yes | `Divider` | |
 | Sheet | maybe | settings overlay | Today settings is absolute over kept-mounted chat — Sheet may fight that |
 | Sidebar | spike | `SessionSidebar` | High value, high risk — density + grouping + DnD later |
@@ -330,7 +330,7 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | **0 — Foundation** | ✅ `components.json` (`base-nova`), `@/` alias, `clsx`+`tailwind-merge` `cn`, shadcn semantic vars bridged to Flex tokens (`data-theme` only — no `.dark` second system) | `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
 | **1 — Atom adapters** | ✅ Button is `@/components/ui/button` (atoms re-export only); Spinner + Alert. `IconButton` removed. Remaining: Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Avatar, Tooltip, ScrollArea | Atom unit tests + vitest green |
 | **2 — Overlays & menus** | ✅ Dialog + AlertDialog + DropdownMenu + ContextMenu; remaining: Popover, Menubar, Sonner | Confirm/auth on AlertDialog; Search/Command on Dialog; right-click on ContextMenu |
-| **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | Settings forms, ModePicker, ModelPicker, CommandPalette/SearchModal |
+| **3 — Forms & pickers** | ✅ Select + Combobox; remaining: Field/FieldGroup, ToggleGroup, RadioGroup, Input Group, Command | Settings native selects → Select; Project/Branch → Combobox; Mode/Isolation → Select |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty; optional Sidebar/Sheet/Drawer spikes | Split sash + empty states; sidebar spike documented go/no-go |
 | **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Chip/bubble/marker parity; scroller decision recorded here |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
