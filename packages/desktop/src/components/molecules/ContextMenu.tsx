@@ -196,16 +196,21 @@ export const ContextMenu = ({ position, items, onClose }: ContextMenuProps) => {
               onClose()
             }}
             className={cn(
-              "h-auto w-full justify-start gap-2 rounded-sm px-2 py-1 font-normal text-sm",
+              // Icon + label flush start — shadcn menu-row density.
+              "h-8 w-full justify-start gap-1.5 rounded-md px-2 py-0 font-normal text-sm",
               item.danger
-                ? "text-red hover:text-red hover:bg-fill-4"
-                : "text-ink-secondary hover:bg-fill-4 hover:text-ink",
+                ? "text-destructive hover:bg-muted hover:text-destructive"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
             {Icon ? (
-              <Icon className="h-3.5 w-3.5 shrink-0 text-ink-muted" aria-hidden />
+              <Icon
+                data-icon="inline-start"
+                className="text-muted-foreground"
+                aria-hidden
+              />
             ) : null}
-            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            <span className="min-w-0 truncate text-left">{item.label}</span>
           </Button>
         )
       })}

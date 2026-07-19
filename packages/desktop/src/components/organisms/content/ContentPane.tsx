@@ -253,6 +253,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
         <div className="flex shrink-0 items-center gap-1">
           <IconButton
             label="Open tab"
+            size="icon-xs"
             onClick={(e: ReactMouseEvent<HTMLButtonElement>) => {
               const r = e.currentTarget.getBoundingClientRect()
               setOpenTabAnchor({
@@ -263,9 +264,8 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
               })
               setOpenTabModal(true)
             }}
-            className="h-6 w-6"
           >
-            <Plus className="h-3.5 w-3.5" aria-hidden />
+            <Plus aria-hidden />
           </IconButton>
           {split ? (
             <Tooltip label="Close pane">

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { GitMerge, XCircle } from "lucide-react"
-import { workspaceStatus } from "../../../lib/tauri"
+import { isSessionNotFoundError } from "../../../lib/sessions"
+import { toInvokeError, workspaceStatus } from "../../../lib/tauri"
 import { useWorkspaceActions } from "../../../hooks/useWorkspaceActions"
 import { cn } from "../../../lib/utils"
 import { PopoverItem } from "../../molecules/PopoverTray"
@@ -24,9 +25,18 @@ export const IsolationBadge = ({
 
   const { data: status, isLoading } = useQuery({
     queryKey: ["workspace-status", sessionId],
-    queryFn: () => workspaceStatus(sessionId),
+    queryFn: async () => {
+      try {
+        return await workspaceStatus(sessionId)
+      } catch (err) {
+        const message = toInvokeError(err)
+        if (isSessionNotFoundError(message)) return null
+        throw err
+      }
+    },
     enabled: open,
     staleTime: 2_000,
+    retry: false,
   })
 
   useEffect(() => {
