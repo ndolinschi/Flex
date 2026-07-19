@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
+import { Toggle } from "@/components/ui/toggle"
 import { TextInput } from "../atoms"
 import { ErrorBanner } from "../molecules"
 import { respondQuestion, toInvokeError } from "../../lib/tauri"
@@ -70,16 +71,16 @@ const StepBody = ({
         {q.options.map((opt) => {
           const active = draft.selected.includes(opt.label)
           return (
-            <Button
+            <Toggle
               key={opt.label}
               variant="outline"
-              aria-pressed={active}
-              onClick={() => handleToggle(opt.label)}
+              pressed={active}
+              onPressedChange={() => handleToggle(opt.label)}
               className={cn(
                 "h-auto w-full justify-start px-3 py-2 text-left text-sm leading-snug",
                 "transition-colors duration-[var(--duration-fast)]",
                 active
-                  ? "border-accent bg-accent-subtle text-ink hover:bg-accent-subtle"
+                  ? "border-accent bg-accent-subtle text-ink hover:bg-accent-subtle data-pressed:bg-accent-subtle data-pressed:text-ink"
                   : "border-stroke-3 bg-fill-5 text-ink-secondary hover:border-stroke-2 hover:bg-fill-4 hover:text-ink-secondary",
               )}
             >
@@ -91,7 +92,7 @@ const StepBody = ({
                   </span>
                 ) : null}
               </span>
-            </Button>
+            </Toggle>
           )
         })}
         {allowCustom ? (
