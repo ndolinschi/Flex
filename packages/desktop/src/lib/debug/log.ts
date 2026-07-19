@@ -302,8 +302,12 @@ export const initGlobalErrorLogging = (): void => {
     // observer simply deferred some callbacks to the next frame, not a real
     // error. During any layout churn it can fire many times per second;
     // recording it (and forwarding each entry to the Rust backend) floods the
-    // log and pegs the main thread, which looks like the UI freezing. Ignore.
-    if ((event.message || "").includes("ResizeObserver loop")) return
+    // log and pegs the main thread, which looks like the UI freezing. Ignore
+    // and preventDefault so DevTools / overlays don't treat it as a crash.
+    if ((event.message || "").includes("ResizeObserver loop")) {
+      event.preventDefault()
+      return
+    }
     record(event.message || "uncaught error", {
       filename: event.filename,
       lineno: event.lineno,

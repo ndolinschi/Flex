@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { FileIcon, ImageIcon, PlusIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,8 +23,10 @@ export const PlusMenu = ({
   onAttachImage,
   disabled = false,
 }: PlusMenuProps) => {
+  const [open, setOpen] = useState(false)
+
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
         disabled={disabled}
         render={
@@ -42,20 +45,22 @@ export const PlusMenu = ({
       >
         <PlusIcon />
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" className="w-56">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>Add agents, context, tools…</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={onAttachFile}>
-            <FileIcon />
-            Attach file
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onAttachImage}>
-            <ImageIcon />
-            Attach image
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
+      {open ? (
+        <DropdownMenuContent side="top" align="start" className="w-56">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Add agents, context, tools…</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onAttachFile}>
+              <FileIcon />
+              Attach file
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onAttachImage}>
+              <ImageIcon />
+              Attach image
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      ) : null}
     </DropdownMenu>
   )
 }

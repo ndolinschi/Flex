@@ -18,8 +18,18 @@ const itemHighlight =
 const itemHighlightDescendants =
   "data-highlighted:[&_svg:not([class*='text-'])]:text-ink focus:[&_svg:not([class*='text-'])]:text-ink"
 
-function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
-  return <MenuPrimitive.Root data-slot="dropdown-menu" {...props} />
+/**
+ * Default `modal={false}`: Base UI's modal menus scroll-lock the document
+ * (hide the scrollbar), which shifts layout width and races the composer
+ * textarea + timeline ResizeObservers — surfacing as
+ * "ResizeObserver loop completed with undelivered notifications" on open
+ * (e.g. the composer + button). Pass `modal` to opt back in.
+ */
+function DropdownMenu({
+  modal = false,
+  ...props
+}: MenuPrimitive.Root.Props) {
+  return <MenuPrimitive.Root data-slot="dropdown-menu" modal={modal} {...props} />
 }
 
 function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {

@@ -34,14 +34,22 @@ export const useAutoGrowTextarea = (value: string) => {
     const el = textareaRef.current
     if (!el) return
     let lastWidth = el.clientWidth
+    let raf = 0
     const ro = new ResizeObserver(() => {
       const width = el.clientWidth
       if (width === lastWidth) return
       lastWidth = width
-      measureComposerHeight()
+      // Defer height writes out of the RO notification cycle. Writing layout
+      // here (and Base UI menu scroll-lock doing the same) trips
+      // "ResizeObserver loop completed with undelivered notifications".
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(measureComposerHeight)
     })
     ro.observe(el)
-    return () => ro.disconnect()
+    return () => {
+      cancelAnimationFrame(raf)
+      ro.disconnect()
+    }
   }, [measureComposerHeight])
 
   return { textareaRef }
