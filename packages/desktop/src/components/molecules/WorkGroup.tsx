@@ -4,6 +4,7 @@ import { RunningDot } from "../atoms"
 import { Collapsible } from "./Collapsible"
 import type { VerificationVerdict } from "../../lib/types"
 import { cn, formatCost, formatDuration, formatTokens } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 const VERDICT_GLYPH: Record<VerificationVerdict["outcome"], string> = {
   pass: "✓",
@@ -117,13 +118,14 @@ export const WorkGroup = memo(({
 
   return (
     <div className={cn("flex flex-col", className)}>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={handleToggle}
         aria-expanded={expanded}
         aria-label={isOpen ? openLabel : undefined}
         className={cn(
-          "group flex min-h-[var(--end-of-turn-reserved-height)] w-full items-center gap-1.5 text-left text-base",
+          "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-base hover:bg-transparent",
+          "min-h-[var(--end-of-turn-reserved-height)]",
           !isOpen && "cursor-pointer animate-end-turn-in",
         )}
       >
@@ -170,7 +172,7 @@ export const WorkGroup = memo(({
             />
           </>
         )}
-      </button>
+      </Button>
 
       <Collapsible open={expanded}>
         <div className="flex flex-col gap-0.5">{children}</div>

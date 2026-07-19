@@ -1,61 +1,85 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react"
-import { cn } from "../../lib/utils"
-import { Spinner } from "./Spinner"
+import type { ReactNode } from "react"
+import { Button as ShadcnButton } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger"
-type ButtonSize = "sm" | "md" | "lg"
+/**
+ * Flex atom adapter over shadcn Base UI `Button`.
+ * Maps legacy Flex variant/size names onto the registry API so call sites
+ * can migrate gradually; prefer importing `@/components/ui/button` for new code.
+ *
+ * Legacy → shadcn: primary→default, danger→destructive, md→default.
+ * Drop `isLoading` at call sites eventually — compose Spinner + disabled.
+ */
+type FlexVariant = "primary" | "secondary" | "ghost" | "danger" | "outline" | "link"
+type FlexSize = "sm" | "md" | "lg" | "xs"
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: ButtonVariant
-  size?: ButtonSize
+type ShadcnVariant = "default" | "secondary" | "ghost" | "destructive" | "outline" | "link"
+type ShadcnSize = "default" | "sm" | "lg" | "xs"
+
+const VARIANT_MAP: Record<FlexVariant, ShadcnVariant> = {
+  primary: "default",
+  secondary: "secondary",
+  ghost: "ghost",
+  danger: "destructive",
+  outline: "outline",
+  link: "link",
+}
+
+const SIZE_MAP: Record<FlexSize, ShadcnSize> = {
+  xs: "xs",
+  sm: "sm",
+  md: "default",
+  lg: "lg",
+}
+
+type ButtonProps = Omit<
+  React.ComponentProps<typeof ShadcnButton>,
+  "variant" | "size"
+> & {
+  variant?: FlexVariant | ShadcnVariant
+  size?: FlexSize | ShadcnSize | "icon" | "icon-xs" | "icon-sm" | "icon-lg" | "icon-2xs"
+  /** @deprecated Compose `<Spinner data-icon="inline-start" />` + `disabled`. */
   isLoading?: boolean
   children: ReactNode
 }
 
-const variantClasses: Record<ButtonVariant, string> = {
-  primary:
-    "bg-accent text-accent-text hover:bg-accent-hover border border-transparent",
-  secondary:
-    "bg-surface-muted text-ink border border-border hover:bg-surface-raised",
-  ghost:
-    "bg-transparent text-ink-secondary hover:bg-surface-muted border border-transparent",
-  danger:
-    "bg-danger-subtle text-danger border border-danger/20 hover:bg-danger/10",
+const resolveVariant = (
+  variant: ButtonProps["variant"],
+): ShadcnVariant => {
+  if (!variant) return "default"
+  if (variant in VARIANT_MAP) return VARIANT_MAP[variant as FlexVariant]
+  return variant as ShadcnVariant
 }
 
-const sizeClasses: Record<ButtonSize, string> = {
-  // Use explicit length utilities — never `text-base`/`text-sm` alone for
-  // color-bearing buttons: those names can resolve to color tokens.
-  sm: "h-7 px-2.5 text-[length:var(--text-sm)] leading-[var(--text-sm--line-height)] gap-1.5",
-  md: "h-8 px-3 text-[length:var(--text-sm)] leading-[var(--text-sm--line-height)] gap-1.5",
-  lg: "h-9 px-4 text-[length:var(--text-base)] leading-[var(--text-base--line-height)] gap-2",
+const resolveSize = (
+  size: ButtonProps["size"],
+): React.ComponentProps<typeof ShadcnButton>["size"] => {
+  if (!size || size === "md") return "default"
+  if (size in SIZE_MAP) return SIZE_MAP[size as FlexSize]
+  return size as React.ComponentProps<typeof ShadcnButton>["size"]
 }
 
 export const Button = ({
-  variant = "primary",
-  size = "md",
+  variant = "default",
+  size = "default",
   isLoading = false,
   disabled,
   className,
   children,
+  type = "button",
   ...props
 }: ButtonProps) => {
   return (
-    <button
-      type="button"
+    <ShadcnButton
+      type={type}
+      variant={resolveVariant(variant)}
+      size={resolveSize(size)}
       disabled={disabled || isLoading}
-      className={cn(
-        "inline-flex items-center justify-center rounded-md font-medium",
-        "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-        "disabled:opacity-50 disabled:pointer-events-none",
-        variantClasses[variant],
-        sizeClasses[size],
-        className,
-      )}
+      className={className}
       {...props}
     >
-      {isLoading ? <Spinner size="sm" /> : null}
+      {isLoading ? <Spinner data-icon="inline-start" className="size-3.5" /> : null}
       {children}
-    </button>
+    </ShadcnButton>
   )
 }

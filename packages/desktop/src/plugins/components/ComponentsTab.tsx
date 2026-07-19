@@ -21,7 +21,8 @@ import {
   TextInput,
   Tooltip,
 } from "../../components/atoms"
-import { EmptyState } from "../../components/molecules"
+import { EmptyState, ErrorBanner } from "../../components/molecules"
+import { Button } from "@/components/ui/button"
 import {
   browserApplyStyleOverrides,
   componentsDetect,
@@ -412,9 +413,10 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
       </div>
 
       {error ? (
-        <p className="shrink-0 border-b border-stroke-3 px-2.5 py-1.5 text-xs text-danger">
-          {error}
-        </p>
+        <ErrorBanner
+          message={error}
+          className="shrink-0 rounded-none border-x-0 border-t-0 px-2.5 py-1.5 text-xs"
+        />
       ) : null}
 
       {!list || list.components.length === 0 ? (
@@ -441,16 +443,16 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
                     const isActive = node.id === activeId
                     return (
                       <li key={node.id}>
-                        <button
-                          type="button"
+                        <Button
+                          variant="ghost"
                           onClick={() => openComponent(node.id)}
                           style={{ paddingLeft: `${10 + depth * 10}px` }}
                           className={cn(
-                            "flex w-full items-center gap-1 py-1.5 pr-2.5 text-left text-xs",
+                            "h-auto w-full justify-start gap-1 py-1.5 pr-2.5 text-xs font-normal",
                             isActive
-                              ? "bg-fill-2 text-ink"
+                              ? "bg-fill-2 text-ink hover:bg-fill-2"
                               : isOpen
-                                ? "bg-fill-3 text-ink-secondary"
+                                ? "bg-fill-3 text-ink-secondary hover:bg-fill-3"
                                 : "text-ink-secondary hover:bg-fill-4 hover:text-ink",
                           )}
                         >
@@ -468,7 +470,7 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
                           <span className="min-w-0 truncate font-mono">
                             {node.name}
                           </span>
-                        </button>
+                        </Button>
                       </li>
                     )
                   })}
@@ -630,14 +632,14 @@ const ComponentCanvas = ({
           ) : null}
         </div>
         {!hasLiveTarget ? (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={onOpenBrowser}
-            className="inline-flex items-center gap-1 text-xs text-ink-muted hover:text-ink"
+            className="h-auto gap-1 px-0 py-0 text-xs font-normal text-ink-muted hover:bg-transparent hover:text-ink"
           >
             <ExternalLink className="h-3 w-3" aria-hidden />
             Open Browser + Design Mode for live preview
-          </button>
+          </Button>
         ) : (
           <span className="text-xs text-ink-muted">
             Live overrides apply to the Design Mode selection

@@ -10,6 +10,7 @@ import {
   toInvokeError,
 } from "../../lib/tauri"
 import { openExternalUrl } from "../../lib/openExternalUrl"
+import { Button } from "@/components/ui/button"
 import { PickerTrigger } from "../atoms"
 import { PopoverItem, PopoverSearch, PopoverTray } from "./PopoverTray"
 import { cn } from "../../lib/utils"
@@ -109,17 +110,13 @@ export const BranchPicker = ({
       />
 
       {branchPr ? (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="xs"
           onClick={() => void openExternalUrl(branchPr.url)}
           title={`${branchPr.title} — ${branchPr.checksSummary}`}
           aria-label={`Open pull request #${branchPr.number}`}
-          className={cn(
-            "flex h-6 max-w-[7.5rem] items-center gap-1 rounded-md px-1.5",
-            "text-xs text-ink-secondary",
-            "transition-colors duration-[var(--duration-fast)]",
-            "hover:bg-fill-3 hover:text-ink",
-          )}
+          className="max-w-[7.5rem] gap-1 px-1.5 text-ink-secondary hover:bg-fill-3 hover:text-ink"
         >
           <GitPullRequest className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
           <span className="shrink-0 font-medium text-ink">#{branchPr.number}</span>
@@ -127,7 +124,7 @@ export const BranchPicker = ({
             className={cn(
               "min-w-0 truncate",
               branchPr.checksSummary.includes("failing")
-                ? "text-danger"
+                ? "text-destructive"
                 : branchPr.checksSummary.includes("pending")
                   ? "text-ink-muted"
                   : "text-success",
@@ -135,7 +132,7 @@ export const BranchPicker = ({
           >
             {branchPr.checksSummary}
           </span>
-        </button>
+        </Button>
       ) : null}
 
       <PopoverTray

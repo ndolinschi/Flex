@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { ChevronDown } from "lucide-react"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 type PickerTriggerProps = {
   /** Small leading glyph (e.g. GitBranch, Folder, GitFork). Optional — some
@@ -33,18 +34,17 @@ export const PickerTrigger = ({
   className,
 }: PickerTriggerProps) => {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       disabled={disabled}
       aria-haspopup="listbox"
       aria-expanded={open}
       aria-label={ariaLabel}
       onClick={onClick}
       className={cn(
-        "flex h-6 items-center gap-1 rounded-md px-1.5",
+        "h-6 gap-1 px-1.5 font-normal",
         "text-sm text-ink-muted opacity-80",
-        "transition-[color,opacity] duration-[var(--duration-fast)]",
-        "hover:text-ink-secondary hover:opacity-100 disabled:opacity-50",
+        "hover:bg-transparent hover:text-ink-secondary hover:opacity-100",
         open && "opacity-100",
         className,
       )}
@@ -52,6 +52,6 @@ export const PickerTrigger = ({
       {leadingIcon}
       <span className="min-w-0 truncate">{label}</span>
       <ChevronDown className="h-2.5 w-2.5 shrink-0" aria-hidden />
-    </button>
+    </Button>
   )
 }

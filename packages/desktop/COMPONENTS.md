@@ -10,9 +10,9 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 
 | Component | Purpose | Key props | Used by |
 |---|---|---|---|
-| `Button` | Primary action control | `variant`, `size`, `disabled`, `onClick`, `children` | Composer, ProviderSettingsForm, PermissionPrompt, QuestionPrompt, WelcomePage, ConfirmDialog |
+| `Button` | shadcn Base UI adapter (`@/components/ui/button`); maps legacy `primary`/`danger`/`md` | `variant`, `size`, `disabled`, `isLoading?`, `onClick`, `children` | Composer, ProviderSettingsForm, PermissionPrompt, QuestionPrompt, WelcomePage, ConfirmDialog |
 | `Checkbox` | Round selection control (filled accent circle + check) | `checked`, `indeterminate?`, `onChange`, `label` | ChangesTab select-all, FileRow |
-| `IconButton` | Compact icon-only action; optional `quiet` opacity .5→.8 | `label`, `quiet?`, `onClick`, `children` | SessionListItem, SessionSidebar, PlusMenu, ErrorBanner, SettingsShell, SessionMenu |
+| `IconButton` | Thin wrap over shadcn `Button` icon sizes (`ghost` + `icon-sm`); optional `quiet` | `label`, `quiet?`, `size?`, `onClick`, `children` | SessionListItem, SessionSidebar, PlusMenu, ErrorBanner, SettingsShell, SessionMenu |
 | `TextInput` | Single-line text field (forwardRef) | standard input props | FormField, SessionListItem, SessionSidebar search, QuestionPrompt, ConfirmDialog |
 | `TextArea` | Multi-line text field | standard textarea props | Composer |
 | `Label` | Accessible form label | `htmlFor`, `children` | FormField, ModelSelect |
@@ -47,7 +47,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `SessionRowSubtitle` | Diff + relative-time under a session title | `updatedAtMs`, `workspaceStatus?`, `gitStatus?` | SessionListItem |
 | `SessionRowActions` | Hover pin / archive / more trailing actions | `pinned`, `archived`, `onTogglePin`, … | SessionListItem |
 | `SidebarFooter` | Theme + settings chrome (+ optional creating spinner) | `theme`, `onToggleTheme`, `onOpenSettings`, `isCreating?` | SessionSidebar |
-| `SidebarResumeError` | Resume-failure Retry / Dismiss banner | `message`, `onRetry`, `onDismiss` | SessionSidebar |
+| `ErrorBanner` | shadcn `Alert` (destructive) inline error | `message`, `onDismiss?`, `title?` | Composer, Settings, timeline, dialogs |
+| `SidebarResumeError` | shadcn `Alert` + Retry/Dismiss actions | `message`, `onRetry`, `onDismiss` | SessionSidebar |
 | `ArchivedSectionHeader` | Collapsible Archived group header | `count`, `collapsed`, `onToggle` | SessionSidebar |
 | `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays + optional ghost-text inline completion (isolates keystrokes from ModelPicker/ContextBar) | `composerMode`, `anchorRef`, `attachments`, `onSend` | Composer |
 | `ModelSelect` | Simple model `<select>` | `models`, `value`, `onChange` | ProviderSettingsForm |
@@ -78,7 +79,6 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `IndexingCard` | Settled code-index boundary (divider + file counts) | `added`, `changed`, `removed`, `unchanged` | TurnTimeline (`TimelineRowView`) |
 | `FilesChangedCard` | End-of-turn git diff headline; expand file list (click → Files/Monaco), Review opens Changes | `cwd?`, `sessionId?` | TurnTimeline |
 | `EmptyState` | Empty async surface | `title`, `description?`, `action?` | SessionSidebar, TurnTimeline |
-| `ErrorBanner` | Inline error | `message`, `onDismiss?` | Composer, Settings |
 | `ToolCallChip` | Single tool as Cursor-style step | `call` | TurnTimeline |
 | `ToolStepGroup` | Aggregated explore/edit/shell summary + card expand; single settled Edit/Write auto-expands `ChatDiffCard` | `calls` | TurnTimeline (via ToolStepList) |
 | `ToolStepList` | Clusters consecutive same-kind tool rows | `rows`, `renderOther` | TurnTimeline |
@@ -248,15 +248,16 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 - Round Changes-panel `Checkbox` and green settings `Toggle` (`--color-switch-on`)
   are intentional product visuals; restyle shadcn primitives after install — do
   not silently flip to square/primary defaults.
-- `packages/desktop` only (Vite + React 19 + Tailwind v4). No `components.json`
-  yet — Phase 0 creates it under `packages/desktop/`.
+- `packages/desktop` has `components.json` (style `base-nova`, Base UI).
+  Phase 0 foundation + Button/IconButton/Alert adapters ship; theming is
+  shadcn semantic tokens bridged to Flex values (see DESIGN.md).
 
 ### Target registry inventory (user list → migrate?)
 
 | shadcn | Migrate? | Current Flex surface | Notes |
 |---|---|---|---|
 | Accordion | later | none as primitive | Optional for settings groups; prefer `Collapsible` first |
-| Alert | yes | `ErrorBanner`, resume banners | Replace callout markup |
+| Alert | ✅ done | `ErrorBanner`, `SidebarResumeError`, `ReconnectBanner`, form/field errors | `@/components/ui/alert`; no ad-hoc danger strips |
 | Alert Dialog | yes | `ConfirmDialog` (danger paths) | Rename/delete session, discard |
 | Aspect Ratio | skip | — | No first-class need |
 | Attachment | yes (chat kit) | `AttachmentChip` | Registry name `attachment` (not `AttachmentNew`) |
@@ -264,7 +265,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Badge | yes | `Badge`, `NewBadge`, `VerdictBadge` | Keep tone mapping via variants/`className` |
 | Breadcrumb | yes | `PlanToolbar` crumbs | Small win |
 | Bubble | yes (chat kit) | user/assistant bubbles in timeline | After Message spike |
-| Button | yes | `Button`, `IconButton`, `SendButton` shell | Drop custom `isLoading` — compose `Spinner` + `disabled` |
+| Button | ✅ done | `atoms/Button`, `IconButton` → `@/components/ui/button` | Legacy `primary`/`danger`/`md` mapped; drop `isLoading` over time |
 | Button Group | yes | composer toolbar clusters | Optional; `ToggleGroup` covers ModePicker |
 | Calendar | skip | — | No date UX today |
 | Card | selective | settings cards, catalog cards | Use full Card composition only where DESIGN allows cards |
@@ -327,11 +328,11 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| **0 — Foundation** | `shadcn init` in `packages/desktop` (Vite, Tailwind v4, **radix** base, `lucide`, css variables); path alias `@/`; upgrade `cn` to `clsx` + `tailwind-merge`; map shadcn semantic tokens → Flex tokens in `src/index.css` / `tokens.css` without breaking `data-theme` | `components.json` present; `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
-| **1 — Atom adapters** | Add Button, Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Spinner, Avatar, Tooltip, ScrollArea; re-export from `components/atoms` with temporary compat props | Atom unit tests + vitest green; call sites compile via barrel |
+| **0 — Foundation** | ✅ `components.json` (`base-nova`), `@/` alias, `clsx`+`tailwind-merge` `cn`, shadcn semantic vars bridged to Flex tokens (`data-theme` only — no `.dark` second system) | `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
+| **1 — Atom adapters** | ✅ Button + Spinner + Alert installed; `atoms/Button` + `IconButton` adapt legacy Flex props. Callouts use `ErrorBanner` / `Alert`. Remaining: Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Avatar, Tooltip, ScrollArea | Atom unit tests + vitest green; call sites compile via barrel |
 | **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | Confirm/auth/PR/bug dialogs + ToastHost + TitleBarMenus on primitives |
 | **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | Settings forms, ModePicker, ModelPicker, CommandPalette/SearchModal |
-| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | Split sash + empty/error callouts; sidebar spike documented go/no-go |
+| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty; optional Sidebar/Sheet/Drawer spikes | Split sash + empty states; sidebar spike documented go/no-go |
 | **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Chip/bubble/marker parity; scroller decision recorded here |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
 
@@ -394,3 +395,4 @@ spacing changes, update [DESIGN.md](./DESIGN.md).
 - **Spacing balance (careful):** see [DESIGN.md](./DESIGN.md) for the full gutter/height canon. Short form: chat chrome `px-3`; content pane `TabStrip` + tab chrome `px-2.5` / `--header-height` with `Tab` at `h-6`; Terminal/Database side lists `px-2.5 py-1.5 text-xs`; Settings `px-3.5` rows / `gap-3` cards; Welcome `h-9` inputs; session sidebar list `px-2`.
 - **Streaming visuals:** `StreamingCaret` renders inline inside live `MarkdownBody` (including mid-turn narration in work groups); live assistant rows reserve `MessageActions` height; highlight.js preloads while live; `TurnTimeline` uses per-session `streamingSessions[id]` (SubagentViewer-safe); bottom “Working” hides when live answer text is visible; double-rAF remeasure on stream settle.
 - **Files / Monaco:** `@monaco-editor/react` + Vite `?worker` locals (`lib/monacoEnv.ts`); editor/vendor split via `manualChunks.monaco`. Open buffers live in `openFilesBySession` under one content `files` tab (keep-alive like Terminal).
+- **shadcn Button (Base UI):** Prefer `@/components/ui/button` for interactive chrome. Timeline stays safe via virtualization (only overscan rows mount). Sidebar session / memory rows defer hover `IconButton`s until first pointer/focus (`actionsReady`, sticky) so long lists do not permanently mount 3 Base UI button trees per row.

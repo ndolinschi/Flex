@@ -11,6 +11,7 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Check, Copy } from "lucide-react"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 import {
   parseFenceMeta,
   shouldRenderChatDiff,
@@ -84,19 +85,20 @@ const CodeBlock = (props: HTMLAttributes<HTMLPreElement>) => {
             {language}
           </span>
         ) : null}
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-xs"
           aria-label="Copy code"
           title="Copy code"
           onClick={handleCopy}
-          className="inline-flex h-5 w-5 items-center justify-center rounded text-ink-muted hover:bg-surface-muted hover:text-ink"
+          className="rounded text-ink-muted hover:bg-surface-muted hover:text-ink"
         >
           {copied ? (
             <Check className="h-3 w-3" aria-hidden />
           ) : (
             <Copy className="h-3 w-3" aria-hidden />
           )}
-        </button>
+        </Button>
       </div>
     </div>
   )

@@ -12,6 +12,7 @@ import { useAppStore } from "../../stores/appStore"
 import { Collapsible } from "./Collapsible"
 import { PlanStatusIcon } from "./PlanCard"
 import { SubagentGroup } from "./SubagentGroup"
+import { Button } from "@/components/ui/button"
 
 /** Inferred progress state of one workflow step. Mirrors `PlanEntry.status`
  * plus a `failed` outcome (a workflow step can error; a plan entry cannot). */
@@ -97,14 +98,14 @@ const StepRow = ({ step }: { step: ResolvedStep }) => {
 
   return (
     <div className="flex flex-col">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => canExpand && setExpanded((v) => !v)}
         aria-expanded={expanded}
         disabled={!canExpand}
         className={cn(
-          "group flex min-h-6 w-full items-center gap-1.5 text-left text-base leading-[1.5]",
-          canExpand && "cursor-pointer",
+          "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-base leading-[1.5] hover:bg-transparent",
+          !canExpand && "cursor-default",
         )}
       >
         <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
@@ -118,7 +119,7 @@ const StepRow = ({ step }: { step: ResolvedStep }) => {
           className={cn(
             "min-w-0 flex-1 truncate",
             step.state === "in_progress" && "animate-shimmer-text",
-            step.state === "failed" ? "text-danger" : "text-ink-secondary",
+            step.state === "failed" ? "text-destructive" : "text-ink-secondary",
           )}
         >
           {step.label}
@@ -133,7 +134,7 @@ const StepRow = ({ step }: { step: ResolvedStep }) => {
             aria-hidden
           />
         ) : null}
-      </button>
+      </Button>
       <Collapsible open={expanded && canExpand}>
         <div className="ml-1.5 flex flex-col gap-1 py-1 pl-3">
           {step.slots.map((slot) => (
@@ -243,16 +244,16 @@ export const WorkflowGroup = ({
 
   return (
     <div className="flex flex-col pl-1">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => {
           if (state === "in_progress") return
           setExpanded((v) => !v)
         }}
         aria-expanded={open}
         className={cn(
-          "group flex min-h-7 w-full items-center gap-1.5 text-left text-base",
-          state !== "in_progress" && "cursor-pointer",
+          "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-base hover:bg-transparent",
+          state === "in_progress" && "cursor-default",
         )}
       >
         <Workflow className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
@@ -260,7 +261,7 @@ export const WorkflowGroup = ({
           className={cn(
             "min-w-0 truncate text-ink-secondary",
             state === "in_progress" && "animate-shimmer-text",
-            state === "failed" && "text-danger",
+            state === "failed" && "text-destructive",
           )}
         >
           Workflow
@@ -276,7 +277,7 @@ export const WorkflowGroup = ({
             aria-hidden
           />
         ) : null}
-      </button>
+      </Button>
       <Collapsible open={open}>
         <div className="ml-1.5 flex flex-col gap-0.5 py-1 pl-3">
           {resolved.map((step, i) => (

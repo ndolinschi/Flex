@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { ArrowDown } from "lucide-react"
 import { RunningDot, Skeleton } from "../atoms"
+import { Button } from "@/components/ui/button"
 import {
   EmptyState,
   ErrorBanner,
@@ -482,19 +483,20 @@ export const TurnTimeline = ({
       </div>
 
       {showScrollDown ? (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-sm"
           onClick={handleScrollToBottom}
           aria-label="Scroll to bottom"
           className={cn(
-            "absolute bottom-3 left-1/2 z-20 flex h-7 w-7 -translate-x-1/2",
-            "items-center justify-center rounded-full border border-stroke-2",
-            "bg-panel text-ink-secondary transition-colors duration-[var(--duration-fast)] hover:text-ink",
+            "absolute bottom-3 left-1/2 z-20 -translate-x-1/2",
+            "rounded-full border border-stroke-2",
+            "bg-panel text-ink-secondary hover:text-ink",
             "animate-tray-in",
           )}
         >
           <ArrowDown className="h-3 w-3" aria-hidden />
-        </button>
+        </Button>
       ) : null}
     </div>
   )

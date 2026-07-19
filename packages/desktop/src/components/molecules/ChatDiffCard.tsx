@@ -7,6 +7,7 @@ import {
   type ChatDiffLineKind,
 } from "../../lib/chatDiff"
 import { DiffStat } from "../atoms/DiffStat"
+import { Button } from "@/components/ui/button"
 
 type ChatDiffCardProps = {
   /** Raw unified / +/- dump. Parsed when `lines` is omitted. */
@@ -85,14 +86,14 @@ export const ChatDiffCard = ({
       data-chat-diff-card
     >
       {onOpenFile ? (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           title={path ?? basename}
           onClick={onOpenFile}
-          className="flex w-full items-center gap-1.5 border-b border-stroke-3 px-2.5 py-1.5 text-left hover:bg-fill-4"
+          className="h-auto w-full justify-start gap-1.5 rounded-none border-b border-stroke-3 px-2.5 py-1.5 font-normal hover:bg-fill-4"
         >
           {headerInner}
-        </button>
+        </Button>
       ) : (
         <div
           title={path ?? basename}

@@ -2,7 +2,11 @@ import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plug, Settings2, Trash2 } from "lucide-react"
 import { Badge, Button } from "../../../components/atoms"
-import { ConfirmDialog, McpInstallDialog } from "../../../components/molecules"
+import {
+  ConfirmDialog,
+  ErrorBanner,
+  McpInstallDialog,
+} from "../../../components/molecules"
 import { buildCatalogServerDto, prefillCatalogValues } from "../../../lib/mcp"
 import { catalogEntryNeedsConfig, findCatalogEntry } from "../../../lib/mcpCatalog"
 import { mcpRemove, mcpTest, mcpUpsert, toInvokeError } from "../../../lib/tauri"
@@ -91,7 +95,12 @@ export const McpServerRow = ({ server }: { server: McpServerDto }) => {
                 : "Connected — no tools reported."}
             </p>
           ) : testResult?.kind === "error" ? (
-            <p className="mt-1 text-xs text-danger">{testResult.message}</p>
+            <div className="mt-1">
+              <ErrorBanner
+                message={testResult.message}
+                className="py-1.5 text-xs"
+              />
+            </div>
           ) : null}
         </div>
 
@@ -131,9 +140,8 @@ export const McpServerRow = ({ server }: { server: McpServerDto }) => {
             Test
           </Button>
           <Button
-            variant="ghost"
+            variant="destructive"
             size="sm"
-            className="text-danger"
             onClick={() => setConfirmDelete(true)}
           >
             <Trash2 className="h-3 w-3" aria-hidden />

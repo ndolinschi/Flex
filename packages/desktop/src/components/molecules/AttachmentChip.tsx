@@ -1,6 +1,7 @@
 import { FileIcon, Folder, ImageIcon, MousePointer2, Palette, X } from "lucide-react"
 import type { ComposerAttachment } from "../../lib/types"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 type AttachmentChipProps = {
   attachment: ComposerAttachment
@@ -30,17 +31,15 @@ export const AttachmentChip = ({ attachment, onRemove }: AttachmentChipProps) =>
     >
       <Icon className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
       <span className="truncate">{attachment.name}</span>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="icon-xs"
         aria-label={`Remove ${attachment.name}`}
         onClick={() => onRemove(attachment.id)}
-        className={cn(
-          "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded",
-          "text-icon-3 transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink",
-        )}
+        className="shrink-0 text-icon-3 hover:bg-fill-2 hover:text-ink"
       >
         <X className="h-2.5 w-2.5" aria-hidden />
-      </button>
+      </Button>
     </span>
   )
 }

@@ -1,5 +1,6 @@
 import { useMemo } from "react"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 import {
   describeHunklessDiff,
   isDiffTruncated,
@@ -77,24 +78,26 @@ const HunkBlock = ({
         </span>
         <span className="flex shrink-0 items-center gap-2 opacity-0 transition-opacity duration-[var(--duration-fast)] group-hover/hunk:opacity-100">
           {onKeepHunk ? (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="xs"
               title="Keep"
               onClick={() => onKeepHunk(hunk, file)}
-              className="text-xs text-ink-muted hover:text-ink"
+              className="h-auto px-1 py-0.5 text-xs text-ink-muted hover:bg-transparent hover:text-ink"
             >
               Keep
-            </button>
+            </Button>
           ) : null}
           {onUndoHunk ? (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="xs"
               title="Undo"
               onClick={() => onUndoHunk(hunk, file)}
-              className="text-xs text-ink-muted hover:text-ink"
+              className="h-auto px-1 py-0.5 text-xs text-ink-muted hover:bg-transparent hover:text-ink"
             >
               Undo
-            </button>
+            </Button>
           ) : null}
         </span>
       </div>

@@ -2,6 +2,7 @@ import { useEffect } from "react"
 import { Check, TriangleAlert } from "lucide-react"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 const TOAST_TIMEOUT_MS = 4000
 
@@ -28,10 +29,10 @@ const ToastRow = ({ id, text, kind, action, onDismiss }: ToastRowProps) => {
         "bg-panel/80 backdrop-blur-[40px]",
       )}
     >
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => onDismiss(id)}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        className="h-auto min-w-0 flex-1 justify-start gap-2 px-0 py-0 font-normal hover:bg-transparent"
       >
         <Icon
           className={cn(
@@ -41,18 +42,18 @@ const ToastRow = ({ id, text, kind, action, onDismiss }: ToastRowProps) => {
           aria-hidden
         />
         <span className="min-w-0 flex-1 text-ink">{text}</span>
-      </button>
+      </Button>
       {action ? (
-        <button
-          type="button"
+        <Button
+          variant="default"
+          size="xs"
           onClick={() => {
             action.onAction()
             onDismiss(id)
           }}
-          className="shrink-0 rounded-sm bg-accent px-2 py-1 text-xs font-medium text-accent-text transition-colors duration-[var(--duration-fast)] hover:bg-accent-hover"
         >
           {action.label}
-        </button>
+        </Button>
       ) : null}
     </div>
   )

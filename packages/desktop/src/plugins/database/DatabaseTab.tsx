@@ -11,7 +11,8 @@ import {
   Unplug,
 } from "lucide-react"
 import { Button, IconButton, ScrollArea, TextArea, TextInput } from "../../components/atoms"
-import { ConfirmDialog, EmptyState, FormField } from "../../components/molecules"
+import { ConfirmDialog, EmptyState, ErrorBanner, FormField } from "../../components/molecules"
+import { Button as ShadcnButton } from "@/components/ui/button"
 import {
   dbActiveConnection,
   dbConnect,
@@ -320,30 +321,31 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
       ) : null}
 
       {error ? (
-        <p className="border-b border-stroke-3 bg-danger-subtle px-2.5 py-1.5 text-xs text-danger">
-          {error}
-        </p>
+        <ErrorBanner
+          message={error}
+          className="rounded-none border-x-0 border-t-0 px-2.5 py-1.5 text-xs"
+        />
       ) : null}
 
       {selectedId && schemas.length > 1 ? (
         <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-stroke-3 px-2.5 py-1.5">
           {schemas.map((s) => (
-            <button
+            <ShadcnButton
               key={s.name}
-              type="button"
+              variant="ghost"
               onClick={() => {
                 setSchema(s.name)
                 setSelectedTable(null)
               }}
               className={cn(
-                "rounded-md px-2 py-0.5 text-xs",
+                "h-auto rounded-md px-2 py-0.5 text-xs font-normal",
                 activeSchema === s.name
-                  ? "bg-fill-2 text-ink"
+                  ? "bg-fill-2 text-ink hover:bg-fill-2"
                   : "text-ink-muted hover:bg-fill-3 hover:text-ink",
               )}
             >
               {s.name}
-            </button>
+            </ShadcnButton>
           ))}
         </div>
       ) : null}
@@ -398,13 +400,13 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
                           selectedTable?.name === t.name
                         return (
                           <li key={key}>
-                            <button
-                              type="button"
+                            <ShadcnButton
+                              variant="ghost"
                               onClick={() => void runPreview(t)}
                               className={cn(
-                                "flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-xs",
+                                "h-auto w-full justify-start gap-1.5 px-2.5 py-1.5 text-xs font-normal",
                                 isActive
-                                  ? "bg-fill-2 text-ink"
+                                  ? "bg-fill-2 text-ink hover:bg-fill-2"
                                   : "text-ink-secondary hover:bg-fill-4 hover:text-ink",
                               )}
                             >
@@ -415,7 +417,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
                               <span className="min-w-0 truncate font-mono">
                                 {t.name}
                               </span>
-                            </button>
+                            </ShadcnButton>
                           </li>
                         )
                       })}
@@ -425,9 +427,9 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
               ) : null}
             </ScrollArea>
             {selectedId ? (
-              <button
-                type="button"
-                className="flex items-center gap-1.5 border-t border-stroke-3 px-2.5 py-2 text-xs text-ink-muted hover:text-ink"
+              <ShadcnButton
+                variant="ghost"
+                className="h-auto justify-start gap-1.5 rounded-none border-t border-stroke-3 px-2.5 py-2 text-xs text-ink-muted font-normal hover:bg-transparent hover:text-ink"
                 onClick={() => {
                   void dbDisconnect(selectedId)
                   setSelectedId(null)
@@ -438,7 +440,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
               >
                 <Unplug className="h-3 w-3" aria-hidden />
                 Disconnect
-              </button>
+              </ShadcnButton>
             ) : null}
           </aside>
 
@@ -453,7 +455,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
                   <div className="mb-1.5 flex shrink-0 justify-end">
                     <Button
                       size="sm"
-                      variant="primary"
+                      variant="default"
                       onClick={() => void runSql()}
                     >
                       <Play className="h-3 w-3" aria-hidden />
@@ -542,11 +544,14 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
             />
           </FormField>
           {form.target.trim() && !targetOk ? (
-            <p className="text-xs text-danger">
-              {form.engine === "mysql"
-                ? "MySQL target must be a URL like mysql://user:pass@127.0.0.1:3306/dbname"
-                : "PostgreSQL target must be a URL like postgres://user:pass@127.0.0.1:5432/dbname"}
-            </p>
+            <ErrorBanner
+              message={
+                form.engine === "mysql"
+                  ? "MySQL target must be a URL like mysql://user:pass@127.0.0.1:3306/dbname"
+                  : "PostgreSQL target must be a URL like postgres://user:pass@127.0.0.1:5432/dbname"
+              }
+              className="py-1.5 text-xs"
+            />
           ) : null}
         </div>
       </ConfirmDialog>
@@ -584,20 +589,20 @@ const ConnectionRow = ({
   onDelete: () => void
 }) => (
   <li className="group relative">
-    <button
-      type="button"
+    <ShadcnButton
+      variant="ghost"
       disabled={busy}
       onClick={onOpen}
       className={cn(
-        "flex w-full flex-col gap-0.5 px-2.5 py-1.5 text-left",
-        active ? "bg-fill-2" : "hover:bg-fill-4",
+        "h-auto w-full flex-col items-start justify-start gap-0.5 rounded-none px-2.5 py-1.5 font-normal",
+        active ? "bg-fill-2 hover:bg-fill-2" : "hover:bg-fill-4",
       )}
     >
       <span className="truncate text-xs font-medium text-ink">{spec.name}</span>
       <span className="truncate text-[10px] uppercase tracking-wide text-ink-faint">
         {spec.engine}
       </span>
-    </button>
+    </ShadcnButton>
     <IconButton
       label={`Remove ${spec.name}`}
       className="absolute right-1 top-1 h-5 w-5 opacity-0 group-hover:opacity-100"

@@ -2,6 +2,7 @@ import { useRef, useState } from "react"
 import { ChevronDown, ChevronUp, Plus, X } from "lucide-react"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 import { Label } from "../atoms"
 import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
@@ -94,33 +95,36 @@ export const ModelMultiSelect = ({
                 {displayFor(modelId, models)}
               </span>
               <div className="flex shrink-0 items-center gap-0.5">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   aria-label={`Move ${displayFor(modelId, models)} up`}
                   disabled={disabled || index === 0}
                   onClick={() => moveUp(index)}
-                  className="inline-flex h-5 w-5 items-center justify-center rounded text-icon-3 transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+                  className="text-icon-3 hover:bg-fill-2 hover:text-ink"
                 >
-                  <ChevronUp className="h-3 w-3" aria-hidden />
-                </button>
-                <button
-                  type="button"
+                  <ChevronUp aria-hidden />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   aria-label={`Move ${displayFor(modelId, models)} down`}
                   disabled={disabled || index === value.length - 1}
                   onClick={() => moveDown(index)}
-                  className="inline-flex h-5 w-5 items-center justify-center rounded text-icon-3 transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+                  className="text-icon-3 hover:bg-fill-2 hover:text-ink"
                 >
-                  <ChevronDown className="h-3 w-3" aria-hidden />
-                </button>
-                <button
-                  type="button"
+                  <ChevronDown aria-hidden />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   aria-label={`Remove ${displayFor(modelId, models)}`}
                   disabled={disabled}
                   onClick={() => removeAt(index)}
-                  className="inline-flex h-5 w-5 items-center justify-center rounded text-icon-3 transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-danger disabled:pointer-events-none disabled:opacity-30"
+                  className="text-muted-foreground hover:bg-muted hover:text-destructive"
                 >
-                  <X className="h-3 w-3" aria-hidden />
-                </button>
+                  <X aria-hidden />
+                </Button>
               </div>
             </li>
           ))}
@@ -130,21 +134,18 @@ export const ModelMultiSelect = ({
       )}
 
       <div ref={addRef} className="relative self-start">
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => setOpen((v) => !v)}
           disabled={disabled || isLoading || available.length === 0}
           aria-haspopup="listbox"
           aria-expanded={open}
-          className={cn(
-            "flex h-7 items-center gap-1 rounded-md border border-dashed border-stroke-2 px-2",
-            "text-xs text-ink-muted transition-colors duration-[var(--duration-fast)] hover:border-stroke-1 hover:text-ink-secondary",
-            "disabled:pointer-events-none disabled:opacity-40",
-          )}
+          className="border-dashed border-stroke-2 text-ink-muted hover:border-stroke-1 hover:text-ink-secondary"
         >
-          <Plus className="h-3 w-3" aria-hidden />
+          <Plus data-icon="inline-start" aria-hidden />
           Add fallback
-        </button>
+        </Button>
 
         <PopoverTray
           open={open}

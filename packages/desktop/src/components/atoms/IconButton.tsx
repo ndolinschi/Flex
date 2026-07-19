@@ -1,15 +1,26 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react"
-import { cn } from "../../lib/utils"
-import { Spinner } from "./Spinner"
+import type { ReactNode } from "react"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
+import { cn } from "@/lib/utils"
 
-type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+type IconButtonProps = Omit<
+  React.ComponentProps<typeof Button>,
+  "variant" | "size" | "children"
+> & {
   label: string
+  /** @deprecated Compose Spinner + disabled on `Button size="icon-*"` instead. */
   isLoading?: boolean
   /** Quiet chrome: idle opacity .5 → hover .8 (Feel: Opacity hover language). */
   quiet?: boolean
   children: ReactNode
+  /** Prefer `icon-xs` (h-6) in panel headers; `icon-2xs` (h-5) for sidebar rows. */
+  size?: "icon-2xs" | "icon-xs" | "icon-sm" | "icon" | "icon-lg"
 }
 
+/**
+ * Icon-only control — thin wrapper over shadcn `Button` icon sizes.
+ * New code: use `<Button variant="ghost" size="icon-sm" aria-label=…>` directly.
+ */
 export const IconButton = ({
   label,
   isLoading = false,
@@ -17,25 +28,26 @@ export const IconButton = ({
   disabled,
   className,
   children,
+  size = "icon-sm",
+  type = "button",
   ...props
 }: IconButtonProps) => {
   return (
-    <button
-      type="button"
+    <Button
+      type={type}
+      variant="ghost"
+      size={size}
       aria-label={label}
       title={label}
       disabled={disabled || isLoading}
       className={cn(
-        "inline-flex h-7 w-7 items-center justify-center rounded-sm",
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "transition-[color,background-color,opacity] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-        "disabled:opacity-50 disabled:pointer-events-none",
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
         quiet && "opacity-50 hover:opacity-80",
         className,
       )}
       {...props}
     >
-      {isLoading ? <Spinner size="sm" /> : children}
-    </button>
+      {isLoading ? <Spinner className="size-3.5" /> : children}
+    </Button>
   )
 }

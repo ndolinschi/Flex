@@ -5,6 +5,7 @@ import type { MemoryEntryDto } from "../../../lib/types"
 import { cn } from "../../../lib/utils"
 import type { MemoryScope } from "./constants"
 import { MemoryRow } from "./MemoryRow"
+import { Button } from "@/components/ui/button"
 
 /** One collapsible "Global" or per-project section, styled like a Settings
  * section header (title + entry count), holding a list of `MemoryRow`s
@@ -26,11 +27,11 @@ export const MemoryScopeSection = ({
 
   return (
     <section>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="mb-2 flex w-full items-center gap-2 px-3.5 text-left"
+        className="mb-2 h-auto w-full justify-start gap-2 px-3.5 py-0 font-normal hover:bg-transparent"
       >
         <ChevronDown
           className={cn(
@@ -44,7 +45,7 @@ export const MemoryScopeSection = ({
         {hint ? (
           <span className="truncate text-xs text-ink-faint">{hint}</span>
         ) : null}
-      </button>
+      </Button>
       <Collapsible open={open}>
         <div className="flex flex-col gap-1.5">
           {memories.map((memory) => (

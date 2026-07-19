@@ -1,4 +1,4 @@
-import type { MouseEvent } from "react"
+import { memo, type MouseEvent } from "react"
 import {
   ArchiveRestore,
   Archive as ArchiveIcon,
@@ -20,10 +20,16 @@ type SessionRowActionsProps = {
   onOpenMenu: (e: MouseEvent<HTMLButtonElement>) => void
   canTogglePin: boolean
   canSetArchived: boolean
+  /**
+   * Mount Base UI IconButtons only after the row is hovered/focused.
+   * Sidebar lists are not virtualized — permanently mounting 3 buttons per
+   * row scales poorly (hooks × sessions). Sticky once true.
+   */
+  actionsReady: boolean
 }
 
 /** Hover trailing actions (pin / archive / more) + optional compact time. */
-export const SessionRowActions = ({
+export const SessionRowActions = memo(function SessionRowActions({
   pinned,
   archived,
   showTrailingTime,
@@ -35,7 +41,8 @@ export const SessionRowActions = ({
   onOpenMenu,
   canTogglePin,
   canSetArchived,
-}: SessionRowActionsProps) => {
+  actionsReady,
+}: SessionRowActionsProps) {
   return (
     <span className="flex shrink-0 items-center">
       {showTrailingTime ? (
@@ -60,66 +67,70 @@ export const SessionRowActions = ({
           "group-focus-within:pointer-events-auto group-focus-within:max-w-[90px] group-focus-within:opacity-100",
         )}
       >
-        <Tooltip label={pinned ? "Unpin" : "Pin"}>
-          <IconButton
-            label={pinned ? "Unpin session" : "Pin session"}
-            quiet
-            className="!h-5 !w-5"
-            disabled={!canTogglePin}
-            onClick={(e) => {
-              e.stopPropagation()
-              onTogglePin?.(e)
-            }}
-          >
-            <Pin
-              className={cn("h-3 w-3", pinned && "fill-current text-accent")}
-              aria-hidden
-            />
-          </IconButton>
-        </Tooltip>
-        {archived ? (
-          <Tooltip label="Restore">
+        {actionsReady ? (
+          <>
+            <Tooltip label={pinned ? "Unpin" : "Pin"}>
+              <IconButton
+                label={pinned ? "Unpin session" : "Pin session"}
+                quiet
+                size="icon-2xs"
+                disabled={!canTogglePin}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onTogglePin?.(e)
+                }}
+              >
+                <Pin
+                  className={cn("h-3 w-3", pinned && "fill-current text-accent")}
+                  aria-hidden
+                />
+              </IconButton>
+            </Tooltip>
+            {archived ? (
+              <Tooltip label="Restore">
+                <IconButton
+                  label="Restore session"
+                  quiet
+                  size="icon-2xs"
+                  disabled={!canSetArchived}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onSetArchived?.(e, false)
+                  }}
+                >
+                  <ArchiveRestore className="h-3 w-3" aria-hidden />
+                </IconButton>
+              </Tooltip>
+            ) : (
+              <Tooltip label="Archive">
+                <IconButton
+                  label="Archive session"
+                  quiet
+                  size="icon-2xs"
+                  disabled={!canSetArchived}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onSetArchived?.(e, true)
+                  }}
+                >
+                  <ArchiveIcon className="h-3 w-3" aria-hidden />
+                </IconButton>
+              </Tooltip>
+            )}
             <IconButton
-              label="Restore session"
+              label="More actions"
               quiet
-              className="!h-5 !w-5"
-              disabled={!canSetArchived}
+              size="icon-2xs"
               onClick={(e) => {
                 e.stopPropagation()
-                onSetArchived?.(e, false)
+                onOpenMenu(e)
               }}
             >
-              <ArchiveRestore className="h-3 w-3" aria-hidden />
+              <MoreHorizontal className="h-3 w-3" aria-hidden />
             </IconButton>
-          </Tooltip>
-        ) : (
-          <Tooltip label="Archive">
-            <IconButton
-              label="Archive session"
-              quiet
-              className="!h-5 !w-5"
-              disabled={!canSetArchived}
-              onClick={(e) => {
-                e.stopPropagation()
-                onSetArchived?.(e, true)
-              }}
-            >
-              <ArchiveIcon className="h-3 w-3" aria-hidden />
-            </IconButton>
-          </Tooltip>
-        )}
-        <IconButton
-          label="More actions"
-          quiet
-          className="!h-5 !w-5"
-          onClick={(e) => {
-            e.stopPropagation()
-            onOpenMenu(e)
-          }}
-        >
-          <MoreHorizontal className="h-3 w-3" aria-hidden />
-        </IconButton>
+          </>
+        ) : null}
       </span>
     </span>
   )
-}
+})

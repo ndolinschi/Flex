@@ -1,5 +1,6 @@
 import { HighlightedLabel } from "../atoms"
 import { cn, formatRelativeTime } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 type FuzzySessionRowProps = {
   index: number
@@ -22,14 +23,14 @@ export const FuzzySessionRow = ({
   onHover,
 }: FuzzySessionRowProps) => {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       data-index={index}
       onMouseEnter={onHover}
       onClick={onActivate}
       className={cn(
-        "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm",
-        "transition-colors duration-[var(--duration-fast)]",
+        "h-auto w-full justify-start gap-2 px-3 py-1.5 font-normal",
+        "text-sm",
         active ? "bg-fill-4 text-ink" : "text-ink-secondary hover:bg-fill-5",
       )}
     >
@@ -39,6 +40,6 @@ export const FuzzySessionRow = ({
       <span className="shrink-0 truncate text-xs text-ink-faint">
         {formatRelativeTime(updatedAtMs)}
       </span>
-    </button>
+    </Button>
   )
 }

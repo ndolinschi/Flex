@@ -17,6 +17,7 @@ import {
   Smartphone,
   Tablet,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { IconButton, Tooltip } from "../../atoms"
 import { VIEWPORT_PRESETS as VIEWPORT_PRESETS_BASE } from "../../../hooks/useBrowserSession"
 import type { BrowserViewportPreset } from "../../../stores/appStore"
@@ -192,20 +193,17 @@ export const BrowserToolbar = ({
             className="h-6 w-full rounded-sm bg-fill-4 px-2 text-sm text-ink outline-none focus-visible:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
           />
         ) : (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             onClick={() => setEditing(true)}
-            className={cn(
-              "flex h-6 w-full items-center truncate rounded-sm px-2 text-left text-sm",
-              "cursor-text transition-colors duration-[var(--duration-fast)] hover:bg-fill-4",
-            )}
+            className="h-6 w-full justify-start truncate rounded-sm px-2 text-sm cursor-text hover:bg-fill-4"
           >
             {browserStarted ? (
               <FormattedUrl url={browserUrl} />
             ) : (
               <span className="text-ink-muted">Search or enter a URL</span>
             )}
-          </button>
+          </Button>
         )}
       </div>
 

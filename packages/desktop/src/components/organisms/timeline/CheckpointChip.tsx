@@ -5,6 +5,7 @@ import { ConfirmDialog, ErrorBanner } from "../../molecules"
 import { revertSnapshot } from "../../../lib/tauri"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import { cn } from "../../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 export const CheckpointChip = ({
   sessionId,
@@ -37,21 +38,18 @@ export const CheckpointChip = ({
 
   return (
     <>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         disabled={disabled}
         onClick={() => setOpen(true)}
         className={cn(
-          "group/checkpoint flex h-3 items-center gap-1 text-sm leading-none text-ink-muted",
-          "transition-colors duration-[var(--duration-fast)]",
-          disabled
-            ? "cursor-not-allowed opacity-40"
-            : "cursor-pointer hover:text-ink-secondary",
+          "group/checkpoint h-auto gap-1 px-0 py-0 font-normal text-sm leading-none text-ink-muted hover:bg-transparent",
+          disabled ? "cursor-not-allowed" : "hover:text-ink-secondary",
         )}
       >
         <ArrowRight className="h-2.5 w-2.5" aria-hidden />
         <span>Restore Checkpoint</span>
-      </button>
+      </Button>
       <ConfirmDialog
         open={open}
         title="Restore checkpoint?"

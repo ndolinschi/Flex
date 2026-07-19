@@ -6,6 +6,7 @@ import {
   Collapsible,
   ConfirmDialog,
 } from "../../../components/molecules"
+import { Button as ShadcnButton } from "@/components/ui/button"
 import { routinesHistory, routinesRemove, routinesRun } from "../../../lib/tauri"
 import type { RoutineDto } from "../../../lib/types"
 import { formatRelativeTime } from "../../../lib/utils"
@@ -48,10 +49,10 @@ export const RoutineRow = ({ routine }: { routine: RoutineDto }) => {
   return (
     <div className="flex flex-col">
       <div className="flex items-start gap-3 px-3.5 py-3">
-        <button
-          type="button"
+        <ShadcnButton
+          variant="ghost"
           onClick={() => setExpanded((v) => !v)}
-          className="min-w-0 flex-1 text-left"
+          className="h-auto min-w-0 flex-1 justify-start px-0 py-0 font-normal hover:bg-transparent"
           aria-label={expanded ? "Collapse run history" : "Expand run history"}
           aria-expanded={expanded}
         >
@@ -66,7 +67,7 @@ export const RoutineRow = ({ routine }: { routine: RoutineDto }) => {
               Started — a new session will appear in the sidebar.
             </p>
           ) : null}
-        </button>
+        </ShadcnButton>
 
         <div className="flex shrink-0 items-center gap-1.5">
           {historyQuery.isSuccess && lastRun ? (
@@ -83,9 +84,8 @@ export const RoutineRow = ({ routine }: { routine: RoutineDto }) => {
             <Play className="h-3 w-3" aria-hidden /> Run now
           </Button>
           <Button
-            variant="ghost"
+            variant="destructive"
             size="sm"
-            className="text-danger"
             onClick={() => setConfirmDelete(true)}
           >
             <Trash2 className="h-3 w-3" aria-hidden />

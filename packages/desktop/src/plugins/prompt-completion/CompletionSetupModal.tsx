@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
+import { AlertCircleIcon, CheckCircle2Icon } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button, Spinner } from "../../components/atoms"
 import { ErrorBanner, ModelSelect } from "../../components/molecules"
+import { Button as ShadcnButton } from "@/components/ui/button"
 import { useInlineCompletionPrefs } from "../../hooks/useInlineCompletionPrefs"
 import { useModels } from "../../hooks/useModels"
 import {
@@ -189,52 +192,50 @@ export const CompletionSetupModal = ({
         </div>
 
         <div className="flex gap-1 rounded-md bg-fill-4 p-0.5">
-          <button
-            type="button"
-            className={cn(
-              "flex-1 rounded-md px-2 py-1.5 text-sm transition-colors",
-              path === "ollama"
-                ? "bg-fill-2 text-ink"
-                : "text-ink-muted hover:text-ink",
-            )}
+          <ShadcnButton
+            variant="ghost"
             onClick={() => {
               setPath("ollama")
               setProviderId("ollama")
               setModelId(RECOMMENDED_OLLAMA_MODEL)
             }}
+            className={cn(
+              "h-auto flex-1 rounded-md px-2 py-1.5 text-sm font-normal",
+              path === "ollama"
+                ? "bg-fill-2 text-ink hover:bg-fill-2"
+                : "text-ink-muted hover:bg-transparent hover:text-ink",
+            )}
           >
             Ollama
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "flex-1 rounded-md px-2 py-1.5 text-sm transition-colors",
-              path === "provider"
-                ? "bg-fill-2 text-ink"
-                : "text-ink-muted hover:text-ink",
-            )}
+          </ShadcnButton>
+          <ShadcnButton
+            variant="ghost"
             onClick={() => {
               setPath("provider")
               setProviderId(otherProviders[0] ?? "")
               setModelId("")
             }}
+            className={cn(
+              "h-auto flex-1 rounded-md px-2 py-1.5 text-sm font-normal",
+              path === "provider"
+                ? "bg-fill-2 text-ink hover:bg-fill-2"
+                : "text-ink-muted hover:bg-transparent hover:text-ink",
+            )}
           >
             Existing connection
-          </button>
+          </ShadcnButton>
         </div>
 
         {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}
         {checkMessage ? (
-          <p
-            className={cn(
-              "rounded-md border px-2.5 py-2 text-sm",
-              checkOk
-                ? "border-success/30 bg-success-subtle text-success"
-                : "border-danger/30 bg-danger-subtle text-danger",
-            )}
-          >
-            {checkMessage}
-          </p>
+          <Alert variant={checkOk ? "default" : "destructive"}>
+            {checkOk ? <CheckCircle2Icon /> : <AlertCircleIcon />}
+            <AlertDescription
+              className={checkOk ? "text-foreground" : "text-destructive"}
+            >
+              {checkMessage}
+            </AlertDescription>
+          </Alert>
         ) : null}
 
         {path === "ollama" ? (

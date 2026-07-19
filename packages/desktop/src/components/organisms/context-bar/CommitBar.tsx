@@ -12,10 +12,10 @@ import {
 import { toastPrOutcome } from "../../../lib/prOutcomeToast"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import { useAppStore } from "../../../stores/appStore"
-import { cn } from "../../../lib/utils"
 import { CreatePrDialog } from "../../molecules/CreatePrDialog"
 import { PopoverTray } from "../../molecules/PopoverTray"
 import { Button, DiffStat, TextInput } from "../../atoms"
+import { Button as ShadcnButton } from "@/components/ui/button"
 
 /** Right-aligned "N changes" pill + Commit button, shown above the
  * composer for non-isolated sessions with a dirty working tree (design:
@@ -135,36 +135,30 @@ export const CommitBar = ({
 
   return (
     <div ref={rootRef} className="relative flex shrink-0 items-center gap-1.5">
-      <button
-        type="button"
+      <ShadcnButton
+        variant="secondary"
+        size="xs"
         onClick={() => {
           openToolBesideChat(sessionId, "changes")
         }}
-        className={cn(
-          "flex h-6 max-w-[12rem] shrink items-center gap-1.5 truncate rounded-md",
-          "bg-fill-3 px-2 text-xs text-ink-muted whitespace-nowrap",
-          "transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink-secondary",
-        )}
+        className="max-w-[12rem] shrink gap-1.5 truncate font-normal"
       >
         <span className="truncate">
           {totalCount} change{totalCount === 1 ? "" : "s"}
         </span>
         <DiffStat summary={totals} />
-      </button>
+      </ShadcnButton>
 
-      <button
-        type="button"
+      <ShadcnButton
+        variant="default"
+        size="xs"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className={cn(
-          "flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md",
-          "bg-accent px-2 text-xs text-accent-text",
-          "transition-colors duration-[var(--duration-fast)] hover:bg-accent-hover",
-        )}
+        className="shrink-0 gap-1 font-normal"
       >
-        <GitMerge className="h-3 w-3 shrink-0" aria-hidden />
+        <GitMerge data-icon="inline-start" aria-hidden />
         {primaryLabel}
-      </button>
+      </ShadcnButton>
 
       <PopoverTray
         open={open}
@@ -204,7 +198,7 @@ export const CommitBar = ({
                 Commit & Push
               </Button>
               <Button
-                variant="primary"
+                variant="default"
                 size="sm"
                 disabled={busy !== null || !trimmed}
                 onClick={() => {
@@ -218,7 +212,7 @@ export const CommitBar = ({
             </>
           ) : (
             <Button
-              variant="primary"
+              variant="default"
               size="sm"
               isLoading={busy === "commit"}
               disabled={busy !== null || !trimmed}

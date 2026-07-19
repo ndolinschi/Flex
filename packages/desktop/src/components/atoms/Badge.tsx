@@ -10,11 +10,11 @@ type BadgeProps = {
 }
 
 const variantClasses: Record<BadgeVariant, string> = {
-  default: "bg-accent-subtle text-accent",
+  default: "bg-primary/15 text-primary",
   success: "bg-success-subtle text-success",
   warning: "bg-warning-subtle text-warning",
-  danger: "bg-danger-subtle text-danger",
-  muted: "bg-surface-muted text-ink-muted",
+  danger: "bg-destructive/10 text-destructive",
+  muted: "bg-muted text-muted-foreground",
 }
 
 export const Badge = ({

@@ -18,8 +18,10 @@ import {
 } from "../../lib/tauri"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 import { IconButton, TextInput } from "../atoms"
 import { ConfirmDialog } from "./ConfirmDialog"
+import { ErrorBanner } from "./ErrorBanner"
 
 type SessionMenuProps = {
   sessionId: string
@@ -171,9 +173,8 @@ export const SessionMenu = ({
   }
 
   const itemClass = cn(
-    "flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-base",
-    "text-ink-secondary transition-colors duration-[var(--duration-fast)] hover:bg-fill-3 hover:text-ink",
-    "disabled:pointer-events-none disabled:opacity-40",
+    "w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-base",
+    "text-ink-secondary hover:bg-fill-3 hover:text-ink",
   )
 
   return (
@@ -195,17 +196,17 @@ export const SessionMenu = ({
             "border border-stroke-2 bg-panel py-0.5 shadow-lg animate-tray-in",
           )}
         >
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             role="menuitem"
             className={itemClass}
             onClick={handleOpenRename}
           >
             <Pencil className="h-3.5 w-3.5 text-icon-3" aria-hidden />
             Rename
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
             role="menuitem"
             disabled={!canUndo || busy}
             className={itemClass}
@@ -213,9 +214,9 @@ export const SessionMenu = ({
           >
             <Undo2 className="h-3.5 w-3.5 text-icon-3" aria-hidden />
             Undo files
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
             role="menuitem"
             disabled={!canRedo || busy}
             className={itemClass}
@@ -223,12 +224,12 @@ export const SessionMenu = ({
           >
             <Redo2 className="h-3.5 w-3.5 text-icon-3" aria-hidden />
             Redo files
-          </button>
+          </Button>
           {isolated ? (
             <>
               <div className="mx-2 my-0.5 border-t border-stroke-3" />
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 role="menuitem"
                 disabled={busy}
                 className={itemClass}
@@ -236,9 +237,9 @@ export const SessionMenu = ({
               >
                 <GitMerge className="h-3.5 w-3.5 text-icon-3" aria-hidden />
                 Integrate workspace
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="ghost"
                 role="menuitem"
                 disabled={busy}
                 className={itemClass}
@@ -246,26 +247,30 @@ export const SessionMenu = ({
               >
                 <XCircle className="h-3.5 w-3.5 text-icon-3" aria-hidden />
                 Discard workspace
-              </button>
+              </Button>
             </>
           ) : null}
           <div className="mx-2 my-0.5 border-t border-stroke-3" />
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             role="menuitem"
             className={itemClass}
             onClick={handleOpenDelete}
           >
             <Trash2 className="h-3.5 w-3.5 text-icon-3" aria-hidden />
             Delete
-          </button>
+          </Button>
         </div>
       ) : null}
 
       {error ? (
-        <p className="absolute right-0 top-full z-50 mt-10 w-56 rounded-md bg-danger-subtle px-2 py-1 text-xs text-danger">
-          {error}
-        </p>
+        <div className="absolute right-0 top-full z-50 mt-10 w-56">
+          <ErrorBanner
+            message={error}
+            onDismiss={() => setError(null)}
+            className="py-1.5 text-xs shadow-md"
+          />
+        </div>
       ) : null}
 
       <ConfirmDialog

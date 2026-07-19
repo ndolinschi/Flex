@@ -6,6 +6,7 @@ import {
 } from "react"
 import { Search } from "lucide-react"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 type PopoverTrayProps = {
   open: boolean
@@ -203,22 +204,20 @@ export const PopoverItem = ({
   className,
   role = "option",
 }: PopoverItemProps) => (
-  <button
-    type="button"
+  <Button
+    variant="ghost"
     role={role}
     aria-selected={role === "option" ? active : undefined}
     disabled={disabled}
     tabIndex={disabled ? -1 : 0}
     onClick={onClick}
     className={cn(
-      "flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm",
-      "transition-colors duration-[var(--duration-fast)]",
+      "h-auto w-full justify-start gap-2 px-2.5 py-1.5 font-normal text-sm",
       "hover:bg-[color:var(--color-select-hover)] focus:bg-[color:var(--color-select-hover)]",
-      "focus:outline-none disabled:opacity-50",
       active ? "bg-fill-4 text-ink" : "text-ink-secondary",
       className,
     )}
   >
     {children}
-  </button>
+  </Button>
 )

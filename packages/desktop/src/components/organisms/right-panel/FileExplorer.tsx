@@ -29,6 +29,7 @@ import { useAppStore } from "../../../stores/appStore"
 import { IconButton, Spinner, TextInput } from "../../atoms"
 import { ConfirmDialog, ContextMenu, type ContextMenuItem } from "../../molecules"
 import { STATUS_COLOR } from "./FileRow"
+import { Button } from "@/components/ui/button"
 
 type FileExplorerProps = {
   sessionId: string
@@ -201,8 +202,8 @@ const TreeBranch = ({
         const statusClass = gitStatusClass(hit.path, isDir, gitIndex)
         return (
           <li key={hit.path}>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={() => {
                 if (isDir) onToggle(hit.path)
                 else onOpenFile(hit.path)
@@ -211,7 +212,7 @@ const TreeBranch = ({
               title={hit.path}
               aria-expanded={isDir ? isOpen : undefined}
               className={cn(
-                "flex h-7 w-full items-center gap-1 rounded-md pr-2 text-left text-sm",
+                "h-7 w-full justify-start gap-1 rounded-md pr-2 text-sm font-normal",
                 "hover:bg-fill-4",
                 statusClass ?? "text-ink-secondary hover:text-ink",
               )}
@@ -241,7 +242,7 @@ const TreeBranch = ({
               {isDir && isFetching && isOpen ? (
                 <Spinner size="sm" />
               ) : null}
-            </button>
+            </Button>
             {isDir && isOpen ? (
               <TreeBranch
                 cwd={cwd}
@@ -505,8 +506,8 @@ export const FileExplorer = ({
                 const statusClass = gitStatusClass(hit.path, isDir, gitIndex)
                 return (
                   <li key={hit.path}>
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
                       onClick={() => {
                         if (isDir) {
                           setQuery("")
@@ -518,7 +519,7 @@ export const FileExplorer = ({
                       onContextMenu={(e) => handleContextMenu(e, hit)}
                       title={hit.path}
                       className={cn(
-                        "flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-sm",
+                        "h-7 w-full justify-start gap-2 rounded-md px-2 text-sm font-normal",
                         "hover:bg-fill-4",
                         statusClass ?? "text-ink-secondary hover:text-ink",
                       )}
@@ -538,7 +539,7 @@ export const FileExplorer = ({
                         </span>
                         {hit.name}
                       </span>
-                    </button>
+                    </Button>
                   </li>
                 )
               })}

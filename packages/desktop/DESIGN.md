@@ -28,22 +28,24 @@ audit and fix UI against this file. For shadcn adds/rewrites, also load the
 | Keyboard focus | Neutral `stroke-2` ring; no accent glow |
 | Semibold = 590 | Plus micro tracking on captions |
 
-### shadcn token bridge (when `components.json` lands)
+### shadcn token bridge
 
-Phase 0 of the migration maps shadcn semantic variables onto these Flex tokens
-— Flex wins on conflict. Typical aliases (illustrative):
+Phase 0 maps shadcn semantic variables onto Flex tokens — Flex wins on
+conflict. Live aliases in `src/index.css`:
 
 | shadcn semantic | Flex source |
 |---|---|
 | `--background` / `--card` / `--popover` | `--color-chrome` / `--color-elevated` / `--color-panel` |
-| `--foreground` / `--muted-foreground` | `--color-text-1` / `--color-text-2` |
+| `--foreground` / `--muted-foreground` | `--color-ink` / `--color-text-2` |
 | `--border` / `--input` / `--ring` | `--color-stroke-3` / `--color-stroke-2` (ring stays neutral — never accent glow) |
 | `--primary` / `--primary-foreground` | `--color-accent` / `--color-accent-text` |
 | `--destructive` | `--color-danger` |
-| `--radius` | keep role radii (`--radius-*`); controls stay `rounded-md` (8) |
+| `--radius` | `0.5rem` base; role radii stay Flex `--radius-*` |
 
 Do not introduce a second theme system. Keep `data-theme="dark"|"light"` and
 Settings → Appearance accent overrides as the only runtime theme knobs.
+shadcn’s `--accent` means muted hover fill (`--color-fill-4`), **not** the
+product accent (`--color-accent` / `bg-primary`).
 
 ---
 

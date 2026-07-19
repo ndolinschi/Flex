@@ -2,6 +2,7 @@ import { useRef, useState } from "react"
 import { Check, ChevronDown } from "lucide-react"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 import { Label, Spinner } from "../atoms"
 import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
@@ -54,19 +55,14 @@ export const ModelSelect = ({
     <div className={cn("flex flex-col gap-1.5", className)}>
       {label ? <Label htmlFor={id}>{label}</Label> : null}
       <div ref={rootRef} className="relative">
-        <button
-          type="button"
+        <Button
+          variant="outline"
           id={id}
           onClick={() => setOpen((v) => !v)}
           disabled={disabled || isLoading}
           aria-haspopup="listbox"
           aria-expanded={open}
-          className={cn(
-            "flex h-9 w-full items-center gap-2 rounded-md border border-border bg-surface",
-            "px-3 text-sm text-ink",
-            "focus:border-stroke-2 focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]",
-            "disabled:cursor-not-allowed disabled:opacity-50",
-          )}
+          className="h-9 w-full justify-start gap-2 border-border bg-surface px-3 text-sm text-ink hover:bg-surface focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
         >
           <span
             className={cn(
@@ -81,7 +77,7 @@ export const ModelSelect = ({
           ) : (
             <ChevronDown className="h-3.5 w-3.5 shrink-0 text-icon-3" aria-hidden />
           )}
-        </button>
+        </Button>
 
         <PopoverTray
           open={open}

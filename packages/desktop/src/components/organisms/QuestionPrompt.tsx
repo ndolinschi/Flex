@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { Button as ShadcnButton } from "@/components/ui/button"
 import { Button, TextInput } from "../atoms"
 import { ErrorBanner } from "../molecules"
 import { respondQuestion, toInvokeError } from "../../lib/tauri"
@@ -22,7 +23,6 @@ const emptyDraft = (): DraftAnswer => ({ selected: [], custom: "" })
 const CARD_PAD = "px-3 pt-3 pb-3"
 const SECTION_GAP = "mt-2.5"
 const STACK_GAP = "gap-2"
-const OPTION_PAD = "px-3 py-2"
 
 const StepBody = ({
   q,
@@ -69,27 +69,28 @@ const StepBody = ({
         {q.options.map((opt) => {
           const active = draft.selected.includes(opt.label)
           return (
-            <button
+            <ShadcnButton
               key={opt.label}
-              type="button"
+              variant="outline"
               aria-pressed={active}
               onClick={() => handleToggle(opt.label)}
               className={cn(
-                "w-full rounded-md border text-left text-sm leading-snug",
-                OPTION_PAD,
+                "h-auto w-full justify-start px-3 py-2 text-left text-sm leading-snug",
                 "transition-colors duration-[var(--duration-fast)]",
                 active
-                  ? "border-accent bg-accent-subtle text-ink"
-                  : "border-stroke-3 bg-fill-5 text-ink-secondary hover:border-stroke-2 hover:bg-fill-4",
+                  ? "border-accent bg-accent-subtle text-ink hover:bg-accent-subtle"
+                  : "border-stroke-3 bg-fill-5 text-ink-secondary hover:border-stroke-2 hover:bg-fill-4 hover:text-ink-secondary",
               )}
             >
-              <span className="block font-medium leading-snug">{opt.label}</span>
-              {opt.description ? (
-                <span className="mt-1 block text-xs leading-snug text-ink-muted">
-                  {opt.description}
-                </span>
-              ) : null}
-            </button>
+              <span className="flex flex-col items-start gap-1">
+                <span className="font-medium leading-snug">{opt.label}</span>
+                {opt.description ? (
+                  <span className="text-xs leading-snug text-ink-muted">
+                    {opt.description}
+                  </span>
+                ) : null}
+              </span>
+            </ShadcnButton>
           )
         })}
         {allowCustom ? (

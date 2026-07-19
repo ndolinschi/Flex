@@ -15,6 +15,7 @@ import {
 } from "../../lib/workerPresentation"
 import { cn, formatDuration } from "../../lib/utils"
 import { Collapsible } from "./Collapsible"
+import { Button } from "@/components/ui/button"
 
 type SubagentGroupProps = {
   task: string
@@ -47,7 +48,7 @@ const StatusGlyph = ({ status }: { status: WorkerStatus }) => {
     )
   }
   if (status === "failed") {
-    return <X className="h-3.5 w-3.5 shrink-0 text-danger" aria-hidden />
+    return <X className="h-3.5 w-3.5 shrink-0 text-destructive" aria-hidden />
   }
   return <Check className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
 }
@@ -59,11 +60,11 @@ const TaskPromptDetail = ({ task }: { task: string }) => {
 
   return (
     <div className="flex flex-col">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        className="group/prompt flex min-h-5 w-full items-center gap-1 text-left text-base leading-[1.5] text-ink-muted"
+        className="group/prompt h-auto min-h-5 w-full justify-start gap-1 px-0 py-0 font-normal text-base leading-[1.5] text-ink-muted hover:bg-transparent"
       >
         <ChevronRight
           className={cn(
@@ -76,7 +77,7 @@ const TaskPromptDetail = ({ task }: { task: string }) => {
         <span className="min-w-0 flex-1 truncate text-ink-faint">
           {preview}
         </span>
-      </button>
+      </Button>
       <Collapsible open={expanded}>
         <div className="ml-3.5 max-h-[300px] overflow-auto rounded-md border border-stroke-3 bg-panel px-3 py-2">
           <p className="whitespace-pre-wrap text-base leading-[1.5] text-ink-muted">
@@ -148,8 +149,8 @@ export const SubagentGroup = memo(function SubagentGroup({
   return (
     <div className="flex flex-col">
       <div className="group flex min-h-7 w-full items-start gap-1.5">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => {
             if (onOpenViewer) {
               onOpenViewer()
@@ -159,8 +160,9 @@ export const SubagentGroup = memo(function SubagentGroup({
             setExpanded((v) => !v)
           }}
           className={cn(
-            "flex min-w-0 flex-1 flex-col gap-0.5 text-left",
-            (onOpenViewer || phase !== "started" || compact) && "cursor-pointer",
+            "h-auto min-w-0 flex-1 flex-col items-start justify-start gap-0.5 px-0 py-0 font-normal",
+            "hover:bg-transparent",
+            (onOpenViewer || phase !== "started" || compact) ? "cursor-pointer" : "cursor-default",
           )}
         >
           <span className="flex min-w-0 items-center gap-1.5 text-base">
@@ -173,7 +175,7 @@ export const SubagentGroup = memo(function SubagentGroup({
               className={cn(
                 "min-w-0 truncate text-ink-secondary",
                 status === "running" && "animate-shimmer-text",
-                status === "failed" && "text-danger",
+                status === "failed" && "text-destructive",
               )}
             >
               {title}
@@ -203,14 +205,15 @@ export const SubagentGroup = memo(function SubagentGroup({
               {activityLine}
             </span>
           ) : null}
-        </button>
+        </Button>
         {(phase === "completed" || compact) && hasBody ? (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-xs"
             onClick={() => setExpanded((v) => !v)}
             aria-expanded={open}
             aria-label="Toggle inline details"
-            className="mt-1 shrink-0 cursor-pointer p-0.5"
+            className="mt-1 shrink-0 p-0.5 hover:bg-transparent"
           >
             <ChevronRight
               className={cn(
@@ -220,7 +223,7 @@ export const SubagentGroup = memo(function SubagentGroup({
               )}
               aria-hidden
             />
-          </button>
+          </Button>
         ) : null}
       </div>
       <Collapsible open={open && hasBody}>

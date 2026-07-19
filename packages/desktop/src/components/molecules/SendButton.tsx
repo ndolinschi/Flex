@@ -1,5 +1,6 @@
-import { ArrowUp, Square } from "lucide-react"
-import { cn } from "../../lib/utils"
+import { ArrowUpIcon, SquareIcon } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 type SendButtonProps = {
   isStreaming: boolean
@@ -10,7 +11,13 @@ type SendButtonProps = {
   onStop: () => void
 }
 
-/** 24px circle send / stop / queue — matches Plus / Bypass composer controls. */
+const circleClass = cn(
+  "size-6 shrink-0 rounded-full bg-send text-send-fg opacity-80",
+  "hover:opacity-100 hover:bg-send hover:text-send-fg",
+)
+const disabledCircleClass = cn(circleClass, "disabled:opacity-30")
+
+/** 24px circle send / stop / queue — shadcn Button icon shell. */
 export const SendButton = ({
   isStreaming,
   canQueue = false,
@@ -18,58 +25,59 @@ export const SendButton = ({
   onSend,
   onStop,
 }: SendButtonProps) => {
-  const circleClass = cn(
-    "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full",
-    "bg-send text-send-fg opacity-80",
-    "transition-opacity duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-    "hover:opacity-100",
-  )
-
   if (isStreaming && canQueue) {
     return (
       <div className="flex items-center gap-1.5">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           onClick={onStop}
           aria-label="Stop generation"
           className={circleClass}
         >
-          <Square className="h-2.5 w-2.5 fill-current" aria-hidden />
-        </button>
-        <button
+          <SquareIcon className="size-2.5 fill-current" />
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           onClick={onSend}
           aria-label="Queue message"
           className={circleClass}
         >
-          <ArrowUp className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
-        </button>
+          <ArrowUpIcon className="size-3.5" strokeWidth={2.5} />
+        </Button>
       </div>
     )
   }
 
   if (isStreaming) {
     return (
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon-xs"
         onClick={onStop}
         aria-label="Stop generation"
         className={circleClass}
       >
-        <Square className="h-2.5 w-2.5 fill-current" aria-hidden />
-      </button>
+        <SquareIcon className="size-2.5 fill-current" />
+      </Button>
     )
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon-xs"
       onClick={onSend}
       disabled={disabled}
       aria-label="Send message"
-      className={cn(circleClass, "disabled:opacity-30 disabled:pointer-events-none")}
+      className={disabledCircleClass}
     >
-      <ArrowUp className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
-    </button>
+      <ArrowUpIcon className="size-3.5" strokeWidth={2.5} />
+    </Button>
   )
 }

@@ -1,6 +1,7 @@
 import { Terminal as TerminalIcon, X } from "lucide-react"
 import { cn } from "../../../lib/utils"
 import { formatElapsed } from "./time"
+import { Button } from "@/components/ui/button"
 
 export const TerminalRow = ({
   title,
@@ -38,8 +39,9 @@ export const TerminalRow = ({
       <span className="shrink-0 text-xs text-ink-muted group-hover:hidden">
         {formatElapsed(createdAtMs, now)}
       </span>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="icon-xs"
         aria-label="Close terminal"
         title="Close Terminal"
         onClick={(e) => {
@@ -47,12 +49,12 @@ export const TerminalRow = ({
           onRequestClose()
         }}
         className={cn(
-          "hidden h-4 w-4 shrink-0 items-center justify-center rounded-sm text-ink-muted",
+          "hidden h-4 w-4 shrink-0 rounded-sm text-ink-muted",
           "hover:bg-fill-4 hover:text-ink group-hover:flex",
         )}
       >
         <X className="h-3 w-3" aria-hidden />
-      </button>
+      </Button>
     </div>
   )
 }

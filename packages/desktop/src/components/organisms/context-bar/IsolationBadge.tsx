@@ -5,6 +5,7 @@ import { workspaceStatus } from "../../../lib/tauri"
 import { useWorkspaceActions } from "../../../hooks/useWorkspaceActions"
 import { cn } from "../../../lib/utils"
 import { PopoverItem } from "../../molecules/PopoverTray"
+import { Button } from "@/components/ui/button"
 
 /** Isolated-workspace badge → popover with the diff summary + integrate/discard. */
 export const IsolationBadge = ({
@@ -38,18 +39,18 @@ export const IsolationBadge = ({
 
   return (
     <div ref={rootRef} className="relative">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className={cn(
-          "ml-1 flex h-6 items-center rounded-full bg-fill-3 px-2 text-xs text-ink-muted",
-          "transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink-secondary",
+          "ml-1 h-6 rounded-full bg-fill-3 px-2 text-xs text-ink-muted font-normal",
+          "hover:bg-fill-2 hover:text-ink-secondary",
           open && "bg-fill-2 text-ink-secondary",
         )}
       >
         Isolated
-      </button>
+      </Button>
 
       {open ? (
         <div

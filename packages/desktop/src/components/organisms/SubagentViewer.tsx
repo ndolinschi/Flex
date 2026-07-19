@@ -1,5 +1,6 @@
 import { useEffect } from "react"
 import { Bot, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { TurnTimeline } from "./TurnTimeline"
 import { useAppStore } from "../../stores/appStore"
 
@@ -29,11 +30,11 @@ export const SubagentViewer = () => {
   return (
     <>
       {/* Dim + click-capture over the conversation behind the tray. */}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         aria-label="Close subagent view"
         onClick={closeSubagentViewer}
-        className="subagent-viewer-mask absolute inset-0 z-10 cursor-default bg-bg/45"
+        className="subagent-viewer-mask absolute inset-0 z-10 h-auto w-auto cursor-default rounded-none bg-bg/45 hover:bg-bg/45"
       />
       <section
         role="dialog"
@@ -50,14 +51,15 @@ export const SubagentViewer = () => {
           <span className="min-w-0 flex-1 truncate text-sm text-ink-secondary">
             {viewer.title}
           </span>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-xs"
             onClick={closeSubagentViewer}
             aria-label="Close"
-            className="rounded-md p-1 text-icon-3 transition-colors duration-[var(--duration-fast)] hover:bg-fill-4 hover:text-ink-secondary"
+            className="text-icon-3 hover:bg-fill-4 hover:text-ink-secondary"
           >
-            <X className="h-3.5 w-3.5" aria-hidden />
-          </button>
+            <X aria-hidden />
+          </Button>
         </header>
         <div className="flex min-h-0 flex-1 flex-col">
           <TurnTimeline sessionId={viewer.sessionId} />

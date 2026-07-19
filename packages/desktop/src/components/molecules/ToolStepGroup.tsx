@@ -23,6 +23,7 @@ import {
   summarizeToolCalls,
   type ToolKind,
 } from "../../lib/toolPresentation"
+import { Button } from "@/components/ui/button"
 
 const KindIcon = ({
   kind,
@@ -135,17 +136,16 @@ export const ToolStepGroup = memo(function ToolStepGroup({
         className,
       )}
     >
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         aria-expanded={open}
         aria-label={`${summary.title}, ${open ? "collapse" : "expand"} details`}
         onClick={handleToggle}
         onKeyDown={handleKeyDown}
         className={cn(
-          "flex w-full items-center gap-1 rounded-md py-px text-left text-base",
-          "text-ink-muted transition-colors duration-[var(--duration-fast)]",
-          "hover:text-ink-secondary focus-visible:outline-none",
-          summary.failed && "text-danger",
+          "h-auto w-full justify-start gap-1 rounded-md px-0 py-px font-normal text-base",
+          "text-ink-muted hover:bg-transparent hover:text-ink-secondary",
+          summary.failed && "text-destructive",
         )}
       >
         <KindIcon kind={summary.kind} running={summary.running} />
@@ -170,7 +170,7 @@ export const ToolStepGroup = memo(function ToolStepGroup({
             aria-hidden
           />
         ) : null}
-      </button>
+      </Button>
 
       <Collapsible open={open}>
         <ul className="mt-0.5 ml-1.5 flex flex-col gap-0.5 py-0.5 pl-3">

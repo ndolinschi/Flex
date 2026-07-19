@@ -12,6 +12,7 @@ import {
   Search,
   X,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { TextInput } from "../atoms"
 import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import type { SettingsSearchEntry, SettingsSectionId } from "../../lib/settingsSearchIndex"
@@ -123,14 +124,15 @@ export const SettingsNav = ({
           className="h-7 pl-7 pr-7 text-xs"
         />
         {searching ? (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-xs"
             aria-label="Clear search"
             onClick={() => onQueryChange("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-faint hover:bg-transparent hover:text-ink"
           >
-            <X className="h-3 w-3" aria-hidden />
-          </button>
+            <X aria-hidden />
+          </Button>
         ) : null}
       </div>
 
@@ -140,15 +142,15 @@ export const SettingsNav = ({
             <p className="px-1.5 py-1 text-xs text-ink-faint">No results found.</p>
           ) : (
             results.map((entry, i) => (
-              <button
+              <Button
                 key={`${entry.section}-${entry.rowId}`}
-                type="button"
+                variant="ghost"
                 role="option"
                 aria-selected={i === resultIndex}
                 onClick={() => onResultSelect(entry)}
                 onMouseEnter={() => onResultIndexChange(i)}
                 className={cn(
-                  "flex flex-col gap-0 rounded-sm px-1.5 py-1 text-left transition-colors duration-[var(--duration-fast)]",
+                  "h-auto w-full flex-col items-start gap-0 rounded-sm px-1.5 py-1 text-left",
                   i === resultIndex ? "bg-fill-2 text-ink" : "hover:bg-fill-4",
                 )}
               >
@@ -158,7 +160,7 @@ export const SettingsNav = ({
                     {entry.description}
                   </span>
                 ) : null}
-              </button>
+              </Button>
             ))
           )}
         </div>
@@ -168,22 +170,22 @@ export const SettingsNav = ({
             const Icon = NAV_ICONS[item.id]
             const isActive = item.id === active
             return (
-              <button
+              <Button
                 key={item.id}
-                type="button"
+                variant="ghost"
                 onClick={() => onSelect(item.id)}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-sm leading-4",
+                  "h-auto w-full justify-start gap-1.5 rounded-sm px-1.5 py-1 text-sm leading-4",
                   "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                   isActive
-                    ? "bg-fill-2 text-ink"
+                    ? "bg-fill-2 text-ink hover:bg-fill-2"
                     : "text-ink-secondary hover:bg-fill-4",
                 )}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 <span className="truncate">{item.label}</span>
-              </button>
+              </Button>
             )
           })}
         </div>

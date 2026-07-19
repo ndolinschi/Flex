@@ -8,6 +8,7 @@ import {
 } from "../../lib/accent"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 /** Accent swatch grid + custom hex/color picker for Appearance settings. */
 export const AccentColorPicker = () => {
@@ -53,18 +54,18 @@ export const AccentColorPicker = () => {
           const swatch =
             theme === "dark" ? preset.tokens.dark.accent : preset.tokens.light.accent
           return (
-            <button
+            <Button
               key={preset.id}
-              type="button"
+              variant="ghost"
+              size="icon-xs"
               role="option"
               aria-selected={selected}
               aria-label={preset.label}
               title={preset.label}
               onClick={() => selectPreset(preset.id)}
               className={cn(
-                "relative flex h-7 w-7 items-center justify-center rounded-md",
-                "ring-1 ring-stroke-2 transition-[box-shadow,transform]",
-                "hover:scale-[1.04] focus-visible:outline-none",
+                "rounded-md ring-1 ring-stroke-2 transition-[box-shadow,transform]",
+                "hover:scale-[1.04] hover:bg-transparent",
                 "focus-visible:ring-2 focus-visible:ring-ink",
                 selected && "ring-2 ring-ink",
               )}
@@ -77,12 +78,13 @@ export const AccentColorPicker = () => {
                   aria-hidden
                 />
               ) : null}
-            </button>
+            </Button>
           )
         })}
 
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-xs"
           role="option"
           aria-selected={accentId === "custom"}
           aria-label="Custom accent color"
@@ -92,15 +94,14 @@ export const AccentColorPicker = () => {
             setAccentCustomHex(normalized)
           }}
           className={cn(
-            "relative flex h-7 w-7 items-center justify-center rounded-md",
-            "bg-fill-3 ring-1 ring-stroke-2 transition-[box-shadow,transform]",
-            "hover:scale-[1.04] focus-visible:outline-none",
+            "rounded-md bg-fill-3 ring-1 ring-stroke-2 transition-[box-shadow,transform]",
+            "hover:scale-[1.04] hover:bg-fill-3",
             "focus-visible:ring-2 focus-visible:ring-ink",
             accentId === "custom" && "ring-2 ring-ink",
           )}
         >
           <Pipette className="h-3.5 w-3.5 text-ink-secondary" aria-hidden />
-        </button>
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

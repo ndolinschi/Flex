@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import type { TitleBarActionHandlers } from "../../hooks/useTitleBarActions"
 import { detectWindowHost } from "../../lib/windowChrome"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 import { PopoverItem, PopoverTray } from "./PopoverTray"
 
 type MenuId = "file" | "edit" | "view" | "help"
@@ -156,8 +157,8 @@ export const TitleBarMenus = ({
         const open = openMenu === id
         return (
           <div key={id} className="relative flex h-full items-center">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               aria-haspopup="menu"
               aria-expanded={open}
               onClick={() => setOpenMenu(open ? null : id)}
@@ -165,14 +166,14 @@ export const TitleBarMenus = ({
                 if (openMenu && openMenu !== id) setOpenMenu(id)
               }}
               className={cn(
-                "flex h-[22px] items-center rounded-sm px-1.5 text-xs leading-none text-ink-secondary",
+                "h-[22px] rounded-sm px-1.5 text-xs leading-none text-ink-secondary",
                 "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                 "hover:bg-fill-3 hover:text-ink",
                 open && "bg-fill-3 text-ink",
               )}
             >
               {menu.label}
-            </button>
+            </Button>
             <PopoverTray
               open={open}
               onClose={close}

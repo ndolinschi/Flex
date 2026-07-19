@@ -6,12 +6,7 @@ import {
   RotateCw,
 } from "lucide-react"
 import { cn } from "../../../lib/utils"
-
-const menuItemClass = cn(
-  "flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm",
-  "text-ink-secondary transition-colors duration-[var(--duration-fast)] hover:bg-fill-3 hover:text-ink",
-  "disabled:pointer-events-none disabled:opacity-40",
-)
+import { Button } from "@/components/ui/button"
 
 export type BrowserOverflowMenuProps = {
   browserStarted: boolean
@@ -24,6 +19,9 @@ export type BrowserOverflowMenuProps = {
   onClearHistory: () => void | Promise<void>
   onClearData: () => void | Promise<void>
 }
+
+const menuItemClass =
+  "w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm text-ink-secondary hover:bg-fill-3 hover:text-ink"
 
 /** Browser "…" overflow actions menu. */
 export const BrowserOverflowMenu = ({
@@ -46,8 +44,8 @@ export const BrowserOverflowMenu = ({
         "border border-stroke-2 bg-panel py-0.5 shadow-lg animate-tray-in",
       )}
     >
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         role="menuitem"
         disabled={!showLiveContent}
         className={menuItemClass}
@@ -58,9 +56,9 @@ export const BrowserOverflowMenu = ({
       >
         <Camera className="h-3.5 w-3.5 text-icon-3" aria-hidden />
         Take Screenshot
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="ghost"
         role="menuitem"
         disabled={!showLiveContent}
         className={menuItemClass}
@@ -71,9 +69,9 @@ export const BrowserOverflowMenu = ({
       >
         <RotateCw className="h-3.5 w-3.5 text-icon-3" aria-hidden />
         Hard Reload
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="ghost"
         role="menuitem"
         disabled={!browserUrl}
         className={menuItemClass}
@@ -84,10 +82,10 @@ export const BrowserOverflowMenu = ({
       >
         <Copy className="h-3.5 w-3.5 text-icon-3" aria-hidden />
         Copy Current URL
-      </button>
+      </Button>
       <div className="mx-2 my-0.5 border-t border-stroke-3" />
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         role="menuitem"
         disabled={!browserStarted}
         className={menuItemClass}
@@ -98,9 +96,9 @@ export const BrowserOverflowMenu = ({
       >
         <History className="h-3.5 w-3.5 text-icon-3" aria-hidden />
         Clear Browsing History
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="ghost"
         role="menuitem"
         disabled={!showLiveContent}
         className={menuItemClass}
@@ -111,7 +109,7 @@ export const BrowserOverflowMenu = ({
       >
         <Eraser className="h-3.5 w-3.5 text-icon-3" aria-hidden />
         Clear Browsing Data
-      </button>
+      </Button>
     </div>
   )
 }

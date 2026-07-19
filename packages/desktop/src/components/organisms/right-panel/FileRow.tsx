@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, ChevronRight, FileCode2, Undo2 } from "lucide-react"
 import { Checkbox, DiffStat, IconButton, Spinner } from "../../atoms"
 import { Collapsible, ConfirmDialog, DiffView } from "../../molecules"
+import { Button } from "@/components/ui/button"
 import { invalidateReviewQueries } from "../../../hooks/useWorkspaceActions"
 import { buildPatch, type Hunk, type ParsedDiffFile } from "../../../lib/diff"
 import {
@@ -213,12 +214,12 @@ export const FileRow = memo(function FileRow({
             />
           ) : null}
         </span>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={onToggle}
           onDoubleClick={handleOpenFile}
           aria-expanded={expanded}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          className="h-auto min-w-0 flex-1 justify-start gap-2 px-0 py-0 font-normal hover:bg-transparent"
         >
           <FileGlyph
             className="h-3.5 w-3.5 shrink-0 text-ink-muted"
@@ -238,7 +239,7 @@ export const FileRow = memo(function FileRow({
             )}
             aria-hidden
           />
-        </button>
+        </Button>
         <DiffStat
           summary={{
             added: file.added ?? 0,
