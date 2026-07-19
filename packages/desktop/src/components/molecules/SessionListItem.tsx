@@ -255,7 +255,7 @@ export const SessionListItem = memo(function SessionListItem({
             <Tooltip label={label}>
               <p
                 className={cn(
-                  "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-sm",
+                  "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-sm",
                   // Soft edge always; on hover/focus widen the dissolve so the
                   // title fades under the trailing action tray. Keep the fade
                   // short/soft so dark themes don't read a bright tip.

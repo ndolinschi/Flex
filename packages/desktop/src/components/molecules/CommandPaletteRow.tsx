@@ -42,7 +42,7 @@ export const CommandPaletteRow = ({
       ) : (
         <span className="size-3.5 shrink-0" aria-hidden />
       )}
-      <span className="min-w-0 truncate text-left">{label}</span>
+      <span className="min-w-0 truncate">{label}</span>
       {hint ? (
         <span className="ml-auto shrink-0 truncate text-xs text-muted-foreground">
           {hint}

@@ -197,6 +197,13 @@ select,
   app-region: no-drag;
 }
 
+/* UA `<button>` defaults to text-align:center — that centers labels inside
+ * flex-1 slots (sidebar rows, menu items). Pin shadcn buttons left; flex
+ * `justify-*` still controls icon-only centering. */
+button[data-slot="button"] {
+  text-align: left;
+}
+
 /* Keyboard-first focus — thin neutral ring, never accent glow (Feel: Keyboard-first focus). */
 :focus-visible:not(input):not(textarea):not(select) {
   outline: 1px solid var(--color-stroke-2);

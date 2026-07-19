@@ -78,14 +78,7 @@ type ModePickerProps = {
   disabled?: boolean
 }
 
-const triggerClass = cn(
-  "rounded-full border border-stroke-3 bg-fill-4 px-2",
-  "tracking-[var(--tracking-caption)] text-ink-secondary font-normal",
-  "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink-secondary",
-  "aria-expanded:border-stroke-2 aria-expanded:bg-fill-2",
-)
-
-/** Agent / Plan / Ask (/ Flex when flagged) mode pill for the composer footer. */
+/** Agent / Plan / Ask (/ Flex when flagged) mode picker for the composer footer. */
 export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
   const modes = useMemo(() => visibleComposerModes(), [])
   const effectiveValue =
@@ -104,16 +97,16 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
         disabled={disabled}
         render={
           <Button
-            variant="ghost"
-            size="xs"
+            variant="outline"
+            size="sm"
+            disabled={disabled}
             aria-label={`Mode: ${selected.label}`}
-            className={triggerClass}
           />
         }
       >
-        <Icon className={cn("size-3", selected.accent)} aria-hidden />
-        <span className="font-medium">{selected.label}</span>
-        <ChevronDown className="size-2.5 opacity-60" aria-hidden />
+        <Icon className={cn("size-3.5", selected.accent)} aria-hidden />
+        {selected.label}
+        <ChevronDown data-icon="inline-end" className="opacity-60" aria-hidden />
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-56">
         <DropdownMenuGroup>
@@ -135,7 +128,7 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
                   className={cn("mt-0.5 size-3.5 shrink-0", mode.accent)}
                   aria-hidden
                 />
-                <span className="min-w-0 flex-1">
+                <span className="min-w-0 flex-1 text-left">
                   <span className="flex items-center gap-1.5 text-sm text-foreground">
                     {mode.label}
                     {isActive ? (

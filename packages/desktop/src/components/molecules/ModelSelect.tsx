@@ -74,7 +74,7 @@ export const ModelSelect = ({
         >
           <span
             className={cn(
-              "min-w-0 flex-1 truncate text-left",
+              "min-w-0 truncate text-left",
               !selected && "text-muted-foreground",
             )}
           >
@@ -122,14 +122,12 @@ export const ModelSelect = ({
                           setOpen(false)
                         }}
                       >
-                        <span className="min-w-0 flex-1 truncate">
+                        <span className="min-w-0 truncate">
                           {m.displayName ?? m.id}
                         </span>
                         {active ? (
-                          <Check className="size-3 text-primary" aria-hidden />
-                        ) : (
-                          <span className="size-3" aria-hidden />
-                        )}
+                          <Check className="ml-auto size-3 text-primary" aria-hidden />
+                        ) : null}
                       </DropdownMenuItem>
                     )
                   })}

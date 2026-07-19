@@ -189,14 +189,14 @@ export const ProjectPicker = ({
                   className="mx-1"
                 >
                   <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="min-w-0 flex-1 truncate" title={path}>
+                  <span className="min-w-0 truncate" title={path}>
                     {parent ? (
                       <span className="text-muted-foreground">{parent}</span>
                     ) : null}
                     <span className="text-foreground">{name}</span>
                   </span>
                   {active ? (
-                    <Check className="size-3 shrink-0 text-primary" aria-hidden />
+                    <Check className="ml-auto size-3 shrink-0 text-primary" aria-hidden />
                   ) : null}
                 </DropdownMenuItem>
               )

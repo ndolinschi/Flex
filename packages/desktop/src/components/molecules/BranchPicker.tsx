@@ -160,9 +160,9 @@ export const BranchPicker = ({
                     onClick={() => void handleSelect(branch)}
                     className="mx-1"
                   >
-                    <span className="min-w-0 flex-1 truncate">{branch}</span>
+                    <span className="min-w-0 truncate">{branch}</span>
                     {active ? (
-                      <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                      <span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                         Current
                         <Check className="size-3 text-primary" aria-hidden />
                       </span>

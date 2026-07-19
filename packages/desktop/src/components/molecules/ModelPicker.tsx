@@ -78,31 +78,21 @@ export const ModelPicker = ({
         render={
           <Button
             type="button"
-            variant="ghost"
-            size="xs"
+            variant="outline"
+            size="sm"
             disabled={isLoading || disabled}
             aria-label="Select model"
-            className={cn(
-              "max-w-[14rem] rounded-full border border-border bg-muted/50 px-2",
-              "tracking-[var(--tracking-caption)] text-muted-foreground",
-              "transition-[color,opacity,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-              "hover:border-border hover:bg-muted hover:text-foreground",
-              "aria-expanded:border-border aria-expanded:bg-muted aria-expanded:text-foreground",
-            )}
+            className="max-w-[14rem]"
           />
         }
       >
-        <span className="min-w-0 flex-1 truncate">{label}</span>
+        <span className="min-w-0 truncate">{label}</span>
         {selectedEffort ? (
           <span className="shrink-0 text-muted-foreground">
             · {effortLabel(selectedEffort)}
           </span>
         ) : null}
-        <ChevronDown
-          className="size-2.5 shrink-0 opacity-60"
-          strokeWidth={2.5}
-          aria-hidden
-        />
+        <ChevronDown data-icon="inline-end" className="opacity-60" aria-hidden />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
@@ -144,19 +134,21 @@ export const ModelPicker = ({
                         className="min-w-0 flex-1 gap-1.5"
                         onClick={() => applyModel(m.id)}
                       >
-                        <span className="min-w-0 flex-1 truncate text-left">
-                          {name}
-                        </span>
+                        <span className="min-w-0 truncate">{name}</span>
                         {modelEffort ? (
-                          <span className="max-w-[4.5rem] shrink-0 truncate text-xs text-muted-foreground">
+                          <span className="ml-auto max-w-[4.5rem] shrink-0 truncate text-xs text-muted-foreground">
                             {effortLabel(modelEffort)}
                           </span>
                         ) : null}
                         {active ? (
-                          <Check className="size-3 text-primary" aria-hidden />
-                        ) : (
-                          <span className="size-3" aria-hidden />
-                        )}
+                          <Check
+                            className={cn(
+                              "size-3 shrink-0 text-primary",
+                              !modelEffort && "ml-auto",
+                            )}
+                            aria-hidden
+                          />
+                        ) : null}
                       </DropdownMenuItem>
                       {onEffortChange ? (
                         <DropdownMenuSub>

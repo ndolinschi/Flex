@@ -212,7 +212,8 @@ export const PopoverItem = ({
     tabIndex={disabled ? -1 : 0}
     onClick={onClick}
     className={cn(
-      "h-8 w-full justify-start gap-1.5 px-2.5 py-0 font-normal text-sm",
+      // Icon + label start; callers put trailing marks in children with ml-auto.
+      "h-8 w-full justify-start gap-1.5 px-2.5 py-0 text-left font-normal text-sm",
       "hover:bg-muted focus:bg-muted",
       active ? "bg-muted text-foreground" : "text-muted-foreground",
       className,

@@ -55,7 +55,10 @@ function Button({
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      // Merge AFTER cva so twMerge can override base `justify-center` with
+      // caller `justify-start` (menu / sidebar rows). Passing className into
+      // cva alone leaves both utilities in the string depending on compose.
+      className={cn(buttonVariants({ variant, size }), className)}
       {...props}
     />
   )
