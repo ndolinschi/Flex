@@ -10,11 +10,15 @@ export const formatElapsed = (createdAtMs: number, nowMs: number): string => {
   return `${hours}h`
 }
 
-export const useNowTicker = (intervalMs: number): number => {
+export const useNowTicker = (
+  intervalMs: number,
+  enabled = true,
+): number => {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
+    if (!enabled) return
     const id = setInterval(() => setNow(Date.now()), intervalMs)
     return () => clearInterval(id)
-  }, [intervalMs])
+  }, [intervalMs, enabled])
   return now
 }

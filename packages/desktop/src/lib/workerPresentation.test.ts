@@ -3,6 +3,7 @@ import type { TimelineRow, ToolCall } from "./types"
 import {
   clusterWorkRows,
   collectRunningWorkers,
+  runningWorkersSignature,
   stripMatchedAgentToolRows,
   summarizeWorkerActivity,
   workersHeaderLabel,
@@ -165,5 +166,58 @@ describe("collectRunningWorkers", () => {
     ]
     const running = collectRunningWorkers(rows)
     expect(running.map((w) => w.childSession).sort()).toEqual(["c1", "c3"])
+  })
+})
+
+describe("runningWorkersSignature", () => {
+  it("stays stable across unrelated assistant markdown growth", () => {
+    const base: TimelineRow[] = [
+      subagent({ childSession: "c1", task: "A", phase: "started" }),
+      {
+        type: "assistant",
+        id: "a1",
+        messageId: "m1",
+        text: "hello",
+        tsMs: 1,
+      },
+    ]
+    const grown: TimelineRow[] = [
+      subagent({ childSession: "c1", task: "A", phase: "started" }),
+      {
+        type: "assistant",
+        id: "a1",
+        messageId: "m1",
+        text: "hello world from a long streaming delta",
+        tsMs: 1,
+      },
+    ]
+    expect(runningWorkersSignature(base)).toBe(runningWorkersSignature(grown))
+  })
+
+  it("changes when a nested tool status flips", () => {
+    const running = makeCall({
+      tool_name: "Read",
+      status: { state: "running" },
+    })
+    const completed = { ...running, status: { state: "completed" as const } }
+    const before: TimelineRow[] = [
+      subagent({
+        childSession: "c1",
+        task: "A",
+        phase: "started",
+        children: [{ type: "tool", id: running.id, call: running, tsMs: 1 }],
+      }),
+    ]
+    const after: TimelineRow[] = [
+      subagent({
+        childSession: "c1",
+        task: "A",
+        phase: "started",
+        children: [{ type: "tool", id: completed.id, call: completed, tsMs: 1 }],
+      }),
+    ]
+    expect(runningWorkersSignature(before)).not.toBe(
+      runningWorkersSignature(after),
+    )
   })
 })

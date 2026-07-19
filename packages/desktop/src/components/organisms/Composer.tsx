@@ -28,6 +28,8 @@ import { ComposerQueue } from "./composer/ComposerQueue"
 type ComposerProps = {
   /** When set, bind drafts/send to this session instead of global active. */
   sessionId?: string | null
+  /** When false (visited/hidden chat), disable autocomplete + skip ContextBar. */
+  interactive?: boolean
   isHero?: boolean
   /** Permission / question card stacked flush above the bubble (same rail). */
   dockedOverlay?: ReactNode
@@ -81,6 +83,7 @@ const DOCKED_BUBBLE_SHADOW_FOCUS =
  * ContextBar + ModelPicker stay stable across keystrokes. */
 export const Composer = ({
   sessionId: sessionIdProp = null,
+  interactive = true,
   isHero = false,
   dockedOverlay = null,
   workersSlot = null,
@@ -269,13 +272,15 @@ export const Composer = ({
       ) : null}
 
       <div className="mx-auto mb-1 w-full max-w-[var(--content-rail)]">
-        <ContextBar
-          cwd={active?.cwd}
-          projectCwd={active ? active.base_cwd || active.cwd : undefined}
-          sessionId={activeSessionId}
-          disabled={false}
-          onError={setError}
-        />
+        {interactive ? (
+          <ContextBar
+            cwd={active?.cwd}
+            projectCwd={active ? active.base_cwd || active.cwd : undefined}
+            sessionId={activeSessionId}
+            disabled={false}
+            onError={setError}
+          />
+        ) : null}
       </div>
 
       <ComposerQueue
@@ -322,7 +327,10 @@ export const Composer = ({
             isHero={isHero}
             cwd={active?.cwd}
             enabled={
-              isBootstrapped && route !== "welcome" && !pendingPermission
+              interactive &&
+              isBootstrapped &&
+              route !== "welcome" &&
+              !pendingPermission
             }
             anchorRef={slashRootRef}
             attachments={attachments}

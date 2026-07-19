@@ -1,7 +1,6 @@
 import { useMemo } from "react"
 import type { SessionMeta } from "../../../lib/types"
 import type { RightPanelTab } from "../../../stores/appStore"
-import { useIsGitRepo } from "../../../hooks/useIsGitRepo"
 import { findPluginTab } from "../../../plugins/registry"
 import { BrowserTab } from "../BrowserTab"
 import { TerminalTab } from "../TerminalTab"
@@ -30,9 +29,6 @@ export const ToolTabBody = ({
   active,
   keepAlive,
 }: ToolTabBodyProps) => {
-  const isRepo = useIsGitRepo(session?.cwd).data
-  void isRepo
-
   const pluginTab = useMemo(() => findPluginTab(tool), [tool])
 
   if (tool === "status") {

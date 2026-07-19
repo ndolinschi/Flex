@@ -104,8 +104,16 @@ const materializedIdsFromRows = (rows: TimelineRow[]): Set<string> => {
 /**
  * Active-session timeline: replay + live row/buffer updates.
  * Turn lifecycle / HITL / subscribe ownership live in `useGlobalSessionEvents`.
+ *
+ * Pass `live: false` for visited/hidden chat tabs so they keep the last
+ * painted rows without folding every streaming delta (and without a live
+ * bus subscription). Re-activating boots a fresh replay + subscribe.
  */
-export const useSessionEvents = (sessionId: string | null) => {
+export const useSessionEvents = (
+  sessionId: string | null,
+  options?: { live?: boolean },
+) => {
+  const live = options?.live !== false
   const [rows, setRows] = useState<TimelineRow[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -287,6 +295,13 @@ export const useSessionEvents = (sessionId: string | null) => {
       setReconnectStatus(null)
       setCompactingStatus(null)
       setIndexingStatus(null)
+      return
+    }
+
+    // Visited/hidden chat: keep last painted rows, drop the live bus so
+    // background streaming does not fold + remasure every frame.
+    if (!live) {
+      cancelPendingFlush()
       return
     }
 
@@ -495,7 +510,7 @@ export const useSessionEvents = (sessionId: string | null) => {
       // letting it fire against a torn-down/replaced session.
       cancelPendingFlush()
     }
-  }, [sessionId, processEvent, cancelPendingFlush])
+  }, [sessionId, live, processEvent, cancelPendingFlush])
 
   // Local sweep backstop: bumped by Composer's handleStop / App.tsx's
   // streaming-cancel branch on the user's explicit Stop action, so rows

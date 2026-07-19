@@ -54,7 +54,7 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
 
   const [pendingClose, setPendingClose] = useState<string | null>(null)
   const [closing, setClosing] = useState(false)
-  const now = useNowTicker(30_000)
+  const now = useNowTicker(30_000, active)
   /** Sessions for which we've already tried default spawn this tab visit —
    * prevents StrictMode double-create and recreate-after-close while still
    * on the Terminal tab. Cleared when the tab becomes inactive. */

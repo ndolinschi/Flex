@@ -58,8 +58,7 @@ export const BranchPicker = ({
     queryKey: ["git-pr-status", cwd],
     queryFn: () => gitPrStatus(cwd!),
     enabled: !!cwd && hasRemote,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    staleTime: 60_000,
     refetchOnWindowFocus: true,
   })
   const branchPr = prStatus?.pr ?? null

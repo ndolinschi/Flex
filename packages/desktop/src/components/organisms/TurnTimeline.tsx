@@ -32,8 +32,11 @@ import { WorkGroupBody } from "./timeline/WorkGroupBody"
 
 type TurnTimelineProps = {
   sessionId: string | null
+  /** When false, freeze the timeline (no live bus / remasure) for hidden tabs. */
+  active?: boolean
   onConversationEmpty?: (empty: boolean) => void
-  /** Live merged rows — used by the composer WorkingAgentsPill. */
+  /** Live merged rows — ChatSessionBody fingerprints running workers off
+   * this and only lifts state when the worker set changes (not every delta). */
   onLiveRows?: (rows: import("../../lib/types").TimelineRow[]) => void
 }
 
@@ -50,11 +53,12 @@ const displayItemKey = (item: DisplayItem): string => {
 
 export const TurnTimeline = ({
   sessionId,
+  active = true,
   onConversationEmpty,
   onLiveRows,
 }: TurnTimelineProps) => {
   const { rows, streaming, isLoading, error, thinkingDurations, reconnectStatus, compactingStatus, indexingStatus } =
-    useSessionEvents(sessionId)
+    useSessionEvents(sessionId, { live: active })
   // Per-session — SubagentViewer mounts a second TurnTimeline for a child id;
   // the global `isStreaming` flag tracks only the active root session.
   const isStreaming = useAppStore((s) =>
@@ -229,6 +233,7 @@ export const TurnTimeline = ({
   const wasStreamingRef = useRef(isStreaming)
   const lastStreamRemeasureAt = useRef(0)
   useEffect(() => {
+    if (!active) return
     const settled = wasStreamingRef.current && !isStreaming
     wasStreamingRef.current = isStreaming
     let second: number | null = null
@@ -267,7 +272,7 @@ export const TurnTimeline = ({
       if (second !== null) cancelAnimationFrame(second)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- remount on content growth / settle only
-  }, [streamContentKey, isStreaming, displayItems.length])
+  }, [streamContentKey, isStreaming, displayItems.length, active])
 
   // WorkGroup expand/collapse changes row height; remeasure in place before
   // re-sticking so virtual offsets stay correct (esp. WebView2).

@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Bot, ChevronDown, Network } from "lucide-react"
-import type { TimelineRow } from "../../lib/types"
+import type { SubagentTimelineRow } from "../../lib/workerPresentation"
 import {
-  collectRunningWorkers,
   summarizeWorkerActivity,
   workerTitle,
 } from "../../lib/workerPresentation"
@@ -11,7 +10,7 @@ import { useAppStore } from "../../stores/appStore"
 import { PopoverTray } from "./PopoverTray"
 
 type WorkingAgentsPillProps = {
-  rows: TimelineRow[]
+  workers: SubagentTimelineRow[]
   /** Scroll the timeline to the active workers group. */
   onScrollToWorkers?: () => void
 }
@@ -19,11 +18,10 @@ type WorkingAgentsPillProps = {
 /** Composer-adjacent glance: "N Working" opens a short menu of running
  * worker titles (open viewer / scroll to group). Hidden when none running. */
 export const WorkingAgentsPill = ({
-  rows,
+  workers,
   onScrollToWorkers,
 }: WorkingAgentsPillProps) => {
   const openSubagentViewer = useAppStore((s) => s.openSubagentViewer)
-  const workers = useMemo(() => collectRunningWorkers(rows), [rows])
   const [open, setOpen] = useState(false)
   const anchorRef = useRef<HTMLButtonElement>(null)
 

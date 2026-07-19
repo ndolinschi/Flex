@@ -64,12 +64,11 @@ export const ContentWorkspace = () => {
     const set = new Set<string>()
     for (const pane of contentLayout.panes) {
       for (const t of pane.tabs) {
+        // Prompt is cheap to remount and otherwise re-renders on every
+        // composer keystroke via draftsBySession while keep-alive hidden.
         if (
           t.kind === "tool" &&
-          (t.tool === "files" ||
-            t.tool === "terminal" ||
-            t.tool === "browser" ||
-            t.tool === "prompt")
+          (t.tool === "files" || t.tool === "terminal" || t.tool === "browser")
         ) {
           set.add(`${t.sessionId}:${t.tool}`)
         }
