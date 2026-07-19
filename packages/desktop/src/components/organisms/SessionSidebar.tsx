@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useMemo,
   useState,
   type MouseEvent as ReactMouseEvent,
@@ -119,6 +120,29 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     [sessions, activeSessionId],
   )
 
+  // Drop persisted active/pin ids that are no longer in the sessions list
+  // (engine restarted, deleted elsewhere) so status polls never target ghosts.
+  useEffect(() => {
+    if (isLoading) return
+    const known = new Set(allSessions.map((s) => s.id))
+    if (activeSessionId && !known.has(activeSessionId)) {
+      setActiveSessionId(null)
+      void persistUiState({ activeSessionId: null })
+    }
+    const pinnedGone = pinnedSessionIds.some((id) => !known.has(id))
+    if (pinnedGone) {
+      const next = pinnedSessionIds.filter((id) => known.has(id))
+      useAppStore.getState().setPinnedSessionIds(next)
+      void persistUiState({ pinnedSessionIds: next })
+    }
+  }, [
+    isLoading,
+    allSessions,
+    activeSessionId,
+    pinnedSessionIds,
+    setActiveSessionId,
+  ])
+
   const { pinnedSessions, archivedSessions, repoGroups } = useSessionSidebarGroups(
     sessions,
     pinnedSessionIds,
@@ -232,13 +256,21 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     if (selectErrorId) void handleSelect(selectErrorId)
   }
 
-  // Poll only sessions the user can see (plus active + pinned), and pause
-  // intervals entirely while the sidebar is collapsed — Changes tab keeps its
-  // own observer on the shared git-status query key for the active session.
+  // Poll only sessions that both exist in the list cache and are visible
+  // (plus active + pinned when present). Never poll a stale persisted
+  // activeSessionId / pin that is gone engine-side — that path used to
+  // hammer `workspace_status` with "session not found" for ~6s each.
+  const knownSessionIds = useMemo(
+    () => new Set(sessions.map((s) => s.id)),
+    [sessions],
+  )
   const statusPollIds = useMemo(() => {
     const ids = new Set<string>()
-    if (activeSessionId) ids.add(activeSessionId)
-    for (const id of pinnedSessionIds) ids.add(id)
+    const addIfKnown = (id: string | null | undefined) => {
+      if (id && knownSessionIds.has(id)) ids.add(id)
+    }
+    addIfKnown(activeSessionId)
+    for (const id of pinnedSessionIds) addIfKnown(id)
     for (const group of repoGroups) {
       if (collapsedRepos[group.cwd]) continue
       for (const s of group.sessions) ids.add(s.id)
@@ -248,6 +280,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     }
     return ids
   }, [
+    knownSessionIds,
     activeSessionId,
     pinnedSessionIds,
     repoGroups,

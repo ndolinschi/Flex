@@ -12,7 +12,7 @@ type CommandPaletteRowProps = {
   onHover: () => void
 }
 
-/** Single command/session row inside the CommandPalette list. */
+/** Single command/session row inside the CommandPalette / Open-tab list. */
 export const CommandPaletteRow = ({
   index,
   active,
@@ -29,22 +29,22 @@ export const CommandPaletteRow = ({
       onMouseEnter={onHover}
       onClick={onActivate}
       className={cn(
-        "h-auto w-full justify-start gap-2 px-3 py-1.5 font-normal",
+        // Real menu row: icon + label flush start (not justify-center).
+        "h-8 w-full justify-start gap-1.5 rounded-md px-2.5 py-0 font-normal",
         "text-sm",
-        active ? "bg-fill-4 text-ink" : "text-ink-secondary",
+        active
+          ? "bg-muted text-foreground hover:bg-muted"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >
       {Icon ? (
-        <Icon
-          className="h-3.5 w-3.5 shrink-0 text-ink-muted"
-          aria-hidden
-        />
+        <Icon data-icon="inline-start" className="text-muted-foreground" aria-hidden />
       ) : (
-        <span className="h-3.5 w-3.5 shrink-0" />
+        <span className="size-3.5 shrink-0" aria-hidden />
       )}
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="min-w-0 truncate text-left">{label}</span>
       {hint ? (
-        <span className="shrink-0 truncate text-xs text-ink-faint">
+        <span className="ml-auto shrink-0 truncate text-xs text-muted-foreground">
           {hint}
         </span>
       ) : null}

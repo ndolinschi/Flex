@@ -212,9 +212,9 @@ export const PopoverItem = ({
     tabIndex={disabled ? -1 : 0}
     onClick={onClick}
     className={cn(
-      "h-auto w-full justify-start gap-2 px-2.5 py-1.5 font-normal text-sm",
-      "hover:bg-[color:var(--color-select-hover)] focus:bg-[color:var(--color-select-hover)]",
-      active ? "bg-fill-4 text-ink" : "text-ink-secondary",
+      "h-8 w-full justify-start gap-1.5 px-2.5 py-0 font-normal text-sm",
+      "hover:bg-muted focus:bg-muted",
+      active ? "bg-muted text-foreground" : "text-muted-foreground",
       className,
     )}
   >

@@ -1,9 +1,28 @@
 import { useQueries } from "@tanstack/react-query"
-import { gitStatusSinceBaseline } from "../lib/tauri"
+import { isSessionNotFoundError } from "../lib/sessions"
+import { gitStatusSinceBaseline, toInvokeError } from "../lib/tauri"
 import type { GitStatusSummary } from "../lib/types"
 import { statusRefetchInterval, type StatusPollOptions } from "./statusPoll"
 
 const STALE_TIME_MS = 15_000
+
+const EMPTY_GIT: GitStatusSummary = {
+  files: [],
+  totalCount: 0,
+  totalAdded: 0,
+  totalRemoved: 0,
+  truncated: false,
+}
+
+const fetchGitStatus = async (id: string): Promise<GitStatusSummary> => {
+  try {
+    return await gitStatusSinceBaseline(id)
+  } catch (err) {
+    const message = toInvokeError(err)
+    if (isSessionNotFoundError(message)) return EMPTY_GIT
+    throw err
+  }
+}
 
 /**
  * Sidebar change-indicator data: one `git_status_since_baseline` query per
@@ -24,7 +43,7 @@ export const useGitStatuses = (
   const results = useQueries({
     queries: sessions.map(({ id, cwd }) => ({
       queryKey: ["git-status", cwd, id] as const,
-      queryFn: () => gitStatusSinceBaseline(id),
+      queryFn: () => fetchGitStatus(id),
       // Gate fetch (not only interval) for collapsed / filtered-out rows —
       // Changes tab keeps its own observer on the shared query key.
       enabled:
@@ -33,6 +52,8 @@ export const useGitStatuses = (
         options?.pollingEnabled !== false &&
         (!options?.pollIds || options.pollIds.has(id)),
       staleTime: STALE_TIME_MS,
+      // Same as workspace status — missing sessions must not retry.
+      retry: false,
       refetchInterval: statusRefetchInterval(id, STALE_TIME_MS, options),
     })),
   })
