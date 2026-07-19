@@ -38,7 +38,7 @@ type ButtonProps = Omit<
   "variant" | "size"
 > & {
   variant?: FlexVariant | ShadcnVariant
-  size?: FlexSize | ShadcnSize | "icon" | "icon-xs" | "icon-sm" | "icon-lg"
+  size?: FlexSize | ShadcnSize | "icon" | "icon-xs" | "icon-sm" | "icon-lg" | "icon-2xs"
   /** @deprecated Compose `<Spinner data-icon="inline-start" />` + `disabled`. */
   isLoading?: boolean
   children: ReactNode

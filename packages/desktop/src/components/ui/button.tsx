@@ -16,7 +16,7 @@ const buttonVariants = cva(
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-fill-4 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+          "bg-secondary text-secondary-foreground hover:bg-muted aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         destructive:
@@ -33,6 +33,8 @@ const buttonVariants = cva(
         "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
         "icon-sm": "size-7 rounded-md",
         "icon-lg": "size-9",
+        /** Sidebar row actions — 20px chrome (DESIGN.md compact density). */
+        "icon-2xs": "size-5 rounded-md [&_svg:not([class*='size-'])]:size-3",
       },
     },
     defaultVariants: {

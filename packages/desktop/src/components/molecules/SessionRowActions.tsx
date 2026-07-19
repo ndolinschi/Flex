@@ -64,7 +64,7 @@ export const SessionRowActions = ({
           <IconButton
             label={pinned ? "Unpin session" : "Pin session"}
             quiet
-            className="!h-5 !w-5"
+            size="icon-2xs"
             disabled={!canTogglePin}
             onClick={(e) => {
               e.stopPropagation()
@@ -82,7 +82,7 @@ export const SessionRowActions = ({
             <IconButton
               label="Restore session"
               quiet
-              className="!h-5 !w-5"
+              size="icon-2xs"
               disabled={!canSetArchived}
               onClick={(e) => {
                 e.stopPropagation()
@@ -97,7 +97,7 @@ export const SessionRowActions = ({
             <IconButton
               label="Archive session"
               quiet
-              className="!h-5 !w-5"
+              size="icon-2xs"
               disabled={!canSetArchived}
               onClick={(e) => {
                 e.stopPropagation()
@@ -111,7 +111,7 @@ export const SessionRowActions = ({
         <IconButton
           label="More actions"
           quiet
-          className="!h-5 !w-5"
+          size="icon-2xs"
           onClick={(e) => {
             e.stopPropagation()
             onOpenMenu(e)

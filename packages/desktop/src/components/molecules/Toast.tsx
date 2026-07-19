@@ -45,12 +45,12 @@ const ToastRow = ({ id, text, kind, action, onDismiss }: ToastRowProps) => {
       </Button>
       {action ? (
         <Button
-          variant="ghost"
+          variant="default"
+          size="xs"
           onClick={() => {
             action.onAction()
             onDismiss(id)
           }}
-          className="h-auto shrink-0 rounded-sm bg-accent px-2 py-1 text-xs font-medium text-accent-text hover:bg-accent-hover"
         >
           {action.label}
         </Button>

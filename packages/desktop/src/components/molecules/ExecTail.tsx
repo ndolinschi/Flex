@@ -93,12 +93,7 @@ export const ExecErrorAction = ({
       <Badge variant="danger">
         {scan.count} error{scan.count === 1 ? "" : "s"} in output
       </Badge>
-      <Button
-        variant="link"
-        size="sm"
-        onClick={handleAskAgent}
-        className="h-auto px-0 py-0 text-sm text-accent"
-      >
+      <Button variant="link" onClick={handleAskAgent} className="h-auto px-0 py-0">
         Ask Agent to fix
       </Button>
     </span>

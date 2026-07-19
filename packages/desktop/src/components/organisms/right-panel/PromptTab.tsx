@@ -48,7 +48,7 @@ type PromptTabProps = {
 
 const markClass = (severity: PromptAnnotation["severity"]): string => {
   if (severity === "error") {
-    return "rounded-[4px] bg-danger-subtle text-danger ring-1 ring-danger/30"
+    return "rounded-[4px] bg-destructive/10 text-destructive ring-1 ring-destructive/30"
   }
   if (severity === "info") {
     return "rounded-[4px] bg-fill-3 text-ink-secondary ring-1 ring-stroke-3"
@@ -529,9 +529,9 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
                 <span
                   className={cn(
                     "mt-0.5 shrink-0 rounded px-1 py-px font-medium uppercase tracking-wide",
-                    a.severity === "error" && "bg-danger-subtle text-danger",
+                    a.severity === "error" && "bg-destructive/10 text-destructive",
                     a.severity === "warn" && "bg-yellow/15 text-yellow",
-                    a.severity === "info" && "bg-fill-3 text-ink-muted",
+                    a.severity === "info" && "bg-muted text-muted-foreground",
                   )}
                 >
                   {a.severity}

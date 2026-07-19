@@ -112,7 +112,7 @@ export const MemoryRow = ({
           <Tooltip label="Expiry">
             <IconButton
               label="Set memory expiry"
-              className="!h-6 !w-6"
+              size="icon-xs"
               isLoading={expiryMutation.isPending}
               onClick={(e) => {
                 e.stopPropagation()
@@ -126,7 +126,8 @@ export const MemoryRow = ({
           <Tooltip label="Delete">
             <IconButton
               label="Delete memory"
-              className="!h-6 !w-6 hover:!text-red"
+              size="icon-xs"
+              className="hover:text-destructive"
               onClick={(e) => {
                 e.stopPropagation()
                 setConfirmDelete(true)

@@ -12,7 +12,6 @@ import {
 import { toastPrOutcome } from "../../../lib/prOutcomeToast"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import { useAppStore } from "../../../stores/appStore"
-import { cn } from "../../../lib/utils"
 import { CreatePrDialog } from "../../molecules/CreatePrDialog"
 import { PopoverTray } from "../../molecules/PopoverTray"
 import { Button, DiffStat, TextInput } from "../../atoms"
@@ -137,15 +136,12 @@ export const CommitBar = ({
   return (
     <div ref={rootRef} className="relative flex shrink-0 items-center gap-1.5">
       <ShadcnButton
-        variant="ghost"
+        variant="secondary"
+        size="xs"
         onClick={() => {
           openToolBesideChat(sessionId, "changes")
         }}
-        className={cn(
-          "h-6 max-w-[12rem] shrink gap-1.5 truncate rounded-md",
-          "bg-fill-3 px-2 text-xs text-ink-muted whitespace-nowrap font-normal",
-          "hover:bg-fill-2 hover:text-ink-secondary",
-        )}
+        className="max-w-[12rem] shrink gap-1.5 truncate font-normal"
       >
         <span className="truncate">
           {totalCount} change{totalCount === 1 ? "" : "s"}
@@ -154,16 +150,13 @@ export const CommitBar = ({
       </ShadcnButton>
 
       <ShadcnButton
-        variant="ghost"
+        variant="default"
+        size="xs"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className={cn(
-          "h-6 shrink-0 gap-1 whitespace-nowrap rounded-md",
-          "bg-accent px-2 text-xs text-accent-text font-normal",
-          "hover:bg-accent-hover",
-        )}
+        className="shrink-0 gap-1 font-normal"
       >
-        <GitMerge className="h-3 w-3 shrink-0" aria-hidden />
+        <GitMerge data-icon="inline-start" aria-hidden />
         {primaryLabel}
       </ShadcnButton>
 

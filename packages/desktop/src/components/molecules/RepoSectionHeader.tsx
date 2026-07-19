@@ -57,7 +57,8 @@ export const RepoSectionHeader = ({
       <IconButton
         label="New agent in this repository"
         quiet
-        className="!h-5 !w-5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+        size="icon-2xs"
+        className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
         onClick={(e) => {
           e.stopPropagation()
           onNewSession()

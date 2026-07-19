@@ -13,8 +13,8 @@ type IconButtonProps = Omit<
   /** Quiet chrome: idle opacity .5 → hover .8 (Feel: Opacity hover language). */
   quiet?: boolean
   children: ReactNode
-  /** Prefer `icon-xs` (h-6) in panel headers; default `icon-sm` (h-7). */
-  size?: "icon-xs" | "icon-sm" | "icon" | "icon-lg"
+  /** Prefer `icon-xs` (h-6) in panel headers; `icon-2xs` (h-5) for sidebar rows. */
+  size?: "icon-2xs" | "icon-xs" | "icon-sm" | "icon" | "icon-lg"
 }
 
 /**

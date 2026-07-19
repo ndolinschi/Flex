@@ -13,7 +13,7 @@ type SendButtonProps = {
 
 const circleClass = cn(
   "size-6 shrink-0 rounded-full bg-send text-send-fg opacity-80",
-  "hover:opacity-100 hover:bg-send",
+  "hover:opacity-100 hover:bg-send hover:text-send-fg",
 )
 
 /** 24px circle send / stop / queue — shadcn Button icon shell. */
@@ -29,7 +29,7 @@ export const SendButton = ({
       <div className="flex items-center gap-1.5">
         <Button
           type="button"
-          variant="default"
+          variant="ghost"
           size="icon-xs"
           onClick={onStop}
           aria-label="Stop generation"
@@ -39,7 +39,7 @@ export const SendButton = ({
         </Button>
         <Button
           type="button"
-          variant="default"
+          variant="ghost"
           size="icon-xs"
           onClick={onSend}
           aria-label="Queue message"
@@ -55,7 +55,7 @@ export const SendButton = ({
     return (
       <Button
         type="button"
-        variant="default"
+        variant="ghost"
         size="icon-xs"
         onClick={onStop}
         aria-label="Stop generation"
@@ -69,7 +69,7 @@ export const SendButton = ({
   return (
     <Button
       type="button"
-      variant="default"
+      variant="ghost"
       size="icon-xs"
       onClick={onSend}
       disabled={disabled}

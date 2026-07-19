@@ -9,11 +9,8 @@ type PermissionActionsProps = {
   className?: string
 }
 
-const COMPACT =
-  "h-6 px-2.5 text-xs gap-1"
-
 /** Composer-footer Allow once / Always allow / Deny — replaces Send while a
- * tool permission is pending (Claude Code–style inline HITL). Compact `h-6`
+ * tool permission is pending (Claude Code–style inline HITL). `size="xs"`
  * keeps the footer row aligned with Plus / Mode / Model / Send controls. */
 export const PermissionActions = ({
   permission,
@@ -35,8 +32,7 @@ export const PermissionActions = ({
       >
         {permission.options.includes("allow_once") ? (
           <Button
-            size="sm"
-            className={COMPACT}
+            size="xs"
             isLoading={isSubmitting}
             onClick={() => void respond("allow_once")}
           >
@@ -45,9 +41,8 @@ export const PermissionActions = ({
         ) : null}
         {permission.options.includes("allow_always") ? (
           <Button
-            size="sm"
+            size="xs"
             variant="secondary"
-            className={COMPACT}
             isLoading={isSubmitting}
             onClick={() => void respond("allow_always")}
           >
@@ -56,11 +51,10 @@ export const PermissionActions = ({
         ) : null}
         {permission.options.includes("deny") ? (
           <Button
-            size="sm"
+            size="xs"
             variant="destructive"
             isLoading={isSubmitting}
             onClick={() => void respond("deny")}
-            className={COMPACT}
           >
             Deny
           </Button>
