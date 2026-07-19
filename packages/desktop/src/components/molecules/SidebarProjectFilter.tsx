@@ -1,12 +1,22 @@
-import { useRef, useState } from "react"
+import { useState } from "react"
 import { Check, ListFilter } from "lucide-react"
 import type {
   SidebarProjectSort,
   SidebarProjectVisibility,
 } from "../../lib/sessionGrouping"
 import { cn } from "../../lib/utils"
-import { IconButton } from "../atoms"
-import { PopoverItem, PopoverSection, PopoverTray } from "./PopoverTray"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 type SidebarProjectFilterProps = {
   sort: SidebarProjectSort
@@ -46,85 +56,75 @@ export const SidebarProjectFilter = ({
   onVisibilityChange,
 }: SidebarProjectFilterProps) => {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
   const isFiltered = sort !== "recency" || visibility !== "all"
 
   return (
-    <div ref={rootRef} className="relative">
-      <IconButton
-        label="Filter projects"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className={cn(
-          "h-6 w-6 transition-opacity duration-[var(--duration-fast)]",
-          isFiltered || open
-            ? "opacity-100"
-            : "opacity-0 group-hover/label:opacity-100 focus-visible:opacity-100",
-          open && "bg-fill-2",
-        )}
-        onClick={() => setOpen((v) => !v)}
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Filter projects"
+            className={cn(
+              "size-6 transition-opacity duration-[var(--duration-fast)]",
+              isFiltered || open
+                ? "opacity-100"
+                : "opacity-0 group-hover/label:opacity-100 focus-visible:opacity-100",
+              open && "bg-muted",
+            )}
+          />
+        }
       >
-        <ListFilter className="h-3 w-3" aria-hidden />
-      </IconButton>
-
-      <PopoverTray
-        open={open}
-        onClose={() => setOpen(false)}
-        anchorRef={rootRef}
-        placement="below"
-        role="menu"
-        aria-label="Filter projects"
-        className="right-0 left-auto z-[60] w-56"
-      >
-        <PopoverSection label="Sort">
-          {SORT_OPTIONS.map((option) => {
-            const isActive = option.id === sort
-            return (
-              <PopoverItem
+        <ListFilter className="size-3" aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={4} className="w-56">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Sort</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={sort}
+            onValueChange={(v) => onSortChange(v as SidebarProjectSort)}
+          >
+            {SORT_OPTIONS.map((option) => (
+              <DropdownMenuRadioItem
                 key={option.id}
-                role="menuitem"
-                active={isActive}
-                onClick={() => onSortChange(option.id)}
+                value={option.id}
+                closeOnClick={false}
               >
-                <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                {isActive ? (
-                  <Check className="h-3 w-3 shrink-0 text-accent" aria-hidden />
-                ) : null}
-              </PopoverItem>
-            )
-          })}
-        </PopoverSection>
-        <div className="mx-2 border-t border-stroke-3" />
-        <PopoverSection label="Show">
+                {option.label}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Show</DropdownMenuLabel>
           {VISIBILITY_OPTIONS.map((option) => {
             const isActive = option.id === visibility
             return (
-              <PopoverItem
+              <DropdownMenuItem
                 key={option.id}
-                role="menuitem"
-                active={isActive}
-                onClick={() => onVisibilityChange(option.id)}
                 className="items-start py-2"
+                closeOnClick={false}
+                onClick={() => onVisibilityChange(option.id)}
               >
                 <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5 text-sm text-ink">
+                  <span className="flex items-center gap-1.5 text-sm text-foreground">
                     <span className="min-w-0 flex-1 truncate">{option.label}</span>
                     {isActive ? (
-                      <Check
-                        className="h-3 w-3 shrink-0 text-accent"
-                        aria-hidden
-                      />
+                      <Check className="size-3 shrink-0 text-primary" aria-hidden />
                     ) : null}
                   </span>
-                  <span className="block text-xs text-ink-muted">
+                  <span className="block text-xs text-muted-foreground">
                     {option.description}
                   </span>
                 </span>
-              </PopoverItem>
+              </DropdownMenuItem>
             )
           })}
-        </PopoverSection>
-      </PopoverTray>
-    </div>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

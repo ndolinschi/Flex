@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   Check,
   ChevronDown,
@@ -15,9 +15,16 @@ import {
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Button as ShadcnButton } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Button, IconButton, RunningDot } from "../atoms"
-import { ContextMenu, type ContextMenuItem } from "./ContextMenu"
-import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
 
 export type PlanBuildStatus = "draft" | "ready" | "building" | "built"
@@ -63,11 +70,7 @@ type PlanToolbarProps = {
   className?: string
 }
 
-/** Compact provider-grouped model pill for the Plan tab's toolbar — same
- * grouping/search logic as `ModelPicker`/`ModelSelect` (see
- * `useGroupedModels`) but styled as a small pill trigger rather than a
- * form field or composer-pill, matching the reference header's "Grok 4.5
- * Medium" chip. */
+/** Compact provider-grouped model pill for the Plan tab's toolbar. */
 const PlanModelPill = ({
   models,
   builtinProviders = [],
@@ -83,96 +86,91 @@ const PlanModelPill = ({
 }) => {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
-  const rootRef = useRef<HTMLDivElement>(null)
 
   const selected = models.find((m) => m.id === value)
   const label = selected?.displayName ?? selected?.id ?? "Select model"
   const { groups } = useGroupedModels(models, query, builtinProviders)
 
-  const handleClose = () => {
-    setOpen(false)
-    setQuery("")
-  }
+  useEffect(() => {
+    if (!open) setQuery("")
+  }, [open])
 
   return (
-    <div ref={rootRef} className="relative shrink-0">
-      <ShadcnButton
-        variant="ghost"
-        size="xs"
-        onClick={() => setOpen((v) => !v)}
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger
         disabled={isLoading}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className={cn(
-          "max-w-[12rem] rounded-full border border-stroke-3 px-2 text-ink-secondary",
-          "transition-colors duration-[var(--duration-fast)]",
-          "hover:border-stroke-2 hover:text-ink hover:bg-transparent",
-          open && "border-stroke-2 text-ink",
-        )}
+        render={
+          <ShadcnButton
+            type="button"
+            variant="ghost"
+            size="xs"
+            disabled={isLoading}
+            className={cn(
+              "max-w-[12rem] rounded-full border border-border px-2 text-muted-foreground",
+              "transition-colors duration-[var(--duration-fast)]",
+              "hover:border-border hover:bg-transparent hover:text-foreground",
+              "aria-expanded:border-border aria-expanded:text-foreground",
+            )}
+          />
+        }
       >
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        <ChevronDown className="h-2.5 w-2.5 shrink-0 text-icon-3" aria-hidden />
-      </ShadcnButton>
-
-      <PopoverTray
-        open={open}
-        onClose={handleClose}
-        anchorRef={rootRef}
-        placement="below"
-        role="listbox"
-        aria-label="Build model"
-        className="right-0 left-auto w-64"
-      >
-        <PopoverSearch value={query} onChange={setQuery} placeholder="Search models" />
-        <div className="max-h-56 overflow-y-auto py-0.5">
+        <ChevronDown className="size-2.5 shrink-0 text-muted-foreground" aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={4} className="w-64 p-0">
+        <div className="border-b border-border px-2.5 py-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder="Search models"
+            aria-label="Search models"
+            className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+          />
+        </div>
+        <div className="max-h-56 overflow-y-auto py-1">
           {groups.length === 0 ? (
-            <p className="px-2.5 py-3 text-center text-xs text-ink-faint">
+            <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">
               No models found
             </p>
           ) : (
             groups.map((group) => (
-              <PopoverSection key={group.providerId} label={group.label}>
-                <ul>
-                  {group.items.map((m) => {
-                    const active = m.id === value
-                    return (
-                      <li key={m.id}>
-                        <PopoverItem
-                          active={active}
-                          onClick={() => {
-                            onChange(m.id)
-                            handleClose()
-                          }}
-                        >
-                          <span className="min-w-0 flex-1 truncate">
-                            {m.displayName ?? m.id}
-                          </span>
-                          <span className="flex w-3 shrink-0 items-center justify-center">
-                            {active ? (
-                              <Check
-                                className="h-3 w-3 text-accent"
-                                aria-hidden
-                              />
-                            ) : null}
-                          </span>
-                        </PopoverItem>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </PopoverSection>
+              <DropdownMenuGroup key={group.providerId}>
+                <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                {group.items.map((m) => {
+                  const active = m.id === value
+                  return (
+                    <DropdownMenuItem
+                      key={m.id}
+                      className="mx-1"
+                      onClick={() => {
+                        onChange(m.id)
+                        setOpen(false)
+                      }}
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {m.displayName ?? m.id}
+                      </span>
+                      {active ? (
+                        <Check className="size-3 text-primary" aria-hidden />
+                      ) : (
+                        <span className="size-3" aria-hidden />
+                      )}
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuGroup>
             ))
           )}
         </div>
-      </PopoverTray>
-    </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
 /** Header toolbar for the right panel's Plan tab: breadcrumbs, build model
- * pill, Build/Keep-planning actions, and a "…" overflow menu (Copy as
- * Markdown / Find in Plan / Save to Workspace). Folds the old
- * Approve/Keep-planning buttons into one bar (reference design). */
+ * pill, Build/Keep-planning actions, and a "…" overflow menu. */
 export const PlanToolbar = ({
   repo,
   title,
@@ -198,84 +196,34 @@ export const PlanToolbar = ({
   actionsDisabled,
   className,
 }: PlanToolbarProps) => {
-  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
-  const menuButtonRef = useRef<HTMLDivElement>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   const findInputRef = useRef<HTMLInputElement>(null)
 
-  const openMenu = () => {
-    const rect = menuButtonRef.current?.getBoundingClientRect()
-    if (!rect) return
-    setMenuPos({ x: rect.right, y: rect.bottom + 4 })
-  }
-
-  const menuItems: ContextMenuItem[] = [
-    {
-      type: "item",
-      label: "Add comment",
-      icon: MessageSquareText,
-      disabled: !onAddComment,
-      onSelect: () => onAddComment?.(),
-    },
-    {
-      type: "item",
-      label: "Rewrite plan",
-      icon: Pencil,
-      disabled: !!actionsDisabled || !onRewrite,
-      onSelect: () => onRewrite?.(),
-    },
-    {
-      type: "item",
-      label: "Restart / try again",
-      icon: RotateCcw,
-      disabled: !!actionsDisabled || !onRestart,
-      onSelect: () => onRestart?.(),
-    },
-    { type: "separator" },
-    {
-      type: "item",
-      label: "Copy as Markdown",
-      icon: ClipboardCopy,
-      onSelect: onCopyMarkdown,
-    },
-    {
-      type: "item",
-      label: "Find in Plan",
-      icon: Search,
-      disabled: !find,
-      onSelect: () => {
-        find?.onOpenChange(true)
-        requestAnimationFrame(() => findInputRef.current?.focus())
-      },
-    },
-    {
-      type: "item",
-      label: "Save to Workspace",
-      icon: Save,
-      disabled: !!saveDisabled,
-      onSelect: onSaveToWorkspace,
-    },
-  ]
+  const saveLabel =
+    saveDisabled && saveDisabledReason
+      ? `Save to Workspace (${saveDisabledReason})`
+      : "Save to Workspace"
 
   return (
     <div className={cn("flex shrink-0 flex-col", className)}>
       <div className="flex h-[var(--header-height)] items-center gap-1.5 px-2.5 text-sm">
         <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
-          <span className="min-w-0 truncate text-ink-muted">{repo}</span>
-          <span className="shrink-0 text-ink-faint">›</span>
+          <span className="min-w-0 truncate text-muted-foreground">{repo}</span>
+          <span className="shrink-0 text-muted-foreground/60">›</span>
           {showPlansListCrumb && onBackToPlans ? (
             <ShadcnButton
               variant="ghost"
               size="xs"
               onClick={onBackToPlans}
-              className="h-auto shrink-0 px-0.5 py-0 text-ink-muted hover:bg-transparent hover:text-ink"
+              className="h-auto shrink-0 px-0.5 py-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
             >
               Plans
             </ShadcnButton>
           ) : (
-            <span className="shrink-0 text-ink-muted">Plans</span>
+            <span className="shrink-0 text-muted-foreground">Plans</span>
           )}
-          <span className="shrink-0 text-ink-faint">›</span>
-          <span className="min-w-0 truncate text-ink-secondary">{title}</span>
+          <span className="shrink-0 text-muted-foreground/60">›</span>
+          <span className="min-w-0 truncate text-foreground/80">{title}</span>
         </div>
 
         <span className="flex shrink-0 items-center gap-1.5">
@@ -303,11 +251,11 @@ export const PlanToolbar = ({
               className="flex h-6 items-center gap-1 rounded-md px-2 text-sm text-yellow"
               data-testid="plan-build-status"
             >
-              <Check className="h-3 w-3" aria-hidden /> Built
+              <Check className="size-3" aria-hidden /> Built
             </span>
           ) : status === "building" ? (
             <span
-              className="flex h-6 items-center gap-1.5 rounded-md px-2 text-sm text-ink-secondary"
+              className="flex h-6 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground"
               data-testid="plan-build-status"
             >
               <RunningDot className="h-4 w-4" /> Building…
@@ -321,26 +269,81 @@ export const PlanToolbar = ({
               onClick={onBuild}
               aria-label="Build plan"
             >
-              <Hammer className="h-3.5 w-3.5" aria-hidden />
+              <Hammer className="size-3.5" aria-hidden />
               Build
             </Button>
           )}
 
-          <div ref={menuButtonRef} className="shrink-0">
-            <IconButton
-              label="More plan actions"
-              onClick={openMenu}
-              className={cn("h-6 w-6", menuPos && "bg-fill-3 text-ink")}
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <DropdownMenuTrigger
+              render={
+                <ShadcnButton
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="More plan actions"
+                  className="size-6"
+                />
+              }
             >
-              <MoreHorizontal className="h-3.5 w-3.5" aria-hidden />
-            </IconButton>
-          </div>
+              <MoreHorizontal className="size-3.5" aria-hidden />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={4} className="w-56">
+              <DropdownMenuGroup>
+                <DropdownMenuItem
+                  disabled={!onAddComment}
+                  onClick={() => onAddComment?.()}
+                >
+                  <MessageSquareText />
+                  Add comment
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!!actionsDisabled || !onRewrite}
+                  onClick={() => onRewrite?.()}
+                >
+                  <Pencil />
+                  Rewrite plan
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!!actionsDisabled || !onRestart}
+                  onClick={() => onRestart?.()}
+                >
+                  <RotateCcw />
+                  Restart / try again
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem onClick={onCopyMarkdown}>
+                  <ClipboardCopy />
+                  Copy as Markdown
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!find}
+                  onClick={() => {
+                    find?.onOpenChange(true)
+                    requestAnimationFrame(() => findInputRef.current?.focus())
+                  }}
+                >
+                  <Search />
+                  Find in Plan
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!!saveDisabled}
+                  onClick={onSaveToWorkspace}
+                >
+                  <Save />
+                  {saveLabel}
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </span>
       </div>
 
       {find?.open ? (
-        <div className="flex h-8 items-center gap-1.5 border-y border-stroke-3 px-2.5">
-          <Search className="h-3.5 w-3.5 shrink-0 text-icon-3" aria-hidden />
+        <div className="flex h-8 items-center gap-1.5 border-y border-border px-2.5">
+          <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
           <input
             ref={findInputRef}
             type="text"
@@ -360,36 +363,22 @@ export const PlanToolbar = ({
             }}
             placeholder="Find in plan"
             aria-label="Find in plan"
-            className="h-6 min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-ink-faint focus:outline-none focus-visible:[box-shadow:inset_0_0_0_1px_var(--color-stroke-2)]"
+            className="h-6 min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
           />
-          <span className="shrink-0 text-xs tabular-nums text-ink-faint">
+          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
             {find.matchCount > 0 ? `${find.activeIndex + 1}/${find.matchCount}` : "0/0"}
           </span>
           <IconButton label="Previous match" onClick={find.onPrev} disabled={find.matchCount === 0} className="h-6 w-6">
-            <ChevronDown className="h-3 w-3 rotate-180" aria-hidden />
+            <ChevronDown className="size-3 rotate-180" aria-hidden />
           </IconButton>
           <IconButton label="Next match" onClick={find.onNext} disabled={find.matchCount === 0} className="h-6 w-6">
-            <ChevronDown className="h-3 w-3" aria-hidden />
+            <ChevronDown className="size-3" aria-hidden />
           </IconButton>
           <IconButton label="Close find" onClick={() => find.onOpenChange(false)} className="h-6 w-6">
-            <X className="h-3 w-3" aria-hidden />
+            <X className="size-3" aria-hidden />
           </IconButton>
         </div>
       ) : null}
-
-      <ContextMenu
-        position={menuPos}
-        items={
-          saveDisabled && saveDisabledReason
-            ? menuItems.map((item) =>
-                item.type === "item" && item.label === "Save to Workspace"
-                  ? { ...item, label: `Save to Workspace (${saveDisabledReason})` }
-                  : item,
-              )
-            : menuItems
-        }
-        onClose={() => setMenuPos(null)}
-      />
     </div>
   )
 }

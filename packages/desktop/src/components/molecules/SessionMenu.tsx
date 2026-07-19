@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import {
   Ellipsis,
   GitMerge,
@@ -17,9 +17,16 @@ import {
   toInvokeError,
 } from "../../lib/tauri"
 import { useAppStore } from "../../stores/appStore"
-import { cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
-import { IconButton, TextInput } from "../atoms"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { TextInput } from "../atoms"
 import { ConfirmDialog } from "./ConfirmDialog"
 import { ErrorBanner } from "./ErrorBanner"
 
@@ -46,7 +53,6 @@ export const SessionMenu = ({
   const [renameValue, setRenameValue] = useState(label)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const rootRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
 
   const snapshots = useAppStore(
@@ -59,17 +65,8 @@ export const SessionMenu = ({
     queryKey: ["is-isolated", sessionId],
     queryFn: () => isIsolated(sessionId),
     staleTime: 30_000,
-    // Don't hit IPC on every chat switch — only when the menu opens.
     enabled: open,
   })
-
-  useEffect(() => {
-    const handlePointer = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener("mousedown", handlePointer)
-    return () => document.removeEventListener("mousedown", handlePointer)
-  }, [])
 
   const tipIndex = snapshots.length - 1
   const effectiveIndex = cursor < 0 ? tipIndex : cursor
@@ -172,99 +169,79 @@ export const SessionMenu = ({
     }
   }
 
-  const itemClass = cn(
-    "w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-base",
-    "text-ink-secondary hover:bg-fill-3 hover:text-ink",
-  )
-
   return (
-    <div ref={rootRef} className="relative">
-      <IconButton
-        label="Chat actions"
-        onClick={() => setOpen((v) => !v)}
-        quiet
-        className={cn("h-6 w-6", open && "bg-fill-3 text-ink opacity-100")}
-      >
-        <Ellipsis className="h-3 w-3" aria-hidden />
-      </IconButton>
-
-      {open ? (
-        <div
-          role="menu"
-          className={cn(
-            "absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-lg",
-            "border border-stroke-2 bg-panel py-0.5 shadow-lg animate-tray-in",
-          )}
+    <div className="relative">
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Chat actions"
+              className="size-6 text-muted-foreground hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground"
+            />
+          }
         >
-          <Button
-            variant="ghost"
-            role="menuitem"
-            className={itemClass}
-            onClick={handleOpenRename}
-          >
-            <Pencil className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-            Rename
-          </Button>
-          <Button
-            variant="ghost"
-            role="menuitem"
-            disabled={!canUndo || busy}
-            className={itemClass}
-            onClick={() => void handleUndo()}
-          >
-            <Undo2 className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-            Undo files
-          </Button>
-          <Button
-            variant="ghost"
-            role="menuitem"
-            disabled={!canRedo || busy}
-            className={itemClass}
-            onClick={() => void handleRedo()}
-          >
-            <Redo2 className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-            Redo files
-          </Button>
+          <Ellipsis className="size-3" aria-hidden />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" sideOffset={4} className="w-48">
+          <DropdownMenuGroup>
+            <DropdownMenuItem onClick={handleOpenRename}>
+              <Pencil />
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!canUndo || busy}
+              onClick={() => void handleUndo()}
+            >
+              <Undo2 />
+              Undo files
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!canRedo || busy}
+              onClick={() => void handleRedo()}
+            >
+              <Redo2 />
+              Redo files
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
           {isolated ? (
             <>
-              <div className="mx-2 my-0.5 border-t border-stroke-3" />
-              <Button
-                variant="ghost"
-                role="menuitem"
-                disabled={busy}
-                className={itemClass}
-                onClick={() => void handleIntegrate()}
-              >
-                <GitMerge className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-                Integrate workspace
-              </Button>
-              <Button
-                variant="ghost"
-                role="menuitem"
-                disabled={busy}
-                className={itemClass}
-                onClick={() => void handleDiscard()}
-              >
-                <XCircle className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-                Discard workspace
-              </Button>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem
+                  disabled={busy}
+                  onClick={() => void handleIntegrate()}
+                >
+                  <GitMerge />
+                  Integrate workspace
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={busy}
+                  onClick={() => void handleDiscard()}
+                >
+                  <XCircle />
+                  Discard workspace
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
             </>
           ) : null}
-          <div className="mx-2 my-0.5 border-t border-stroke-3" />
-          <Button
-            variant="ghost"
-            role="menuitem"
-            className={itemClass}
-            onClick={handleOpenDelete}
-          >
-            <Trash2 className="h-3.5 w-3.5 text-icon-3" aria-hidden />
-            Delete
-          </Button>
-        </div>
-      ) : null}
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={handleOpenDelete}
+            >
+              <Trash2 />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {error ? (
-        <div className="absolute right-0 top-full z-50 mt-10 w-56">
+        <div className="absolute right-0 top-full z-50 mt-1 w-56">
           <ErrorBanner
             message={error}
             onDismiss={() => setError(null)}

@@ -1,14 +1,21 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Bot, ChevronDown, Network } from "lucide-react"
 import type { SubagentTimelineRow } from "../../lib/workerPresentation"
 import {
   summarizeWorkerActivity,
   workerTitle,
 } from "../../lib/workerPresentation"
-import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
 import { Button } from "@/components/ui/button"
-import { PopoverTray } from "./PopoverTray"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { cn } from "../../lib/utils"
 
 type WorkingAgentsPillProps = {
   workers: SubagentTimelineRow[]
@@ -24,7 +31,6 @@ export const WorkingAgentsPill = ({
 }: WorkingAgentsPillProps) => {
   const openSubagentViewer = useAppStore((s) => s.openSubagentViewer)
   const [open, setOpen] = useState(false)
-  const anchorRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (workers.length === 0) setOpen(false)
@@ -37,84 +43,85 @@ export const WorkingAgentsPill = ({
 
   return (
     <div className="relative mb-1.5 flex justify-start">
-      <Button
-        ref={anchorRef}
-        variant="ghost"
-        size="sm"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        className={cn(
-          "rounded-md border border-stroke-3 bg-fill-3 px-2 text-ink-secondary",
-          "hover:bg-fill-4 hover:text-ink",
-        )}
-      >
-        <Network className="h-3 w-3 shrink-0 text-ink-faint" aria-hidden />
-        <span className="animate-shimmer-text">{label}</span>
-        <ChevronDown
-          className={cn(
-            "h-2.5 w-2.5 text-icon-3 transition-transform duration-[var(--duration-fast)]",
-            open && "rotate-180",
-          )}
-          aria-hidden
-        />
-      </Button>
-      <PopoverTray
-        open={open}
-        onClose={() => setOpen(false)}
-        placement="above"
-        anchorRef={anchorRef}
-        role="menu"
-        aria-label="Running workers"
-        className="left-0 min-w-[220px] max-w-[320px] border border-stroke-3"
-      >
-        <div className="flex flex-col gap-0.5 p-1">
-          {onScrollToWorkers ? (
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger
+          render={
             <Button
+              type="button"
               variant="ghost"
-              role="menuitem"
-              className="w-full justify-start gap-2 rounded-md px-2 py-1.5 text-sm text-ink-secondary hover:bg-fill-4"
-              onClick={() => {
-                setOpen(false)
-                onScrollToWorkers()
-              }}
-            >
-              <Network className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
-              Jump to workers
-            </Button>
-          ) : null}
-          {workers.map((w) => {
-            const activity = summarizeWorkerActivity(
-              w.children,
-              w.phase,
-              w.summary,
-            )
-            const title = workerTitle(w.role, w.task)
-            return (
-              <Button
-                key={w.childSession}
-                variant="ghost"
-                role="menuitem"
-                className="h-auto w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 hover:bg-fill-4"
-                onClick={() => {
-                  setOpen(false)
-                  openSubagentViewer(w.childSession, title)
-                }}
-              >
-                <span className="flex min-w-0 items-center gap-1.5 text-sm text-ink-secondary">
-                  <Bot className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
-                  <span className="min-w-0 truncate">{title}</span>
-                </span>
-                {activity.latestLabel ? (
-                  <span className="truncate pl-5 text-sm text-ink-faint">
-                    {activity.latestLabel}
+              size="sm"
+              aria-label="Running workers"
+              className={cn(
+                "rounded-md border border-border bg-muted px-2 text-muted-foreground",
+                "hover:bg-muted/80 hover:text-foreground",
+              )}
+            />
+          }
+        >
+          <Network className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="animate-shimmer-text">{label}</span>
+          <ChevronDown
+            className={cn(
+              "size-2.5 text-muted-foreground transition-transform duration-[var(--duration-fast)]",
+              open && "rotate-180",
+            )}
+            aria-hidden
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          side="top"
+          sideOffset={6}
+          className="min-w-[220px] max-w-[320px]"
+        >
+          <DropdownMenuGroup>
+            {onScrollToWorkers ? (
+              <>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setOpen(false)
+                    onScrollToWorkers()
+                  }}
+                >
+                  <Network />
+                  Jump to workers
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            ) : null}
+            {workers.map((w) => {
+              const activity = summarizeWorkerActivity(
+                w.children,
+                w.phase,
+                w.summary,
+              )
+              const title = workerTitle(w.role, w.task)
+              return (
+                <DropdownMenuItem
+                  key={w.childSession}
+                  className="h-auto items-start py-1.5"
+                  onClick={() => {
+                    setOpen(false)
+                    openSubagentViewer(w.childSession, title)
+                  }}
+                >
+                  <Bot className="mt-0.5" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-foreground">
+                      {title}
+                    </span>
+                    {activity.latestLabel ? (
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {activity.latestLabel}
+                      </span>
+                    ) : null}
                   </span>
-                ) : null}
-              </Button>
-            )
-          })}
-        </div>
-      </PopoverTray>
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }

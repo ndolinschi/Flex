@@ -1,10 +1,16 @@
-import { useRef, useState } from "react"
+import { useState } from "react"
 import { Check, GitFork } from "lucide-react"
 import type { IsolationPolicy } from "../../../lib/types"
 import { useAppStore } from "../../../stores/appStore"
-import { cn } from "../../../lib/utils"
-import { PopoverItem, PopoverTray } from "../../molecules/PopoverTray"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 const ISOLATION_OPTIONS: {
   value: IsolationPolicy
@@ -43,7 +49,6 @@ export const IsolationPicker = ({
   disabled?: boolean
 }) => {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
   const selectedIsolation = useAppStore((s) => s.selectedIsolation)
   const setSelectedIsolation = useAppStore((s) => s.setSelectedIsolation)
   // Both selectors must run unconditionally on every render — `||` short-
@@ -66,73 +71,63 @@ export const IsolationPicker = ({
   if (hasTurns) {
     return (
       <span
-        className="ml-1 flex h-6 items-center gap-1 rounded-md px-1.5 text-sm text-ink-muted opacity-60"
+        className="ml-1 flex h-6 items-center gap-1 rounded-md px-1.5 text-sm text-muted-foreground opacity-60"
         title="Isolation is fixed for this session"
       >
-        <GitFork className="h-3 w-3 shrink-0" aria-hidden />
+        <GitFork className="size-3 shrink-0" aria-hidden />
         {currentLabel}
       </span>
     )
   }
 
   return (
-    <div ref={rootRef} className="relative">
-      <Button
-        variant="ghost"
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger
         disabled={disabled}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={`Isolation: ${currentLabel}`}
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "ml-1 h-6 gap-1 rounded-md px-1.5",
-          "text-sm text-ink-muted opacity-80 font-normal",
-          "hover:bg-transparent hover:text-ink-secondary hover:opacity-100",
-          open && "opacity-100",
-        )}
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={disabled}
+            aria-label={`Isolation: ${currentLabel}`}
+            className="ml-1 h-6 gap-1 rounded-md px-1.5 text-sm font-normal text-muted-foreground opacity-80 hover:bg-transparent hover:text-foreground hover:opacity-100 aria-expanded:opacity-100"
+          />
+        }
       >
-        <GitFork className="h-3 w-3 shrink-0" aria-hidden />
+        <GitFork className="size-3 shrink-0" aria-hidden />
         <span className="min-w-0 truncate">{currentLabel}</span>
-      </Button>
-
-      <PopoverTray
-        open={open}
-        onClose={() => setOpen(false)}
-        anchorRef={rootRef}
-        placement="above"
-        role="listbox"
-        aria-label="Session isolation"
-        className="left-0 w-72"
-      >
-        <ul className="py-0.5">
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" sideOffset={6} className="w-72">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Session isolation</DropdownMenuLabel>
           {ISOLATION_OPTIONS.map((opt) => {
             const active = opt.value === current
             return (
-              <li key={opt.value}>
-                <PopoverItem
-                  active={active}
-                  onClick={() => {
-                    setSelectedIsolation(opt.value)
-                    setOpen(false)
-                  }}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate">{opt.label}</span>
-                      {active ? (
-                        <Check className="h-3 w-3 shrink-0 text-accent" aria-hidden />
-                      ) : null}
-                    </div>
-                    <p className="mt-0.5 truncate text-xs text-ink-muted">
-                      {opt.description}
-                    </p>
-                  </div>
-                </PopoverItem>
-              </li>
+              <DropdownMenuItem
+                key={opt.value}
+                className="items-start gap-2"
+                onClick={() => {
+                  setSelectedIsolation(opt.value)
+                  setOpen(false)
+                }}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5 text-sm text-foreground">
+                    {opt.label}
+                    {active ? (
+                      <Check className="size-3 text-primary" aria-hidden />
+                    ) : null}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {opt.description}
+                  </span>
+                </span>
+              </DropdownMenuItem>
             )
           })}
-        </ul>
-      </PopoverTray>
-    </div>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

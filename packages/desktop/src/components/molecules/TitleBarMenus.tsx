@@ -1,9 +1,17 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import type { TitleBarActionHandlers } from "../../hooks/useTitleBarActions"
 import { detectWindowHost } from "../../lib/windowChrome"
 import { cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
-import { PopoverItem, PopoverTray } from "./PopoverTray"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 type MenuId = "file" | "edit" | "view" | "help"
 
@@ -34,15 +42,6 @@ export const TitleBarMenus = ({
   canCommandPalette,
 }: TitleBarMenusProps) => {
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null)
-
-  useEffect(() => {
-    if (!openMenu) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpenMenu(null)
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [openMenu])
 
   const close = () => setOpenMenu(null)
 
@@ -156,91 +155,72 @@ export const TitleBarMenus = ({
         const menu = menus[id]
         const open = openMenu === id
         return (
-          <div key={id} className="relative flex h-full items-center">
-            <Button
-              variant="ghost"
-              aria-haspopup="menu"
-              aria-expanded={open}
-              onClick={() => setOpenMenu(open ? null : id)}
-              onMouseEnter={() => {
-                if (openMenu && openMenu !== id) setOpenMenu(id)
-              }}
-              className={cn(
-                "h-[22px] rounded-sm px-1.5 text-xs leading-none text-ink-secondary",
-                "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-                "hover:bg-fill-3 hover:text-ink",
-                open && "bg-fill-3 text-ink",
-              )}
+          <DropdownMenu
+            key={id}
+            open={open}
+            onOpenChange={(next) => {
+              if (next) setOpenMenu(id)
+              else if (openMenu === id) setOpenMenu(null)
+            }}
+          >
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onMouseEnter={() => {
+                    if (openMenu && openMenu !== id) setOpenMenu(id)
+                  }}
+                  className={cn(
+                    "h-[22px] rounded-sm px-1.5 text-xs leading-none text-muted-foreground",
+                    "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+                    "hover:bg-muted hover:text-foreground",
+                    open && "bg-muted text-foreground",
+                  )}
+                />
+              }
             >
               {menu.label}
-            </Button>
-            <PopoverTray
-              open={open}
-              onClose={close}
-              placement="below"
-              role="menu"
-              aria-label={menu.label}
-              className="left-0 top-full mt-0.5 min-w-[188px] py-1"
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              sideOffset={2}
+              className="min-w-[188px]"
             >
-              {menu.items.map((item) =>
-                item.separator ? (
-                  <div
-                    key={item.id}
-                    role="separator"
-                    className="my-1 h-px bg-stroke-3"
-                  />
-                ) : (
-                  <MenuRow
-                    key={item.id}
-                    label={item.label}
-                    hint={item.hint}
-                    disabled={item.disabled}
-                    onClick={() => {
-                      if (item.disabled || !item.run) return
-                      run(item.run)
-                    }}
-                  />
-                ),
-              )}
-            </PopoverTray>
-          </div>
+              <DropdownMenuGroup>
+                {menu.items.map((item) =>
+                  item.separator ? (
+                    <DropdownMenuSeparator key={item.id} />
+                  ) : (
+                    <DropdownMenuItem
+                      key={item.id}
+                      disabled={item.disabled}
+                      onClick={() => {
+                        if (item.disabled || !item.run) return
+                        run(item.run)
+                      }}
+                    >
+                      {item.label}
+                      {item.hint ? (
+                        <DropdownMenuShortcut>{item.hint}</DropdownMenuShortcut>
+                      ) : null}
+                    </DropdownMenuItem>
+                  ),
+                )}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )
       })}
     </div>
   )
 }
 
-const MenuRow = ({
-  label,
-  hint,
-  disabled,
-  onClick,
-}: {
-  label: string
-  hint?: string
-  disabled?: boolean
-  onClick: () => void
-}) => (
-  <PopoverItem
-    role="menuitem"
-    disabled={disabled}
-    onClick={onClick}
-    className="justify-between gap-6 px-3 py-1.5 text-sm"
-  >
-    <span>{label}</span>
-    {hint ? (
-      <span className="text-xs text-ink-muted [font-variant-numeric:tabular-nums]">
-        {hint}
-      </span>
-    ) : null}
-  </PopoverItem>
-)
-
 /** Compact app mark used on Windows/Linux title bars (Cursor-style). */
 export const AppMark = ({ className }: { className?: string }) => (
   <div
     className={cn(
-      "flex h-full items-center justify-center px-1.5 text-ink-secondary",
+      "flex h-full items-center justify-center px-1.5 text-muted-foreground",
       className,
     )}
     aria-hidden

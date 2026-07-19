@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { Check, Folder, FolderOpen } from "lucide-react"
+import { Check, ChevronDown, Folder, FolderOpen } from "lucide-react"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
 import { createSession, toInvokeError, updateSession } from "../../lib/tauri"
 import { isBrowserPreview, NATIVE_APP_REQUIRED } from "../../lib/browserPreview"
@@ -8,13 +8,16 @@ import { invalidateWorkspaceQueries } from "../../lib/invalidateWorkspaceQueries
 import { DEFAULT_SESSION_TITLE } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
 import { basename, parentPathPrefix } from "../../lib/utils"
-import { PickerTrigger } from "../atoms"
+import { Button } from "@/components/ui/button"
 import {
-  PopoverItem,
-  PopoverSearch,
-  PopoverSection,
-  PopoverTray,
-} from "./PopoverTray"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 type ProjectPickerProps = {
   sessionId: string | null
@@ -34,7 +37,6 @@ export const ProjectPicker = ({
   const [openMenu, setOpenMenu] = useState(false)
   const [query, setQuery] = useState("")
   const [busy, setBusy] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const recentCwds = useAppStore((s) => s.recentCwds)
   const pushRecentCwd = useAppStore((s) => s.pushRecentCwd)
@@ -78,10 +80,9 @@ export const ProjectPicker = ({
     )
   }, [recents, query])
 
-  const handleClose = () => {
-    setOpenMenu(false)
-    setQuery("")
-  }
+  useEffect(() => {
+    if (!openMenu) setQuery("")
+  }, [openMenu])
 
   const applyCwd = async (nextCwd: string) => {
     setBusy(true)
@@ -112,7 +113,7 @@ export const ProjectPicker = ({
         setActiveSessionId(meta.id, { panel: "closed" })
         setRoute("chat")
       }
-      handleClose()
+      setOpenMenu(false)
     } catch (err) {
       onError?.(toInvokeError(err))
     } finally {
@@ -139,83 +140,85 @@ export const ProjectPicker = ({
   }
 
   return (
-    <div ref={rootRef} className="relative">
-      <PickerTrigger
-        leadingIcon={<Folder className="h-3 w-3 shrink-0" aria-hidden />}
-        label={label}
-        open={openMenu}
-        onClick={() => setOpenMenu((v) => !v)}
+    <DropdownMenu open={openMenu} onOpenChange={setOpenMenu}>
+      <DropdownMenuTrigger
         disabled={disabled || busy}
-        ariaLabel={`Project: ${label}`}
-        className="max-w-[10rem]"
-      />
-
-      <PopoverTray
-        open={openMenu}
-        onClose={handleClose}
-        anchorRef={rootRef}
-        placement="above"
-        role="listbox"
-        aria-label="Projects"
-        className="left-0 w-80"
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={disabled || busy}
+            aria-label={`Project: ${label}`}
+            className="h-6 max-w-[10rem] gap-1 px-1.5 text-sm font-normal text-muted-foreground opacity-80 hover:bg-transparent hover:text-foreground hover:opacity-100 aria-expanded:opacity-100"
+          />
+        }
       >
-        <PopoverSearch
-          value={query}
-          onChange={setQuery}
-          placeholder="Run agent anywhere…"
-        />
+        <Folder className="size-3 shrink-0" aria-hidden />
+        <span className="min-w-0 truncate">{label}</span>
+        <ChevronDown className="size-2.5 shrink-0" aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        side="top"
+        sideOffset={6}
+        className="w-80 p-0"
+      >
+        <div className="border-b border-border px-2.5 py-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder="Run agent anywhere…"
+            aria-label="Search projects"
+            className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+          />
+        </div>
         {filtered.length > 0 ? (
-          <PopoverSection label="Recents">
-            <ul className="max-h-48 overflow-y-auto">
-              {filtered.map((path) => {
-                const active = path === cwd
-                const parent = parentPathPrefix(path)
-                const name = basename(path)
-                return (
-                  <li key={path}>
-                    <PopoverItem
-                      active={active}
-                      disabled={busy}
-                      onClick={() => void applyCwd(path)}
-                    >
-                      <Folder
-                        className="h-3.5 w-3.5 shrink-0 text-icon-3"
-                        aria-hidden
-                      />
-                      <span className="min-w-0 flex-1 truncate" title={path}>
-                        {parent ? (
-                          <span className="text-ink-faint">{parent}</span>
-                        ) : null}
-                        <span className="text-ink">{name}</span>
-                      </span>
-                      {active ? (
-                        <Check
-                          className="h-3 w-3 shrink-0 text-accent"
-                          aria-hidden
-                        />
-                      ) : null}
-                    </PopoverItem>
-                  </li>
-                )
-              })}
-            </ul>
-          </PopoverSection>
+          <DropdownMenuGroup className="max-h-48 overflow-y-auto py-1">
+            <DropdownMenuLabel>Recents</DropdownMenuLabel>
+            {filtered.map((path) => {
+              const active = path === cwd
+              const parent = parentPathPrefix(path)
+              const name = basename(path)
+              return (
+                <DropdownMenuItem
+                  key={path}
+                  disabled={busy}
+                  onClick={() => void applyCwd(path)}
+                  className="mx-1"
+                >
+                  <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate" title={path}>
+                    {parent ? (
+                      <span className="text-muted-foreground">{parent}</span>
+                    ) : null}
+                    <span className="text-foreground">{name}</span>
+                  </span>
+                  {active ? (
+                    <Check className="size-3 shrink-0 text-primary" aria-hidden />
+                  ) : null}
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuGroup>
         ) : (
-          <p className="px-2.5 py-3 text-center text-xs text-ink-faint">
+          <div className="px-2.5 py-3 text-center text-xs text-muted-foreground">
             No recent projects
-          </p>
+          </div>
         )}
-        <div className="border-t border-stroke-3 py-0.5">
-          <PopoverItem
-            role="menuitem"
+        <DropdownMenuSeparator className="m-0" />
+        <DropdownMenuGroup className="py-1">
+          <DropdownMenuItem
             disabled={busy}
             onClick={() => void handleOpenFolder()}
+            className="mx-1"
           >
-            <FolderOpen className="h-3.5 w-3.5" aria-hidden />
+            <FolderOpen />
             Open Folder
-          </PopoverItem>
-        </div>
-      </PopoverTray>
-    </div>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

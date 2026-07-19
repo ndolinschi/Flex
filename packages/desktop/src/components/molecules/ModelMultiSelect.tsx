@@ -1,10 +1,17 @@
-import { useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { ChevronDown, ChevronUp, Plus, X } from "lucide-react"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Label } from "../atoms"
-import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
 
 type ModelMultiSelectProps = {
@@ -42,15 +49,13 @@ export const ModelMultiSelect = ({
 }: ModelMultiSelectProps) => {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
-  const addRef = useRef<HTMLDivElement>(null)
 
   const available = models.filter((m) => !value.includes(m.id))
   const { groups } = useGroupedModels(available, query, builtinProviders)
 
-  const handleClose = () => {
-    setOpen(false)
-    setQuery("")
-  }
+  useEffect(() => {
+    if (!open) setQuery("")
+  }, [open])
 
   const moveUp = (index: number) => {
     if (index <= 0) return
@@ -72,7 +77,7 @@ export const ModelMultiSelect = ({
 
   const add = (modelId: string) => {
     onChange([...value, modelId])
-    handleClose()
+    setOpen(false)
   }
 
   return (
@@ -84,14 +89,12 @@ export const ModelMultiSelect = ({
           {value.map((modelId, index) => (
             <li
               key={`${modelId}-${index}`}
-              className={cn(
-                "flex items-center gap-2 rounded-md border border-stroke-3 bg-fill-3 px-2 py-1.5",
-              )}
+              className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1.5"
             >
-              <span className="w-4 shrink-0 text-center text-xs text-ink-faint">
+              <span className="w-4 shrink-0 text-center text-xs text-muted-foreground">
                 {index + 1}
               </span>
-              <span className="min-w-0 flex-1 truncate text-sm text-ink-secondary">
+              <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
                 {displayFor(modelId, models)}
               </span>
               <div className="flex shrink-0 items-center gap-0.5">
@@ -101,7 +104,7 @@ export const ModelMultiSelect = ({
                   aria-label={`Move ${displayFor(modelId, models)} up`}
                   disabled={disabled || index === 0}
                   onClick={() => moveUp(index)}
-                  className="text-icon-3 hover:bg-fill-2 hover:text-ink"
+                  className="text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
                   <ChevronUp aria-hidden />
                 </Button>
@@ -111,7 +114,7 @@ export const ModelMultiSelect = ({
                   aria-label={`Move ${displayFor(modelId, models)} down`}
                   disabled={disabled || index === value.length - 1}
                   onClick={() => moveDown(index)}
-                  className="text-icon-3 hover:bg-fill-2 hover:text-ink"
+                  className="text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
                   <ChevronDown aria-hidden />
                 </Button>
@@ -130,62 +133,63 @@ export const ModelMultiSelect = ({
           ))}
         </ul>
       ) : (
-        <p className="text-xs text-ink-faint">No fallbacks configured</p>
+        <p className="text-xs text-muted-foreground">No fallbacks configured</p>
       )}
 
-      <div ref={addRef} className="relative self-start">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setOpen((v) => !v)}
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger
           disabled={disabled || isLoading || available.length === 0}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          className="border-dashed border-stroke-2 text-ink-muted hover:border-stroke-1 hover:text-ink-secondary"
+          render={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={disabled || isLoading || available.length === 0}
+              className="self-start border-dashed"
+            />
+          }
         >
           <Plus data-icon="inline-start" aria-hidden />
           Add fallback
-        </Button>
-
-        <PopoverTray
-          open={open}
-          onClose={handleClose}
-          anchorRef={addRef}
-          placement="below"
-          role="listbox"
-          aria-label="Add fallback model"
-          className="left-0 w-72"
-        >
-          <PopoverSearch
-            value={query}
-            onChange={setQuery}
-            placeholder="Search models"
-          />
-          <div className="max-h-56 overflow-y-auto py-0.5">
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" sideOffset={4} className="w-72 p-0">
+          <div className="border-b border-border px-2.5 py-2">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+              placeholder="Search models"
+              aria-label="Search models"
+              className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto py-1">
             {groups.length === 0 ? (
-              <p className="px-2.5 py-3 text-center text-xs text-ink-faint">
+              <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">
                 {available.length === 0 ? "All models added" : "No models found"}
               </p>
             ) : (
               groups.map((group) => (
-                <PopoverSection key={group.providerId} label={group.label}>
-                  <ul>
-                    {group.items.map((m) => (
-                      <li key={m.id}>
-                        <PopoverItem onClick={() => add(m.id)}>
-                          <span className="min-w-0 flex-1 truncate">
-                            {m.displayName ?? m.id}
-                          </span>
-                        </PopoverItem>
-                      </li>
-                    ))}
-                  </ul>
-                </PopoverSection>
+                <DropdownMenuGroup key={group.providerId}>
+                  <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                  {group.items.map((m) => (
+                    <DropdownMenuItem
+                      key={m.id}
+                      className="mx-1"
+                      onClick={() => add(m.id)}
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {m.displayName ?? m.id}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
               ))
             )}
           </div>
-        </PopoverTray>
-      </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }

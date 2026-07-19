@@ -52,8 +52,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `ArchivedSectionHeader` | Collapsible Archived group header | `count`, `collapsed`, `onToggle` | SessionSidebar |
 | `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays + optional ghost-text inline completion (isolates keystrokes from ModelPicker/ContextBar) | `composerMode`, `anchorRef`, `attachments`, `onSend` | Composer |
 | `ModelSelect` | Simple model `<select>` | `models`, `value`, `onChange` | ProviderSettingsForm |
-| `ModelPicker` | Searchable model tray (PopoverTray) | `models`, `value`, `onChange` | Composer |
-| `ModePicker` | Agent / Plan / Ask / Debug (/ Flex when flagged) mode pill | `value`, `onChange` | Composer |
+| `ModelPicker` | Searchable model dropdown (shadcn DropdownMenu + effort submenu) | `models`, `value`, `onChange`, `effortFor`, `onEffortChange` | Composer |
+| `ModePicker` | Agent / Plan / Ask / Debug (/ Flex when flagged) mode dropdown | `value`, `onChange` | Composer |
 | `PlanBuildBar` | Cursor-style Build CTA after ExitPlanMode | `onBuild`, `onKeepPlanning?`, `variant` | Plan tab, ChatSessionBody |
 | `PlanCard` | Checklist from `plan_updated` (Plan tool tab; not inlined in timeline) | `entries` | PlanTab |
 | `PlanList` | Multi-plan “Review plans” list for a session | `plans`, `onSelect` | PlanTab |
@@ -67,7 +67,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `BranchPicker` | List/checkout local git branches; shows current-branch PR # + checks when present | `cwd`, `onError?` | ContextBar |
 | `BranchPrStatusChip` | Current-branch PR # + title + CI summary; opens PR in browser | `pr` | ChangesTab header |
 | `CreatePrDialog` | Editable title/body modal before `gh pr create` | `open`, `initialTitle?`, `initialBody?`, `onConfirm` | ChangesTab, CommitCenter, CommitBar |
-| `PopoverTray` | Shared Esc/click-outside/↑↓ tray; `onClose` via ref so stream re-renders don't rebind listeners | `open`, `onClose`, `placement`, `children` | Model/Mode/Plus/Project/Branch pickers |
+| `PopoverTray` | Shared Esc/click-outside/↑↓ tray; used for autocomplete (slash/@) and form popovers (commit message) | `open`, `onClose`, `placement`, `children` | Composer trays, CommitBar |
 | `ContextMenu` | Portal menu; ignores timeline scroll + webview-induced `window.blur` so it stays open mid-stream | `position`, `items`, `onClose` | ContentPane `+`, SessionListItem, FileExplorer, PlanToolbar |
 | `ConfirmDialog` | In-app modal (rename/delete/create PR fields) | `open`, `title`, `onConfirm`, `onCancel`, `confirmDisabled?` | SessionMenu, CreatePrDialog |
 | `AttachmentChip` | Pending attachment pill (file/image/directory/dom) | `attachment`, `onRemove` | Composer |

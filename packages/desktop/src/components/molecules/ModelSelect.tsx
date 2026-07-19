@@ -1,10 +1,17 @@
-import { useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Check, ChevronDown } from "lucide-react"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Label, Spinner } from "../atoms"
-import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
 
 type ModelSelectProps = {
@@ -39,35 +46,36 @@ export const ModelSelect = ({
 }: ModelSelectProps) => {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
-  const rootRef = useRef<HTMLDivElement>(null)
 
   const selected = models.find((m) => m.id === value)
   const triggerLabel = selected?.displayName ?? selected?.id ?? placeholder
 
   const { groups } = useGroupedModels(models, query, builtinProviders)
 
-  const handleClose = () => {
-    setOpen(false)
-    setQuery("")
-  }
+  useEffect(() => {
+    if (!open) setQuery("")
+  }, [open])
 
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       {label ? <Label htmlFor={id}>{label}</Label> : null}
-      <div ref={rootRef} className="relative">
-        <Button
-          variant="outline"
-          id={id}
-          onClick={() => setOpen((v) => !v)}
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger
           disabled={disabled || isLoading}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          className="h-9 w-full justify-start gap-2 border-border bg-surface px-3 text-sm text-ink hover:bg-surface focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
+          render={
+            <Button
+              type="button"
+              variant="outline"
+              id={id}
+              disabled={disabled || isLoading}
+              className="h-9 w-full justify-start gap-2 px-3 text-sm"
+            />
+          }
         >
           <span
             className={cn(
               "min-w-0 flex-1 truncate text-left",
-              !selected && "text-ink-faint",
+              !selected && "text-muted-foreground",
             )}
           >
             {triggerLabel}
@@ -75,66 +83,62 @@ export const ModelSelect = ({
           {isLoading ? (
             <Spinner size="sm" />
           ) : (
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-icon-3" aria-hidden />
+            <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
           )}
-        </Button>
-
-        <PopoverTray
-          open={open}
-          onClose={handleClose}
-          anchorRef={rootRef}
-          placement="below"
-          role="listbox"
-          aria-label={label || "Models"}
-          className="left-0 w-full min-w-[16rem]"
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          sideOffset={4}
+          className="w-(--anchor-width) min-w-[16rem] p-0"
         >
-          <PopoverSearch
-            value={query}
-            onChange={setQuery}
-            placeholder="Search models"
-          />
-          <div className="max-h-56 overflow-y-auto py-0.5">
+          <div className="border-b border-border px-2.5 py-2">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+              placeholder="Search models"
+              aria-label="Search models"
+              className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto py-1">
             {groups.length === 0 ? (
-              <p className="px-2.5 py-3 text-center text-xs text-ink-faint">
+              <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">
                 No models found
               </p>
             ) : (
               groups.map((group) => (
-                <PopoverSection key={group.providerId} label={group.label}>
-                  <ul>
-                    {group.items.map((m) => {
-                      const active = m.id === value
-                      return (
-                        <li key={m.id}>
-                          <PopoverItem
-                            active={active}
-                            onClick={() => {
-                              onChange(m.id)
-                              handleClose()
-                            }}
-                          >
-                            <span className="min-w-0 flex-1 truncate">
-                              {m.displayName ?? m.id}
-                            </span>
-                            <span className="flex w-3 shrink-0 items-center justify-center">
-                              {active ? (
-                                <Check
-                                  className="h-3 w-3 text-accent"
-                                  aria-hidden
-                                />
-                              ) : null}
-                            </span>
-                          </PopoverItem>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </PopoverSection>
+                <DropdownMenuGroup key={group.providerId}>
+                  <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                  {group.items.map((m) => {
+                    const active = m.id === value
+                    return (
+                      <DropdownMenuItem
+                        key={m.id}
+                        className="mx-1"
+                        onClick={() => {
+                          onChange(m.id)
+                          setOpen(false)
+                        }}
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {m.displayName ?? m.id}
+                        </span>
+                        {active ? (
+                          <Check className="size-3 text-primary" aria-hidden />
+                        ) : (
+                          <span className="size-3" aria-hidden />
+                        )}
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuGroup>
               ))
             )}
           </div>
-        </PopoverTray>
-      </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }

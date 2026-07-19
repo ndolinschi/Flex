@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo } from "react"
 import {
   Bug,
   Check,
@@ -13,7 +13,13 @@ import { FLEX_MODE_ENABLED } from "../../lib/featureFlags"
 import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
 import { Button } from "@/components/ui/button"
-import { PopoverItem, PopoverTray } from "./PopoverTray"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 type ModeOption = {
   id: ComposerMode
@@ -72,10 +78,15 @@ type ModePickerProps = {
   disabled?: boolean
 }
 
+const triggerClass = cn(
+  "rounded-full border border-stroke-3 bg-fill-4 px-2",
+  "tracking-[var(--tracking-caption)] text-ink-secondary font-normal",
+  "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink-secondary",
+  "aria-expanded:border-stroke-2 aria-expanded:bg-fill-2",
+)
+
 /** Agent / Plan / Ask (/ Flex when flagged) mode pill for the composer footer. */
 export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
-  const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
   const modes = useMemo(() => visibleComposerModes(), [])
   const effectiveValue =
     value === "flex" && !FLEX_MODE_ENABLED ? "agent" : value
@@ -88,74 +99,59 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
   }, [value, onChange])
 
   return (
-    <div ref={rootRef} className="relative">
-      <Button
-        variant="ghost"
-        size="xs"
+    <DropdownMenu>
+      <DropdownMenuTrigger
         disabled={disabled}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={`Mode: ${selected.label}`}
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "rounded-full border border-stroke-3 bg-fill-4 px-2",
-          "tracking-[var(--tracking-caption)] text-ink-secondary",
-          "transition-[background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-          "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink-secondary",
-          open && "border-stroke-2 bg-fill-2",
-        )}
+        render={
+          <Button
+            variant="ghost"
+            size="xs"
+            aria-label={`Mode: ${selected.label}`}
+            className={triggerClass}
+          />
+        }
       >
-        <Icon className={cn("h-3 w-3", selected.accent)} aria-hidden />
+        <Icon className={cn("size-3", selected.accent)} aria-hidden />
         <span className="font-medium">{selected.label}</span>
-        <ChevronDown className="h-2.5 w-2.5 opacity-60" aria-hidden />
-      </Button>
-
-      <PopoverTray
-        open={open}
-        onClose={() => setOpen(false)}
-        anchorRef={rootRef}
-        placement="above"
-        role="listbox"
-        aria-label="Composer mode"
-        className="left-0 w-56"
-      >
-        {modes.map((mode) => {
-          const ModeIcon = mode.icon
-          const isActive = mode.id === effectiveValue
-          return (
-            <PopoverItem
-              key={mode.id}
-              onClick={() => {
-                onChange(mode.id)
-                // Plan mode should surface the Plan tab even when empty —
-                // previously the tab only appeared after ExitPlanMode.
-                if (mode.id === "plan") {
-                  useAppStore.getState().revealPlanPanel()
-                }
-                setOpen(false)
-              }}
-              className="items-start py-2"
-            >
-              <ModeIcon
-                className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", mode.accent)}
-                aria-hidden
-              />
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1.5 text-base text-ink">
-                  {mode.label}
-                  {isActive ? (
-                    <Check className="h-3 w-3 text-accent" aria-hidden />
-                  ) : null}
+        <ChevronDown className="size-2.5 opacity-60" aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="start" className="w-56">
+        <DropdownMenuGroup>
+          {modes.map((mode) => {
+            const ModeIcon = mode.icon
+            const isActive = mode.id === effectiveValue
+            return (
+              <DropdownMenuItem
+                key={mode.id}
+                className="items-start py-2"
+                onClick={() => {
+                  onChange(mode.id)
+                  if (mode.id === "plan") {
+                    useAppStore.getState().revealPlanPanel()
+                  }
+                }}
+              >
+                <ModeIcon
+                  className={cn("mt-0.5 size-3.5 shrink-0", mode.accent)}
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5 text-sm text-foreground">
+                    {mode.label}
+                    {isActive ? (
+                      <Check className="size-3 text-primary" aria-hidden />
+                    ) : null}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {mode.description}
+                  </span>
                 </span>
-                <span className="block text-sm text-ink-muted">
-                  {mode.description}
-                </span>
-              </span>
-            </PopoverItem>
-          )
-        })}
-      </PopoverTray>
-    </div>
+              </DropdownMenuItem>
+            )
+          })}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

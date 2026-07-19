@@ -1,11 +1,23 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
-import { createPortal } from "react-dom"
-import { Check, ChevronDown, ChevronRight, Gauge } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Check, ChevronDown, Gauge } from "lucide-react"
 import { EFFORT_LEVELS, effortLabel } from "../../lib/types"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
-import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
 
 type ModelPickerProps = {
@@ -25,119 +37,6 @@ type ModelPickerProps = {
   builtinProviders?: BuiltinProvider[]
 }
 
-const SUBMENU_WIDTH = 144
-
-/** Effort submenu — a chevron/"Edit" affordance on EVERY model row expands
- * Default + the 5 contract effort levels (reference design lets you set
- * effort for any model, not just the active one). Portal-mounted (the model
- * tray clips overflow) and viewport-clamped like ContextMenu, anchored to the
- * trigger row's rect. */
-const EffortSubmenu = ({
-  anchorRect,
-  value,
-  onChange,
-  onClose,
-}: {
-  anchorRect: DOMRect
-  value: string | null
-  onChange: (effort: string | null) => void
-  onClose: () => void
-}) => {
-  const menuRef = useRef<HTMLDivElement>(null)
-  const [coords, setCoords] = useState<{ x: number; y: number } | null>(null)
-
-  useLayoutEffect(() => {
-    const el = menuRef.current
-    const margin = 8
-    const height = el?.getBoundingClientRect().height ?? 0
-    let x = anchorRect.right + 4
-    let y = anchorRect.top
-    if (x + SUBMENU_WIDTH + margin > window.innerWidth) {
-      x = Math.max(margin, anchorRect.left - SUBMENU_WIDTH - 4)
-    }
-    if (y + height + margin > window.innerHeight) {
-      y = Math.max(margin, window.innerHeight - height - margin)
-    }
-    setCoords({ x, y })
-  }, [anchorRect])
-
-  useEffect(() => {
-    const handlePointer = (e: MouseEvent) => {
-      if (menuRef.current?.contains(e.target as Node)) return
-      onClose()
-    }
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        e.stopPropagation()
-        onClose()
-      }
-    }
-    document.addEventListener("mousedown", handlePointer, true)
-    document.addEventListener("keydown", handleKey, true)
-    return () => {
-      document.removeEventListener("mousedown", handlePointer, true)
-      document.removeEventListener("keydown", handleKey, true)
-    }
-  }, [onClose])
-
-  return createPortal(
-    <div
-      ref={menuRef}
-      role="menu"
-      aria-label="Effort"
-      data-popover-outside-ignore
-      style={{
-        position: "fixed",
-        left: coords?.x ?? anchorRect.right,
-        top: coords?.y ?? anchorRect.top,
-        width: SUBMENU_WIDTH,
-        visibility: coords ? "visible" : "hidden",
-      }}
-      className={cn(
-        "z-[200] overflow-hidden rounded-md py-0.5",
-        "bg-panel shadow-[var(--shadow-popover)] animate-tray-in",
-      )}
-    >
-      <PopoverItem
-        role="menuitem"
-        active={value === null}
-        onClick={() => {
-          onChange(null)
-          onClose()
-        }}
-      >
-        <span className="min-w-0 flex-1 truncate text-ink">Default</span>
-        {value === null ? (
-          <Check className="h-3 w-3 shrink-0 text-accent" aria-hidden />
-        ) : null}
-      </PopoverItem>
-      {EFFORT_LEVELS.map((level) => {
-        const active = level === value
-        return (
-          <PopoverItem
-            key={level}
-            role="menuitem"
-            active={active}
-            onClick={() => {
-              onChange(level)
-              onClose()
-            }}
-          >
-            <span className="min-w-0 flex-1 truncate text-ink">
-              {effortLabel(level)}
-            </span>
-            {active ? (
-              <Check className="h-3 w-3 shrink-0 text-accent" aria-hidden />
-            ) : null}
-          </PopoverItem>
-        )
-      })}
-    </div>,
-    document.body,
-  )
-}
-
 export const ModelPicker = ({
   models,
   value,
@@ -150,11 +49,6 @@ export const ModelPicker = ({
 }: ModelPickerProps) => {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
-  const [effortMenuFor, setEffortMenuFor] = useState<{
-    modelId: string
-    rect: DOMRect
-  } | null>(null)
-  const rootRef = useRef<HTMLDivElement>(null)
 
   const selected = models.find((m) => m.id === value)
   const selectedEffort = value && effortFor ? effortFor(value) : null
@@ -162,156 +56,151 @@ export const ModelPicker = ({
 
   const { groups } = useGroupedModels(models, query, builtinProviders)
 
-  const handleClose = () => {
+  useEffect(() => {
+    if (!open) setQuery("")
+  }, [open])
+
+  const applyModel = (modelId: string) => {
+    onChange(modelId)
     setOpen(false)
-    setQuery("")
-    setEffortMenuFor(null)
   }
 
-  const openEffortMenu = (modelId: string, el: HTMLElement) => {
-    const rect = el.getBoundingClientRect()
-    setEffortMenuFor((cur) =>
-      cur?.modelId === modelId ? null : { modelId, rect },
-    )
-  }
-
-  const renderRow = (m: ModelInfoDto) => {
-    const active = m.id === value
-    const modelEffort = effortFor ? effortFor(m.id) : null
-    return (
-      <li key={m.id} className="relative">
-        <PopoverItem
-          active={active}
-          onClick={() => {
-            onChange(m.id)
-            handleClose()
-          }}
-          className="gap-1.5"
-        >
-          <span className="min-w-0 flex-1 truncate text-left">
-            {m.displayName ?? m.id}
-          </span>
-          {modelEffort ? (
-            <span className="max-w-[4.5rem] shrink-0 truncate text-xs text-ink-muted">
-              {effortLabel(modelEffort)}
-            </span>
-          ) : null}
-          {/* Fixed trailing slots so rows don't jump: check, then effort. */}
-          <span className="flex w-3 shrink-0 items-center justify-center">
-            {active ? (
-              <Check className="h-3 w-3 text-accent" aria-hidden />
-            ) : null}
-          </span>
-          {onEffortChange ? (
-            // Not a nested <button> — PopoverItem's row is itself a
-            // <button>, and HTML forbids button-in-button. A role="button"
-            // span keeps the same a11y/interaction contract without the
-            // invalid nesting. Sits AFTER the check so selection stays
-            // stable and effort is the rightmost affordance.
-            <span
-              role="button"
-              tabIndex={0}
-              aria-label={`Effort for ${m.displayName ?? m.id}`}
-              aria-haspopup="menu"
-              aria-expanded={effortMenuFor?.modelId === m.id}
-              onClick={(e) => {
-                e.stopPropagation()
-                openEffortMenu(m.id, e.currentTarget)
-              }}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter" && e.key !== " ") return
-                e.preventDefault()
-                e.stopPropagation()
-                openEffortMenu(m.id, e.currentTarget)
-              }}
-              className={cn(
-                "flex w-8 shrink-0 cursor-pointer items-center justify-end gap-0.5 rounded px-0.5 py-0.5",
-                "text-xs text-ink-faint transition-colors duration-[var(--duration-fast)] hover:bg-fill-2 hover:text-ink",
-                effortMenuFor?.modelId === m.id && "bg-fill-2 text-ink",
-              )}
-            >
-              <Gauge className="h-3 w-3" aria-hidden />
-              <ChevronRight className="h-2.5 w-2.5" aria-hidden />
-            </span>
-          ) : null}
-        </PopoverItem>
-        {effortMenuFor?.modelId === m.id && onEffortChange ? (
-          <EffortSubmenu
-            anchorRect={effortMenuFor.rect}
-            value={modelEffort}
-            onChange={(effort) => {
-              // One gesture: picking an effort on any row also selects that
-              // model at that effort (reference design), then close so the
-              // composer chip shows the new label.
-              onEffortChange(m.id, effort)
-              onChange(m.id)
-              handleClose()
-            }}
-            onClose={() => setEffortMenuFor(null)}
-          />
-        ) : null}
-      </li>
-    )
+  const applyEffort = (modelId: string, effort: string | null) => {
+    onEffortChange?.(modelId, effort)
+    onChange(modelId)
+    setOpen(false)
   }
 
   return (
-    <div ref={rootRef} className="relative">
-      <Button
-        variant="ghost"
-        size="xs"
-        onClick={() => setOpen((v) => !v)}
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger
         disabled={isLoading || disabled}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className={cn(
-          "max-w-[14rem] rounded-full border border-stroke-3 bg-fill-4 px-2",
-          "tracking-[var(--tracking-caption)] text-ink-secondary",
-          "transition-[color,opacity,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-          "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink",
-          open && "border-stroke-2 bg-fill-2 text-ink",
-        )}
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            disabled={isLoading || disabled}
+            aria-label="Select model"
+            className={cn(
+              "max-w-[14rem] rounded-full border border-border bg-muted/50 px-2",
+              "tracking-[var(--tracking-caption)] text-muted-foreground",
+              "transition-[color,opacity,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+              "hover:border-border hover:bg-muted hover:text-foreground",
+              "aria-expanded:border-border aria-expanded:bg-muted aria-expanded:text-foreground",
+            )}
+          />
+        }
       >
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {selectedEffort ? (
-          <span className="shrink-0 text-ink-muted">
+          <span className="shrink-0 text-muted-foreground">
             · {effortLabel(selectedEffort)}
           </span>
         ) : null}
         <ChevronDown
-          className="h-2.5 w-2.5 shrink-0 text-icon-3"
+          className="size-2.5 shrink-0 opacity-60"
           strokeWidth={2.5}
           aria-hidden
         />
-      </Button>
-
-      <PopoverTray
-        open={open}
-        onClose={handleClose}
-        anchorRef={rootRef}
-        placement="above"
-        role="listbox"
-        aria-label="Models"
-        className="left-0 w-72"
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        side="top"
+        sideOffset={6}
+        className="w-72 p-0"
       >
-        <PopoverSearch
-          value={query}
-          onChange={setQuery}
-          placeholder="Search models"
-        />
-        <div className="max-h-56 overflow-y-auto py-0.5">
+        <div className="border-b border-border px-2.5 py-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder="Search models"
+            aria-label="Search models"
+            className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+          />
+        </div>
+        <div className="max-h-56 overflow-y-auto py-1">
           {groups.length === 0 ? (
-            <p className="px-2.5 py-3 text-center text-xs text-ink-faint">
+            <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">
               No models found
             </p>
           ) : (
             groups.map((group) => (
-              <PopoverSection key={group.providerId} label={group.label}>
-                <ul>{group.items.map(renderRow)}</ul>
-              </PopoverSection>
+              <DropdownMenuGroup key={group.providerId}>
+                <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                {group.items.map((m) => {
+                  const active = m.id === value
+                  const modelEffort = effortFor ? effortFor(m.id) : null
+                  const name = m.displayName ?? m.id
+
+                  return (
+                    <div
+                      key={m.id}
+                      className="mx-1 flex items-center gap-0.5"
+                    >
+                      <DropdownMenuItem
+                        className="min-w-0 flex-1 gap-1.5"
+                        onClick={() => applyModel(m.id)}
+                      >
+                        <span className="min-w-0 flex-1 truncate text-left">
+                          {name}
+                        </span>
+                        {modelEffort ? (
+                          <span className="max-w-[4.5rem] shrink-0 truncate text-xs text-muted-foreground">
+                            {effortLabel(modelEffort)}
+                          </span>
+                        ) : null}
+                        {active ? (
+                          <Check className="size-3 text-primary" aria-hidden />
+                        ) : (
+                          <span className="size-3" aria-hidden />
+                        )}
+                      </DropdownMenuItem>
+                      {onEffortChange ? (
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger
+                            aria-label={`Effort for ${name}`}
+                            className="size-7 shrink-0 justify-center px-0 [&_svg:last-child]:hidden"
+                          >
+                            <Gauge className="size-3" aria-hidden />
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuPortal>
+                            <DropdownMenuSubContent className="w-36">
+                              <DropdownMenuRadioGroup
+                                value={modelEffort ?? "default"}
+                                onValueChange={(v) => {
+                                  applyEffort(
+                                    m.id,
+                                    v === "default" ? null : v,
+                                  )
+                                }}
+                              >
+                                <DropdownMenuRadioItem value="default">
+                                  Default
+                                </DropdownMenuRadioItem>
+                                {EFFORT_LEVELS.map((level) => (
+                                  <DropdownMenuRadioItem
+                                    key={level}
+                                    value={level}
+                                  >
+                                    {effortLabel(level)}
+                                  </DropdownMenuRadioItem>
+                                ))}
+                              </DropdownMenuRadioGroup>
+                            </DropdownMenuSubContent>
+                          </DropdownMenuPortal>
+                        </DropdownMenuSub>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </DropdownMenuGroup>
             ))
           )}
         </div>
-      </PopoverTray>
-    </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

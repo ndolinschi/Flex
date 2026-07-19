@@ -1,6 +1,4 @@
 import {
-  useEffect,
-  useRef,
   type KeyboardEvent as ReactKeyboardEvent,
   type RefObject,
 } from "react"
@@ -10,7 +8,6 @@ import {
   Bug,
   Loader2,
   Maximize,
-  MoreHorizontal,
   Monitor,
   MousePointer2,
   RotateCw,
@@ -108,8 +105,6 @@ export const BrowserToolbar = ({
   browserDesignMode,
   toggleDesignMode,
 }: BrowserToolbarProps) => {
-  const menuRootRef = useRef<HTMLDivElement>(null)
-
   const handleInputKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault()
@@ -120,26 +115,6 @@ export const BrowserToolbar = ({
       setEditing(false)
     }
   }
-
-  // Overflow menu: close on outside click / Escape (mirrors SessionMenu).
-  useEffect(() => {
-    if (!menuOpen) return
-    const handlePointer = (e: MouseEvent) => {
-      if (!menuRootRef.current?.contains(e.target as Node)) setMenuOpen(false)
-    }
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        setMenuOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handlePointer)
-    document.addEventListener("keydown", handleKey)
-    return () => {
-      document.removeEventListener("mousedown", handlePointer)
-      document.removeEventListener("keydown", handleKey)
-    }
-  }, [menuOpen, setMenuOpen])
 
   return (
     <div
@@ -249,29 +224,18 @@ export const BrowserToolbar = ({
         </IconButton>
       </Tooltip>
 
-      <div ref={menuRootRef} className="relative">
-        <IconButton
-          label="More browser actions"
-          onClick={() => setMenuOpen((v) => !v)}
-          className={cn("h-6 w-6", menuOpen && "bg-fill-3 text-ink")}
-        >
-          <MoreHorizontal className="h-3.5 w-3.5" aria-hidden />
-        </IconButton>
-
-        {menuOpen ? (
-          <BrowserOverflowMenu
-            browserStarted={browserStarted}
-            showLiveContent={showLiveContent}
-            browserUrl={browserUrl}
-            onClose={() => setMenuOpen(false)}
-            onScreenshot={handleScreenshot}
-            onHardReload={handleHardReload}
-            onCopyUrl={handleCopyUrl}
-            onClearHistory={handleClearHistory}
-            onClearData={handleClearData}
-          />
-        ) : null}
-      </div>
+      <BrowserOverflowMenu
+        open={menuOpen}
+        onOpenChange={(next) => setMenuOpen(next)}
+        browserStarted={browserStarted}
+        showLiveContent={showLiveContent}
+        browserUrl={browserUrl}
+        onScreenshot={handleScreenshot}
+        onHardReload={handleHardReload}
+        onCopyUrl={handleCopyUrl}
+        onClearHistory={handleClearHistory}
+        onClearData={handleClearData}
+      />
     </div>
   )
 }

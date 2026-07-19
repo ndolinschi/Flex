@@ -1,14 +1,21 @@
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { GitMerge, XCircle } from "lucide-react"
 import { isSessionNotFoundError } from "../../../lib/sessions"
 import { toInvokeError, workspaceStatus } from "../../../lib/tauri"
 import { useWorkspaceActions } from "../../../hooks/useWorkspaceActions"
-import { cn } from "../../../lib/utils"
-import { PopoverItem } from "../../molecules/PopoverTray"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
-/** Isolated-workspace badge → popover with the diff summary + integrate/discard. */
+/** Isolated-workspace badge → menu with the diff summary + integrate/discard. */
 export const IsolationBadge = ({
   sessionId,
   onError,
@@ -17,7 +24,6 @@ export const IsolationBadge = ({
   onError?: (message: string) => void
 }) => {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
 
   const workspace = useWorkspaceActions(sessionId, onError, () =>
     setOpen(false),
@@ -39,69 +45,50 @@ export const IsolationBadge = ({
     retry: false,
   })
 
-  useEffect(() => {
-    const handlePointer = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener("mousedown", handlePointer)
-    return () => document.removeEventListener("mousedown", handlePointer)
-  }, [])
-
   return (
-    <div ref={rootRef} className="relative">
-      <Button
-        variant="ghost"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className={cn(
-          "ml-1 h-6 rounded-full bg-fill-3 px-2 text-xs text-ink-muted font-normal",
-          "hover:bg-fill-2 hover:text-ink-secondary",
-          open && "bg-fill-2 text-ink-secondary",
-        )}
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            className="ml-1 h-6 rounded-full bg-muted px-2 text-xs font-normal text-muted-foreground hover:bg-muted/80 hover:text-foreground aria-expanded:bg-muted/80 aria-expanded:text-foreground"
+          />
+        }
       >
         Isolated
-      </Button>
-
-      {open ? (
-        <div
-          role="dialog"
-          className={cn(
-            "absolute bottom-full left-0 z-50 mb-1.5 w-64 overflow-hidden rounded-lg",
-            "border border-stroke-2 bg-panel shadow-[var(--shadow-md)] animate-tray-in",
-          )}
-        >
-          <div className="border-b border-stroke-3 px-3 py-2">
-            <p className="text-sm font-medium text-ink-secondary">
-              Isolated workspace
-            </p>
-            <p className="mt-0.5 text-xs text-ink-muted">
-              {isLoading
-                ? "Checking changes…"
-                : status
-                  ? `${status.filesChanged} file${status.filesChanged === 1 ? "" : "s"} changed${status.summary ? ` · ${status.summary}` : ""}`
-                  : "No changes yet"}
-            </p>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side="top" sideOffset={6} className="w-64">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="font-medium text-foreground">
+            Isolated workspace
+          </DropdownMenuLabel>
+          <div className="px-1.5 pb-1.5 text-xs text-muted-foreground">
+            {isLoading
+              ? "Checking changes…"
+              : status
+                ? `${status.filesChanged} file${status.filesChanged === 1 ? "" : "s"} changed${status.summary ? ` · ${status.summary}` : ""}`
+                : "No changes yet"}
           </div>
-          <PopoverItem
-            role="menuitem"
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem
             disabled={workspace.busy}
             onClick={() => void workspace.integrate()}
-            className="px-3 py-2 text-base text-ink-secondary hover:text-ink"
           >
-            <GitMerge className="h-3.5 w-3.5 text-icon-3" aria-hidden />
+            <GitMerge />
             Integrate into origin
-          </PopoverItem>
-          <PopoverItem
-            role="menuitem"
+          </DropdownMenuItem>
+          <DropdownMenuItem
             disabled={workspace.busy}
             onClick={() => void workspace.discard()}
-            className="px-3 py-2 text-base text-ink-secondary hover:text-ink"
           >
-            <XCircle className="h-3.5 w-3.5 text-icon-3" aria-hidden />
+            <XCircle />
             Discard workspace
-          </PopoverItem>
-        </div>
-      ) : null}
-    </div>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
