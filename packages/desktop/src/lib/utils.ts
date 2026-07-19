@@ -1,3 +1,5 @@
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
 import {
   File,
   FileCode2,
@@ -6,8 +8,9 @@ import {
   FileText,
 } from "lucide-react"
 
-export const cn = (...parts: (string | false | undefined | null)[]): string =>
-  parts.filter(Boolean).join(" ")
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
 
 export const formatRelativeTime = (tsMs: number): string => {
   const diff = Date.now() - tsMs

@@ -1,8 +1,12 @@
+import path from "node:path"
+import { fileURLToPath } from "node:url"
 import { defineConfig } from "vitest/config"
 import react from "@vitejs/plugin-react"
 
+const rootDir = path.dirname(fileURLToPath(import.meta.url))
+
 // Minimal test config, separate from vite.config.ts (which is tauri-dev
-// specific: fixed port/host, HMR-over-websocket, `src-tauui` watch-ignore —
+// specific: fixed port/host, HMR-over-websocket, `src-tauri` watch-ignore —
 // none of that applies to a one-shot node-environment test run). Only the
 // react plugin is carried over, so `.tsx` files reached transitively (e.g.
 // via the `components/molecules` barrel) still transform; the Tailwind vite
@@ -10,6 +14,11 @@ import react from "@vitejs/plugin-react"
 // with no CSS/DOM involved.
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(rootDir, "./src"),
+    },
+  },
   test: {
     environment: "node",
     // Playwright specs live under e2e/ and must not be collected by Vitest.

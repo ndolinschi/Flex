@@ -10,9 +10,9 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 
 | Component | Purpose | Key props | Used by |
 |---|---|---|---|
-| `Button` | Primary action control | `variant`, `size`, `disabled`, `onClick`, `children` | Composer, ProviderSettingsForm, PermissionPrompt, QuestionPrompt, WelcomePage, ConfirmDialog |
+| `Button` | shadcn Base UI adapter (`@/components/ui/button`); maps legacy `primary`/`danger`/`md` | `variant`, `size`, `disabled`, `isLoading?`, `onClick`, `children` | Composer, ProviderSettingsForm, PermissionPrompt, QuestionPrompt, WelcomePage, ConfirmDialog |
 | `Checkbox` | Round selection control (filled accent circle + check) | `checked`, `indeterminate?`, `onChange`, `label` | ChangesTab select-all, FileRow |
-| `IconButton` | Compact icon-only action; optional `quiet` opacity .5→.8 | `label`, `quiet?`, `onClick`, `children` | SessionListItem, SessionSidebar, PlusMenu, ErrorBanner, SettingsShell, SessionMenu |
+| `IconButton` | Thin wrap over shadcn `Button` icon sizes (`ghost` + `icon-sm`); optional `quiet` | `label`, `quiet?`, `size?`, `onClick`, `children` | SessionListItem, SessionSidebar, PlusMenu, ErrorBanner, SettingsShell, SessionMenu |
 | `TextInput` | Single-line text field (forwardRef) | standard input props | FormField, SessionListItem, SessionSidebar search, QuestionPrompt, ConfirmDialog |
 | `TextArea` | Multi-line text field | standard textarea props | Composer |
 | `Label` | Accessible form label | `htmlFor`, `children` | FormField, ModelSelect |
@@ -248,8 +248,9 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 - Round Changes-panel `Checkbox` and green settings `Toggle` (`--color-switch-on`)
   are intentional product visuals; restyle shadcn primitives after install — do
   not silently flip to square/primary defaults.
-- `packages/desktop` only (Vite + React 19 + Tailwind v4). No `components.json`
-  yet — Phase 0 creates it under `packages/desktop/`.
+- `packages/desktop` has `components.json` (style `base-nova`, Base UI).
+  Phase 0 foundation + Button/IconButton adapters ship; further primitives
+  follow the phased cutover below.
 
 ### Target registry inventory (user list → migrate?)
 
@@ -264,7 +265,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Badge | yes | `Badge`, `NewBadge`, `VerdictBadge` | Keep tone mapping via variants/`className` |
 | Breadcrumb | yes | `PlanToolbar` crumbs | Small win |
 | Bubble | yes (chat kit) | user/assistant bubbles in timeline | After Message spike |
-| Button | yes | `Button`, `IconButton`, `SendButton` shell | Drop custom `isLoading` — compose `Spinner` + `disabled` |
+| Button | ✅ done | `atoms/Button`, `IconButton` → `@/components/ui/button` | Legacy `primary`/`danger`/`md` mapped; drop `isLoading` over time |
 | Button Group | yes | composer toolbar clusters | Optional; `ToggleGroup` covers ModePicker |
 | Calendar | skip | — | No date UX today |
 | Card | selective | settings cards, catalog cards | Use full Card composition only where DESIGN allows cards |
@@ -327,8 +328,8 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| **0 — Foundation** | `shadcn init` in `packages/desktop` (Vite, Tailwind v4, **radix** base, `lucide`, css variables); path alias `@/`; upgrade `cn` to `clsx` + `tailwind-merge`; map shadcn semantic tokens → Flex tokens in `src/index.css` / `tokens.css` without breaking `data-theme` | `components.json` present; `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
-| **1 — Atom adapters** | Add Button, Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Spinner, Avatar, Tooltip, ScrollArea; re-export from `components/atoms` with temporary compat props | Atom unit tests + vitest green; call sites compile via barrel |
+| **0 — Foundation** | ✅ `components.json` (`base-nova`), `@/` alias, `clsx`+`tailwind-merge` `cn`, shadcn semantic vars bridged to Flex tokens (`data-theme` only — no `.dark` second system) | `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
+| **1 — Atom adapters** | ✅ Button + Spinner installed; `atoms/Button` + `IconButton` adapt legacy Flex props. Remaining: Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Avatar, Tooltip, ScrollArea | Atom unit tests + vitest green; call sites compile via barrel |
 | **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | Confirm/auth/PR/bug dialogs + ToastHost + TitleBarMenus on primitives |
 | **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | Settings forms, ModePicker, ModelPicker, CommandPalette/SearchModal |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | Split sash + empty/error callouts; sidebar spike documented go/no-go |
