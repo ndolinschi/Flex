@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
-import { IconButton } from "../atoms"
 import { SettingsNav } from "../molecules"
 import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import type { SettingsSectionId } from "../../lib/settingsSearchIndex"
@@ -84,13 +84,19 @@ export const SettingsShell = ({
   const body = (
     <>
       <header className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-4">
-        <IconButton
-          label="Back to chat"
-          onClick={() => setRoute("chat")}
-          className="h-6 w-6"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-        </IconButton>
+        <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Back to chat" title="Back to chat"
+      onClick={() => setRoute("chat")}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+    </Button>
       </header>
       <main className="flex flex-1 items-stretch gap-6 overflow-y-auto px-4">
         <SettingsNav

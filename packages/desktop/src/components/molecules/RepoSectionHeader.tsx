@@ -1,6 +1,6 @@
+import { Button } from "@/components/ui/button"
 import { ChevronDown, Folder, Plus } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { IconButton } from "../atoms"
 
 type RepoSectionHeaderProps = {
   label: string
@@ -54,18 +54,23 @@ export const RepoSectionHeader = ({
           indexed
         </span>
       ) : null}
-      <IconButton
-        label="New agent in this repository"
-        quiet
-        size="icon-2xs"
-        className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-        onClick={(e) => {
+      <Button
+      type="button"
+      variant="ghost"
+      size="icon-2xs"
+      aria-label="New agent in this repository" title="New agent in this repository"
+      onClick={(e) => {
           e.stopPropagation()
           onNewSession()
         }}
-      >
-        <Plus className="h-3.5 w-3.5" aria-hidden />
-      </IconButton>
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "opacity-50 hover:opacity-80",
+        "shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100",
+      )}
+    >
+      <Plus className="h-3.5 w-3.5" aria-hidden />
+    </Button>
     </div>
   )
 }

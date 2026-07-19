@@ -1,4 +1,6 @@
-import { Badge, Button } from "../atoms"
+import { Badge } from "../atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import type { McpCatalogEntry } from "../../lib/mcpCatalog"
 import { catalogEntryNeedsConfig } from "../../lib/mcpCatalog"
 
@@ -48,10 +50,10 @@ export const McpCatalogCard = ({
           <Button
             variant="secondary"
             size="sm"
-            isLoading={installing}
             disabled={installing}
             onClick={() => onInstall(entry)}
           >
+            {installing ? <Spinner data-icon="inline-start" /> : null}
             Install
           </Button>
         )}

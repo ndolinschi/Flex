@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button"
 import {
   useCallback,
   useEffect,
@@ -16,7 +17,7 @@ import {
   Trash2,
   X,
 } from "lucide-react"
-import { IconButton, ScrollArea } from "../atoms"
+import { ScrollArea } from "../atoms"
 import {
   ArchivedSectionHeader,
   ConfirmDialog,
@@ -478,13 +479,19 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         // chat area).
         <div className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b border-stroke-3 px-4">
           <span className="text-sm text-ink-secondary">Sessions</span>
-          <IconButton
-            label="Close sidebar"
-            onClick={() => setSidebarCollapsed(true)}
-            className="h-6 w-6"
-          >
-            <X className="h-3.5 w-3.5" aria-hidden />
-          </IconButton>
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Close sidebar" title="Close sidebar"
+      onClick={() => setSidebarCollapsed(true)}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <X className="h-3.5 w-3.5" aria-hidden />
+    </Button>
         </div>
       ) : null}
 
@@ -545,19 +552,23 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
           onSortChange={setSidebarProjectSort}
           onVisibilityChange={setSidebarProjectVisibility}
         />
-        <IconButton
-          label="Search agents"
-          className={cn(
-            "h-6 w-6 transition-opacity duration-[var(--duration-fast)]",
+        <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Search agents" title="Search agents"
+      onClick={onOpenSearch}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6 transition-opacity duration-[var(--duration-fast)]",
             sidebarProjectSort !== "recency" ||
               sidebarProjectVisibility !== "all"
               ? "opacity-100"
               : "opacity-0 group-hover/label:opacity-100 focus-visible:opacity-100",
-          )}
-          onClick={onOpenSearch}
-        >
-          <Search className="h-3 w-3" aria-hidden />
-        </IconButton>
+      )}
+    >
+      <Search className="h-3 w-3" aria-hidden />
+    </Button>
       </div>
 
       {error ? (

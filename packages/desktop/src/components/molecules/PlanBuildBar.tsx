@@ -1,5 +1,6 @@
 import { Hammer } from "lucide-react"
-import { Button } from "../atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { cn } from "../../lib/utils"
 
 type PlanBuildBarProps = {
@@ -29,11 +30,12 @@ export const PlanBuildBar = ({
       >
         <Button
           variant="default"
-          isLoading={isBuilding}
+          disabled={isBuilding}
           onClick={onBuild}
           aria-label="Build plan"
           className="min-w-[7.5rem] shadow-[var(--shadow-composer)]"
         >
+          {isBuilding ? <Spinner data-icon="inline-start" /> : null}
           <Hammer className="h-3.5 w-3.5" aria-hidden />
           Build
         </Button>
@@ -60,11 +62,12 @@ export const PlanBuildBar = ({
       ) : null}
       <Button
         variant="default"
-        isLoading={isBuilding}
+        disabled={isBuilding}
         onClick={onBuild}
         aria-label="Build plan"
         className="min-w-[6.5rem]"
       >
+        {isBuilding ? <Spinner data-icon="inline-start" /> : null}
         <Hammer className="h-3.5 w-3.5" aria-hidden />
         Build
       </Button>

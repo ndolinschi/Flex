@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { cn } from "../../lib/utils"
-import { Button } from "../atoms"
+import { Button } from "@/components/ui/button"
 
 type EmptyStateProps = {
   title: string

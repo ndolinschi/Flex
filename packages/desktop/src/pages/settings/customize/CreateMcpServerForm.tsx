@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
-import { Button, TextArea, TextInput } from "../../../components/atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
+import { TextArea, TextInput } from "../../../components/atoms"
 import { ErrorBanner, FieldRow, SettingsSection } from "../../../components/molecules"
 import { emptyMcpForm, MCP_ID_RE, parseArgs, parseEnv, splitEnvSecrets, type McpFormState } from "../../../lib/mcp"
 import { mcpUpsert, toInvokeError } from "../../../lib/tauri"
@@ -126,7 +128,14 @@ export const CreateMcpServerForm = ({
         <Button variant="secondary" size="sm" onClick={onCancel}>
           Cancel
         </Button>
-        <Button size="sm" isLoading={upsertMutation.isPending} onClick={() => void handleSave()}>
+        <Button
+          size="sm"
+          disabled={upsertMutation.isPending}
+          onClick={() => void handleSave()}
+        >
+          {upsertMutation.isPending ? (
+            <Spinner data-icon="inline-start" />
+          ) : null}
           Save server
         </Button>
       </div>

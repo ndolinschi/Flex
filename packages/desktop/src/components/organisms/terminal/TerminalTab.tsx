@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
+import { Button } from "@/components/ui/button"
 import { List, Plus, Terminal as TerminalIcon } from "lucide-react"
-import { IconButton, ScrollArea } from "../../atoms"
+import { ScrollArea } from "../../atoms"
 import { ConfirmDialog, EmptyState } from "../../molecules"
 import { agentTerminalId } from "../../../hooks/useGlobalSessionEvents"
 import { terminalCreate, terminalKill } from "../../../lib/tauri"
@@ -131,20 +132,32 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
               : "Terminal"}
         </span>
         <div className="flex shrink-0 items-center gap-1">
-          <IconButton
-            label="New Terminal"
-            onClick={() => void handleNewTerminal()}
-            className="h-6 w-6"
-          >
-            <Plus className="h-3.5 w-3.5" aria-hidden />
-          </IconButton>
-          <IconButton
-            label={terminalListVisible ? "Hide Terminal List" : "Show Terminal List"}
-            onClick={toggleTerminalListVisible}
-            className="h-6 w-6"
-          >
-            <List className="h-3.5 w-3.5" aria-hidden />
-          </IconButton>
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="New Terminal" title="New Terminal"
+      onClick={() => void handleNewTerminal()}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <Plus className="h-3.5 w-3.5" aria-hidden />
+    </Button>
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label={terminalListVisible ? "Hide Terminal List" : "Show Terminal List"} title={terminalListVisible ? "Hide Terminal List" : "Show Terminal List"}
+      onClick={toggleTerminalListVisible}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <List className="h-3.5 w-3.5" aria-hidden />
+    </Button>
         </div>
       </div>
       {isAgentSelected ? (

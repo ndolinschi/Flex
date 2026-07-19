@@ -1,5 +1,5 @@
 import { MessageSquareText } from "lucide-react"
-import { Button } from "../atoms"
+import { Button } from "@/components/ui/button"
 import { cn } from "../../lib/utils"
 import type { PlanSelectionAnchor } from "../../hooks/usePlanSelectionComment"
 

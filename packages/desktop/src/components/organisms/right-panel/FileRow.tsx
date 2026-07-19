@@ -1,7 +1,8 @@
 import { memo, useState, type MouseEvent as ReactMouseEvent } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, ChevronRight, FileCode2, Undo2 } from "lucide-react"
-import { Checkbox, DiffStat, IconButton, Spinner } from "../../atoms"
+import { Checkbox, DiffStat } from "../../atoms"
+import { Spinner } from "@/components/ui/spinner"
 import { Collapsible, ConfirmDialog, DiffView } from "../../molecules"
 import { Button } from "@/components/ui/button"
 import { invalidateReviewQueries } from "../../../hooks/useWorkspaceActions"
@@ -268,50 +269,68 @@ export const FileRow = memo(function FileRow({
           )}
         >
           {!isDir && file.status !== "D" ? (
-            <IconButton
-              label="Open file"
-              onClick={handleOpenFile}
-              className="h-6 w-6"
-            >
-              <FileCode2 className="h-3.5 w-3.5" aria-hidden />
-            </IconButton>
+            <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Open file" title="Open file"
+      onClick={handleOpenFile}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <FileCode2 className="h-3.5 w-3.5" aria-hidden />
+    </Button>
           ) : null}
           {isolated ? (
-            <IconButton
-              label="Keep"
-              onClick={handleKeepFile}
-              disabled={busyAction !== null}
-              className="h-6 w-6"
-            >
-              {busyAction === "keep" ? (
-                <Spinner size="sm" />
+            <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Keep" title="Keep"
+      onClick={handleKeepFile}
+      disabled={busyAction !== null}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      {busyAction === "keep" ? (
+                <Spinner />
               ) : (
                 <Check className="h-3.5 w-3.5" aria-hidden />
               )}
-            </IconButton>
+    </Button>
           ) : null}
-          <IconButton
-            label="Undo"
-            onClick={(e) => {
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Undo" title="Undo"
+      onClick={(e) => {
               e.stopPropagation()
               setConfirmUndo(true)
             }}
-            disabled={busyAction !== null}
-            className="h-6 w-6"
-          >
-            {busyAction === "undo" ? (
-              <Spinner size="sm" />
+      disabled={busyAction !== null}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      {busyAction === "undo" ? (
+                <Spinner className="size-3.5" />
             ) : (
               <Undo2 className="h-3.5 w-3.5" aria-hidden />
             )}
-          </IconButton>
+    </Button>
         </span>
       </div>
       <Collapsible open={expanded}>
         <div className="mx-1 mb-1 overflow-hidden rounded-[var(--radius-sm)] border border-stroke-4 bg-fill-5">
           {isLoading ? (
             <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-ink-muted">
-              <Spinner size="sm" /> Loading diff…
+                <Spinner className="size-3.5" /> Loading diff…
             </div>
           ) : (
             <DiffView

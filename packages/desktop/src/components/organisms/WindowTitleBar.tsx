@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useState } from "react"
+import { Button } from "@/components/ui/button"
 import { Columns2, PanelLeft } from "lucide-react"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { AppMark, TitleBarMenus } from "../molecules/TitleBarMenus"
@@ -8,7 +9,6 @@ import {
   CaptionButtons,
   TrafficLights,
 } from "../molecules/WindowControls"
-import { IconButton } from "../atoms"
 import { useNativeAppMenu } from "../../hooks/useNativeAppMenu"
 import { useTitleBarActions } from "../../hooks/useTitleBarActions"
 import { useSessions } from "../../hooks/useSessions"
@@ -106,14 +106,21 @@ const WindowTitleBarImpl = ({
             />
           ) : null}
           {showChatChrome ? (
-            <IconButton
-              label={`${collapsed ? "Show" : "Hide"} sidebar (${mod}B)`}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`${collapsed ? "Show" : "Hide"} sidebar (${mod}B)`}
+              title={`${collapsed ? "Show" : "Hide"} sidebar (${mod}B)`}
               onClick={handlers.toggleSidebar}
-              quiet
-              className="h-6 w-6 shrink-0"
+              className={cn(
+                "text-muted-foreground hover:bg-muted hover:text-foreground",
+                "opacity-50 hover:opacity-80",
+                "h-6 w-6 shrink-0",
+              )}
             >
               <PanelLeft className="h-3.5 w-3.5" aria-hidden />
-            </IconButton>
+            </Button>
           ) : null}
         </div>
 
@@ -133,14 +140,22 @@ const WindowTitleBarImpl = ({
         {showChatChrome ? (
           <div className="flex h-full shrink-0 items-center gap-0.5 pr-1">
             {viewport === "wide" ? (
-              <IconButton
-                label={`${split ? "Close split" : "Split view"} (${mod}J)`}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`${split ? "Close split" : "Split view"} (${mod}J)`}
+                title={`${split ? "Close split" : "Split view"} (${mod}J)`}
                 onClick={toggleSplit}
-                quiet
-                className={cn("h-6 w-6", split ? undefined : "opacity-60")}
+                className={cn(
+                  "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  "opacity-50 hover:opacity-80",
+                  "h-6 w-6",
+                  !split && "opacity-60",
+                )}
               >
                 <Columns2 className="h-3.5 w-3.5" aria-hidden />
-              </IconButton>
+              </Button>
             ) : null}
             {active ? (
               <SessionMenu

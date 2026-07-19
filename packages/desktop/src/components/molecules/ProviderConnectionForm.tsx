@@ -1,5 +1,7 @@
 import { useState } from "react"
-import { Button, TextInput } from "../atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
+import { TextInput } from "../atoms"
 import { ErrorBanner } from "./ErrorBanner"
 import { FieldRow, SettingsSection } from "./SettingsSection"
 import { ModelMultiSelect } from "./ModelMultiSelect"
@@ -367,10 +369,17 @@ export const ProviderConnectionForm = ({
             Back
           </Button>
         ) : null}
-        <Button type="button" variant="ghost" isLoading={isValidating} onClick={onValidate}>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={isValidating}
+          onClick={onValidate}
+        >
+          {isValidating ? <Spinner data-icon="inline-start" /> : null}
           Validate
         </Button>
-        <Button type="submit" isLoading={isSaving}>
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? <Spinner data-icon="inline-start" /> : null}
           Save & continue
         </Button>
       </div>

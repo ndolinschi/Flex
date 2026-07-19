@@ -1,4 +1,6 @@
-import { Badge, Button, ProviderIcon } from "../atoms"
+import { Badge, ProviderIcon } from "../atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { SettingsSection } from "./SettingsSection"
 import type { ProviderProfileView } from "../../lib/types"
 import { cn } from "../../lib/utils"
@@ -88,9 +90,10 @@ export const ProviderProfileList = ({
                 <Button
                   size="sm"
                   variant="secondary"
-                  isLoading={isActivating}
+                  disabled={isActivating}
                   onClick={() => onActivate(p.id)}
                 >
+                  {isActivating ? <Spinner data-icon="inline-start" /> : null}
                   Activate
                 </Button>
               ) : null}

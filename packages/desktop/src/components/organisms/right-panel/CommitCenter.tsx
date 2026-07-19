@@ -1,9 +1,10 @@
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ChevronDown, GitBranch, GitMerge, GitPullRequest } from "lucide-react"
-import { Button, TextArea } from "../../atoms"
+import { TextArea } from "../../atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { CreatePrDialog } from "../../molecules/CreatePrDialog"
-import { Button as ShadcnButton } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -202,10 +203,10 @@ export const CommitCenter = ({
               variant="default"
               size="sm"
               className="rounded-none border-r border-r-accent-hover/40"
-              isLoading={busy}
-              disabled={disabled}
+              disabled={busy || disabled}
               onClick={() => void run(effectivePrimary)}
             >
+              {busy ? <Spinner data-icon="inline-start" /> : null}
               <GitMerge className="h-3 w-3" aria-hidden />
               {MODE_LABEL[effectivePrimary]}
             </Button>
@@ -213,7 +214,7 @@ export const CommitCenter = ({
               <DropdownMenuTrigger
                 disabled={disabled}
                 render={
-                  <ShadcnButton
+                  <Button
                     type="button"
                     variant="default"
                     size="sm"

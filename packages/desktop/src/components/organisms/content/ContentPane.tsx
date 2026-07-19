@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button"
 import {
   useEffect,
   useMemo,
@@ -8,7 +9,7 @@ import {
 } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { MessageSquare, Plus, X } from "lucide-react"
-import { IconButton, Tab, TabStrip, Tooltip } from "../../atoms"
+import { Tab, TabStrip, Tooltip } from "../../atoms"
 import { OpenTabModal } from "../../molecules"
 import { useSessions } from "../../../hooks/useSessions"
 import {
@@ -251,10 +252,12 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
           })}
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <IconButton
-            label="Open tab"
-            size="icon-xs"
-            onClick={(e: ReactMouseEvent<HTMLButtonElement>) => {
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      aria-label="Open tab" title="Open tab"
+      onClick={(e: ReactMouseEvent<HTMLButtonElement>) => {
               const r = e.currentTarget.getBoundingClientRect()
               setOpenTabAnchor({
                 x: r.left,
@@ -264,22 +267,31 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
               })
               setOpenTabModal(true)
             }}
-          >
-            <Plus aria-hidden />
-          </IconButton>
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+      )}
+    >
+      <Plus aria-hidden />
+    </Button>
           {split ? (
             <Tooltip label="Close pane">
-              <IconButton
-                label="Close pane"
-                onClick={(e: ReactMouseEvent<HTMLButtonElement>) => {
+              <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Close pane" title="Close pane"
+      onClick={(e: ReactMouseEvent<HTMLButtonElement>) => {
                   e.stopPropagation()
                   closePane(paneIndex)
                 }}
-                className="h-6 w-6"
-                quiet
-              >
-                <X className="h-3.5 w-3.5" aria-hidden />
-              </IconButton>
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "opacity-50 hover:opacity-80",
+        "h-6 w-6",
+      )}
+    >
+      <X className="h-3.5 w-3.5" aria-hidden />
+    </Button>
             </Tooltip>
           ) : null}
         </div>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Editor from "@monaco-editor/react"
 import { Code2, Eye, FolderTree, Save } from "lucide-react"
-import { IconButton, ScrollArea, Spinner, Tab } from "../../atoms"
+import { ScrollArea, Spinner, Tab } from "../../atoms"
 import { ConfirmDialog, ErrorBanner, MarkdownBody } from "../../molecules"
 import { Button } from "@/components/ui/button"
 import { ensureMonaco, languageForPath } from "../../../lib/monacoEnv"
@@ -302,40 +302,58 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-stroke-3 px-2.5">
-        <IconButton
-          label="Browse files"
-          onClick={() => setBrowseMode(true)}
-          className="h-6 w-6 shrink-0"
-        >
-          <FolderTree className="h-3.5 w-3.5" aria-hidden />
-        </IconButton>
+        <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Browse files" title="Browse files"
+      onClick={() => setBrowseMode(true)}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6 shrink-0",
+      )}
+    >
+      <FolderTree className="h-3.5 w-3.5" aria-hidden />
+    </Button>
         {fileChips}
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
           {isMarkdown && path ? (
-            <IconButton
-              label={previewMode ? "Edit markdown" : "Preview markdown"}
-              onClick={toggleMarkdownPreview}
-              className={cn("h-6 w-6", previewMode && "bg-fill-3 text-ink")}
-            >
-              {previewMode ? (
+            <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label={previewMode ? "Edit markdown" : "Preview markdown"} title={previewMode ? "Edit markdown" : "Preview markdown"}
+      onClick={toggleMarkdownPreview}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6", previewMode && "bg-fill-3 text-ink",
+      )}
+    >
+      {previewMode ? (
                 <Code2 className="h-3 w-3" aria-hidden />
               ) : (
                 <Eye className="h-3 w-3" aria-hidden />
               )}
-            </IconButton>
+    </Button>
           ) : null}
-          <IconButton
-            label={dirty ? "Save" : "Save (no changes)"}
-            disabled={!dirty || saving || !path}
-            onClick={() => void handleSave()}
-            className="h-6 w-6"
-          >
-            {saving ? (
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label={dirty ? "Save" : "Save (no changes)"} title={dirty ? "Save" : "Save (no changes)"}
+      disabled={!dirty || saving || !path}
+      onClick={() => void handleSave()}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      {saving ? (
               <Spinner size="sm" />
             ) : (
               <Save className="h-3 w-3" aria-hidden />
             )}
-          </IconButton>
+    </Button>
         </div>
       </div>
 

@@ -10,9 +10,9 @@ import {
   Trash2,
   Unplug,
 } from "lucide-react"
-import { Button, IconButton, ScrollArea, TextArea, TextInput } from "../../components/atoms"
+import { ScrollArea, TextArea, TextInput } from "../../components/atoms"
+import { Button } from "@/components/ui/button"
 import { ConfirmDialog, EmptyState, ErrorBanner, FormField } from "../../components/molecules"
-import { Button as ShadcnButton } from "@/components/ui/button"
 import {
   dbActiveConnection,
   dbConnect,
@@ -303,20 +303,32 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
           <span className="min-w-0 flex-1 truncate text-sm text-ink-muted">
             {connectionCountLabel}
           </span>
-          <IconButton
-            label="Refresh tables"
-            className="h-6 w-6"
-            onClick={() => void refetchTables()}
-          >
-            <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
-          </IconButton>
-          <IconButton
-            label="Add connection"
-            className="h-6 w-6"
-            onClick={openAddForm}
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </IconButton>
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Refresh tables" title="Refresh tables"
+      onClick={() => void refetchTables()}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+    </Button>
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Add connection" title="Add connection"
+      onClick={openAddForm}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <Plus className="h-3.5 w-3.5" />
+    </Button>
         </div>
       ) : null}
 
@@ -330,7 +342,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
       {selectedId && schemas.length > 1 ? (
         <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-stroke-3 px-2.5 py-1.5">
           {schemas.map((s) => (
-            <ShadcnButton
+            <Button
               key={s.name}
               variant="ghost"
               onClick={() => {
@@ -345,7 +357,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
               )}
             >
               {s.name}
-            </ShadcnButton>
+            </Button>
           ))}
         </div>
       ) : null}
@@ -400,7 +412,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
                           selectedTable?.name === t.name
                         return (
                           <li key={key}>
-                            <ShadcnButton
+                            <Button
                               variant="ghost"
                               onClick={() => void runPreview(t)}
                               className={cn(
@@ -417,7 +429,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
                               <span className="min-w-0 truncate font-mono">
                                 {t.name}
                               </span>
-                            </ShadcnButton>
+                            </Button>
                           </li>
                         )
                       })}
@@ -427,7 +439,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
               ) : null}
             </ScrollArea>
             {selectedId ? (
-              <ShadcnButton
+              <Button
                 variant="ghost"
                 className="h-auto justify-start gap-1.5 rounded-none border-t border-stroke-3 px-2.5 py-2 text-xs text-ink-muted font-normal hover:bg-transparent hover:text-ink"
                 onClick={() => {
@@ -440,7 +452,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
               >
                 <Unplug className="h-3 w-3" aria-hidden />
                 Disconnect
-              </ShadcnButton>
+              </Button>
             ) : null}
           </aside>
 
@@ -589,7 +601,7 @@ const ConnectionRow = ({
   onDelete: () => void
 }) => (
   <li className="group relative">
-    <ShadcnButton
+    <Button
       variant="ghost"
       disabled={busy}
       onClick={onOpen}
@@ -602,17 +614,23 @@ const ConnectionRow = ({
       <span className="truncate text-[10px] uppercase tracking-wide text-ink-faint">
         {spec.engine}
       </span>
-    </ShadcnButton>
-    <IconButton
-      label={`Remove ${spec.name}`}
-      className="absolute right-1 top-1 h-5 w-5 opacity-0 group-hover:opacity-100"
+    </Button>
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label={`Remove ${spec.name}`} title={`Remove ${spec.name}`}
       onClick={(e) => {
         e.stopPropagation()
         onDelete()
       }}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "absolute right-1 top-1 h-5 w-5 opacity-0 group-hover:opacity-100",
+      )}
     >
       <Trash2 className="h-3 w-3" />
-    </IconButton>
+    </Button>
   </li>
 )
 
@@ -705,22 +723,34 @@ const ResultGrid = ({
           {result.truncated ? " (truncated)" : ""}
           {kind === "preview" && canNext ? "+" : ""}
         </span>
-        <IconButton
-          label="Previous page"
-          className="h-5 w-5"
-          disabled={!canPrev}
-          onClick={() => onPageChange(page - 1)}
-        >
-          <ChevronLeft className="h-3 w-3" aria-hidden />
-        </IconButton>
-        <IconButton
-          label="Next page"
-          className="h-5 w-5"
-          disabled={!canNext}
-          onClick={() => onPageChange(page + 1)}
-        >
-          <ChevronRight className="h-3 w-3" aria-hidden />
-        </IconButton>
+        <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Previous page" title="Previous page"
+      disabled={!canPrev}
+      onClick={() => onPageChange(page - 1)}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-5 w-5",
+      )}
+    >
+      <ChevronLeft className="h-3 w-3" aria-hidden />
+    </Button>
+        <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Next page" title="Next page"
+      disabled={!canNext}
+      onClick={() => onPageChange(page + 1)}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-5 w-5",
+      )}
+    >
+      <ChevronRight className="h-3 w-3" aria-hidden />
+    </Button>
       </div>
     </div>
   )

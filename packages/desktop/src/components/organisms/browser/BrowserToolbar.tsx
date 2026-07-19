@@ -15,7 +15,7 @@ import {
   Tablet,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { IconButton, Tooltip } from "../../atoms"
+import { Tooltip } from "../../atoms"
 import { VIEWPORT_PRESETS as VIEWPORT_PRESETS_BASE } from "../../../hooks/useBrowserSession"
 import type { BrowserViewportPreset } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
@@ -123,22 +123,34 @@ export const BrowserToolbar = ({
       data-browser-chrome="toolbar"
     >
       <div className="flex items-center gap-px">
-        <IconButton
-          label="Back"
-          disabled={!showLiveContent}
-          onClick={browserBack}
-          className="h-6 w-6"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-        </IconButton>
-        <IconButton
-          label="Forward"
-          disabled={!showLiveContent}
-          onClick={browserForward}
-          className="h-6 w-6"
-        >
-          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-        </IconButton>
+        <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Back" title="Back"
+      disabled={!showLiveContent}
+      onClick={browserBack}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+    </Button>
+        <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Forward" title="Forward"
+      disabled={!showLiveContent}
+      onClick={browserForward}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+    </Button>
         <div className="relative flex h-6 w-6 items-center justify-center">
           {browserLoading ? (
             <Loader2
@@ -146,14 +158,20 @@ export const BrowserToolbar = ({
               aria-hidden
             />
           ) : (
-            <IconButton
-              label="Reload"
-              disabled={!showLiveContent}
-              onClick={handleReload}
-              className="h-6 w-6"
-            >
-              <RotateCw className="h-3.5 w-3.5" aria-hidden />
-            </IconButton>
+            <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Reload" title="Reload"
+      disabled={!showLiveContent}
+      onClick={handleReload}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <RotateCw className="h-3.5 w-3.5" aria-hidden />
+    </Button>
           )}
         </div>
       </div>
@@ -185,43 +203,57 @@ export const BrowserToolbar = ({
       <div className="flex items-center gap-px">
         {VIEWPORT_PRESETS.map(({ id, label, icon: Icon }) => (
           <Tooltip key={id} label={label}>
-            <IconButton
-              label={label}
-              onClick={() => setViewportPreset(id)}
-              className={cn(
-                "h-6 w-6",
+            <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label={label} title={label}
+      onClick={() => setViewportPreset(id)}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
                 viewportPreset === id && "bg-surface-muted text-ink",
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" aria-hidden />
-            </IconButton>
+      )}
+    >
+      <Icon className="h-3.5 w-3.5" aria-hidden />
+    </Button>
           </Tooltip>
         ))}
       </div>
 
       <Tooltip label={browserDesignMode ? "Exit Design Mode (⌘⇧D)" : "Design Mode (⌘⇧D)"}>
-        <IconButton
-          label={browserDesignMode ? "Exit Design Mode" : "Design Mode"}
-          disabled={!showLiveContent}
-          onClick={() => void toggleDesignMode()}
-          className={cn(
-            "h-6 w-6",
+        <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label={browserDesignMode ? "Exit Design Mode" : "Design Mode"} title={browserDesignMode ? "Exit Design Mode" : "Design Mode"}
+      disabled={!showLiveContent}
+      onClick={() => void toggleDesignMode()}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
             browserDesignMode && "bg-surface-muted text-ink",
-          )}
-        >
-          <MousePointer2 className="h-3.5 w-3.5" aria-hidden />
-        </IconButton>
+      )}
+    >
+      <MousePointer2 className="h-3.5 w-3.5" aria-hidden />
+    </Button>
       </Tooltip>
 
       <Tooltip label="Open DevTools (floating)">
-        <IconButton
-          label="Open DevTools"
-          disabled={!showLiveContent}
-          onClick={handleOpenDevtools}
-          className="h-6 w-6"
-        >
-          <Bug className="h-3.5 w-3.5" aria-hidden />
-        </IconButton>
+        <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Open DevTools" title="Open DevTools"
+      disabled={!showLiveContent}
+      onClick={handleOpenDevtools}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <Bug className="h-3.5 w-3.5" aria-hidden />
+    </Button>
       </Tooltip>
 
       <BrowserOverflowMenu

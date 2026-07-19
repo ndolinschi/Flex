@@ -1,9 +1,11 @@
 import { useState, useSyncExternalStore } from "react"
+import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { ListEnd, Square } from "lucide-react"
 import { backgroundKill } from "../../lib/tauri"
 import { useAppStore } from "../../stores/appStore"
 import { getExecTail, subscribeExecTail } from "../../lib/execTailBus"
-import { IconButton } from "../atoms/IconButton"
 import { ErrorBanner } from "./ErrorBanner"
 import { ExecErrorAction, ExecTail } from "./ExecTail"
 import type { ToolStepDetail } from "../../lib/toolPresentation"
@@ -72,14 +74,22 @@ export const BackgroundBashRow = ({ detail }: { detail: ToolStepDetail }) => {
               : null}
         </span>
         {running && detail.background?.processId ? (
-          <IconButton
-            label="Stop process"
-            isLoading={stopping}
-            onClick={handleStop}
-            className="ml-auto h-5 w-5"
-          >
-            <Square className="h-3 w-3" aria-hidden />
-          </IconButton>
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Stop process" title="Stop process"
+      onClick={handleStop}
+      disabled={stopping}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "ml-auto h-5 w-5",
+      )}
+    >
+      {stopping ? <Spinner /> : (
+        <Square className="h-3 w-3" aria-hidden />
+      )}
+    </Button>
         ) : null}
       </div>
       {stopError ? (

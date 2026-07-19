@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { GitMerge, RefreshCw, XCircle } from "lucide-react"
-import { Button, Checkbox, DiffStat, IconButton, ScrollArea } from "../../atoms"
+import { Checkbox, DiffStat, ScrollArea } from "../../atoms"
 import { BranchPrStatusChip, ConfirmDialog, CreatePrDialog, ErrorBanner } from "../../molecules"
 import { useWorkspaceActions } from "../../../hooks/useWorkspaceActions"
 import { useIsGitRepo } from "../../../hooks/useIsGitRepo"
@@ -194,16 +196,23 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 text-center">
         <GitMerge className="h-7 w-7 text-ink-faint opacity-70" aria-hidden />
         <p className="text-sm text-ink-secondary">Not a git repository</p>
-        <IconButton
-          label="Refresh changes"
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Refresh changes"
+          title="Refresh changes"
           onClick={handleRefresh}
-          className="h-7 w-7"
+          className={cn(
+            "text-muted-foreground hover:bg-muted hover:text-foreground",
+            "h-7 w-7",
+          )}
         >
           <RefreshCw
             className={cn("h-3.5 w-3.5", isRepoFetching && "animate-spin")}
             aria-hidden
           />
-        </IconButton>
+        </Button>
       </div>
     )
   }
@@ -241,10 +250,17 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
           </Button>
         ) : null}
         {totalCount > 0 ? <DiffStat summary={totals} size="sm" /> : null}
-        <IconButton
-          label="Refresh changes"
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Refresh changes"
+          title="Refresh changes"
           onClick={handleRefresh}
-          className="h-6 w-6"
+          className={cn(
+            "text-muted-foreground hover:bg-muted hover:text-foreground",
+            "h-6 w-6",
+          )}
         >
           <RefreshCw
             className={cn(
@@ -253,7 +269,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             )}
             aria-hidden
           />
-        </IconButton>
+        </Button>
       </div>
 
       {showSelectAll ? (
@@ -367,9 +383,10 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
           <Button
             variant="secondary"
             size="sm"
-            isLoading={workspace.busy}
+            disabled={workspace.busy}
             onClick={() => void workspace.integrate()}
           >
+            {workspace.busy ? <Spinner data-icon="inline-start" /> : null}
             <GitMerge className="h-3 w-3" aria-hidden /> Keep{aggregateSuffix}
           </Button>
         </div>

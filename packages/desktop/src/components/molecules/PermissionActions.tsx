@@ -1,4 +1,5 @@
-import { Button } from "../atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { ErrorBanner } from "./ErrorBanner"
 import type { PendingPermission } from "../../lib/types"
 import { usePermissionRespond } from "../../hooks/usePermissionRespond"
@@ -33,9 +34,10 @@ export const PermissionActions = ({
         {permission.options.includes("allow_once") ? (
           <Button
             size="xs"
-            isLoading={isSubmitting}
+            disabled={isSubmitting}
             onClick={() => void respond("allow_once")}
           >
+            {isSubmitting ? <Spinner data-icon="inline-start" /> : null}
             Allow once
           </Button>
         ) : null}
@@ -43,9 +45,10 @@ export const PermissionActions = ({
           <Button
             size="xs"
             variant="secondary"
-            isLoading={isSubmitting}
+            disabled={isSubmitting}
             onClick={() => void respond("allow_always")}
           >
+            {isSubmitting ? <Spinner data-icon="inline-start" /> : null}
             Always allow
           </Button>
         ) : null}
@@ -53,9 +56,10 @@ export const PermissionActions = ({
           <Button
             size="xs"
             variant="destructive"
-            isLoading={isSubmitting}
+            disabled={isSubmitting}
             onClick={() => void respond("deny")}
           >
+            {isSubmitting ? <Spinner data-icon="inline-start" /> : null}
             Deny
           </Button>
         ) : null}

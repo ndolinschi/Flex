@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { Button } from "../atoms"
+import { Button } from "@/components/ui/button"
 import { ErrorBanner } from "./ErrorBanner"
 import { isBrowserPreview } from "../../lib/browserPreview"
 import type { ChatgptAuthStart } from "../../lib/types"

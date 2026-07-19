@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { RefreshCw } from "lucide-react"
-import { Button, Spinner, Toggle } from "../../components/atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner as ButtonSpinner } from "@/components/ui/spinner"
+import { Spinner, Toggle } from "../../components/atoms"
 import { ErrorBanner, SettingsCard, SettingRow } from "../../components/molecules"
 import { useProviderConfig } from "../../hooks/useProviderConfig"
 import { useSessions } from "../../hooks/useSessions"
@@ -259,11 +261,11 @@ export const IndexingContent = () => {
                 <Button
                   variant="secondary"
                   size="sm"
-                  isLoading={row.rebuilding}
                   disabled={row.rebuilding || row.loading}
                   onClick={() => void handleRebuild(row.cwd)}
                   aria-label={`Rebuild index for ${row.label}`}
                 >
+                  {row.rebuilding ? <ButtonSpinner data-icon="inline-start" /> : null}
                   <RefreshCw className="h-3 w-3" aria-hidden />
                   Rebuild
                 </Button>

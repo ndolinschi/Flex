@@ -1,5 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
-import { createPortal } from "react-dom"
+import { useEffect, useState } from "react"
 import { Check, ChevronDown, Gauge } from "lucide-react"
 import { EFFORT_LEVELS, effortLabel } from "../../lib/types"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
@@ -11,6 +10,11 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -35,124 +39,6 @@ type ModelPickerProps = {
   builtinProviders?: BuiltinProvider[]
 }
 
-const EFFORT_MENU_WIDTH = 144
-
-/** One shared effort menu — avoids mounting a submenu tree per model row. */
-const EffortMenu = ({
-  anchorRect,
-  value,
-  onChange,
-  onClose,
-}: {
-  anchorRect: DOMRect
-  value: string | null
-  onChange: (effort: string | null) => void
-  onClose: () => void
-}) => {
-  const menuRef = useRef<HTMLDivElement>(null)
-  const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
-  const [coords, setCoords] = useState<{ x: number; y: number } | null>(null)
-
-  useLayoutEffect(() => {
-    const el = menuRef.current
-    const margin = 8
-    const height = el?.getBoundingClientRect().height ?? 0
-    let x = anchorRect.right + 4
-    let y = anchorRect.top
-    if (x + EFFORT_MENU_WIDTH + margin > window.innerWidth) {
-      x = Math.max(margin, anchorRect.left - EFFORT_MENU_WIDTH - 4)
-    }
-    if (y + height + margin > window.innerHeight) {
-      y = Math.max(margin, window.innerHeight - height - margin)
-    }
-    setCoords({ x, y })
-  }, [anchorRect])
-
-  useEffect(() => {
-    const handlePointer = (e: MouseEvent) => {
-      if (menuRef.current?.contains(e.target as Node)) return
-      onCloseRef.current()
-    }
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        e.stopPropagation()
-        onCloseRef.current()
-      }
-    }
-    document.addEventListener("mousedown", handlePointer, true)
-    document.addEventListener("keydown", handleKey, true)
-    return () => {
-      document.removeEventListener("mousedown", handlePointer, true)
-      document.removeEventListener("keydown", handleKey, true)
-    }
-  }, [])
-
-  return createPortal(
-    <div
-      ref={menuRef}
-      role="menu"
-      aria-label="Effort"
-      data-popover-outside-ignore
-      style={{
-        position: "fixed",
-        left: coords?.x ?? anchorRect.right,
-        top: coords?.y ?? anchorRect.top,
-        width: EFFORT_MENU_WIDTH,
-        visibility: coords ? "visible" : "hidden",
-      }}
-      className={cn(
-        "z-[200] overflow-hidden rounded-md border border-border bg-popover py-1 text-popover-foreground shadow-md",
-      )}
-    >
-      <button
-        type="button"
-        role="menuitem"
-        className={cn(
-          "flex w-full items-center justify-start gap-1.5 px-2 py-1 text-left text-sm",
-          "hover:bg-fill-4 hover:text-ink",
-          value === null && "bg-fill-4 text-ink",
-        )}
-        onClick={() => {
-          onChange(null)
-          onClose()
-        }}
-      >
-        <span className="min-w-0 flex-1 truncate">Default</span>
-        {value === null ? (
-          <Check className="size-3 shrink-0 text-primary" aria-hidden />
-        ) : null}
-      </button>
-      {EFFORT_LEVELS.map((level) => {
-        const active = level === value
-        return (
-          <button
-            key={level}
-            type="button"
-            role="menuitem"
-            className={cn(
-              "flex w-full items-center justify-start gap-1.5 px-2 py-1 text-left text-sm",
-              "hover:bg-fill-4 hover:text-ink",
-              active && "bg-fill-4 text-ink",
-            )}
-            onClick={() => {
-              onChange(level)
-              onClose()
-            }}
-          >
-            <span className="min-w-0 flex-1 truncate">{effortLabel(level)}</span>
-            {active ? (
-              <Check className="size-3 shrink-0 text-primary" aria-hidden />
-            ) : null}
-          </button>
-        )
-      })}
-    </div>,
-    document.body,
-  )
-}
-
 export const ModelPicker = ({
   models,
   value,
@@ -165,10 +51,6 @@ export const ModelPicker = ({
 }: ModelPickerProps) => {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
-  const [effortMenuFor, setEffortMenuFor] = useState<{
-    modelId: string
-    rect: DOMRect
-  } | null>(null)
 
   const selected = models.find((m) => m.id === value)
   const selectedEffort = value && effortFor ? effortFor(value) : null
@@ -183,10 +65,7 @@ export const ModelPicker = ({
   )
 
   useEffect(() => {
-    if (!open) {
-      setQuery("")
-      setEffortMenuFor(null)
-    }
+    if (!open) setQuery("")
   }, [open])
 
   const applyModel = (modelId: string) => {
@@ -198,13 +77,6 @@ export const ModelPicker = ({
     onEffortChange?.(modelId, effort)
     onChange(modelId)
     setOpen(false)
-  }
-
-  const openEffortMenu = (modelId: string, el: HTMLElement) => {
-    const rect = el.getBoundingClientRect()
-    setEffortMenuFor((cur) =>
-      cur?.modelId === modelId ? null : { modelId, rect },
-    )
   }
 
   return (
@@ -287,25 +159,38 @@ export const ModelPicker = ({
                           ) : null}
                         </DropdownMenuItem>
                         {onEffortChange ? (
-                          <button
-                            type="button"
-                            aria-label={`Effort for ${name}`}
-                            aria-haspopup="menu"
-                            aria-expanded={effortMenuFor?.modelId === m.id}
-                            className={cn(
-                              "flex size-7 shrink-0 items-center justify-center rounded-md",
-                              "text-muted-foreground hover:bg-fill-4 hover:text-ink",
-                              effortMenuFor?.modelId === m.id &&
-                                "bg-fill-4 text-ink",
-                            )}
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              openEffortMenu(m.id, e.currentTarget)
-                            }}
-                          >
-                            <Gauge className="size-3" aria-hidden />
-                          </button>
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger
+                              aria-label={`Effort for ${name}`}
+                              className="size-7 shrink-0 justify-center px-0 [&>svg:last-child]:hidden"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Gauge className="size-3" aria-hidden />
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                              <DropdownMenuRadioGroup
+                                value={modelEffort ?? "default"}
+                                onValueChange={(next) => {
+                                  applyEffort(
+                                    m.id,
+                                    next === "default" ? null : next,
+                                  )
+                                }}
+                              >
+                                <DropdownMenuRadioItem value="default">
+                                  Default
+                                </DropdownMenuRadioItem>
+                                {EFFORT_LEVELS.map((level) => (
+                                  <DropdownMenuRadioItem
+                                    key={level}
+                                    value={level}
+                                  >
+                                    {effortLabel(level)}
+                                  </DropdownMenuRadioItem>
+                                ))}
+                              </DropdownMenuRadioGroup>
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
                         ) : null}
                       </div>
                     )
@@ -320,16 +205,6 @@ export const ModelPicker = ({
               </p>
             ) : null}
           </div>
-          {effortMenuFor && onEffortChange ? (
-            <EffortMenu
-              anchorRect={effortMenuFor.rect}
-              value={effortFor ? effortFor(effortMenuFor.modelId) : null}
-              onChange={(effort) => {
-                applyEffort(effortMenuFor.modelId, effort)
-              }}
-              onClose={() => setEffortMenuFor(null)}
-            />
-          ) : null}
         </DropdownMenuContent>
       ) : null}
     </DropdownMenu>

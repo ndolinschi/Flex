@@ -25,7 +25,7 @@ describe("MessageActions", () => {
       <MessageActions text="hello" tsMs={Date.now()} hideTimestamp />,
     )
     expect(html).not.toContain("just now")
-    // The copy button (IconButton) still renders.
+    // The copy button still renders.
     expect(html).toContain("Copy message")
   })
 })

@@ -1,4 +1,6 @@
 import { useEffect, useState, type MouseEvent } from "react"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { ChevronRight, FileCode2, ListEnd, LoaderCircle } from "lucide-react"
 import { backgroundDemote, reviewFileDiff, toInvokeError } from "../../lib/tauri"
 import { cn, toSessionRelativePath } from "../../lib/utils"
@@ -6,7 +8,6 @@ import { sessionScopeKey, useAppStore } from "../../stores/appStore"
 import { useSessions } from "../../hooks/useSessions"
 import { Collapsible } from "./Collapsible"
 import { ChatDiffCard } from "./ChatDiffCard"
-import { IconButton } from "../atoms/IconButton"
 import { BackgroundBashRow } from "./BackgroundBashRow"
 import { DiffBadge, ExecErrorAction, ExecTail } from "./ExecTail"
 import type { ToolStepDetail } from "../../lib/toolPresentation"
@@ -22,14 +23,22 @@ const DemoteButton = ({ callId }: { callId: string }) => {
   }
 
   return (
-    <IconButton
-      label="Move to background"
-      isLoading={demoting}
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Move to background" title="Move to background"
       onClick={handleDemote}
-      className="ml-1 h-5 w-5 shrink-0"
+      disabled={demoting}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "ml-1 h-5 w-5 shrink-0",
+      )}
     >
-      <ListEnd className="h-3 w-3" aria-hidden />
-    </IconButton>
+      {demoting ? <Spinner /> : (
+        <ListEnd className="h-3 w-3" aria-hidden />
+      )}
+    </Button>
   )
 }
 
@@ -182,13 +191,19 @@ export const DetailRow = ({
         ) : null}
         <DiffBadge added={detail.added} removed={detail.removed} />
         {canOpenFile ? (
-          <IconButton
-            label="Open file"
-            onClick={handleOpenFile}
-            className="ml-auto h-5 w-5 shrink-0 opacity-0 group-hover/detail:opacity-100"
-          >
-            <FileCode2 className="h-3 w-3" aria-hidden />
-          </IconButton>
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Open file" title="Open file"
+      onClick={handleOpenFile}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "ml-auto h-5 w-5 shrink-0 opacity-0 group-hover/detail:opacity-100",
+      )}
+    >
+      <FileCode2 className="h-3 w-3" aria-hidden />
+    </Button>
         ) : null}
         {detail.canDemote ? <DemoteButton callId={detail.id} /> : null}
       </div>

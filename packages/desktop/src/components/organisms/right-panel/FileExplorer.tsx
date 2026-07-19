@@ -26,7 +26,7 @@ import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import type { FileHit } from "../../../lib/types"
 import { basename, cn, fileIconForPath } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
-import { IconButton, Spinner, TextInput } from "../../atoms"
+import { Spinner, TextInput } from "../../atoms"
 import { ConfirmDialog, ContextMenu, type ContextMenuItem } from "../../molecules"
 import { STATUS_COLOR } from "./FileRow"
 import { Button } from "@/components/ui/button"
@@ -480,9 +480,19 @@ export const FileExplorer = ({
           aria-label="Search workspace files"
         />
         {searchFetching ? <Spinner size="sm" /> : null}
-        <IconButton label="New file" onClick={() => openCreate()} className="h-6 w-6">
-          <FilePlus className="h-3.5 w-3.5" aria-hidden />
-        </IconButton>
+        <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="New file" title="New file"
+      onClick={() => openCreate()}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <FilePlus className="h-3.5 w-3.5" aria-hidden />
+    </Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-1">

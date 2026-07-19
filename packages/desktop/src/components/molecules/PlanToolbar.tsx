@@ -14,7 +14,7 @@ import {
 } from "lucide-react"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
-import { Button as ShadcnButton } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Button, IconButton, RunningDot } from "../atoms"
+import { RunningDot } from "../atoms"
 import { useGroupedModels, MODEL_MENU_VISIBLE_CAP } from "../../hooks/useGroupedModels"
 
 export type PlanBuildStatus = "draft" | "ready" | "building" | "built"
@@ -105,7 +105,7 @@ const PlanModelPill = ({
       <DropdownMenuTrigger
         disabled={isLoading}
         render={
-          <ShadcnButton
+          <Button
             type="button"
             variant="ghost"
             size="xs"
@@ -222,14 +222,14 @@ export const PlanToolbar = ({
           <span className="min-w-0 truncate text-muted-foreground">{repo}</span>
           <span className="shrink-0 text-muted-foreground/60">›</span>
           {showPlansListCrumb && onBackToPlans ? (
-            <ShadcnButton
+            <Button
               variant="ghost"
               size="xs"
               onClick={onBackToPlans}
               className="h-auto shrink-0 px-0.5 py-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
             >
               Plans
-            </ShadcnButton>
+            </Button>
           ) : (
             <span className="shrink-0 text-muted-foreground">Plans</span>
           )}
@@ -288,7 +288,7 @@ export const PlanToolbar = ({
           <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
             <DropdownMenuTrigger
               render={
-                <ShadcnButton
+                <Button
                   type="button"
                   variant="ghost"
                   size="icon-xs"
@@ -379,15 +379,47 @@ export const PlanToolbar = ({
           <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
             {find.matchCount > 0 ? `${find.activeIndex + 1}/${find.matchCount}` : "0/0"}
           </span>
-          <IconButton label="Previous match" onClick={find.onPrev} disabled={find.matchCount === 0} className="h-6 w-6">
-            <ChevronDown className="size-3 rotate-180" aria-hidden />
-          </IconButton>
-          <IconButton label="Next match" onClick={find.onNext} disabled={find.matchCount === 0} className="h-6 w-6">
-            <ChevronDown className="size-3" aria-hidden />
-          </IconButton>
-          <IconButton label="Close find" onClick={() => find.onOpenChange(false)} className="h-6 w-6">
-            <X className="size-3" aria-hidden />
-          </IconButton>
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Previous match" title="Previous match"
+      onClick={find.onPrev}
+      disabled={find.matchCount === 0}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <ChevronDown className="size-3 rotate-180" aria-hidden />
+    </Button>
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Next match" title="Next match"
+      onClick={find.onNext}
+      disabled={find.matchCount === 0}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <ChevronDown className="size-3" aria-hidden />
+    </Button>
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Close find" title="Close find"
+      onClick={() => find.onOpenChange(false)}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <X className="size-3" aria-hidden />
+    </Button>
         </div>
       ) : null}
     </div>

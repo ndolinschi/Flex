@@ -73,7 +73,7 @@ export const SessionListItem = memo(function SessionListItem({
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(
     null,
   )
-  /** Defer Base UI IconButtons until first hover/focus — sticky thereafter. */
+  /** Defer icon action Buttons until first hover/focus — sticky thereafter. */
   const [actionsReady, setActionsReady] = useState(false)
 
   const label = sessionLabel(session)

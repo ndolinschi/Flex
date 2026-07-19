@@ -1,5 +1,7 @@
 import { Moon, Settings, Sun } from "lucide-react"
-import { IconButton, Spinner } from "../atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "../atoms"
+import { cn } from "../../lib/utils"
 
 type SidebarFooterProps = {
   theme: "dark" | "light"
@@ -18,21 +20,44 @@ export const SidebarFooter = ({
   return (
     <>
       <div className="flex items-center justify-end gap-1 border-t border-stroke-3 px-2.5 py-1.5">
-        <IconButton
-          quiet
-          label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label={
+            theme === "dark" ? "Switch to light theme" : "Switch to dark theme"
+          }
+          title={
+            theme === "dark" ? "Switch to light theme" : "Switch to dark theme"
+          }
           onClick={onToggleTheme}
-          className="h-6 w-6"
+          className={cn(
+            "text-muted-foreground hover:bg-muted hover:text-foreground",
+            "opacity-50 hover:opacity-80",
+            "h-6 w-6",
+          )}
         >
           {theme === "dark" ? (
             <Sun className="h-3.5 w-3.5" aria-hidden />
           ) : (
             <Moon className="h-3.5 w-3.5" aria-hidden />
           )}
-        </IconButton>
-        <IconButton quiet label="Settings" onClick={onOpenSettings} className="h-6 w-6">
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Settings"
+          title="Settings"
+          onClick={onOpenSettings}
+          className={cn(
+            "text-muted-foreground hover:bg-muted hover:text-foreground",
+            "opacity-50 hover:opacity-80",
+            "h-6 w-6",
+          )}
+        >
           <Settings className="h-3.5 w-3.5" aria-hidden />
-        </IconButton>
+        </Button>
       </div>
 
       {isCreating ? (

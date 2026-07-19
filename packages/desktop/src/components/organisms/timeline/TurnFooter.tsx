@@ -1,6 +1,8 @@
 import { useState } from "react"
+import { cn } from "../../../lib/utils"
+import { Button } from "@/components/ui/button"
 import { Check, Copy } from "lucide-react"
-import { IconButton, Tooltip } from "../../atoms"
+import { Tooltip } from "../../atoms"
 import { useAppStore } from "../../../stores/appStore"
 import { formatDuration, formatRelativeTime } from "../../../lib/utils"
 import type { TurnFooterInfo } from "./buildDisplayItems"
@@ -40,17 +42,23 @@ export const TurnFooter = ({
         {stopped ? " · Stopped" : ""}
       </span>
       <Tooltip label="Copy response">
-        <IconButton
-          label={copied ? "Copied" : "Copy response"}
-          className="h-6 w-6"
-          onClick={() => void handleCopy()}
-        >
-          {copied ? (
+        <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label={copied ? "Copied" : "Copy response"} title={copied ? "Copied" : "Copy response"}
+      onClick={() => void handleCopy()}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      {copied ? (
             <Check className="h-3 w-3 text-green" aria-hidden />
           ) : (
             <Copy className="h-3 w-3" aria-hidden />
           )}
-        </IconButton>
+    </Button>
       </Tooltip>
     </div>
   )

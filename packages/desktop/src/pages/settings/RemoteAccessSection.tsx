@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Check, Copy, RefreshCw } from "lucide-react"
-import { Button, TextInput, Toggle } from "../../components/atoms"
+import { Button } from "@/components/ui/button"
+import { TextInput, Toggle } from "../../components/atoms"
 import { SettingsCard, SettingRow } from "../../components/molecules"
 import {
   remoteAccessGet,

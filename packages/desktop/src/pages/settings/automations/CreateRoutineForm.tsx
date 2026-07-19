@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
-import { Button, TextArea, TextInput } from "../../../components/atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
+import { TextArea, TextInput } from "../../../components/atoms"
 import {
   ErrorBanner,
   FieldRow,
@@ -216,7 +218,14 @@ export const CreateRoutineForm = ({
         <Button variant="secondary" size="sm" onClick={onCancel}>
           Cancel
         </Button>
-        <Button size="sm" isLoading={upsertMutation.isPending} onClick={() => void handleSave()}>
+        <Button
+          size="sm"
+          disabled={upsertMutation.isPending}
+          onClick={() => void handleSave()}
+        >
+          {upsertMutation.isPending ? (
+            <Spinner data-icon="inline-start" />
+          ) : null}
           Save automation
         </Button>
       </div>

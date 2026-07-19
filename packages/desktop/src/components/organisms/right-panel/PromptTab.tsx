@@ -14,7 +14,7 @@ import {
   Send,
   ShieldCheck,
 } from "lucide-react"
-import { IconButton, Tooltip } from "../../atoms"
+import { Tooltip } from "../../atoms"
 import { ErrorBanner } from "../../molecules"
 import { Button } from "@/components/ui/button"
 import { AtMentionTray } from "../composer/AtMentionTray"
@@ -315,14 +315,21 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
           {chars.toLocaleString()} · ~{tokens.toLocaleString()} tok
         </span>
         <div className="relative">
-          <IconButton
-            label="Insert section"
-            quiet
-            className="h-6 w-6"
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Insert section"
+            title="Insert section"
             onClick={() => setInsertOpen((v) => !v)}
+            className={cn(
+              "text-muted-foreground hover:bg-muted hover:text-foreground",
+              "opacity-50 hover:opacity-80",
+              "h-6 w-6",
+            )}
           >
             <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-          </IconButton>
+          </Button>
           {insertOpen ? (
             <div
               className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md bg-panel shadow-[var(--shadow-popover)]"
@@ -346,42 +353,60 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
         </div>
         {annotations.length > 0 ? (
           <Tooltip label={showMarks ? "Edit text (@ /)" : "Show highlighted marks"}>
-            <IconButton
-              label={showMarks ? "Edit prompt" : "Show marks"}
-              className={cn("h-6 w-6", showMarks && "bg-fill-3 text-ink")}
-              onClick={() => setShowMarks((v) => !v)}
-            >
-              {showMarks ? (
+            <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label={showMarks ? "Edit prompt" : "Show marks"} title={showMarks ? "Edit prompt" : "Show marks"}
+      onClick={() => setShowMarks((v) => !v)}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6", showMarks && "bg-fill-3 text-ink",
+      )}
+    >
+      {showMarks ? (
                 <Pencil className="h-3.5 w-3.5" aria-hidden />
               ) : (
                 <Eye className="h-3.5 w-3.5" aria-hidden />
               )}
-            </IconButton>
+    </Button>
           </Tooltip>
         ) : null}
         <Tooltip label="Verify with model (grill the prompt)">
-          <IconButton
-            label="Verify prompt"
-            className="h-6 w-6"
-            disabled={!draft.trim() || busy}
-            onClick={() => void runVerify()}
-          >
-            {busy ? (
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Verify prompt" title="Verify prompt"
+      disabled={!draft.trim() || busy}
+      onClick={() => void runVerify()}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      {busy ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
             ) : (
               <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
             )}
-          </IconButton>
+    </Button>
         </Tooltip>
         <Tooltip label="Send prompt">
-          <IconButton
-            label="Send prompt"
-            onClick={sendFromEditor}
-            disabled={!draft.trim()}
-            className="h-6 w-6"
-          >
-            <Send className="h-3.5 w-3.5" aria-hidden />
-          </IconButton>
+          <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Send prompt" title="Send prompt"
+      onClick={sendFromEditor}
+      disabled={!draft.trim()}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6",
+      )}
+    >
+      <Send className="h-3.5 w-3.5" aria-hidden />
+    </Button>
         </Tooltip>
       </div>
 

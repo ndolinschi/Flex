@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Brain, ChevronDown, Clock, MoreHorizontal, Trash2 } from "lucide-react"
-import { IconButton, Spinner, Tooltip } from "../../../components/atoms"
+import { Tooltip } from "../../../components/atoms"
 import {
   Collapsible,
   ConfirmDialog,
@@ -11,6 +11,7 @@ import {
   MarkdownBody,
 } from "../../../components/molecules"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { toInvokeError } from "../../../lib/tauri"
 import { memoryExpiryFromPreset } from "../../../lib/types"
 import { cn, formatRelativeTime } from "../../../lib/utils"
@@ -31,7 +32,7 @@ export const MemoryRow = ({
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(
     null,
   )
-  /** Defer hover IconButtons until first pointer/focus — sticky thereafter. */
+  /** Defer hover icon actions until first pointer/focus — sticky thereafter. */
   const [actionsReady, setActionsReady] = useState(false)
 
   const detailQuery = useQuery({
@@ -118,31 +119,43 @@ export const MemoryRow = ({
           {actionsReady ? (
             <>
               <Tooltip label="Expiry">
-                <IconButton
-                  label="Set memory expiry"
-                  size="icon-xs"
-                  isLoading={expiryMutation.isPending}
-                  onClick={(e) => {
+                <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      aria-label="Set memory expiry" title="Set memory expiry"
+      onClick={(e) => {
                     e.stopPropagation()
                     const rect = e.currentTarget.getBoundingClientRect()
                     setMenuPosition({ x: rect.left, y: rect.bottom })
                   }}
-                >
-                  <MoreHorizontal className="h-3 w-3" aria-hidden />
-                </IconButton>
+      disabled={expiryMutation.isPending}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+      )}
+    >
+      {expiryMutation.isPending ? <Spinner /> : (
+        <MoreHorizontal className="h-3 w-3" aria-hidden />
+      )}
+    </Button>
               </Tooltip>
               <Tooltip label="Delete">
-                <IconButton
-                  label="Delete memory"
-                  size="icon-xs"
-                  className="hover:text-destructive"
-                  onClick={(e) => {
+                <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      aria-label="Delete memory" title="Delete memory"
+      onClick={(e) => {
                     e.stopPropagation()
                     setConfirmDelete(true)
                   }}
-                >
-                  <Trash2 className="h-3 w-3" aria-hidden />
-                </IconButton>
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "hover:text-destructive",
+      )}
+    >
+      <Trash2 className="h-3 w-3" aria-hidden />
+    </Button>
               </Tooltip>
             </>
           ) : null}
@@ -153,7 +166,7 @@ export const MemoryRow = ({
         <div className="border-t border-stroke-3 px-2.5 py-2">
           {detailQuery.isLoading ? (
             <div className="flex items-center gap-2 py-2 text-xs text-ink-muted">
-              <Spinner size="sm" /> Loading…
+              <Spinner className="size-3.5" /> Loading…
             </div>
           ) : detailQuery.isError ? (
             <ErrorBanner message={toInvokeError(detailQuery.error)} />

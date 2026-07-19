@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Sparkles } from "lucide-react"
-import { Button, Spinner, Toggle } from "../../components/atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner, Toggle } from "../../components/atoms"
 import {
   ErrorBanner,
   SettingRow,

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
-import { Button as ShadcnButton } from "@/components/ui/button"
-import { Button, TextInput } from "../atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
+import { TextInput } from "../atoms"
 import { ErrorBanner } from "../molecules"
 import { respondQuestion, toInvokeError } from "../../lib/tauri"
 import type { PendingQuestion, Question } from "../../lib/types"
@@ -69,7 +70,7 @@ const StepBody = ({
         {q.options.map((opt) => {
           const active = draft.selected.includes(opt.label)
           return (
-            <ShadcnButton
+            <Button
               key={opt.label}
               variant="outline"
               aria-pressed={active}
@@ -90,7 +91,7 @@ const StepBody = ({
                   </span>
                 ) : null}
               </span>
-            </ShadcnButton>
+            </Button>
           )
         })}
         {allowCustom ? (
@@ -279,10 +280,10 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
             {showAdvance ? (
               <Button
                 size="sm"
-                disabled={!currentStepFilled}
-                isLoading={isSubmitting}
+                disabled={!currentStepFilled || isSubmitting}
                 onClick={handleAdvance}
               >
+                {isSubmitting ? <Spinner data-icon="inline-start" /> : null}
                 {isLastStep ? "Submit" : "Next"}
               </Button>
             ) : null}

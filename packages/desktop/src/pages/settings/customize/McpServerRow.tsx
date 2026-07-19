@@ -1,7 +1,9 @@
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plug, Settings2, Trash2 } from "lucide-react"
-import { Badge, Button } from "../../../components/atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
+import { Badge } from "../../../components/atoms"
 import {
   ConfirmDialog,
   ErrorBanner,
@@ -131,12 +133,13 @@ export const McpServerRow = ({ server }: { server: McpServerDto }) => {
           <Button
             variant="secondary"
             size="sm"
-            isLoading={testMutation.isPending}
+            disabled={testMutation.isPending}
             onClick={() => {
               setTestResult(null)
               void testMutation.mutateAsync()
             }}
           >
+            {testMutation.isPending ? <Spinner data-icon="inline-start" /> : null}
             Test
           </Button>
           <Button

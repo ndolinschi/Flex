@@ -1,6 +1,5 @@
 import { MessageSquareText, X } from "lucide-react"
 import type { PlanComment } from "../../stores/types"
-import { IconButton } from "../atoms"
 import { formatRelativeTime, cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
 
@@ -52,13 +51,19 @@ export const PlanCommentList = ({
                   {formatRelativeTime(comment.createdAtMs)}
                 </p>
               </Button>
-              <IconButton
-                label="Remove comment"
-                onClick={() => onRemove(comment.id)}
-                className="h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
-              >
-                <X className="h-3 w-3" aria-hidden />
-              </IconButton>
+              <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Remove comment" title="Remove comment"
+      onClick={() => onRemove(comment.id)}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100",
+      )}
+    >
+      <X className="h-3 w-3" aria-hidden />
+    </Button>
             </li>
           )
         })}

@@ -1,12 +1,13 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Play, Trash2 } from "lucide-react"
-import { Badge, Button, Spinner } from "../../../components/atoms"
+import { Badge, Spinner } from "../../../components/atoms"
+import { Button } from "@/components/ui/button"
+import { Button as ShadcnButton } from "@/components/ui/button"
 import {
   Collapsible,
   ConfirmDialog,
 } from "../../../components/molecules"
-import { Button as ShadcnButton } from "@/components/ui/button"
 import { routinesHistory, routinesRemove, routinesRun } from "../../../lib/tauri"
 import type { RoutineDto } from "../../../lib/types"
 import { formatRelativeTime } from "../../../lib/utils"
@@ -78,9 +79,10 @@ export const RoutineRow = ({ routine }: { routine: RoutineDto }) => {
           <Button
             variant="ghost"
             size="sm"
-            isLoading={runMutation.isPending}
+            disabled={runMutation.isPending}
             onClick={() => void runMutation.mutateAsync()}
           >
+            {runMutation.isPending ? <Spinner data-icon="inline-start" /> : null}
             <Play className="h-3 w-3" aria-hidden /> Run now
           </Button>
           <Button

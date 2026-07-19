@@ -8,7 +8,9 @@ import {
   Search,
   AppWindow,
 } from "lucide-react"
-import { Button, Spinner, TextInput, Toggle } from "../../../components/atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner as ButtonSpinner } from "@/components/ui/spinner"
+import { Spinner, TextInput, Toggle } from "../../../components/atoms"
 import { ErrorBanner, SettingsSection } from "../../../components/molecules"
 import { useProviderConfig } from "../../../hooks/useProviderConfig"
 import type { PluginPrefs } from "../../../lib/types"
@@ -183,11 +185,11 @@ export const PluginCatalog = () => {
             <Button
               variant={added ? "ghost" : "secondary"}
               size="sm"
-              isLoading={busy}
-              disabled={busyKey !== null && !busy}
+              disabled={busy || (busyKey !== null && !busy)}
               onClick={() => void handleToggle(plugin.key)}
               className={cn("shrink-0", added && "text-green")}
             >
+              {busy ? <ButtonSpinner data-icon="inline-start" /> : null}
               {added ? (
                 <>
                   <Check className="h-3 w-3" aria-hidden /> Added

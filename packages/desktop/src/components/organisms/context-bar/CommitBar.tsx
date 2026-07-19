@@ -14,8 +14,9 @@ import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import { useAppStore } from "../../../stores/appStore"
 import { CreatePrDialog } from "../../molecules/CreatePrDialog"
 import { PopoverTray } from "../../molecules/PopoverTray"
-import { Button, DiffStat, TextInput } from "../../atoms"
-import { Button as ShadcnButton } from "@/components/ui/button"
+import { DiffStat, TextInput } from "../../atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 
 /** Right-aligned "N changes" pill + Commit button, shown above the
  * composer for non-isolated sessions with a dirty working tree (design:
@@ -135,7 +136,7 @@ export const CommitBar = ({
 
   return (
     <div ref={rootRef} className="relative flex shrink-0 items-center gap-1.5">
-      <ShadcnButton
+      <Button
         variant="secondary"
         size="xs"
         onClick={() => {
@@ -147,9 +148,9 @@ export const CommitBar = ({
           {totalCount} change{totalCount === 1 ? "" : "s"}
         </span>
         <DiffStat summary={totals} />
-      </ShadcnButton>
+      </Button>
 
-      <ShadcnButton
+      <Button
         variant="default"
         size="xs"
         onClick={() => setOpen((v) => !v)}
@@ -158,7 +159,7 @@ export const CommitBar = ({
       >
         <GitMerge data-icon="inline-start" aria-hidden />
         {primaryLabel}
-      </ShadcnButton>
+      </Button>
 
       <PopoverTray
         open={open}
@@ -182,19 +183,19 @@ export const CommitBar = ({
               <Button
                 variant="secondary"
                 size="sm"
-                isLoading={busy === "commit"}
                 disabled={busy !== null || !trimmed}
                 onClick={() => void handleCommit(false)}
               >
+                {busy === "commit" ? <Spinner data-icon="inline-start" /> : null}
                 Commit
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
-                isLoading={busy === "push"}
                 disabled={busy !== null || !trimmed}
                 onClick={() => void handleCommit(true)}
               >
+                {busy === "push" ? <Spinner data-icon="inline-start" /> : null}
                 Commit & Push
               </Button>
               <Button
@@ -214,10 +215,10 @@ export const CommitBar = ({
             <Button
               variant="default"
               size="sm"
-              isLoading={busy === "commit"}
               disabled={busy !== null || !trimmed}
               onClick={() => void handleCommit(false)}
             >
+              {busy === "commit" ? <Spinner data-icon="inline-start" /> : null}
               Commit
             </Button>
           )}

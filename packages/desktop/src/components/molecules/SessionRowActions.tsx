@@ -1,4 +1,5 @@
 import { memo, type MouseEvent } from "react"
+import { Button } from "@/components/ui/button"
 import {
   ArchiveRestore,
   Archive as ArchiveIcon,
@@ -6,7 +7,7 @@ import {
   Pin,
 } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { IconButton, Tooltip } from "../atoms"
+import { Tooltip } from "../atoms"
 
 type SessionRowActionsProps = {
   pinned: boolean
@@ -21,7 +22,7 @@ type SessionRowActionsProps = {
   canTogglePin: boolean
   canSetArchived: boolean
   /**
-   * Mount Base UI IconButtons only after the row is hovered/focused.
+   * Mount icon action Buttons only after the row is hovered/focused.
    * Sidebar lists are not virtualized — permanently mounting 3 buttons per
    * row scales poorly (hooks × sessions). Sticky once true.
    */
@@ -70,64 +71,84 @@ export const SessionRowActions = memo(function SessionRowActions({
         {actionsReady ? (
           <>
             <Tooltip label={pinned ? "Unpin" : "Pin"}>
-              <IconButton
-                label={pinned ? "Unpin session" : "Pin session"}
-                quiet
-                size="icon-2xs"
-                disabled={!canTogglePin}
-                onClick={(e) => {
+              <Button
+      type="button"
+      variant="ghost"
+      size="icon-2xs"
+      aria-label={pinned ? "Unpin session" : "Pin session"} title={pinned ? "Unpin session" : "Pin session"}
+      disabled={!canTogglePin}
+      onClick={(e) => {
                   e.stopPropagation()
                   onTogglePin?.(e)
                 }}
-              >
-                <Pin
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "opacity-50 hover:opacity-80",
+      )}
+    >
+      <Pin
                   className={cn("h-3 w-3", pinned && "fill-current text-accent")}
                   aria-hidden
                 />
-              </IconButton>
+    </Button>
             </Tooltip>
             {archived ? (
               <Tooltip label="Restore">
-                <IconButton
-                  label="Restore session"
-                  quiet
-                  size="icon-2xs"
-                  disabled={!canSetArchived}
-                  onClick={(e) => {
+                <Button
+      type="button"
+      variant="ghost"
+      size="icon-2xs"
+      aria-label="Restore session" title="Restore session"
+      disabled={!canSetArchived}
+      onClick={(e) => {
                     e.stopPropagation()
                     onSetArchived?.(e, false)
                   }}
-                >
-                  <ArchiveRestore className="h-3 w-3" aria-hidden />
-                </IconButton>
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "opacity-50 hover:opacity-80",
+      )}
+    >
+      <ArchiveRestore className="h-3 w-3" aria-hidden />
+    </Button>
               </Tooltip>
             ) : (
               <Tooltip label="Archive">
-                <IconButton
-                  label="Archive session"
-                  quiet
-                  size="icon-2xs"
-                  disabled={!canSetArchived}
-                  onClick={(e) => {
+                <Button
+      type="button"
+      variant="ghost"
+      size="icon-2xs"
+      aria-label="Archive session" title="Archive session"
+      disabled={!canSetArchived}
+      onClick={(e) => {
                     e.stopPropagation()
                     onSetArchived?.(e, true)
                   }}
-                >
-                  <ArchiveIcon className="h-3 w-3" aria-hidden />
-                </IconButton>
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "opacity-50 hover:opacity-80",
+      )}
+    >
+      <ArchiveIcon className="h-3 w-3" aria-hidden />
+    </Button>
               </Tooltip>
             )}
-            <IconButton
-              label="More actions"
-              quiet
-              size="icon-2xs"
-              onClick={(e) => {
+            <Button
+      type="button"
+      variant="ghost"
+      size="icon-2xs"
+      aria-label="More actions" title="More actions"
+      onClick={(e) => {
                 e.stopPropagation()
                 onOpenMenu(e)
               }}
-            >
-              <MoreHorizontal className="h-3 w-3" aria-hidden />
-            </IconButton>
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "opacity-50 hover:opacity-80",
+      )}
+    >
+      <MoreHorizontal className="h-3 w-3" aria-hidden />
+    </Button>
           </>
         ) : null}
       </span>

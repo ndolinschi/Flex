@@ -10,9 +10,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 
 | Component | Purpose | Key props | Used by |
 |---|---|---|---|
-| `Button` | shadcn Base UI adapter (`@/components/ui/button`); maps legacy `primary`/`danger`/`md` | `variant`, `size`, `disabled`, `isLoading?`, `onClick`, `children` | Composer, ProviderSettingsForm, PermissionPrompt, QuestionPrompt, WelcomePage, ConfirmDialog |
+| `Button` | Re-export of `@/components/ui/button` (prefer direct ui import) | shadcn `variant`/`size` | Everywhere |
 | `Checkbox` | Round selection control (filled accent circle + check) | `checked`, `indeterminate?`, `onChange`, `label` | ChangesTab select-all, FileRow |
-| `IconButton` | Thin wrap over shadcn `Button` icon sizes (`ghost` + `icon-sm`); optional `quiet` | `label`, `quiet?`, `size?`, `onClick`, `children` | SessionListItem, SessionSidebar, PlusMenu, ErrorBanner, SettingsShell, SessionMenu |
 | `TextInput` | Single-line text field (forwardRef) | standard input props | FormField, SessionListItem, SessionSidebar search, QuestionPrompt, ConfirmDialog |
 | `TextArea` | Multi-line text field | standard textarea props | Composer |
 | `Label` | Accessible form label | `htmlFor`, `children` | FormField, ModelSelect |
@@ -265,7 +264,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Badge | yes | `Badge`, `NewBadge`, `VerdictBadge` | Keep tone mapping via variants/`className` |
 | Breadcrumb | yes | `PlanToolbar` crumbs | Small win |
 | Bubble | yes (chat kit) | user/assistant bubbles in timeline | After Message spike |
-| Button | ✅ done | `atoms/Button`, `IconButton` → `@/components/ui/button` | Legacy `primary`/`danger`/`md` mapped; drop `isLoading` over time |
+| Button | ✅ done | Call sites use `@/components/ui/button`; `atoms/Button` is a re-export only; `IconButton` removed | Compose Spinner + `disabled` instead of `isLoading` |
 | Button Group | yes | composer toolbar clusters | Optional; `ToggleGroup` covers ModePicker |
 | Calendar | skip | — | No date UX today |
 | Card | selective | settings cards, catalog cards | Use full Card composition only where DESIGN allows cards |
@@ -275,13 +274,13 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader`, WorkGroup | |
 | Combobox | yes | `ModelPicker`, branch/project trays | Prefer over bespoke `PopoverTray` search |
 | Command | yes | `CommandPalette`, `SearchModal`, `OpenTabModal` | Command-in-Dialog pattern |
-| Context Menu | yes | `ContextMenu` molecule | Keep timeline-scroll / webview-blur ignore behavior |
+| Context Menu | ✅ done | `ContextMenu` molecule → `@/components/ui/context-menu` | Imperative position API; timeline-scroll / webview-blur ignore preserved |
 | Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
 | Date Picker | skip | — | |
 | Dialog | ✅ done | `SearchModal`, `CommandPalette` | `@/components/ui/dialog` (outside-click dismiss); confirms use Alert Dialog |
 | Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
 | Drawer | maybe | `SubagentViewer` (bottom overlay) | Spike vs keep custom |
-| Dropdown Menu | yes | `@/components/ui/dropdown-menu` — Mode/Model/Plus pickers, SessionMenu, TitleBarMenus, overflow menus | Base UI `render` trigger prop |
+| Dropdown Menu | ✅ done | `@/components/ui/dropdown-menu` — Mode/Model(+effort sub)/Plus/Session/TitleBar/overflow | Base UI `render` trigger; ModelPicker effort uses `DropdownMenuSub` |
 | Empty | yes | `EmptyState` | |
 | Field | yes | `FormField` + settings forms | `FieldGroup` / `FieldLabel` / validation attrs |
 | Hover Card | later | — | Optional enrichment on chips |
@@ -329,8 +328,8 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | Phase | Scope | Exit criteria |
 |---|---|---|
 | **0 — Foundation** | ✅ `components.json` (`base-nova`), `@/` alias, `clsx`+`tailwind-merge` `cn`, shadcn semantic vars bridged to Flex tokens (`data-theme` only — no `.dark` second system) | `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
-| **1 — Atom adapters** | ✅ Button + Spinner + Alert installed; `atoms/Button` + `IconButton` adapt legacy Flex props. Callouts use `ErrorBanner` / `Alert`. Remaining: Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Avatar, Tooltip, ScrollArea | Atom unit tests + vitest green; call sites compile via barrel |
-| **2 — Overlays & menus** | ✅ Dialog + AlertDialog + DropdownMenu; remaining: Popover, ContextMenu, Menubar, Sonner | Confirm/auth/PR/bug/completion on AlertDialog; Search/Command on Dialog |
+| **1 — Atom adapters** | ✅ Button is `@/components/ui/button` (atoms re-export only); Spinner + Alert. `IconButton` removed. Remaining: Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Avatar, Tooltip, ScrollArea | Atom unit tests + vitest green |
+| **2 — Overlays & menus** | ✅ Dialog + AlertDialog + DropdownMenu + ContextMenu; remaining: Popover, Menubar, Sonner | Confirm/auth on AlertDialog; Search/Command on Dialog; right-click on ContextMenu |
 | **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | Settings forms, ModePicker, ModelPicker, CommandPalette/SearchModal |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty; optional Sidebar/Sheet/Drawer spikes | Split sash + empty states; sidebar spike documented go/no-go |
 | **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Chip/bubble/marker parity; scroller decision recorded here |
@@ -395,4 +394,4 @@ spacing changes, update [DESIGN.md](./DESIGN.md).
 - **Spacing balance (careful):** see [DESIGN.md](./DESIGN.md) for the full gutter/height canon. Short form: chat chrome `px-3`; content pane `TabStrip` + tab chrome `px-2.5` / `--header-height` with `Tab` at `h-6`; Terminal/Database side lists `px-2.5 py-1.5 text-xs`; Settings `px-3.5` rows / `gap-3` cards; Welcome `h-9` inputs; session sidebar list `px-2`.
 - **Streaming visuals:** `StreamingCaret` renders inline inside live `MarkdownBody` (including mid-turn narration in work groups); live assistant rows reserve `MessageActions` height; highlight.js preloads while live; `TurnTimeline` uses per-session `streamingSessions[id]` (SubagentViewer-safe); bottom “Working” hides when live answer text is visible; double-rAF remeasure on stream settle.
 - **Files / Monaco:** `@monaco-editor/react` + Vite `?worker` locals (`lib/monacoEnv.ts`); editor/vendor split via `manualChunks.monaco`. Open buffers live in `openFilesBySession` under one content `files` tab (keep-alive like Terminal).
-- **shadcn Button (Base UI):** Prefer `@/components/ui/button` for interactive chrome. Timeline stays safe via virtualization (only overscan rows mount). Sidebar session / memory rows defer hover `IconButton`s until first pointer/focus (`actionsReady`, sticky) so long lists do not permanently mount 3 Base UI button trees per row.
+- **shadcn Button (Base UI):** Prefer `@/components/ui/button` for interactive chrome. Timeline stays safe via virtualization (only overscan rows mount). Sidebar session / memory rows defer hover icon `Button`s until first pointer/focus (`actionsReady`, sticky) so long lists do not permanently mount 3 Base UI button trees per row.

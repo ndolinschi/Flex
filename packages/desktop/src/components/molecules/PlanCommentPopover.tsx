@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
-import { Button, TextArea } from "../atoms"
+import { Button } from "@/components/ui/button"
+import { TextArea } from "../atoms"
 import { cn } from "../../lib/utils"
 import type { PlanSelectionAnchor } from "../../hooks/usePlanSelectionComment"
 

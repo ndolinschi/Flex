@@ -1,4 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent, type RefObject } from "react"
+import { Button } from "@/components/ui/button"
 import { Maximize2 } from "lucide-react"
 import { useAutoGrowTextarea } from "../../hooks/useAutoGrowTextarea"
 import { useComposerAutocomplete } from "../../hooks/useComposerAutocomplete"
@@ -7,7 +8,7 @@ import type { ComposerAttachment, ComposerMode } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
 import { CompletionSetupModal } from "../../plugins/prompt-completion"
-import { IconButton, Tooltip } from "../atoms"
+import { Tooltip } from "../atoms"
 import { AtMentionTray } from "../organisms/composer/AtMentionTray"
 import { SlashCommandTray } from "../organisms/composer/SlashCommandTray"
 import { AttachmentChip } from "./AttachmentChip"
@@ -278,14 +279,21 @@ export const ComposerInput = ({
         {activeSessionId && enabled ? (
           <div className="absolute right-1.5 top-1.5 z-10">
             <Tooltip label="Open prompt editor">
-              <IconButton
-                label="Open prompt editor"
-                quiet
-                className="h-6 w-6 bg-user-bubble/80 text-ink-muted hover:bg-fill-3 hover:text-ink"
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Open prompt editor"
+                title="Open prompt editor"
                 onClick={() => openToolBesideChat(activeSessionId, "prompt")}
+                className={cn(
+                  "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  "opacity-50 hover:opacity-80",
+                  "h-6 w-6 bg-user-bubble/80 text-ink-muted hover:bg-fill-3 hover:text-ink",
+                )}
               >
                 <Maximize2 className="h-3.5 w-3.5" aria-hidden />
-              </IconButton>
+              </Button>
             </Tooltip>
           </div>
         ) : null}

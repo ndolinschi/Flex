@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
-import { Button, Kbd, Skeleton, TextInput } from "../components/atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
+import { Kbd, Skeleton, TextInput } from "../components/atoms"
 import {
   ChatgptSignInDialog,
   CopilotSignInDialog,
@@ -322,10 +324,10 @@ export const WelcomePage = () => {
             <div className="flex justify-end">
               <Button
                 size="lg"
+                disabled={!provider || busy || isUpserting}
                 onClick={() => void handleProviderNext()}
-                isLoading={busy || isUpserting}
-                disabled={!provider}
               >
+                {(busy || isUpserting) ? <Spinner data-icon="inline-start" /> : null}
                 Continue
               </Button>
             </div>
@@ -389,18 +391,18 @@ export const WelcomePage = () => {
                 <Button
                   variant="secondary"
                   size="lg"
-                  onClick={() => void handleFinish(false)}
-                  isLoading={busy && !projectPath}
                   disabled={busy}
+                  onClick={() => void handleFinish(false)}
                 >
+                  {busy && !projectPath ? <Spinner data-icon="inline-start" /> : null}
                   Skip & start chatting
                 </Button>
                 <Button
                   size="lg"
-                  onClick={() => void handleFinish(true)}
-                  isLoading={busy && !!projectPath}
                   disabled={busy || !projectPath}
+                  onClick={() => void handleFinish(true)}
                 >
+                  {busy && !!projectPath ? <Spinner data-icon="inline-start" /> : null}
                   Start in folder
                 </Button>
               </div>

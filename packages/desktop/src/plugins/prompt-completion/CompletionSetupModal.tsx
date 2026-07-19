@@ -11,9 +11,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Button, Spinner } from "../../components/atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { ErrorBanner, ModelSelect } from "../../components/molecules"
-import { Button as ShadcnButton } from "@/components/ui/button"
 import { useInlineCompletionPrefs } from "../../hooks/useInlineCompletionPrefs"
 import { useModels } from "../../hooks/useModels"
 import {
@@ -201,7 +201,7 @@ export const CompletionSetupModal = ({
         </AlertDialogHeader>
 
         <div className="flex gap-1 rounded-md bg-fill-4 p-0.5">
-          <ShadcnButton
+          <Button
             variant="ghost"
             onClick={() => {
               setPath("ollama")
@@ -216,8 +216,8 @@ export const CompletionSetupModal = ({
             )}
           >
             Ollama
-          </ShadcnButton>
-          <ShadcnButton
+          </Button>
+          <Button
             variant="ghost"
             onClick={() => {
               setPath("provider")
@@ -232,7 +232,7 @@ export const CompletionSetupModal = ({
             )}
           >
             Existing connection
-          </ShadcnButton>
+          </Button>
         </div>
 
         {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}

@@ -4,7 +4,8 @@ import type { SessionMeta } from "../../../lib/types"
 import { gitPrDiff, gitPrStatus } from "../../../lib/tauri"
 import { openExternalUrl } from "../../../lib/openExternalUrl"
 import { cn } from "../../../lib/utils"
-import { Button, ScrollArea, Spinner } from "../../atoms"
+import { ScrollArea, Spinner } from "../../atoms"
+import { Button } from "@/components/ui/button"
 import { DiffView, EmptyState } from "../../molecules"
 
 type PrTabProps = {

@@ -9,7 +9,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert"
-import { Button } from "../atoms"
+import { Button } from "@/components/ui/button"
 import { useBrowserSession } from "../../hooks/useBrowserSession"
 import { NATIVE_APP_REQUIRED } from "../../lib/browserPreview"
 import { BrowserToolbar } from "./browser/BrowserToolbar"

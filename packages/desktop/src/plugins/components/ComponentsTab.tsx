@@ -14,7 +14,6 @@ import {
   Send,
 } from "lucide-react"
 import {
-  IconButton,
   ScrollArea,
   Tab,
   TextArea,
@@ -386,29 +385,43 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
               : "Components"}
         </span>
         <Tooltip label={listVisible ? "Hide list" : "Show list"}>
-          <IconButton
-            label={listVisible ? "Hide list" : "Show list"}
-            quiet
-            className="h-6 w-6"
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={listVisible ? "Hide list" : "Show list"}
+            title={listVisible ? "Hide list" : "Show list"}
             onClick={() => setListVisible((v) => !v)}
+            className={cn(
+              "text-muted-foreground hover:bg-muted hover:text-foreground",
+              "opacity-50 hover:opacity-80",
+              "h-6 w-6",
+            )}
           >
             <List className="h-3.5 w-3.5" aria-hidden />
-          </IconButton>
+          </Button>
         </Tooltip>
         <Tooltip label="Refresh">
-          <IconButton
-            label="Refresh"
-            quiet
-            className="h-6 w-6"
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Refresh"
+            title="Refresh"
             onClick={() => {
               void refetchList().catch((err) => setError(toInvokeError(err)))
             }}
+            className={cn(
+              "text-muted-foreground hover:bg-muted hover:text-foreground",
+              "opacity-50 hover:opacity-80",
+              "h-6 w-6",
+            )}
           >
             <RefreshCw
               className={cn("h-3.5 w-3.5", busy && "animate-spin")}
               aria-hidden
             />
-          </IconButton>
+          </Button>
         </Tooltip>
       </div>
 
@@ -555,14 +568,20 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
                       className="min-h-[2.5rem] flex-1 resize-none text-sm"
                     />
                     <Tooltip label="Send to agent (⌘↵)">
-                      <IconButton
-                        label="Send to agent"
-                        className="h-8 w-8 shrink-0"
-                        disabled={sending}
-                        onClick={sendToAgent}
-                      >
-                        <Send className="h-3.5 w-3.5" aria-hidden />
-                      </IconButton>
+                      <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      aria-label="Send to agent" title="Send to agent"
+      disabled={sending}
+      onClick={sendToAgent}
+      className={cn(
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "h-8 w-8 shrink-0",
+      )}
+    >
+      <Send className="h-3.5 w-3.5" aria-hidden />
+    </Button>
                     </Tooltip>
                   </div>
                   <p className="text-[11px] text-ink-faint">

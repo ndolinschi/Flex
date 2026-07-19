@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react"
 import { Check, Copy, FolderOpen } from "lucide-react"
-import { Button, Toggle } from "../../components/atoms"
+import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
+import { Toggle } from "../../components/atoms"
 import { SettingsCard, SettingRow } from "../../components/molecules"
 import { exportDebugLog, exportDiagnostics, log } from "../../lib/debug/log"
 import {
@@ -157,9 +159,10 @@ export const DiagnosticsContent = () => {
           <Button
             variant="secondary"
             size="sm"
+            disabled={exporting}
             onClick={() => void handleExportDiagnostics()}
-            isLoading={exporting}
           >
+            {exporting ? <Spinner data-icon="inline-start" /> : null}
             Export diagnostics
           </Button>
         </SettingRow>
@@ -175,10 +178,10 @@ export const DiagnosticsContent = () => {
           <Button
             variant="ghost"
             size="sm"
+            disabled={!activeSessionId || exportingSession}
             onClick={() => void handleExportSessionLog()}
-            isLoading={exportingSession}
-            disabled={!activeSessionId}
           >
+            {exportingSession ? <Spinner data-icon="inline-start" /> : null}
             Export to workspace
           </Button>
         </SettingRow>
@@ -219,9 +222,10 @@ export const DiagnosticsContent = () => {
             <Button
               variant="secondary"
               size="sm"
+              disabled={checkingUpdate}
               onClick={() => void handleCheckUpdate()}
-              isLoading={checkingUpdate}
             >
+              {checkingUpdate ? <Spinner data-icon="inline-start" /> : null}
               Check for updates
             </Button>
             {updateStatus ? (
