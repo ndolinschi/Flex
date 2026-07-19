@@ -16,12 +16,12 @@ import {
 import {
   ScrollArea,
   Tab,
-  TextArea,
   TextInput,
   Tooltip,
 } from "../../components/atoms"
 import { EmptyState, ErrorBanner } from "../../components/molecules"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import {
   browserApplyStyleOverrides,
   componentsDetect,
@@ -553,7 +553,7 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
                     </div>
                   ) : null}
                   <div className="flex items-end gap-1.5">
-                    <TextArea
+                    <Textarea
                       value={localPrompt}
                       onChange={(e) =>
                         setPromptById((prev) => ({

@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
-import { TextArea, TextInput } from "../../../components/atoms"
+import { Textarea } from "@/components/ui/textarea"
+import { TextInput } from "../../../components/atoms"
 import {
   ErrorBanner,
   FieldRow,
@@ -137,7 +138,7 @@ export const CreateRoutineForm = ({
       </FieldRow>
 
       <FieldRow label="Prompt" htmlFor="routine-prompt">
-        <TextArea
+        <Textarea
           id="routine-prompt"
           value={form.prompt}
           onChange={(e) => patch({ prompt: e.target.value })}

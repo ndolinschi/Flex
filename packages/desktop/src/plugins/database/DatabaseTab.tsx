@@ -10,8 +10,9 @@ import {
   Trash2,
   Unplug,
 } from "lucide-react"
-import { ScrollArea, TextArea, TextInput } from "../../components/atoms"
+import { ScrollArea, TextInput } from "../../components/atoms"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -482,7 +483,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
                       Run
                     </Button>
                   </div>
-                  <TextArea
+                  <Textarea
                     value={sql}
                     onChange={(e) => setSql(e.target.value)}
                     rows={3}

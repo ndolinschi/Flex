@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { TextArea } from "../atoms"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "../../lib/utils"
 import type { PlanSelectionAnchor } from "../../hooks/usePlanSelectionComment"
 
@@ -69,7 +69,7 @@ export const PlanCommentPopover = ({
       <p className="mb-2 line-clamp-3 border-l-2 border-accent/40 pl-2 text-xs italic text-ink-muted">
         {draft.quote}
       </p>
-      <TextArea
+      <Textarea
         ref={textareaRef}
         value={body}
         onChange={(e) => setBody(e.target.value)}

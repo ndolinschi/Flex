@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { openUrl } from "@tauri-apps/plugin-opener"
-import { TextArea } from "../atoms"
+import { Textarea } from "@/components/ui/textarea"
 import { ErrorBanner } from "./ErrorBanner"
 import {
   BUG_REPORT_PRIVACY_URL,
@@ -149,7 +149,7 @@ export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
             <span className="text-base font-medium text-ink">
               Tell us what went wrong
             </span>
-            <TextArea
+            <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={5}

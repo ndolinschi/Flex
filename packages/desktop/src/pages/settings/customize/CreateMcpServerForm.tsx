@@ -3,7 +3,8 @@ import { useMutation } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
-import { TextArea, TextInput } from "../../../components/atoms"
+import { Textarea } from "@/components/ui/textarea"
+import { TextInput } from "../../../components/atoms"
 import { ErrorBanner, FieldRow, SettingsSection } from "../../../components/molecules"
 import { emptyMcpForm, MCP_ID_RE, parseArgs, parseEnv, splitEnvSecrets, type McpFormState } from "../../../lib/mcp"
 import { mcpUpsert, toInvokeError } from "../../../lib/tauri"
@@ -100,7 +101,7 @@ export const CreateMcpServerForm = ({
         htmlFor="mcp-env"
         hint='One "KEY=value" pair per line. Names containing TOKEN, KEY, SECRET, PASSWORD, or AUTH are stored encrypted.'
       >
-        <TextArea
+        <Textarea
           id="mcp-env"
           value={form.envText}
           onChange={(e) => patch({ envText: e.target.value })}
