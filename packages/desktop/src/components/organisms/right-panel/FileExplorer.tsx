@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type MouseEvent } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   ChevronDown,
   FileCode2,
@@ -14,6 +14,7 @@ import {
   createTextFile,
   deletePath,
   gitStatusSinceBaseline,
+  invalidateWorkspacePathCache,
   listDirChildren,
   listFiles,
   renamePath,
@@ -318,6 +319,7 @@ export const FileExplorer = ({
     queryFn: () => listFiles(cwd, debounced, true, fallbackCwd),
     enabled: !!cwd && !!resolvedCwd && searching,
     staleTime: 15_000,
+    placeholderData: keepPreviousData,
   })
 
   // Shared with Changes / sidebar — color dirty files in the tree.
@@ -325,7 +327,7 @@ export const FileExplorer = ({
     queryKey: ["git-status", cwd, sessionId],
     queryFn: () => gitStatusSinceBaseline(sessionId),
     enabled: !!cwd && !!sessionId,
-    staleTime: 5_000,
+    staleTime: 15_000,
   })
   const gitIndex = useMemo(
     () => buildGitStatusIndex(gitSummary?.files),
@@ -338,6 +340,7 @@ export const FileExplorer = ({
   )
 
   const refreshLists = async (paths: string[] = []) => {
+    await invalidateWorkspacePathCache(cwd)
     await queryClient.invalidateQueries({
       queryKey: ["workspace-dir-children", cwd],
     })

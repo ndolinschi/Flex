@@ -501,6 +501,12 @@ export const listDirChildren = (
     fallbackCwd: fallbackCwd || null,
   })
 
+/** Drop the Rust warm path cache used by `list_files`. Omit `cwd` to clear all. */
+export const invalidateWorkspacePathCache = (
+  cwd?: string | null,
+): Promise<void> =>
+  invoke("invalidate_workspace_path_cache", { cwd: cwd || null })
+
 /** Resolve a live workspace directory (cwd, else fallbackCwd / base_cwd). */
 export const resolveWorkspaceCwd = (
   cwd: string,

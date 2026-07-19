@@ -17,7 +17,7 @@ use agentloop_sdk::routines::{default_routines_dir, FileRoutineStore, RoutineRun
 use agentloop_sdk::EngineService;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tokio_util::sync::CancellationToken;
 
 use crate::compose::build_service;
@@ -699,9 +699,51 @@ pub struct CreateSessionInput {
     pub isolation: Option<String>,
 }
 
+/// Capture + persist a session baseline off the create/resume hot path.
+/// Changes falls back to full-repo status until this finishes; later polls
+/// pick up the baseline once it lands.
+fn schedule_session_baseline(app: tauri::AppHandle, session_id: String, cwd: PathBuf) {
+    tauri::async_runtime::spawn(async move {
+        let Some(state) = app.try_state::<AppState>() else {
+            return;
+        };
+        let cwd_for_block = cwd.clone();
+        let baseline =
+            match tokio::task::spawn_blocking(move || capture_session_baseline(&cwd_for_block))
+                .await
+            {
+                Ok(b) => b,
+                Err(err) => {
+                    tracing::warn!(
+                        error = %err,
+                        session_id = %session_id,
+                        "baseline capture join failed"
+                    );
+                    None
+                }
+            };
+        match baseline {
+            Some(baseline) => {
+                let mut baselines = state.session_baselines.lock().await;
+                // Never overwrite an existing baseline (resume race / double schedule).
+                baselines.entry(session_id.clone()).or_insert(baseline);
+                crate::state::save_session_baselines(&baselines);
+            }
+            None => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    cwd = %cwd.display(),
+                    "failed to capture session baseline; Changes panel will show full repo status"
+                );
+            }
+        }
+    });
+}
+
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn create_session(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
     input: CreateSessionInput,
 ) -> DesktopResult<SessionMeta> {
@@ -733,23 +775,11 @@ pub async fn create_session(
     // clean private worktree, so their `git_status` is already scoped to
     // this session's own changes. Non-fatal on any git failure — the
     // Changes panel just falls back to the full-repo view for this session.
-    // Persisted immediately (not just cached in memory) so the baseline
-    // survives an app restart before the session is ever resumed — this is
-    // the fix for the original "changes vanish when you reopen the chat"
-    // bug, where the in-memory-only map was lost on restart and
-    // `resume_session` re-captured from the already-dirty tree.
+    // Capture runs in the background so create_session returns immediately;
+    // the baseline is still persisted once ready (survives restart before
+    // resume — same guarantee as the previous synchronous path).
     if meta.base_cwd.is_none() {
-        if let Some(baseline) = capture_session_baseline(&meta.cwd) {
-            let mut baselines = state.session_baselines.lock().await;
-            baselines.insert(id.to_string(), baseline);
-            crate::state::save_session_baselines(&baselines);
-        } else {
-            tracing::warn!(
-                session_id = %id,
-                cwd = %meta.cwd.display(),
-                "failed to capture session baseline; Changes panel will show full repo status"
-            );
-        }
+        schedule_session_baseline(app, id.to_string(), meta.cwd.clone());
     }
 
     Ok(meta)
@@ -1295,7 +1325,11 @@ fn extract_json_object(raw: &str) -> Option<&str> {
 
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
-pub async fn resume_session(state: State<'_, AppState>, session_id: String) -> DesktopResult<()> {
+pub async fn resume_session(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    session_id: String,
+) -> DesktopResult<()> {
     let service = require_service(&state).await?;
     let id = SessionId::from(session_id);
     let result = match service.resume_session(&id).await {
@@ -1335,16 +1369,16 @@ pub async fn resume_session(state: State<'_, AppState>, session_id: String) -> D
     // which its baseline is persisted and stable forever after (that
     // session will show nothing until further edits, which is acceptable:
     // strictly better than swallowing edits on every single resume).
+    // Capture is deferred so resume returns without blocking on git.
     if result.is_ok() {
-        let mut baselines = state.session_baselines.lock().await;
-        let has_baseline = baselines.contains_key(id.as_str());
+        let has_baseline = {
+            let baselines = state.session_baselines.lock().await;
+            baselines.contains_key(id.as_str())
+        };
         if !has_baseline {
             if let Ok(meta) = service.session_meta(&id).await {
                 if meta.base_cwd.is_none() {
-                    if let Some(baseline) = capture_session_baseline(&meta.cwd) {
-                        baselines.insert(id.to_string(), baseline);
-                        crate::state::save_session_baselines(&baselines);
-                    }
+                    schedule_session_baseline(app, id.to_string(), meta.cwd.clone());
                 }
             }
         }
@@ -2444,8 +2478,10 @@ fn summarize(mut files: Vec<GitFileStatus>) -> GitStatusSummary {
 /// accurate past the cap.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
-pub fn git_status(cwd: String) -> DesktopResult<GitStatusSummary> {
-    Ok(summarize(git_status_full(&cwd)?))
+pub async fn git_status(cwd: String) -> DesktopResult<GitStatusSummary> {
+    tokio::task::spawn_blocking(move || Ok(summarize(git_status_full(&cwd)?)))
+        .await
+        .map_err(|e| DesktopError::Message(format!("git status join: {e}")))?
 }
 
 /// Shared implementation behind [`git_status`] and
@@ -2578,6 +2614,17 @@ pub async fn git_status_since_baseline(
         }
 
         let all = git_status_full(&cwd_str)?;
+        let paths_to_hash: Vec<String> = all
+            .iter()
+            .filter(|f| {
+                matches!(
+                    baseline_files.get(&f.path),
+                    Some(h) if h.as_str() != "dir"
+                )
+            })
+            .map(|f| f.path.clone())
+            .collect();
+        let hashes = hash_objects_batch(&cwd_path, &paths_to_hash);
         let filtered = all
             .into_iter()
             .filter(|f| match baseline_files.get(&f.path) {
@@ -2590,8 +2637,10 @@ pub async fn git_status_since_baseline(
                 // granularity, which also collapses to the single dir entry).
                 Some(baseline_hash) if baseline_hash == "dir" => false,
                 Some(baseline_hash) => {
-                    let current_hash =
-                        hash_object(&cwd_path, &f.path).unwrap_or_else(|| "deleted".to_string());
+                    let current_hash = hashes
+                        .get(&f.path)
+                        .cloned()
+                        .unwrap_or_else(|| "deleted".to_string());
                     &current_hash != baseline_hash
                 }
             })
@@ -2616,6 +2665,84 @@ fn hash_object(cwd: &std::path::Path, path: &str) -> Option<String> {
         return None;
     }
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+/// Batch `git hash-object --stdin-paths` for many relative paths in one
+/// subprocess. Falls back to per-path [`hash_object`] if the batch fails
+/// (e.g. a path vanished mid-flight). Missing paths are simply omitted from
+/// the map so callers can treat them as deleted.
+fn hash_objects_batch(
+    cwd: &std::path::Path,
+    paths: &[String],
+) -> std::collections::HashMap<String, String> {
+    let mut out = std::collections::HashMap::new();
+    if paths.is_empty() {
+        return out;
+    }
+
+    // Only feed paths that still exist as files — `--stdin-paths` aborts the
+    // whole batch if any path is missing.
+    let existing: Vec<&str> = paths
+        .iter()
+        .map(String::as_str)
+        .filter(|p| cwd.join(p).is_file())
+        .collect();
+    if existing.is_empty() {
+        return out;
+    }
+
+    if let Some(batch) = try_hash_objects_stdin(cwd, &existing) {
+        return batch;
+    }
+
+    for path in existing {
+        if let Some(hash) = hash_object(cwd, path) {
+            out.insert(path.to_string(), hash);
+        }
+    }
+    out
+}
+
+fn try_hash_objects_stdin(
+    cwd: &std::path::Path,
+    paths: &[&str],
+) -> Option<std::collections::HashMap<String, String>> {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    let mut child = crate::win_console::command("git")
+        .args(["hash-object", "--stdin-paths"])
+        .current_dir(cwd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    {
+        let mut stdin = child.stdin.take()?;
+        for path in paths {
+            writeln!(stdin, "{path}").ok()?;
+        }
+    }
+    let output = child.wait_with_output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let hashes: Vec<String> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
+    if hashes.len() != paths.len() {
+        return None;
+    }
+    Some(
+        paths
+            .iter()
+            .zip(hashes)
+            .map(|(p, h)| ((*p).to_string(), h))
+            .collect(),
+    )
 }
 
 /// `git rev-parse HEAD` in `cwd`; empty string if there is no HEAD yet
@@ -2651,6 +2778,7 @@ fn capture_session_baseline(cwd: &std::path::Path) -> Option<crate::state::Sessi
     }
     let head_sha = current_head_sha(cwd);
 
+    let mut pending_hash: Vec<String> = Vec::new();
     let mut files = std::collections::HashMap::new();
     for line in String::from_utf8_lossy(&porcelain.stdout).lines() {
         if line.len() < 4 {
@@ -2682,14 +2810,19 @@ fn capture_session_baseline(cwd: &std::path::Path) -> Option<crate::state::Sessi
             continue;
         }
         let is_deleted = code.contains('D');
-        let hash = if is_deleted {
-            "deleted".to_string()
+        if is_deleted {
+            files.insert(path, "deleted".to_string());
         } else {
-            match hash_object(cwd, &path) {
-                Some(h) => h,
-                None => "deleted".to_string(),
-            }
-        };
+            pending_hash.push(path);
+        }
+    }
+
+    let hashes = hash_objects_batch(cwd, &pending_hash);
+    for path in pending_hash {
+        let hash = hashes
+            .get(&path)
+            .cloned()
+            .unwrap_or_else(|| "deleted".to_string());
         files.insert(path, hash);
     }
 
@@ -4039,38 +4172,99 @@ fn score_file(rel_path: &str, name: &str, needle: &str) -> Option<i32> {
 /// @-mentions. Pass `include_ignored = true` for the human Files search so
 /// `.env` and other gitignored paths are findable (heavy vendor dirs are still
 /// pruned so typing stays snappy).
+///
+/// Walks once per `(root, include_ignored)` into
+/// [`AppState::workspace_path_cache`]; subsequent keystrokes score against
+/// the warm list until TTL expiry or explicit invalidation.
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
-pub fn list_files(
+pub async fn list_files(
+    state: State<'_, AppState>,
     cwd: String,
     query: String,
     include_ignored: Option<bool>,
     fallback_cwd: Option<String>,
-) -> Vec<FileHit> {
+) -> DesktopResult<Vec<FileHit>> {
     let Some(root) = crate::path_resolve::resolve_existing_dir(&cwd, fallback_cwd.as_deref())
     else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
     let needle = query.trim().to_lowercase();
     let include_ignored = include_ignored.unwrap_or(false);
+    let root_key = root.to_string_lossy().to_string();
+    let cache_key = (root_key.clone(), include_ignored);
 
-    // Bound the walk so huge repos can't stall an interactive keystroke.
-    // Empty query is browse-only (shallow); typed queries may go deeper but
-    // still stop early once we have enough strong hits.
-    const MAX_HITS: usize = 40;
-    const MAX_WALK_BROWSE: usize = 2_000;
-    const MAX_WALK_SEARCH: usize = 8_000;
-    let max_walk = if needle.is_empty() {
-        MAX_WALK_BROWSE
-    } else {
-        MAX_WALK_SEARCH
-    };
+    // Fast path: reuse a fresh warm walk without leaving the async worker.
+    {
+        let cache = state
+            .workspace_path_cache
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some(entry) = cache.get(&cache_key) {
+            if entry.fresh() {
+                return Ok(score_cached_paths(&entry.entries, &needle));
+            }
+        }
+    }
 
-    let mut hits: Vec<(i32, FileHit)> = Vec::new();
+    let root_for_walk = root.clone();
+    let entries =
+        tokio::task::spawn_blocking(move || walk_workspace_paths(&root_for_walk, include_ignored))
+            .await
+            .map_err(|err| DesktopError::Message(format!("list_files walk join: {err}")))?;
+
+    {
+        let mut cache = state
+            .workspace_path_cache
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        cache.insert(
+            cache_key,
+            crate::state::WorkspacePathCache {
+                entries: entries.clone(),
+                built_at: std::time::Instant::now(),
+            },
+        );
+    }
+
+    Ok(score_cached_paths(&entries, &needle))
+}
+
+/// Drop the warm `list_files` path cache. Pass `cwd` to clear only entries
+/// for that workspace root; omit to clear everything (used after FS-mutating
+/// tools / turn settle).
+#[tracing::instrument(level = "debug", skip_all)]
+#[tauri::command]
+pub fn invalidate_workspace_path_cache(state: State<'_, AppState>, cwd: Option<String>) {
+    let mut cache = state
+        .workspace_path_cache
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    match cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(cwd) => {
+            let resolved = crate::path_resolve::resolve_existing_dir(cwd, None)
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_else(|| cwd.to_string());
+            cache.retain(|(root, _), _| root != &resolved && !root.starts_with(&resolved));
+            // Also drop keys that were stored before canonicalize (raw cwd).
+            cache.retain(|(root, _), _| root != cwd);
+        }
+        None => cache.clear(),
+    }
+}
+
+/// Bound the walk so huge repos can't stall an interactive keystroke.
+const MAX_HITS: usize = 40;
+const MAX_WALK_SEARCH: usize = 8_000;
+
+fn walk_workspace_paths(
+    root: &std::path::Path,
+    include_ignored: bool,
+) -> Vec<crate::state::CachedPathEntry> {
+    let mut entries: Vec<crate::state::CachedPathEntry> = Vec::new();
     let mut walked = 0usize;
-    let mut strong_hits = 0usize; // basename prefix/contains
 
-    let mut builder = ignore::WalkBuilder::new(&root);
+    let mut builder = ignore::WalkBuilder::new(root);
     if include_ignored {
         // Human Files search: show hidden + gitignored (e.g. `.env`).
         builder
@@ -4100,15 +4294,10 @@ pub fn list_files(
         }
         true
     });
-    // Bare `@` / empty Files search: only shallow entries so we don't walk the
-    // whole tree just to show a browse list.
-    if needle.is_empty() {
-        builder.max_depth(Some(3));
-    }
 
     for entry in builder.build().flatten() {
         walked += 1;
-        if walked > max_walk {
+        if walked > MAX_WALK_SEARCH {
             break;
         }
         let Some(ft) = entry.file_type() else {
@@ -4124,7 +4313,7 @@ pub fn list_files(
             continue;
         }
         let entry_path = entry.path();
-        let Ok(rel) = entry_path.strip_prefix(&root) else {
+        let Ok(rel) = entry_path.strip_prefix(root) else {
             continue;
         };
         let rel_str = rel.to_string_lossy().replace('\\', "/");
@@ -4135,30 +4324,35 @@ pub fn list_files(
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| rel_str.clone());
-        let Some(score) = score_file(&rel_str, &name, &needle) else {
+        entries.push(crate::state::CachedPathEntry {
+            path: rel_str,
+            name,
+            is_dir,
+        });
+    }
+    entries
+}
+
+fn score_cached_paths(entries: &[crate::state::CachedPathEntry], needle: &str) -> Vec<FileHit> {
+    // Warm-cache scoring is cheap (string checks only) — score the full list
+    // then rank, instead of the walk-time early-exit that stopped disk I/O.
+    let mut hits: Vec<(i32, FileHit)> = Vec::with_capacity(MAX_HITS * 2);
+
+    for entry in entries {
+        let Some(score) = score_file(&entry.path, &entry.name, needle) else {
             continue;
         };
         // Prefer files slightly over folders when scores tie (files more often
         // what users @-mention), but still surface folders with folder icons.
-        let rank = if is_dir { score + 10 } else { score };
-        if score <= 1 {
-            strong_hits += 1;
-        }
+        let rank = if entry.is_dir { score + 10 } else { score };
         hits.push((
             rank,
             FileHit {
-                path: rel_str,
-                name,
-                is_dir,
+                path: entry.path.clone(),
+                name: entry.name.clone(),
+                is_dir: entry.is_dir,
             },
         ));
-        // Enough good basename matches — don't keep walking for weak path hits.
-        if !needle.is_empty() && strong_hits >= MAX_HITS {
-            break;
-        }
-        if hits.len() >= MAX_HITS * 4 {
-            break;
-        }
     }
 
     hits.sort_by(|a, b| {
@@ -4187,13 +4381,22 @@ pub fn resolve_workspace_cwd(cwd: String, fallback_cwd: Option<String>) -> Optio
 /// gitignore-aware [`list_files`].) Soft-capped; dirs-first then name.
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
-pub fn list_dir_children(
+pub async fn list_dir_children(
     cwd: String,
     relative_dir: String,
     fallback_cwd: Option<String>,
 ) -> Vec<FileHit> {
-    let Some(root) = crate::path_resolve::resolve_existing_dir(&cwd, fallback_cwd.as_deref())
-    else {
+    tokio::task::spawn_blocking(move || list_dir_children_sync(&cwd, &relative_dir, fallback_cwd))
+        .await
+        .unwrap_or_default()
+}
+
+fn list_dir_children_sync(
+    cwd: &str,
+    relative_dir: &str,
+    fallback_cwd: Option<String>,
+) -> Vec<FileHit> {
+    let Some(root) = crate::path_resolve::resolve_existing_dir(cwd, fallback_cwd.as_deref()) else {
         return Vec::new();
     };
 
