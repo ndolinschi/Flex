@@ -365,12 +365,20 @@ pub(crate) fn hash_objects_batch(
         return out;
     }
 
-    // Only feed paths that still exist as files — `--stdin-paths` aborts the
-    // whole batch if any path is missing.
+    // Only feed paths git can hash — `--stdin-paths` aborts the whole batch
+    // if any path is missing. Include symlinks (even to dirs): `is_file()`
+    // follows links and would skip them, wrongly baselining as "deleted".
+    // Real directories are excluded; porcelain already records those as "dir".
     let existing: Vec<&str> = paths
         .iter()
         .map(String::as_str)
-        .filter(|p| cwd.join(p).is_file())
+        .filter(|p| {
+            let meta = match cwd.join(p).symlink_metadata() {
+                Ok(m) => m,
+                Err(_) => return false,
+            };
+            meta.is_file() || meta.file_type().is_symlink()
+        })
         .collect();
     if existing.is_empty() {
         return out;

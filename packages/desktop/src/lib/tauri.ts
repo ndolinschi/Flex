@@ -690,6 +690,16 @@ export const listenSessionEvents = (
   })
 }
 
+/** Fired once a deferred session baseline is persisted (create/resume). */
+export const listenSessionBaselineReady = (
+  handler: (payload: { sessionId: string }) => void,
+): Promise<UnlistenFn> => {
+  if (isBrowserPreview()) return Promise.resolve(() => {})
+  return tauriListen<{ sessionId: string }>("session-baseline-ready", (e) => {
+    handler(e.payload)
+  })
+}
+
 export const routinesList = (): Promise<RoutineDto[]> => invoke("routines_list")
 
 export const routinesUpsert = (routine: RoutineDto): Promise<void> =>

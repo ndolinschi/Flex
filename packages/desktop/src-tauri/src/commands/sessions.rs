@@ -14,9 +14,15 @@ pub struct CreateSessionInput {
     pub isolation: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionBaselineReady {
+    session_id: String,
+}
+
 /// Capture + persist a session baseline off the create/resume hot path.
-/// Changes falls back to full-repo status until this finishes; later polls
-/// pick up the baseline once it lands.
+/// Changes falls back to full-repo status until this finishes; the UI
+/// refetches git-status when `session-baseline-ready` fires.
 pub(crate) fn schedule_session_baseline(app: tauri::AppHandle, session_id: String, cwd: PathBuf) {
     tauri::async_runtime::spawn(async move {
         let Some(state) = app.try_state::<AppState>() else {
@@ -39,10 +45,32 @@ pub(crate) fn schedule_session_baseline(app: tauri::AppHandle, session_id: Strin
             };
         match baseline {
             Some(baseline) => {
-                let mut baselines = state.session_baselines.lock().await;
-                // Never overwrite an existing baseline (resume race / double schedule).
-                baselines.entry(session_id.clone()).or_insert(baseline);
-                crate::state::save_session_baselines(&baselines);
+                let inserted = {
+                    let mut baselines = state.session_baselines.lock().await;
+                    // Never overwrite an existing baseline (resume race / double schedule).
+                    match baselines.entry(session_id.clone()) {
+                        std::collections::hash_map::Entry::Vacant(slot) => {
+                            slot.insert(baseline);
+                            crate::state::save_session_baselines(&baselines);
+                            true
+                        }
+                        std::collections::hash_map::Entry::Occupied(_) => false,
+                    }
+                };
+                if inserted {
+                    if let Err(err) = app.emit(
+                        "session-baseline-ready",
+                        &SessionBaselineReady {
+                            session_id: session_id.clone(),
+                        },
+                    ) {
+                        tracing::warn!(
+                            session_id = %session_id,
+                            error = %err,
+                            "session-baseline-ready emit failed"
+                        );
+                    }
+                }
             }
             None => {
                 tracing::warn!(

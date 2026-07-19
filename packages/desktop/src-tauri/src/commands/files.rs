@@ -153,9 +153,14 @@ pub fn invalidate_workspace_path_cache(state: State<'_, AppState>, cwd: Option<S
     match cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         Some(cwd) => {
             let resolved = crate::path_resolve::resolve_existing_dir(cwd, None)
-                .map(|p| p.to_string_lossy().into_owned())
-                .unwrap_or_else(|| cwd.to_string());
-            cache.retain(|(root, _), _| root != &resolved && !root.starts_with(&resolved));
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| std::path::PathBuf::from(cwd));
+            // Component-aware prefix: string `starts_with` would also evict a
+            // sibling root like `/project2` when invalidating `/project`.
+            cache.retain(|(root, _), _| {
+                let root_path = std::path::Path::new(root);
+                root_path != resolved.as_path() && !root_path.starts_with(&resolved)
+            });
             // Also drop keys that were stored before canonicalize (raw cwd).
             cache.retain(|(root, _), _| root != cwd);
         }
