@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Label } from "../atoms"
 import { cn } from "../../lib/utils"
 
@@ -24,12 +25,17 @@ export const FormField = ({
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
       {hint && !error ? (
-        <p className="text-xs text-ink-faint">{hint}</p>
+        <p className="text-xs text-muted-foreground">{hint}</p>
       ) : null}
       {error ? (
-        <p className="text-xs text-danger" role="alert">
-          {error}
-        </p>
+        <Alert
+          variant="destructive"
+          className="border-0 bg-transparent px-0 py-0"
+        >
+          <AlertDescription className="text-xs text-destructive">
+            {error}
+          </AlertDescription>
+        </Alert>
       ) : null}
     </div>
   )

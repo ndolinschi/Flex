@@ -12,6 +12,7 @@ import type { ComposerMode, PermissionMode } from "../../lib/types"
 import { FLEX_MODE_ENABLED } from "../../lib/featureFlags"
 import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
+import { Button } from "@/components/ui/button"
 import { PopoverItem, PopoverTray } from "./PopoverTray"
 
 type ModeOption = {
@@ -88,25 +89,26 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
 
   return (
     <div ref={rootRef} className="relative">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="xs"
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Mode: ${selected.label}`}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "flex h-6 items-center gap-1 rounded-full border border-stroke-3 bg-fill-4 px-2",
-          "text-xs tracking-[var(--tracking-caption)] text-ink-secondary",
+          "rounded-full border border-stroke-3 bg-fill-4 px-2",
+          "tracking-[var(--tracking-caption)] text-ink-secondary",
           "transition-[background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-          "hover:border-stroke-2 hover:bg-fill-2 disabled:opacity-50",
+          "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink-secondary",
           open && "border-stroke-2 bg-fill-2",
         )}
       >
         <Icon className={cn("h-3 w-3", selected.accent)} aria-hidden />
         <span className="font-medium">{selected.label}</span>
         <ChevronDown className="h-2.5 w-2.5 opacity-60" aria-hidden />
-      </button>
+      </Button>
 
       <PopoverTray
         open={open}

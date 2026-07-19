@@ -4,6 +4,7 @@ import { getExecErrorScan, subscribeExecErrorScan } from "../../lib/execErrorSca
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
 import { Badge } from "../atoms/Badge"
+import { Button } from "@/components/ui/button"
 
 export const DiffBadge = ({
   added,
@@ -92,13 +93,14 @@ export const ExecErrorAction = ({
       <Badge variant="danger">
         {scan.count} error{scan.count === 1 ? "" : "s"} in output
       </Badge>
-      <button
-        type="button"
+      <Button
+        variant="link"
+        size="sm"
         onClick={handleAskAgent}
-        className="text-sm text-accent hover:underline focus-visible:outline-none focus-visible:underline"
+        className="h-auto px-0 py-0 text-sm text-accent"
       >
         Ask Agent to fix
-      </button>
+      </Button>
     </span>
   )
 }

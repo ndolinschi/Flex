@@ -6,6 +6,7 @@ import { useIsGitRepo } from "../../hooks/useIsGitRepo"
 import { sessionScopeKey, useAppStore } from "../../stores/appStore"
 import { basename, cn, fileIconForPath } from "../../lib/utils"
 import { DiffStat } from "../atoms"
+import { Button } from "@/components/ui/button"
 
 type FilesChangedCardProps = {
   cwd?: string
@@ -71,8 +72,8 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
       {/* Shared horizontal recipe with file rows: px-2 shell + px-1.5 row
           gutters so chevron/icon and Review/status share one vertical axis. */}
       <div className="flex min-h-[var(--end-of-turn-reserved-height)] items-center gap-2 px-2">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={handleToggle}
           aria-expanded={expanded}
           aria-label={
@@ -80,10 +81,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
               ? "Collapse changed files"
               : `Expand ${totalCount} changed file${totalCount === 1 ? "" : "s"}`
           }
-          className={cn(
-            "flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-1",
-            "text-left transition-colors duration-[var(--duration-fast)] hover:bg-fill-3",
-          )}
+          className="h-auto min-w-0 flex-1 justify-start gap-1.5 rounded-md px-1.5 py-1 font-normal hover:bg-fill-3"
         >
           {expanded ? (
             <ChevronDown className="h-3.5 w-3.5 shrink-0 text-icon-3" aria-hidden />
@@ -94,15 +92,15 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
             {totalCount} file{totalCount === 1 ? "" : "s"} changed
           </span>
           <DiffStat summary={totals} size="sm" className="shrink-0" />
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="ghost"
           onClick={handleReview}
-          className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-accent transition-opacity hover:opacity-80"
+          className="h-auto shrink-0 gap-1 rounded-md px-1.5 py-1 text-xs text-accent font-normal hover:bg-transparent hover:opacity-80"
         >
           Review
           <ArrowRight className="h-3 w-3" aria-hidden />
-        </button>
+        </Button>
       </div>
 
       {expanded ? (
@@ -121,18 +119,18 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
               (file.added ?? 0) > 0 || (file.removed ?? 0) > 0
             return (
               <li key={file.path} className="list-none">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   disabled={!canOpen}
                   title={canOpen ? `Open ${file.path}` : file.path}
                   onClick={() =>
                     handleOpenFile(file.path, file.status, isDir)
                   }
                   className={cn(
-                    "flex h-7 w-full items-center gap-1.5 rounded-md px-1.5 text-left text-base",
+                    "h-7 w-full justify-start gap-1.5 rounded-md px-1.5 text-base font-normal",
                     canOpen
                       ? "hover:bg-fill-3"
-                      : "cursor-default opacity-70",
+                      : "cursor-default opacity-70 hover:bg-transparent",
                   )}
                 >
                   <FileGlyph
@@ -164,19 +162,19 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
                       {file.status === "?" ? "U" : file.status}
                     </span>
                   )}
-                </button>
+                </Button>
               </li>
             )
           })}
           {truncated || hiddenCount > 0 ? (
             <li className="px-1.5 py-1 text-xs text-ink-muted">
-              <button
-                type="button"
+              <Button
+                variant="link"
                 onClick={handleReview}
-                className="text-accent transition-opacity hover:opacity-80"
+                className="h-auto px-0 py-0 text-xs text-accent font-normal"
               >
                 +{hiddenCount > 0 ? hiddenCount : "more"} in Changes
-              </button>
+              </Button>
             </li>
           ) : null}
         </ul>

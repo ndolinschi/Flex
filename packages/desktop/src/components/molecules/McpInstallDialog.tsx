@@ -199,7 +199,7 @@ export const McpInstallDialog = ({
           <Button size="sm" variant="secondary" disabled={isLoading} onClick={onCancel}>
             Cancel
           </Button>
-          <Button size="sm" variant="primary" isLoading={isLoading} onClick={handleInstall}>
+          <Button size="sm" variant="default" isLoading={isLoading} onClick={handleInstall}>
             {isConfigure ? "Save" : "Install"}
           </Button>
         </div>

@@ -1,6 +1,7 @@
 import { useAppStore } from "../../../stores/appStore"
 import { useModels } from "../../../hooks/useModels"
 import { cn, formatCost, formatTokens } from "../../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 /** Fallback context budget used for the usage ring when the selected
  * model's own context window isn't known (the reference design shows a similar %). */
@@ -96,10 +97,10 @@ export const UsageRing = ({ sessionId }: { sessionId?: string | null }) => {
 
   return (
     <div className="group/usage relative">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         className={cn(
-          "flex h-6 items-center gap-1 rounded-md px-1.5 text-sm transition-colors duration-[var(--duration-fast)] hover:text-ink-secondary",
+          "h-6 gap-1 rounded-md px-1.5 text-sm font-normal hover:text-ink-secondary",
           nearLimitClass,
         )}
         aria-label="Context usage"
@@ -108,7 +109,7 @@ export const UsageRing = ({ sessionId }: { sessionId?: string | null }) => {
         <span className="[font-variant-numeric:tabular-nums]">
           {isOverLimit ? ">99%" : `${Math.round(fraction * 100)}%`}
         </span>
-      </button>
+      </Button>
 
       <div
         role="tooltip"

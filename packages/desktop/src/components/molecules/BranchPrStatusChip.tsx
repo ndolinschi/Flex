@@ -2,6 +2,7 @@ import { GitPullRequest } from "lucide-react"
 import type { BranchPrInfo } from "../../lib/tauri"
 import { openExternalUrl } from "../../lib/openExternalUrl"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 type BranchPrStatusChipProps = {
   pr: BranchPrInfo
@@ -15,15 +16,14 @@ export const BranchPrStatusChip = ({ pr, className }: BranchPrStatusChipProps) =
   const pending = pr.checksSummary.includes("pending")
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={() => void openExternalUrl(pr.url)}
       title={`${pr.title} — ${pr.checksSummary}`}
       aria-label={`Open pull request #${pr.number}`}
       className={cn(
-        "flex max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md px-1.5 py-0.5",
+        "h-auto max-w-[min(100%,18rem)] gap-1.5 px-1.5 py-0.5 font-normal",
         "text-xs tracking-[var(--tracking-caption)] text-ink-secondary",
-        "transition-colors duration-[var(--duration-fast)]",
         "hover:bg-fill-3 hover:text-ink",
         className,
       )}
@@ -39,6 +39,6 @@ export const BranchPrStatusChip = ({ pr, className }: BranchPrStatusChipProps) =
       >
         {pr.checksSummary}
       </span>
-    </button>
+    </Button>
   )
 }

@@ -150,7 +150,7 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
                   {loadError.message}
                 </p>
                 <div className="flex items-center gap-2">
-                  <Button variant="primary" size="sm" onClick={handleAskAgent}>
+                  <Button variant="default" size="sm" onClick={handleAskAgent}>
                     Ask Agent
                   </Button>
                   <Button

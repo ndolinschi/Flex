@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Editor from "@monaco-editor/react"
 import { Code2, Eye, FolderTree, Save } from "lucide-react"
 import { IconButton, ScrollArea, Spinner, Tab } from "../../atoms"
-import { ConfirmDialog, MarkdownBody } from "../../molecules"
+import { ConfirmDialog, ErrorBanner, MarkdownBody } from "../../molecules"
+import { Button } from "@/components/ui/button"
 import { ensureMonaco, languageForPath } from "../../../lib/monacoEnv"
 import {
   readTextFile,
@@ -345,15 +346,15 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
             Loading…
           </div>
         ) : loadError ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
-            <p className="text-sm text-danger">{loadError}</p>
-            <button
-              type="button"
-              className="text-xs text-accent hover:underline"
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
+            <ErrorBanner message={loadError} className="max-w-md" />
+            <Button
+              variant="link"
               onClick={() => void refetch()}
+              className="h-auto px-0 py-0 text-xs font-normal"
             >
               Retry
-            </button>
+            </Button>
           </div>
         ) : path && previewMode ? (
           <ScrollArea className="h-full">

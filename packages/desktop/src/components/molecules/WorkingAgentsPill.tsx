@@ -7,6 +7,7 @@ import {
 } from "../../lib/workerPresentation"
 import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
+import { Button } from "@/components/ui/button"
 import { PopoverTray } from "./PopoverTray"
 
 type WorkingAgentsPillProps = {
@@ -36,16 +37,16 @@ export const WorkingAgentsPill = ({
 
   return (
     <div className="relative mb-1.5 flex justify-start">
-      <button
+      <Button
         ref={anchorRef}
-        type="button"
+        variant="ghost"
+        size="sm"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
         className={cn(
-          "inline-flex h-6 items-center gap-1.5 rounded-md border border-stroke-3",
-          "bg-fill-3 px-2 text-sm text-ink-secondary",
-          "transition-colors duration-[var(--duration-fast)] hover:bg-fill-4 hover:text-ink",
+          "rounded-md border border-stroke-3 bg-fill-3 px-2 text-ink-secondary",
+          "hover:bg-fill-4 hover:text-ink",
         )}
       >
         <Network className="h-3 w-3 shrink-0 text-ink-faint" aria-hidden />
@@ -57,7 +58,7 @@ export const WorkingAgentsPill = ({
           )}
           aria-hidden
         />
-      </button>
+      </Button>
       <PopoverTray
         open={open}
         onClose={() => setOpen(false)}
@@ -69,10 +70,10 @@ export const WorkingAgentsPill = ({
       >
         <div className="flex flex-col gap-0.5 p-1">
           {onScrollToWorkers ? (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               role="menuitem"
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-ink-secondary hover:bg-fill-4"
+              className="w-full justify-start gap-2 rounded-md px-2 py-1.5 text-sm text-ink-secondary hover:bg-fill-4"
               onClick={() => {
                 setOpen(false)
                 onScrollToWorkers()
@@ -80,7 +81,7 @@ export const WorkingAgentsPill = ({
             >
               <Network className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
               Jump to workers
-            </button>
+            </Button>
           ) : null}
           {workers.map((w) => {
             const activity = summarizeWorkerActivity(
@@ -90,11 +91,11 @@ export const WorkingAgentsPill = ({
             )
             const title = workerTitle(w.role, w.task)
             return (
-              <button
+              <Button
                 key={w.childSession}
-                type="button"
+                variant="ghost"
                 role="menuitem"
-                className="flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left hover:bg-fill-4"
+                className="h-auto w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 hover:bg-fill-4"
                 onClick={() => {
                   setOpen(false)
                   openSubagentViewer(w.childSession, title)
@@ -109,7 +110,7 @@ export const WorkingAgentsPill = ({
                     {activity.latestLabel}
                   </span>
                 ) : null}
-              </button>
+              </Button>
             )
           })}
         </div>

@@ -57,10 +57,10 @@ export const PermissionActions = ({
         {permission.options.includes("deny") ? (
           <Button
             size="sm"
-            variant="ghost"
+            variant="destructive"
             isLoading={isSubmitting}
             onClick={() => void respond("deny")}
-            className={cn(COMPACT, "text-danger hover:bg-danger/10")}
+            className={COMPACT}
           >
             Deny
           </Button>

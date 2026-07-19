@@ -4,6 +4,7 @@ import { Tooltip } from "../../atoms"
 import { Collapsible } from "../../molecules"
 import { cn } from "../../../lib/utils"
 import { thinkingDurationLabel } from "./buildDisplayItems"
+import { Button } from "@/components/ui/button"
 
 export const ThinkingBlock = ({
   text,
@@ -55,11 +56,11 @@ export const ThinkingBlock = ({
   return (
     <div className="min-h-5">
       <Tooltip label={collapsed ? "Model reasoning — click to expand" : "Click to collapse"}>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => setCollapsed((v) => !v)}
           aria-expanded={!collapsed}
-          className="group flex min-h-5 w-full items-center gap-1.5 text-left text-base text-ink-muted transition-colors duration-[var(--duration-fast)] hover:text-ink-secondary"
+          className="group h-auto min-h-5 w-full justify-start gap-1.5 px-0 py-0 font-normal text-base text-ink-muted hover:bg-transparent hover:text-ink-secondary"
         >
           {statusLabel}
           <ChevronRight
@@ -70,7 +71,7 @@ export const ThinkingBlock = ({
             )}
             aria-hidden
           />
-        </button>
+        </Button>
       </Tooltip>
       <Collapsible open={!collapsed}>
         <p className="whitespace-pre-wrap pb-1 text-base leading-relaxed text-ink-muted opacity-50">

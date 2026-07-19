@@ -5,6 +5,7 @@ import { workersHeaderLabel } from "../../lib/workerPresentation"
 import { cn } from "../../lib/utils"
 import { Collapsible } from "./Collapsible"
 import { SubagentGroup } from "./SubagentGroup"
+import { Button } from "@/components/ui/button"
 
 type WorkersGroupProps = {
   workers: SubagentTimelineRow[]
@@ -67,16 +68,16 @@ export const WorkersGroup = memo(function WorkersGroup({
 
   return (
     <div id={anchorId} data-workers-group className="flex flex-col pl-1">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => {
           if (anyRunning) return
           setExpanded((v) => !v)
         }}
         aria-expanded={open}
         className={cn(
-          "group flex min-h-7 w-full items-center gap-1.5 text-left text-base",
-          !anyRunning && "cursor-pointer",
+          "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-base hover:bg-transparent",
+          anyRunning && "cursor-default",
         )}
       >
         <Network className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
@@ -100,7 +101,7 @@ export const WorkersGroup = memo(function WorkersGroup({
         ) : (
           <Bot className="h-3 w-3 shrink-0 text-ink-faint" aria-hidden />
         )}
-      </button>
+      </Button>
       <Collapsible open={open}>
         <div className="ml-1.5 flex flex-col gap-0.5 border-l border-stroke-3 py-1 pl-3">
           {workers.map((w) => (

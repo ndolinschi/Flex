@@ -3,6 +3,7 @@ import { ChevronRight, LoaderCircle } from "lucide-react"
 import type { VerificationVerdict } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Collapsible } from "./Collapsible"
+import { Button } from "@/components/ui/button"
 
 type VerdictBadgeProps = {
   /** Absent while the `Verify` call is still running/pending. */
@@ -55,15 +56,15 @@ export const VerdictBadge = ({
 
   return (
     <div className={cn("flex flex-col", className)}>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={() => canExpand && setExpanded((v) => !v)}
         aria-expanded={expanded}
         disabled={!canExpand}
         title={reason}
         className={cn(
-          "group flex min-h-6 w-full items-center gap-1.5 text-left text-base",
-          canExpand && "cursor-pointer",
+          "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-base hover:bg-transparent",
+          !canExpand && "cursor-default",
         )}
       >
         <span className={cn("shrink-0", outcomeClasses(verdict.outcome))} aria-hidden>
@@ -87,7 +88,7 @@ export const VerdictBadge = ({
             aria-hidden
           />
         ) : null}
-      </button>
+      </Button>
       <Collapsible open={expanded && canExpand}>
         <ul className="mt-0.5 ml-1.5 flex flex-col gap-0.5 py-0.5 pl-3">
           {verdict.findings.map((finding, i) => (

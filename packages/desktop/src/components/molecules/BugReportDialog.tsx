@@ -3,6 +3,7 @@ import { createPortal } from "react-dom"
 import { openUrl } from "@tauri-apps/plugin-opener"
 import { X } from "lucide-react"
 import { Button, IconButton, TextArea } from "../atoms"
+import { ErrorBanner } from "./ErrorBanner"
 import {
   BUG_REPORT_PRIVACY_URL,
   BUG_REPORT_TERMS_URL,
@@ -181,9 +182,7 @@ export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
           </label>
 
           {error ? (
-            <p className="text-xs text-danger" role="alert">
-              {error}
-            </p>
+            <ErrorBanner message={error} onDismiss={() => setError(null)} />
           ) : null}
 
           <div className="flex items-center justify-end gap-2 pt-1">
@@ -197,7 +196,7 @@ export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
             </Button>
             <Button
               size="sm"
-              variant="primary"
+              variant="default"
               isLoading={busy}
               disabled={!canSubmit}
               onClick={() => void handleSubmit()}

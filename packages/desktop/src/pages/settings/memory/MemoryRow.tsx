@@ -10,6 +10,7 @@ import {
   ErrorBanner,
   MarkdownBody,
 } from "../../../components/molecules"
+import { Button } from "@/components/ui/button"
 import { toInvokeError } from "../../../lib/tauri"
 import { memoryExpiryFromPreset } from "../../../lib/types"
 import { cn, formatRelativeTime } from "../../../lib/utils"
@@ -63,10 +64,10 @@ export const MemoryRow = ({
   return (
     <div className="rounded-md border border-stroke-3 bg-panel">
       <div className="group/row relative flex min-h-[30px] items-center gap-2 px-2.5 py-1">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           onClick={() => setExpanded((v) => !v)}
-          className="flex shrink-0 items-center gap-1.5 rounded-sm p-0.5 text-ink-muted transition-colors duration-[var(--duration-fast)] hover:text-ink"
+          className="h-auto shrink-0 gap-1.5 rounded-sm p-0.5 font-normal text-ink-muted hover:bg-transparent hover:text-ink"
           aria-label={expanded ? "Collapse memory" : "Expand memory"}
           aria-expanded={expanded}
         >
@@ -78,7 +79,7 @@ export const MemoryRow = ({
             aria-hidden
           />
           <Brain className="h-3.5 w-3.5 shrink-0" aria-hidden />
-        </button>
+        </Button>
 
         <Tooltip label={memory.title}>
           <p className="min-w-0 flex-1 truncate text-base text-ink">{memory.title}</p>

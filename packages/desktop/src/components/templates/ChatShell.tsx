@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react"
 import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
+import { Button } from "@/components/ui/button"
 
 const QUICKSTART_SUGGESTIONS = [
   "Fix a bug in this repo",
@@ -77,14 +78,15 @@ export const ChatShell = ({
               <p className="text-base text-ink-muted">{heroHint}</p>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
                 {QUICKSTART_SUGGESTIONS.map((suggestion) => (
-                  <button
+                  <Button
                     key={suggestion}
-                    type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => handleQuickstart(suggestion)}
-                    className="rounded-full border border-stroke-3 px-3 py-1 text-sm text-ink-secondary transition-colors duration-[var(--duration-fast)] hover:border-stroke-2 hover:bg-fill-4"
+                    className="rounded-full border-stroke-3 text-ink-secondary hover:border-stroke-2 hover:bg-fill-4 hover:text-ink-secondary"
                   >
                     {suggestion}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>

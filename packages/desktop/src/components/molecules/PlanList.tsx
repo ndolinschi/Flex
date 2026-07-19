@@ -1,6 +1,7 @@
 import { Check, MessageSquareText } from "lucide-react"
 import type { SessionPlan } from "../../stores/types"
 import { formatRelativeTime, cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 type PlanListProps = {
   plans: SessionPlan[]
@@ -28,12 +29,12 @@ export const PlanList = ({ plans, onSelect, className }: PlanListProps) => {
           const commentCount = plan.comments.length
           return (
             <li key={plan.id}>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 onClick={() => onSelect(plan.id)}
                 className={cn(
-                  "flex w-full items-start gap-3 rounded-md px-2.5 py-2.5 text-left",
-                  "transition-colors duration-[var(--duration-fast)] hover:bg-fill-3",
+                  "h-auto w-full items-start justify-start gap-3 px-2.5 py-2.5 font-normal",
+                  "hover:bg-fill-3",
                 )}
               >
                 <div className="min-w-0 flex-1">
@@ -58,7 +59,7 @@ export const PlanList = ({ plans, onSelect, className }: PlanListProps) => {
                     ) : null}
                   </div>
                 </div>
-              </button>
+              </Button>
             </li>
           )
         })}

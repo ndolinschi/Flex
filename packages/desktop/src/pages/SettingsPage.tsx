@@ -1,6 +1,7 @@
 import { Moon, Sun } from "lucide-react"
 import { SettingsShell } from "../components/templates"
 import { SettingsCard, SettingRow, SETTINGS_NAV_ITEMS, AccentColorPicker } from "../components/molecules"
+import { Button } from "@/components/ui/button"
 import { Toggle } from "../components/atoms"
 import { ProviderSettingsForm } from "../components/organisms"
 import { AUTOMATIONS_UI_ENABLED } from "../lib/featureFlags"
@@ -169,26 +170,28 @@ const BehaviorContent = () => {
         title="Default isolation"
         description="New sessions can opt into a git worktree sandbox — configured together with your provider connection."
       >
-        <button
-          type="button"
+        <Button
+          variant="link"
+          size="xs"
           onClick={() => setSettingsSection("models")}
-          className="text-xs text-accent hover:underline"
+          className="h-auto p-0 text-accent"
         >
           Open Models & Connections
-        </button>
+        </Button>
       </SettingRow>
       <SettingRow
         rowId="behavior-secret-storage"
         title="Secret storage"
         description="Where the encryption key for your stored API keys lives — configured together with your provider connection."
       >
-        <button
-          type="button"
+        <Button
+          variant="link"
+          size="xs"
           onClick={() => setSettingsSection("models")}
-          className="text-xs text-accent hover:underline"
+          className="h-auto p-0 text-accent"
         >
           Open Models & Connections
-        </button>
+        </Button>
       </SettingRow>
     </SettingsCard>
   )

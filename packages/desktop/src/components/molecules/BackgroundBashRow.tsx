@@ -4,6 +4,7 @@ import { backgroundKill } from "../../lib/tauri"
 import { useAppStore } from "../../stores/appStore"
 import { getExecTail, subscribeExecTail } from "../../lib/execTailBus"
 import { IconButton } from "../atoms/IconButton"
+import { ErrorBanner } from "./ErrorBanner"
 import { ExecErrorAction, ExecTail } from "./ExecTail"
 import type { ToolStepDetail } from "../../lib/toolPresentation"
 import { parseExitMarker } from "../../lib/toolPresentation"
@@ -82,7 +83,9 @@ export const BackgroundBashRow = ({ detail }: { detail: ToolStepDetail }) => {
         ) : null}
       </div>
       {stopError ? (
-        <div className="ml-3.5 mt-0.5 text-xs text-danger">{stopError}</div>
+        <div className="ml-3.5 mt-0.5">
+          <ErrorBanner message={stopError} className="py-1 text-xs" />
+        </div>
       ) : null}
       <ExecTail callId={detail.id} muted={!running} />
       {exited ? (

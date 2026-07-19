@@ -6,6 +6,7 @@ import {
   isTimelineScrollEvent,
 } from "../../lib/programmaticScroll"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 export type ContextMenuItem =
   | {
@@ -184,9 +185,9 @@ export const ContextMenu = ({ position, items, onClose }: ContextMenuProps) => {
         }
         const Icon = item.icon
         return (
-          <button
+          <Button
             key={i}
-            type="button"
+            variant="ghost"
             role="menuitem"
             disabled={item.disabled}
             tabIndex={item.disabled ? -1 : 0}
@@ -195,19 +196,17 @@ export const ContextMenu = ({ position, items, onClose }: ContextMenuProps) => {
               onClose()
             }}
             className={cn(
-              "flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-sm",
-              "transition-colors duration-[var(--duration-fast)] focus:outline-none",
+              "h-auto w-full justify-start gap-2 rounded-sm px-2 py-1 font-normal text-sm",
               item.danger
                 ? "text-red hover:text-red hover:bg-fill-4"
                 : "text-ink-secondary hover:bg-fill-4 hover:text-ink",
-              item.disabled && "pointer-events-none opacity-40",
             )}
           >
             {Icon ? (
               <Icon className="h-3.5 w-3.5 shrink-0 text-ink-muted" aria-hidden />
             ) : null}
             <span className="min-w-0 flex-1 truncate">{item.label}</span>
-          </button>
+          </Button>
         )
       })}
     </div>,

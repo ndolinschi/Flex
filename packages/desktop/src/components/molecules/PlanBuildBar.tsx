@@ -28,8 +28,7 @@ export const PlanBuildBar = ({
         )}
       >
         <Button
-          variant="primary"
-          size="md"
+          variant="default"
           isLoading={isBuilding}
           onClick={onBuild}
           aria-label="Build plan"
@@ -60,8 +59,7 @@ export const PlanBuildBar = ({
         </Button>
       ) : null}
       <Button
-        variant="primary"
-        size="md"
+        variant="default"
         isLoading={isBuilding}
         onClick={onBuild}
         aria-label="Build plan"

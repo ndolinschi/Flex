@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { GitMerge, RefreshCw, XCircle } from "lucide-react"
 import { Button, Checkbox, DiffStat, IconButton, ScrollArea } from "../../atoms"
-import { BranchPrStatusChip, ConfirmDialog, CreatePrDialog } from "../../molecules"
+import { BranchPrStatusChip, ConfirmDialog, CreatePrDialog, ErrorBanner } from "../../molecules"
 import { useWorkspaceActions } from "../../../hooks/useWorkspaceActions"
 import { useIsGitRepo } from "../../../hooks/useIsGitRepo"
 import {
@@ -285,9 +285,10 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       ) : null}
 
       {error ? (
-        <p className="border-b border-stroke-3 bg-danger-subtle px-2.5 py-1.5 text-xs text-danger">
-          {error}
-        </p>
+        <ErrorBanner
+          message={error}
+          className="rounded-none border-x-0 border-t-0 px-2.5 py-1.5 text-xs"
+        />
       ) : null}
 
       <ScrollArea className="min-h-0 flex-1">

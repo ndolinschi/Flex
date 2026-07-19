@@ -1,3 +1,6 @@
+import { Button } from "@/components/ui/button"
+import { X } from "lucide-react"
+
 type ComposerQueueProps = {
   items: string[]
   onSendNow: (index: number) => void
@@ -15,21 +18,23 @@ export const ComposerQueue = ({ items, onSendNow, onRemove }: ComposerQueueProps
         >
           <span className="shrink-0 text-xs text-ink-faint">Queued</span>
           <span className="min-w-0 flex-1 truncate">{item}</span>
-          <button
-            type="button"
+          <Button
+            variant="link"
+            size="xs"
             onClick={() => onSendNow(index)}
-            className="shrink-0 text-xs text-accent transition-colors duration-[var(--duration-fast)] hover:text-accent-hover"
+            className="h-auto shrink-0 p-0 text-accent hover:text-accent-hover"
           >
             Send now
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
             onClick={() => onRemove(index)}
             aria-label="Remove queued message"
-            className="shrink-0 text-ink-faint transition-colors duration-[var(--duration-fast)] hover:text-ink"
+            className="shrink-0 text-ink-faint hover:bg-transparent hover:text-ink"
           >
-            ×
-          </button>
+            <X aria-hidden />
+          </Button>
         </div>
       ))}
     </div>

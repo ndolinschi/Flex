@@ -90,7 +90,7 @@ export const PlanCommentPopover = ({
           Save
         </Button>
         <Button
-          variant="primary"
+          variant="default"
           size="sm"
           disabled={!canSubmit}
           onClick={() => canSubmit && onSaveAndSend(trimmed)}

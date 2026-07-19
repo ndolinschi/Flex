@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
+import { Button as ShadcnButton } from "@/components/ui/button"
 import { Button, IconButton, RunningDot } from "../atoms"
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu"
 import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
@@ -95,22 +96,23 @@ const PlanModelPill = ({
 
   return (
     <div ref={rootRef} className="relative shrink-0">
-      <button
-        type="button"
+      <ShadcnButton
+        variant="ghost"
+        size="xs"
         onClick={() => setOpen((v) => !v)}
         disabled={isLoading}
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          "inline-flex h-6 max-w-[12rem] items-center gap-1 rounded-full border border-stroke-3 px-2",
-          "text-xs text-ink-secondary transition-colors duration-[var(--duration-fast)]",
-          "hover:border-stroke-2 hover:text-ink disabled:opacity-50",
+          "max-w-[12rem] rounded-full border border-stroke-3 px-2 text-ink-secondary",
+          "transition-colors duration-[var(--duration-fast)]",
+          "hover:border-stroke-2 hover:text-ink hover:bg-transparent",
           open && "border-stroke-2 text-ink",
         )}
       >
         <span className="min-w-0 flex-1 truncate">{label}</span>
         <ChevronDown className="h-2.5 w-2.5 shrink-0 text-icon-3" aria-hidden />
-      </button>
+      </ShadcnButton>
 
       <PopoverTray
         open={open}
@@ -261,13 +263,14 @@ export const PlanToolbar = ({
           <span className="min-w-0 truncate text-ink-muted">{repo}</span>
           <span className="shrink-0 text-ink-faint">›</span>
           {showPlansListCrumb && onBackToPlans ? (
-            <button
-              type="button"
+            <ShadcnButton
+              variant="ghost"
+              size="xs"
               onClick={onBackToPlans}
-              className="shrink-0 text-ink-muted transition-colors duration-[var(--duration-fast)] hover:text-ink"
+              className="h-auto shrink-0 px-0.5 py-0 text-ink-muted hover:bg-transparent hover:text-ink"
             >
               Plans
-            </button>
+            </ShadcnButton>
           ) : (
             <span className="shrink-0 text-ink-muted">Plans</span>
           )}
@@ -311,7 +314,7 @@ export const PlanToolbar = ({
             </span>
           ) : (
             <Button
-              variant="primary"
+              variant="default"
               size="sm"
               className="h-6"
               disabled={status === "draft"}

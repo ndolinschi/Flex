@@ -15,6 +15,8 @@ import {
   ShieldCheck,
 } from "lucide-react"
 import { IconButton, Tooltip } from "../../atoms"
+import { ErrorBanner } from "../../molecules"
+import { Button } from "@/components/ui/button"
 import { AtMentionTray } from "../composer/AtMentionTray"
 import { SlashCommandTray } from "../composer/SlashCommandTray"
 import { useComposerAutocomplete } from "../../../hooks/useComposerAutocomplete"
@@ -327,17 +329,17 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
               data-popover-outside-ignore
             >
               {PROMPT_SECTION_TEMPLATES.map((t) => (
-                <button
+                <Button
                   key={t.id}
-                  type="button"
-                  className="flex w-full px-2.5 py-1.5 text-left text-xs text-ink-secondary hover:bg-fill-4 hover:text-ink"
+                  variant="ghost"
                   onClick={() => {
                     setDraft(appendPromptSection(draft, t.markdown))
                     setInsertOpen(false)
                   }}
+                  className="h-auto w-full justify-start px-2.5 py-1.5 text-xs text-ink-secondary font-normal hover:bg-fill-4 hover:text-ink"
                 >
                   {t.label}
-                </button>
+                </Button>
               ))}
             </div>
           ) : null}
@@ -384,9 +386,10 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
       </div>
 
       {error ? (
-        <p className="shrink-0 border-b border-stroke-3 bg-danger-subtle px-2.5 py-1.5 text-xs text-danger">
-          {error}
-        </p>
+        <ErrorBanner
+          message={error}
+          className="shrink-0 rounded-none border-x-0 border-t-0 px-2.5 py-1.5 text-xs"
+        />
       ) : null}
 
       {review?.summary ? (
@@ -504,14 +507,14 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
               </li>
             ))}
           </ul>
-          <button
-            type="button"
+          <Button
+            variant="link"
             disabled={busy}
             onClick={submitAnswers}
-            className="mt-2 text-xs text-accent hover:underline disabled:opacity-50"
+            className="mt-2 h-auto px-0 py-0 text-xs text-accent font-normal"
           >
             Answer & re-verify
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -543,21 +546,21 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
                   </p>
                   <div className="mt-0.5 flex flex-wrap gap-2">
                     {a.fix ? (
-                      <button
-                        type="button"
-                        className="text-accent hover:underline"
+                      <Button
+                        variant="link"
                         onClick={() => applyFix(a)}
+                        className="h-auto px-0 py-0 text-accent font-normal"
                       >
                         Apply: {a.fix}
-                      </button>
+                      </Button>
                     ) : null}
-                    <button
-                      type="button"
-                      className="text-ink-muted hover:underline"
+                    <Button
+                      variant="link"
                       onClick={() => dismissFinding(a)}
+                      className="h-auto px-0 py-0 text-ink-muted font-normal"
                     >
                       Dismiss
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </li>

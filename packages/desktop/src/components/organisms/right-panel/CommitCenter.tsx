@@ -193,7 +193,7 @@ export const CommitCenter = ({
           </span>
           <div className="flex shrink-0 items-center overflow-hidden rounded-md">
             <Button
-              variant="primary"
+              variant="default"
               size="sm"
               className="rounded-none border-r border-r-accent-hover/40"
               isLoading={busy}
@@ -204,7 +204,7 @@ export const CommitCenter = ({
               {MODE_LABEL[effectivePrimary]}
             </Button>
             <Button
-              variant="primary"
+              variant="default"
               size="sm"
               aria-label="Commit options"
               aria-haspopup="menu"

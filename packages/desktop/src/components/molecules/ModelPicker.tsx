@@ -4,6 +4,7 @@ import { Check, ChevronDown, ChevronRight, Gauge } from "lucide-react"
 import { EFFORT_LEVELS, effortLabel } from "../../lib/types"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 import { PopoverItem, PopoverSearch, PopoverSection, PopoverTray } from "./PopoverTray"
 import { useGroupedModels } from "../../hooks/useGroupedModels"
 
@@ -255,17 +256,18 @@ export const ModelPicker = ({
 
   return (
     <div ref={rootRef} className="relative">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="xs"
         onClick={() => setOpen((v) => !v)}
         disabled={isLoading || disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          "inline-flex h-6 max-w-[14rem] items-center gap-1 rounded-full border border-stroke-3 bg-fill-4 px-2",
-          "text-xs tracking-[var(--tracking-caption)] text-ink-secondary",
+          "max-w-[14rem] rounded-full border border-stroke-3 bg-fill-4 px-2",
+          "tracking-[var(--tracking-caption)] text-ink-secondary",
           "transition-[color,opacity,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-          "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink disabled:opacity-50",
+          "hover:border-stroke-2 hover:bg-fill-2 hover:text-ink",
           open && "border-stroke-2 bg-fill-2 text-ink",
         )}
       >
@@ -280,7 +282,7 @@ export const ModelPicker = ({
           strokeWidth={2.5}
           aria-hidden
         />
-      </button>
+      </Button>
 
       <PopoverTray
         open={open}

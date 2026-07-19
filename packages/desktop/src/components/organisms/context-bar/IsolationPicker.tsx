@@ -4,6 +4,7 @@ import type { IsolationPolicy } from "../../../lib/types"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
 import { PopoverItem, PopoverTray } from "../../molecules/PopoverTray"
+import { Button } from "@/components/ui/button"
 
 const ISOLATION_OPTIONS: {
   value: IsolationPolicy
@@ -76,24 +77,23 @@ export const IsolationPicker = ({
 
   return (
     <div ref={rootRef} className="relative">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Isolation: ${currentLabel}`}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "ml-1 flex h-6 items-center gap-1 rounded-md px-1.5",
-          "text-sm text-ink-muted opacity-80",
-          "transition-[color,opacity] duration-[var(--duration-fast)]",
-          "hover:text-ink-secondary hover:opacity-100 disabled:opacity-50",
+          "ml-1 h-6 gap-1 rounded-md px-1.5",
+          "text-sm text-ink-muted opacity-80 font-normal",
+          "hover:bg-transparent hover:text-ink-secondary hover:opacity-100",
           open && "opacity-100",
         )}
       >
         <GitFork className="h-3 w-3 shrink-0" aria-hidden />
         <span className="min-w-0 truncate">{currentLabel}</span>
-      </button>
+      </Button>
 
       <PopoverTray
         open={open}

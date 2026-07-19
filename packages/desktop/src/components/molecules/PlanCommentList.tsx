@@ -2,6 +2,7 @@ import { MessageSquareText, X } from "lucide-react"
 import type { PlanComment } from "../../stores/types"
 import { IconButton } from "../atoms"
 import { formatRelativeTime, cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 type PlanCommentListProps = {
   comments: PlanComment[]
@@ -38,10 +39,10 @@ export const PlanCommentList = ({
                 active && "bg-fill-2",
               )}
             >
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 onClick={() => onFocus(comment.id)}
-                className="min-w-0 flex-1 text-left"
+                className="h-auto min-w-0 flex-1 justify-start px-0 py-0 font-normal text-left"
               >
                 <p className="line-clamp-2 text-xs italic text-ink-muted">
                   “{comment.quote}”
@@ -50,7 +51,7 @@ export const PlanCommentList = ({
                 <p className="mt-0.5 text-xs text-ink-faint">
                   {formatRelativeTime(comment.createdAtMs)}
                 </p>
-              </button>
+              </Button>
               <IconButton
                 label="Remove comment"
                 onClick={() => onRemove(comment.id)}

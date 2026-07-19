@@ -1,5 +1,6 @@
 import type { ComponentType } from "react"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 type SidebarActionRowProps = {
   icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>
@@ -22,16 +23,14 @@ export const SidebarActionRow = ({
   disabled = false,
 }: SidebarActionRowProps) => {
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "group flex min-h-7 w-full items-center gap-3 rounded-sm px-2 py-1.5",
-        "text-left text-sm text-ink-secondary",
-        "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+        "group h-auto min-h-7 w-full justify-start gap-3 rounded-sm px-2 py-1.5",
+        "text-sm text-ink-secondary font-normal",
         "hover:bg-fill-4 hover:text-ink",
-        "disabled:pointer-events-none disabled:opacity-50",
       )}
     >
       <span className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -45,6 +44,6 @@ export const SidebarActionRow = ({
           {kbd}
         </kbd>
       ) : null}
-    </button>
+    </Button>
   )
 }

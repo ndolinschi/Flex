@@ -33,7 +33,7 @@ export const PlanCommentButton = ({
       style={{ left, top }}
     >
       <Button
-        variant="primary"
+        variant="default"
         size="sm"
         onMouseDown={(e) => {
           // Keep the selection; a click would otherwise collapse it.

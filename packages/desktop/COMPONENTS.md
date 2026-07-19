@@ -47,7 +47,8 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `SessionRowSubtitle` | Diff + relative-time under a session title | `updatedAtMs`, `workspaceStatus?`, `gitStatus?` | SessionListItem |
 | `SessionRowActions` | Hover pin / archive / more trailing actions | `pinned`, `archived`, `onTogglePin`, … | SessionListItem |
 | `SidebarFooter` | Theme + settings chrome (+ optional creating spinner) | `theme`, `onToggleTheme`, `onOpenSettings`, `isCreating?` | SessionSidebar |
-| `SidebarResumeError` | Resume-failure Retry / Dismiss banner | `message`, `onRetry`, `onDismiss` | SessionSidebar |
+| `ErrorBanner` | shadcn `Alert` (destructive) inline error | `message`, `onDismiss?`, `title?` | Composer, Settings, timeline, dialogs |
+| `SidebarResumeError` | shadcn `Alert` + Retry/Dismiss actions | `message`, `onRetry`, `onDismiss` | SessionSidebar |
 | `ArchivedSectionHeader` | Collapsible Archived group header | `count`, `collapsed`, `onToggle` | SessionSidebar |
 | `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays + optional ghost-text inline completion (isolates keystrokes from ModelPicker/ContextBar) | `composerMode`, `anchorRef`, `attachments`, `onSend` | Composer |
 | `ModelSelect` | Simple model `<select>` | `models`, `value`, `onChange` | ProviderSettingsForm |
@@ -78,7 +79,6 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `IndexingCard` | Settled code-index boundary (divider + file counts) | `added`, `changed`, `removed`, `unchanged` | TurnTimeline (`TimelineRowView`) |
 | `FilesChangedCard` | End-of-turn git diff headline; expand file list (click → Files/Monaco), Review opens Changes | `cwd?`, `sessionId?` | TurnTimeline |
 | `EmptyState` | Empty async surface | `title`, `description?`, `action?` | SessionSidebar, TurnTimeline |
-| `ErrorBanner` | Inline error | `message`, `onDismiss?` | Composer, Settings |
 | `ToolCallChip` | Single tool as Cursor-style step | `call` | TurnTimeline |
 | `ToolStepGroup` | Aggregated explore/edit/shell summary + card expand; single settled Edit/Write auto-expands `ChatDiffCard` | `calls` | TurnTimeline (via ToolStepList) |
 | `ToolStepList` | Clusters consecutive same-kind tool rows | `rows`, `renderOther` | TurnTimeline |
@@ -249,15 +249,15 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
   are intentional product visuals; restyle shadcn primitives after install — do
   not silently flip to square/primary defaults.
 - `packages/desktop` has `components.json` (style `base-nova`, Base UI).
-  Phase 0 foundation + Button/IconButton adapters ship; further primitives
-  follow the phased cutover below.
+  Phase 0 foundation + Button/IconButton/Alert adapters ship; theming is
+  shadcn semantic tokens bridged to Flex values (see DESIGN.md).
 
 ### Target registry inventory (user list → migrate?)
 
 | shadcn | Migrate? | Current Flex surface | Notes |
 |---|---|---|---|
 | Accordion | later | none as primitive | Optional for settings groups; prefer `Collapsible` first |
-| Alert | yes | `ErrorBanner`, resume banners | Replace callout markup |
+| Alert | ✅ done | `ErrorBanner`, `SidebarResumeError`, `ReconnectBanner`, form/field errors | `@/components/ui/alert`; no ad-hoc danger strips |
 | Alert Dialog | yes | `ConfirmDialog` (danger paths) | Rename/delete session, discard |
 | Aspect Ratio | skip | — | No first-class need |
 | Attachment | yes (chat kit) | `AttachmentChip` | Registry name `attachment` (not `AttachmentNew`) |
@@ -329,10 +329,10 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | Phase | Scope | Exit criteria |
 |---|---|---|
 | **0 — Foundation** | ✅ `components.json` (`base-nova`), `@/` alias, `clsx`+`tailwind-merge` `cn`, shadcn semantic vars bridged to Flex tokens (`data-theme` only — no `.dark` second system) | `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
-| **1 — Atom adapters** | ✅ Button + Spinner installed; `atoms/Button` + `IconButton` adapt legacy Flex props. Remaining: Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Avatar, Tooltip, ScrollArea | Atom unit tests + vitest green; call sites compile via barrel |
+| **1 — Atom adapters** | ✅ Button + Spinner + Alert installed; `atoms/Button` + `IconButton` adapt legacy Flex props. Callouts use `ErrorBanner` / `Alert`. Remaining: Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Avatar, Tooltip, ScrollArea | Atom unit tests + vitest green; call sites compile via barrel |
 | **2 — Overlays & menus** | Dialog, AlertDialog, Popover, DropdownMenu, ContextMenu, Menubar, Sonner | Confirm/auth/PR/bug dialogs + ToastHost + TitleBarMenus on primitives |
 | **3 — Forms & pickers** | Field/FieldGroup, Select, Native Select, Combobox, ToggleGroup, RadioGroup, Input Group, Command | Settings forms, ModePicker, ModelPicker, CommandPalette/SearchModal |
-| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty, Alert; optional Sidebar/Sheet/Drawer spikes | Split sash + empty/error callouts; sidebar spike documented go/no-go |
+| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty; optional Sidebar/Sheet/Drawer spikes | Split sash + empty states; sidebar spike documented go/no-go |
 | **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Chip/bubble/marker parity; scroller decision recorded here |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
 

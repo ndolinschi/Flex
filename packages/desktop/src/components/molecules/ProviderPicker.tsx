@@ -1,6 +1,7 @@
 import { ProviderIcon } from "../atoms/ProviderIcon"
 import type { BuiltinProvider } from "../../lib/types"
 import { cn } from "../../lib/utils"
+import { Button } from "@/components/ui/button"
 
 type ProviderPickerProps = {
   providers: BuiltinProvider[]
@@ -31,18 +32,14 @@ export const ProviderPicker = ({
         const active = p.id === value
         return (
           <li key={p.id} role="option" aria-selected={active}>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               disabled={disabled}
               onClick={() => onChange(p.id)}
               className={cn(
-                // Symmetric 8px inset — avoid the old px-2.5 + flex-1 stretch
-                // that left a bright empty pad on the right of short labels.
-                "flex h-9 w-full items-center justify-start gap-2 rounded-md border px-2 text-left",
-                "transition-colors duration-[var(--duration-fast)]",
-                "disabled:pointer-events-none disabled:opacity-50",
+                "h-9 w-full justify-start gap-2 rounded-md border px-2 font-normal",
                 active
-                  ? "border-accent bg-fill-2 text-ink"
+                  ? "border-accent bg-fill-2 text-ink hover:bg-fill-2"
                   : "border-stroke-3 bg-surface text-ink-secondary hover:border-stroke-2 hover:bg-fill-4 hover:text-ink",
               )}
             >
@@ -50,7 +47,7 @@ export const ProviderPicker = ({
               <span className="min-w-0 truncate text-sm font-medium leading-none">
                 {p.label}
               </span>
-            </button>
+            </Button>
           </li>
         )
       })}
