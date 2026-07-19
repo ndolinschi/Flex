@@ -382,15 +382,11 @@ export const useBrowserSession = (active: boolean) => {
         name,
         payload: element,
       })
+      // Chip + composer placeholder already confirm selection — no toast.
+      // A toast used to set data-suppress-native-webview and blank the site.
       window.dispatchEvent(new CustomEvent("flex:focus-composer"))
-      pushToast(
-        additive
-          ? `Added ${name} — describe the change`
-          : `Selected ${name} — describe the change`,
-        "success",
-      )
     },
-    [addAttachment, clearAttachments, pushToast],
+    [addAttachment, clearAttachments],
   )
 
   // Effect 1: browser-state subscription (mount once). Applies to whichever

@@ -173,7 +173,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `src/lib/browserPreview.ts` | Tiny `isBrowserPreview` + `NATIVE_APP_REQUIRED` gate (no mock backend) |
 | `src/lib/browserDesign.ts` | Design Mode DOM payload + markdown serializer for composer chips |
 | `src/lib/componentDesign.ts` | Components-tab CSS style-edit payload + markdown serializer for composer chips |
-| `src/lib/nativeWebviewGate.ts` | Hide native browser webview only when an `aria-modal` / `data-suppress-native-webview` surface intersects the webview slot (center modals stay clear of the Browser panel). ToastHost uses the same marker — DOM z-index cannot stack above a Tauri child webview. |
+| `src/lib/nativeWebviewGate.ts` | Hide native browser webview only when an `aria-modal` / `data-suppress-native-webview` surface intersects the webview slot (center modals stay clear of the Browser panel). Do not mark toasts — a corner toast intersecting the slot used to blank the open site. |
 | `e2e/` + `playwright.config.ts` | Asserts Vite preview shows native-app-required (no IPC mock) |
 | `scripts/soak.mjs` | Soak skeleton — exits unless real Tauri is available |
 | `scripts/preview-verify.mjs` | Manual screenshot walk (requires native app) |

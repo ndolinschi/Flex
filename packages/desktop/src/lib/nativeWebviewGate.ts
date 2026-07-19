@@ -7,6 +7,9 @@
  * `aria-modal="true"` and/or `data-suppress-native-webview`. Prefer those on
  * the panel itself — never on a full-viewport dimmer — or the intersection
  * check treats the whole window as blocked.
+ *
+ * Do **not** mark transient corner chrome (toasts). A toast intersecting the
+ * Browser slot used to hide the open site for the toast lifetime.
  */
 export const NATIVE_WEBVIEW_SUPPRESS_ATTR = "data-suppress-native-webview"
 

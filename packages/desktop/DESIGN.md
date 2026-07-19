@@ -337,7 +337,9 @@ is a no-op.
 
 Native Browser webview stacks above DOM — use
 `data-suppress-native-webview` / `aria-modal` intersection (see
-`nativeWebviewGate.ts`) when a modal must cover it.
+`nativeWebviewGate.ts`) when a modal or context menu must cover it.
+Never mark transient corner toasts; they intersect the Browser panel and
+would hide the open site for the toast lifetime.
 
 ---
 

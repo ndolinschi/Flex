@@ -59,8 +59,13 @@ const ToastRow = ({ id, text, kind, action, onDismiss }: ToastRowProps) => {
 }
 
 /** in-app toast host — bottom-right, stacked, auto-dismissing.
- * Marks `data-suppress-native-webview` so the Browser child webview hides
- * when a toast intersects its slot (native webviews paint above all DOM). */
+ *
+ * Deliberately does **not** set `data-suppress-native-webview`. A corner toast
+ * intersecting the Browser panel used to hide the whole native webview for
+ * the toast lifetime (design-mode select → "Selected …" flash), which felt
+ * like the open site vanished. Prefer in-panel feedback (chips / placeholders)
+ * when the browser is open; native webviews may paint over a toast, which is
+ * preferable to blanking the page. */
 export const ToastHost = () => {
   const toasts = useAppStore((s) => s.toasts)
   const dismissToast = useAppStore((s) => s.dismissToast)
@@ -68,10 +73,7 @@ export const ToastHost = () => {
   if (toasts.length === 0) return null
 
   return (
-    <div
-      data-suppress-native-webview=""
-      className="pointer-events-none fixed bottom-4 right-4 z-[1000] flex flex-col gap-2"
-    >
+    <div className="pointer-events-none fixed bottom-4 right-4 z-[1000] flex flex-col gap-2">
       {toasts.map((t) => (
         <div key={t.id} className="pointer-events-auto">
           <ToastRow
