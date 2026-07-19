@@ -13,7 +13,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `Button` | Re-export of `@/components/ui/button` (prefer direct ui import) | shadcn `variant`/`size` | Everywhere |
 | `Checkbox` | Round selection control (filled accent circle + check) | `checked`, `indeterminate?`, `onChange`, `label` | ChangesTab select-all, FileRow |
 | `TextInput` | Single-line text field (forwardRef) | standard input props | FormField, SessionListItem, SessionSidebar search, QuestionPrompt, ConfirmDialog |
-| `TextArea` | Multi-line text field | standard textarea props | Composer |
+| `TextArea` | Re-export of `@/components/ui/textarea` | standard textarea props | Forms / settings |
 | `Label` | Accessible form label | `htmlFor`, `children` | FormField, ModelSelect |
 | `Spinner` | Indeterminate loading | `size` | SessionSidebar, ProviderSettingsForm |
 | `Tab` | Pill tab / open-buffer chip; pointer DnD reorder/move (idle `cursor-pointer`, grabbing only while dragging — HTML5 DnD broken in Tauri webviews) | `selected`, `size?`, `variant?`, `icon?`, `badge?`, `onSelect`, `onClose?`, `draggable?`, `onPointerDown?`, `dropEdge?` | ContentPane, FilesTab (`FileChip`) |
@@ -313,7 +313,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Switch | ✅ done | Settings prefs + MCP/routine enabled flags | `@/components/ui/switch`; green ON (`bg-switch-on`); `Toggle` atom removed |
 | Table | later | Database results | With Data Table |
 | Tabs | careful | panel/file tabs | Prefer keep custom `Tab*` for chrome chips; shadcn Tabs for settings sections only |
-| Textarea | yes | `TextArea`, composer draft | Composer may stay specialized |
+| Textarea | ✅ done | Forms, settings, commit/PR/bug dialogs, SQL | `@/components/ui/textarea`; atoms `TextArea` re-export; composer draft stays specialized raw `<textarea>` |
 | Toast | n/a | — | Use **Sonner**, not legacy Toast component |
 | Toggle | yes | ModePicker pills if not ToggleGroup | Distinct from Switch |
 | Toggle Group | yes | `ModePicker` (Agent/Plan/Ask[/Flex]) | Ideal fit |
@@ -328,7 +328,7 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | Phase | Scope | Exit criteria |
 |---|---|---|
 | **0 — Foundation** | ✅ `components.json` (`base-nova`), `@/` alias, `clsx`+`tailwind-merge` `cn`, shadcn semantic vars bridged to Flex tokens (`data-theme` only — no `.dark` second system) | `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
-| **1 — Atom adapters** | ✅ Button is `@/components/ui/button` (atoms re-export only); Spinner + Alert. `IconButton` removed; `Toggle` → `@/components/ui/switch`. Remaining: Input, Textarea, Label, Checkbox, Badge, Kbd, Separator, Skeleton, Avatar, Tooltip, ScrollArea | Atom unit tests + vitest green |
+| **1 — Atom adapters** | ✅ Button is `@/components/ui/button` (atoms re-export only); Spinner + Alert. `IconButton` removed; `Toggle` → `@/components/ui/switch`; `TextArea` → `@/components/ui/textarea`. Remaining: Input, Label, Checkbox, Badge, Kbd, Separator, Skeleton, Avatar, Tooltip, ScrollArea | Atom unit tests + vitest green |
 | **2 — Overlays & menus** | ✅ Dialog + AlertDialog + DropdownMenu + ContextMenu; remaining: Popover, Menubar, Sonner | Confirm/auth on AlertDialog; Search/Command on Dialog; right-click on ContextMenu |
 | **3 — Forms & pickers** | ✅ Select + Combobox; remaining: Field/FieldGroup, ToggleGroup, RadioGroup, Input Group, Command | Settings native selects → Select; Project/Branch → Combobox; Mode/Isolation → Select |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty; optional Sidebar/Sheet/Drawer spikes | Split sash + empty states; sidebar spike documented go/no-go |

@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ChevronDown, GitBranch, GitMerge, GitPullRequest } from "lucide-react"
-import { TextArea } from "../../atoms"
+import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { CreatePrDialog } from "../../molecules/CreatePrDialog"
@@ -179,7 +179,7 @@ export const CommitCenter = ({
   return (
     <>
       <div className="flex shrink-0 flex-col gap-2 border-t border-stroke-3 bg-fill-5/40 px-2.5 py-2.5">
-        <TextArea
+        <Textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Commit message"

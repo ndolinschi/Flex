@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
-import { TextArea, TextInput } from "../atoms"
+import { Textarea } from "@/components/ui/textarea"
+import { TextInput } from "../atoms"
 import { ConfirmDialog } from "./ConfirmDialog"
 import { FormField } from "./FormField"
 
@@ -60,7 +61,7 @@ export const CreatePrDialog = ({
           />
         </FormField>
         <FormField label="Description" htmlFor="create-pr-body" hint="Optional">
-          <TextArea
+          <Textarea
             id="create-pr-body"
             value={body}
             onChange={(e) => setBody(e.target.value)}
