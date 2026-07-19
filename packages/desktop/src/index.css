@@ -631,6 +631,10 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   --color-card: var(--color-elevated);
   --color-foreground: var(--color-ink);
   --color-background: var(--color-chrome);
+  /* Pair with brand `--color-accent` (kept above). Needed when a control
+   * intentionally uses `bg-accent` + `text-accent-foreground`. Menu hovers
+   * must NOT use `bg-accent` — that token is the product accent (near-white). */
+  --color-accent-foreground: var(--color-accent-text);
 }
 
 /* shadcn runtime vars — alias onto Flex; no second theme system.

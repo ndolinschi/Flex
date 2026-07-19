@@ -149,7 +149,7 @@ export const ProjectPicker = ({
             variant="ghost"
             disabled={disabled || busy}
             aria-label={`Project: ${label}`}
-            className="h-6 max-w-[10rem] gap-1 px-1.5 text-sm font-normal text-muted-foreground opacity-80 hover:bg-transparent hover:text-foreground hover:opacity-100 aria-expanded:opacity-100"
+            className="h-6 max-w-[10rem] justify-start gap-1 px-1.5 text-sm font-normal text-muted-foreground opacity-80 hover:bg-transparent hover:text-foreground hover:opacity-100 aria-expanded:opacity-100"
           />
         }
       >
@@ -189,7 +189,7 @@ export const ProjectPicker = ({
                   className="mx-1"
                 >
                   <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="min-w-0 truncate" title={path}>
+                  <span className="min-w-0 truncate" aria-label={path}>
                     {parent ? (
                       <span className="text-muted-foreground">{parent}</span>
                     ) : null}

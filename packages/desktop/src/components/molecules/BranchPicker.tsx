@@ -121,7 +121,7 @@ export const BranchPicker = ({
               disabled={!canOpen || busy}
               aria-label={`Branch: ${label}`}
               className={cn(
-                "h-6 max-w-[12rem] gap-1 px-1.5 font-normal",
+                "h-6 max-w-[12rem] justify-start gap-1 px-1.5 font-normal",
                 "text-sm text-muted-foreground opacity-80",
                 "hover:bg-transparent hover:text-foreground hover:opacity-100",
                 "aria-expanded:opacity-100",

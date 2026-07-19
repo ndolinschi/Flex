@@ -109,8 +109,8 @@ const EffortMenu = ({
         role="menuitem"
         className={cn(
           "flex w-full items-center justify-start gap-1.5 px-2 py-1 text-left text-sm",
-          "hover:bg-accent hover:text-accent-foreground",
-          value === null && "bg-accent/50",
+          "hover:bg-fill-4 hover:text-ink",
+          value === null && "bg-fill-4 text-ink",
         )}
         onClick={() => {
           onChange(null)
@@ -131,8 +131,8 @@ const EffortMenu = ({
             role="menuitem"
             className={cn(
               "flex w-full items-center justify-start gap-1.5 px-2 py-1 text-left text-sm",
-              "hover:bg-accent hover:text-accent-foreground",
-              active && "bg-accent/50",
+              "hover:bg-fill-4 hover:text-ink",
+              active && "bg-fill-4 text-ink",
             )}
             onClick={() => {
               onChange(level)
@@ -292,9 +292,9 @@ export const ModelPicker = ({
                             aria-expanded={effortMenuFor?.modelId === m.id}
                             className={cn(
                               "flex size-7 shrink-0 items-center justify-center rounded-md",
-                              "text-muted-foreground hover:bg-accent hover:text-foreground",
+                              "text-muted-foreground hover:bg-fill-4 hover:text-ink",
                               effortMenuFor?.modelId === m.id &&
-                                "bg-accent text-foreground",
+                                "bg-fill-4 text-ink",
                             )}
                             onClick={(e) => {
                               e.preventDefault()
