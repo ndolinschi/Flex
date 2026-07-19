@@ -50,6 +50,8 @@ const EffortMenu = ({
   onClose: () => void
 }) => {
   const menuRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null)
 
   useLayoutEffect(() => {
@@ -70,13 +72,13 @@ const EffortMenu = ({
   useEffect(() => {
     const handlePointer = (e: MouseEvent) => {
       if (menuRef.current?.contains(e.target as Node)) return
-      onClose()
+      onCloseRef.current()
     }
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault()
         e.stopPropagation()
-        onClose()
+        onCloseRef.current()
       }
     }
     document.addEventListener("mousedown", handlePointer, true)
@@ -85,7 +87,7 @@ const EffortMenu = ({
       document.removeEventListener("mousedown", handlePointer, true)
       document.removeEventListener("keydown", handleKey, true)
     }
-  }, [onClose])
+  }, [])
 
   return createPortal(
     <div

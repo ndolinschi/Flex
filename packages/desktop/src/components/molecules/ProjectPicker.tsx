@@ -48,6 +48,8 @@ export const ProjectPicker = ({
   const label = cwd ? basename(cwd) : "Project"
 
   const recents = useMemo(() => {
+    // Closed: skip session-cache scan — trigger only needs `label`.
+    if (!openMenu) return []
     const sessions =
       queryClient.getQueryData<
         { cwd: string; base_cwd?: string; parent_id?: string }[]
@@ -69,16 +71,17 @@ export const ProjectPicker = ({
       unique.push(path)
     }
     return unique.slice(0, RECENT_CAP)
-  }, [recentCwds, cwd, queryClient, openMenu])
+  }, [openMenu, recentCwds, cwd, queryClient])
 
   const filtered = useMemo(() => {
+    if (!openMenu) return []
     const q = query.trim().toLowerCase()
     if (!q) return recents
     return recents.filter(
       (p) =>
         p.toLowerCase().includes(q) || basename(p).toLowerCase().includes(q),
     )
-  }, [recents, query])
+  }, [openMenu, recents, query])
 
   useEffect(() => {
     if (!openMenu) setQuery("")
@@ -157,68 +160,70 @@ export const ProjectPicker = ({
         <span className="min-w-0 truncate">{label}</span>
         <ChevronDown className="size-2.5 shrink-0" aria-hidden />
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        side="top"
-        sideOffset={6}
-        className="w-80 p-0"
-      >
-        <div className="border-b border-border px-2.5 py-2">
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.stopPropagation()}
-            placeholder="Run agent anywhere…"
-            aria-label="Search projects"
-            className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-          />
-        </div>
-        {filtered.length > 0 ? (
-          <DropdownMenuGroup className="max-h-48 overflow-y-auto py-1">
-            <DropdownMenuLabel>Recents</DropdownMenuLabel>
-            {filtered.map((path) => {
-              const active = path === cwd
-              const parent = parentPathPrefix(path)
-              const name = basename(path)
-              return (
-                <DropdownMenuItem
-                  key={path}
-                  disabled={busy}
-                  onClick={() => void applyCwd(path)}
-                  className="mx-1"
-                >
-                  <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="min-w-0 truncate" aria-label={path}>
-                    {parent ? (
-                      <span className="text-muted-foreground">{parent}</span>
-                    ) : null}
-                    <span className="text-foreground">{name}</span>
-                  </span>
-                  {active ? (
-                    <Check className="ml-auto size-3 shrink-0 text-primary" aria-hidden />
-                  ) : null}
-                </DropdownMenuItem>
-              )
-            })}
-          </DropdownMenuGroup>
-        ) : (
-          <div className="px-2.5 py-3 text-center text-xs text-muted-foreground">
-            No recent projects
+      {openMenu ? (
+        <DropdownMenuContent
+          align="start"
+          side="top"
+          sideOffset={6}
+          className="w-80 p-0"
+        >
+          <div className="border-b border-border px-2.5 py-2">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+              placeholder="Run agent anywhere…"
+              aria-label="Search projects"
+              className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+            />
           </div>
-        )}
-        <DropdownMenuSeparator className="m-0" />
-        <DropdownMenuGroup className="py-1">
-          <DropdownMenuItem
-            disabled={busy}
-            onClick={() => void handleOpenFolder()}
-            className="mx-1"
-          >
-            <FolderOpen />
-            Open Folder
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
+          {filtered.length > 0 ? (
+            <DropdownMenuGroup className="max-h-48 overflow-y-auto py-1">
+              <DropdownMenuLabel>Recents</DropdownMenuLabel>
+              {filtered.map((path) => {
+                const active = path === cwd
+                const parent = parentPathPrefix(path)
+                const name = basename(path)
+                return (
+                  <DropdownMenuItem
+                    key={path}
+                    disabled={busy}
+                    onClick={() => void applyCwd(path)}
+                    className="mx-1"
+                  >
+                    <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="min-w-0 truncate" aria-label={path}>
+                      {parent ? (
+                        <span className="text-muted-foreground">{parent}</span>
+                      ) : null}
+                      <span className="text-foreground">{name}</span>
+                    </span>
+                    {active ? (
+                      <Check className="ml-auto size-3 shrink-0 text-primary" aria-hidden />
+                    ) : null}
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuGroup>
+          ) : (
+            <div className="px-2.5 py-3 text-center text-xs text-muted-foreground">
+              No recent projects
+            </div>
+          )}
+          <DropdownMenuSeparator className="m-0" />
+          <DropdownMenuGroup className="py-1">
+            <DropdownMenuItem
+              disabled={busy}
+              onClick={() => void handleOpenFolder()}
+              className="mx-1"
+            >
+              <FolderOpen />
+              Open Folder
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      ) : null}
     </DropdownMenu>
   )
 }
