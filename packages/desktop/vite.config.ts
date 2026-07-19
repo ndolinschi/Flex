@@ -35,19 +35,41 @@ export default defineConfig(async () => ({
   },
 
   build: {
+    // Monaco alone is ~3.9MB minified — expected for a full editor (+ workers).
+    // Other vendor/app chunks stay well under 1MB after manualChunks + lazy panels.
+    chunkSizeWarningLimit: 4000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          "react-vendor": ["react", "react-dom"],
-          tanstack: ["@tanstack/react-query", "@tanstack/react-virtual"],
-          markdown: [
-            "react-markdown",
-            "remark-gfm",
-            "rehype-highlight",
-            "highlight.js",
-          ],
-          xterm: ["@xterm/xterm", "@xterm/addon-fit"],
-          monaco: ["monaco-editor", "@monaco-editor/react"],
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return
+          if (
+            id.includes("monaco-editor") ||
+            id.includes("@monaco-editor")
+          ) {
+            return "monaco"
+          }
+          if (id.includes("@xterm")) return "xterm"
+          if (
+            id.includes("react-markdown") ||
+            id.includes("remark-") ||
+            id.includes("rehype-") ||
+            id.includes("highlight.js") ||
+            id.includes("/highlight.js/")
+          ) {
+            return "markdown"
+          }
+          if (id.includes("@tanstack")) return "tanstack"
+          if (id.includes("@base-ui")) return "base-ui"
+          if (id.includes("lucide-react")) return "lucide"
+          if (id.includes("zustand")) return "zustand"
+          if (id.includes("@tauri-apps")) return "tauri"
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/scheduler/")
+          ) {
+            return "react-vendor"
+          }
         },
       },
     },

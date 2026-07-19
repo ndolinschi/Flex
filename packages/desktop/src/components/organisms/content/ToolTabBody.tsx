@@ -1,17 +1,26 @@
-import { useMemo } from "react"
+import { lazy, Suspense, useMemo } from "react"
 import type { SessionMeta } from "../../../lib/types"
 import type { RightPanelTab } from "../../../stores/appStore"
 import { findPluginTab } from "../../../plugins/registry"
-import { BrowserTab } from "../BrowserTab"
-import { TerminalTab } from "../TerminalTab"
 import { PlanTab } from "../right-panel/PlanTab"
 import { ChangesTab } from "../right-panel/ChangesTab"
-import { FilesTab } from "../right-panel/FilesTab"
 import { MemoryTab } from "../right-panel/MemoryTab"
 import { PrTab } from "../right-panel/PrTab"
 import { PromptTab } from "../right-panel/PromptTab"
 import { StatusTab } from "../right-panel/StatusTab"
+import { Spinner } from "../../atoms"
 import { cn } from "../../../lib/utils"
+
+/** Heavy panels — keep out of the initial JS graph (Monaco ~3MB, xterm, browser). */
+const FilesTab = lazy(() =>
+  import("../right-panel/FilesTab").then((m) => ({ default: m.FilesTab })),
+)
+const TerminalTab = lazy(() =>
+  import("../TerminalTab").then((m) => ({ default: m.TerminalTab })),
+)
+const BrowserTab = lazy(() =>
+  import("../BrowserTab").then((m) => ({ default: m.BrowserTab })),
+)
 
 type ToolTabBodyProps = {
   tool: RightPanelTab
@@ -21,6 +30,13 @@ type ToolTabBodyProps = {
   /** Keep Files/Terminal/Browser/Prompt mounted while the tab exists in any pane. */
   keepAlive: boolean
 }
+
+const PanelFallback = () => (
+  <div className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted">
+    <Spinner size="sm" />
+    Loading…
+  </div>
+)
 
 /** Renders one tool surface; keep-alive hosts stay mounted when inactive. */
 export const ToolTabBody = ({
@@ -91,7 +107,9 @@ export const ToolTabBody = ({
           active || keepAlive ? (active ? "flex" : "hidden") : "hidden",
         )}
       >
-        <FilesTab active={active} session={session} />
+        <Suspense fallback={<PanelFallback />}>
+          <FilesTab active={active} session={session} />
+        </Suspense>
       </div>
     )
   }
@@ -104,7 +122,9 @@ export const ToolTabBody = ({
           active || keepAlive ? (active ? "flex" : "hidden") : "hidden",
         )}
       >
-        <TerminalTab active={active} />
+        <Suspense fallback={<PanelFallback />}>
+          <TerminalTab active={active} />
+        </Suspense>
       </div>
     )
   }
@@ -117,7 +137,9 @@ export const ToolTabBody = ({
           active || keepAlive ? (active ? "block" : "hidden") : "hidden",
         )}
       >
-        <BrowserTab active={active} />
+        <Suspense fallback={<PanelFallback />}>
+          <BrowserTab active={active} />
+        </Suspense>
       </div>
     )
   }

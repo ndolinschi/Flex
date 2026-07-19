@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import Editor from "@monaco-editor/react"
 import { Code2, Eye, FolderTree, Save } from "lucide-react"
 import { ScrollArea, Spinner, Tab } from "../../atoms"
 import { ConfirmDialog, ErrorBanner, MarkdownBody } from "../../molecules"
 import { Button } from "@/components/ui/button"
-import { ensureMonaco, languageForPath } from "../../../lib/monacoEnv"
+import { languageForPath } from "../../../lib/monacoLanguages"
 import {
   readTextFile,
   saveTextFile,
@@ -18,6 +17,8 @@ import {
 } from "../../../stores/appStore"
 import { FileExplorer } from "./FileExplorer"
 import type { SessionMeta } from "../../../lib/types"
+
+const MonacoEditor = lazy(() => import("@monaco-editor/react"))
 
 type FilesTabProps = {
   /** True when the Files panel body is the visible right-panel tab. */
@@ -87,7 +88,8 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
   const hadOpenFilesRef = useRef(openFiles.length > 0)
 
   useEffect(() => {
-    ensureMonaco()
+    // Monaco (~3MB) stays out of the initial graph — wire workers on first Files mount.
+    void import("../../../lib/monacoEnv").then((m) => m.ensureMonaco())
   }, [])
 
   const path =
@@ -385,18 +387,26 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
             </div>
           </ScrollArea>
         ) : path && active ? (
-          <Editor
-            height="100%"
-            path={path}
-            language={language}
-            theme={theme === "light" ? "vs" : "vs-dark"}
-            value={value}
-            onChange={handleChange}
-            options={{
-              fontSize: 13,
-              fontFamily: "var(--font-mono), ui-monospace, monospace",
-              minimap: { enabled: false },
-              scrollBeyondLastLine: false,
+          <Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted">
+                <Spinner size="sm" />
+                Loading editor…
+              </div>
+            }
+          >
+            <MonacoEditor
+              height="100%"
+              path={path}
+              language={language}
+              theme={theme === "light" ? "vs" : "vs-dark"}
+              value={value}
+              onChange={handleChange}
+              options={{
+                fontSize: 13,
+                fontFamily: "var(--font-mono), ui-monospace, monospace",
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
               wordWrap: "on",
               automaticLayout: true,
               tabSize: 2,
@@ -410,6 +420,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
               </div>
             }
           />
+          </Suspense>
         ) : path ? (
           // Keep-alive host is hidden — skip Monaco so automaticLayout / workers
           // do not run off-screen. Drafts stay in the store.
