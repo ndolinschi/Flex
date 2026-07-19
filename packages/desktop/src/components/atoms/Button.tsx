@@ -1,7 +1,6 @@
 import type { ReactNode } from "react"
 import { Button as ShadcnButton } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
-import { cn } from "@/lib/utils"
 
 /**
  * Flex atom adapter over shadcn Base UI `Button`.
@@ -76,7 +75,7 @@ export const Button = ({
       variant={resolveVariant(variant)}
       size={resolveSize(size)}
       disabled={disabled || isLoading}
-      className={cn(className)}
+      className={className}
       {...props}
     >
       {isLoading ? <Spinner data-icon="inline-start" className="size-3.5" /> : null}

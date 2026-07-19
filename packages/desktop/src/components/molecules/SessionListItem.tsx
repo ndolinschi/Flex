@@ -1,4 +1,4 @@
-import { memo, useState, type KeyboardEvent, type MouseEvent } from "react"
+import { memo, useCallback, useState, type KeyboardEvent, type MouseEvent } from "react"
 import {
   ArchiveRestore,
   Archive as ArchiveIcon,
@@ -73,8 +73,30 @@ export const SessionListItem = memo(function SessionListItem({
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(
     null,
   )
+  /** Defer Base UI IconButtons until first hover/focus — sticky thereafter. */
+  const [actionsReady, setActionsReady] = useState(false)
 
   const label = sessionLabel(session)
+
+  const armActions = useCallback(() => {
+    setActionsReady(true)
+  }, [])
+
+  const handleOpenMenu = useCallback((e: MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setMenuPosition({ x: rect.left, y: rect.bottom })
+  }, [])
+
+  const handleTogglePin = useCallback(() => {
+    onTogglePin?.(session.id)
+  }, [onTogglePin, session.id])
+
+  const handleSetArchived = useCallback(
+    (_e: MouseEvent, next: boolean) => {
+      onSetArchived?.(session.id, next)
+    },
+    [onSetArchived, session.id],
+  )
 
   const handleSaveRename = async () => {
     const trimmed = draft.trim()
@@ -191,6 +213,8 @@ export const SessionListItem = memo(function SessionListItem({
         if (!isEditing) startRename()
       }}
       onContextMenu={handleContextMenu}
+      onPointerEnter={armActions}
+      onFocusCapture={armActions}
       className={cn(
         "group relative flex min-h-7 items-center gap-3 rounded-sm px-2 py-1.5",
         "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
@@ -295,12 +319,10 @@ export const SessionListItem = memo(function SessionListItem({
           formatTime={formatCompactTime}
           canTogglePin={!!onTogglePin}
           canSetArchived={!!onSetArchived}
-          onTogglePin={() => onTogglePin?.(session.id)}
-          onSetArchived={(_e, next) => onSetArchived?.(session.id, next)}
-          onOpenMenu={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect()
-            setMenuPosition({ x: rect.left, y: rect.bottom })
-          }}
+          actionsReady={actionsReady}
+          onTogglePin={handleTogglePin}
+          onSetArchived={handleSetArchived}
+          onOpenMenu={handleOpenMenu}
         />
       )}
 

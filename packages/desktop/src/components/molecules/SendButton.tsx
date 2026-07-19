@@ -15,6 +15,7 @@ const circleClass = cn(
   "size-6 shrink-0 rounded-full bg-send text-send-fg opacity-80",
   "hover:opacity-100 hover:bg-send hover:text-send-fg",
 )
+const disabledCircleClass = cn(circleClass, "disabled:opacity-30")
 
 /** 24px circle send / stop / queue — shadcn Button icon shell. */
 export const SendButton = ({
@@ -74,7 +75,7 @@ export const SendButton = ({
       onClick={onSend}
       disabled={disabled}
       aria-label="Send message"
-      className={cn(circleClass, "disabled:opacity-30")}
+      className={disabledCircleClass}
     >
       <ArrowUpIcon className="size-3.5" strokeWidth={2.5} />
     </Button>

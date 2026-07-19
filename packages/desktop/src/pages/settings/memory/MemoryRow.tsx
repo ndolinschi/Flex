@@ -31,6 +31,8 @@ export const MemoryRow = ({
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(
     null,
   )
+  /** Defer hover IconButtons until first pointer/focus — sticky thereafter. */
+  const [actionsReady, setActionsReady] = useState(false)
 
   const detailQuery = useQuery({
     queryKey: [...scope.invalidateKey, "detail", memory.id],
@@ -63,7 +65,11 @@ export const MemoryRow = ({
 
   return (
     <div className="rounded-md border border-stroke-3 bg-panel">
-      <div className="group/row relative flex min-h-[30px] items-center gap-2 px-2.5 py-1">
+      <div
+        className="group/row relative flex min-h-[30px] items-center gap-2 px-2.5 py-1"
+        onPointerEnter={() => setActionsReady(true)}
+        onFocusCapture={() => setActionsReady(true)}
+      >
         <Button
           variant="ghost"
           onClick={() => setExpanded((v) => !v)}
@@ -109,33 +115,37 @@ export const MemoryRow = ({
             "group-focus-within/row:pointer-events-auto group-focus-within/row:max-w-[76px] group-focus-within/row:opacity-100",
           )}
         >
-          <Tooltip label="Expiry">
-            <IconButton
-              label="Set memory expiry"
-              size="icon-xs"
-              isLoading={expiryMutation.isPending}
-              onClick={(e) => {
-                e.stopPropagation()
-                const rect = e.currentTarget.getBoundingClientRect()
-                setMenuPosition({ x: rect.left, y: rect.bottom })
-              }}
-            >
-              <MoreHorizontal className="h-3 w-3" aria-hidden />
-            </IconButton>
-          </Tooltip>
-          <Tooltip label="Delete">
-            <IconButton
-              label="Delete memory"
-              size="icon-xs"
-              className="hover:text-destructive"
-              onClick={(e) => {
-                e.stopPropagation()
-                setConfirmDelete(true)
-              }}
-            >
-              <Trash2 className="h-3 w-3" aria-hidden />
-            </IconButton>
-          </Tooltip>
+          {actionsReady ? (
+            <>
+              <Tooltip label="Expiry">
+                <IconButton
+                  label="Set memory expiry"
+                  size="icon-xs"
+                  isLoading={expiryMutation.isPending}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const rect = e.currentTarget.getBoundingClientRect()
+                    setMenuPosition({ x: rect.left, y: rect.bottom })
+                  }}
+                >
+                  <MoreHorizontal className="h-3 w-3" aria-hidden />
+                </IconButton>
+              </Tooltip>
+              <Tooltip label="Delete">
+                <IconButton
+                  label="Delete memory"
+                  size="icon-xs"
+                  className="hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setConfirmDelete(true)
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" aria-hidden />
+                </IconButton>
+              </Tooltip>
+            </>
+          ) : null}
         </span>
       </div>
 
