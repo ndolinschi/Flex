@@ -244,7 +244,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 - Preserve `@tanstack/react-virtual` on `TurnTimeline` until a measured
   `MessageScroller` spike proves equal or better (virtualization + stick-to-bottom
   + mid-stream remasure are load-bearing — Wave 3/4 notes below).
-- Round Changes-panel `Checkbox` and green settings `Toggle` (`--color-switch-on`)
+- Round Changes-panel `Checkbox` and green settings `Switch` (`--color-switch-on`)
   are intentional product visuals; restyle shadcn primitives after install — do
   not silently flip to square/primary defaults.
 - `packages/desktop` has `components.json` (style `base-nova`, Base UI).
@@ -310,7 +310,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Slider | skip | — | |
 | Sonner | yes | `Toast` / ToastHost | Bridge Zustand toast API → `toast()` |
 | Spinner | yes | `Spinner` | |
-| Switch | yes | `Toggle` atom | Keep green ON track |
+| Switch | ✅ done | Settings prefs + MCP/routine enabled flags | `@/components/ui/switch`; green ON (`bg-switch-on`); `Toggle` atom removed |
 | Table | later | Database results | With Data Table |
 | Tabs | careful | panel/file tabs | Prefer keep custom `Tab*` for chrome chips; shadcn Tabs for settings sections only |
 | Textarea | yes | `TextArea`, composer draft | Composer may stay specialized |
@@ -328,7 +328,7 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | Phase | Scope | Exit criteria |
 |---|---|---|
 | **0 — Foundation** | ✅ `components.json` (`base-nova`), `@/` alias, `clsx`+`tailwind-merge` `cn`, shadcn semantic vars bridged to Flex tokens (`data-theme` only — no `.dark` second system) | `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
-| **1 — Atom adapters** | ✅ Button is `@/components/ui/button` (atoms re-export only); Spinner + Alert. `IconButton` removed. Remaining: Input, Textarea, Label, Checkbox, Switch, Badge, Kbd, Separator, Skeleton, Avatar, Tooltip, ScrollArea | Atom unit tests + vitest green |
+| **1 — Atom adapters** | ✅ Button is `@/components/ui/button` (atoms re-export only); Spinner + Alert. `IconButton` removed; `Toggle` → `@/components/ui/switch`. Remaining: Input, Textarea, Label, Checkbox, Badge, Kbd, Separator, Skeleton, Avatar, Tooltip, ScrollArea | Atom unit tests + vitest green |
 | **2 — Overlays & menus** | ✅ Dialog + AlertDialog + DropdownMenu + ContextMenu; remaining: Popover, Menubar, Sonner | Confirm/auth on AlertDialog; Search/Command on Dialog; right-click on ContextMenu |
 | **3 — Forms & pickers** | ✅ Select + Combobox; remaining: Field/FieldGroup, ToggleGroup, RadioGroup, Input Group, Command | Settings native selects → Select; Project/Branch → Combobox; Mode/Isolation → Select |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty; optional Sidebar/Sheet/Drawer spikes | Split sash + empty states; sidebar spike documented go/no-go |

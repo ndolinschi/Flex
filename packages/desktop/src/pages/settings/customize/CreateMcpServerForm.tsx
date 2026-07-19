@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
+import { Switch } from "@/components/ui/switch"
 import { TextArea, TextInput } from "../../../components/atoms"
 import { ErrorBanner, FieldRow, SettingsSection } from "../../../components/molecules"
 import { emptyMcpForm, MCP_ID_RE, parseArgs, parseEnv, splitEnvSecrets, type McpFormState } from "../../../lib/mcp"
@@ -109,12 +110,11 @@ export const CreateMcpServerForm = ({
       </FieldRow>
 
       <FieldRow label="Enabled" htmlFor="mcp-enabled">
-        <input
+        <Switch
           id="mcp-enabled"
-          type="checkbox"
           checked={form.enabled}
-          onChange={(e) => patch({ enabled: e.target.checked })}
-          className="h-3.5 w-3.5 rounded border-border accent-accent"
+          onCheckedChange={(checked) => patch({ enabled: checked })}
+          aria-label="Enabled"
         />
       </FieldRow>
 

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react"
 import { RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Spinner as ButtonSpinner } from "@/components/ui/spinner"
-import { Spinner, Toggle } from "../../components/atoms"
+import { Spinner } from "../../components/atoms"
+import { Switch } from "@/components/ui/switch"
 import { ErrorBanner, SettingsCard, SettingRow } from "../../components/molecules"
 import { useProviderConfig } from "../../hooks/useProviderConfig"
 import { useSessions } from "../../hooks/useSessions"
@@ -182,10 +183,11 @@ export const IndexingContent = () => {
           {isLoading || !plugins ? (
             <Spinner size="sm" />
           ) : (
-            <Toggle
+            <Switch
               checked={plugins.index}
-              onChange={(on) => void handleSavePlugins({ index: on }, "index")}
-              label="Toggle code index plugin"
+              onCheckedChange={(on) => void handleSavePlugins({ index: on }, "index")}
+              aria-label="Toggle code index plugin"
+              title="Toggle code index plugin"
               disabled={busyToggle !== null}
             />
           )}
@@ -198,12 +200,13 @@ export const IndexingContent = () => {
           {isLoading || !plugins ? (
             <Spinner size="sm" />
           ) : (
-            <Toggle
+            <Switch
               checked={!!plugins.autoUpdateIndex && plugins.index}
-              onChange={(on) =>
+              onCheckedChange={(on) =>
                 void handleSavePlugins({ autoUpdateIndex: on }, "autoUpdateIndex")
               }
-              label="Toggle update index on search"
+              aria-label="Toggle update index on search"
+              title="Toggle update index on search"
               disabled={busyToggle !== null || !plugins.index}
             />
           )}
@@ -216,12 +219,13 @@ export const IndexingContent = () => {
           {isLoading || !plugins ? (
             <Spinner size="sm" />
           ) : (
-            <Toggle
+            <Switch
               checked={!!plugins.autoContext && plugins.index}
-              onChange={(on) =>
+              onCheckedChange={(on) =>
                 void handleSavePlugins({ autoContext: on }, "autoContext")
               }
-              label="Toggle auto-context"
+              aria-label="Toggle auto-context"
+              title="Toggle auto-context"
               disabled={busyToggle !== null || !plugins.index}
             />
           )}

@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Toggle } from "../components/atoms"
+import { Switch } from "@/components/ui/switch"
 import { ProviderSettingsForm } from "../components/organisms"
 import { AUTOMATIONS_UI_ENABLED } from "../lib/featureFlags"
 import { AutomationsContent } from "./settings/AutomationsSection"
@@ -67,10 +67,11 @@ const GeneralContent = () => {
         description="Native OS notification when a background session finishes a turn. First enable triggers the OS permission prompt."
         first
       >
-        <Toggle
+        <Switch
           checked={notificationsEnabled}
-          onChange={setNotificationsEnabled}
-          label="Toggle system notifications"
+          onCheckedChange={setNotificationsEnabled}
+          aria-label="Toggle system notifications"
+          title="Toggle system notifications"
         />
       </SettingRow>
       <SettingRow
@@ -78,10 +79,11 @@ const GeneralContent = () => {
         title="Completion sound"
         description="Play a short chime whenever a turn finishes, including the session you're viewing."
       >
-        <Toggle
+        <Switch
           checked={completionSoundEnabled}
-          onChange={setCompletionSoundEnabled}
-          label="Toggle completion sound"
+          onCheckedChange={setCompletionSoundEnabled}
+          aria-label="Toggle completion sound"
+          title="Toggle completion sound"
         />
       </SettingRow>
     </SettingsCard>
@@ -111,10 +113,13 @@ const AppearanceContent = () => {
             ) : (
               <Sun className="h-3.5 w-3.5" aria-hidden />
             )}
-            <Toggle
+            <Switch
               checked={theme === "light"}
-              onChange={() => toggleTheme()}
-              label={
+              onCheckedChange={() => toggleTheme()}
+              aria-label={
+                theme === "dark" ? "Switch to light theme" : "Switch to dark theme"
+              }
+              title={
                 theme === "dark" ? "Switch to light theme" : "Switch to dark theme"
               }
             />

@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
+import { Switch } from "@/components/ui/switch"
 import { TextArea, TextInput } from "../../../components/atoms"
 import {
   ErrorBanner,
@@ -224,12 +225,11 @@ export const CreateRoutineForm = ({
       </FieldRow>
 
       <FieldRow label="Require verification" htmlFor="routine-require-verification">
-        <input
+        <Switch
           id="routine-require-verification"
-          type="checkbox"
           checked={form.requireVerification}
-          onChange={(e) => patch({ requireVerification: e.target.checked })}
-          className="h-3.5 w-3.5 rounded border-border accent-accent"
+          onCheckedChange={(checked) => patch({ requireVerification: checked })}
+          aria-label="Require verification"
         />
       </FieldRow>
 

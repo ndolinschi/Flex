@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { Check, Copy, FolderOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
-import { Toggle } from "../../components/atoms"
+import { Switch } from "@/components/ui/switch"
 import { SettingsCard, SettingRow } from "../../components/molecules"
 import { exportDebugLog, exportDiagnostics, log } from "../../lib/debug/log"
 import {
@@ -134,10 +134,11 @@ export const DiagnosticsContent = () => {
           description="Warn/error always recorded for production. Debug/info and raw session events only when this is on. Backend log level rises on next launch."
           first
         >
-          <Toggle
+          <Switch
             checked={debugLoggingEnabled}
-            onChange={setDebugLoggingEnabled}
-            label="Toggle debug logging"
+            onCheckedChange={setDebugLoggingEnabled}
+            aria-label="Toggle debug logging"
+            title="Toggle debug logging"
           />
         </SettingRow>
         <SettingRow
@@ -145,10 +146,11 @@ export const DiagnosticsContent = () => {
           title="Crash reporting (local)"
           description="Retain uncaught errors in memory for the diagnostics export. Nothing is uploaded — remote reporting (Sentry DSN) is not configured."
         >
-          <Toggle
+          <Switch
             checked={crashReportingEnabled}
-            onChange={setCrashReportingEnabled}
-            label="Toggle local crash capture"
+            onCheckedChange={setCrashReportingEnabled}
+            aria-label="Toggle local crash capture"
+            title="Toggle local crash capture"
           />
         </SettingRow>
         <SettingRow
