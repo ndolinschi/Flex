@@ -41,7 +41,7 @@ export const IconButton = ({
       title={label}
       disabled={disabled || isLoading}
       className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
+        "text-muted-foreground hover:bg-muted hover:text-foreground",
         quiet && "opacity-50 hover:opacity-80",
         className,
       )}

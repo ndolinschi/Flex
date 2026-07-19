@@ -61,8 +61,8 @@ const resolveSize = (
 }
 
 export const Button = ({
-  variant = "primary",
-  size = "md",
+  variant = "default",
+  size = "default",
   isLoading = false,
   disabled,
   className,

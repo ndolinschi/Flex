@@ -96,7 +96,7 @@ export const ConfirmDialog = ({
           </Button>
           <Button
             size="sm"
-            variant={danger ? "danger" : "primary"}
+            variant={danger ? "destructive" : "default"}
             isLoading={isLoading}
             disabled={confirmDisabled || isLoading}
             onClick={onConfirm}

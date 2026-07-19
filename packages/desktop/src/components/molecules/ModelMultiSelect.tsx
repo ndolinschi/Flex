@@ -121,7 +121,7 @@ export const ModelMultiSelect = ({
                   aria-label={`Remove ${displayFor(modelId, models)}`}
                   disabled={disabled}
                   onClick={() => removeAt(index)}
-                  className="text-icon-3 hover:bg-fill-2 hover:text-danger"
+                  className="text-muted-foreground hover:bg-muted hover:text-destructive"
                 >
                   <X aria-hidden />
                 </Button>
