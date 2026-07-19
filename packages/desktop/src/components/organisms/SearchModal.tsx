@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { createPortal } from "react-dom"
 import { Search } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { FuzzySessionRow } from "../molecules"
 import { useSessions } from "../../hooks/useSessions"
 import { fuzzyScore } from "../../lib/fuzzySearch"
 import { groupByRepo } from "../../lib/sessionGrouping"
 import { resumeSession, toInvokeError } from "../../lib/tauri"
 import { sessionLabel } from "../../lib/types"
-import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
 import { log } from "../../lib/debug/log"
 
@@ -85,11 +90,6 @@ export const SearchModal = ({ open, onClose }: SearchModalProps) => {
     if (!open) return
 
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        onClose()
-        return
-      }
       if (e.key === "ArrowDown") {
         e.preventDefault()
         setActiveIndex((i) => Math.min(i + 1, flatSessions.length - 1))
@@ -122,26 +122,26 @@ export const SearchModal = ({ open, onClose }: SearchModalProps) => {
     el?.scrollIntoView({ block: "nearest" })
   }, [activeIndex])
 
-  if (!open) return null
-
   let runningIndex = -1
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex justify-center bg-black/20 animate-backdrop-in"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose()
       }}
     >
-      <div
-        className={cn(
-          "mt-[10vh] flex h-fit w-[560px] max-w-[90vw] flex-col overflow-hidden",
-          "rounded-lg bg-panel shadow-[var(--shadow-popover)] animate-tray-in",
-        )}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Search agents"
+      <DialogContent
+        showCloseButton={false}
+        className="top-[10vh] max-w-[min(100%,560px)] translate-y-0 gap-0 overflow-hidden border-stroke-3 bg-panel p-0 shadow-[var(--shadow-popover)] sm:max-w-[560px]"
       >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Search agents</DialogTitle>
+          <DialogDescription>
+            Search and switch between agent sessions.
+          </DialogDescription>
+        </DialogHeader>
+
         <div className="flex items-center gap-1.5 border-b border-stroke-3 px-3 py-2.5">
           <Search className="h-3.5 w-3.5 shrink-0 text-ink-muted" aria-hidden />
           <input
@@ -188,8 +188,7 @@ export const SearchModal = ({ open, onClose }: SearchModalProps) => {
             ))
           )}
         </div>
-      </div>
-    </div>,
-    document.body,
+      </DialogContent>
+    </Dialog>
   )
 }

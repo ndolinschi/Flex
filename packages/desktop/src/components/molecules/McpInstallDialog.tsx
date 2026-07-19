@@ -1,10 +1,20 @@
 import { useEffect, useState } from "react"
-import { Button, TextInput } from "../atoms"
+import { TextInput } from "../atoms"
 import { ErrorBanner } from "./ErrorBanner"
 import { FieldRow } from "./SettingsSection"
 import type { McpCatalogEntry } from "../../lib/mcpCatalog"
 import type { CatalogInstallValues } from "../../lib/mcp"
-import { cn } from "../../lib/utils"
+import { Spinner } from "@/components/ui/spinner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 type McpInstallDialogProps = {
   entry: McpCatalogEntry | null
@@ -54,24 +64,10 @@ export const McpInstallDialog = ({
     setValidationError(null)
   }, [entry, initialValues])
 
-  useEffect(() => {
-    if (!entry) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        onCancel()
-      }
-    }
-    document.addEventListener("keydown", handleKey)
-    return () => document.removeEventListener("keydown", handleKey)
-  }, [entry, onCancel])
-
-  if (!entry) return null
-
-  const configuredSecretSet = new Set(configuredSecretEnv)
-
   const handleInstall = () => {
+    if (!entry) return
     setValidationError(null)
+    const configuredSecretSet = new Set(configuredSecretEnv)
     for (const arg of entry.argKeys) {
       const value = argValues[arg.key]?.trim() ?? ""
       if (!arg.required) continue
@@ -91,119 +87,126 @@ export const McpInstallDialog = ({
     onInstall({ args: argValues, env: envValues })
   }
 
+  const configuredSecretSet = new Set(configuredSecretEnv)
+
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/20 pt-[100px] animate-backdrop-in"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onCancel()
+    <AlertDialog
+      open={!!entry}
+      onOpenChange={(next) => {
+        if (!next) onCancel()
       }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="mcp-install-dialog-title"
-        className={cn(
-          "w-full max-w-[500px] rounded-xl border border-stroke-2 bg-panel p-4 shadow-lg",
-          "animate-modal-in",
-        )}
+      <AlertDialogContent
+        size="sm"
+        className="max-w-[min(100%,32rem)] sm:max-w-lg"
       >
-        <h2 id="mcp-install-dialog-title" className="text-base font-semibold text-ink">
-          {isConfigure ? `Configure ${entry.name}` : `Install ${entry.name}`}
-        </h2>
-        <p className="mt-1 text-sm text-ink-muted">{entry.description}</p>
-        {entry.setupHint ? (
-          <p className="mt-2 text-base leading-snug text-ink-secondary">{entry.setupHint}</p>
-        ) : null}
-        {entry.docsUrl ? (
-          <a
-            href={entry.docsUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-1 inline-block text-sm text-accent hover:underline"
-          >
-            Docs
-          </a>
-        ) : null}
+        {entry ? (
+          <>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {isConfigure ? `Configure ${entry.name}` : `Install ${entry.name}`}
+              </AlertDialogTitle>
+              <AlertDialogDescription>{entry.description}</AlertDialogDescription>
+            </AlertDialogHeader>
 
-        <div className="mt-3 flex flex-col divide-y divide-stroke-3 rounded-lg border border-stroke-3">
-          {entry.argKeys.map((arg) => {
-            const keepHint =
-              isConfigure && arg.secret && hasSecretArgs
-                ? "Leave blank to keep the stored value."
-                : arg.hint
-            return (
-              <FieldRow
-                key={arg.key}
-                label={arg.label + (arg.required ? " *" : "")}
-                htmlFor={`mcp-install-arg-${arg.key}`}
-                hint={keepHint}
+            {entry.setupHint ? (
+              <p className="text-base leading-snug text-ink-secondary">{entry.setupHint}</p>
+            ) : null}
+            {entry.docsUrl ? (
+              <a
+                href={entry.docsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-block text-sm text-accent hover:underline"
               >
-                <TextInput
-                  id={`mcp-install-arg-${arg.key}`}
-                  type={arg.secret ? "password" : "text"}
-                  autoComplete="off"
-                  value={argValues[arg.key] ?? ""}
-                  onChange={(e) =>
-                    setArgValues((prev) => ({ ...prev, [arg.key]: e.target.value }))
-                  }
-                  placeholder={
-                    isConfigure && arg.secret && hasSecretArgs
-                      ? "••••••••"
-                      : arg.placeholder
-                  }
-                />
-              </FieldRow>
-            )
-          })}
-          {entry.envKeys.map((env) => {
-            const hasStored = configuredSecretSet.has(env.name)
-            const keepHint =
-              isConfigure && env.secret && hasStored
-                ? "Leave blank to keep the stored value."
-                : env.hint
-            return (
-              <FieldRow
-                key={env.name}
-                label={env.label + (env.required ? " *" : "")}
-                htmlFor={`mcp-install-env-${env.name}`}
-                hint={keepHint}
+                Docs
+              </a>
+            ) : null}
+
+            <div className="flex flex-col divide-y divide-stroke-3 rounded-lg border border-stroke-3">
+              {entry.argKeys.map((arg) => {
+                const keepHint =
+                  isConfigure && arg.secret && hasSecretArgs
+                    ? "Leave blank to keep the stored value."
+                    : arg.hint
+                return (
+                  <FieldRow
+                    key={arg.key}
+                    label={arg.label + (arg.required ? " *" : "")}
+                    htmlFor={`mcp-install-arg-${arg.key}`}
+                    hint={keepHint}
+                  >
+                    <TextInput
+                      id={`mcp-install-arg-${arg.key}`}
+                      type={arg.secret ? "password" : "text"}
+                      autoComplete="off"
+                      value={argValues[arg.key] ?? ""}
+                      onChange={(e) =>
+                        setArgValues((prev) => ({ ...prev, [arg.key]: e.target.value }))
+                      }
+                      placeholder={
+                        isConfigure && arg.secret && hasSecretArgs
+                          ? "••••••••"
+                          : arg.placeholder
+                      }
+                    />
+                  </FieldRow>
+                )
+              })}
+              {entry.envKeys.map((env) => {
+                const hasStored = configuredSecretSet.has(env.name)
+                const keepHint =
+                  isConfigure && env.secret && hasStored
+                    ? "Leave blank to keep the stored value."
+                    : env.hint
+                return (
+                  <FieldRow
+                    key={env.name}
+                    label={env.label + (env.required ? " *" : "")}
+                    htmlFor={`mcp-install-env-${env.name}`}
+                    hint={keepHint}
+                  >
+                    <TextInput
+                      id={`mcp-install-env-${env.name}`}
+                      type={env.secret ? "password" : "text"}
+                      autoComplete="off"
+                      value={envValues[env.name] ?? ""}
+                      onChange={(e) =>
+                        setEnvValues((prev) => ({ ...prev, [env.name]: e.target.value }))
+                      }
+                      placeholder={
+                        isConfigure && env.secret && hasStored ? "••••••••" : env.placeholder
+                      }
+                    />
+                  </FieldRow>
+                )
+              })}
+            </div>
+
+            {error || validationError ? (
+              <ErrorBanner
+                message={error ?? validationError ?? ""}
+                onDismiss={() => setValidationError(null)}
+              />
+            ) : null}
+
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={isLoading}
+                onClick={(e) => {
+                  e.preventDefault()
+                  if (isLoading) return
+                  handleInstall()
+                }}
               >
-                <TextInput
-                  id={`mcp-install-env-${env.name}`}
-                  type={env.secret ? "password" : "text"}
-                  autoComplete="off"
-                  value={envValues[env.name] ?? ""}
-                  onChange={(e) =>
-                    setEnvValues((prev) => ({ ...prev, [env.name]: e.target.value }))
-                  }
-                  placeholder={
-                    isConfigure && env.secret && hasStored ? "••••••••" : env.placeholder
-                  }
-                />
-              </FieldRow>
-            )
-          })}
-        </div>
-
-        {error || validationError ? (
-          <div className="mt-3">
-            <ErrorBanner
-              message={error ?? validationError ?? ""}
-              onDismiss={() => setValidationError(null)}
-            />
-          </div>
+                {isLoading ? <Spinner data-icon="inline-start" /> : null}
+                {isConfigure ? "Save" : "Install"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </>
         ) : null}
-
-        <div className="mt-4 flex justify-end gap-1.5">
-          <Button size="sm" variant="secondary" disabled={isLoading} onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button size="sm" variant="default" isLoading={isLoading} onClick={handleInstall}>
-            {isConfigure ? "Save" : "Install"}
-          </Button>
-        </div>
-      </div>
-    </div>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

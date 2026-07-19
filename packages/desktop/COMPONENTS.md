@@ -69,7 +69,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `CreatePrDialog` | Editable title/body modal before `gh pr create` | `open`, `initialTitle?`, `initialBody?`, `onConfirm` | ChangesTab, CommitCenter, CommitBar |
 | `PopoverTray` | Shared Esc/click-outside/↑↓ tray; used for autocomplete (slash/@) and form popovers (commit message) | `open`, `onClose`, `placement`, `children` | Composer trays, CommitBar |
 | `ContextMenu` | Portal menu; ignores timeline scroll + webview-induced `window.blur` so it stays open mid-stream | `position`, `items`, `onClose` | ContentPane `+`, SessionListItem, FileExplorer |
-| `ConfirmDialog` | In-app modal (rename/delete/create PR fields) | `open`, `title`, `onConfirm`, `onCancel`, `confirmDisabled?` | SessionMenu, CreatePrDialog |
+| `ConfirmDialog` | shadcn `AlertDialog` shell (rename/delete/forms) | `open`, `title`, `onConfirm`, `onCancel`, `confirmDisabled?`, `danger?` | SessionMenu, CreatePrDialog, FilesTab, … |
 | `AttachmentChip` | Pending attachment pill (file/image/directory/dom) | `attachment`, `onRemove` | Composer |
 | `SendButton` | Circular send / stop / queue | `isStreaming`, `canQueue?`, `onSend`, `onStop` | Composer |
 | `MarkdownBody` | GFM + lazy highlight.js language pack; `live` plain pre-wrap fast-path; `diff` fences → `ChatDiffCard` | `content`, `live?` | TurnTimeline (`TimelineRowView`) |
@@ -258,7 +258,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 |---|---|---|---|
 | Accordion | later | none as primitive | Optional for settings groups; prefer `Collapsible` first |
 | Alert | ✅ done | `ErrorBanner`, `SidebarResumeError`, `ReconnectBanner`, form/field errors | `@/components/ui/alert`; no ad-hoc danger strips |
-| Alert Dialog | yes | `ConfirmDialog` (danger paths) | Rename/delete session, discard |
+| Alert Dialog | ✅ done | `ConfirmDialog`, auth/PR/bug/MCP/completion dialogs | `@/components/ui/alert-dialog`; danger paths use `AlertDialogMedia` |
 | Aspect Ratio | skip | — | No first-class need |
 | Attachment | yes (chat kit) | `AttachmentChip` | Registry name `attachment` (not `AttachmentNew`) |
 | Avatar | yes | `Avatar` atom | Thin wrap + `AvatarFallback` |
@@ -278,7 +278,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Context Menu | yes | `ContextMenu` molecule | Keep timeline-scroll / webview-blur ignore behavior |
 | Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
 | Date Picker | skip | — | |
-| Dialog | yes | `ConfirmDialog`, auth/PR/bug/MCP dialogs | Portal + focus already hand-rolled |
+| Dialog | ✅ done | `SearchModal`, `CommandPalette` | `@/components/ui/dialog` (outside-click dismiss); confirms use Alert Dialog |
 | Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
 | Drawer | maybe | `SubagentViewer` (bottom overlay) | Spike vs keep custom |
 | Dropdown Menu | yes | `@/components/ui/dropdown-menu` — Mode/Model/Plus pickers, SessionMenu, TitleBarMenus, overflow menus | Base UI `render` trigger prop |

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { createPortal } from "react-dom"
 import {
   Bot,
   Brain,
@@ -15,6 +14,13 @@ import {
   MessagesSquare,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { CommandPaletteRow } from "../molecules"
 import { useSessions } from "../../hooks/useSessions"
 import {
@@ -24,7 +30,7 @@ import {
 import { fuzzyScore } from "../../lib/fuzzySearch"
 import { resumeSession, toInvokeError } from "../../lib/tauri"
 import { sessionLabel } from "../../lib/types"
-import { basename, cn } from "../../lib/utils"
+import { basename } from "../../lib/utils"
 import { useAppStore, type RightPanelTab } from "../../stores/appStore"
 import { visibleRightPanelTabs } from "./right-panel/tabs"
 import { log } from "../../lib/debug/log"
@@ -255,11 +261,6 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
     if (!open) return
 
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        onClose()
-        return
-      }
       if (e.key === "ArrowDown") {
         e.preventDefault()
         setActiveIndex((i) => Math.min(i + 1, filtered.length - 1))
@@ -291,8 +292,6 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
     el?.scrollIntoView({ block: "nearest" })
   }, [activeIndex])
 
-  if (!open) return null
-
   const groups: Array<{ label: CommandEntry["group"]; items: CommandEntry[] }> = (
     [
       { label: "Commands", items: filtered.filter((c) => c.group === "Commands") },
@@ -302,22 +301,24 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
 
   let runningIndex = -1
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex justify-center bg-black/20 animate-backdrop-in"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose()
       }}
     >
-      <div
-        className={cn(
-          "mt-[10vh] flex h-fit w-[560px] max-w-[90vw] flex-col overflow-hidden",
-          "rounded-lg bg-panel shadow-[var(--shadow-popover)] animate-tray-in",
-        )}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Command palette"
+      <DialogContent
+        showCloseButton={false}
+        className="top-[10vh] max-w-[min(100%,560px)] translate-y-0 gap-0 overflow-hidden border-stroke-3 bg-panel p-0 shadow-[var(--shadow-popover)] sm:max-w-[560px]"
       >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Command palette</DialogTitle>
+          <DialogDescription>
+            Type a command or search sessions.
+          </DialogDescription>
+        </DialogHeader>
+
         <div className="flex items-center gap-1.5 border-b border-stroke-3 px-3 py-2.5">
           <input
             ref={inputRef}
@@ -363,8 +364,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
             ))
           )}
         </div>
-      </div>
-    </div>,
-    document.body,
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from "react"
-import { createPortal } from "react-dom"
 import { AlertCircleIcon, CheckCircle2Icon } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button, Spinner } from "../../components/atoms"
 import { ErrorBanner, ModelSelect } from "../../components/molecules"
@@ -89,8 +98,6 @@ export const CompletionSetupModal = ({
     }
   }, [open, prefs?.providerId, prefs?.modelId])
 
-  if (!open) return null
-
   const handleCopyPull = async () => {
     try {
       await navigator.clipboard.writeText(OLLAMA_PULL_COMMAND)
@@ -164,32 +171,34 @@ export const CompletionSetupModal = ({
     onClose()
   }
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) handleDismiss()
+  const saveDisabled =
+    isSaving ||
+    (path === "ollama" && !resolvedModelId.trim()) ||
+    (path === "provider" && (!providerId || !modelId))
+
+  const checkDisabled =
+    checking ||
+    isSaving ||
+    (path === "ollama" && !resolvedModelId.trim()) ||
+    (path === "provider" && (!providerId || !modelId))
+
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) handleDismiss()
       }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="completion-setup-title"
-        className="flex w-full max-w-md flex-col gap-3 rounded-[var(--radius-card)] border border-stroke-3 bg-panel p-4 shadow-lg"
-      >
-        <div className="flex flex-col gap-1">
-          <h2
-            id="completion-setup-title"
-            className="text-base font-semibold text-ink"
-          >
+      <AlertDialogContent className="gap-3 border-stroke-3 bg-panel p-4 sm:max-w-md">
+        <AlertDialogHeader className="place-items-start gap-1 text-left">
+          <AlertDialogTitle className="text-base font-semibold text-ink">
             Prompt completions
-          </h2>
-          <p className="text-sm text-ink-muted">
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-sm text-ink-muted">
             Ghost-text suggestions while you write prompts. Use a small local
             Ollama model or any connected provider.
-          </p>
-        </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
 
         <div className="flex gap-1 rounded-md bg-fill-4 p-0.5">
           <ShadcnButton
@@ -378,39 +387,34 @@ export const CompletionSetupModal = ({
           </div>
         )}
 
-        <div className="flex justify-between gap-2 pt-1">
+        <div className="flex justify-start pt-1">
           <Button
             variant="ghost"
             size="sm"
-            disabled={
-              checking ||
-              isSaving ||
-              (path === "ollama" && !resolvedModelId.trim()) ||
-              (path === "provider" && (!providerId || !modelId))
-            }
+            disabled={checkDisabled}
             onClick={() => void handleCheckConnection()}
           >
             {checking ? "Checking…" : "Check connection"}
           </Button>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={handleDismiss}>
-              Not now
-            </Button>
-            <Button
-              size="sm"
-              disabled={
-                isSaving ||
-                (path === "ollama" && !resolvedModelId.trim()) ||
-                (path === "provider" && (!providerId || !modelId))
-              }
-              onClick={() => void handleSave()}
-            >
-              {isSaving ? "Saving…" : "Save"}
-            </Button>
-          </div>
         </div>
-      </div>
-    </div>,
-    document.body,
+
+        <AlertDialogFooter className="border-0 bg-transparent p-0 sm:justify-end">
+          <AlertDialogCancel variant="ghost" size="sm">
+            Not now
+          </AlertDialogCancel>
+          <AlertDialogAction
+            size="sm"
+            disabled={saveDisabled}
+            onClick={(e) => {
+              e.preventDefault()
+              if (saveDisabled) return
+              void handleSave()
+            }}
+          >
+            {isSaving ? "Saving…" : "Save"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

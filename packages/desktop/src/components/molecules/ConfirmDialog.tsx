@@ -1,7 +1,18 @@
-import { useEffect, useRef, type ReactNode } from "react"
-import { createPortal } from "react-dom"
-import { Button } from "../atoms"
+import type { ReactNode } from "react"
+import { Spinner } from "@/components/ui/spinner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { cn } from "../../lib/utils"
+import { TriangleAlertIcon } from "lucide-react"
 
 type ConfirmDialogProps = {
   open: boolean
@@ -18,9 +29,9 @@ type ConfirmDialogProps = {
   children?: ReactNode
 }
 
-/** In-app modal shell for rename / delete (replaces window.prompt/confirm).
- * Portaled to `document.body` so virtualized timeline rows (and other
- * remounting parents) cannot unmount an open dialog mid-stream. */
+/** In-app confirm / short-form modal on shadcn Base UI `AlertDialog`.
+ * Controlled `open` — parent owns state; Esc / Cancel call `onCancel`.
+ * Outside click does not dismiss (Alert Dialog default). */
 export const ConfirmDialog = ({
   open,
   title,
@@ -34,78 +45,58 @@ export const ConfirmDialog = ({
   onCancel,
   children,
 }: ConfirmDialogProps) => {
-  const panelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        onCancel()
-      }
-    }
-
-    document.addEventListener("keydown", handleKey)
-    const el = panelRef.current?.querySelector<HTMLElement>(
-      "input, textarea, button:not([disabled])",
-    )
-    el?.focus()
-
-    return () => document.removeEventListener("keydown", handleKey)
-  }, [open, onCancel])
-
-  if (!open) return null
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex items-start justify-center bg-black/20 pt-[10vh] animate-backdrop-in"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onCancel()
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onCancel()
       }}
     >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
+      <AlertDialogContent
+        size="sm"
         className={cn(
-          "w-full max-w-[500px] rounded-xl border border-stroke-2 bg-panel p-4 shadow-lg",
-          "animate-modal-in",
+          // Forms (rename, Create PR) need more than the default sm width.
+          children && "max-w-[min(100%,32rem)] sm:max-w-lg",
         )}
       >
-        <h2
-          id="confirm-dialog-title"
-          className="text-base font-semibold text-ink"
-        >
-          {title}
-        </h2>
-        {description ? (
-          <p className="mt-1 text-sm text-ink-muted">{description}</p>
-        ) : null}
-        {children ? <div className="mt-3">{children}</div> : null}
-        <div className="mt-4 flex justify-end gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={isLoading}
-            onClick={onCancel}
-          >
-            {cancelLabel}
-          </Button>
-          <Button
-            size="sm"
+        <AlertDialogHeader>
+          {danger ? (
+            <AlertDialogMedia className="bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive">
+              <TriangleAlertIcon />
+            </AlertDialogMedia>
+          ) : null}
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          {description ? (
+            <AlertDialogDescription>{description}</AlertDialogDescription>
+          ) : children ? (
+            <AlertDialogDescription className="sr-only">
+              {title}
+            </AlertDialogDescription>
+          ) : (
+            <AlertDialogDescription className="sr-only">
+              Confirm this action.
+            </AlertDialogDescription>
+          )}
+        </AlertDialogHeader>
+        {children ? <div className="flex flex-col gap-3">{children}</div> : null}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isLoading}>{cancelLabel}</AlertDialogCancel>
+          <AlertDialogAction
             variant={danger ? "destructive" : "default"}
-            isLoading={isLoading}
             disabled={confirmDisabled || isLoading}
-            onClick={onConfirm}
+            onClick={(e) => {
+              // Action is a plain Button (not Close) — keep dialog open until
+              // the parent sets `open={false}` after the async work finishes.
+              e.preventDefault()
+              if (confirmDisabled || isLoading) return
+              onConfirm()
+            }}
           >
+            {isLoading ? <Spinner data-icon="inline-start" /> : null}
             {confirmLabel}
-          </Button>
-        </div>
-      </div>
-    </div>,
-    document.body,
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

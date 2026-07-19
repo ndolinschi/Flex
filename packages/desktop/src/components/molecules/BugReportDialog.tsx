@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react"
-import { createPortal } from "react-dom"
 import { openUrl } from "@tauri-apps/plugin-opener"
-import { X } from "lucide-react"
-import { Button, IconButton, TextArea } from "../atoms"
+import { TextArea } from "../atoms"
 import { ErrorBanner } from "./ErrorBanner"
 import {
   BUG_REPORT_PRIVACY_URL,
@@ -12,7 +10,17 @@ import {
 } from "../../lib/bugReport"
 import { appVersion, toInvokeError } from "../../lib/tauri"
 import { useAppStore } from "../../stores/appStore"
-import { cn } from "../../lib/utils"
+import { Spinner } from "@/components/ui/spinner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 type BugReportDialogProps = {
   open: boolean
@@ -53,20 +61,6 @@ export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
       .catch(() => setVersion("unknown"))
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        onClose()
-      }
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [open, onClose])
-
-  if (!open) return null
-
   const canSubmit = note.trim().length > 0 && !busy
 
   const handleSubmit = async () => {
@@ -90,42 +84,27 @@ export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
     }
   }
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/30 px-4 pt-[12vh] animate-backdrop-in"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !busy) onClose()
+  return (
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !busy) onClose()
       }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="bug-report-title"
-        className={cn(
-          "flex w-full max-w-[440px] flex-col overflow-hidden rounded-2xl",
-          "border border-stroke-2 bg-panel shadow-lg animate-modal-in",
-        )}
+      <AlertDialogContent
+        size="sm"
+        className="max-w-[min(100%,28rem)] sm:max-w-md"
       >
-        <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-1">
-          <h2
-            id="bug-report-title"
-            className="text-[18px] font-medium tracking-tight text-ink"
-          >
-            Submit Bug
-          </h2>
-          <IconButton
-            label="Close"
-            quiet
-            className="h-7 w-7 -mr-1 -mt-1"
-            onClick={onClose}
-            disabled={busy}
-          >
-            <X className="h-3.5 w-3.5" aria-hidden />
-          </IconButton>
-        </div>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Submit Bug</AlertDialogTitle>
+          <AlertDialogDescription>
+            Submitting this report sends your app ID and task IDs from this
+            session to the maintainers. Do not include personal or sensitive
+            information.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
 
-        <div className="flex flex-col gap-3 px-5 pb-5 pt-2">
+        <div className="flex flex-col gap-3">
           <div className="rounded-lg bg-fill-4/80 px-3.5 py-3 text-base leading-relaxed text-ink-secondary">
             <p className="text-ink">
               Submitting this feedback report will send the following
@@ -184,29 +163,23 @@ export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
           {error ? (
             <ErrorBanner message={error} onDismiss={() => setError(null)} />
           ) : null}
-
-          <div className="flex items-center justify-end gap-2 pt-1">
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={busy}
-              onClick={onClose}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              variant="default"
-              isLoading={busy}
-              disabled={!canSubmit}
-              onClick={() => void handleSubmit()}
-            >
-              Submit
-            </Button>
-          </div>
         </div>
-      </div>
-    </div>,
-    document.body,
+
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={!canSubmit}
+            onClick={(e) => {
+              e.preventDefault()
+              if (!canSubmit) return
+              void handleSubmit()
+            }}
+          >
+            {busy ? <Spinner data-icon="inline-start" /> : null}
+            Submit
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

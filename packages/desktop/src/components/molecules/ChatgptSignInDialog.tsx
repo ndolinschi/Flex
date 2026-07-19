@@ -2,8 +2,17 @@ import { useEffect, useRef, useState } from "react"
 import { Button } from "../atoms"
 import { ErrorBanner } from "./ErrorBanner"
 import { isBrowserPreview } from "../../lib/browserPreview"
-import { cn } from "../../lib/utils"
 import type { ChatgptAuthStart } from "../../lib/types"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 type ChatgptSignInDialogProps = {
   open: boolean
@@ -24,7 +33,6 @@ export const ChatgptSignInDialog = ({
   wait,
   cancel,
 }: ChatgptSignInDialogProps) => {
-  const panelRef = useRef<HTMLDivElement>(null)
   const sessionIdRef = useRef<string | null>(null)
   const startRef = useRef(start)
   const waitRef = useRef(wait)
@@ -89,18 +97,6 @@ export const ChatgptSignInDialog = ({
     }
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        void handleClose()
-      }
-    }
-    document.addEventListener("keydown", handleKey)
-    return () => document.removeEventListener("keydown", handleKey)
-  }, [open])
-
   const handleClose = async () => {
     const id = sessionIdRef.current
     sessionIdRef.current = null
@@ -135,49 +131,57 @@ export const ChatgptSignInDialog = ({
     }
   }
 
-  if (!open) return null
+  const handleTryAgain = () => {
+    setError(null)
+    setAuth(null)
+    setPhase("starting")
+    void (async () => {
+      try {
+        const started = await startRef.current()
+        sessionIdRef.current = started.sessionId
+        setAuth(started)
+        setPhase("waiting")
+        await waitRef.current(started.sessionId)
+        sessionIdRef.current = null
+        setPhase("done")
+        onSuccessRef.current()
+      } catch (err) {
+        sessionIdRef.current = null
+        setError(err instanceof Error ? err.message : String(err))
+        setPhase("starting")
+      }
+    })()
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 p-4 animate-backdrop-in"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) void handleClose()
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) void handleClose()
       }}
     >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="chatgpt-signin-dialog-title"
-        className={cn(
-          "w-full max-w-[440px] rounded-xl border border-stroke-2 bg-panel p-4 shadow-lg",
-          "animate-modal-in",
-        )}
+      <AlertDialogContent
+        size="sm"
+        className="max-w-[min(100%,28rem)] sm:max-w-md"
       >
-        <h2
-          id="chatgpt-signin-dialog-title"
-          className="text-base font-semibold text-ink"
-        >
-          Sign in to ChatGPT
-        </h2>
-        <p className="mt-1 text-sm text-ink-muted">
-          Enter this code on OpenAI, then return here. Uses your ChatGPT
-          Plus/Pro subscription via Codex.
-        </p>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Sign in to ChatGPT</AlertDialogTitle>
+          <AlertDialogDescription>
+            Enter this code on OpenAI, then return here. Uses your ChatGPT
+            Plus/Pro subscription via Codex.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
 
         {error ? (
-          <div className="mt-3">
-            <ErrorBanner message={error} onDismiss={() => setError(null)} />
-          </div>
+          <ErrorBanner message={error} onDismiss={() => setError(null)} />
         ) : null}
 
         {phase === "starting" && !error ? (
-          <p className="mt-4 text-sm text-ink-muted">Requesting a device code…</p>
+          <p className="text-sm text-ink-muted">Requesting a device code…</p>
         ) : null}
 
         {auth ? (
-          <div className="mt-4 flex flex-col gap-3">
+          <div className="flex flex-col gap-3">
             <div className="rounded-md border border-border bg-surface px-3 py-3 text-center">
               <p className="text-xs font-medium uppercase tracking-widest text-ink-faint">
                 User code
@@ -202,39 +206,20 @@ export const ChatgptSignInDialog = ({
           </div>
         ) : null}
 
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => void handleClose()}>
-            Cancel
-          </Button>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
           {error ? (
-            <Button
-              onClick={() => {
-                setError(null)
-                setAuth(null)
-                setPhase("starting")
-                void (async () => {
-                  try {
-                    const started = await startRef.current()
-                    sessionIdRef.current = started.sessionId
-                    setAuth(started)
-                    setPhase("waiting")
-                    await waitRef.current(started.sessionId)
-                    sessionIdRef.current = null
-                    setPhase("done")
-                    onSuccessRef.current()
-                  } catch (err) {
-                    sessionIdRef.current = null
-                    setError(err instanceof Error ? err.message : String(err))
-                    setPhase("starting")
-                  }
-                })()
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleTryAgain()
               }}
             >
               Try again
-            </Button>
+            </AlertDialogAction>
           ) : null}
-        </div>
-      </div>
-    </div>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
