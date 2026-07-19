@@ -26,6 +26,9 @@ type BranchPickerProps = {
   onError?: (message: string) => void
 }
 
+/** Cap rendered branch rows — large repos can have thousands of locals. */
+const BRANCH_MENU_VISIBLE_CAP = 100
+
 export const BranchPicker = ({
   cwd,
   disabled = false,
@@ -73,6 +76,12 @@ export const BranchPicker = ({
     if (!q) return branches
     return branches.filter((b) => b.toLowerCase().includes(q))
   }, [branches, query])
+
+  const visible = useMemo(
+    () => filtered.slice(0, BRANCH_MENU_VISIBLE_CAP),
+    [filtered],
+  )
+  const truncated = filtered.length > BRANCH_MENU_VISIBLE_CAP
 
   const label = current ?? "No branch"
   const canOpen = !!cwd && !disabled
@@ -124,55 +133,65 @@ export const BranchPicker = ({
           <span className="min-w-0 truncate">{label}</span>
           <ChevronDown className="size-2.5 shrink-0" aria-hidden />
         </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="start"
-          side="top"
-          sideOffset={6}
-          className="w-72 p-0"
-        >
-          <div className="border-b border-border px-2.5 py-2">
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.stopPropagation()}
-              placeholder="Search branches…"
-              aria-label="Search branches"
-              className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-            />
-          </div>
-          <DropdownMenuGroup className="max-h-56 overflow-y-auto py-1">
-            {isFetching && filtered.length === 0 ? (
-              <div className="px-2.5 py-3 text-center text-xs text-muted-foreground">
-                Loading branches…
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="px-2.5 py-3 text-center text-xs text-muted-foreground">
-                No branches found
-              </div>
-            ) : (
-              filtered.map((branch) => {
-                const active = branch === current
-                return (
-                  <DropdownMenuItem
-                    key={branch}
-                    disabled={busy}
-                    onClick={() => void handleSelect(branch)}
-                    className="mx-1"
-                  >
-                    <span className="min-w-0 truncate">{branch}</span>
-                    {active ? (
-                      <span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                        Current
-                        <Check className="size-3 text-primary" aria-hidden />
-                      </span>
-                    ) : null}
-                  </DropdownMenuItem>
-                )
-              })
-            )}
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
+        {open ? (
+          <DropdownMenuContent
+            align="start"
+            side="top"
+            sideOffset={6}
+            className="w-72 p-0"
+          >
+            <div className="border-b border-border px-2.5 py-2">
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+                placeholder="Search branches…"
+                aria-label="Search branches"
+                className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+            <DropdownMenuGroup className="max-h-56 overflow-y-auto py-1">
+              {isFetching && filtered.length === 0 ? (
+                <div className="px-2.5 py-3 text-center text-xs text-muted-foreground">
+                  Loading branches…
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="px-2.5 py-3 text-center text-xs text-muted-foreground">
+                  No branches found
+                </div>
+              ) : (
+                <>
+                  {visible.map((branch) => {
+                    const active = branch === current
+                    return (
+                      <DropdownMenuItem
+                        key={branch}
+                        disabled={busy}
+                        onClick={() => void handleSelect(branch)}
+                        className="mx-1"
+                      >
+                        <span className="min-w-0 truncate">{branch}</span>
+                        {active ? (
+                          <span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                            Current
+                            <Check className="size-3 text-primary" aria-hidden />
+                          </span>
+                        ) : null}
+                      </DropdownMenuItem>
+                    )
+                  })}
+                  {truncated ? (
+                    <div className="px-2.5 py-2 text-xs text-muted-foreground">
+                      Showing {BRANCH_MENU_VISIBLE_CAP} of {filtered.length}. Type
+                      to narrow.
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        ) : null}
       </DropdownMenu>
 
       {branchPr ? (

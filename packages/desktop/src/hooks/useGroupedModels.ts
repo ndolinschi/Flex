@@ -10,22 +10,36 @@ export type ModelGroup = {
   items: ModelInfoDto[]
 }
 
+const EMPTY_GROUPS: ModelGroup[] = []
+
+/** Cap total rows rendered in searchable model menus. Large catalogs
+ * (OpenRouter-style) otherwise mount hundreds of menu items per open. */
+export const MODEL_MENU_VISIBLE_CAP = 80
+
 /** Shared provider-grouping + search-filter logic behind both `ModelPicker`
- * (composer, compact pill trigger) and `ModelSelect` (settings, form-field
- * trigger). Groups preserve each group's first-seen order (the models
- * list's own ordering) rather than sorting — matches the reference design's
- * provider clusters without re-ranking providers. */
+ * (composer) and `ModelSelect` / plan toolbar pills. Groups preserve each
+ * group's first-seen order (the models list's own ordering).
+ *
+ * Pass `enabled: false` while the menu is closed so composers/settings don't
+ * rebuild group trees on every parent re-render. */
 export const useGroupedModels = (
   models: ModelInfoDto[],
   query: string,
   builtinProviders: BuiltinProvider[] = [],
-): { groups: ModelGroup[]; providerLabel: (providerId: string) => string } => {
+  enabled = true,
+): {
+  groups: ModelGroup[]
+  totalMatched: number
+  truncated: boolean
+  providerLabel: (providerId: string) => string
+} => {
   const providerLabel = useMemo(() => {
     const byId = new Map(builtinProviders.map((p) => [p.id, p.label]))
     return (providerId: string) => byId.get(providerId) ?? capitalize(providerId)
   }, [builtinProviders])
 
   const filtered = useMemo(() => {
+    if (!enabled) return null
     const q = query.trim().toLowerCase()
     if (!q) return models
     return models.filter(
@@ -35,9 +49,12 @@ export const useGroupedModels = (
         m.providerId.toLowerCase().includes(q) ||
         providerLabel(m.providerId).toLowerCase().includes(q),
     )
-  }, [models, query, providerLabel])
+  }, [enabled, models, query, providerLabel])
 
-  const groups = useMemo(() => {
+  const { groups, totalMatched, truncated } = useMemo(() => {
+    if (!filtered) {
+      return { groups: EMPTY_GROUPS, totalMatched: 0, truncated: false }
+    }
     const order: string[] = []
     const byProvider = new Map<string, ModelInfoDto[]>()
     for (const m of filtered) {
@@ -47,12 +64,27 @@ export const useGroupedModels = (
       }
       byProvider.get(m.providerId)?.push(m)
     }
-    return order.map((providerId) => ({
-      providerId,
-      label: providerLabel(providerId),
-      items: byProvider.get(providerId) ?? [],
-    }))
+
+    let remaining = MODEL_MENU_VISIBLE_CAP
+    const capped: ModelGroup[] = []
+    for (const providerId of order) {
+      if (remaining <= 0) break
+      const items = byProvider.get(providerId) ?? []
+      const slice = items.slice(0, remaining)
+      remaining -= slice.length
+      capped.push({
+        providerId,
+        label: providerLabel(providerId),
+        items: slice,
+      })
+    }
+
+    return {
+      groups: capped,
+      totalMatched: filtered.length,
+      truncated: filtered.length > MODEL_MENU_VISIBLE_CAP,
+    }
   }, [filtered, providerLabel])
 
-  return { groups, providerLabel }
+  return { groups, totalMatched, truncated, providerLabel }
 }

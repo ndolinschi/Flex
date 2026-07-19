@@ -24,7 +24,8 @@ type WorkingAgentsPillProps = {
 }
 
 /** Composer-adjacent glance: "N Working" opens a short menu of running
- * worker titles (open viewer / scroll to group). Hidden when none running. */
+ * worker titles (open viewer / scroll to group). Hidden when none running.
+ * Menu body (per-worker summarize) only mounts while open. */
 export const WorkingAgentsPill = ({
   workers,
   onScrollToWorkers,
@@ -68,59 +69,61 @@ export const WorkingAgentsPill = ({
             aria-hidden
           />
         </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="start"
-          side="top"
-          sideOffset={6}
-          className="min-w-[220px] max-w-[320px]"
-        >
-          <DropdownMenuGroup>
-            {onScrollToWorkers ? (
-              <>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setOpen(false)
-                    onScrollToWorkers()
-                  }}
-                >
-                  <Network />
-                  Jump to workers
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
-            ) : null}
-            {workers.map((w) => {
-              const activity = summarizeWorkerActivity(
-                w.children,
-                w.phase,
-                w.summary,
-              )
-              const title = workerTitle(w.role, w.task)
-              return (
-                <DropdownMenuItem
-                  key={w.childSession}
-                  className="h-auto items-start py-1.5"
-                  onClick={() => {
-                    setOpen(false)
-                    openSubagentViewer(w.childSession, title)
-                  }}
-                >
-                  <Bot className="mt-0.5" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm text-foreground">
-                      {title}
-                    </span>
-                    {activity.latestLabel ? (
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {activity.latestLabel}
+        {open ? (
+          <DropdownMenuContent
+            align="start"
+            side="top"
+            sideOffset={6}
+            className="min-w-[220px] max-w-[320px]"
+          >
+            <DropdownMenuGroup>
+              {onScrollToWorkers ? (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setOpen(false)
+                      onScrollToWorkers()
+                    }}
+                  >
+                    <Network />
+                    Jump to workers
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              ) : null}
+              {workers.map((w) => {
+                const activity = summarizeWorkerActivity(
+                  w.children,
+                  w.phase,
+                  w.summary,
+                )
+                const title = workerTitle(w.role, w.task)
+                return (
+                  <DropdownMenuItem
+                    key={w.childSession}
+                    className="h-auto items-start py-1.5"
+                    onClick={() => {
+                      setOpen(false)
+                      openSubagentViewer(w.childSession, title)
+                    }}
+                  >
+                    <Bot className="mt-0.5" />
+                    <span className="min-w-0 flex-1 text-left">
+                      <span className="block truncate text-sm text-foreground">
+                        {title}
                       </span>
-                    ) : null}
-                  </span>
-                </DropdownMenuItem>
-              )
-            })}
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
+                      {activity.latestLabel ? (
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {activity.latestLabel}
+                        </span>
+                      ) : null}
+                    </span>
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        ) : null}
       </DropdownMenu>
     </div>
   )

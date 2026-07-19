@@ -25,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Button, IconButton, RunningDot } from "../atoms"
-import { useGroupedModels } from "../../hooks/useGroupedModels"
+import { useGroupedModels, MODEL_MENU_VISIBLE_CAP } from "../../hooks/useGroupedModels"
 
 export type PlanBuildStatus = "draft" | "ready" | "building" | "built"
 
@@ -89,7 +89,12 @@ const PlanModelPill = ({
 
   const selected = models.find((m) => m.id === value)
   const label = selected?.displayName ?? selected?.id ?? "Select model"
-  const { groups } = useGroupedModels(models, query, builtinProviders)
+  const { groups, truncated, totalMatched } = useGroupedModels(
+    models,
+    query,
+    builtinProviders,
+    open,
+  )
 
   useEffect(() => {
     if (!open) setQuery("")
@@ -114,57 +119,63 @@ const PlanModelPill = ({
           />
         }
       >
-        <span className="min-w-0 flex-1 truncate">{label}</span>
+        <span className="min-w-0 truncate">{label}</span>
         <ChevronDown className="size-2.5 shrink-0 text-muted-foreground" aria-hidden />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={4} className="w-64 p-0">
-        <div className="border-b border-border px-2.5 py-2">
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.stopPropagation()}
-            placeholder="Search models"
-            aria-label="Search models"
-            className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-          />
-        </div>
-        <div className="max-h-56 overflow-y-auto py-1">
-          {groups.length === 0 ? (
-            <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">
-              No models found
-            </p>
-          ) : (
-            groups.map((group) => (
-              <DropdownMenuGroup key={group.providerId}>
-                <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
-                {group.items.map((m) => {
-                  const active = m.id === value
-                  return (
-                    <DropdownMenuItem
-                      key={m.id}
-                      className="mx-1"
-                      onClick={() => {
-                        onChange(m.id)
-                        setOpen(false)
-                      }}
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {m.displayName ?? m.id}
-                      </span>
-                      {active ? (
-                        <Check className="size-3 text-primary" aria-hidden />
-                      ) : (
-                        <span className="size-3" aria-hidden />
-                      )}
-                    </DropdownMenuItem>
-                  )
-                })}
-              </DropdownMenuGroup>
-            ))
-          )}
-        </div>
-      </DropdownMenuContent>
+      {open ? (
+        <DropdownMenuContent align="end" sideOffset={4} className="w-64 p-0">
+          <div className="border-b border-border px-2.5 py-2">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
+              placeholder="Search models"
+              aria-label="Search models"
+              className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto py-1">
+            {groups.length === 0 ? (
+              <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">
+                No models found
+              </p>
+            ) : (
+              groups.map((group) => (
+                <DropdownMenuGroup key={group.providerId}>
+                  <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                  {group.items.map((m) => {
+                    const active = m.id === value
+                    return (
+                      <DropdownMenuItem
+                        key={m.id}
+                        className="mx-1"
+                        onClick={() => {
+                          onChange(m.id)
+                          setOpen(false)
+                        }}
+                      >
+                        <span className="min-w-0 truncate">
+                          {m.displayName ?? m.id}
+                        </span>
+                        {active ? (
+                          <Check className="ml-auto size-3 text-primary" aria-hidden />
+                        ) : null}
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuGroup>
+              ))
+            )}
+            {truncated ? (
+              <p className="px-2.5 py-2 text-xs text-muted-foreground">
+                Showing {MODEL_MENU_VISIBLE_CAP} of {totalMatched}. Type to
+                narrow.
+              </p>
+            ) : null}
+          </div>
+        </DropdownMenuContent>
+      ) : null}
     </DropdownMenu>
   )
 }

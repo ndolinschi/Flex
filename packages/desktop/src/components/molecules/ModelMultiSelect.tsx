@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ChevronDown, ChevronUp, Plus, X } from "lucide-react"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
@@ -12,7 +12,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Label } from "../atoms"
-import { useGroupedModels } from "../../hooks/useGroupedModels"
+import {
+  MODEL_MENU_VISIBLE_CAP,
+  useGroupedModels,
+} from "../../hooks/useGroupedModels"
 
 type ModelMultiSelectProps = {
   id: string
@@ -29,13 +32,9 @@ type ModelMultiSelectProps = {
   builtinProviders?: BuiltinProvider[]
 }
 
-const displayFor = (id: string, models: ModelInfoDto[]): string =>
-  models.find((m) => m.id === id)?.displayName ?? id
-
 /** Ordered multi-select for the fallback model chain: removable, reorderable
  * chips + an "Add fallback" button that opens the same grouped/searchable
- * picker surface as `ModelSelect` (already-chosen models are excluded from
- * the list). Order matters — index 0 is tried first on failover. */
+ * picker surface as `ModelSelect`. */
 export const ModelMultiSelect = ({
   id,
   label = "Fallback models",
@@ -50,12 +49,33 @@ export const ModelMultiSelect = ({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
 
-  const available = models.filter((m) => !value.includes(m.id))
-  const { groups } = useGroupedModels(available, query, builtinProviders)
+  const selectedIds = useMemo(() => new Set(value), [value])
+  const displayById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const m of models) {
+      map.set(m.id, m.displayName ?? m.id)
+    }
+    return map
+  }, [models])
+
+  const available = useMemo(
+    () => models.filter((m) => !selectedIds.has(m.id)),
+    [models, selectedIds],
+  )
+
+  const { groups, truncated, totalMatched } = useGroupedModels(
+    available,
+    query,
+    builtinProviders,
+    open,
+  )
 
   useEffect(() => {
     if (!open) setQuery("")
   }, [open])
+
+  const displayFor = (modelId: string) =>
+    displayById.get(modelId) ?? modelId
 
   const moveUp = (index: number) => {
     if (index <= 0) return
@@ -86,51 +106,54 @@ export const ModelMultiSelect = ({
 
       {value.length > 0 ? (
         <ul className="flex flex-col gap-1" id={id}>
-          {value.map((modelId, index) => (
-            <li
-              key={`${modelId}-${index}`}
-              className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1.5"
-            >
-              <span className="w-4 shrink-0 text-center text-xs text-muted-foreground">
-                {index + 1}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-                {displayFor(modelId, models)}
-              </span>
-              <div className="flex shrink-0 items-center gap-0.5">
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label={`Move ${displayFor(modelId, models)} up`}
-                  disabled={disabled || index === 0}
-                  onClick={() => moveUp(index)}
-                  className="text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  <ChevronUp aria-hidden />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label={`Move ${displayFor(modelId, models)} down`}
-                  disabled={disabled || index === value.length - 1}
-                  onClick={() => moveDown(index)}
-                  className="text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  <ChevronDown aria-hidden />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label={`Remove ${displayFor(modelId, models)}`}
-                  disabled={disabled}
-                  onClick={() => removeAt(index)}
-                  className="text-muted-foreground hover:bg-muted hover:text-destructive"
-                >
-                  <X aria-hidden />
-                </Button>
-              </div>
-            </li>
-          ))}
+          {value.map((modelId, index) => {
+            const name = displayFor(modelId)
+            return (
+              <li
+                key={`${modelId}-${index}`}
+                className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1.5"
+              >
+                <span className="w-4 shrink-0 text-center text-xs text-muted-foreground">
+                  {index + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-left text-sm text-muted-foreground">
+                  {name}
+                </span>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`Move ${name} up`}
+                    disabled={disabled || index === 0}
+                    onClick={() => moveUp(index)}
+                    className="text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    <ChevronUp aria-hidden />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`Move ${name} down`}
+                    disabled={disabled || index === value.length - 1}
+                    onClick={() => moveDown(index)}
+                    className="text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    <ChevronDown aria-hidden />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`Remove ${name}`}
+                    disabled={disabled}
+                    onClick={() => removeAt(index)}
+                    className="text-muted-foreground hover:bg-muted hover:text-destructive"
+                  >
+                    <X aria-hidden />
+                  </Button>
+                </div>
+              </li>
+            )
+          })}
         </ul>
       ) : (
         <p className="text-xs text-muted-foreground">No fallbacks configured</p>
@@ -152,43 +175,51 @@ export const ModelMultiSelect = ({
           <Plus data-icon="inline-start" aria-hidden />
           Add fallback
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" sideOffset={4} className="w-72 p-0">
-          <div className="border-b border-border px-2.5 py-2">
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.stopPropagation()}
-              placeholder="Search models"
-              aria-label="Search models"
-              className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-            />
-          </div>
-          <div className="max-h-56 overflow-y-auto py-1">
-            {groups.length === 0 ? (
-              <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">
-                {available.length === 0 ? "All models added" : "No models found"}
-              </p>
-            ) : (
-              groups.map((group) => (
-                <DropdownMenuGroup key={group.providerId}>
-                  <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
-                  {group.items.map((m) => (
-                    <DropdownMenuItem
-                      key={m.id}
-                      className="mx-1"
-                      onClick={() => add(m.id)}
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {m.displayName ?? m.id}
-                      </span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuGroup>
-              ))
-            )}
-          </div>
-        </DropdownMenuContent>
+        {open ? (
+          <DropdownMenuContent align="start" sideOffset={4} className="w-72 p-0">
+            <div className="border-b border-border px-2.5 py-2">
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+                placeholder="Search models"
+                aria-label="Search models"
+                className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+            <div className="max-h-56 overflow-y-auto py-1">
+              {groups.length === 0 ? (
+                <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">
+                  {available.length === 0 ? "All models added" : "No models found"}
+                </p>
+              ) : (
+                groups.map((group) => (
+                  <DropdownMenuGroup key={group.providerId}>
+                    <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                    {group.items.map((m) => (
+                      <DropdownMenuItem
+                        key={m.id}
+                        className="mx-1"
+                        onClick={() => add(m.id)}
+                      >
+                        <span className="min-w-0 truncate">
+                          {m.displayName ?? m.id}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuGroup>
+                ))
+              )}
+              {truncated ? (
+                <p className="px-2.5 py-2 text-xs text-muted-foreground">
+                  Showing {MODEL_MENU_VISIBLE_CAP} of {totalMatched}. Type to
+                  narrow.
+                </p>
+              ) : null}
+            </div>
+          </DropdownMenuContent>
+        ) : null}
       </DropdownMenu>
     </div>
   )
