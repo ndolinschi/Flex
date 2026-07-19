@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react"
+import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, ChevronDown, GitBranch, GitPullRequest } from "lucide-react"
+import { GitBranch, GitPullRequest } from "lucide-react"
 import {
   gitBranch,
   gitCheckout,
@@ -12,12 +12,13 @@ import {
 import { openExternalUrl } from "../../lib/openExternalUrl"
 import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox"
 import { cn } from "../../lib/utils"
 
 type BranchPickerProps = {
@@ -26,8 +27,8 @@ type BranchPickerProps = {
   onError?: (message: string) => void
 }
 
-/** Cap rendered branch rows — large repos can have thousands of locals. */
-const BRANCH_MENU_VISIBLE_CAP = 100
+const triggerInputClassName =
+  "h-6 min-w-0 flex-1 border-0 bg-transparent shadow-none ring-0 has-[[data-slot=input-group-control]:focus-visible]:border-transparent has-[[data-slot=input-group-control]:focus-visible]:ring-0 focus-within:border-transparent focus-within:ring-0 text-sm font-normal text-muted-foreground opacity-80 hover:opacity-100 data-open:opacity-100"
 
 export const BranchPicker = ({
   cwd,
@@ -35,7 +36,6 @@ export const BranchPicker = ({
   onError,
 }: BranchPickerProps) => {
   const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState("")
   const [busy, setBusy] = useState(false)
   const queryClient = useQueryClient()
 
@@ -71,24 +71,8 @@ export const BranchPicker = ({
   })
   const branchPr = prStatus?.pr ?? null
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return branches
-    return branches.filter((b) => b.toLowerCase().includes(q))
-  }, [branches, query])
-
-  const visible = useMemo(
-    () => filtered.slice(0, BRANCH_MENU_VISIBLE_CAP),
-    [filtered],
-  )
-  const truncated = filtered.length > BRANCH_MENU_VISIBLE_CAP
-
   const label = current ?? "No branch"
   const canOpen = !!cwd && !disabled
-
-  useEffect(() => {
-    if (!open) setQuery("")
-  }, [open])
 
   const handleSelect = async (branch: string) => {
     if (!cwd || branch === current) {
@@ -111,88 +95,52 @@ export const BranchPicker = ({
 
   return (
     <div className="relative flex items-center gap-1">
-      <DropdownMenu open={open} onOpenChange={setOpen}>
-        <DropdownMenuTrigger
-          disabled={!canOpen || busy}
-          render={
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={!canOpen || busy}
-              aria-label={`Branch: ${label}`}
-              className={cn(
-                "h-6 max-w-[12rem] justify-start gap-1 px-1.5 font-normal",
-                "text-sm text-muted-foreground opacity-80",
-                "hover:bg-transparent hover:text-foreground hover:opacity-100",
-                "aria-expanded:opacity-100",
-              )}
-            />
-          }
+      <Combobox
+        items={open ? branches : []}
+        value={current ?? null}
+        onValueChange={(next) => {
+          if (typeof next === "string" && next) void handleSelect(next)
+        }}
+        open={open}
+        onOpenChange={setOpen}
+        disabled={!canOpen || busy}
+      >
+        <div
+          className="flex max-w-[12rem] items-center gap-1"
+          aria-label={`Branch: ${label}`}
         >
-          <GitBranch className="size-3 shrink-0" aria-hidden />
-          <span className="min-w-0 truncate">{label}</span>
-          <ChevronDown className="size-2.5 shrink-0" aria-hidden />
-        </DropdownMenuTrigger>
-        {open ? (
-          <DropdownMenuContent
-            align="start"
-            side="top"
-            sideOffset={6}
-            className="w-72 p-0"
-          >
-            <div className="border-b border-border px-2.5 py-2">
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.stopPropagation()}
-                placeholder="Search branches…"
-                aria-label="Search branches"
-                className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-              />
-            </div>
-            <DropdownMenuGroup className="max-h-56 overflow-y-auto py-1">
-              {isFetching && filtered.length === 0 ? (
-                <div className="px-2.5 py-3 text-center text-xs text-muted-foreground">
-                  Loading branches…
-                </div>
-              ) : filtered.length === 0 ? (
-                <div className="px-2.5 py-3 text-center text-xs text-muted-foreground">
-                  No branches found
-                </div>
-              ) : (
-                <>
-                  {visible.map((branch) => {
-                    const active = branch === current
-                    return (
-                      <DropdownMenuItem
-                        key={branch}
-                        disabled={busy}
-                        onClick={() => void handleSelect(branch)}
-                        className="mx-1"
-                      >
-                        <span className="min-w-0 truncate">{branch}</span>
-                        {active ? (
-                          <span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                            Current
-                            <Check className="size-3 text-primary" aria-hidden />
-                          </span>
-                        ) : null}
-                      </DropdownMenuItem>
-                    )
-                  })}
-                  {truncated ? (
-                    <div className="px-2.5 py-2 text-xs text-muted-foreground">
-                      Showing {BRANCH_MENU_VISIBLE_CAP} of {filtered.length}. Type
-                      to narrow.
-                    </div>
+          <GitBranch
+            className="size-3 shrink-0 text-muted-foreground"
+            aria-hidden
+          />
+          <ComboboxInput
+            placeholder={label}
+            aria-label={`Branch: ${label}`}
+            className={triggerInputClassName}
+            disabled={!canOpen || busy}
+          />
+        </div>
+        <ComboboxContent className="w-72" side="top" align="start">
+          <ComboboxEmpty>
+            {isFetching ? "Loading branches…" : "No branches found"}
+          </ComboboxEmpty>
+          <ComboboxList>
+            {(branch) => {
+              const active = branch === current
+              return (
+                <ComboboxItem key={branch} value={branch} disabled={busy}>
+                  <span className="min-w-0 truncate">{branch}</span>
+                  {active ? (
+                    <span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                      Current
+                    </span>
                   ) : null}
-                </>
-              )}
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        ) : null}
-      </DropdownMenu>
+                </ComboboxItem>
+              )
+            }}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
 
       {branchPr ? (
         <Button

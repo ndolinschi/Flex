@@ -12,6 +12,14 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
 import { ErrorBanner, ModelSelect } from "../../components/molecules"
 import { useInlineCompletionPrefs } from "../../hooks/useInlineCompletionPrefs"
@@ -348,20 +356,28 @@ export const CompletionSetupModal = ({
               <>
                 <label className="flex flex-col gap-1.5">
                   <span className="text-xs text-ink-muted">Provider</span>
-                  <select
-                    className="h-9 w-full rounded-md border border-stroke-3 bg-elevated px-3 text-sm text-ink outline-none focus:border-stroke-2"
+                  <Select
+                    items={otherProviders.map((id) => ({ value: id, label: id }))}
                     value={providerId}
-                    onChange={(e) => {
-                      setProviderId(e.target.value)
+                    onValueChange={(v) => {
+                      if (v == null) return
+                      setProviderId(v)
                       setModelId("")
                     }}
                   >
-                    {otherProviders.map((id) => (
-                      <option key={id} value={id}>
-                        {id}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full" size="sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {otherProviders.map((id) => (
+                          <SelectItem key={id} value={id}>
+                            {id}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                 </label>
                 <ModelSelect
                   id="completion-provider-model"

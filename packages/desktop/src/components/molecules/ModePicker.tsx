@@ -1,8 +1,6 @@
 import { useEffect, useMemo } from "react"
 import {
   Bug,
-  Check,
-  ChevronDown,
   ListTodo,
   MessageCircle,
   Network,
@@ -12,14 +10,14 @@ import type { ComposerMode, PermissionMode } from "../../lib/types"
 import { FLEX_MODE_ENABLED } from "../../lib/featureFlags"
 import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
-import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 type ModeOption = {
   id: ComposerMode
@@ -81,6 +79,10 @@ type ModePickerProps = {
 /** Agent / Plan / Ask (/ Flex when flagged) mode picker for the composer footer. */
 export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
   const modes = useMemo(() => visibleComposerModes(), [])
+  const items = useMemo(
+    () => modes.map((m) => ({ label: m.label, value: m.id })),
+    [modes],
+  )
   const effectiveValue =
     value === "flex" && !FLEX_MODE_ENABLED ? "agent" : value
   const selected = modes.find((m) => m.id === effectiveValue) ?? modes[0]
@@ -92,59 +94,49 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
   }, [value, onChange])
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        disabled={disabled}
-        render={
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={disabled}
-            aria-label={`Mode: ${selected.label}`}
-          />
+    <Select
+      items={items}
+      value={effectiveValue}
+      disabled={disabled}
+      onValueChange={(next) => {
+        if (next == null) return
+        const mode = next as ComposerMode
+        onChange(mode)
+        if (mode === "plan") {
+          useAppStore.getState().revealPlanPanel()
         }
+      }}
+    >
+      <SelectTrigger
+        size="sm"
+        aria-label={`Mode: ${selected.label}`}
+        className="gap-1.5"
       >
         <Icon className={cn("size-3.5", selected.accent)} aria-hidden />
-        {selected.label}
-        <ChevronDown data-icon="inline-end" className="opacity-60" aria-hidden />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" className="w-56">
-        <DropdownMenuGroup>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent side="top" align="start" alignItemWithTrigger={false} className="min-w-56">
+        <SelectGroup>
           {modes.map((mode) => {
             const ModeIcon = mode.icon
-            const isActive = mode.id === effectiveValue
             return (
-              <DropdownMenuItem
-                key={mode.id}
-                className="items-start py-2"
-                onClick={() => {
-                  onChange(mode.id)
-                  if (mode.id === "plan") {
-                    useAppStore.getState().revealPlanPanel()
-                  }
-                }}
-              >
+              <SelectItem key={mode.id} value={mode.id} className="items-start py-2">
                 <ModeIcon
                   className={cn("mt-0.5 size-3.5 shrink-0", mode.accent)}
                   aria-hidden
                 />
                 <span className="min-w-0 flex-1 text-left">
-                  <span className="flex items-center gap-1.5 text-sm text-foreground">
-                    {mode.label}
-                    {isActive ? (
-                      <Check className="size-3 text-primary" aria-hidden />
-                    ) : null}
-                  </span>
+                  <span className="block text-sm text-foreground">{mode.label}</span>
                   <span className="block text-xs text-muted-foreground">
                     {mode.description}
                   </span>
                 </span>
-              </DropdownMenuItem>
+              </SelectItem>
             )
           })}
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </SelectGroup>
+      </SelectContent>
+    </Select>
   )
 }
 

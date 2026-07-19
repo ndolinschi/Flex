@@ -1,5 +1,13 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
 import { TextInput } from "../atoms"
 import { ErrorBanner } from "./ErrorBanner"
@@ -9,8 +17,11 @@ import { ModelSelect } from "./ModelSelect"
 import { ProviderPicker } from "./ProviderPicker"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 
-const selectClassName =
-  "h-8 w-full rounded-md border border-border bg-surface px-2.5 text-sm text-ink focus:border-stroke-2 focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
+const ISOLATION_ITEMS = [
+  { value: "never", label: "Never" },
+  { value: "optional", label: "Optional (when git allows)" },
+  { value: "required", label: "Required" },
+]
 
 type ProviderConnectionFormProps = {
   editingId: string | null
@@ -342,16 +353,27 @@ export const ProviderConnectionForm = ({
           htmlFor="defaultIsolation"
           hint="Sessions can override this when created — this only sets the starting default"
         >
-          <select
-            id="defaultIsolation"
+          <Select
+            items={ISOLATION_ITEMS}
             value={defaultIsolation}
-            onChange={(e) => onDefaultIsolationChange(e.target.value)}
-            className={selectClassName}
+            onValueChange={(v) => {
+              if (v == null) return
+              onDefaultIsolationChange(v)
+            }}
           >
-            <option value="never">Never</option>
-            <option value="optional">Optional (when git allows)</option>
-            <option value="required">Required</option>
-          </select>
+            <SelectTrigger id="defaultIsolation" className="w-full" size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {ISOLATION_ITEMS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </FieldRow>
       </SettingsSection>
 

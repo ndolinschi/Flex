@@ -1,6 +1,14 @@
 import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
 import { TextArea, TextInput } from "../../../components/atoms"
 import {
@@ -12,7 +20,12 @@ import {
 import { useModels } from "../../../hooks/useModels"
 import { routinesUpsert, toInvokeError } from "../../../lib/tauri"
 import type { RoutineDto } from "../../../lib/types"
-import { KEBAB_RE, selectClasses } from "./constants"
+import { KEBAB_RE } from "./constants"
+
+const TRIGGER_KIND_ITEMS = [
+  { value: "cron", label: "Cron" },
+  { value: "webhook", label: "Webhook" },
+] as const
 
 type FormState = {
   id: string
@@ -134,15 +147,27 @@ export const CreateRoutineForm = ({
 
       <FieldRow label="Trigger" htmlFor="routine-trigger-kind">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <select
-            id="routine-trigger-kind"
+          <Select
+            items={TRIGGER_KIND_ITEMS}
             value={form.triggerKind}
-            onChange={(e) => patch({ triggerKind: e.target.value as "cron" | "webhook" })}
-            className={selectClasses}
+            onValueChange={(v) => {
+              if (v == null) return
+              patch({ triggerKind: v as "cron" | "webhook" })
+            }}
           >
-            <option value="cron">Cron</option>
-            <option value="webhook">Webhook</option>
-          </select>
+            <SelectTrigger id="routine-trigger-kind" className="w-full" size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {TRIGGER_KIND_ITEMS.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
 
           <TextInput
             id="routine-trigger-value"

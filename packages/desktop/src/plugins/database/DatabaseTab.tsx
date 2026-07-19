@@ -12,6 +12,14 @@ import {
 } from "lucide-react"
 import { ScrollArea, TextArea, TextInput } from "../../components/atoms"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { ConfirmDialog, EmptyState, ErrorBanner, FormField } from "../../components/molecules"
 import {
   dbActiveConnection,
@@ -527,18 +535,27 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
             />
           </FormField>
           <FormField label="Engine" htmlFor="db-engine">
-            <select
-              id="db-engine"
+            <Select
+              items={ENGINE_OPTIONS.map((o) => ({ value: o.id, label: o.label }))}
               value={form.engine}
-              onChange={(e) => setEngine(e.target.value as DbEngine)}
-              className="h-9 w-full rounded-md border border-stroke-2 bg-bg px-2 text-sm text-ink"
+              onValueChange={(v) => {
+                if (v == null) return
+                setEngine(v as DbEngine)
+              }}
             >
-              {ENGINE_OPTIONS.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="db-engine" className="w-full" size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {ENGINE_OPTIONS.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </FormField>
           <FormField
             label={form.engine === "sqlite" ? "File path" : "Connection URL"}

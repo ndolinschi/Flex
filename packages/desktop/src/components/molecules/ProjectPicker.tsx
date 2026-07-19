@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { Check, ChevronDown, Folder, FolderOpen } from "lucide-react"
+import { Folder, FolderOpen } from "lucide-react"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
 import { createSession, toInvokeError, updateSession } from "../../lib/tauri"
 import { isBrowserPreview, NATIVE_APP_REQUIRED } from "../../lib/browserPreview"
@@ -10,14 +10,16 @@ import { useAppStore } from "../../stores/appStore"
 import { basename, parentPathPrefix } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxLabel,
+  ComboboxList,
+  ComboboxSeparator,
+} from "@/components/ui/combobox"
 
 type ProjectPickerProps = {
   sessionId: string | null
@@ -28,14 +30,16 @@ type ProjectPickerProps = {
 
 const RECENT_CAP = 10
 
+const triggerInputClassName =
+  "h-6 min-w-0 flex-1 border-0 bg-transparent shadow-none ring-0 has-[[data-slot=input-group-control]:focus-visible]:border-transparent has-[[data-slot=input-group-control]:focus-visible]:ring-0 focus-within:border-transparent focus-within:ring-0 text-sm font-normal text-muted-foreground opacity-80 hover:opacity-100 data-open:opacity-100"
+
 export const ProjectPicker = ({
   sessionId,
   cwd,
   disabled = false,
   onError,
 }: ProjectPickerProps) => {
-  const [openMenu, setOpenMenu] = useState(false)
-  const [query, setQuery] = useState("")
+  const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const queryClient = useQueryClient()
   const recentCwds = useAppStore((s) => s.recentCwds)
@@ -49,7 +53,7 @@ export const ProjectPicker = ({
 
   const recents = useMemo(() => {
     // Closed: skip session-cache scan — trigger only needs `label`.
-    if (!openMenu) return []
+    if (!open) return []
     const sessions =
       queryClient.getQueryData<
         { cwd: string; base_cwd?: string; parent_id?: string }[]
@@ -71,21 +75,7 @@ export const ProjectPicker = ({
       unique.push(path)
     }
     return unique.slice(0, RECENT_CAP)
-  }, [openMenu, recentCwds, cwd, queryClient])
-
-  const filtered = useMemo(() => {
-    if (!openMenu) return []
-    const q = query.trim().toLowerCase()
-    if (!q) return recents
-    return recents.filter(
-      (p) =>
-        p.toLowerCase().includes(q) || basename(p).toLowerCase().includes(q),
-    )
-  }, [openMenu, recents, query])
-
-  useEffect(() => {
-    if (!openMenu) setQuery("")
-  }, [openMenu])
+  }, [open, recentCwds, cwd, queryClient])
 
   const applyCwd = async (nextCwd: string) => {
     setBusy(true)
@@ -116,7 +106,7 @@ export const ProjectPicker = ({
         setActiveSessionId(meta.id, { panel: "closed" })
         setRoute("chat")
       }
-      setOpenMenu(false)
+      setOpen(false)
     } catch (err) {
       onError?.(toInvokeError(err))
     } finally {
@@ -143,87 +133,71 @@ export const ProjectPicker = ({
   }
 
   return (
-    <DropdownMenu open={openMenu} onOpenChange={setOpenMenu}>
-      <DropdownMenuTrigger
-        disabled={disabled || busy}
-        render={
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={disabled || busy}
-            aria-label={`Project: ${label}`}
-            className="h-6 max-w-[10rem] justify-start gap-1 px-1.5 text-sm font-normal text-muted-foreground opacity-80 hover:bg-transparent hover:text-foreground hover:opacity-100 aria-expanded:opacity-100"
-          />
-        }
+    <Combobox
+      items={open ? recents : []}
+      value={cwd ?? null}
+      onValueChange={(next) => {
+        if (typeof next === "string" && next) void applyCwd(next)
+      }}
+      itemToStringLabel={(path) => basename(path)}
+      open={open}
+      onOpenChange={setOpen}
+      disabled={disabled || busy}
+    >
+      <div
+        className="flex max-w-[10rem] items-center gap-1"
+        aria-label={`Project: ${label}`}
       >
-        <Folder className="size-3 shrink-0" aria-hidden />
-        <span className="min-w-0 truncate">{label}</span>
-        <ChevronDown className="size-2.5 shrink-0" aria-hidden />
-      </DropdownMenuTrigger>
-      {openMenu ? (
-        <DropdownMenuContent
-          align="start"
-          side="top"
-          sideOffset={6}
-          className="w-80 p-0"
-        >
-          <div className="border-b border-border px-2.5 py-2">
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.stopPropagation()}
-              placeholder="Run agent anywhere…"
-              aria-label="Search projects"
-              className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-            />
-          </div>
-          {filtered.length > 0 ? (
-            <DropdownMenuGroup className="max-h-48 overflow-y-auto py-1">
-              <DropdownMenuLabel>Recents</DropdownMenuLabel>
-              {filtered.map((path) => {
-                const active = path === cwd
+        <Folder className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+        <ComboboxInput
+          placeholder={label}
+          aria-label={`Project: ${label}`}
+          className={triggerInputClassName}
+          disabled={disabled || busy}
+        />
+      </div>
+      <ComboboxContent className="w-80" side="top" align="start">
+        <ComboboxEmpty>No recent projects</ComboboxEmpty>
+        {recents.length > 0 ? (
+          <ComboboxGroup>
+            <ComboboxLabel>Recents</ComboboxLabel>
+            <ComboboxList>
+              {(path) => {
                 const parent = parentPathPrefix(path)
                 const name = basename(path)
                 return (
-                  <DropdownMenuItem
-                    key={path}
-                    disabled={busy}
-                    onClick={() => void applyCwd(path)}
-                    className="mx-1"
-                  >
-                    <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <ComboboxItem key={path} value={path} disabled={busy}>
+                    <Folder
+                      className="size-3.5 shrink-0 text-muted-foreground"
+                      aria-hidden
+                    />
                     <span className="min-w-0 truncate" aria-label={path}>
                       {parent ? (
                         <span className="text-muted-foreground">{parent}</span>
                       ) : null}
                       <span className="text-foreground">{name}</span>
                     </span>
-                    {active ? (
-                      <Check className="ml-auto size-3 shrink-0 text-primary" aria-hidden />
-                    ) : null}
-                  </DropdownMenuItem>
+                  </ComboboxItem>
                 )
-              })}
-            </DropdownMenuGroup>
-          ) : (
-            <div className="px-2.5 py-3 text-center text-xs text-muted-foreground">
-              No recent projects
-            </div>
-          )}
-          <DropdownMenuSeparator className="m-0" />
-          <DropdownMenuGroup className="py-1">
-            <DropdownMenuItem
-              disabled={busy}
-              onClick={() => void handleOpenFolder()}
-              className="mx-1"
-            >
-              <FolderOpen />
-              Open Folder
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      ) : null}
-    </DropdownMenu>
+              }}
+            </ComboboxList>
+          </ComboboxGroup>
+        ) : null}
+        <ComboboxSeparator />
+        <div className="p-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start"
+            disabled={busy}
+            onClick={() => void handleOpenFolder()}
+          >
+            <FolderOpen />
+            Open Folder
+          </Button>
+        </div>
+      </ComboboxContent>
+    </Combobox>
   )
 }

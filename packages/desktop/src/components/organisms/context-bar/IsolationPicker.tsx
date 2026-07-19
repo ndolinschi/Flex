@@ -1,16 +1,15 @@
-import { useState } from "react"
-import { Check, GitFork } from "lucide-react"
+import { GitFork } from "lucide-react"
 import type { IsolationPolicy } from "../../../lib/types"
 import { useAppStore } from "../../../stores/appStore"
-import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const ISOLATION_OPTIONS: {
   value: IsolationPolicy
@@ -48,7 +47,6 @@ export const IsolationPicker = ({
   sessionId: string
   disabled?: boolean
 }) => {
-  const [open, setOpen] = useState(false)
   const selectedIsolation = useAppStore((s) => s.selectedIsolation)
   const setSelectedIsolation = useAppStore((s) => s.setSelectedIsolation)
   // Both selectors must run unconditionally on every render — `||` short-
@@ -81,53 +79,38 @@ export const IsolationPicker = ({
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger
-        disabled={disabled}
-        render={
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={disabled}
-            aria-label={`Isolation: ${currentLabel}`}
-            className="ml-1 h-6 gap-1 rounded-md px-1.5 text-sm font-normal text-muted-foreground opacity-80 hover:bg-transparent hover:text-foreground hover:opacity-100 aria-expanded:opacity-100"
-          />
-        }
+    <Select
+      items={ISOLATION_OPTIONS}
+      value={current}
+      disabled={disabled}
+      onValueChange={(v) => {
+        if (v == null) return
+        setSelectedIsolation(v as IsolationPolicy)
+      }}
+    >
+      <SelectTrigger
+        aria-label={`Isolation: ${currentLabel}`}
+        className="ml-1 h-6 w-auto gap-1 rounded-md border-0 bg-transparent px-1.5 text-sm font-normal text-muted-foreground opacity-80 shadow-none hover:bg-transparent hover:text-foreground hover:opacity-100 data-[size=sm]:h-6 data-open:opacity-100"
+        size="sm"
       >
         <GitFork className="size-3 shrink-0" aria-hidden />
-        <span className="min-w-0 truncate">{currentLabel}</span>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" sideOffset={6} className="w-72">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>Session isolation</DropdownMenuLabel>
-          {ISOLATION_OPTIONS.map((opt) => {
-            const active = opt.value === current
-            return (
-              <DropdownMenuItem
-                key={opt.value}
-                className="items-start gap-2"
-                onClick={() => {
-                  setSelectedIsolation(opt.value)
-                  setOpen(false)
-                }}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5 text-sm text-foreground">
-                    {opt.label}
-                    {active ? (
-                      <Check className="size-3 text-primary" aria-hidden />
-                    ) : null}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    {opt.description}
-                  </span>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent align="start" className="w-72">
+        <SelectGroup>
+          <SelectLabel>Session isolation</SelectLabel>
+          {ISOLATION_OPTIONS.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              <span className="flex flex-col gap-0.5">
+                <span>{opt.label}</span>
+                <span className="text-xs text-muted-foreground">
+                  {opt.description}
                 </span>
-              </DropdownMenuItem>
-            )
-          })}
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+              </span>
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
   )
 }

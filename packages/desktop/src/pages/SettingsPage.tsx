@@ -2,6 +2,14 @@ import { Moon, Sun } from "lucide-react"
 import { SettingsShell } from "../components/templates"
 import { SettingsCard, SettingRow, SETTINGS_NAV_ITEMS, AccentColorPicker } from "../components/molecules"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Toggle } from "../components/atoms"
 import { ProviderSettingsForm } from "../components/organisms"
 import { AUTOMATIONS_UI_ENABLED } from "../lib/featureFlags"
@@ -150,20 +158,32 @@ const BehaviorContent = () => {
         description="Bypass applies in Agent mode; AskUserQuestion still appears. Plan, Ask, and Flex keep their own safeguards."
         first
       >
-        <select
+        <Select
+          items={PERMISSION_MODE_OPTIONS}
           value={defaultPermissionMode}
-          onChange={(e) =>
-            setDefaultPermissionMode(e.target.value as PermissionMode)
-          }
-          aria-label="Default permission mode"
-          className="h-8 rounded-md border border-border bg-surface px-2.5 text-sm text-ink focus:border-stroke-2 focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
+          onValueChange={(v) => {
+            if (v == null) return
+            setDefaultPermissionMode(v as PermissionMode)
+          }}
         >
-          {PERMISSION_MODE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger
+            id="default-permission-mode"
+            aria-label="Default permission mode"
+            className="w-full"
+            size="sm"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {PERMISSION_MODE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </SettingRow>
       <SettingRow
         rowId="behavior-isolation"

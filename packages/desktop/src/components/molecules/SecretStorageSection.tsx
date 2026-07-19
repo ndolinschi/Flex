@@ -1,9 +1,20 @@
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { ErrorBanner } from "./ErrorBanner"
 import { FieldRow, SettingsSection } from "./SettingsSection"
 import type { SecretStorageMode } from "../../lib/types"
 
-const selectClassName =
-  "h-8 w-full rounded-md border border-border bg-surface px-2.5 text-sm text-ink focus:border-stroke-2 focus:outline-none focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
+const SECRET_STORAGE_ITEMS: Array<{ value: SecretStorageMode; label: string }> =
+  [
+    { value: "file", label: "Local file (no system prompts)" },
+    { value: "keychain", label: "System Keychain (OS-protected)" },
+  ]
 
 type SecretStorageSectionProps = {
   secretStorage: SecretStorageMode | undefined
@@ -21,6 +32,10 @@ export const SecretStorageSection = ({
   error,
   onChange,
 }: SecretStorageSectionProps) => {
+  const items = isMac
+    ? SECRET_STORAGE_ITEMS
+    : SECRET_STORAGE_ITEMS.filter((item) => item.value !== "keychain")
+
   return (
     <SettingsSection
       title="Security"
@@ -39,18 +54,28 @@ export const SecretStorageSection = ({
               : "Local file stores the encryption key on disk, readable by your user account — no system prompts, ever. System Keychain is only available on macOS."
         }
       >
-        <select
-          id="secretStorage"
+        <Select
+          items={items}
           value={secretStorage ?? "file"}
           disabled={disabled}
-          onChange={(e) => onChange(e.target.value as SecretStorageMode)}
-          className={selectClassName}
+          onValueChange={(v) => {
+            if (v == null) return
+            onChange(v as SecretStorageMode)
+          }}
         >
-          <option value="file">Local file (no system prompts)</option>
-          {isMac ? (
-            <option value="keychain">System Keychain (OS-protected)</option>
-          ) : null}
-        </select>
+          <SelectTrigger id="secretStorage" className="w-full" size="sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {items.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </FieldRow>
       {error ? (
         <div className="px-4 py-3">
