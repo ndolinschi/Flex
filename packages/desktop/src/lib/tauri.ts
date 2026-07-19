@@ -501,6 +501,12 @@ export const listDirChildren = (
     fallbackCwd: fallbackCwd || null,
   })
 
+/** Drop the Rust warm path cache used by `list_files`. Omit `cwd` to clear all. */
+export const invalidateWorkspacePathCache = (
+  cwd?: string | null,
+): Promise<void> =>
+  invoke("invalidate_workspace_path_cache", { cwd: cwd || null })
+
 /** Resolve a live workspace directory (cwd, else fallbackCwd / base_cwd). */
 export const resolveWorkspaceCwd = (
   cwd: string,
@@ -680,6 +686,16 @@ export const listenSessionEvents = (
 ): Promise<UnlistenFn> => {
   if (isBrowserPreview()) return Promise.resolve(() => {})
   return tauriListen<SessionEvent>("session-event", (e) => {
+    handler(e.payload)
+  })
+}
+
+/** Fired once a deferred session baseline is persisted (create/resume). */
+export const listenSessionBaselineReady = (
+  handler: (payload: { sessionId: string }) => void,
+): Promise<UnlistenFn> => {
+  if (isBrowserPreview()) return Promise.resolve(() => {})
+  return tauriListen<{ sessionId: string }>("session-baseline-ready", (e) => {
     handler(e.payload)
   })
 }

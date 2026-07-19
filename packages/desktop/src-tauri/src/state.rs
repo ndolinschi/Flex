@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 // Plain (non-async) Mutex for the terminal registry: PTY I/O on the writer
 // and resize calls are blocking, so a guard must never be held across an
 // `.await` point. Aliased to avoid clashing with the existing tokio Mutex
@@ -18,6 +19,34 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::config::ProviderConfig;
+
+/// Soft TTL for the in-process workspace path cache used by `list_files`.
+/// Long enough to cover a burst of keystrokes; short enough that new files
+/// appear without an explicit invalidate after a few idle seconds.
+pub const WORKSPACE_PATH_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// One entry in the warm path list (`list_files` reuses this instead of
+/// re-walking the tree on every keystroke).
+#[derive(Debug, Clone)]
+pub struct CachedPathEntry {
+    pub path: String,
+    pub name: String,
+    pub is_dir: bool,
+}
+
+/// Process-level cache of a workspace walk, keyed by
+/// `(canonical_root, include_ignored)`.
+#[derive(Debug, Clone)]
+pub struct WorkspacePathCache {
+    pub entries: Vec<CachedPathEntry>,
+    pub built_at: Instant,
+}
+
+impl WorkspacePathCache {
+    pub fn fresh(&self) -> bool {
+        self.built_at.elapsed() < WORKSPACE_PATH_CACHE_TTL
+    }
+}
 
 /// In-flight GitHub Copilot device-code sign-in. The full
 /// [`DeviceAuthorization`] (including the private `device_code`) stays on
@@ -63,8 +92,8 @@ pub struct SessionBaseline {
     /// Dirty paths (from `git status --porcelain`) at capture time, mapped
     /// to a `git hash-object` content hash. Deleted paths are recorded with
     /// the sentinel `"deleted"`, and pre-existing untracked directories with
-    /// the sentinel `"dir"` (see `capture_session_baseline` in `commands.rs`
-    /// for why the "dir" sentinel matters).
+    /// the sentinel `"dir"` (see `capture_session_baseline` in
+    /// `commands/git.rs` for why the "dir" sentinel matters).
     pub files: HashMap<String, String>,
 }
 
@@ -160,6 +189,10 @@ pub struct AppState {
     pub db_plugin: Mutex<crate::db_plugin::DbPluginState>,
     /// Desktop Remote Access HTTP server + connection-method adapters.
     pub remote: Mutex<Option<crate::remote::RemoteServerHandle>>,
+    /// Warm path lists for `list_files` (Files search / composer `@`).
+    /// Sync mutex: filled and read from `spawn_blocking` / short critical
+    /// sections — never held across an `.await`.
+    pub workspace_path_cache: SyncMutex<HashMap<(String, bool), WorkspacePathCache>>,
 }
 
 impl AppState {
@@ -184,6 +217,7 @@ impl AppState {
             pending_chatgpt_auth: Mutex::new(HashMap::new()),
             db_plugin: Mutex::new(crate::db_plugin::DbPluginState::load()),
             remote: Mutex::new(crate::remote::init_remote_server().ok()),
+            workspace_path_cache: SyncMutex::new(HashMap::new()),
         }
     }
 }

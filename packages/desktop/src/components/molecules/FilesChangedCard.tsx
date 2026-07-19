@@ -37,7 +37,6 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
     queryFn: () => gitStatusSinceBaseline(sessionId!),
     enabled: !!cwd && !!sessionId && isRepo !== false,
     staleTime: 30_000,
-    refetchOnMount: "always",
   })
 
   const totalCount = summary?.totalCount ?? 0

@@ -1,6 +1,10 @@
 import { useEffect, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { subscribeSession, unsubscribeSession } from "../lib/tauri"
+import {
+  listenSessionBaselineReady,
+  subscribeSession,
+  unsubscribeSession,
+} from "../lib/tauri"
 import { subscribeSessionEvents } from "../lib/sessionEventBus"
 import { useAppStore } from "../stores/appStore"
 import { applyGlobalSessionEvent } from "../lib/sessionSideEffects/applyGlobalEvent"
@@ -40,6 +44,27 @@ export const useGlobalSessionEvents = () => {
     return subscribeSessionEvents((event) => {
       applyGlobalSessionEvent(event, { queryClient: queryClientRef.current })
     })
+  }, [])
+
+  // Deferred baseline capture finishes after create/resume returns. Early
+  // git-status polls may have cached full-repo status; bust them once the
+  // session-scoped baseline is ready so Changes / badges switch filters.
+  useEffect(() => {
+    let disposed = false
+    let unlisten: (() => void) | undefined
+    void listenSessionBaselineReady(({ sessionId }) => {
+      void queryClientRef.current.invalidateQueries({
+        predicate: (q) =>
+          q.queryKey[0] === "git-status" && q.queryKey[2] === sessionId,
+      })
+    }).then((fn) => {
+      if (disposed) fn()
+      else unlisten = fn
+    })
+    return () => {
+      disposed = true
+      unlisten?.()
+    }
   }, [])
 
   useEffect(() => {

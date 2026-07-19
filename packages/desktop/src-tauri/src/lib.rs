@@ -322,6 +322,7 @@ pub fn run() {
             commands::review_file_diff,
             commands::list_files,
             commands::list_dir_children,
+            commands::invalidate_workspace_path_cache,
             commands::resolve_workspace_cwd,
             commands::list_commands,
             db_plugin::db_list_connections,
