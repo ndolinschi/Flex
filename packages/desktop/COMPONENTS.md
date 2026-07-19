@@ -68,7 +68,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `BranchPrStatusChip` | Current-branch PR # + title + CI summary; opens PR in browser | `pr` | ChangesTab header |
 | `CreatePrDialog` | Editable title/body modal before `gh pr create` | `open`, `initialTitle?`, `initialBody?`, `onConfirm` | ChangesTab, CommitCenter, CommitBar |
 | `PopoverTray` | Shared Esc/click-outside/↑↓ tray; used for autocomplete (slash/@) and form popovers (commit message) | `open`, `onClose`, `placement`, `children` | Composer trays, CommitBar |
-| `ContextMenu` | Portal menu; ignores timeline scroll + webview-induced `window.blur` so it stays open mid-stream | `position`, `items`, `onClose` | ContentPane `+`, SessionListItem, FileExplorer, PlanToolbar |
+| `ContextMenu` | Portal menu; ignores timeline scroll + webview-induced `window.blur` so it stays open mid-stream | `position`, `items`, `onClose` | ContentPane `+`, SessionListItem, FileExplorer |
 | `ConfirmDialog` | In-app modal (rename/delete/create PR fields) | `open`, `title`, `onConfirm`, `onCancel`, `confirmDisabled?` | SessionMenu, CreatePrDialog |
 | `AttachmentChip` | Pending attachment pill (file/image/directory/dom) | `attachment`, `onRemove` | Composer |
 | `SendButton` | Circular send / stop / queue | `isStreaming`, `canQueue?`, `onSend`, `onStop` | Composer |
@@ -281,7 +281,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Dialog | yes | `ConfirmDialog`, auth/PR/bug/MCP dialogs | Portal + focus already hand-rolled |
 | Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
 | Drawer | maybe | `SubagentViewer` (bottom overlay) | Spike vs keep custom |
-| Dropdown Menu | yes | `SessionMenu`, `PlusMenu`, overflow menus | |
+| Dropdown Menu | yes | `@/components/ui/dropdown-menu` — Mode/Model/Plus pickers, SessionMenu, TitleBarMenus, overflow menus | Base UI `render` trigger prop |
 | Empty | yes | `EmptyState` | |
 | Field | yes | `FormField` + settings forms | `FieldGroup` / `FieldLabel` / validation attrs |
 | Hover Card | later | — | Optional enrichment on chips |
