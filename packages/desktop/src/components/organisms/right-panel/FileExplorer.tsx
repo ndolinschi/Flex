@@ -340,7 +340,9 @@ export const FileExplorer = ({
   )
 
   const refreshLists = async (paths: string[] = []) => {
-    await invalidateWorkspacePathCache(cwd)
+    // Fire-and-forget: do not serialize the UI behind path canonicalize +
+    // cache clear — React Query refetch can race the clear safely (cold walk).
+    void invalidateWorkspacePathCache(cwd)
     await queryClient.invalidateQueries({
       queryKey: ["workspace-dir-children", cwd],
     })

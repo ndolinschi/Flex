@@ -142,6 +142,7 @@ export const Composer = ({
     handlePick,
     handlePaste,
     handleDrop,
+    picking,
   } = useComposerAttachments()
 
   // Surface attachment errors through the same banner as everything else.
@@ -349,6 +350,7 @@ export const Composer = ({
                   <PlusMenu
                     onAttachFile={() => void handlePick("file")}
                     onAttachImage={() => void handlePick("image")}
+                    disabled={picking}
                   />
                   <ModePicker
                     value={composerMode}

@@ -15,8 +15,13 @@ export const useComposerAttachments = () => {
   const removeAttachment = useAppStore((s) => s.removeAttachment)
   const clearAttachments = useAppStore((s) => s.clearAttachments)
   const [error, setError] = useState<string | null>(null)
+  /** True while the native OS file dialog is open — dims the + button so a
+   * main-thread modal wait does not look like a frozen app. */
+  const [picking, setPicking] = useState(false)
 
   const handlePick = async (kind: "file" | "image") => {
+    if (picking) return
+    setPicking(true)
     try {
       if (isBrowserPreview()) {
         setError(NATIVE_APP_REQUIRED)
@@ -42,6 +47,8 @@ export const useComposerAttachments = () => {
       }
     } catch (err) {
       setError(toInvokeError(err))
+    } finally {
+      setPicking(false)
     }
   }
 
@@ -84,6 +91,7 @@ export const useComposerAttachments = () => {
     clearAttachments,
     error,
     setError,
+    picking,
     handlePick,
     handlePaste,
     handleDrop,

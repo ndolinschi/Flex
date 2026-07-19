@@ -105,16 +105,21 @@ pub async fn list_files(
     let cache_key = (root_key.clone(), include_ignored);
 
     // Fast path: reuse a fresh warm walk without leaving the async worker.
-    {
+    // Clone under the lock, score after — never hold SyncMutex across the
+    // sort (sync `invalidate_workspace_path_cache` needs the same lock and
+    // would stall the UI thread if it blocked here).
+    let cached_entries = {
         let cache = state
             .workspace_path_cache
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        if let Some(entry) = cache.get(&cache_key) {
-            if entry.fresh() {
-                return Ok(score_cached_paths(&entry.entries, &needle));
-            }
-        }
+        cache
+            .get(&cache_key)
+            .filter(|entry| entry.fresh())
+            .map(|entry| entry.entries.clone())
+    };
+    if let Some(entries) = cached_entries {
+        return Ok(score_cached_paths(&entries, &needle));
     }
 
     let root_for_walk = root.clone();
@@ -143,18 +148,33 @@ pub async fn list_files(
 /// Drop the warm `list_files` path cache. Pass `cwd` to clear only entries
 /// for that workspace root; omit to clear everything (used after FS-mutating
 /// tools / turn settle).
+///
+/// Async so path canonicalize never runs as a sync Tauri command on the UI
+/// thread (composer Attach / `@` can race with this after turn settle).
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
-pub fn invalidate_workspace_path_cache(state: State<'_, AppState>, cwd: Option<String>) {
+pub async fn invalidate_workspace_path_cache(
+    state: State<'_, AppState>,
+    cwd: Option<String>,
+) -> DesktopResult<()> {
+    let scope = cwd
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|cwd| {
+            let resolved = crate::path_resolve::resolve_existing_dir(cwd, None)
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| std::path::PathBuf::from(cwd));
+            (resolved, cwd.to_string())
+        });
+
+    // Resolve happens above (may touch disk); only hold the mutex for retain.
     let mut cache = state
         .workspace_path_cache
         .lock()
         .unwrap_or_else(|e| e.into_inner());
-    match cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-        Some(cwd) => {
-            let resolved = crate::path_resolve::resolve_existing_dir(cwd, None)
-                .map(|p| p.to_path_buf())
-                .unwrap_or_else(|| std::path::PathBuf::from(cwd));
+    match scope {
+        Some((resolved, raw_cwd)) => {
             // Component-aware prefix: string `starts_with` would also evict a
             // sibling root like `/project2` when invalidating `/project`.
             cache.retain(|(root, _), _| {
@@ -162,10 +182,11 @@ pub fn invalidate_workspace_path_cache(state: State<'_, AppState>, cwd: Option<S
                 root_path != resolved.as_path() && !root_path.starts_with(&resolved)
             });
             // Also drop keys that were stored before canonicalize (raw cwd).
-            cache.retain(|(root, _), _| root != cwd);
+            cache.retain(|(root, _), _| root != &raw_cwd);
         }
         None => cache.clear(),
     }
+    Ok(())
 }
 
 /// Bound the walk so huge repos can't stall an interactive keystroke.

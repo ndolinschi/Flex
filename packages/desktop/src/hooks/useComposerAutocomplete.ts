@@ -117,6 +117,7 @@ export const useComposerAutocomplete = ({
     enabled: debouncedAtQuery !== null && !!cwd && !atDismissed,
     staleTime: 15_000,
     placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
   })
 
   const { data: pluginHits = [] } = useQuery({
