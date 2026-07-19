@@ -1,5 +1,5 @@
 import { ShieldIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Toggle } from "@/components/ui/toggle"
 import { cn } from "@/lib/utils"
 import { Tooltip } from "./Tooltip"
 
@@ -14,7 +14,7 @@ type BypassPermissionsButtonProps = {
 const allowsBypass = (mode: string): boolean =>
   mode === "agent" || mode === "debug"
 
-/** Session-scoped bypass-permissions shield — shadcn Button icon. */
+/** Session-scoped bypass-permissions shield — pressed Toggle in the composer. */
 export const BypassPermissionsButton = ({
   composerMode,
   sessionBypass,
@@ -22,6 +22,7 @@ export const BypassPermissionsButton = ({
   onToggle,
 }: BypassPermissionsButtonProps) => {
   const canBypass = allowsBypass(composerMode)
+  const pressed = sessionBypass && canBypass
   const shieldLabel = !canBypass
     ? "Bypass applies in Agent or Debug mode"
     : sessionBypass
@@ -30,23 +31,21 @@ export const BypassPermissionsButton = ({
 
   return (
     <Tooltip label={shieldLabel}>
-      <Button
-        type="button"
-        variant="ghost"
+      <Toggle
         size="icon-xs"
+        pressed={pressed}
         disabled={disabled || !canBypass}
         aria-label={shieldLabel}
-        aria-pressed={sessionBypass && canBypass}
-        onClick={onToggle}
+        onPressedChange={() => onToggle()}
         className={cn(
-          "size-6 shrink-0 rounded-full",
-          sessionBypass && canBypass
-            ? "bg-orange/15 text-orange opacity-100 hover:bg-orange/25 hover:text-orange"
+          "shrink-0 rounded-full",
+          pressed
+            ? "bg-orange/15 text-orange opacity-100 hover:bg-orange/25 hover:text-orange data-pressed:bg-orange/15 data-pressed:text-orange"
             : "text-muted-foreground opacity-50 hover:bg-muted hover:opacity-80",
         )}
       >
         <ShieldIcon />
-      </Button>
+      </Toggle>
     </Tooltip>
   )
 }

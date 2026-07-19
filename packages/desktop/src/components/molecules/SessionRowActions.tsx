@@ -1,5 +1,6 @@
 import { memo, type MouseEvent } from "react"
 import { Button } from "@/components/ui/button"
+import { Toggle } from "@/components/ui/toggle"
 import {
   ArchiveRestore,
   Archive as ArchiveIcon,
@@ -16,7 +17,7 @@ type SessionRowActionsProps = {
   updatedAtMs: number
   isActive: boolean
   formatTime: (ms: number) => string
-  onTogglePin?: (e: MouseEvent) => void
+  onTogglePin?: () => void
   onSetArchived?: (e: MouseEvent, archived: boolean) => void
   onOpenMenu: (e: MouseEvent<HTMLButtonElement>) => void
   canTogglePin: boolean
@@ -71,26 +72,27 @@ export const SessionRowActions = memo(function SessionRowActions({
         {actionsReady ? (
           <>
             <Tooltip label={pinned ? "Unpin" : "Pin"}>
-              <Button
-      type="button"
-      variant="ghost"
-      size="icon-2xs"
-      aria-label={pinned ? "Unpin session" : "Pin session"} title={pinned ? "Unpin session" : "Pin session"}
-      disabled={!canTogglePin}
-      onClick={(e) => {
-                  e.stopPropagation()
-                  onTogglePin?.(e)
-                }}
-      className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
-        "opacity-50 hover:opacity-80",
-      )}
-    >
-      <Pin
-                  className={cn("h-3 w-3", pinned && "fill-current text-accent")}
+              <Toggle
+                size="icon-2xs"
+                pressed={pinned}
+                aria-label={pinned ? "Unpin session" : "Pin session"}
+                title={pinned ? "Unpin session" : "Pin session"}
+                disabled={!canTogglePin}
+                onClick={(e) => e.stopPropagation()}
+                onPressedChange={() => onTogglePin?.()}
+                className={cn(
+                  "text-muted-foreground opacity-50 hover:bg-muted hover:opacity-80 hover:text-foreground",
+                  pinned && "opacity-100",
+                )}
+              >
+                <Pin
+                  className={cn(
+                    "h-3 w-3",
+                    pinned && "fill-current text-accent",
+                  )}
                   aria-hidden
                 />
-    </Button>
+              </Toggle>
             </Tooltip>
             {archived ? (
               <Tooltip label="Restore">

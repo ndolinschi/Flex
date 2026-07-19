@@ -20,7 +20,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `TabClose` | Hover-collapse close control for tabs/chips | `label`, `onClose`, `revealOnFocusWithin?` | `Tab` |
 | `TabStrip` | Horizontal open-tabs strip; content panes scroll tabs and pin trailing actions | `children`, `className?` | ContentPane, ChatSessionTabBar |
 | `Badge` | Status / meta chip | `tone`, `children` | ToolCallChip |
-| `BypassPermissionsButton` | Session bypass-permissions shield | `composerMode`, `sessionBypass`, `onToggle` | Composer |
+| `BypassPermissionsButton` | Session bypass-permissions shield (Toggle) | `composerMode`, `sessionBypass`, `onToggle` | Composer |
 | `Kbd` | Keyboard shortcut hint | `children` | WelcomePage |
 | `Divider` | Horizontal rule | `label?` | SettingsShell |
 | `HighlightedLabel` | Fuzzy-match accent spans in a label | `label`, `query` | FuzzySessionRow |
@@ -265,7 +265,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Breadcrumb | yes | `PlanToolbar` crumbs | Small win |
 | Bubble | yes (chat kit) | user/assistant bubbles in timeline | After Message spike |
 | Button | ✅ done | Call sites use `@/components/ui/button`; `atoms/Button` is a re-export only; `IconButton` removed | Compose Spinner + `disabled` instead of `isLoading` |
-| Button Group | yes | composer toolbar clusters | Optional; `ToggleGroup` covers ModePicker |
+| Button Group | yes | composer toolbar clusters | Optional; ModePicker is Select |
 | Calendar | skip | — | No date UX today |
 | Card | selective | settings cards, catalog cards | Use full Card composition only where DESIGN allows cards |
 | Carousel | skip | — | |
@@ -315,8 +315,8 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Tabs | careful | panel/file tabs | Prefer keep custom `Tab*` for chrome chips; shadcn Tabs for settings sections only |
 | Textarea | ✅ done | Forms, settings, commit/PR/bug dialogs, SQL | `@/components/ui/textarea`; atoms `TextArea` re-export; composer draft stays specialized raw `<textarea>` |
 | Toast | n/a | — | Use **Sonner**, not legacy Toast component |
-| Toggle | yes | ModePicker pills if not ToggleGroup | Distinct from Switch |
-| Toggle Group | yes | `ModePicker` (Agent/Plan/Ask[/Flex]) | Ideal fit |
+| Toggle | ✅ done | Bypass shield, session pin, QuestionPrompt option chips | `@/components/ui/toggle`; pressed uses `fill-4` (orange override for bypass). Distinct from Switch |
+| Toggle Group | later | QuestionPrompt multi chips (optional); ModePicker stays Select | Ideal for exclusive/multi chip sets; Mode/Isolation already Select |
 | Tooltip | yes | `Tooltip` atom | |
 | Typography | selective | prose in settings / empty states | Do not replace `MarkdownBody` |
 
@@ -330,7 +330,7 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | **0 — Foundation** | ✅ `components.json` (`base-nova`), `@/` alias, `clsx`+`tailwind-merge` `cn`, shadcn semantic vars bridged to Flex tokens (`data-theme` only — no `.dark` second system) | `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
 | **1 — Atom adapters** | ✅ Button is `@/components/ui/button` (atoms re-export only); Spinner + Alert. `IconButton` removed; `Toggle` → `@/components/ui/switch`; `TextArea` → `@/components/ui/textarea`. Remaining: Input, Label, Checkbox, Badge, Kbd, Separator, Skeleton, Avatar, Tooltip, ScrollArea | Atom unit tests + vitest green |
 | **2 — Overlays & menus** | ✅ Dialog + AlertDialog + DropdownMenu + ContextMenu; remaining: Popover, Menubar, Sonner | Confirm/auth on AlertDialog; Search/Command on Dialog; right-click on ContextMenu |
-| **3 — Forms & pickers** | ✅ Select + Combobox; remaining: Field/FieldGroup, ToggleGroup, RadioGroup, Input Group, Command | Settings native selects → Select; Project/Branch → Combobox; Mode/Isolation → Select |
+| **3 — Forms & pickers** | ✅ Select + Combobox + Toggle (pressed buttons); remaining: Field/FieldGroup, ToggleGroup, RadioGroup, Input Group, Command | Settings native selects → Select; Project/Branch → Combobox; Mode/Isolation → Select; bypass/pin/question chips → Toggle |
 | **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty; optional Sidebar/Sheet/Drawer spikes | Split sash + empty states; sidebar spike documented go/no-go |
 | **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Chip/bubble/marker parity; scroller decision recorded here |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
