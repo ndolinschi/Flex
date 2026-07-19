@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react"
 import { Check, Copy, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { TextInput, Toggle } from "../../components/atoms"
+import { TextInput } from "../../components/atoms"
+import { Switch } from "@/components/ui/switch"
 import { SettingsCard, SettingRow } from "../../components/molecules"
 import {
   remoteAccessGet,
@@ -138,11 +139,12 @@ export const RemoteAccessContent = () => {
           description="Start a chat-only Remote API so a phone can see and send messages. The client cannot run tools, change MCP, or mutate the system."
           first
         >
-          <Toggle
+          <Switch
             checked={status.config.enabled}
             disabled={saving}
-            onChange={(enabled) => void save({ enabled })}
-            label="Toggle remote access"
+            onCheckedChange={(enabled) => void save({ enabled })}
+            aria-label="Toggle remote access"
+            title="Toggle remote access"
           />
         </SettingRow>
         <SettingRow
@@ -237,10 +239,10 @@ export const RemoteAccessContent = () => {
               description={meta.description}
               first={index === 0}
             >
-              <Toggle
+              <Switch
                 checked={checked}
                 disabled={saving || comingSoon}
-                onChange={(next) => {
+                onCheckedChange={(next) => {
                   if (key === "cloudflare") {
                     void save({
                       methods: {
@@ -252,7 +254,8 @@ export const RemoteAccessContent = () => {
                     void save({ methods: { ...methods, [key]: next } })
                   }
                 }}
-                label={`Toggle ${meta.title}`}
+                aria-label={`Toggle ${meta.title}`}
+                title={`Toggle ${meta.title}`}
               />
             </SettingRow>
           )

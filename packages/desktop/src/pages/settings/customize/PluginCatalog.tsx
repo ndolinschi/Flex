@@ -10,7 +10,8 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Spinner as ButtonSpinner } from "@/components/ui/spinner"
-import { Spinner, TextInput, Toggle } from "../../../components/atoms"
+import { Spinner, TextInput } from "../../../components/atoms"
+import { Switch } from "@/components/ui/switch"
 import { ErrorBanner, SettingsSection } from "../../../components/molecules"
 import { useProviderConfig } from "../../../hooks/useProviderConfig"
 import type { PluginPrefs } from "../../../lib/types"
@@ -203,31 +204,39 @@ export const PluginCatalog = () => {
 
         {plugin.key === "learning" && added ? (
           <div className="ml-11 flex flex-col gap-2 border-l border-stroke-3 pl-3">
-            <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
+            <label
+              htmlFor="learning-require-human-approval"
+              className="flex items-center justify-between gap-3 text-sm text-ink-secondary"
+            >
               <span>Require human approval for SkillSave / MemoryWrite</span>
-              <Toggle
+              <Switch
+                id="learning-require-human-approval"
                 checked={!!plugins.learningRequireHumanApproval}
-                onChange={(on) =>
+                onCheckedChange={(on) =>
                   void savePlugins(
                     { learningRequireHumanApproval: on },
                     "learningRequireHumanApproval",
                   )
                 }
-                label="Require human approval for SkillSave / MemoryWrite"
+                aria-label="Require human approval for SkillSave / MemoryWrite"
                 disabled={busyKey !== null}
               />
             </label>
-            <label className="flex items-center justify-between gap-3 text-sm text-ink-secondary">
+            <label
+              htmlFor="learning-require-verified-memory"
+              className="flex items-center justify-between gap-3 text-sm text-ink-secondary"
+            >
               <span>Require Verify before memory writes</span>
-              <Toggle
+              <Switch
+                id="learning-require-verified-memory"
                 checked={!!plugins.learningRequireVerifiedMemory}
-                onChange={(on) =>
+                onCheckedChange={(on) =>
                   void savePlugins(
                     { learningRequireVerifiedMemory: on },
                     "learningRequireVerifiedMemory",
                   )
                 }
-                label="Require Verify before memory writes"
+                aria-label="Require Verify before memory writes"
                 disabled={busyKey !== null}
               />
             </label>

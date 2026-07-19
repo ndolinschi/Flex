@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Spinner, Toggle } from "../../components/atoms"
+import { Spinner } from "../../components/atoms"
+import { Switch } from "@/components/ui/switch"
 import {
   ErrorBanner,
   SettingRow,
@@ -61,10 +62,11 @@ export const InlineCompletionSettingsCard = () => {
           {isLoading ? (
             <Spinner className="h-3.5 w-3.5" />
           ) : (
-            <Toggle
+            <Switch
               checked={!!prefs?.enabled && configured}
-              onChange={(v) => void toggleEnabled(v)}
-              label="Enable inline prompt completions"
+              onCheckedChange={(v) => void toggleEnabled(v)}
+              aria-label="Enable inline prompt completions"
+              title="Enable inline prompt completions"
               disabled={isSaving}
             />
           )}

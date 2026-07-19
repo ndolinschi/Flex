@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Plug, Settings2, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
+import { Switch } from "@/components/ui/switch"
 import { Badge } from "../../../components/atoms"
 import {
   ConfirmDialog,
@@ -107,13 +108,16 @@ export const McpServerRow = ({ server }: { server: McpServerDto }) => {
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-ink-secondary">
-            <input
-              type="checkbox"
+          <label
+            htmlFor={`mcp-enabled-${server.id}`}
+            className="flex items-center gap-1.5 text-xs text-ink-secondary"
+          >
+            <Switch
+              id={`mcp-enabled-${server.id}`}
               checked={server.enabled}
               disabled={toggleMutation.isPending}
-              onChange={() => void toggleMutation.mutateAsync()}
-              className="h-3.5 w-3.5 rounded border-border accent-accent"
+              onCheckedChange={() => void toggleMutation.mutateAsync()}
+              aria-label={`Enable ${server.id}`}
             />
             Enabled
           </label>

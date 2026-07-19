@@ -15,7 +15,7 @@ type CheckboxProps = Omit<
 
 /** Round selection control — filled accent circle + check when on, hairline
  * ring when off. Used by Changes select-all / file rows (not a settings switch;
- * use `Toggle` for binary prefs). */
+ * use `Switch` for binary prefs). */
 export const Checkbox = ({
   checked,
   indeterminate = false,
