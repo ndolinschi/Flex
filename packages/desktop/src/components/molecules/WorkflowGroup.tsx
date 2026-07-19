@@ -119,7 +119,7 @@ const StepRow = ({ step }: { step: ResolvedStep }) => {
           className={cn(
             "min-w-0 flex-1 truncate",
             step.state === "in_progress" && "animate-shimmer-text",
-            step.state === "failed" ? "text-danger" : "text-ink-secondary",
+            step.state === "failed" ? "text-destructive" : "text-ink-secondary",
           )}
         >
           {step.label}
@@ -261,7 +261,7 @@ export const WorkflowGroup = ({
           className={cn(
             "min-w-0 truncate text-ink-secondary",
             state === "in_progress" && "animate-shimmer-text",
-            state === "failed" && "text-danger",
+            state === "failed" && "text-destructive",
           )}
         >
           Workflow

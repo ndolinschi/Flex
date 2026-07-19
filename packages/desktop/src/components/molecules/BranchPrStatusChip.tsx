@@ -34,7 +34,7 @@ export const BranchPrStatusChip = ({ pr, className }: BranchPrStatusChipProps) =
       <span
         className={cn(
           "shrink-0",
-          failing ? "text-danger" : pending ? "text-ink-muted" : "text-success",
+          failing ? "text-destructive" : pending ? "text-ink-muted" : "text-success",
         )}
       >
         {pr.checksSummary}

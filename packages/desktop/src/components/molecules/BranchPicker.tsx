@@ -124,7 +124,7 @@ export const BranchPicker = ({
             className={cn(
               "min-w-0 truncate",
               branchPr.checksSummary.includes("failing")
-                ? "text-danger"
+                ? "text-destructive"
                 : branchPr.checksSummary.includes("pending")
                   ? "text-ink-muted"
                   : "text-success",

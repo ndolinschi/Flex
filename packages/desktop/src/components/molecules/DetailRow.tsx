@@ -130,7 +130,7 @@ export const DetailRow = ({
     <li
       className={cn(
         "flex flex-col animate-tool-step-in",
-        detail.failed && "text-danger",
+        detail.failed && "text-destructive",
         detail.running && "text-ink-faint",
       )}
     >

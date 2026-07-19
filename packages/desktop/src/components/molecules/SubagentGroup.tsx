@@ -48,7 +48,7 @@ const StatusGlyph = ({ status }: { status: WorkerStatus }) => {
     )
   }
   if (status === "failed") {
-    return <X className="h-3.5 w-3.5 shrink-0 text-danger" aria-hidden />
+    return <X className="h-3.5 w-3.5 shrink-0 text-destructive" aria-hidden />
   }
   return <Check className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
 }
@@ -175,7 +175,7 @@ export const SubagentGroup = memo(function SubagentGroup({
               className={cn(
                 "min-w-0 truncate text-ink-secondary",
                 status === "running" && "animate-shimmer-text",
-                status === "failed" && "text-danger",
+                status === "failed" && "text-destructive",
               )}
             >
               {title}

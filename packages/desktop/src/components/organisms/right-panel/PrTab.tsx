@@ -82,7 +82,7 @@ export const PrTab = ({ active }: PrTabProps) => {
               <span
                 className={cn(
                   failing
-                    ? "text-danger"
+                    ? "text-destructive"
                     : pending
                       ? "text-ink-muted"
                       : "text-success",

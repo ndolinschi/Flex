@@ -145,7 +145,7 @@ export const ToolStepGroup = memo(function ToolStepGroup({
         className={cn(
           "h-auto w-full justify-start gap-1 rounded-md px-0 py-px font-normal text-base",
           "text-ink-muted hover:bg-transparent hover:text-ink-secondary",
-          summary.failed && "text-danger",
+          summary.failed && "text-destructive",
         )}
       >
         <KindIcon kind={summary.kind} running={summary.running} />
