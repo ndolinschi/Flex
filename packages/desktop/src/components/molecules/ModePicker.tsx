@@ -52,15 +52,14 @@ const MODES: ModeOption[] = [
   {
     id: "debug",
     label: "Debug",
-    description:
-      "Reproduce → probe → fix → clean: temporary debug code, then remove it",
+    description: "Reproduce, probe, fix, then clean up",
     icon: Bug,
     accent: "text-orange",
   },
   {
     id: "flex",
     label: "Flex",
-    description: "Orchestrates planning, review, and isolated workers across models",
+    description: "Plan, review, and run isolated workers",
     icon: Network,
     accent: "text-purple",
   },
@@ -115,7 +114,7 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
         <Icon className={cn("size-3.5", selected.accent)} aria-hidden />
         <SelectValue />
       </SelectTrigger>
-      <SelectContent side="top" align="start" alignItemWithTrigger={false} className="min-w-56">
+      <SelectContent side="top" align="start" alignItemWithTrigger={false} className="min-w-64">
         <SelectGroup>
           {modes.map((mode) => {
             const ModeIcon = mode.icon
@@ -127,7 +126,7 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
                 />
                 <span className="min-w-0 flex-1 text-left">
                   <span className="block text-sm text-foreground">{mode.label}</span>
-                  <span className="block text-xs text-muted-foreground">
+                  <span className="block whitespace-normal text-xs text-muted-foreground">
                     {mode.description}
                   </span>
                 </span>
