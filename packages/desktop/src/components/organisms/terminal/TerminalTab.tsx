@@ -20,6 +20,8 @@ const EMPTY_TERMINALS: TerminalMeta[] = []
 /** Terminal right-panel tab: terminal list + xterm instances.
  * Scoped to the session that owns this content tab (prop `sessionId`).
  * Stays mounted when inactive (parent hides via display:none).
+ * Only the *active* terminal mounts an xterm instance — others stay as
+ * metadata + `terminalBus` scrollback until selected.
  *
  * Opening the tab with zero workspace terminals auto-creates one PTY so the
  * user lands in a shell instead of an empty state. */
@@ -231,18 +233,18 @@ export const TerminalTab = ({
               onAction={() => void handleNewTerminal()}
             />
           ) : null}
-          {terminals.map((t) => (
+          {activeTerminal ? (
             <TerminalInstance
-              key={t.id}
-              id={t.id}
-              active={active && t.id === activeTerminalId}
+              key={activeTerminal.id}
+              id={activeTerminal.id}
+              active={active}
             />
-          ))}
-          {hasAgentStream && agentId ? (
+          ) : null}
+          {isAgentSelected && agentId ? (
             <TerminalInstance
               key={agentId}
               id={agentId}
-              active={active && agentId === activeTerminalId}
+              active={active}
               readOnly
             />
           ) : null}

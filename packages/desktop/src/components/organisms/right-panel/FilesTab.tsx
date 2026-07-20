@@ -139,7 +139,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
     queryKey: ["workspace-file", activeSessionId, path],
     queryFn: () => readTextFile(activeSessionId!, path!),
     enabled: !!activeSessionId && !!path && !browseMode,
-    staleTime: 5_000,
+    staleTime: 60_000,
   })
 
   const draft = path ? drafts[path] : undefined

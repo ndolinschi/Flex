@@ -1,47 +1,52 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
+import { useQueries } from "@tanstack/react-query"
 import { useProviderConfig } from "./useProviderConfig"
 import { indexStatus } from "../lib/tauri"
 
-/** Low-cost map of `cwd → indexed` for sidebar badges. Polls once when the
- * set of repo cwds changes; skips entirely when the index plugin is off. */
+const STALE_TIME_MS = 5 * 60_000
+
+/** Low-cost map of `cwd → indexed` for sidebar badges.
+ *
+ * Per-cwd React Query cache (5 min stale) so expanding/collapsing repos does
+ * not re-hit `index_status` IPC for every path on each cwd-set change.
+ * Skips entirely when the index plugin is off. */
 export const useIndexedRepos = (cwds: string[]): Record<string, boolean> => {
   const { config } = useProviderConfig()
   const indexEnabled = !!config?.plugins?.index
-  const key = useMemo(
-    () =>
-      [...new Set(cwds.filter(Boolean))]
-        .sort()
-        .join("\0"),
+  const paths = useMemo(
+    () => [...new Set(cwds.filter(Boolean))].sort(),
     [cwds],
   )
-  const [ready, setReady] = useState<Record<string, boolean>>({})
 
-  useEffect(() => {
-    if (!indexEnabled || !key) {
-      setReady({})
-      return
-    }
-    let cancelled = false
-    const paths = key.split("\0").filter(Boolean)
-    void (async () => {
-      const entries = await Promise.all(
-        paths.map(async (cwd) => {
-          try {
-            const status = await indexStatus(cwd)
-            return [cwd, status.ready] as const
-          } catch {
-            return [cwd, false] as const
-          }
-        }),
-      )
-      if (!cancelled) {
-        setReady(Object.fromEntries(entries))
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [indexEnabled, key])
+  const results = useQueries({
+    queries: paths.map((cwd) => ({
+      queryKey: ["index-status", cwd] as const,
+      queryFn: async () => {
+        try {
+          const status = await indexStatus(cwd)
+          return status.ready
+        } catch {
+          return false
+        }
+      },
+      enabled: indexEnabled && !!cwd,
+      staleTime: STALE_TIME_MS,
+      gcTime: STALE_TIME_MS * 2,
+    })),
+  })
 
-  return ready
+  // Derive a stable key — `useQueries` returns a new array each render.
+  const readyKey = results
+    .map((r) => (r.data === true ? "1" : r.data === false ? "0" : "?"))
+    .join("")
+
+  return useMemo(() => {
+    const out: Record<string, boolean> = {}
+    paths.forEach((cwd, i) => {
+      const ready = results[i]?.data
+      if (typeof ready === "boolean") out[cwd] = ready
+    })
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- readyKey tracks result data
+  }, [paths, readyKey])
 }

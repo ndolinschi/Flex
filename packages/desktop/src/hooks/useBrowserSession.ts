@@ -629,7 +629,7 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     const watchdog = window.setInterval(() => measure(false), watchdogMs)
     // Overlay open/close doesn't resize the content host — observe DOM so
     // CommandPalette / ConfirmDialog / etc. immediately hide the webview.
-    const overlayObserver = new MutationObserver(() => measure(true))
+    const overlayObserver = new MutationObserver(() => schedule())
     overlayObserver.observe(document.body, {
       childList: true,
       subtree: true,

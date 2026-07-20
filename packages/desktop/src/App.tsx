@@ -23,6 +23,7 @@ import { Spinner } from "./components/atoms"
 import { WelcomePage } from "./pages/WelcomePage"
 import { sessionScopeKey, useAppStore } from "./stores/appStore"
 import { cn } from "./lib/utils"
+import { startDesktopIdlePrefetch } from "./lib/idlePrefetch"
 
 const SettingsPage = lazy(() =>
   import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
@@ -255,6 +256,12 @@ const AppRoutes = () => {
 
   useBootstrap(setRoute, setTheme)
   useUpdaterCheck(isBootstrapped && route !== "welcome")
+
+  // Background-load heavy tab chunks + markdown highlight after the shell
+  // is interactive (Files / Terminal / Browser first-open hitch).
+  useEffect(() => {
+    if (isBootstrapped) startDesktopIdlePrefetch()
+  }, [isBootstrapped])
 
   const openCommandPalette = useCallback(() => setCommandPaletteOpen(true), [])
   const openSearch = useCallback(() => setSearchModalOpen(true), [])

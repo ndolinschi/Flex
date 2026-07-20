@@ -101,13 +101,21 @@ const materializedIdsFromRows = (rows: TimelineRow[]): Set<string> => {
   return ids
 }
 
+/** Kinds that can introduce a new materialized message id — only then rebuild
+ * the Set (full row scans on every delta were a long-session hotspot). */
+const MATERIALIZED_ID_KINDS: ReadonlySet<AgentEvent["kind"]> = new Set([
+  "assistant_message",
+  "user_message",
+])
+
 /**
  * Active-session timeline: replay + live row/buffer updates.
  * Turn lifecycle / HITL / subscribe ownership live in `useGlobalSessionEvents`.
  *
  * Pass `live: false` for visited/hidden chat tabs so they keep the last
  * painted rows without folding every streaming delta (and without a live
- * bus subscription). Re-activating boots a fresh replay + subscribe.
+ * bus subscription). Re-activating warm-reattaches the bus (and delta
+ * replays from `lastSeq`) instead of clearing + full `replay(0)`.
  */
 export const useSessionEvents = (
   sessionId: string | null,
@@ -130,12 +138,14 @@ export const useSessionEvents = (
   )
   const rowsRef = useRef<TimelineRow[]>([])
   const sessionRef = useRef<string | null>(null)
-  /** True after a successful cold boot for the current sessionId — flipping
-   * `live` false→true (switching back to a visited chat) must reattach the
-   * bus without clearing rows and re-replaying JSONL. */
-  const hasBootedRef = useRef(false)
   const resyncRef = useRef<(() => Promise<void>) | null>(null)
   const thinkingSpansRef = useRef<Record<string, ThinkingSpan>>({})
+  /** True after a successful cold boot for the current `sessionId`. */
+  const hasBootedRef = useRef(false)
+  /** Highest applied event seq — warm remount delta-replays from lastSeq+1. */
+  const lastSeqRef = useRef(0)
+  /** Cached message ids already on the timeline (avoids O(rows) per event). */
+  const materializedIdsRef = useRef<Set<string>>(new Set())
 
   // Event-burst coalescing: a fast run of Tauri events (e.g. rapid
   // tool_call_updated / markdown_delta during streaming) would otherwise
@@ -246,8 +256,12 @@ export const useSessionEvents = (
       }
 
       rowsRef.current = applyEventToTimeline(rowsRef.current, event)
+      if (event.seq > lastSeqRef.current) lastSeqRef.current = event.seq
 
-      const materialized = materializedIdsFromRows(rowsRef.current)
+      if (MATERIALIZED_ID_KINDS.has(event.payload.kind)) {
+        materializedIdsRef.current = materializedIdsFromRows(rowsRef.current)
+      }
+      const materialized = materializedIdsRef.current
       const prevUpdate = pendingBuffersRef.current
       pendingSessionIdRef.current = event.session_id
       pendingBuffersRef.current = (prev) => {
@@ -292,6 +306,8 @@ export const useSessionEvents = (
       cancelPendingFlush()
       sessionRef.current = null
       hasBootedRef.current = false
+      lastSeqRef.current = 0
+      materializedIdsRef.current = new Set()
       rowsRef.current = []
       setRows([])
       setError(null)
@@ -303,6 +319,13 @@ export const useSessionEvents = (
       return
     }
 
+    // Session identity changed on this hook instance — drop warm cache.
+    if (sessionRef.current !== sessionId) {
+      hasBootedRef.current = false
+      lastSeqRef.current = 0
+      materializedIdsRef.current = new Set()
+    }
+
     // Visited/hidden chat: keep last painted rows, drop the live bus so
     // background streaming does not fold + remasure every frame.
     if (!live) {
@@ -310,13 +333,59 @@ export const useSessionEvents = (
       return
     }
 
-    // Session identity changed on this hook instance — force a cold boot.
-    if (sessionRef.current !== null && sessionRef.current !== sessionId) {
-      hasBootedRef.current = false
-    }
-
     let cancelled = false
     let unlisten: (() => void) | null = null
+
+    const applyReplayEvents = (
+      events: SessionEvent[],
+      opts: { resetTotals: boolean; seedAccumulated: boolean },
+    ): {
+      accumulated: TimelineRow[]
+      buffers: StreamingBuffers
+      spans: Record<string, ThinkingSpan>
+      turnOpenFromReplay: boolean
+    } => {
+      let accumulated = opts.seedAccumulated ? rowsRef.current : []
+      let buffers = opts.seedAccumulated
+        ? (useAppStore.getState().streamingBySession[sessionId] ??
+          emptyStreamingBuffers())
+        : emptyStreamingBuffers()
+      let spans = opts.seedAccumulated ? { ...thinkingSpansRef.current } : {}
+      let turnOpenFromReplay = false
+      let materialized = opts.seedAccumulated
+        ? new Set(materializedIdsRef.current)
+        : new Set<string>()
+
+      if (opts.resetTotals) {
+        useAppStore.getState().resetSessionTotals(sessionId)
+      }
+
+      for (const event of events) {
+        if (event.seq > lastSeqRef.current) lastSeqRef.current = event.seq
+        accumulated = applyEventToTimeline(accumulated, event)
+        if (MATERIALIZED_ID_KINDS.has(event.payload.kind)) {
+          materialized = materializedIdsFromRows(accumulated)
+        }
+        buffers = applyEventToStreaming(buffers, event.payload, materialized)
+        spans = trackThinkingSpan(spans, event)
+        if (event.payload.kind === "turn_started") turnOpenFromReplay = true
+        if (
+          event.payload.kind === "turn_completed" ||
+          event.payload.kind === "session_error"
+        ) {
+          turnOpenFromReplay = false
+        }
+        applyGlobalSessionEvent(event, { ignoreStreaming: true })
+        if (event.payload.kind === "plan_updated") {
+          useAppStore
+            .getState()
+            .setPlanEntries(event.session_id, event.payload.entries)
+        }
+      }
+
+      materializedIdsRef.current = materialized
+      return { accumulated, buffers, spans, turnOpenFromReplay }
+    }
 
     const attachLive = () => {
       unlisten = subscribeSessionEvents((event) => {
@@ -329,25 +398,70 @@ export const useSessionEvents = (
     }
 
     const boot = async () => {
-      // Warm remount: same session already painted — just reattach the bus.
-      if (hasBootedRef.current && sessionRef.current === sessionId) {
-        attachLive()
-        return
-      }
-
-      // A pending flush from the previous session must never land after
-      // rowsRef/buffers below are reset for the new one.
       cancelPendingFlush()
-      setIsLoading(true)
       setError(null)
       setReconnectStatus(null)
       setCompactingStatus(null)
       setIndexingStatus(null)
       sessionRef.current = sessionId
+
+      // Warm remount: same session already folded — subscribe first so live
+      // events during delta-replay are not dropped, then pull seq > lastSeq
+      // and dedupe against anything the live handler already applied.
+      if (hasBootedRef.current) {
+        setIsLoading(false)
+        try {
+          attachLive()
+          const fromSeq = lastSeqRef.current + 1
+          const deltas = await replay(sessionId, fromSeq)
+          if (cancelled || sessionRef.current !== sessionId) return
+          const unseen = deltas.filter((e) => e.seq > lastSeqRef.current)
+          if (unseen.length > 0) {
+            const {
+              accumulated,
+              buffers,
+              spans,
+              turnOpenFromReplay,
+            } = applyReplayEvents(unseen, {
+              resetTotals: false,
+              seedAccumulated: true,
+            })
+            // Never sweep running rows while the turn is still open — that
+            // falsely cancelled in-flight tools on tab re-activate.
+            const stillStreaming =
+              turnOpenFromReplay ||
+              !!useAppStore.getState().streamingSessions[sessionId]
+            const nextRows = stillStreaming
+              ? accumulated
+              : closeRunningRows(accumulated)
+            rowsRef.current = nextRows
+            setRows(nextRows)
+            useAppStore.getState().setStreamingBuffers(sessionId, buffers)
+            thinkingSpansRef.current = spans
+            setThinkingDurations(durationsFromSpans(spans))
+          }
+        } catch (err) {
+          // Fall through to cold boot on delta failure.
+          log.warn("session", "warm remount delta replay failed; cold boot", {
+            sessionId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+          hasBootedRef.current = false
+          if (unlisten) {
+            unlisten()
+            unlisten = null
+          }
+        }
+        if (hasBootedRef.current) return
+      }
+
+      setIsLoading(true)
       rowsRef.current = []
       setRows([])
       thinkingSpansRef.current = {}
       setThinkingDurations({})
+      lastSeqRef.current = 0
+      materializedIdsRef.current = new Set()
       useAppStore
         .getState()
         .setStreamingBuffers(sessionId, emptyStreamingBuffers())
@@ -356,28 +470,11 @@ export const useSessionEvents = (
         const events = await replay(sessionId, 0)
         if (cancelled) return
 
-        let accumulated: TimelineRow[] = []
-        let buffers = emptyStreamingBuffers()
-        let spans: Record<string, ThinkingSpan> = {}
-
-        // Replay re-runs applyGlobalSessionEvent, so totals must restart.
-        useAppStore.getState().resetSessionTotals(sessionId)
-
-        for (const event of events) {
-          accumulated = applyEventToTimeline(accumulated, event)
-          const materialized = materializedIdsFromRows(accumulated)
-          buffers = applyEventToStreaming(buffers, event.payload, materialized)
-          spans = trackThinkingSpan(spans, event)
-          // Restore HITL / usage from history — not streaming flags.
-          // Orphan turn_started markers after app restart would leave a zombie
-          // isStreaming=true with no live engine turn (queue stuck, Stop no-op).
-          applyGlobalSessionEvent(event, { ignoreStreaming: true })
-          if (event.payload.kind === "plan_updated") {
-            useAppStore
-              .getState()
-              .setPlanEntries(event.session_id, event.payload.entries)
-          }
-        }
+        const { accumulated: folded, buffers, spans } = applyReplayEvents(
+          events,
+          { resetTotals: true, seedAccumulated: false },
+        )
+        let accumulated = folded
 
         // Live process owns streaming — never infer it from JSONL alone.
         useAppStore.getState().setSessionStreaming(sessionId, false)
@@ -386,24 +483,6 @@ export const useSessionEvents = (
           useAppStore.getState().clearStreamingForSession(sessionId)
         }
 
-        // Zombie-row guard: a restart mid-turn leaves JSONL with a
-        // turn_started (and tool/subagent rows) but no terminal event — the
-        // engine process that would have emitted turn_completed/session_error
-        // is gone. Nothing in the fold above catches that (closeRunningRows
-        // only runs *inside* the turn_completed/session_error cases), so
-        // without this the replayed timeline would render spinners with no
-        // way to ever resolve them (no terminal event coming, Stop is a
-        // no-op since nothing is actually streaming). Sweep unconditionally
-        // before the first publish — cheap no-op if the last turn closed
-        // cleanly, and safe for a genuinely-live session too: if the engine
-        // is still running, its live events (tool_call_updated etc.) arrive
-        // right after via the listener below and overwrite these rows with
-        // their real status (see applyEventToTimeline's tool/subagent update
-        // paths, which replace status wholesale rather than merging).
-        // Check for a dangling AskUserQuestion BEFORE sweeping (the sweep
-        // closes its status to "cancelled", so the check must run against
-        // the pre-sweep rows) so the user sees why the agent went quiet
-        // instead of a silently-abandoned question.
         const hadDanglingAsk = findDanglingAskRow(accumulated)
         accumulated = closeRunningRows(accumulated)
         if (hadDanglingAsk) {
@@ -425,7 +504,6 @@ export const useSessionEvents = (
         setThinkingDurations(durationsFromSpans(spans))
         hasBootedRef.current = true
 
-        // Demux bus — one Tauri listen shared with useGlobalSessionEvents.
         attachLive()
       } catch (err) {
         if (!cancelled) {
@@ -435,6 +513,7 @@ export const useSessionEvents = (
             error: message,
           })
           setError(message)
+          hasBootedRef.current = false
         }
       } finally {
         if (!cancelled) setIsLoading(false)
@@ -450,49 +529,22 @@ export const useSessionEvents = (
       try {
         const events = await replay(sessionId, 0)
         if (cancelled || sessionRef.current !== sessionId) return
-        // Same reasoning as boot(): drop any queued flush from the stale
-        // pre-resync view before rebuilding rows/buffers from scratch.
         cancelPendingFlush()
-        // A gap means the live listener skipped straight to resync — whatever
-        // reconnect banner was showing is stale either way (retry_scheduled
-        // itself is never replayed, so it can't come back from this rebuild).
         setReconnectStatus(null)
         setCompactingStatus(null)
         setIndexingStatus(null)
-        let accumulated: TimelineRow[] = []
-        let buffers = emptyStreamingBuffers()
-        let spans: Record<string, ThinkingSpan> = {}
-        // Detect an open turn from JSONL without trusting orphan turn_started
-        // flags via applyGlobal (ignoreStreaming). Used so a mid-turn gap
-        // resync does not clear streamingSessions and freeze the Stop button.
-        let turnOpenFromReplay = false
-        useAppStore.getState().resetSessionTotals(sessionId)
-        for (const event of events) {
-          accumulated = applyEventToTimeline(accumulated, event)
-          const materialized = materializedIdsFromRows(accumulated)
-          buffers = applyEventToStreaming(buffers, event.payload, materialized)
-          spans = trackThinkingSpan(spans, event)
-          if (event.payload.kind === "turn_started") turnOpenFromReplay = true
-          if (
-            event.payload.kind === "turn_completed" ||
-            event.payload.kind === "session_error"
-          ) {
-            turnOpenFromReplay = false
-          }
-          // Same as boot: never restore streaming from JSONL (orphan turn_started).
-          applyGlobalSessionEvent(event, { ignoreStreaming: true })
-          if (event.payload.kind === "plan_updated") {
-            useAppStore
-              .getState()
-              .setPlanEntries(event.session_id, event.payload.entries)
-          }
-        }
-        // Same zombie-row guard as boot() — a resync rebuilds purely from
-        // JSONL too, so any dangling running row from a mid-turn restart
-        // needs the same unconditional sweep before publish. The live
-        // listener stays subscribed across a resync, so a still-streaming
-        // session's next event re-updates the swept row for real.
-        accumulated = closeRunningRows(accumulated)
+        lastSeqRef.current = 0
+        materializedIdsRef.current = new Set()
+        const {
+          accumulated: folded,
+          buffers,
+          spans,
+          turnOpenFromReplay,
+        } = applyReplayEvents(events, {
+          resetTotals: true,
+          seedAccumulated: false,
+        })
+        const accumulated = closeRunningRows(folded)
         rowsRef.current = accumulated
         setRows(accumulated)
         useAppStore.getState().setStreamingBuffers(sessionId, buffers)
@@ -511,7 +563,6 @@ export const useSessionEvents = (
           }
         }
       } catch (err) {
-        // Keep the current view; the next gap will retry.
         log.warn("session", "resync replay failed", {
           sessionId,
           error: err instanceof Error ? err.message : String(err),
@@ -527,8 +578,6 @@ export const useSessionEvents = (
       cancelled = true
       resyncRef.current = null
       if (unlisten) unlisten()
-      // Unmount/session switch — drop any queued rAF flush rather than
-      // letting it fire against a torn-down/replaced session.
       cancelPendingFlush()
     }
   }, [sessionId, live, processEvent, cancelPendingFlush])

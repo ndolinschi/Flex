@@ -60,7 +60,9 @@ const scheduleIdle = (fn: () => void, timeoutMs = 400): (() => void) => {
     const id = requestIdleCallback(() => fn(), { timeout: timeoutMs })
     return () => cancelIdleCallback(id)
   }
-  const t = setTimeout(fn, 0)
+  // WebKit may lack requestIdleCallback — defer past the settle frame
+  // instead of setTimeout(0) which races the GFM paint.
+  const t = setTimeout(fn, Math.min(timeoutMs, 120))
   return () => clearTimeout(t)
 }
 
