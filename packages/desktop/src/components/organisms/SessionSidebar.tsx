@@ -207,6 +207,9 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   const handleSelect = useCallback(
     async (id: string) => {
       if (id === activeSessionId) {
+        // Re-open the chat tab if the user closed every tab but stayed
+        // "active" on this session (empty "+ " placeholder).
+        setActiveSessionId(id)
         setRoute("chat")
         if (narrow) setSidebarCollapsed(true)
         return
