@@ -121,7 +121,7 @@ export const SettingsSection = ({
 }: SettingsSectionProps) => {
   return (
     <section data-settings-row={rowId} className={cn("mb-8", className)}>
-      <div className="mb-2 flex items-start justify-between gap-4 px-3.5">
+      <div className="flex items-start justify-between gap-4 px-3.5">
         <div className="min-w-0">
           <h2 className="text-sm leading-4 text-ink-secondary">{title}</h2>
           {description ? (
