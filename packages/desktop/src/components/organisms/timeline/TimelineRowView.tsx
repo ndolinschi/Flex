@@ -16,6 +16,8 @@ import { parseDomContextMessage } from "../../../lib/browserDesign"
 import { parseComponentStyleMessage } from "../../../lib/componentDesign"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
+import { Message, MessageContent } from "@/components/ui/message"
+import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { ThinkingBlock } from "./ThinkingBlock"
 import { MessageActions } from "./MessageActions"
 import { CheckpointChip } from "./CheckpointChip"
@@ -67,55 +69,77 @@ export const TimelineRowView = memo(({
       const copyText =
         displayText.trim() || (style || dom ? displayText : row.text)
       return (
-        <div className="group/row ml-auto flex w-fit max-w-full min-w-[150px] flex-col items-stretch">
-          <div
-            className={cn(
-              "rounded-[var(--radius-bubble)] border border-stroke-2 bg-user-bubble px-2.5 py-2",
-              "transition-[opacity,background-color,border-color] duration-[var(--duration-fast)]",
-              "hover:border-stroke-1 hover:bg-[color-mix(in_srgb,var(--color-user-bubble)_96%,white)]",
-              dimmed ? "opacity-50 hover:opacity-100" : "opacity-100",
-            )}
-          >
-            {style ? (
-              <span className="mb-1.5 mr-1 inline-flex h-5 items-center gap-1 rounded-[4px] border border-stroke-3 bg-fill-3 px-1 text-sm text-ink-secondary">
-                <Palette className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
-                {style.editCount} style edit{style.editCount > 1 ? "s" : ""}
-              </span>
+        <Message
+          align="end"
+          className={cn(
+            "group/row",
+            dimmed ? "opacity-50 hover:opacity-100" : "opacity-100",
+            "transition-opacity duration-[var(--duration-fast)]",
+          )}
+        >
+          <MessageContent>
+            {/*
+             * Scope-override --color-secondary → --color-user-bubble so
+             * Bubble's variant="secondary" selector (bg-secondary on
+             * BubbleContent) picks up the Flex user-bubble token without
+             * needing !important overrides. The hover border/bg still
+             * reference the Flex token directly.
+             */}
+            <Bubble
+              variant="secondary"
+              align="end"
+              className="min-w-[150px] [--color-secondary:var(--color-user-bubble)] [--secondary:var(--color-user-bubble)]"
+            >
+              <BubbleContent
+                className={cn(
+                  "border-stroke-2 px-2.5 py-2",
+                  "hover:border-stroke-1 hover:bg-[color-mix(in_srgb,var(--color-user-bubble)_96%,white)]",
+                )}
+              >
+                {style ? (
+                  <span className="mb-1.5 mr-1 inline-flex h-5 items-center gap-1 rounded-[4px] border border-stroke-3 bg-fill-3 px-1 text-sm text-ink-secondary">
+                    <Palette className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
+                    {style.editCount} style edit{style.editCount > 1 ? "s" : ""}
+                  </span>
+                ) : null}
+                {dom ? (
+                  <span className="mb-1.5 inline-flex h-5 items-center gap-1 rounded-[4px] border border-stroke-3 bg-fill-3 px-1 text-sm text-ink-secondary">
+                    <MousePointer2 className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
+                    {dom.elementCount} element{dom.elementCount > 1 ? "s" : ""} selected
+                  </span>
+                ) : null}
+                {displayText.trim() ? (
+                  <p className="text-base leading-snug text-ink">
+                    <MentionText text={displayText} />
+                  </p>
+                ) : null}
+              </BubbleContent>
+            </Bubble>
+            {showActions && !footer ? (
+              <MessageActions text={copyText} tsMs={row.tsMs} />
             ) : null}
-            {dom ? (
-              <span className="mb-1.5 inline-flex h-5 items-center gap-1 rounded-[4px] border border-stroke-3 bg-fill-3 px-1 text-sm text-ink-secondary">
-                <MousePointer2 className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
-                {dom.elementCount} element{dom.elementCount > 1 ? "s" : ""} selected
-              </span>
-            ) : null}
-            {displayText.trim() ? (
-              <p className="text-base leading-snug text-ink">
-                <MentionText text={displayText} />
-              </p>
-            ) : null}
-          </div>
-          {showActions && !footer ? (
-            <MessageActions text={copyText} tsMs={row.tsMs} />
-          ) : null}
-          {footer ? <TurnFooter {...footer} /> : null}
-        </div>
+            {footer ? <TurnFooter {...footer} /> : null}
+          </MessageContent>
+        </Message>
       )
     }
     case "assistant": {
       if (!row.text.trim()) return null
       const isLive = row.id.startsWith("live-assistant:")
       return (
-        <div className="group/row min-h-5">
-          <MarkdownBody content={row.text} live={isLive} />
-          {showActions && !footer ? (
-            <MessageActions text={row.text} tsMs={row.tsMs} />
-          ) : isLive && !footer ? (
-            // Reserve the actions row height while streaming so materialization
-            // (MessageActions mount) does not jump the virtual row ~28px.
-            <div className="mt-1 h-7" aria-hidden />
-          ) : null}
-          {footer ? <TurnFooter {...footer} /> : null}
-        </div>
+        <Message align="start" className="group/row min-h-5">
+          <MessageContent>
+            <MarkdownBody content={row.text} live={isLive} />
+            {showActions && !footer ? (
+              <MessageActions text={row.text} tsMs={row.tsMs} />
+            ) : isLive && !footer ? (
+              // Reserve the actions row height while streaming so materialization
+              // (MessageActions mount) does not jump the virtual row ~28px.
+              <div className="mt-1 h-7" aria-hidden />
+            ) : null}
+            {footer ? <TurnFooter {...footer} /> : null}
+          </MessageContent>
+        </Message>
       )
     }
     case "thinking":

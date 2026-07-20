@@ -204,7 +204,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
           title="Refresh changes"
           onClick={handleRefresh}
           className={cn(
-            "text-muted-foreground hover:bg-muted hover:text-foreground",
+            "text-muted-foreground hover:bg-accent hover:text-foreground",
             "h-7 w-7",
           )}
         >
@@ -258,7 +258,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
           title="Refresh changes"
           onClick={handleRefresh}
           className={cn(
-            "text-muted-foreground hover:bg-muted hover:text-foreground",
+            "text-muted-foreground hover:bg-accent hover:text-foreground",
             "h-6 w-6",
           )}
         >

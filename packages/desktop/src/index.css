@@ -290,6 +290,15 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   contain-intrinsic-size: auto 32px;
 }
 
+/* Utility used by shadcn components (sidebar, command, combobox) to suppress the
+   native scrollbar where custom scrolling chrome is undesirable. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Thin translucent scrollbars — track invisible, thumb ≈ fill hover (Feel: Thin scrollbars). */
 ::-webkit-scrollbar {
   width: 8px;

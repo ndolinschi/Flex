@@ -14,7 +14,7 @@ import {
   Send,
   ShieldCheck,
 } from "lucide-react"
-import { Tooltip } from "../../atoms"
+import { TextInput, Tooltip } from "../../atoms"
 import { ErrorBanner } from "../../molecules"
 import { Button } from "@/components/ui/button"
 import { AtMentionTray } from "../composer/AtMentionTray"
@@ -323,7 +323,7 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
             title="Insert section"
             onClick={() => setInsertOpen((v) => !v)}
             className={cn(
-              "text-muted-foreground hover:bg-muted hover:text-foreground",
+              "text-muted-foreground hover:bg-accent hover:text-foreground",
               "opacity-50 hover:opacity-80",
               "h-6 w-6",
             )}
@@ -360,7 +360,7 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
       aria-label={showMarks ? "Edit prompt" : "Show marks"} title={showMarks ? "Edit prompt" : "Show marks"}
       onClick={() => setShowMarks((v) => !v)}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6", showMarks && "bg-fill-3 text-ink",
       )}
     >
@@ -381,7 +381,7 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
       disabled={!draft.trim() || busy}
       onClick={() => void runVerify()}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -401,7 +401,7 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
       onClick={sendFromEditor}
       disabled={!draft.trim()}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -520,13 +520,13 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
             {questions.map((q) => (
               <li key={q} className="flex flex-col gap-1">
                 <label className="text-xs text-ink">{q}</label>
-                <input
+                <TextInput
                   type="text"
                   value={answers[q] ?? ""}
                   onChange={(e) =>
                     setAnswers((prev) => ({ ...prev, [q]: e.target.value }))
                   }
-                  className="h-7 rounded-md border border-stroke-3 bg-fill-5 px-2 text-xs text-ink outline-none focus-visible:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
+                  className="h-7 rounded-md border-stroke-3 bg-fill-5 px-2 text-xs text-ink focus-visible:ring-1 focus-visible:ring-stroke-2"
                   placeholder="Your answer…"
                 />
               </li>

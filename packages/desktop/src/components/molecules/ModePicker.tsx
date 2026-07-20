@@ -107,9 +107,9 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
       }}
     >
       <SelectTrigger
-        size="sm"
+        size="xs"
         aria-label={`Mode: ${selected.label}`}
-        className="gap-1.5"
+        className="gap-1"
       >
         <Icon className={cn("size-3.5", selected.accent)} aria-hidden />
         <SelectValue />

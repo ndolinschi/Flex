@@ -36,18 +36,18 @@ export const SidebarActionRow = ({
       disabled={disabled}
       className={cn(
         "h-7 w-full justify-start gap-1.5 rounded-sm px-2 font-normal",
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
       )}
     >
-      <Icon data-icon="inline-start" className="text-muted-foreground" aria-hidden />
+      <Icon data-icon="inline-start" className="text-ink-secondary" aria-hidden />
       <span className="min-w-0 truncate">{label}</span>
       {TrailingIcon ? (
         <TrailingIcon
-          className="ml-auto size-3 shrink-0 text-muted-foreground"
+          className="ml-auto size-3 shrink-0 text-ink-secondary"
           aria-hidden
         />
       ) : kbd ? (
-        <kbd className="ml-auto shrink-0 font-sans text-xs tracking-[var(--tracking-caption)] text-muted-foreground">
+        <kbd className="ml-auto shrink-0 font-sans text-xs tracking-[var(--tracking-caption)] text-ink-secondary">
           {kbd}
         </kbd>
       ) : null}

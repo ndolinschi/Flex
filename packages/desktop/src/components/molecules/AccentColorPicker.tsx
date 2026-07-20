@@ -9,6 +9,7 @@ import {
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 /** Accent swatch grid + custom hex/color picker for Appearance settings. */
 export const AccentColorPicker = () => {
@@ -117,7 +118,7 @@ export const AccentColorPicker = () => {
             aria-label="Pick custom accent color"
             className="h-7 w-7 cursor-pointer rounded-md border border-stroke-2 bg-transparent p-0.5"
           />
-          <input
+          <Input
             type="text"
             value={draftHex}
             spellCheck={false}
@@ -131,12 +132,7 @@ export const AccentColorPicker = () => {
             }}
             aria-label="Accent color hex value"
             placeholder="#6b9eff"
-            className={cn(
-              "h-7 w-[6.5rem] rounded-md border border-border bg-surface px-2",
-              "font-mono text-xs text-ink",
-              "focus:border-stroke-2 focus:outline-none",
-              "focus:[box-shadow:0_0_0_1px_var(--color-stroke-2)]",
-            )}
+            className="h-7 w-[6.5rem] font-mono text-xs"
           />
         </label>
         <span

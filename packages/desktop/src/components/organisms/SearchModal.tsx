@@ -1,5 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Search } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 import {
   Dialog,
   DialogContent,
@@ -7,12 +14,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { FuzzySessionRow } from "../molecules"
+import { HighlightedLabel } from "../atoms"
 import { useSessions } from "../../hooks/useSessions"
 import { fuzzyScore } from "../../lib/fuzzySearch"
 import { groupByRepo } from "../../lib/sessionGrouping"
 import { resumeSession, toInvokeError } from "../../lib/tauri"
 import { sessionLabel } from "../../lib/types"
+import { formatRelativeTime } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
 import { log } from "../../lib/debug/log"
 
@@ -21,12 +29,9 @@ type SearchModalProps = {
   onClose: () => void
 }
 
-/**  "Search Agents" modal — same chrome as CommandPalette. */
+/** "Search Agents" modal — same chrome as CommandPalette. */
 export const SearchModal = ({ open, onClose }: SearchModalProps) => {
   const [query, setQuery] = useState("")
-  const [activeIndex, setActiveIndex] = useState(0)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const listRef = useRef<HTMLDivElement>(null)
 
   const { sessions: allSessions } = useSessions()
   // Match the sidebar: subagent child sessions are not directly searchable.
@@ -38,9 +43,6 @@ export const SearchModal = ({ open, onClose }: SearchModalProps) => {
   const setActiveSessionId = useAppStore((s) => s.setActiveSessionId)
 
   const handleSelectSession = async (id: string) => {
-    // Mirrors SessionSidebar.handleSelect's happy path (resume then activate)
-    // without duplicating its per-row error-banner state — log.error is enough
-    // for a modal action the user can just retry.
     try {
       await resumeSession(id)
       setActiveSessionId(id)
@@ -70,59 +72,10 @@ export const SearchModal = ({ open, onClose }: SearchModalProps) => {
     () => groupByRepo(filteredSessions),
     [filteredSessions],
   )
-  const flatSessions = useMemo(() => groups.flatMap((g) => g.sessions), [groups])
-
-  useEffect(() => {
-    setActiveIndex(0)
-  }, [query, open])
 
   useEffect(() => {
     if (open) setQuery("")
   }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const el = inputRef.current
-    if (el) requestAnimationFrame(() => el.focus())
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowDown") {
-        e.preventDefault()
-        setActiveIndex((i) => Math.min(i + 1, flatSessions.length - 1))
-        return
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault()
-        setActiveIndex((i) => Math.max(i - 1, 0))
-        return
-      }
-      if (e.key === "Enter") {
-        e.preventDefault()
-        const session = flatSessions[activeIndex]
-        if (session) {
-          void handleSelectSession(session.id)
-          onClose()
-        }
-      }
-    }
-
-    window.addEventListener("keydown", handleKey)
-    return () => window.removeEventListener("keydown", handleKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, onClose, flatSessions, activeIndex])
-
-  useEffect(() => {
-    const el = listRef.current?.querySelector<HTMLElement>(
-      `[data-index="${activeIndex}"]`,
-    )
-    el?.scrollIntoView({ block: "nearest" })
-  }, [activeIndex])
-
-  let runningIndex = -1
 
   return (
     <Dialog
@@ -142,52 +95,48 @@ export const SearchModal = ({ open, onClose }: SearchModalProps) => {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center gap-1.5 border-b border-stroke-3 px-3 py-2.5">
-          <Search className="h-3.5 w-3.5 shrink-0 text-ink-muted" aria-hidden />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search Agents…"
-            aria-label="Search agents input"
-            className="w-full bg-transparent text-base text-ink outline-none placeholder:text-ink-faint"
-          />
-        </div>
-
-        <div ref={listRef} className="max-h-[320px] overflow-y-auto py-1">
-          {groups.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-ink-faint">
+        <Command
+          shouldFilter={false}
+          className="rounded-none bg-transparent p-0"
+        >
+          <div className="border-b border-stroke-3">
+            <CommandInput
+              value={query}
+              onValueChange={setQuery}
+              placeholder="Search Agents…"
+              autoFocus
+            />
+          </div>
+          <CommandList className="max-h-[min(320px,60vh)] py-1">
+            <CommandEmpty className="py-6 text-center text-sm text-ink-faint">
               No agents found
-            </p>
-          ) : (
-            groups.map((group) => (
-              <div key={group.cwd} className="py-1">
-                <p className="px-3 py-1 text-xs font-medium text-ink-faint">
-                  {group.label}
-                </p>
+            </CommandEmpty>
+            {groups.map((group) => (
+              <CommandGroup key={group.cwd} heading={group.label}>
                 {group.sessions.map((session) => {
-                  runningIndex += 1
-                  const index = runningIndex
+                  const label = sessionLabel(session)
                   return (
-                    <FuzzySessionRow
+                    <CommandItem
                       key={session.id}
-                      index={index}
-                      active={index === activeIndex}
-                      label={sessionLabel(session)}
-                      query={query}
-                      updatedAtMs={session.updated_at_ms}
-                      onHover={() => setActiveIndex(index)}
-                      onActivate={() => {
+                      value={session.id}
+                      onSelect={() => {
                         void handleSelectSession(session.id)
                         onClose()
                       }}
-                    />
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        <HighlightedLabel label={label} query={query} />
+                      </span>
+                      <span className="shrink-0 text-xs text-ink-faint">
+                        {formatRelativeTime(session.updated_at_ms)}
+                      </span>
+                    </CommandItem>
                   )
                 })}
-              </div>
-            ))
-          )}
-        </div>
+              </CommandGroup>
+            ))}
+          </CommandList>
+        </Command>
       </DialogContent>
     </Dialog>
   )

@@ -20,8 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Spinner } from "@/components/ui/spinner"
 import { ErrorBanner, ModelSelect } from "../../components/molecules"
+import { Spinner, TextInput } from "../../components/atoms"
 import { useInlineCompletionPrefs } from "../../hooks/useInlineCompletionPrefs"
 import { useModels } from "../../hooks/useModels"
 import {
@@ -259,7 +259,7 @@ export const CompletionSetupModal = ({
           <div className="flex flex-col gap-2 text-sm">
             {modelsLoading ? (
               <div className="flex items-center gap-2 text-ink-muted">
-                <Spinner className="h-3.5 w-3.5" />
+                <Spinner size="sm" />
                 Checking Ollama…
               </div>
             ) : (
@@ -324,9 +324,9 @@ export const CompletionSetupModal = ({
                       placeholder={RECOMMENDED_OLLAMA_MODEL}
                     />
                   ) : (
-                    <input
+                    <TextInput
                       type="text"
-                      className="h-8 rounded-md border border-stroke-3 bg-elevated px-2 text-sm text-ink outline-none focus:border-stroke-2"
+                      className="h-8 rounded-md border-stroke-3 bg-elevated px-2 text-sm text-ink focus-visible:ring-0 focus-visible:border-stroke-2"
                       value={normalizeCompletionModelId("ollama", modelId)}
                       onChange={(e) =>
                         setModelId(
@@ -344,7 +344,7 @@ export const CompletionSetupModal = ({
           <div className="flex flex-col gap-2 text-sm">
             {modelsLoading ? (
               <div className="flex items-center gap-2 text-ink-muted">
-                <Spinner className="h-3.5 w-3.5" />
+                <Spinner size="sm" />
                 Loading models…
               </div>
             ) : otherProviders.length === 0 ? (

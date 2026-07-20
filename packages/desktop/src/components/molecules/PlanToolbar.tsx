@@ -24,7 +24,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { RunningDot } from "../atoms"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import { RunningDot, TextInput } from "../atoms"
 import { useGroupedModels, MODEL_MENU_VISIBLE_CAP } from "../../hooks/useGroupedModels"
 
 export type PlanBuildStatus = "draft" | "ready" | "building" | "built"
@@ -125,14 +133,14 @@ const PlanModelPill = ({
       {open ? (
         <DropdownMenuContent align="end" sideOffset={4} className="w-64 p-0">
           <div className="border-b border-border px-2.5 py-2">
-            <input
+            <TextInput
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.stopPropagation()}
               placeholder="Search models"
               aria-label="Search models"
-              className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+              className="h-6 border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0 rounded-none"
             />
           </div>
           <div className="max-h-56 overflow-y-auto py-1">
@@ -218,24 +226,43 @@ export const PlanToolbar = ({
   return (
     <div className={cn("flex shrink-0 flex-col", className)}>
       <div className="flex h-[var(--header-height)] items-center gap-1.5 px-2.5 text-sm">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
-          <span className="min-w-0 truncate text-muted-foreground">{repo}</span>
-          <span className="shrink-0 text-muted-foreground/60">›</span>
-          {showPlansListCrumb && onBackToPlans ? (
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={onBackToPlans}
-              className="h-auto shrink-0 px-0.5 py-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-            >
-              Plans
-            </Button>
-          ) : (
-            <span className="shrink-0 text-muted-foreground">Plans</span>
-          )}
-          <span className="shrink-0 text-muted-foreground/60">›</span>
-          <span className="min-w-0 truncate text-foreground/80">{title}</span>
-        </div>
+        <Breadcrumb className="min-w-0 flex-1 overflow-hidden">
+          <BreadcrumbList className="flex-nowrap overflow-hidden gap-1.5">
+            <BreadcrumbItem className="min-w-0 shrink overflow-hidden">
+              <BreadcrumbPage className="min-w-0 truncate text-muted-foreground font-normal">
+                {repo}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator className="shrink-0 text-muted-foreground/60">
+              ›
+            </BreadcrumbSeparator>
+            <BreadcrumbItem className="shrink-0">
+              {showPlansListCrumb && onBackToPlans ? (
+                <BreadcrumbLink
+                  render={
+                    <button
+                      type="button"
+                      onClick={onBackToPlans}
+                      className="text-muted-foreground hover:text-foreground"
+                    />
+                  }
+                >
+                  Plans
+                </BreadcrumbLink>
+              ) : (
+                <span className="text-muted-foreground">Plans</span>
+              )}
+            </BreadcrumbItem>
+            <BreadcrumbSeparator className="shrink-0 text-muted-foreground/60">
+              ›
+            </BreadcrumbSeparator>
+            <BreadcrumbItem className="min-w-0 shrink overflow-hidden">
+              <BreadcrumbPage className="min-w-0 truncate text-foreground/80 font-normal">
+                {title}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
         <span className="flex shrink-0 items-center gap-1.5">
           <PlanModelPill
@@ -387,7 +414,7 @@ export const PlanToolbar = ({
       onClick={find.onPrev}
       disabled={find.matchCount === 0}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -401,7 +428,7 @@ export const PlanToolbar = ({
       onClick={find.onNext}
       disabled={find.matchCount === 0}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -414,7 +441,7 @@ export const PlanToolbar = ({
       aria-label="Close find" title="Close find"
       onClick={() => find.onOpenChange(false)}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >

@@ -49,7 +49,7 @@ export const TurnFooter = ({
       aria-label={copied ? "Copied" : "Copy response"} title={copied ? "Copied" : "Copy response"}
       onClick={() => void handleCopy()}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >

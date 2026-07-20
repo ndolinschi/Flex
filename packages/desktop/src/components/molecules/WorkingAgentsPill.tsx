@@ -6,6 +6,7 @@ import {
   workerTitle,
 } from "../../lib/workerPresentation"
 import { useAppStore } from "../../stores/appStore"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -40,7 +41,6 @@ export const WorkingAgentsPill = ({
   if (workers.length === 0) return null
 
   const n = workers.length
-  const label = n === 1 ? "1 Working" : `${n} Working`
 
   return (
     <div className="relative mb-1.5 flex justify-start">
@@ -49,21 +49,21 @@ export const WorkingAgentsPill = ({
           render={
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="sm"
               aria-label="Running workers"
-              className={cn(
-                "rounded-md border border-border bg-muted px-2 text-muted-foreground",
-                "hover:bg-muted/80 hover:text-foreground",
-              )}
+              className="h-6 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
             />
           }
         >
-          <Network className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="animate-shimmer-text">{label}</span>
+          <Network className="size-3 shrink-0" aria-hidden />
+          <span className="animate-shimmer-text text-xs">Working</span>
+          <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[10px]">
+            {n}
+          </Badge>
           <ChevronDown
             className={cn(
-              "size-2.5 text-muted-foreground transition-transform duration-[var(--duration-fast)]",
+              "size-2.5 transition-transform duration-[var(--duration-fast)]",
               open && "rotate-180",
             )}
             aria-hidden

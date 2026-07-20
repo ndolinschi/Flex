@@ -46,7 +46,7 @@ export const SubagentViewer = () => {
           "shadow-[var(--shadow-popover)] animate-subagent-viewer-in",
         ].join(" ")}
       >
-        <header className="flex h-9 shrink-0 items-center gap-2 border-b border-stroke-3 px-3">
+        <header className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5">
           <Bot className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
           <span className="min-w-0 flex-1 truncate text-sm text-ink-secondary">
             {viewer.title}

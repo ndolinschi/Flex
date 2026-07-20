@@ -2,7 +2,14 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { MessageSquare } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-import { CommandPaletteRow } from "./CommandPaletteRow"
+import { Input } from "@/components/ui/input"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 import { fuzzyScore } from "../../lib/fuzzySearch"
 import type { SessionId } from "../../lib/types"
 import { cn } from "../../lib/utils"
@@ -41,10 +48,6 @@ type OpenTabModalProps = {
 
 const MENU_WIDTH = 280
 const MARGIN = 8
-/** Row height ≈ CommandPaletteRow py-1.5 + icon line (~32px). Show ~5, rest scroll. */
-const ROW_HEIGHT_PX = 32
-const VISIBLE_ROWS = 5
-const LIST_MAX_HEIGHT_PX = ROW_HEIGHT_PX * VISIBLE_ROWS
 
 /** Prefer everyday workspace tabs first; everything else follows catalog order. */
 const PRIMARY_TOOL_ORDER: readonly RightPanelTab[] = [
@@ -91,7 +94,7 @@ const buildEntries = (
 }
 
 /** Searchable open-tab picker for ContentPane `+` (catalog-driven).
- * Idle list shows ~5 primary tabs; the rest stay a short scroll away. */
+ * Anchored near the trigger; ~5 primary tabs visible, remainder scrolls. */
 export const OpenTabModal = ({
   open,
   onClose,
@@ -103,12 +106,9 @@ export const OpenTabModal = ({
   onOpenTool,
 }: OpenTabModalProps) => {
   const [query, setQuery] = useState("")
-  const [activeIndex, setActiveIndex] = useState(0)
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(
     null,
   )
-  const inputRef = useRef<HTMLInputElement>(null)
-  const listRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
@@ -139,17 +139,7 @@ export const OpenTabModal = ({
   }
 
   useEffect(() => {
-    setActiveIndex(0)
-  }, [query, open])
-
-  useEffect(() => {
     if (open) setQuery("")
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const el = inputRef.current
-    if (el) requestAnimationFrame(() => el.focus())
   }, [open])
 
   // Anchor below the `+` button; flip/clamp to stay in the viewport.
@@ -182,22 +172,6 @@ export const OpenTabModal = ({
       if (e.key === "Escape") {
         e.preventDefault()
         onCloseRef.current()
-        return
-      }
-      if (e.key === "ArrowDown") {
-        e.preventDefault()
-        setActiveIndex((i) => Math.min(i + 1, filtered.length - 1))
-        return
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault()
-        setActiveIndex((i) => Math.max(i - 1, 0))
-        return
-      }
-      if (e.key === "Enter") {
-        e.preventDefault()
-        const entry = filtered[activeIndex]
-        if (entry) activate(entry)
       }
     }
 
@@ -213,17 +187,13 @@ export const OpenTabModal = ({
       window.removeEventListener("keydown", handleKey)
       window.removeEventListener("pointerdown", handlePointerDown, true)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, filtered, activeIndex, sessionId, paneIndex])
-
-  useEffect(() => {
-    const el = listRef.current?.querySelector<HTMLElement>(
-      `[data-index="${activeIndex}"]`,
-    )
-    el?.scrollIntoView({ block: "nearest" })
-  }, [activeIndex])
+  }, [open])
 
   if (!open || !anchor) return null
+
+  const showGroups = !query.trim()
+  const chatFiltered = filtered.filter((e) => e.kind === "chat")
+  const toolFiltered = filtered.filter((e) => e.kind === "tool")
 
   return createPortal(
     <div
@@ -240,59 +210,64 @@ export const OpenTabModal = ({
       }
       aria-label="Open tab"
     >
-      <div className="flex shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5 py-2">
-        <input
-          ref={inputRef}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Open a tab…"
-          aria-label="Open tab search"
-          className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
-        />
-      </div>
-      <div
-        ref={listRef}
-        className="overflow-y-auto py-1"
-        style={{ maxHeight: LIST_MAX_HEIGHT_PX }}
-        role="listbox"
-        aria-label="Tabs"
+      <Command
+        shouldFilter={false}
+        className="rounded-none bg-transparent p-0"
       >
-        {filtered.length === 0 ? (
-          <p className="px-2.5 py-2 text-sm text-ink-muted">No matching tabs</p>
-        ) : (
-          (() => {
-            // When not searching, show "Chat" and "Tools" group headers.
-            const showHeaders = !query.trim()
-            let seenTool = false
-            return filtered.map((entry, i) => {
-              const isFirstTool = showHeaders && !seenTool && entry.kind === "tool"
-              if (entry.kind === "tool") seenTool = true
-              return (
-                <div key={entry.id}>
-                  {showHeaders && i === 0 && entry.kind === "chat" ? (
-                    <p className="px-2.5 pb-0.5 pt-1 text-[10px] font-medium uppercase tracking-wider text-ink-faint">
-                      Chat
-                    </p>
-                  ) : null}
-                  {isFirstTool ? (
-                    <p className="px-2.5 pb-0.5 pt-1 text-[10px] font-medium uppercase tracking-wider text-ink-faint">
-                      Tools
-                    </p>
-                  ) : null}
-                  <CommandPaletteRow
-                    index={i}
-                    active={i === activeIndex}
-                    label={entry.label}
-                    icon={entry.icon}
-                    onActivate={() => activate(entry)}
-                    onHover={() => setActiveIndex(i)}
-                  />
-                </div>
-              )
-            })
-          })()
-        )}
-      </div>
+        <div className="flex shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5 py-1.5">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Open a tab…"
+            autoFocus
+            className="h-auto border-0 bg-transparent px-0 py-0 text-sm text-ink shadow-none focus-visible:ring-0 placeholder:text-ink-faint rounded-none"
+          />
+        </div>
+        <CommandList
+          className="py-1"
+          style={{ maxHeight: 160 }}
+        >
+          <CommandEmpty className="px-2.5 py-2 text-sm text-ink-muted">
+            No matching tabs
+          </CommandEmpty>
+          {chatFiltered.length > 0 && (
+            <CommandGroup heading={showGroups ? "Chat" : undefined}>
+              {chatFiltered.map((entry) => {
+                const Icon = entry.icon
+                return (
+                  <CommandItem
+                    key={entry.id}
+                    value={entry.id}
+                    onSelect={() => activate(entry)}
+                    className="px-2.5"
+                  >
+                    <Icon aria-hidden />
+                    <span className="min-w-0 truncate">{entry.label}</span>
+                  </CommandItem>
+                )
+              })}
+            </CommandGroup>
+          )}
+          {toolFiltered.length > 0 && (
+            <CommandGroup heading={showGroups ? "Tools" : undefined}>
+              {toolFiltered.map((entry) => {
+                const Icon = entry.icon
+                return (
+                  <CommandItem
+                    key={entry.id}
+                    value={entry.id}
+                    onSelect={() => activate(entry)}
+                    className="px-2.5"
+                  >
+                    <Icon aria-hidden />
+                    <span className="min-w-0 truncate">{entry.label}</span>
+                  </CommandItem>
+                )
+              })}
+            </CommandGroup>
+          )}
+        </CommandList>
+      </Command>
     </div>,
     document.body,
   )

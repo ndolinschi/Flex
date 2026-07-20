@@ -52,7 +52,7 @@ export const MessageActions = ({
       aria-label={copied ? "Copied" : "Copy message"} title={copied ? "Copied" : "Copy message"}
       onClick={() => void handleCopy()}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >

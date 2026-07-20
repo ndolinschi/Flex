@@ -311,7 +311,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
       aria-label="Browse files" title="Browse files"
       onClick={() => setBrowseMode(true)}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6 shrink-0",
       )}
     >
@@ -327,7 +327,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
       aria-label={previewMode ? "Edit markdown" : "Preview markdown"} title={previewMode ? "Edit markdown" : "Preview markdown"}
       onClick={toggleMarkdownPreview}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6", previewMode && "bg-fill-3 text-ink",
       )}
     >
@@ -346,7 +346,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
       disabled={!dirty || saving || !path}
       onClick={() => void handleSave()}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >

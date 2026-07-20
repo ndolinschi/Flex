@@ -1,4 +1,8 @@
-import { cn } from "../../lib/utils"
+import {
+  Avatar as AvatarPrimitive,
+  AvatarFallback,
+} from "@/components/ui/avatar"
+import { cn } from "@/lib/utils"
 
 type AvatarProps = {
   label: string
@@ -7,17 +11,14 @@ type AvatarProps = {
 
 export const Avatar = ({ label, className }: AvatarProps) => {
   const initial = label.trim().charAt(0).toUpperCase() || "?"
-
   return (
-    <span
+    <AvatarPrimitive
       aria-hidden="true"
-      className={cn(
-        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
-        "bg-accent-subtle text-xs font-semibold text-accent",
-        className,
-      )}
+      className={cn("size-7", className)}
     >
-      {initial}
-    </span>
+      <AvatarFallback className="bg-accent-subtle text-xs font-semibold text-accent">
+        {initial}
+      </AvatarFallback>
+    </AvatarPrimitive>
   )
 }

@@ -110,7 +110,7 @@ export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
               Submitting this feedback report will send the following
               information to the maintainers:
             </p>
-            <ul className="mt-2 list-disc space-y-1 pl-4">
+            <ul className="mt-2 flex flex-col gap-1 list-disc pl-4">
               <li>The ID of your app</li>
               <li>The IDs of tasks you executed in this session</li>
             </ul>

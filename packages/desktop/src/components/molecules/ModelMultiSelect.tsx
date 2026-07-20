@@ -4,11 +4,16 @@ import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Label } from "../atoms"
@@ -126,7 +131,7 @@ export const ModelMultiSelect = ({
                     aria-label={`Move ${name} up`}
                     disabled={disabled || index === 0}
                     onClick={() => moveUp(index)}
-                    className="text-muted-foreground hover:bg-muted hover:text-foreground"
+                    className="text-muted-foreground hover:bg-accent hover:text-foreground"
                   >
                     <ChevronUp aria-hidden />
                   </Button>
@@ -136,7 +141,7 @@ export const ModelMultiSelect = ({
                     aria-label={`Move ${name} down`}
                     disabled={disabled || index === value.length - 1}
                     onClick={() => moveDown(index)}
-                    className="text-muted-foreground hover:bg-muted hover:text-foreground"
+                    className="text-muted-foreground hover:bg-accent hover:text-foreground"
                   >
                     <ChevronDown aria-hidden />
                   </Button>
@@ -146,7 +151,7 @@ export const ModelMultiSelect = ({
                     aria-label={`Remove ${name}`}
                     disabled={disabled}
                     onClick={() => removeAt(index)}
-                    className="text-muted-foreground hover:bg-muted hover:text-destructive"
+                    className="text-muted-foreground hover:bg-accent hover:text-destructive"
                   >
                     <X aria-hidden />
                   </Button>
@@ -177,47 +182,40 @@ export const ModelMultiSelect = ({
         </DropdownMenuTrigger>
         {open ? (
           <DropdownMenuContent align="start" sideOffset={4} className="w-72 p-0">
-            <div className="border-b border-border px-2.5 py-2">
-              <input
-                type="search"
+            <Command shouldFilter={false} className="bg-transparent">
+              <CommandInput
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.stopPropagation()}
+                onValueChange={setQuery}
                 placeholder="Search models"
                 aria-label="Search models"
-                className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
               />
-            </div>
-            <div className="max-h-56 overflow-y-auto py-1">
-              {groups.length === 0 ? (
-                <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">
+              <CommandList className="max-h-56">
+                <CommandEmpty className="text-xs">
                   {available.length === 0 ? "All models added" : "No models found"}
-                </p>
-              ) : (
-                groups.map((group) => (
-                  <DropdownMenuGroup key={group.providerId}>
-                    <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                </CommandEmpty>
+                {groups.map((group) => (
+                  <CommandGroup key={group.providerId} heading={group.label}>
                     {group.items.map((m) => (
-                      <DropdownMenuItem
+                      <CommandItem
                         key={m.id}
-                        className="mx-1"
-                        onClick={() => add(m.id)}
+                        value={m.id}
+                        onSelect={() => add(m.id)}
                       >
                         <span className="min-w-0 truncate">
                           {m.displayName ?? m.id}
                         </span>
-                      </DropdownMenuItem>
+                      </CommandItem>
                     ))}
-                  </DropdownMenuGroup>
-                ))
-              )}
+                  </CommandGroup>
+                ))}
+              </CommandList>
               {truncated ? (
                 <p className="px-2.5 py-2 text-xs text-muted-foreground">
                   Showing {MODEL_MENU_VISIBLE_CAP} of {totalMatched}. Type to
                   narrow.
                 </p>
               ) : null}
-            </div>
+            </Command>
           </DropdownMenuContent>
         ) : null}
       </DropdownMenu>

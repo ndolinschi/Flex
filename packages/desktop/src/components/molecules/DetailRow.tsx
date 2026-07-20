@@ -1,6 +1,7 @@
 import { useEffect, useState, type MouseEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ChevronRight, FileCode2, ListEnd, LoaderCircle } from "lucide-react"
 import { backgroundDemote, reviewFileDiff, toInvokeError } from "../../lib/tauri"
 import { cn, toSessionRelativePath } from "../../lib/utils"
@@ -31,7 +32,7 @@ const DemoteButton = ({ callId }: { callId: string }) => {
       onClick={handleDemote}
       disabled={demoting}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
         "ml-1 h-5 w-5 shrink-0",
       )}
     >
@@ -198,7 +199,7 @@ export const DetailRow = ({
       aria-label="Open file" title="Open file"
       onClick={handleOpenFile}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
         "ml-auto h-5 w-5 shrink-0 opacity-0 group-hover/detail:opacity-100",
       )}
     >
@@ -217,13 +218,13 @@ export const DetailRow = ({
         <Collapsible open={expanded}>
           <div className="ml-3.5 mt-0.5">
             {loading ? (
-              <div className="rounded-md border border-stroke-3 bg-panel px-3 py-1 text-sm text-ink-faint">
-                Loading diff…
-              </div>
+              <Alert>
+                <AlertDescription>Loading diff…</AlertDescription>
+              </Alert>
             ) : error ? (
-              <div className="rounded-md border border-stroke-3 bg-panel px-3 py-1 text-sm text-ink-faint">
-                Diff unavailable — {error}
-              </div>
+              <Alert variant="destructive">
+                <AlertDescription>Diff unavailable — {error}</AlertDescription>
+              </Alert>
             ) : diff ? (
               <ChatDiffCard
                 diff={diff}
@@ -242,9 +243,9 @@ export const DetailRow = ({
                 }
               />
             ) : (
-              <div className="rounded-md border border-stroke-3 bg-panel px-3 py-1 text-sm text-ink-faint">
-                No changes vs HEAD
-              </div>
+              <Alert>
+                <AlertDescription>No changes vs HEAD</AlertDescription>
+              </Alert>
             )}
           </div>
         </Collapsible>

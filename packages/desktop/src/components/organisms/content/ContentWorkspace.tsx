@@ -1,21 +1,24 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
+import { useGroupRef, type LayoutChangedMeta } from "react-resizable-panels"
 import { useAppStore } from "../../../stores/appStore"
 import { CHAT_MIN_WIDTH } from "../../../stores/layoutConstants"
 import { clampSplitRatio } from "../../../stores/contentLayoutModel"
 import { ContentPane } from "./ContentPane"
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable"
 import { cn } from "../../../lib/utils"
 import { useContentTabLifecycle } from "../../../hooks/useContentTabLifecycle"
 import {
   useInstallContentTabPointerDnD,
   useTabDragUi,
 } from "../../../hooks/useContentTabPointerDnD"
+
+const LEFT_PANEL_ID = "content-left"
+const RIGHT_PANEL_ID = "content-right"
 
 /** Floating label that follows the pointer while a tab is dragged. */
 const TabDragGhost = () => {
@@ -49,7 +52,7 @@ const TabDragGhost = () => {
   )
 }
 
-/** Main content host: one or two ContentPanes with a sash.
+/** Main content host: one or two ContentPanes with a resizable sash.
  * Chat chrome (sidebar / split / session) lives on WindowTitleBar. */
 export const ContentWorkspace = () => {
   useContentTabLifecycle()
@@ -57,14 +60,14 @@ export const ContentWorkspace = () => {
   const contentLayout = useAppStore((s) => s.contentLayout)
   const setSplitRatio = useAppStore((s) => s.setSplitRatio)
   const setRightPanelDragging = useAppStore((s) => s.setRightPanelDragging)
-  const [dragging, setDragging] = useState(false)
-  const rowRef = useRef<HTMLDivElement>(null)
+  const groupImperativeRef = useGroupRef()
+  const containerRef = useRef<HTMLDivElement | null>(null)
   // Threshold boolean — avoid re-rendering on every resize pixel while the
   // sash eligibility does not change.
   const [canShowSash, setCanShowSash] = useState(false)
 
   useEffect(() => {
-    const el = rowRef.current
+    const el = containerRef.current
     if (!el) return
     const update = (width: number) => {
       const next = width >= CHAT_MIN_WIDTH * 2
@@ -97,82 +100,79 @@ export const ContentWorkspace = () => {
   }, [contentLayout.panes])
 
   const split = contentLayout.mode === "split" && contentLayout.panes.length > 1
-  // Only render the resize sash when the content row is wide enough for two
+  // Only show the resize handle when the container is wide enough for two
   // minimum-width panes. Both panes stay mounted to preserve scroll/xterm
-  // state; the sash handle just hides when there is no room to drag it.
+  // state; the handle just hides when there is no room to drag it.
   const showSash = split && canShowSash
 
-  const handleSashDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    const row = rowRef.current
-    if (!row) return
-    setDragging(true)
-    setRightPanelDragging(true)
-    const startX = e.clientX
-    const startRatio = contentLayout.splitRatio
-    const width = row.getBoundingClientRect().width
-
-    const onMove = (ev: globalThis.PointerEvent) => {
-      if (width <= 0) return
-      const delta = (ev.clientX - startX) / width
-      const minRatio = CHAT_MIN_WIDTH / width
-      const maxRatio = 1 - minRatio
-      const next = clampSplitRatio(
-        Math.min(maxRatio, Math.max(minRatio, startRatio + delta)),
-      )
-      setSplitRatio(next, false)
-    }
-    const onUp = () => {
-      setDragging(false)
-      setRightPanelDragging(false)
-      setSplitRatio(useAppStore.getState().contentLayout.splitRatio, true)
-      window.removeEventListener("pointermove", onMove)
-      window.removeEventListener("pointerup", onUp)
-    }
-    window.addEventListener("pointermove", onMove)
-    window.addEventListener("pointerup", onUp)
-  }
+  // When split mode is activated, push the stored ratio to the panel group so
+  // the newly mounted right panel starts at the correct size.
+  useEffect(() => {
+    if (!split) return
+    const ref = groupImperativeRef.current
+    if (!ref) return
+    const left = Math.round(clampSplitRatio(contentLayout.splitRatio) * 100)
+    ref.setLayout({ [LEFT_PANEL_ID]: left, [RIGHT_PANEL_ID]: 100 - left })
+    // Intentionally excludes contentLayout.splitRatio: we only want to sync
+    // on split mode activation, not on every drag update (which would fight
+    // the panel group's own layout tracking).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [split])
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
       <TabDragGhost />
-      <div
-        ref={rowRef}
-        className="relative flex min-h-0 min-w-0 flex-1"
+      <ResizablePanelGroup
+        orientation="horizontal"
+        elementRef={containerRef}
+        groupRef={groupImperativeRef}
+        onLayoutChange={(layout) => {
+          if (!split) return
+          const leftPct = layout[LEFT_PANEL_ID]
+          if (leftPct === undefined) return
+          setSplitRatio(leftPct / 100, false)
+        }}
+        onLayoutChanged={(
+          layout: Record<string, number>,
+          meta: LayoutChangedMeta,
+        ) => {
+          if (!split || !meta.isUserInteraction) return
+          const leftPct = layout[LEFT_PANEL_ID]
+          if (leftPct === undefined) return
+          setRightPanelDragging(false)
+          setSplitRatio(leftPct / 100, true)
+        }}
+        className="relative min-h-0 min-w-0 flex-1"
       >
-        <div
-          className="flex min-h-0 min-w-0 flex-col overflow-hidden"
-          style={
-            split
-              ? { width: `${contentLayout.splitRatio * 100}%`, flex: "none" }
-              : { flex: 1 }
-          }
+        <ResizablePanel
+          id={LEFT_PANEL_ID}
+          minSize={CHAT_MIN_WIDTH}
+          className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
         >
           <ContentPane paneIndex={0} keepAliveTools={keepAliveTools} />
-        </div>
+        </ResizablePanel>
         {split ? (
           <>
-            {showSash ? (
-              <div
-                role="separator"
-                aria-orientation="vertical"
-                aria-label="Resize content panes"
-                tabIndex={0}
-                onPointerDown={handleSashDown}
-                className={cn(
-                  "sash-line-transition relative z-10 w-1.5 shrink-0 cursor-col-resize",
-                  "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-stroke-3",
-                  "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_15%,transparent)]",
-                  dragging && "after:bg-stroke-1",
-                )}
-              />
-            ) : null}
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <ResizableHandle
+              disabled={!showSash}
+              className={cn(
+                "sash-line-transition z-10 w-1.5 shrink-0 cursor-col-resize bg-transparent",
+                "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-stroke-3",
+                "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_15%,transparent)]",
+                !showSash && "invisible pointer-events-none",
+              )}
+              onPointerDown={() => setRightPanelDragging(true)}
+            />
+            <ResizablePanel
+              id={RIGHT_PANEL_ID}
+              minSize={CHAT_MIN_WIDTH}
+              className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
+            >
               <ContentPane paneIndex={1} keepAliveTools={keepAliveTools} />
-            </div>
+            </ResizablePanel>
           </>
         ) : null}
-      </div>
+      </ResizablePanelGroup>
     </div>
   )
 }

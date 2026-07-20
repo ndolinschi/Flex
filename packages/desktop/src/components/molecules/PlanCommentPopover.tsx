@@ -61,12 +61,13 @@ export const PlanCommentPopover = ({
       aria-label="Comment on plan"
       data-suppress-native-webview=""
       className={cn(
-        "fixed z-50 w-72 rounded-md border border-stroke-2 bg-surface-1 p-3 shadow-lg",
+        "fixed z-50 flex w-72 flex-col gap-2 rounded-lg bg-popover p-2.5",
+        "text-popover-foreground shadow-md ring-1 ring-foreground/10",
         className,
       )}
       style={{ left, top }}
     >
-      <p className="mb-2 line-clamp-3 border-l-2 border-accent/40 pl-2 text-xs italic text-ink-muted">
+      <p className="line-clamp-3 border-l-2 border-accent/40 pl-2 text-xs italic text-muted-foreground">
         {draft.quote}
       </p>
       <Textarea
@@ -78,7 +79,7 @@ export const PlanCommentPopover = ({
         className="w-full text-sm"
         aria-label="Comment text"
       />
-      <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
         <Button variant="ghost" size="sm" onClick={onCancel}>
           Cancel
         </Button>
@@ -96,7 +97,7 @@ export const PlanCommentPopover = ({
           disabled={!canSubmit}
           onClick={() => canSubmit && onSaveAndSend(trimmed)}
         >
-          Save & send
+          Save &amp; send
         </Button>
       </div>
     </div>

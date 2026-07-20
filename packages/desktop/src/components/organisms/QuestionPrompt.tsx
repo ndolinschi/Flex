@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Spinner } from "@/components/ui/spinner"
-import { Toggle } from "@/components/ui/toggle"
 import { TextInput } from "../atoms"
 import { ErrorBanner } from "../molecules"
 import { respondQuestion, toInvokeError } from "../../lib/tauri"
@@ -41,22 +42,6 @@ const StepBody = ({
   const multi = !!q.multi_select
   const allowCustom = q.allow_custom !== false
 
-  const handleToggle = (label: string) => {
-    if (multi) {
-      const has = draft.selected.includes(label)
-      onChange({
-        ...draft,
-        selected: has
-          ? draft.selected.filter((s) => s !== label)
-          : [...draft.selected, label],
-        custom: "",
-      })
-      return
-    }
-    onChange({ selected: [label], custom: "" })
-    onOptionSelected()
-  }
-
   return (
     <fieldset className={cn("flex min-w-0 flex-col", STACK_GAP)}>
       <legend className="flex w-full min-w-0 flex-col gap-1">
@@ -68,40 +53,82 @@ const StepBody = ({
         </span>
       </legend>
       <div className={cn("flex flex-col", STACK_GAP)}>
-        {q.options.map((opt) => {
-          const active = draft.selected.includes(opt.label)
-          return (
-            <Toggle
-              key={opt.label}
-              variant="outline"
-              pressed={active}
-              onPressedChange={() => handleToggle(opt.label)}
-              className={cn(
-                "h-auto w-full justify-start px-3 py-2 text-left text-sm leading-snug",
-                "transition-colors duration-[var(--duration-fast)]",
-                active
-                  ? "border-accent bg-accent-subtle text-ink hover:bg-accent-subtle data-pressed:bg-accent-subtle data-pressed:text-ink"
-                  : "border-stroke-3 bg-fill-5 text-ink-secondary hover:border-stroke-2 hover:bg-fill-4 hover:text-ink-secondary",
-              )}
-            >
-              <span className="flex flex-col items-start gap-1">
-                <span className="font-medium leading-snug">{opt.label}</span>
-                {opt.description ? (
-                  <span className="text-xs leading-snug text-ink-muted">
-                    {opt.description}
+        {multi ? (
+          <ToggleGroup
+            multiple
+            value={draft.selected}
+            onValueChange={(vals) =>
+              onChange({ ...draft, selected: vals, custom: "" })
+            }
+            orientation="vertical"
+            className="w-full flex-col items-stretch"
+          >
+            {q.options.map((opt) => (
+              <ToggleGroupItem
+                key={opt.label}
+                value={opt.label}
+                className={cn(
+                  "h-auto w-full justify-start rounded-md border px-3 py-2 text-left text-sm leading-snug",
+                  "border-stroke-3 bg-fill-5 text-ink-secondary",
+                  "transition-colors duration-[var(--duration-fast)]",
+                  "hover:border-stroke-2 hover:bg-fill-4 hover:text-ink-secondary",
+                  "data-[pressed]:border-accent data-[pressed]:bg-accent-subtle data-[pressed]:text-ink",
+                  "data-[pressed]:hover:bg-accent-subtle",
+                )}
+              >
+                <span className="flex flex-col items-start gap-1">
+                  <span className="font-medium leading-snug">{opt.label}</span>
+                  {opt.description ? (
+                    <span className="text-xs leading-snug text-ink-muted">
+                      {opt.description}
+                    </span>
+                  ) : null}
+                </span>
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        ) : (
+          <RadioGroup
+            value={draft.selected[0] ?? ""}
+            onValueChange={(val) => {
+              onChange({ selected: [val as string], custom: "" })
+              onOptionSelected()
+            }}
+          >
+            {q.options.map((opt) => {
+              const active = draft.selected[0] === opt.label
+              return (
+                <label
+                  key={opt.label}
+                  className={cn(
+                    "flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-sm leading-snug",
+                    "transition-colors duration-[var(--duration-fast)]",
+                    active
+                      ? "border-accent bg-accent-subtle text-ink"
+                      : "border-stroke-3 bg-fill-5 text-ink-secondary hover:border-stroke-2 hover:bg-fill-4",
+                  )}
+                >
+                  <RadioGroupItem value={opt.label} className="mt-0.5 shrink-0" />
+                  <span className="flex flex-col items-start gap-1">
+                    <span className="font-medium leading-snug">{opt.label}</span>
+                    {opt.description ? (
+                      <span className="text-xs leading-snug text-ink-muted">
+                        {opt.description}
+                      </span>
+                    ) : null}
                   </span>
-                ) : null}
-              </span>
-            </Toggle>
-          )
-        })}
+                </label>
+              )
+            })}
+          </RadioGroup>
+        )}
         {allowCustom ? (
           <TextInput
             value={draft.custom}
             onChange={(e) => onChange({ selected: [], custom: e.target.value })}
             placeholder="Or type a custom answer…"
             aria-label={`Custom answer for ${q.header}`}
-            className="h-9 w-full text-sm"
+            className="h-8 w-full text-sm"
           />
         ) : null}
       </div>
