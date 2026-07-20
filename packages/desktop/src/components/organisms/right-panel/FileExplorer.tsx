@@ -145,7 +145,7 @@ const TreeBranch = ({
     queryKey: ["workspace-dir-children", cwd, fallbackCwd ?? "", dirPath],
     queryFn: () => listDirChildren(cwd, dirPath, fallbackCwd),
     enabled: !!cwd && shouldLoad,
-    staleTime: 15_000,
+    staleTime: 60_000,
   })
 
   // Hide cmd.exe artifacts like a literal `$null` file created when a
@@ -319,7 +319,7 @@ export const FileExplorer = ({
     queryKey: ["workspace-file-list", cwd, fallbackCwd ?? "", debounced],
     queryFn: () => listFiles(cwd, debounced, true, fallbackCwd),
     enabled: !!cwd && !!resolvedCwd && searching,
-    staleTime: 15_000,
+    staleTime: 60_000,
     placeholderData: keepPreviousData,
   })
 
@@ -328,7 +328,7 @@ export const FileExplorer = ({
     queryKey: ["git-status", cwd, sessionId],
     queryFn: () => gitStatusSinceBaseline(sessionId),
     enabled: !!cwd && !!sessionId,
-    staleTime: 15_000,
+    staleTime: 60_000,
   })
   const gitIndex = useMemo(
     () => buildGitStatusIndex(gitSummary?.files),

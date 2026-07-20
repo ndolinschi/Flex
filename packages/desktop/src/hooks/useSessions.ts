@@ -28,12 +28,11 @@ export const useSessions = () => {
     queryKey: SESSIONS_KEY,
     queryFn: listSessions,
     retry: 1,
-    // A prior failed mutation (e.g. a "not found" resume/delete) must not
-    // leave this query permanently wedged in an error state — without this,
-    // `invalidateQueries` after a later successful create/delete can no-op
-    // against a query stuck on `status: "error"`, and the sidebar silently
-    // never picks up new rows (see FAILURE B report).
-    refetchOnMount: "always",
+    // Prefer cache for label consumers (ContentPane / timeline / terminal).
+    // Sidebar still recovers via invalidateQueries after mutations; a prior
+    // failed fetch uses refetchOnMount when data is stale (default 30s).
+    staleTime: 30_000,
+    refetchOnMount: true,
   })
 
   const createMutation = useMutation({

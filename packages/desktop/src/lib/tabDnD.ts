@@ -52,6 +52,7 @@ export const beginTabDrag = (session: TabDragSession): void => {
 
 export const endTabDrag = (): void => {
   active = null
+  clearTabDropGeometryCache()
   if (dragUi != null) {
     dragUi = null
     emitUi()
@@ -143,7 +144,68 @@ export type TabDropHit = {
  *
  * `excludeTabId` skips the dragged tab so live preview reordering does not
  * jitter the insert index under the cursor.
+ *
+ * Strip geometry is cached for ~one frame so pointermove does not
+ * querySelectorAll + getBoundingClientRect every event.
  */
+type StripGeometryCache = {
+  strip: HTMLElement
+  excludeTabId: string | undefined
+  tabNodes: HTMLElement[]
+  geometry: Array<{ left: number; width: number }>
+  capturedAt: number
+}
+
+let stripGeometryCache: StripGeometryCache | null = null
+
+const STRIP_CACHE_TTL_MS = 32
+
+const getStripGeometry = (
+  strip: HTMLElement,
+  excludeTabId?: string,
+): Pick<StripGeometryCache, "tabNodes" | "geometry"> => {
+  const now = performance.now()
+  if (
+    stripGeometryCache &&
+    stripGeometryCache.strip === strip &&
+    stripGeometryCache.excludeTabId === excludeTabId &&
+    now - stripGeometryCache.capturedAt < STRIP_CACHE_TTL_MS
+  ) {
+    return stripGeometryCache
+  }
+
+  const tabNodes = Array.from(
+    strip.querySelectorAll<HTMLElement>("[data-tab-id]"),
+  )
+    .filter(
+      (node) =>
+        strip.contains(node) &&
+        node.getAttribute("data-tab-id") !== excludeTabId,
+    )
+    .sort(
+      (a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left,
+    )
+
+  const geometry = tabNodes.map((node) => {
+    const rect = node.getBoundingClientRect()
+    return { left: rect.left, width: rect.width }
+  })
+
+  stripGeometryCache = {
+    strip,
+    excludeTabId,
+    tabNodes,
+    geometry,
+    capturedAt: now,
+  }
+  return stripGeometryCache
+}
+
+/** Clear geometry cache when a drag ends (tabs may reorder). */
+export const clearTabDropGeometryCache = (): void => {
+  stripGeometryCache = null
+}
+
 export const hitTestTabDrop = (
   clientX: number,
   clientY: number,
@@ -168,11 +230,7 @@ export const hitTestTabDrop = (
       `[data-content-tab-strip="${toPane}"]`,
     )
     const count = stripEl
-      ? Array.from(stripEl.querySelectorAll<HTMLElement>("[data-tab-id]")).filter(
-          (node) =>
-            stripEl.contains(node) &&
-            node.getAttribute("data-tab-id") !== excludeTabId,
-        ).length
+      ? getStripGeometry(stripEl, excludeTabId).tabNodes.length
       : 0
     return { toPane, insertAt: count }
   }
@@ -190,26 +248,11 @@ const hitTestStrip = (
   if (paneRaw !== "0" && paneRaw !== "1") return null
   const toPane = Number(paneRaw) as 0 | 1
 
-  const tabNodes = Array.from(
-    strip.querySelectorAll<HTMLElement>("[data-tab-id]"),
-  )
-    .filter(
-      (node) =>
-        strip.contains(node) &&
-        node.getAttribute("data-tab-id") !== excludeTabId,
-    )
-    .sort(
-      (a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left,
-    )
+  const { tabNodes, geometry } = getStripGeometry(strip, excludeTabId)
 
   if (tabNodes.length === 0) {
     return { toPane, insertAt: 0 }
   }
-
-  const geometry = tabNodes.map((node) => {
-    const rect = node.getBoundingClientRect()
-    return { left: rect.left, width: rect.width }
-  })
 
   const overTab = el.closest("[data-tab-id]")
   if (

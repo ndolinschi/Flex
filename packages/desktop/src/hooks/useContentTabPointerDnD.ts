@@ -55,7 +55,10 @@ export const useInstallContentTabPointerDnD = (): void => {
       clearBodyCursor()
     }
 
-    const onMove = (e: PointerEvent) => {
+    let moveRaf: number | null = null
+    let moveEvent: PointerEvent | null = null
+
+    const handleMove = (e: PointerEvent) => {
       if (!pendingPointer || e.pointerId !== pendingPointer.pointerId) return
 
       let current = getTabDragUi()
@@ -129,8 +132,30 @@ export const useInstallContentTabPointerDnD = (): void => {
       })
     }
 
+    const onMove = (e: PointerEvent) => {
+      if (!pendingPointer || e.pointerId !== pendingPointer.pointerId) return
+
+      // Coalesce hit-tests to one per frame — pointermove can fire 100+/s
+      // and each hitTest walks the tab strip DOM.
+      moveEvent = e
+      if (moveRaf != null) return
+      moveRaf = requestAnimationFrame(() => {
+        moveRaf = null
+        const ev = moveEvent
+        moveEvent = null
+        if (!ev || !pendingPointer) return
+        handleMove(ev)
+      })
+    }
+
     const onUp = (e: PointerEvent) => {
       if (!pendingPointer || e.pointerId !== pendingPointer.pointerId) return
+      if (moveRaf != null) {
+        cancelAnimationFrame(moveRaf)
+        moveRaf = null
+        if (moveEvent) handleMove(moveEvent)
+        moveEvent = null
+      }
       const didDrag = getTabDragUi()?.dragging === true
       finish(didDrag)
       if (didDrag) {
@@ -148,6 +173,11 @@ export const useInstallContentTabPointerDnD = (): void => {
 
     const onCancel = (e: PointerEvent) => {
       if (!pendingPointer || e.pointerId !== pendingPointer.pointerId) return
+      if (moveRaf != null) {
+        cancelAnimationFrame(moveRaf)
+        moveRaf = null
+        moveEvent = null
+      }
       finish(false)
     }
 
@@ -158,6 +188,7 @@ export const useInstallContentTabPointerDnD = (): void => {
       window.removeEventListener("pointermove", onMove)
       window.removeEventListener("pointerup", onUp)
       window.removeEventListener("pointercancel", onCancel)
+      if (moveRaf != null) cancelAnimationFrame(moveRaf)
       pendingPointer = null
       endTabDrag()
       clearBodyCursor()

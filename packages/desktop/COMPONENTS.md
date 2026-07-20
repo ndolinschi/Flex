@@ -392,6 +392,17 @@ spacing changes, update [DESIGN.md](./DESIGN.md).
 - **Browser / terminal selectors:** `useBrowserSession` selects per-session primitives; `TerminalTab` mounts xterm only for the active session's terminals (+ that session's agent terminal). `useIsGitRepo` shares the 5s `git-is-repo` poll across ContextBar / FilesChangedCard / ChangesTab.
 - **MarkdownBody:** module-scoped `components` map so settled `react-markdown` trees keep stable element constructors across parent re-renders.
 - **Spacing balance (careful):** see [DESIGN.md](./DESIGN.md) for the full gutter/height canon. Short form: chat chrome `px-3`; content pane `TabStrip` + tab chrome `px-2.5` / `--header-height` with `Tab` at `h-6`; Terminal/Database side lists `px-2.5 py-1.5 text-xs`; Settings `px-3.5` rows / `gap-3` cards; Welcome `h-9` inputs; session sidebar list `px-2`.
+
+## Perf notes (Wave 5 — cache / prefetch / background)
+
+- **Warm timeline remount:** `useSessionEvents` keeps folded rows when a visited chat goes `live: false`; re-activating reattaches the bus and delta-replays from `lastSeq` instead of `replay(0)`. Materialized message ids are maintained incrementally (not rescanned every delta).
+- **Idle prefetch:** `lib/idlePrefetch.ts` warms Files / Terminal / Browser chunks + `markdownHighlight` after bootstrap via `requestIdleCallback`.
+- **Index badges:** `useIndexedRepos` uses per-cwd React Query (`staleTime` 5 min) instead of Promise.all on every cwd-set change.
+- **Files cache:** `workspace-file` / `workspace-dir-children` staleTime raised to 60s; explicit invalidation still busts after tool edits.
+- **Tab DnD:** strip geometry cached ~1 frame; pointermove hit-tests coalesced to rAF.
+- **Terminal:** only the active PTY mounts an xterm instance (inactive stay buffered on `terminalBus`).
+- **Browser overlays:** MutationObserver routes through the existing double-rAF `schedule()` path instead of immediate `measure(true)`.
+- **Sessions list:** `useSessions` uses `staleTime: 30s` + `refetchOnMount: true` (not always) so pane label consumers do not force IPC on every mount.
 - **Streaming visuals:** `StreamingCaret` renders inline inside live `MarkdownBody` (including mid-turn narration in work groups); live assistant rows reserve `MessageActions` height; highlight.js preloads while live; `TurnTimeline` uses per-session `streamingSessions[id]` (SubagentViewer-safe); bottom “Working” hides when live answer text is visible; double-rAF remeasure on stream settle.
 - **Files / Monaco:** `@monaco-editor/react` + Vite `?worker` locals (`lib/monacoEnv.ts`); editor/vendor split via `manualChunks.monaco`. Open buffers live in `openFilesBySession` under one content `files` tab (keep-alive like Terminal).
 - **shadcn Button (Base UI):** Prefer `@/components/ui/button` for interactive chrome. Timeline stays safe via virtualization (only overscan rows mount). Sidebar session / memory rows defer hover icon `Button`s until first pointer/focus (`actionsReady`, sticky) so long lists do not permanently mount 3 Base UI button trees per row.
