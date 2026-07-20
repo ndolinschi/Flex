@@ -1,3 +1,5 @@
+import { Marker, MarkerContent } from "@/components/ui/marker"
+
 type IndexingCardProps = {
   added: number
   changed: number
@@ -5,7 +7,7 @@ type IndexingCardProps = {
   unchanged: number
 }
 
-/** Settled code-index boundary: readable one-line summary of what was indexed. */
+/** Settled code-index boundary: centered separator label with file counts. */
 export const IndexingCard = ({
   added,
   changed,
@@ -20,13 +22,11 @@ export const IndexingCard = ({
   const detail = parts.length > 0 ? parts.join(" · ") : `${unchanged} unchanged`
 
   return (
-    <div className="animate-row-fade flex items-center gap-2 py-1 text-sm text-ink-muted">
-      <span className="h-px flex-1 bg-stroke-3" aria-hidden />
-      <span className="shrink-0">
+    <Marker variant="separator" className="animate-row-fade py-1 text-sm text-ink-muted">
+      <MarkerContent>
         Indexed {total.toLocaleString()} file{total === 1 ? "" : "s"}
         {detail ? ` · ${detail}` : ""}
-      </span>
-      <span className="h-px flex-1 bg-stroke-3" aria-hidden />
-    </div>
+      </MarkerContent>
+    </Marker>
   )
 }

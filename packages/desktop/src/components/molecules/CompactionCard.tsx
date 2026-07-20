@@ -3,7 +3,7 @@ import { ChevronRight } from "lucide-react"
 import { cn, formatTokens } from "../../lib/utils"
 import { Collapsible } from "./Collapsible"
 import { MarkdownBody } from "./MarkdownBody"
-import { Button } from "@/components/ui/button"
+import { Marker, MarkerIcon, MarkerContent } from "@/components/ui/marker"
 
 type CompactionCardProps = {
   summaryMarkdown: string
@@ -17,7 +17,7 @@ type CompactionCardProps = {
 const isAutoStrategy = (strategy: string): boolean =>
   strategy.startsWith("auto_")
 
-/** Settled context-compaction boundary: hairline divider, readable title,
+/** Settled context-compaction boundary: separator divider, readable title,
  * optional token delta, expandable summary of what the model will see. */
 export const CompactionCard = ({
   summaryMarkdown,
@@ -44,33 +44,34 @@ export const CompactionCard = ({
 
   return (
     <div className="animate-row-fade flex flex-col gap-1.5 py-1">
-      <div className="border-t border-stroke-3" aria-hidden />
-      <Button
-        variant="ghost"
-        onClick={handleToggle}
-        aria-expanded={hasSummary ? expanded : undefined}
-        disabled={!hasSummary}
+      <Marker
+        variant="separator"
+        render={hasSummary ? <button type="button" onClick={handleToggle} aria-expanded={expanded} /> : undefined}
         className={cn(
-          "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-sm text-ink-muted",
-          hasSummary && "hover:bg-transparent hover:text-ink",
+          "text-sm text-ink-muted",
+          hasSummary && "cursor-pointer hover:text-ink",
         )}
       >
         {hasSummary ? (
-          <ChevronRight
-            className={cn(
-              "h-2.5 w-2.5 shrink-0 text-icon-3 transition-transform duration-[var(--duration-fast)]",
-              expanded && "rotate-90",
-            )}
-            aria-hidden
-          />
+          <MarkerIcon>
+            <ChevronRight
+              className={cn(
+                "h-2.5 w-2.5 transition-transform duration-[var(--duration-fast)]",
+                expanded && "rotate-90",
+              )}
+              aria-hidden
+            />
+          </MarkerIcon>
         ) : null}
-        <span className="min-w-0 font-medium text-ink-secondary">{title}</span>
-        {sizes ? (
-          <span className="shrink-0 text-ink-faint [font-variant-numeric:tabular-nums]">
-            · {sizes}
-          </span>
-        ) : null}
-      </Button>
+        <MarkerContent>
+          <span className="font-medium text-ink-secondary">{title}</span>
+          {sizes ? (
+            <span className="ml-1 shrink-0 text-ink-faint [font-variant-numeric:tabular-nums]">
+              · {sizes}
+            </span>
+          ) : null}
+        </MarkerContent>
+      </Marker>
       {hasSummary ? (
         <Collapsible open={expanded}>
           <div className="pl-4 text-ink-muted">
