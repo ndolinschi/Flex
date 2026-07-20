@@ -1,7 +1,10 @@
 import type { ReactNode } from "react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Label } from "../atoms"
-import { cn } from "../../lib/utils"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field"
 
 type FormFieldProps = {
   label: string
@@ -21,22 +24,13 @@ export const FormField = ({
   className,
 }: FormFieldProps) => {
   return (
-    <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label htmlFor={htmlFor}>{label}</Label>
+    <Field className={className} data-invalid={error ? true : undefined}>
+      <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
       {children}
       {hint && !error ? (
-        <p className="text-xs text-muted-foreground">{hint}</p>
+        <FieldDescription>{hint}</FieldDescription>
       ) : null}
-      {error ? (
-        <Alert
-          variant="destructive"
-          className="border-0 bg-transparent px-0 py-0"
-        >
-          <AlertDescription className="text-xs text-destructive">
-            {error}
-          </AlertDescription>
-        </Alert>
-      ) : null}
-    </div>
+      {error ? <FieldError>{error}</FieldError> : null}
+    </Field>
   )
 }

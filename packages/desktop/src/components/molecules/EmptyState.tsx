@@ -1,5 +1,12 @@
 import type { ReactNode } from "react"
-import { cn } from "../../lib/utils"
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { Button } from "@/components/ui/button"
 
 type EmptyStateProps = {
@@ -20,26 +27,25 @@ export const EmptyState = ({
   className,
 }: EmptyStateProps) => {
   return (
-    <div
-      className={cn(
-        "flex flex-col items-center justify-center gap-2 px-4 py-8 text-center",
-        className,
-      )}
-    >
-      {icon ? (
-        <div className="text-2xl text-ink-faint" aria-hidden="true">
-          {icon}
-        </div>
-      ) : null}
-      <h3 className="text-sm font-medium text-ink">{title}</h3>
-      {description ? (
-        <p className="max-w-sm text-xs text-ink-muted">{description}</p>
-      ) : null}
+    <Empty className={className}>
+      <EmptyHeader>
+        {icon ? (
+          <EmptyMedia variant="icon" aria-hidden="true">
+            {icon}
+          </EmptyMedia>
+        ) : null}
+        <EmptyTitle>{title}</EmptyTitle>
+        {description ? (
+          <EmptyDescription>{description}</EmptyDescription>
+        ) : null}
+      </EmptyHeader>
       {actionLabel && onAction ? (
-        <Button size="sm" onClick={onAction} className="mt-1">
-          {actionLabel}
-        </Button>
+        <EmptyContent>
+          <Button size="sm" onClick={onAction}>
+            {actionLabel}
+          </Button>
+        </EmptyContent>
       ) : null}
-    </div>
+    </Empty>
   )
 }

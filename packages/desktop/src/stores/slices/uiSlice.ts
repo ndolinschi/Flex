@@ -10,6 +10,7 @@ import {
 import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import { persistUiState } from "../persist"
 import { syncCrashReportingFlag, syncDebugFlag } from "../../lib/debug/log"
+import { toast } from "sonner"
 
 const applyThemeToDom = (theme: UiTheme) => {
   if (typeof document === "undefined") return
@@ -224,8 +225,17 @@ export const createUiSlice: StateCreator<
   pushToast: (text, kind, action) => {
     toastCounter += 1
     const id = `toast-${toastCounter}`
+    const sonnerFn = kind === "success" ? toast.success : toast.error
+    sonnerFn(text, {
+      id,
+      ...(action
+        ? { action: { label: action.label, onClick: action.onAction } }
+        : {}),
+    })
     set((state) => ({ toasts: [...state.toasts, { id, text, kind, action }] }))
   },
-  dismissToast: (id) =>
-    set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) })),
+  dismissToast: (id) => {
+    toast.dismiss(id)
+    set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }))
+  },
 })

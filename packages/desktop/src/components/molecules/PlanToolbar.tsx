@@ -24,6 +24,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 import { RunningDot } from "../atoms"
 import { useGroupedModels, MODEL_MENU_VISIBLE_CAP } from "../../hooks/useGroupedModels"
 
@@ -218,24 +226,43 @@ export const PlanToolbar = ({
   return (
     <div className={cn("flex shrink-0 flex-col", className)}>
       <div className="flex h-[var(--header-height)] items-center gap-1.5 px-2.5 text-sm">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
-          <span className="min-w-0 truncate text-muted-foreground">{repo}</span>
-          <span className="shrink-0 text-muted-foreground/60">›</span>
-          {showPlansListCrumb && onBackToPlans ? (
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={onBackToPlans}
-              className="h-auto shrink-0 px-0.5 py-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-            >
-              Plans
-            </Button>
-          ) : (
-            <span className="shrink-0 text-muted-foreground">Plans</span>
-          )}
-          <span className="shrink-0 text-muted-foreground/60">›</span>
-          <span className="min-w-0 truncate text-foreground/80">{title}</span>
-        </div>
+        <Breadcrumb className="min-w-0 flex-1 overflow-hidden">
+          <BreadcrumbList className="flex-nowrap overflow-hidden gap-1.5">
+            <BreadcrumbItem className="min-w-0 shrink overflow-hidden">
+              <BreadcrumbPage className="min-w-0 truncate text-muted-foreground font-normal">
+                {repo}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator className="shrink-0 text-muted-foreground/60">
+              ›
+            </BreadcrumbSeparator>
+            <BreadcrumbItem className="shrink-0">
+              {showPlansListCrumb && onBackToPlans ? (
+                <BreadcrumbLink
+                  render={
+                    <button
+                      type="button"
+                      onClick={onBackToPlans}
+                      className="text-muted-foreground hover:text-foreground"
+                    />
+                  }
+                >
+                  Plans
+                </BreadcrumbLink>
+              ) : (
+                <span className="text-muted-foreground">Plans</span>
+              )}
+            </BreadcrumbItem>
+            <BreadcrumbSeparator className="shrink-0 text-muted-foreground/60">
+              ›
+            </BreadcrumbSeparator>
+            <BreadcrumbItem className="min-w-0 shrink overflow-hidden">
+              <BreadcrumbPage className="min-w-0 truncate text-foreground/80 font-normal">
+                {title}
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
         <span className="flex shrink-0 items-center gap-1.5">
           <PlanModelPill
