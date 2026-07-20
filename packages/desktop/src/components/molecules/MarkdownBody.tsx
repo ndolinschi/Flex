@@ -1,7 +1,9 @@
 import {
   isValidElement,
   memo,
+  startTransition,
   useEffect,
+  useRef,
   useState,
   type ComponentProps,
   type ReactNode,
@@ -25,6 +27,41 @@ type MarkdownBodyProps = {
   /** Live streaming text: skip react-markdown + highlight (plain pre-wrap).
    * Full GFM rendering runs after the row materializes. */
   live?: boolean
+}
+
+type RehypePlugins = NonNullable<
+  ComponentProps<typeof ReactMarkdown>["rehypePlugins"]
+>
+
+/** Module-singleton: one highlight.js chunk shared by every MarkdownBody. */
+let cachedHighlightPlugins: RehypePlugins | null = null
+let highlightPluginsPromise: Promise<RehypePlugins> | null = null
+
+const ensureHighlightPlugins = (): Promise<RehypePlugins> => {
+  if (cachedHighlightPlugins) return Promise.resolve(cachedHighlightPlugins)
+  if (!highlightPluginsPromise) {
+    highlightPluginsPromise = import("../../lib/markdownHighlight").then(
+      (mod) => {
+        cachedHighlightPlugins = [mod.rehypeHighlightPlugin]
+        return cachedHighlightPlugins
+      },
+    )
+  }
+  return highlightPluginsPromise
+}
+
+/** Preload while streaming / on idle so settle does not wait on the chunk. */
+export const preloadMarkdownHighlight = (): void => {
+  void ensureHighlightPlugins()
+}
+
+const scheduleIdle = (fn: () => void, timeoutMs = 400): (() => void) => {
+  if (typeof requestIdleCallback === "function") {
+    const id = requestIdleCallback(() => fn(), { timeout: timeoutMs })
+    return () => cancelIdleCallback(id)
+  }
+  const t = setTimeout(fn, 0)
+  return () => clearTimeout(t)
 }
 
 /** Recursively flattens a React children tree to plain text — rehype-highlight
@@ -172,41 +209,106 @@ const MARKDOWN_COMPONENTS: NonNullable<
   ),
 }
 
+/**
+ * Render phase for conversation markdown:
+ * - `plain` — streaming (or brief post-stream hold): no remark/rehype work
+ * - `gfm` — remark-gfm only; structure lands without highlight.js cost
+ * - `full` — GFM + rehype-highlight (idle upgrade)
+ *
+ * Live→settled used to mount full GFM+highlight on the same frame the stream
+ * ended, which could hitch the WebView ~1s on long answers with code fences.
+ */
+type RenderPhase = "plain" | "gfm" | "full"
+
+/** Fence opener — only then is rehype-highlight worth a second parse. */
+const hasCodeFence = (text: string): boolean => /```[\w+-]*/.test(text)
+
+const upgradeToFull = (
+  cancelled: () => boolean,
+  setPhase: (p: RenderPhase) => void,
+  setRehypePlugins: (p: RehypePlugins) => void,
+): (() => void) =>
+  scheduleIdle(() => {
+    void ensureHighlightPlugins().then((plugins) => {
+      if (cancelled()) return
+      startTransition(() => {
+        if (cancelled()) return
+        setRehypePlugins(plugins)
+        setPhase("full")
+      })
+    })
+  })
+
 /** Conversation markdown — compact reference-like body scale.
  * Highlight.js language packs load lazily via `lib/markdownHighlight` so the
- * initial chunk stays lean; GFM still renders immediately. */
+ * initial chunk stays lean; GFM still renders immediately for history. */
 export const MarkdownBody = memo(({ content, className, live = false }: MarkdownBodyProps) => {
-  const [rehypePlugins, setRehypePlugins] = useState<
-    NonNullable<ComponentProps<typeof ReactMarkdown>["rehypePlugins"]>
-  >([])
+  const [phase, setPhase] = useState<RenderPhase>(() => (live ? "plain" : "gfm"))
+  const [rehypePlugins, setRehypePlugins] = useState<RehypePlugins>(
+    () => cachedHighlightPlugins ?? [],
+  )
+  const wasLiveRef = useRef(live)
+  const contentRef = useRef(content)
+  contentRef.current = content
 
   useEffect(() => {
-    // Load (or preload while `live`) so settle does not flash unhighlighted →
-    // highlighted on a second paint. Live path ignores rehype until settled.
+    if (live) {
+      wasLiveRef.current = true
+      setPhase("plain")
+      preloadMarkdownHighlight()
+      return
+    }
+
+    const wantsHighlight = hasCodeFence(contentRef.current)
     let cancelled = false
-    void import("../../lib/markdownHighlight").then((mod) => {
+    const isCancelled = () => cancelled
+
+    // Historical / non-stream mount: GFM immediately; highlight on idle when
+    // fences exist (skip a second parse for prose-only answers).
+    if (!wasLiveRef.current) {
+      setPhase("gfm")
+      if (!wantsHighlight) return
+      return upgradeToFull(isCancelled, setPhase, setRehypePlugins)
+    }
+
+    // Just finished streaming: keep plain for a frame so stream-end UI
+    // paints, then GFM without highlight (fast), then highlight on idle.
+    wasLiveRef.current = false
+    let cancelIdle: (() => void) | null = null
+    const frame = requestAnimationFrame(() => {
       if (cancelled) return
-      setRehypePlugins([mod.rehypeHighlightPlugin])
+      startTransition(() => {
+        if (cancelled) return
+        setPhase("gfm")
+        if (wantsHighlight) {
+          cancelIdle = upgradeToFull(isCancelled, setPhase, setRehypePlugins)
+        }
+      })
     })
     return () => {
       cancelled = true
+      cancelAnimationFrame(frame)
+      cancelIdle?.()
     }
   }, [live])
 
-  if (live) {
+  if (live || phase === "plain") {
     return (
       <div className={cn(MARKDOWN_BODY_CLASS, "whitespace-pre-wrap", className)}>
         {content}
-        <StreamingCaret />
+        {live ? <StreamingCaret /> : null}
       </div>
     )
   }
+
+  const plugins =
+    phase === "full" ? (cachedHighlightPlugins ?? rehypePlugins) : []
 
   return (
     <div className={cn(MARKDOWN_BODY_CLASS, MARKDOWN_PROSE_CLASS, className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={rehypePlugins}
+        rehypePlugins={plugins}
         components={MARKDOWN_COMPONENTS}
       >
         {content}
