@@ -29,8 +29,8 @@ export const MEMORY_TAB_ENABLED = envBool("VITE_MEMORY_TAB", false)
 export const DATABASE_TAB_ENABLED = envBool("VITE_DATABASE_TAB", true)
 
 /** Right-panel Components UI plugin (React inventory + CSS edit → agent).
- * Default on. Disable with `VITE_COMPONENTS_TAB=false`. */
-export const COMPONENTS_TAB_ENABLED = envBool("VITE_COMPONENTS_TAB", true)
+ * Default off until ready to ship. Enable with `VITE_COMPONENTS_TAB=true`. */
+export const COMPONENTS_TAB_ENABLED = envBool("VITE_COMPONENTS_TAB", false)
 
 /** Inline (ghost-text) prompt completion UI plugin. Default on.
  * Disable with `VITE_INLINE_COMPLETION=false`. */

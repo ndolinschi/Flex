@@ -372,7 +372,7 @@ spacing changes, update [DESIGN.md](./DESIGN.md).
 | `FLEX_MODE_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_FLEX_MODE=true` | Shows composer Flex mode in the ModePicker (orchestrator across plan / review / workers) |
 | `MEMORY_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_MEMORY_TAB=true` | Shows Memory in the right-panel tab strip / `+` menu / command palette (Settings → Memory stays available either way) |
 | `DATABASE_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `true` | `VITE_DATABASE_TAB=false` | Shows Database UI plugin tab (connections / schemas / tables / query) |
-| `COMPONENTS_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `true` | `VITE_COMPONENTS_TAB=false` | Shows Components UI plugin tab (React inventory / CSS edit → agent) |
+| `COMPONENTS_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_COMPONENTS_TAB=true` | Shows Components UI plugin tab (React inventory / CSS edit → agent) |
 | `INLINE_COMPLETION_ENABLED` (`src/lib/featureFlags.ts`) | `true` | `VITE_INLINE_COMPLETION=false` | Registers the `prompt-completion` UI plugin (ghost-text in composer + Prompt tab; setup under Settings → Tools) |
 
 ## Perf notes (Wave 3)
