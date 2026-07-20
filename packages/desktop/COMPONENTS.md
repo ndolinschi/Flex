@@ -259,11 +259,11 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Alert | ✅ done | `ErrorBanner`, `SidebarResumeError`, `ReconnectBanner`, form/field errors | `@/components/ui/alert`; no ad-hoc danger strips |
 | Alert Dialog | ✅ done | `ConfirmDialog`, auth/PR/bug/MCP/completion dialogs | `@/components/ui/alert-dialog`; danger paths use `AlertDialogMedia` |
 | Aspect Ratio | skip | — | No first-class need |
-| Attachment | yes (chat kit) | `AttachmentChip` | Registry name `attachment` (not `AttachmentNew`) |
+| Attachment | ✅ done (chat kit) | `AttachmentChip` | `@/components/ui/attachment`; registry name `attachment` |
 | Avatar | yes | `Avatar` atom | Thin wrap + `AvatarFallback` |
 | Badge | yes | `Badge`, `NewBadge`, `VerdictBadge` | Keep tone mapping via variants/`className` |
-| Breadcrumb | yes | `PlanToolbar` crumbs | Small win |
-| Bubble | yes (chat kit) | user/assistant bubbles in timeline | After Message spike |
+| Breadcrumb | ✅ done | `PlanToolbar` crumbs | `@/components/ui/breadcrumb` |
+| Bubble | ✅ done (chat kit) | user/assistant bubbles in timeline | `@/components/ui/bubble` |
 | Button | ✅ done | Call sites use `@/components/ui/button`; `atoms/Button` is a re-export only; `IconButton` removed | Compose Spinner + `disabled` instead of `isLoading` |
 | Button Group | yes | composer toolbar clusters | Optional; ModePicker is Select |
 | Calendar | skip | — | No date UX today |
@@ -271,7 +271,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Carousel | skip | — | |
 | Chart | skip | — | No dashboards |
 | Checkbox | yes | `Checkbox` atom | Restyle round + indeterminate |
-| Collapsible | yes | `ArchivedSectionHeader`, `RepoSectionHeader`, WorkGroup | |
+| Collapsible | ✅ done | `ArchivedSectionHeader`, `RepoSectionHeader`, WorkGroup | `@/components/ui/collapsible` |
 | Combobox | ✅ done | `ProjectPicker`, `BranchPicker` | `@/components/ui/combobox` — searchable + Open Folder (not plain Select) |
 | Command | yes | `CommandPalette`, `SearchModal`, `OpenTabModal` | Command-in-Dialog pattern |
 | Context Menu | ✅ done | `ContextMenu` molecule → `@/components/ui/context-menu` | Imperative position API; timeline-scroll / webview-blur ignore preserved |
@@ -279,9 +279,9 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Date Picker | skip | — | |
 | Dialog | ✅ done | `SearchModal`, `CommandPalette` | `@/components/ui/dialog` (outside-click dismiss); confirms use Alert Dialog |
 | Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
-| Drawer | maybe | `SubagentViewer` (bottom overlay) | Spike vs keep custom |
+| Drawer | skip (noted) | `SubagentViewer` (bottom overlay) | **Not mapped**: Drawer uses `fixed inset-0` portal (full viewport); SubagentViewer is `absolute` scoped to the content column — would need parent-container restructuring; follow-up spike. |
 | Dropdown Menu | ✅ done | `@/components/ui/dropdown-menu` — Mode/Model(+effort sub)/Plus/Session/TitleBar/overflow | Base UI `render` trigger; ModelPicker effort uses `DropdownMenuSub` |
-| Empty | yes | `EmptyState` | |
+| Empty | ✅ done | `EmptyState` | `@/components/ui/empty` |
 | Field | yes | `FormField` + settings forms | `FieldGroup` / `FieldLabel` / validation attrs |
 | Hover Card | later | — | Optional enrichment on chips |
 | Input | yes | `TextInput` | Alias export during cutover |
@@ -290,25 +290,25 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Item | later | sidebar / palette rows | Only if it simplifies without fighting density |
 | Kbd | yes | `Kbd` atom | |
 | Label | yes | `Label` atom | Prefer `FieldLabel` inside forms |
-| Marker | yes (chat kit) | `CompactionCard` / `IndexingCard` dividers | System notes |
-| Menubar | yes | `TitleBarMenus` | Native-feeling File/Edit/View/Help |
-| Message | yes (chat kit) | timeline message rows | Compose with Bubble; keep actions |
-| Message Scroller | spike | `TurnTimeline` + `useStickToBottom` | **Do not swap blindly** — virtualizer is required at scale |
+| Marker | ✅ done (chat kit) | `CompactionCard` / `IndexingCard` dividers | `@/components/ui/marker`; system notes |
+| Menubar | ✅ done | `TitleBarMenus` | `@/components/ui/menubar`; Base UI Menubar coordinates hover-open; `openMenu` state removed |
+| Message | ✅ done (chat kit) | timeline message rows | `@/components/ui/message`; composed with Bubble |
+| Message Scroller | spike only | `TurnTimeline` + `useStickToBottom` | **Do not swap blindly** — virtualizer is required at scale; spike pending |
 | Native Select | skip | migrated to Select | — |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
 | Pagination | later | DatabaseTab paging | |
 | Popover | yes | `PopoverTray`, comment/plan popovers | Shared Esc/outside-click |
 | Progress | later | indexing / update UX | Soft need |
 | Radio Group | yes | `QuestionPrompt` choices | |
-| Resizable | yes | content split sash | `ContentWorkspace` dual pane |
+| Resizable | ✅ done | `ContentWorkspace` split sash | `@/components/ui/resizable`; `react-resizable-panels` v4 (`onLayoutChanged` for persist, px `minSize`, imperative `setLayout` on split-activate) |
 | Scroll Area | yes | `ScrollArea` atom | Sidebar / overlays; **not** the virtualized timeline |
 | Select | ✅ done | Settings/forms + `IsolationPicker` + `ModePicker` | `@/components/ui/select`; ModelSelect still Combobox-candidate |
 | Separator | yes | `Divider` | |
 | Sheet | maybe | settings overlay | Today settings is absolute over kept-mounted chat — Sheet may fight that |
-| Sidebar | spike | `SessionSidebar` | High value, high risk — density + grouping + DnD later |
+| Sidebar | spike (follow-up) | `SessionSidebar` | High value, high risk — density + grouping + DnD; **not in this pass** |
 | Skeleton | yes | `Skeleton`, `SidebarSkeleton` | |
 | Slider | skip | — | |
-| Sonner | yes | `Toast` / ToastHost | Bridge Zustand toast API → `toast()` |
+| Sonner | ✅ done | `Toast` / ToastHost | `@/components/ui/sonner`; Zustand toast API bridged to `toast()` |
 | Spinner | yes | `Spinner` | |
 | Switch | ✅ done | Settings prefs + MCP/routine enabled flags | `@/components/ui/switch`; green ON (`bg-switch-on`); `Toggle` atom removed |
 | Table | later | Database results | With Data Table |
@@ -329,10 +329,10 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 |---|---|---|
 | **0 — Foundation** | ✅ `components.json` (`base-nova`), `@/` alias, `clsx`+`tailwind-merge` `cn`, shadcn semantic vars bridged to Flex tokens (`data-theme` only — no `.dark` second system) | `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
 | **1 — Atom adapters** | ✅ Button is `@/components/ui/button` (atoms re-export only); Spinner + Alert. `IconButton` removed; `Toggle` → `@/components/ui/switch`; `TextArea` → `@/components/ui/textarea`. Remaining: Input, Label, Checkbox, Badge, Kbd, Separator, Skeleton, Avatar, Tooltip, ScrollArea | Atom unit tests + vitest green |
-| **2 — Overlays & menus** | ✅ Dialog + AlertDialog + DropdownMenu + ContextMenu; remaining: Popover, Menubar, Sonner | Confirm/auth on AlertDialog; Search/Command on Dialog; right-click on ContextMenu |
+| **2 — Overlays & menus** | ✅ Dialog + AlertDialog + DropdownMenu + ContextMenu + **Menubar** (`TitleBarMenus`); remaining: Popover, Sonner | Confirm/auth on AlertDialog; Search/Command on Dialog; right-click on ContextMenu; File/Edit/View/Help on Menubar |
 | **3 — Forms & pickers** | ✅ Select + Combobox + Toggle (pressed buttons); remaining: Field/FieldGroup, ToggleGroup, RadioGroup, Input Group, Command | Settings native selects → Select; Project/Branch → Combobox; Mode/Isolation → Select; bypass/pin/question chips → Toggle |
-| **4 — Layout** | Collapsible, Resizable, Breadcrumb, Empty; optional Sidebar/Sheet/Drawer spikes | Split sash + empty states; sidebar spike documented go/no-go |
-| **5 — Chat kit** | Attachment, Bubble, Message, Marker; MessageScroller **spike only** | Chip/bubble/marker parity; scroller decision recorded here |
+| **4 — Layout** | ✅ **Resizable** (`ContentWorkspace` split sash); remaining: Collapsible, Breadcrumb, Empty; Sidebar/Sheet/Drawer spikes noted | Split sash → `react-resizable-panels` v4; Drawer/Sidebar spikes deferred — see migration map notes |
+| **5 — Chat kit** | ✅ Attachment + Bubble + Message + Marker; MessageScroller **spike only** | Chip/bubble/marker parity; scroller decision pending — virtualizer stays until spike proves parity |
 | **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
 
 ### Adapter strategy (avoid big-bang breakage)

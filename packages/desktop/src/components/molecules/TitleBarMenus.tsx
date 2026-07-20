@@ -1,17 +1,16 @@
-import { useState } from "react"
 import type { TitleBarActionHandlers } from "../../hooks/useTitleBarActions"
 import { detectWindowHost } from "../../lib/windowChrome"
 import { cn } from "../../lib/utils"
-import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  Menubar,
+  MenubarContent,
+  MenubarGroup,
+  MenubarItem,
+  MenubarMenu,
+  MenubarSeparator,
+  MenubarShortcut,
+  MenubarTrigger,
+} from "@/components/ui/menubar"
 
 type MenuId = "file" | "edit" | "view" | "help"
 
@@ -34,22 +33,14 @@ type TitleBarMenusProps = {
 const isMac = () => detectWindowHost() === "macos"
 const mod = () => (isMac() ? "⌘" : "Ctrl+")
 
-/** Cursor-style File / Edit / View / Help menus in the custom title bar (Windows/Linux). */
+/** Cursor-style File / Edit / View / Help menus in the custom title bar (Windows/Linux).
+ * Uses shadcn Menubar so hover-open coordination between menus is automatic. */
 export const TitleBarMenus = ({
   handlers,
   isBootstrapped,
   canSearch,
   canCommandPalette,
 }: TitleBarMenusProps) => {
-  const [openMenu, setOpenMenu] = useState<MenuId | null>(null)
-
-  const close = () => setOpenMenu(null)
-
-  const run = (fn: () => void) => {
-    close()
-    fn()
-  }
-
   const menus: Record<MenuId, { label: string; items: MenuItem[] }> = {
     file: {
       label: "File",
@@ -150,69 +141,54 @@ export const TitleBarMenus = ({
   }
 
   return (
-    <div className="flex h-full items-center gap-px px-0.5">
+    <Menubar
+      className={cn(
+        "h-full items-center gap-px border-0 px-0.5 py-0",
+        "rounded-none bg-transparent p-0",
+      )}
+    >
       {(Object.keys(menus) as MenuId[]).map((id) => {
         const menu = menus[id]
-        const open = openMenu === id
         return (
-          <DropdownMenu
-            key={id}
-            open={open}
-            onOpenChange={(next) => {
-              if (next) setOpenMenu(id)
-              else if (openMenu === id) setOpenMenu(null)
-            }}
-          >
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onMouseEnter={() => {
-                    if (openMenu && openMenu !== id) setOpenMenu(id)
-                  }}
-                  className={cn(
-                    "h-[22px] rounded-sm px-1.5 text-xs leading-none text-muted-foreground",
-                    "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-                    "hover:bg-muted hover:text-foreground",
-                    open && "bg-muted text-foreground",
-                  )}
-                />
-              }
+          <MenubarMenu key={id}>
+            <MenubarTrigger
+              className={cn(
+                "h-[22px] rounded-sm px-1.5 py-0 text-xs font-normal leading-none",
+                "text-muted-foreground",
+                "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+                "hover:bg-muted hover:text-foreground",
+                "aria-expanded:bg-muted aria-expanded:text-foreground",
+              )}
             >
               {menu.label}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              sideOffset={2}
-              className="min-w-[188px]"
-            >
-              <DropdownMenuGroup>
+            </MenubarTrigger>
+            <MenubarContent align="start" sideOffset={2} className="min-w-[188px]">
+              <MenubarGroup>
                 {menu.items.map((item) =>
                   item.separator ? (
-                    <DropdownMenuSeparator key={item.id} />
+                    <MenubarSeparator key={item.id} />
                   ) : (
-                    <DropdownMenuItem
+                    <MenubarItem
                       key={item.id}
                       disabled={item.disabled}
                       onClick={() => {
                         if (item.disabled || !item.run) return
-                        run(item.run)
+                        item.run()
                       }}
                     >
                       {item.label}
                       {item.hint ? (
-                        <DropdownMenuShortcut>{item.hint}</DropdownMenuShortcut>
+                        <MenubarShortcut>{item.hint}</MenubarShortcut>
                       ) : null}
-                    </DropdownMenuItem>
+                    </MenubarItem>
                   ),
                 )}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </MenubarGroup>
+            </MenubarContent>
+          </MenubarMenu>
         )
       })}
-    </div>
+    </Menubar>
   )
 }
 
