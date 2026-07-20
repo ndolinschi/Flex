@@ -201,6 +201,12 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
 
   const handleSelect = useCallback(
     async (id: string) => {
+      if (id === activeSessionId) {
+        setRoute("chat")
+        if (narrow) setSidebarCollapsed(true)
+        return
+      }
+
       // Clear only this row's stale error banner/state — leave other rows alone.
       setSelectErrorId((prevId) => {
         if (prevId === id) {
@@ -209,6 +215,12 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         }
         return prevId
       })
+
+      // Paint the target chat immediately — resume is warm-up, not a gate.
+      setActiveSessionId(id)
+      setRoute("chat")
+      if (narrow) setSidebarCollapsed(true)
+
       try {
         await resumeSession(id)
         setRowErrors((prev) => {
@@ -217,9 +229,6 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
           delete next[id]
           return next
         })
-        setActiveSessionId(id)
-        setRoute("chat")
-        if (narrow) setSidebarCollapsed(true)
       } catch (err) {
         const message = toInvokeError(err)
         log.error("session", "resume_session failed", { sessionId: id, error: message })
@@ -240,6 +249,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
       }
     },
     [
+      activeSessionId,
       healNotFoundSession,
       narrow,
       setActiveSessionId,

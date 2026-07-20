@@ -130,6 +130,10 @@ export const useSessionEvents = (
   )
   const rowsRef = useRef<TimelineRow[]>([])
   const sessionRef = useRef<string | null>(null)
+  /** True after a successful cold boot for the current sessionId — flipping
+   * `live` false→true (switching back to a visited chat) must reattach the
+   * bus without clearing rows and re-replaying JSONL. */
+  const hasBootedRef = useRef(false)
   const resyncRef = useRef<(() => Promise<void>) | null>(null)
   const thinkingSpansRef = useRef<Record<string, ThinkingSpan>>({})
 
@@ -287,6 +291,7 @@ export const useSessionEvents = (
     if (!sessionId) {
       cancelPendingFlush()
       sessionRef.current = null
+      hasBootedRef.current = false
       rowsRef.current = []
       setRows([])
       setError(null)
@@ -305,10 +310,31 @@ export const useSessionEvents = (
       return
     }
 
+    // Session identity changed on this hook instance — force a cold boot.
+    if (sessionRef.current !== null && sessionRef.current !== sessionId) {
+      hasBootedRef.current = false
+    }
+
     let cancelled = false
     let unlisten: (() => void) | null = null
 
+    const attachLive = () => {
+      unlisten = subscribeSessionEvents((event) => {
+        processEvent(event)
+      })
+      if (cancelled) {
+        unlisten()
+        unlisten = null
+      }
+    }
+
     const boot = async () => {
+      // Warm remount: same session already painted — just reattach the bus.
+      if (hasBootedRef.current && sessionRef.current === sessionId) {
+        attachLive()
+        return
+      }
+
       // A pending flush from the previous session must never land after
       // rowsRef/buffers below are reset for the new one.
       cancelPendingFlush()
@@ -397,15 +423,10 @@ export const useSessionEvents = (
         useAppStore.getState().setStreamingBuffers(sessionId, buffers)
         thinkingSpansRef.current = spans
         setThinkingDurations(durationsFromSpans(spans))
+        hasBootedRef.current = true
 
         // Demux bus — one Tauri listen shared with useGlobalSessionEvents.
-        unlisten = subscribeSessionEvents((event) => {
-          processEvent(event)
-        })
-        if (cancelled) {
-          unlisten()
-          unlisten = null
-        }
+        attachLive()
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : String(err)
