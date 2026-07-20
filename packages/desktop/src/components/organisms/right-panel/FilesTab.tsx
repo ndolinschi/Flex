@@ -328,7 +328,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
       onClick={toggleMarkdownPreview}
       className={cn(
         "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
-        "h-6 w-6", previewMode && "bg-fill-3 text-ink",
+        "h-6 w-6", previewMode && "bg-fill-2 text-ink",
       )}
     >
       {previewMode ? (

@@ -361,7 +361,7 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
       onClick={() => setShowMarks((v) => !v)}
       className={cn(
         "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
-        "h-6 w-6", showMarks && "bg-fill-3 text-ink",
+        "h-6 w-6", showMarks && "bg-fill-2 text-ink",
       )}
     >
       {showMarks ? (
