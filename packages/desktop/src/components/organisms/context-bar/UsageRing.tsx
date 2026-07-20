@@ -2,6 +2,11 @@ import { useAppStore } from "../../../stores/appStore"
 import { useModels } from "../../../hooks/useModels"
 import { cn, formatCost, formatTokens } from "../../../lib/utils"
 import { Button } from "@/components/ui/button"
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card"
 
 /** Fallback context budget used for the usage ring when the selected
  * model's own context window isn't known (the reference design shows a similar %). */
@@ -96,30 +101,26 @@ export const UsageRing = ({ sessionId }: { sessionId?: string | null }) => {
         : "text-ink-muted"
 
   return (
-    <div className="group/usage relative">
-      <Button
-        variant="ghost"
-        className={cn(
-          "h-6 gap-1 rounded-md px-1.5 text-sm font-normal hover:text-ink-secondary",
-          nearLimitClass,
-        )}
-        aria-label="Context usage"
+    <HoverCard>
+      <HoverCardTrigger
+        render={
+          <Button
+            variant="ghost"
+            className={cn(
+              "h-6 gap-1 rounded-md px-1.5 text-sm font-normal hover:text-ink-secondary",
+              nearLimitClass,
+            )}
+            aria-label="Context usage"
+          />
+        }
       >
         <ContextRing fraction={fraction} />
         <span className="[font-variant-numeric:tabular-nums]">
           {isOverLimit ? ">99%" : `${Math.round(fraction * 100)}%`}
         </span>
-      </Button>
+      </HoverCardTrigger>
 
-      <div
-        role="tooltip"
-        className={cn(
-          "pointer-events-none absolute bottom-full right-0 z-50 mb-1.5 w-52",
-          "rounded-lg border border-stroke-2 bg-panel p-2.5 text-sm shadow-[var(--shadow-md)]",
-          "opacity-0 transition-opacity duration-[var(--duration-fast)]",
-          "group-hover/usage:opacity-100 group-focus-within/usage:opacity-100",
-        )}
-      >
+      <HoverCardContent side="top" align="end" className="w-52 p-2.5 text-sm">
         <p className="mb-1.5 text-xs text-ink-faint">Last turn</p>
         <div className="flex flex-col gap-1">
           <UsageDetailRow label="Input" value={formatTokens(usage.input)} />
@@ -163,7 +164,7 @@ export const UsageRing = ({ sessionId }: { sessionId?: string | null }) => {
             </>
           ) : null}
         </div>
-      </div>
-    </div>
+      </HoverCardContent>
+    </HoverCard>
   )
 }

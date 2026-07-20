@@ -1,7 +1,13 @@
 import { Check, MessageSquareText } from "lucide-react"
 import type { SessionPlan } from "../../stores/types"
 import { formatRelativeTime, cn } from "../../lib/utils"
-import { Button } from "@/components/ui/button"
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from "@/components/ui/item"
 
 type PlanListProps = {
   plans: SessionPlan[]
@@ -24,46 +30,44 @@ export const PlanList = ({ plans, onSelect, className }: PlanListProps) => {
           </span>
         </h2>
       </div>
-      <ul className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2" role="list">
-        {ordered.map((plan) => {
-          const commentCount = plan.comments.length
-          return (
-            <li key={plan.id}>
-              <Button
-                variant="ghost"
-                onClick={() => onSelect(plan.id)}
-                className={cn(
-                  "h-auto w-full items-start justify-start gap-3 px-2.5 py-2.5 font-normal",
-                  "hover:bg-fill-3",
-                )}
+      <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2">
+        <ItemGroup className="gap-0.5">
+          {ordered.map((plan) => {
+            const commentCount = plan.comments.length
+            return (
+              <Item
+                key={plan.id}
+                render={<button onClick={() => onSelect(plan.id)} />}
+                size="sm"
+                className="cursor-pointer rounded-md border-transparent px-2.5 py-2 hover:bg-fill-4 focus-visible:bg-fill-4"
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="min-w-0 truncate text-sm font-medium text-ink">
-                      {plan.title}
-                    </span>
+                <ItemContent>
+                  <ItemTitle className="gap-2 text-sm font-medium text-ink">
+                    <span className="min-w-0 truncate">{plan.title}</span>
                     {plan.built ? (
                       <span className="inline-flex shrink-0 items-center gap-0.5 text-xs text-yellow">
-                        <Check className="h-3 w-3" aria-hidden />
+                        <Check className="size-3" aria-hidden />
                         Built
                       </span>
                     ) : null}
-                  </div>
-                  <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
-                    <span>{formatRelativeTime(plan.createdAtMs)}</span>
-                    {commentCount > 0 ? (
-                      <span className="inline-flex items-center gap-0.5">
-                        <MessageSquareText className="h-3 w-3" aria-hidden />
-                        {commentCount}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              </Button>
-            </li>
-          )
-        })}
-      </ul>
+                  </ItemTitle>
+                  <ItemDescription className={cn("text-xs text-ink-faint")}>
+                    <span className="inline-flex items-center gap-2">
+                      <span>{formatRelativeTime(plan.createdAtMs)}</span>
+                      {commentCount > 0 ? (
+                        <span className="inline-flex items-center gap-0.5">
+                          <MessageSquareText className="size-3" aria-hidden />
+                          {commentCount}
+                        </span>
+                      ) : null}
+                    </span>
+                  </ItemDescription>
+                </ItemContent>
+              </Item>
+            )
+          })}
+        </ItemGroup>
+      </div>
     </div>
   )
 }
