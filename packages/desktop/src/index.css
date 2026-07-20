@@ -640,9 +640,11 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   --color-card: var(--color-elevated);
   --color-foreground: var(--color-ink);
   --color-background: var(--color-chrome);
-  /* Pair with brand `--color-accent` (kept above). Needed when a control
-   * intentionally uses `bg-accent` + `text-accent-foreground`. Menu hovers
-   * must NOT use `bg-accent` — that token is the product accent (near-white). */
+  /* Brand accent stays on `--color-accent` (near-white in dark). Tailwind
+   * `bg-accent` therefore paints the product brand — use `bg-fill-4` for
+   * quiet chrome hover/expanded fills, or `bg-accent` + `text-accent-foreground`
+   * only when you intentionally want a brand pill. Menu/button hovers must
+   * NOT use `bg-accent` with `text-foreground` (white-on-white). */
   --color-accent-foreground: var(--color-accent-text);
 }
 
