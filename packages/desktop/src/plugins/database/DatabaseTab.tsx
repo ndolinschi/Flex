@@ -21,6 +21,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+} from "@/components/ui/pagination"
+import { Separator } from "@/components/ui/separator"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { ConfirmDialog, EmptyState, ErrorBanner, FormField } from "../../components/molecules"
 import {
   dbActiveConnection,
@@ -406,7 +426,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
 
               {selectedId ? (
                 <>
-                  <div className="mx-2.5 my-1.5 border-t border-stroke-3" />
+                  <Separator className="mx-2.5 my-1.5" />
                   <div className="flex h-6 shrink-0 items-center px-2.5 text-xs text-ink-muted">
                     <span>{tableCountLabel}</span>
                   </div>
@@ -667,16 +687,23 @@ const ResultGrid = ({
 }) => {
   if (!result) {
     return (
-      <div className="flex flex-1 items-center justify-center px-4 text-center text-sm text-ink-muted">
-        Pick a table or run a query.
-      </div>
+      <Empty className="flex-1 rounded-none border-none">
+        <EmptyHeader>
+          <EmptyDescription>Pick a table or run a query.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     )
   }
   if (result.columns.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center px-4 text-sm text-ink-muted">
-        Query returned no columns ({result.rowCount} rows).
-      </div>
+      <Empty className="flex-1 rounded-none border-none">
+        <EmptyHeader>
+          <EmptyTitle>No columns returned</EmptyTitle>
+          <EmptyDescription>
+            Query returned {result.rowCount} rows.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     )
   }
 
@@ -701,35 +728,35 @@ const ResultGrid = ({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ScrollArea className="min-h-0 flex-1">
-        <table className="w-max min-w-full border-collapse text-left text-xs">
-          <thead className="sticky top-0 bg-fill-5">
-            <tr>
+        <Table className="w-max min-w-full text-xs">
+          <TableHeader className="bg-fill-5">
+            <TableRow>
               {result.columns.map((col) => (
-                <th
+                <TableHead
                   key={col}
-                  className="border-b border-stroke-3 px-2 py-1.5 font-medium text-ink-secondary"
+                  className="h-auto py-1.5 text-xs font-medium text-ink-secondary"
                 >
                   {col}
-                </th>
+                </TableHead>
               ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {pageRows.map((row, ri) => (
-              <tr key={start + ri} className="odd:bg-fill-5/40">
+              <TableRow key={start + ri} className="odd:bg-fill-5/40">
                 {row.map((cell, ci) => (
-                  <td
+                  <TableCell
                     key={ci}
-                    className="max-w-[16rem] truncate border-b border-stroke-3/60 px-2 py-1 font-mono text-ink"
+                    className="max-w-[16rem] truncate py-1 font-mono text-ink"
                     title={cellLabel(cell)}
                   >
                     {cellLabel(cell)}
-                  </td>
+                  </TableCell>
                 ))}
-              </tr>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </ScrollArea>
       <div className="flex shrink-0 items-center gap-1 border-t border-stroke-3 px-2.5 py-1.5">
         <span className="min-w-0 flex-1 truncate text-[10px] text-ink-faint">
@@ -741,34 +768,36 @@ const ResultGrid = ({
           {result.truncated ? " (truncated)" : ""}
           {kind === "preview" && canNext ? "+" : ""}
         </span>
-        <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label="Previous page" title="Previous page"
-      disabled={!canPrev}
-      onClick={() => onPageChange(page - 1)}
-      className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
-        "h-5 w-5",
-      )}
-    >
-      <ChevronLeft className="h-3 w-3" aria-hidden />
-    </Button>
-        <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label="Next page" title="Next page"
-      disabled={!canNext}
-      onClick={() => onPageChange(page + 1)}
-      className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
-        "h-5 w-5",
-      )}
-    >
-      <ChevronRight className="h-3 w-3" aria-hidden />
-    </Button>
+        <Pagination className="mx-0 w-auto">
+          <PaginationContent className="gap-0">
+            <PaginationItem>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Previous page"
+                disabled={!canPrev}
+                onClick={() => onPageChange(page - 1)}
+                className="size-5"
+              >
+                <ChevronLeft aria-hidden />
+              </Button>
+            </PaginationItem>
+            <PaginationItem>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Next page"
+                disabled={!canNext}
+                onClick={() => onPageChange(page + 1)}
+                className="size-5"
+              >
+                <ChevronRight aria-hidden />
+              </Button>
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       </div>
     </div>
   )
