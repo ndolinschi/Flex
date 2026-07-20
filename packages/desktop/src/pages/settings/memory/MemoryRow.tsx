@@ -131,7 +131,7 @@ export const MemoryRow = ({
                   }}
       disabled={expiryMutation.isPending}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
       )}
     >
       {expiryMutation.isPending ? <Spinner /> : (
@@ -150,7 +150,7 @@ export const MemoryRow = ({
                     setConfirmDelete(true)
                   }}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
         "hover:text-destructive",
       )}
     >

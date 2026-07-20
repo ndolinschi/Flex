@@ -94,7 +94,6 @@ export const ModelPicker = ({
               // Mirror ModePicker SelectTrigger sm — same height, gap, border,
               // transparent fill, and trailing chevron treatment.
               "max-w-[14rem] gap-1.5 border-input bg-transparent font-normal shadow-none",
-              "dark:bg-input/30 dark:hover:bg-input/50",
             )}
           />
         }

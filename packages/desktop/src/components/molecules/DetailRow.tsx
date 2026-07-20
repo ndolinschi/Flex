@@ -31,7 +31,7 @@ const DemoteButton = ({ callId }: { callId: string }) => {
       onClick={handleDemote}
       disabled={demoting}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
         "ml-1 h-5 w-5 shrink-0",
       )}
     >
@@ -198,7 +198,7 @@ export const DetailRow = ({
       aria-label="Open file" title="Open file"
       onClick={handleOpenFile}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
         "ml-auto h-5 w-5 shrink-0 opacity-0 group-hover/detail:opacity-100",
       )}
     >

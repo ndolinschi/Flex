@@ -19,7 +19,7 @@ export const SidebarFooter = ({
 }: SidebarFooterProps) => {
   return (
     <>
-      <div className="flex items-center justify-end gap-1 border-t border-stroke-3 px-2.5 py-1.5">
+      <div className="flex items-center justify-end gap-0.5 border-t border-stroke-3 px-2.5 py-1.5">
         <Button
           type="button"
           variant="ghost"
@@ -32,7 +32,7 @@ export const SidebarFooter = ({
           }
           onClick={onToggleTheme}
           className={cn(
-            "text-muted-foreground hover:bg-muted hover:text-foreground",
+            "text-ink-secondary hover:bg-fill-4 hover:text-ink",
             "opacity-50 hover:opacity-80",
             "h-6 w-6",
           )}
@@ -51,7 +51,7 @@ export const SidebarFooter = ({
           title="Settings"
           onClick={onOpenSettings}
           className={cn(
-            "text-muted-foreground hover:bg-muted hover:text-foreground",
+            "text-ink-secondary hover:bg-fill-4 hover:text-ink",
             "opacity-50 hover:opacity-80",
             "h-6 w-6",
           )}

@@ -232,9 +232,9 @@ export const PopoverItem = ({
     className={cn(
       // Icon + label start; callers put trailing marks in children with ml-auto.
       "h-8 w-full justify-start gap-1.5 px-2.5 py-0 text-left font-normal text-sm",
-      // Matches CommandItem selection token pattern: data-selected:bg-muted / text-foreground
-      "text-muted-foreground hover:bg-muted hover:text-foreground focus:bg-muted focus:text-foreground",
-      "data-selected:bg-muted data-selected:text-foreground",
+      // Matches list selection pattern: fill-2 selected / fill-4 hover
+      "text-ink-secondary hover:bg-fill-4 hover:text-ink focus:bg-fill-4 focus:text-ink",
+      "data-selected:bg-fill-2 data-selected:text-ink",
       className,
     )}
   >

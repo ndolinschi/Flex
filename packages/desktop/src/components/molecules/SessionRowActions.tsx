@@ -81,7 +81,7 @@ export const SessionRowActions = memo(function SessionRowActions({
                 onClick={(e) => e.stopPropagation()}
                 onPressedChange={() => onTogglePin?.()}
                 className={cn(
-                  "text-muted-foreground opacity-50 hover:bg-muted hover:opacity-80 hover:text-foreground",
+                  "text-ink-secondary opacity-50 hover:bg-fill-4 hover:opacity-80 hover:text-ink",
                   pinned && "opacity-100",
                 )}
               >
@@ -107,7 +107,7 @@ export const SessionRowActions = memo(function SessionRowActions({
                     onSetArchived?.(e, false)
                   }}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
         "opacity-50 hover:opacity-80",
       )}
     >
@@ -127,7 +127,7 @@ export const SessionRowActions = memo(function SessionRowActions({
                     onSetArchived?.(e, true)
                   }}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
         "opacity-50 hover:opacity-80",
       )}
     >
@@ -145,7 +145,7 @@ export const SessionRowActions = memo(function SessionRowActions({
                 onOpenMenu(e)
               }}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
         "opacity-50 hover:opacity-80",
       )}
     >

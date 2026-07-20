@@ -393,7 +393,7 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
             title={listVisible ? "Hide list" : "Show list"}
             onClick={() => setListVisible((v) => !v)}
             className={cn(
-              "text-muted-foreground hover:bg-muted hover:text-foreground",
+              "text-ink-secondary hover:bg-fill-4 hover:text-ink",
               "opacity-50 hover:opacity-80",
               "h-6 w-6",
             )}
@@ -412,7 +412,7 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
               void refetchList().catch((err) => setError(toInvokeError(err)))
             }}
             className={cn(
-              "text-muted-foreground hover:bg-muted hover:text-foreground",
+              "text-ink-secondary hover:bg-fill-4 hover:text-ink",
               "opacity-50 hover:opacity-80",
               "h-6 w-6",
             )}
@@ -576,7 +576,7 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
       disabled={sending}
       onClick={sendToAgent}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
         "h-8 w-8 shrink-0",
       )}
     >
@@ -670,7 +670,7 @@ const ComponentCanvas = ({
         {detail.props.length > 0 ? (
           <section>
             <h3 className="mb-1 text-xs font-medium text-ink-muted">Props</h3>
-            <ul className="space-y-0.5">
+            <ul className="flex flex-col gap-0.5">
               {detail.props.map((p) => (
                 <li
                   key={p.name}
@@ -692,7 +692,7 @@ const ComponentCanvas = ({
             <h3 className="mb-1 text-xs font-medium text-ink-muted">
               Dependencies
             </h3>
-            <ul className="space-y-0.5">
+            <ul className="flex flex-col gap-0.5">
               {detail.children.map((cid) => (
                 <li
                   key={cid}

@@ -31,7 +31,7 @@ export const FuzzySessionRow = ({
       className={cn(
         "h-auto w-full justify-start gap-2 px-3 py-1.5 font-normal",
         "text-sm",
-        active ? "bg-fill-4 text-ink" : "text-ink-secondary hover:bg-fill-5",
+        active ? "bg-fill-2 text-ink" : "text-ink-secondary hover:bg-fill-4",
       )}
     >
       <span className="min-w-0 flex-1 truncate">
