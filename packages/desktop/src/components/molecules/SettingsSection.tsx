@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import { cn } from "../../lib/utils"
+import { Field, FieldLabel, FieldDescription } from "@/components/ui/field"
 
 /* ── Settings shell primitives (see DESIGN.md Settings) ──────────
  * `SettingsCard` + `SettingRow` implement the reference's group-card/row
@@ -26,7 +27,7 @@ export const SettingsCard = ({
   className,
 }: SettingsCardProps) => {
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
+    <div className={cn("flex flex-col gap-3", className)}>
       {label ? (
         <div className="flex flex-col gap-0.5 pl-3.5 pr-3.5">
           <h3 className="text-sm leading-4 text-ink-secondary">{label}</h3>
@@ -120,7 +121,7 @@ export const SettingsSection = ({
   rowId,
 }: SettingsSectionProps) => {
   return (
-    <section data-settings-row={rowId} className={cn("mb-8", className)}>
+    <section data-settings-row={rowId} className={cn("flex flex-col gap-3", className)}>
       <div className="flex items-start justify-between gap-4 px-3.5">
         <div className="min-w-0">
           <h2 className="text-sm leading-4 text-ink-secondary">{title}</h2>
@@ -169,17 +170,16 @@ export const FieldRow = ({
         className,
       )}
     >
-      <div className="min-w-0">
-        <label
-          htmlFor={htmlFor}
-          className="block text-xs text-ink-secondary"
-        >
+      <Field orientation="vertical" className="min-w-0">
+        <FieldLabel htmlFor={htmlFor} className="text-xs text-ink-secondary">
           {label}
-        </label>
+        </FieldLabel>
         {hint ? (
-          <p className="mt-0.5 text-xs text-ink-faint">{hint}</p>
+          <FieldDescription className="text-xs text-ink-faint">
+            {hint}
+          </FieldDescription>
         ) : null}
-      </div>
+      </Field>
       <div className="min-w-0">{children}</div>
     </div>
   )
