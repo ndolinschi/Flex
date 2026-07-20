@@ -11,6 +11,7 @@ import {
 } from "../../lib/tauri"
 import { openExternalUrl } from "../../lib/openExternalUrl"
 import { Button } from "@/components/ui/button"
+import { InputGroupAddon } from "@/components/ui/input-group"
 import {
   Combobox,
   ComboboxContent,
@@ -105,21 +106,19 @@ export const BranchPicker = ({
         onOpenChange={setOpen}
         disabled={!canOpen || busy}
       >
-        <div
-          className="flex max-w-[12rem] items-center gap-1"
+        <ComboboxInput
+          placeholder={label}
           aria-label={`Branch: ${label}`}
+          className={cn(triggerInputClassName, "max-w-[12rem]")}
+          disabled={!canOpen || busy}
         >
-          <GitBranch
-            className="size-3 shrink-0 text-muted-foreground"
-            aria-hidden
-          />
-          <ComboboxInput
-            placeholder={label}
-            aria-label={`Branch: ${label}`}
-            className={triggerInputClassName}
-            disabled={!canOpen || busy}
-          />
-        </div>
+          <InputGroupAddon align="inline-start" className="pl-1.5 pr-0">
+            <GitBranch
+              className="size-3.5 shrink-0 text-muted-foreground"
+              aria-hidden
+            />
+          </InputGroupAddon>
+        </ComboboxInput>
         <ComboboxContent className="w-72" side="top" align="start">
           <ComboboxEmpty>
             {isFetching ? "Loading branches…" : "No branches found"}

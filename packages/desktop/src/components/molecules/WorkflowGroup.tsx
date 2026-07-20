@@ -104,7 +104,8 @@ const StepRow = ({ step }: { step: ResolvedStep }) => {
         aria-expanded={expanded}
         disabled={!canExpand}
         className={cn(
-          "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-base leading-[1.5] hover:bg-transparent",
+          "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-base leading-[1.5]",
+          "hover:bg-transparent aria-expanded:bg-transparent",
           !canExpand && "cursor-default",
         )}
       >
@@ -252,7 +253,8 @@ export const WorkflowGroup = ({
         }}
         aria-expanded={open}
         className={cn(
-          "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-base hover:bg-transparent",
+          "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-base",
+          "hover:bg-transparent aria-expanded:bg-transparent",
           state === "in_progress" && "cursor-default",
         )}
       >

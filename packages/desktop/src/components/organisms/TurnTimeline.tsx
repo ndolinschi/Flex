@@ -9,6 +9,7 @@ import {
   ErrorBanner,
   FilesChangedCard,
   WorkGroup,
+  preloadMarkdownHighlight,
 } from "../molecules"
 import { useSessionEvents } from "../../hooks/useSessionEvents"
 import { useSessions } from "../../hooks/useSessions"
@@ -84,6 +85,12 @@ export const TurnTimeline = ({
     }
     prevStreamingRef.current = isStreaming
   }, [isStreaming, sessionId, queryClient])
+
+  // Warm the highlight.js chunk while tokens stream so live→settled does
+  // not wait on a dynamic import in the critical path.
+  useEffect(() => {
+    if (isStreaming) preloadMarkdownHighlight()
+  }, [isStreaming])
 
   const liveRows = useMemo(
     () => mergeLiveRows(rows, streaming, sessionLogRows),

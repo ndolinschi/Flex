@@ -47,13 +47,13 @@ export const useContentTabLifecycle = () => {
     openToolBesideChat,
   ])
 
-  // Poll only while the active session is streaming (PR may appear mid-turn
-  // after a push). Idle sessions refresh on mount / window focus instead of
-  // a permanent 15s IPC loop.
+  // Poll PR status while streaming (may appear mid-turn after a push). Idle
+  // sessions reuse cache from BranchPicker / window focus — avoid kicking
+  // `gh pr view` on every chat switch (especially empty drafts).
   const prStatusQuery = useQuery({
     queryKey: ["git-pr-status", active?.cwd ?? ""],
     queryFn: () => gitPrStatus(active!.cwd),
-    enabled: !!active?.cwd,
+    enabled: !!active?.cwd && sessionStreaming,
     staleTime: 60_000,
     refetchOnWindowFocus: true,
     refetchInterval: sessionStreaming ? 30_000 : false,

@@ -118,61 +118,58 @@ export const WorkGroup = memo(({
 
   return (
     <div className={cn("flex flex-col", className)}>
-      <Button
-        variant="ghost"
-        onClick={handleToggle}
-        aria-expanded={expanded}
-        aria-label={isOpen ? openLabel : undefined}
-        className={cn(
-          "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-base hover:bg-transparent",
-          "min-h-[var(--end-of-turn-reserved-height)]",
-          !isOpen && "cursor-pointer animate-end-turn-in",
-        )}
-      >
-        {isOpen ? (
-          // ONE live-status indicator lives here, on the header line —
-          // RunningDot + shimmering label together. Priority is Compacting
-          // (silent summarizer) > Thinking > Working. ThinkingBlock inside
-          // an open group suppresses its own shimmer so we never show both.
-          <>
-            <RunningDot className="-ml-1 h-4 w-4" />
-            <span className="animate-shimmer-text">{openLabel}</span>
-          </>
-        ) : (
-          <>
-            <span className="min-w-0 truncate text-ink-secondary [font-variant-numeric:tabular-nums]">
-              {collapsedPrimary}
+      {isOpen ? (
+        // Live status is not interactive (toggle is no-op while open) — use a
+        // plain row so ghost Button's `aria-expanded:bg-muted` does not paint
+        // a full-width pill behind "Working" / "Thinking".
+        <div className="flex min-h-[var(--end-of-turn-reserved-height)] items-center gap-1.5 text-base">
+          <RunningDot className="-ml-1 h-4 w-4" />
+          <span className="animate-shimmer-text">{openLabel}</span>
+        </div>
+      ) : (
+        <Button
+          variant="ghost"
+          onClick={handleToggle}
+          aria-expanded={expanded}
+          className={cn(
+            "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-base",
+            "min-h-[var(--end-of-turn-reserved-height)]",
+            "hover:bg-transparent aria-expanded:bg-transparent",
+            "cursor-pointer animate-end-turn-in",
+          )}
+        >
+          <span className="min-w-0 truncate text-ink-secondary [font-variant-numeric:tabular-nums]">
+            {collapsedPrimary}
+          </span>
+          {typeof totalTokens === "number" && totalTokens > 0 ? (
+            <span className="shrink-0 text-ink-faint [font-variant-numeric:tabular-nums]">
+              · {formatTokens(totalTokens)} tokens
             </span>
-            {typeof totalTokens === "number" && totalTokens > 0 ? (
-              <span className="shrink-0 text-ink-faint [font-variant-numeric:tabular-nums]">
-                · {formatTokens(totalTokens)} tokens
-              </span>
-            ) : null}
-            {typeof costUsd === "number" && costUsd > 0 ? (
-              <span className="shrink-0 text-ink-faint [font-variant-numeric:tabular-nums]">
-                · {formatCost(costUsd)}
-              </span>
-            ) : null}
-            {verdict ? (
-              <span
-                className={cn("shrink-0", verdictClasses(verdict.outcome))}
-                title={verdict.findings.join(" ") || undefined}
-                aria-hidden
-              >
-                · {VERDICT_GLYPH[verdict.outcome]}
-              </span>
-            ) : null}
-            <ChevronRight
-              className={cn(
-                "h-2.5 w-2.5 shrink-0 text-icon-3 opacity-0 transition-[transform,opacity] duration-[var(--duration-fast)]",
-                "group-hover:opacity-100 group-focus-visible:opacity-100",
-                expanded && "rotate-90 opacity-100",
-              )}
+          ) : null}
+          {typeof costUsd === "number" && costUsd > 0 ? (
+            <span className="shrink-0 text-ink-faint [font-variant-numeric:tabular-nums]">
+              · {formatCost(costUsd)}
+            </span>
+          ) : null}
+          {verdict ? (
+            <span
+              className={cn("shrink-0", verdictClasses(verdict.outcome))}
+              title={verdict.findings.join(" ") || undefined}
               aria-hidden
-            />
-          </>
-        )}
-      </Button>
+            >
+              · {VERDICT_GLYPH[verdict.outcome]}
+            </span>
+          ) : null}
+          <ChevronRight
+            className={cn(
+              "h-2.5 w-2.5 shrink-0 text-icon-3 opacity-0 transition-[transform,opacity] duration-[var(--duration-fast)]",
+              "group-hover:opacity-100 group-focus-visible:opacity-100",
+              expanded && "rotate-90 opacity-100",
+            )}
+            aria-hidden
+          />
+        </Button>
+      )}
 
       <Collapsible open={expanded}>
         <div className="flex flex-col gap-0.5">{children}</div>

@@ -144,7 +144,7 @@ export const ToolStepGroup = memo(function ToolStepGroup({
         onKeyDown={handleKeyDown}
         className={cn(
           "h-auto w-full justify-start gap-1 rounded-md px-0 py-px font-normal text-base",
-          "text-ink-muted hover:bg-transparent hover:text-ink-secondary",
+          "text-ink-muted hover:bg-transparent hover:text-ink-secondary aria-expanded:bg-transparent",
           summary.failed && "text-destructive",
         )}
       >

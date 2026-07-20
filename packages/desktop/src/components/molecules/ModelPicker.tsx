@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Check, ChevronDown, Gauge } from "lucide-react"
+import { Box, Check, ChevronDown, Gauge } from "lucide-react"
 import { EFFORT_LEVELS, effortLabel } from "../../lib/types"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
@@ -90,17 +90,26 @@ export const ModelPicker = ({
             size="sm"
             disabled={isLoading || disabled}
             aria-label="Select model"
-            className="max-w-[14rem]"
+            className={cn(
+              // Mirror ModePicker SelectTrigger sm — same height, gap, border,
+              // transparent fill, and trailing chevron treatment.
+              "max-w-[14rem] gap-1.5 border-input bg-transparent font-normal shadow-none",
+              "dark:bg-input/30 dark:hover:bg-input/50",
+            )}
           />
         }
       >
+        <Box className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
         <span className="min-w-0 truncate">{label}</span>
         {selectedEffort ? (
           <span className="shrink-0 text-muted-foreground">
             · {effortLabel(selectedEffort)}
           </span>
         ) : null}
-        <ChevronDown data-icon="inline-end" className="opacity-60" aria-hidden />
+        <ChevronDown
+          className="pointer-events-none size-4 shrink-0 text-muted-foreground"
+          aria-hidden
+        />
       </DropdownMenuTrigger>
       {open ? (
         <DropdownMenuContent

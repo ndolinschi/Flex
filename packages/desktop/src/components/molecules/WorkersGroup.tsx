@@ -76,7 +76,8 @@ export const WorkersGroup = memo(function WorkersGroup({
         }}
         aria-expanded={open}
         className={cn(
-          "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-base hover:bg-transparent",
+          "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-base",
+          "hover:bg-transparent aria-expanded:bg-transparent",
           anyRunning && "cursor-default",
         )}
       >
