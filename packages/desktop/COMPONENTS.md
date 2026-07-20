@@ -283,11 +283,11 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Dropdown Menu | ✅ done | `@/components/ui/dropdown-menu` — Mode/Model(+effort sub)/Plus/Session/overflow | Base UI `render` trigger; ModelPicker effort uses `DropdownMenuSub` |
 | Empty | ✅ done | `EmptyState`, DatabaseTab empty grids | `@/components/ui/empty` |
 | Field | ✅ done | `FormField`, `SettingsSection` FieldRow | `@/components/ui/field` |
-| Hover Card | installed | — | Available; no first call site yet |
+| Hover Card | ✅ done | `UsageRing` context tooltip | `@/components/ui/hover-card`; first call site |
 | Input | ✅ done | `TextInput`, AccentColorPicker hex | Re-export / direct `@/components/ui/input` |
 | Input Group | ✅ done | SettingsNav search | `InputGroup` + `InputGroupInput` + `InputGroupAddon`; composer draft stays specialized |
 | Input OTP | skip | — | |
-| Item | installed | — | Available for future list rows |
+| Item | ✅ done | `PlanList` plan rows | `@/components/ui/item`; hover fill-4 |
 | Kbd | ✅ done | `Kbd` atom | Re-export `@/components/ui/kbd` |
 | Label | ✅ done | `Label` atom | Re-export `@/components/ui/label`; forms prefer `FieldLabel` |
 | Marker | ✅ done (chat kit) | `CompactionCard` / `IndexingCard` dividers | `@/components/ui/marker`; system notes |
@@ -298,7 +298,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
 | Pagination | ✅ done | DatabaseTab result pager | `@/components/ui/pagination` |
 | Popover | partial | `PopoverTray`, PlanCommentPopover | Semantic popover tokens; **keep custom tray** for composer `autoFocus={false}` |
-| Progress | installed | — | Soft need for indexing/update UX |
+| Progress | ✅ done | StatusTab context % | `@/components/ui/progress`; IndexingSection skipped (no progress field on IndexStatus) |
 | Radio Group | ✅ done | `QuestionPrompt` single-select | `@/components/ui/radio-group`; multi uses ToggleGroup |
 | Resizable | ✅ done | `ContentWorkspace` split sash | `@/components/ui/resizable` |
 | Scroll Area | ✅ done | `ScrollArea` atom | Thin wrap; **not** the virtualized timeline |
@@ -334,7 +334,8 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | **4 — Layout** | ✅ Resizable + Collapsible + Breadcrumb + Empty + Sidebar (inner composition) + Table/Pagination; Sheet/Drawer deferred | Split sash; SessionSidebar inner Sidebar*; DatabaseTab Table |
 | **5 — Chat kit** | ✅ Attachment + Bubble + Message + Marker; MessageScroller **spike only** | Chip/bubble/marker parity; virtualizer stays |
 | **6 — Deferred / skip** | Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Navigation Menu, full Drawer/Sheet, MessageScroller swap | Add only when a screen needs them |
-| **7 — Spacing polish** | ✅ design-audit after migration | Compact Sidebar/Command defaults; Mode/Model `h-6` (`size=xs`); no `space-y-*` in product files |
+| **7 — Spacing polish** | ✅ design-audit after migration + fill-2/fill-4 sweep | Compact Sidebar/Command defaults; Mode/Model `h-6`; TabClose/list hovers `fill-4`; selected toggles `fill-2`; no `bg-accent` chrome hover |
+| **8 — Remaining primitives** | ✅ HoverCard (UsageRing), Item (PlanList), Progress (StatusTab context) | PermissionPrompt stays bespoke (composer seam); SettingsNav stays Button rows |
 
 ### Adapter strategy (avoid big-bang breakage)
 

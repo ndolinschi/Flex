@@ -462,10 +462,10 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
                           style={{ paddingLeft: `${10 + depth * 10}px` }}
                           className={cn(
                             "h-auto w-full justify-start gap-1 py-1.5 pr-2.5 text-xs font-normal",
-                            isActive
+                              isActive
                               ? "bg-fill-2 text-ink hover:bg-fill-2"
                               : isOpen
-                                ? "bg-fill-3 text-ink-secondary hover:bg-fill-3"
+                                ? "bg-fill-4 text-ink-secondary hover:bg-fill-4"
                                 : "text-ink-secondary hover:bg-fill-4 hover:text-ink",
                           )}
                         >

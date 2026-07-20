@@ -38,7 +38,7 @@ export const TabClose = ({
       className={cn(
         "ml-0 max-w-0 shrink-0 overflow-hidden rounded-sm p-0 opacity-0",
         "transition-[max-width,margin,padding,opacity] duration-[var(--duration-normal)] ease-[var(--easing-default)]",
-        "hover:bg-fill-3 group-hover:ml-0.5 group-hover:max-w-[1rem] group-hover:p-0.5 group-hover:opacity-100",
+        "hover:bg-fill-4 group-hover:ml-0.5 group-hover:max-w-[1rem] group-hover:p-0.5 group-hover:opacity-100",
         revealOnFocusWithin &&
           "group-focus-within:ml-0.5 group-focus-within:max-w-[1rem] group-focus-within:p-0.5 group-focus-within:opacity-100",
         className,

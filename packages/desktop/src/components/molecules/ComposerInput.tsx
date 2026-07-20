@@ -287,9 +287,8 @@ export const ComposerInput = ({
                 title="Open prompt editor"
                 onClick={() => openToolBesideChat(activeSessionId, "prompt")}
                 className={cn(
-                  "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
-                  "opacity-50 hover:opacity-80",
-                  "h-6 w-6 bg-user-bubble/80 text-ink-muted hover:bg-fill-3 hover:text-ink",
+                  "h-6 w-6 bg-user-bubble/80 opacity-50",
+                  "text-ink-muted hover:bg-fill-4 hover:text-ink hover:opacity-80",
                 )}
               >
                 <Maximize2 className="h-3.5 w-3.5" aria-hidden />

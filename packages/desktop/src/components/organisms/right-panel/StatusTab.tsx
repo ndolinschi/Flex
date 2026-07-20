@@ -4,6 +4,7 @@ import { cacheTotalsFromModelUsage } from "../../../lib/modelUsage"
 import { sessionLabel, type SessionMeta } from "../../../lib/types"
 import { cn, formatTokens } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
+import { Progress } from "@/components/ui/progress"
 
 const CONTEXT_BUDGET_TOKENS = 200_000
 /** Stable empty — inline `?? []` in a Zustand selector re-renders forever. */
@@ -135,6 +136,12 @@ export const StatusTab = ({ session, active }: StatusTabProps) => {
           <DetailRow label="State" value={stateLabel} />
           <DetailRow label="Model" value={modelId || "—"} />
           <DetailRow label="Context" value={contextLabel} />
+          {contextUsed != null && (
+            <Progress
+              value={Math.min(100, (contextUsed / maxTokens) * 100)}
+              className="mb-0.5"
+            />
+          )}
           <DetailRow label="Compact" value={compactLabel} />
           <DetailRow label="Read / write" value={readWrite} />
           <DetailRow

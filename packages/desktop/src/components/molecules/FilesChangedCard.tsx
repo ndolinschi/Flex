@@ -81,7 +81,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
               ? "Collapse changed files"
               : `Expand ${totalCount} changed file${totalCount === 1 ? "" : "s"}`
           }
-          className="h-auto min-w-0 flex-1 justify-start gap-1.5 rounded-md px-1.5 py-1 font-normal hover:bg-fill-3"
+          className="h-auto min-w-0 flex-1 justify-start gap-1.5 rounded-md px-1.5 py-1 font-normal hover:bg-fill-4"
         >
           {expanded ? (
             <ChevronDown className="h-3.5 w-3.5 shrink-0 text-icon-3" aria-hidden />
@@ -129,7 +129,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
                   className={cn(
                     "h-7 w-full justify-start gap-1.5 rounded-md px-1.5 text-base font-normal",
                     canOpen
-                      ? "hover:bg-fill-3"
+                      ? "hover:bg-fill-4"
                       : "cursor-default opacity-70 hover:bg-transparent",
                   )}
                 >

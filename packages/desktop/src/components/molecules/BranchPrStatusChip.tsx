@@ -24,7 +24,7 @@ export const BranchPrStatusChip = ({ pr, className }: BranchPrStatusChipProps) =
       className={cn(
         "h-auto max-w-[min(100%,18rem)] gap-1.5 px-1.5 py-0.5 font-normal",
         "text-xs tracking-[var(--tracking-caption)] text-ink-secondary",
-        "hover:bg-fill-3 hover:text-ink",
+        "hover:bg-fill-4 hover:text-ink",
         className,
       )}
     >
