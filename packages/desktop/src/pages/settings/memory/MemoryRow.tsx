@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Brain, ChevronDown, Clock, MoreHorizontal, Trash2 } from "lucide-react"
-import { Tooltip } from "../../../components/atoms"
+import { Spinner, Tooltip } from "../../../components/atoms"
 import {
   Collapsible,
   ConfirmDialog,
@@ -12,7 +12,6 @@ import {
 } from "../../../components/molecules"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Spinner } from "@/components/ui/spinner"
 import { toInvokeError } from "../../../lib/tauri"
 import { memoryExpiryFromPreset } from "../../../lib/types"
 import { cn, formatRelativeTime } from "../../../lib/utils"
@@ -163,7 +162,7 @@ export const MemoryRow = ({
           <div className="border-t border-stroke-3 px-2.5 py-2">
             {detailQuery.isLoading ? (
               <div className="flex items-center gap-2 py-2 text-xs text-ink-muted">
-                <Spinner className="size-3.5" /> Loading…
+                <Spinner size="sm" /> Loading…
               </div>
             ) : detailQuery.isError ? (
               <ErrorBanner message={toInvokeError(detailQuery.error)} />

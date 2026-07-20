@@ -21,6 +21,7 @@ import {
   MODEL_MENU_VISIBLE_CAP,
   useGroupedModels,
 } from "../../hooks/useGroupedModels"
+import { TextInput } from "../atoms"
 
 type ModelPickerProps = {
   models: ModelInfoDto[]
@@ -117,14 +118,14 @@ export const ModelPicker = ({
           className="w-72 p-0"
         >
           <div className="border-b border-border px-2.5 py-2">
-            <input
+            <TextInput
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.stopPropagation()}
               placeholder="Search models"
               aria-label="Search models"
-              className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+              className="h-6 border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0 rounded-none"
             />
           </div>
           <div className="max-h-56 overflow-y-auto py-1">
