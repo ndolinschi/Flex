@@ -5,7 +5,7 @@ import { closeWindow } from "../lib/windowChrome"
 import { newAgentCreateInput } from "../lib/sessions"
 import { createSession, toInvokeError } from "../lib/tauri"
 import { useAppStore } from "../stores/appStore"
-import { SESSIONS_KEY } from "./useSessions"
+import { SESSIONS_KEY, upsertSessionInCache } from "./useSessions"
 import { useQueryClient } from "@tanstack/react-query"
 
 const DOCS_URL = "https://github.com/ndolinschi/Flex#readme"
@@ -88,11 +88,12 @@ export const useTitleBarActions = ({
             if (!path || Array.isArray(path)) return
             state.pushRecentCwd(path)
             const meta = await createSession(newAgentCreateInput(path))
+            upsertSessionInCache(optsRef.current.queryClient, meta)
+            state.setActiveSessionId(meta.id, { panel: "closed" })
+            state.setRoute("chat")
             void optsRef.current.queryClient.invalidateQueries({
               queryKey: SESSIONS_KEY,
             })
-            state.setActiveSessionId(meta.id, { panel: "closed" })
-            state.setRoute("chat")
           } catch (err) {
             state.pushToast(
               `Could not open folder: ${toInvokeError(err)}`,
