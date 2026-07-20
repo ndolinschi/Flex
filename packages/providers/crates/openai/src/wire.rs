@@ -266,6 +266,27 @@ impl OpenAiStreamMapper {
 }
 
 pub(crate) fn build_request(request: ChatRequest) -> OpenAiChatRequest {
+    let tools: Vec<OpenAiTool> = request
+        .tools
+        .into_iter()
+        .map(|tool| OpenAiTool {
+            kind: "function".to_owned(),
+            function: OpenAiFunction {
+                name: tool.name,
+                description: tool.description,
+                parameters: tool.input_schema,
+            },
+        })
+        .collect();
+    // Copilot (and some Chat Completions gateways) reject
+    // `tool_choice` when `tools` is absent/empty — "tools are required when
+    // tool choice is specified". Default `ChatRequest` uses Auto with no
+    // tools (throwaway completions like session titles); omit the field.
+    let tool_choice = if tools.is_empty() {
+        None
+    } else {
+        tool_choice(request.tool_choice)
+    };
     OpenAiChatRequest {
         model: request.model,
         messages: build_messages(request.system, request.messages),
@@ -273,19 +294,8 @@ pub(crate) fn build_request(request: ChatRequest) -> OpenAiChatRequest {
         stream_options: StreamOptions {
             include_usage: true,
         },
-        tools: request
-            .tools
-            .into_iter()
-            .map(|tool| OpenAiTool {
-                kind: "function".to_owned(),
-                function: OpenAiFunction {
-                    name: tool.name,
-                    description: tool.description,
-                    parameters: tool.input_schema,
-                },
-            })
-            .collect(),
-        tool_choice: tool_choice(request.tool_choice),
+        tools,
+        tool_choice,
         max_tokens: request.max_tokens,
         temperature: request.temperature,
         thinking: request.thinking.map(|thinking| OpenAiThinking {
@@ -550,6 +560,39 @@ mod tests {
             }
             Err(err) => panic!("stream chunk should parse: {err}"),
         }
+    }
+
+    #[test]
+    fn omits_tool_choice_when_tools_are_empty() {
+        // Default ChatRequest is Auto + no tools — must not serialize
+        // tool_choice (Copilot: "tools are required when tool choice is
+        // specified").
+        let bare = ChatRequest::new("gpt-test", Vec::new());
+        let json = match serde_json::to_value(build_request(bare)) {
+            Ok(value) => value,
+            Err(err) => panic!("request should serialize: {err}"),
+        };
+        assert!(
+            json.get("tools").is_none(),
+            "empty tools must be omitted: {json}"
+        );
+        assert!(
+            json.get("tool_choice").is_none(),
+            "tool_choice must be omitted without tools: {json}"
+        );
+
+        let mut with_tools = ChatRequest::new("gpt-test", Vec::new());
+        with_tools.tools.push(agentloop_core::ToolSpec {
+            name: "Read".to_owned(),
+            description: "read a file".to_owned(),
+            input_schema: serde_json::json!({"type": "object"}),
+        });
+        let json = match serde_json::to_value(build_request(with_tools)) {
+            Ok(value) => value,
+            Err(err) => panic!("request should serialize: {err}"),
+        };
+        assert_eq!(json["tool_choice"], "auto");
+        assert_eq!(json["tools"][0]["function"]["name"], "Read");
     }
 
     #[test]
