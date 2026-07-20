@@ -71,13 +71,13 @@ export const SidebarProjectFilter = ({
               "size-6 transition-opacity duration-[var(--duration-fast)]",
               isFiltered || open
                 ? "opacity-100"
-                : "opacity-0 group-hover/label:opacity-100 focus-visible:opacity-100",
+                : "opacity-0 group-hover/label:opacity-100 group-focus-within/label:opacity-100 focus-visible:opacity-100",
               open && "bg-muted",
             )}
           />
         }
       >
-        <ListFilter className="size-3" aria-hidden />
+        <ListFilter className="size-3.5" aria-hidden />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={4} className="w-56">
         <DropdownMenuGroup>

@@ -1,4 +1,4 @@
-import type { ReactNode, DragEvent, PointerEvent } from "react"
+import type { ReactNode, DragEvent, MouseEvent, PointerEvent } from "react"
 import { cn } from "../../lib/utils"
 import { TabClose } from "./TabClose"
 
@@ -23,6 +23,9 @@ type TabProps = {
   className?: string
   /** Stable id for scroll-into-view / DnD (rendered as data-tab-id). */
   tabId?: string
+  onContextMenu?: (e: MouseEvent<HTMLElement>) => void
+  /** Roving tabIndex: 0 for selected tab, -1 for others. Defaults to 0. */
+  tabIndex?: number
   /**
    * When true, tab is a reorder/move target. Idle cursor stays pointer;
    * grabbing is applied on `document.body` only after the drag threshold.
@@ -63,6 +66,8 @@ export const Tab = ({
   title,
   className,
   tabId,
+  onContextMenu,
+  tabIndex,
   draggable = false,
   onPointerDown,
   dropEdge = null,
@@ -73,7 +78,7 @@ export const Tab = ({
     sizeClasses[size],
     selected
       ? "bg-fill-2 text-ink"
-      : "text-ink-muted hover:bg-fill-3 hover:text-ink-secondary",
+      : "text-ink-muted hover:bg-fill-4 hover:text-ink-secondary",
     // Pointer until an active drag sets body cursor to grabbing.
     draggable ? "cursor-pointer touch-none" : null,
     className,
@@ -133,10 +138,12 @@ export const Tab = ({
       type="button"
       onClick={onSelect}
       onPointerDown={onPointerDown}
+      onContextMenu={onContextMenu}
       aria-selected={selected}
       role="tab"
       title={title}
       data-tab-id={tabId}
+      tabIndex={tabIndex ?? 0}
       className={shell}
     >
       {dropMarker}

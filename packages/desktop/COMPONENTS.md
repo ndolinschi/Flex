@@ -43,7 +43,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `ChatgptSignInDialog` | ChatGPT Plus/Pro headless OAuth modal (user code + Open OpenAI + poll) | `open`, `start` / `wait` / `cancel`, `onSuccess` | ProviderSettingsForm, WelcomePage |
 | `SecretStorageSection` | Security: secret-storage backend select | `secretStorage`, `isMac`, `onChange`, `error?` | ProviderSettingsForm |
 | `SessionListItem` | Agent row + rename/delete + running/unread via per-id store selectors | `session`, `isActive`, `memo` | SessionSidebar |
-| `SessionRowSubtitle` | Diff + relative-time under a session title | `updatedAtMs`, `workspaceStatus?`, `gitStatus?` | SessionListItem |
+| `SessionRowSubtitle` | Diff + relative-time under a session title | `updatedAtMs`, `workspaceStatus?`, `gitStatus?`, `repoLabel?` | SessionListItem |
 | `SessionRowActions` | Hover pin / archive / more trailing actions | `pinned`, `archived`, `onTogglePin`, … | SessionListItem |
 | `SidebarFooter` | Theme + settings chrome (+ optional creating spinner) | `theme`, `onToggleTheme`, `onOpenSettings`, `isCreating?` | SessionSidebar |
 | `ErrorBanner` | shadcn `Alert` (destructive) inline error | `message`, `onDismiss?`, `title?` | Composer, Settings, timeline, dialogs |
@@ -91,7 +91,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `SidebarSkeleton` | Sidebar loading placeholder (headers + rows) | — | SessionSidebar |
 | `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?`, `disabled?` | SessionSidebar |
 | `SidebarProjectFilter` | Repositories sort + visibility tray | `sort`, `visibility`, `onSortChange`, `onVisibilityChange` | SessionSidebar |
-| `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle` | SessionSidebar |
+| `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle`, `onNewSession`, `indexed?` | SessionSidebar |
 | `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions | `title`, `status`, `onBuild`, `onAddComment?` | PlanTab |
 | `AppMark` / `TitleBarMenus` | Wireframe mark + in-window File/Edit/View/Help (Windows/Linux); Help → **Submit Bug…** opens `BugReportDialog` | `handlers`, `isBootstrapped`, `canSearch`, `canCommandPalette` | WindowTitleBar (non-macOS) |
 | `BugReportDialog` | Google-style Submit Bug modal: disclosure (app id + session/task ids), Terms/Privacy links, “Tell us what went wrong”, opens GitHub issue form | `open`, `onClose` | WindowTitleBar |

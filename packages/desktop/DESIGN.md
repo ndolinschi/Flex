@@ -21,7 +21,7 @@ audit and fix UI against this file. For shadcn adds/rewrites, also load the
 |---|---|
 | Compact density | 30px chrome rows; prefer `h-6` controls in headers |
 | Quiet chrome | Hairline `stroke-3` borders; sash hover is white-alpha, never accent |
-| Whisper fills | Selected `fill-2`, hover `fill-4` / `fill-3` |
+| Whisper fills | Selected `fill-2`, hover `fill-4` (list rows, tabs, chrome buttons) |
 | Opacity hover | Quiet `IconButton`: idle `.5` → hover `.8` |
 | 4px grid | Spacing tokens `--space-1`…`--space-12` (4–48px) |
 | Radius by role | Controls `rounded-md` (8); composer/bubbles 14; settings cards 12; pills full |
@@ -111,6 +111,10 @@ ContentPane(s)
 
 - **Single:** one pane fills the column.
 - **Split (wide only):** left | sash | right; each pane has its own tabs.
+- **Split eligibility:** entering split requires both `viewport === "wide"` AND
+  `(window.innerWidth - sidebarUsed) >= CHAT_MIN_WIDTH * 2` (760px). The sash
+  is additionally hidden in `ContentWorkspace` when the measured content row is
+  narrower than `CHAT_MIN_WIDTH * 2` (e.g. after a window resize mid-session).
 - Auto-open (plan approval, PR, files, browser, terminal) uses `openToolBesideChat`.
 - Narrow/tight: force single pane.
 
@@ -250,7 +254,7 @@ read flush against the border. Use `h-6` (3px inset each side).
 4. Scrollable groups — Pinned / repos / Archived (`px-2`)
 5. Footer — theme + settings (`px-2.5 py-1.5 border-t`)
 
-Selected row: `bg-fill-2`. Hover: `bg-fill-4`.
+Selected row: `bg-fill-2`. Hover: `bg-fill-4`. Applies uniformly to all interactive list rows, tab pills, and chrome icon buttons.
 
 Filter tray (Repositories row): Sort — Last updated / Name A–Z; Show —
 Active projects (updated within 14 days) / All projects. Prefs persist in
@@ -324,6 +328,26 @@ tabs **live-shift** on the axis as you drag; dropping on the other pane (strip
 or pane body) **moves and activates** the tab. Dropping outside any pane/strip
 is a no-op.
 
+**Tab close — adjacent activation:** closing a tab activates its right
+neighbor at the same index; if no right neighbor exists, the left neighbor
+is activated. This applies to `closeTabInPane` and the source pane in
+`moveTabBetweenPanes`.
+
+**Tab context menu (right-click):** Open to Side (wide viewport only),
+Close, Close Others, Close to Right. Rendered via the `ContextMenu` molecule.
+
+**⌘W / Ctrl+W:** closes the focused pane's active tab (via `onCloseActiveTab`
+in `useKeyboardShortcuts`). No-op on the welcome route or when no pane is
+active.
+
+**Tab strip arrow navigation:** ArrowLeft/ArrowRight move keyboard focus
+between `role="tab"` buttons. Roving tabIndex: selected tab is `tabIndex=0`,
+others are `tabIndex=-1`.
+
+**Tab strip edge fade:** when the tab strip overflows, a CSS `mask-image`
+gradient fades the left edge (when scrolled) and the right edge (when more
+tabs are hidden to the right). Dual-edge composited as two separate gradients.
+
 ---
 
 ## Overlay z-index
@@ -370,7 +394,7 @@ Tailwind `p-*` / `gap-*` map through `@theme` in `src/index.css`.
 | Put only **`h-6`** controls in 30px header rows | `h-7` pills inside `--header-height` (reads flush) |
 | Give TabStrip the bottom border; content headers title the body | Stack two `border-b` with no content between |
 | Neutral `stroke-2` focus rings on chrome inputs | Accent glow focus |
-| `fill-2` selected / `fill-4` list hover | One-off active fills (`fill-3` as selected) |
+| `fill-2` selected / `fill-4` hover on tabs, list rows, and chrome buttons | One-off active fills or `fill-3` as hover |
 | Quiet sash hover (white-alpha) | Accent-colored resize lines |
 | Timeline gaps via **padding** | Margin between virtualized rows |
 | Keep Chat mounted under settings overlays | Remount ContentWorkspace on settings round-trips |
@@ -386,6 +410,8 @@ Tailwind `p-*` / `gap-*` map through `@theme` in `src/index.css`.
 | Status / Database / Components micro-captions `text-[10px]`–`text-[11px]` | Capitals under `text-xs` (11px); section labels stay tighter |
 | Window traffic-light cluster `gap-[6px]` | Platform chrome alignment (macOS spacing), not app gutter |
 | SessionMenu error toast `mt-10` | Clears the title-bar control hit target |
+| `SessionRowSubtitle` indent `pl-[26px]` | Aligns under the session title, skipping the `w-5` status slot + `gap-1.5` (`20px + 6px`). Do not change to a token — the value is intentional. |
+| ContentPane trailing actions `gap-0.5` | Tighter than the `gap-1.5` tab strip; `+` and close are logically grouped chrome, not content. |
 
 **Agent skill:** `.claude/skills/design-audit/SKILL.md` — run that procedure for spacing / layout audits.
 

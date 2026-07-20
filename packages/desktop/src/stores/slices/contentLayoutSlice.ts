@@ -4,6 +4,7 @@ import type {
   AppState,
   ContentLayoutSliceState,
 } from "../types"
+import { CHAT_MIN_WIDTH } from "../layoutConstants"
 import { isRightPanelTabEnabled } from "../../lib/featureFlags"
 import { persistUiState } from "../persist"
 import {
@@ -23,6 +24,21 @@ import {
   type ContentTab,
   type PaneState,
 } from "../contentLayoutModel"
+
+/**
+ * Whether the current state supports opening a split view.
+ * Requires a wide viewport AND enough content-column width for two minimum-
+ * width chat panes. Uses `window.innerWidth - sidebarUsed` as an approximation
+ * (the exact row width is only available in ContentWorkspace's ResizeObserver).
+ * Falls back to the viewport check alone when `window` is unavailable (SSR /
+ * node test environment).
+ */
+export const isSplitEligible = (state: AppState): boolean => {
+  if (state.viewport !== "wide") return false
+  if (typeof window === "undefined" || window.innerWidth === 0) return true
+  const sidebarUsed = state.sidebarCollapsed ? 0 : state.sidebarWidth
+  return window.innerWidth - sidebarUsed >= CHAT_MIN_WIDTH * 2
+}
 
 const persistLayout = (layout: ContentLayout) => {
   void persistUiState({ contentLayout: layout })
@@ -44,6 +60,27 @@ const syncCompatFlags = (
     rightPanelOpen: layout.mode === "split",
     rightPanelTab: tool ?? "plan",
   }
+}
+
+/** Sync global activeSessionId from the focused pane's active chat tab. */
+const sessionIdFromLayout = (layout: ContentLayout): SessionId | null => {
+  const focused = layout.panes[layout.focusedPane] ?? layout.panes[0]
+  const active = focused?.tabs.find((t) => t.id === focused.activeTabId)
+  if (active?.kind === "chat") return active.sessionId
+  // Fall back to any chat still present in the focused pane.
+  const chat = focused?.tabs.find((t) => t.kind === "chat")
+  return chat?.kind === "chat" ? chat.sessionId : null
+}
+
+const withSessionSync = (
+  layout: ContentLayout,
+  currentActive: SessionId | null,
+): Partial<AppState> => {
+  const nextId = sessionIdFromLayout(layout)
+  if (nextId && nextId !== currentActive) {
+    return { activeSessionId: nextId }
+  }
+  return {}
 }
 
 const clonePanes = (layout: ContentLayout): PaneState[] =>
@@ -94,7 +131,7 @@ export const createContentLayoutSlice: StateCreator<
   ensureSplit: () => {
     const layout = get().contentLayout
     if (layout.mode === "split") return
-    if (get().viewport !== "wide") return
+    if (!isSplitEligible(get())) return
     const p0 = layout.panes[0] ?? emptyPane()
     const next: ContentLayout = {
       mode: "split",
@@ -151,7 +188,7 @@ export const createContentLayoutSlice: StateCreator<
   },
 
   toggleSplit: () => {
-    if (get().viewport !== "wide") {
+    if (!isSplitEligible(get())) {
       get().collapseSplit()
       return
     }
@@ -190,7 +227,7 @@ export const createContentLayoutSlice: StateCreator<
     if (!isRightPanelTabEnabled(tool)) return
     let layout = get().contentLayout
     if (pane === 1 && layout.mode !== "split") {
-      if (get().viewport === "wide") {
+      if (isSplitEligible(get())) {
         get().ensureSplit()
         layout = get().contentLayout
       } else {
@@ -218,8 +255,8 @@ export const createContentLayoutSlice: StateCreator<
       }
     }
 
-    if (get().viewport !== "wide") {
-      // Narrow: open tool in the single pane (no split).
+    if (!isSplitEligible(get())) {
+      // Not wide enough for a split: open tool in the single pane.
       layout = ensureChatInPane(layout, 0, sessionId)
       const next = upsertToolInPane(layout, 0, sessionId, tool)
       set({ contentLayout: next, ...syncCompatFlags(next) })
@@ -228,11 +265,29 @@ export const createContentLayoutSlice: StateCreator<
       return
     }
 
-    layout = ensureChatInPane(layout, 0, sessionId)
-    // Activate chat on left if empty active.
-    const left = layout.panes[0]!
-    if (!left.activeTabId || !left.tabs.some((t) => t.id === left.activeTabId)) {
-      left.activeTabId = chatTabId(sessionId)
+    // Prefer the pane that already hosts this session's chat so we don't
+    // clobber a right-pane chat by forcing the tool into pane 1.
+    const chatId = chatTabId(sessionId)
+    let chatPane: 0 | 1 = 0
+    const focused = layout.focusedPane
+    if (layout.panes[focused]?.tabs.some((t) => t.id === chatId)) {
+      chatPane = focused
+    } else {
+      for (let i = 0; i < layout.panes.length; i++) {
+        if (layout.panes[i]?.tabs.some((t) => t.id === chatId)) {
+          chatPane = i as 0 | 1
+          break
+        }
+      }
+    }
+
+    layout = ensureChatInPane(layout, chatPane, sessionId)
+    const chatSide = layout.panes[chatPane]!
+    if (
+      !chatSide.activeTabId ||
+      !chatSide.tabs.some((t) => t.id === chatSide.activeTabId)
+    ) {
+      chatSide.activeTabId = chatId
     }
 
     if (layout.mode !== "split") {
@@ -242,16 +297,18 @@ export const createContentLayoutSlice: StateCreator<
         focusedPane: 1,
         panes: [layout.panes[0]!, emptyPane()],
       }
+      chatPane = 0
     }
 
-    const next = upsertToolInPane(layout, 1, sessionId, tool)
+    const toolPane = otherPaneIndex(chatPane)
+    const next = upsertToolInPane(layout, toolPane, sessionId, tool)
     set({ contentLayout: next, ...syncCompatFlags(next) })
     persistLayout(next)
     get().openTab(sessionId, tool)
   },
 
   openTabToSide: (fromPane, tabId) => {
-    if (get().viewport !== "wide") return
+    if (!isSplitEligible(get())) return
     let layout = get().contentLayout
     const from = layout.panes[fromPane]
     const tab = from?.tabs.find((t) => t.id === tabId)
@@ -359,12 +416,14 @@ export const createContentLayoutSlice: StateCreator<
     if (!p) return
     const tab = p.tabs.find((t) => t.id === tabId)
     if (!tab) return
+    const closedIndex = p.tabs.findIndex((t) => t.id === tabId)
     const tabs = p.tabs.filter((t) => t.id !== tabId)
     const nextPane: PaneState = {
       tabs,
       activeTabId:
         p.activeTabId === tabId
-          ? (tabs[tabs.length - 1]?.id ?? null)
+          // Prefer right neighbor at the removed index, else left neighbor.
+          ? (tabs[closedIndex]?.id ?? tabs[closedIndex - 1]?.id ?? null)
           : p.activeTabId,
     }
 
@@ -391,8 +450,97 @@ export const createContentLayoutSlice: StateCreator<
       }
     }
 
-    set({ contentLayout: next, ...syncCompatFlags(next) })
+    const prevActive = get().activeSessionId
+    const sessionSync = withSessionSync(next, prevActive)
+    set({
+      contentLayout: next,
+      ...sessionSync,
+      ...syncCompatFlags(next),
+    })
     persistLayout(next)
+    if (sessionSync.activeSessionId) {
+      void persistUiState({ activeSessionId: sessionSync.activeSessionId })
+    }
+  },
+
+  closeOtherTabsInPane: (pane, tabId) => {
+    const layout = get().contentLayout
+    const p = layout.panes[pane]
+    if (!p) return
+    const keptTab = p.tabs.find((t) => t.id === tabId)
+    if (!keptTab) return
+    for (const t of p.tabs) {
+      if (t.id !== tabId && t.kind === "tool") {
+        get().closeTab(t.sessionId, t.tool)
+      }
+    }
+    const nextPane: PaneState = { tabs: [keptTab], activeTabId: keptTab.id }
+    let next: ContentLayout = {
+      ...layout,
+      panes: replacePane(layout, pane, nextPane),
+    }
+    if (next.mode === "split" && (next.panes[1]?.tabs.length ?? 0) === 0) {
+      next = {
+        mode: "single",
+        splitRatio: next.splitRatio,
+        focusedPane: 0,
+        panes: [next.panes[0]!],
+      }
+    }
+    const prevActive = get().activeSessionId
+    const sessionSync = withSessionSync(next, prevActive)
+    set({
+      contentLayout: next,
+      ...sessionSync,
+      ...syncCompatFlags(next),
+    })
+    persistLayout(next)
+    if (sessionSync.activeSessionId) {
+      void persistUiState({ activeSessionId: sessionSync.activeSessionId })
+    }
+  },
+
+  closeTabsToRightInPane: (pane, tabId) => {
+    const layout = get().contentLayout
+    const p = layout.panes[pane]
+    if (!p) return
+    const index = p.tabs.findIndex((t) => t.id === tabId)
+    if (index < 0) return
+    const toClose = p.tabs.slice(index + 1)
+    if (toClose.length === 0) return
+    const tabs = p.tabs.slice(0, index + 1)
+    for (const t of toClose) {
+      if (t.kind === "tool") {
+        get().closeTab(t.sessionId, t.tool)
+      }
+    }
+    const keptActiveId = tabs.some((t) => t.id === p.activeTabId)
+      ? p.activeTabId
+      : tabId
+    const nextPane: PaneState = { tabs, activeTabId: keptActiveId }
+    let next: ContentLayout = {
+      ...layout,
+      panes: replacePane(layout, pane, nextPane),
+    }
+    if (next.mode === "split" && (next.panes[1]?.tabs.length ?? 0) === 0) {
+      next = {
+        mode: "single",
+        splitRatio: next.splitRatio,
+        focusedPane: 0,
+        panes: [next.panes[0]!],
+      }
+    }
+    const prevActive = get().activeSessionId
+    const sessionSync = withSessionSync(next, prevActive)
+    set({
+      contentLayout: next,
+      ...sessionSync,
+      ...syncCompatFlags(next),
+    })
+    persistLayout(next)
+    if (sessionSync.activeSessionId) {
+      void persistUiState({ activeSessionId: sessionSync.activeSessionId })
+    }
   },
 
   focusContentTab: (pane, tabId) => {

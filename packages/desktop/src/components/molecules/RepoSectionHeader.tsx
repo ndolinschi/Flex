@@ -64,9 +64,8 @@ export const RepoSectionHeader = ({
           onNewSession()
         }}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
-        "opacity-50 hover:opacity-80",
-        "shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100",
+        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+        "shrink-0 opacity-40 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100",
       )}
     >
       <Plus className="h-3.5 w-3.5" aria-hidden />

@@ -2,16 +2,19 @@ import { memo, useCallback, useState, type KeyboardEvent, type MouseEvent } from
 import {
   ArchiveRestore,
   Archive as ArchiveIcon,
+  CircleAlert,
   Copy,
+  MessageCircleQuestion,
   Pencil,
   Pin,
   Plus,
   Trash2,
   TriangleAlert,
 } from "lucide-react"
+import { useStoreWithEqualityFn } from "zustand/traditional"
 import type { GitStatusSummary, SessionMeta, WorkspaceStatusDto } from "../../lib/types"
 import { sessionLabel } from "../../lib/types"
-import { formatCompactTime, cn } from "../../lib/utils"
+import { basename, formatCompactTime, cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
 import { RunningDot, TextInput, Tooltip } from "../atoms"
 import { ConfirmDialog } from "./ConfirmDialog"
@@ -62,10 +65,27 @@ export const SessionListItem = memo(function SessionListItem({
   onTogglePin,
   onSetArchived,
 }: SessionListItemProps) {
-  // Per-id selectors — parent must not pass the whole streaming/unread maps
-  // or every row redraws on every other session's stream tick.
-  const isRunning = useAppStore((s) => !!s.streamingSessions[session.id])
-  const unread = useAppStore((s) => s.unreadBySession[session.id])
+  // Single selector returning a tuple — one subscription instead of four,
+  // with a field-level equality check so unrelated sessions' updates are skipped.
+  const { isRunning, unread, needsInput, turnFailed } = useStoreWithEqualityFn(
+    useAppStore,
+    (s) => {
+      const id = session.id
+      return {
+        isRunning: !!s.streamingSessions[id],
+        unread: s.unreadBySession[id],
+        needsInput:
+          s.pendingPermission?.sessionId === id ||
+          s.pendingQuestion?.sessionId === id,
+        turnFailed: s.lastTurnSummary[id]?.stop_reason === "error",
+      }
+    },
+    (a, b) =>
+      a.isRunning === b.isRunning &&
+      a.unread === b.unread &&
+      a.needsInput === b.needsInput &&
+      a.turnFailed === b.turnFailed,
+  )
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(session.title ?? "")
   const [isDeleting, setIsDeleting] = useState(false)
@@ -77,6 +97,9 @@ export const SessionListItem = memo(function SessionListItem({
   const [actionsReady, setActionsReady] = useState(false)
 
   const label = sessionLabel(session)
+  const repoLabel = pinned
+    ? basename(session.base_cwd || session.cwd)
+    : undefined
 
   const armActions = useCallback(() => {
     setActionsReady(true)
@@ -193,9 +216,20 @@ export const SessionListItem = memo(function SessionListItem({
   ]
 
   const showSubtitle =
-    !isEditing && sessionRowHasSubtitle(workspaceStatus, gitStatus)
+    !isEditing &&
+    sessionRowHasSubtitle(workspaceStatus, gitStatus, repoLabel)
   // Numeric unread > 0 gets the "(N) " title prefix (reference design).
   const unreadCount = typeof unread === "number" && unread > 0 ? unread : null
+  // Status-first triage: needs-input > working > failed > unread.
+  const statusKind = needsInput
+    ? "needs-input"
+    : isRunning
+      ? "working"
+      : turnFailed
+        ? "failed"
+        : unread
+          ? "unread"
+          : null
 
   return (
     <div
@@ -228,9 +262,23 @@ export const SessionListItem = memo(function SessionListItem({
           <span
             className="flex h-5 w-5 shrink-0 items-center justify-center"
           >
-            {isRunning ? (
+            {statusKind === "needs-input" ? (
+              <Tooltip label="Needs your input">
+                <MessageCircleQuestion
+                  className="h-3.5 w-3.5 text-accent"
+                  aria-label="Needs your input"
+                />
+              </Tooltip>
+            ) : statusKind === "working" ? (
               <RunningDot />
-            ) : unread ? (
+            ) : statusKind === "failed" ? (
+              <Tooltip label="Last turn failed">
+                <CircleAlert
+                  className="h-3.5 w-3.5 text-destructive"
+                  aria-label="Last turn failed"
+                />
+              </Tooltip>
+            ) : statusKind === "unread" ? (
               <Tooltip label="Unread">
                 <span
                   className="h-[5px] w-[5px] shrink-0 rounded-full bg-accent"
@@ -287,6 +335,7 @@ export const SessionListItem = memo(function SessionListItem({
             updatedAtMs={session.updated_at_ms}
             workspaceStatus={workspaceStatus}
             gitStatus={gitStatus}
+            repoLabel={repoLabel}
           />
         ) : null}
       </span>

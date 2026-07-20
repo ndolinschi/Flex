@@ -12,6 +12,8 @@ type ShortcutHandlers = {
   onToggleRightPanel?: () => void
   /** ⌘⇧P — command palette (distinct from ⌘K agent search). */
   onToggleCommandPalette?: () => void
+  /** ⌘W / Ctrl+W — close the focused pane's active tab. */
+  onCloseActiveTab?: () => void
 }
 
 const isEditableTarget = (target: EventTarget | null): boolean => {
@@ -70,6 +72,15 @@ export const useKeyboardShortcuts = (
       if (e.key === "j" && handlers.onToggleRightPanel) {
         e.preventDefault()
         handlers.onToggleRightPanel()
+        return
+      }
+
+      if (e.key === "w" && handlers.onCloseActiveTab) {
+        // Preserve Ctrl+W "delete previous word" in editable fields on
+        // Windows/Linux. Meta+W (macOS) still closes the tab — IDE pattern.
+        if (e.ctrlKey && !e.metaKey && isEditableTarget(e.target)) return
+        e.preventDefault()
+        handlers.onCloseActiveTab()
         return
       }
 

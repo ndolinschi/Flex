@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -56,9 +57,27 @@ export const ContentWorkspace = () => {
   const contentLayout = useAppStore((s) => s.contentLayout)
   const setSplitRatio = useAppStore((s) => s.setSplitRatio)
   const setRightPanelDragging = useAppStore((s) => s.setRightPanelDragging)
-  const viewport = useAppStore((s) => s.viewport)
   const [dragging, setDragging] = useState(false)
   const rowRef = useRef<HTMLDivElement>(null)
+  // Threshold boolean — avoid re-rendering on every resize pixel while the
+  // sash eligibility does not change.
+  const [canShowSash, setCanShowSash] = useState(false)
+
+  useEffect(() => {
+    const el = rowRef.current
+    if (!el) return
+    const update = (width: number) => {
+      const next = width >= CHAT_MIN_WIDTH * 2
+      setCanShowSash((prev) => (prev === next ? prev : next))
+    }
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (entry) update(entry.contentRect.width)
+    })
+    ro.observe(el)
+    update(el.getBoundingClientRect().width)
+    return () => ro.disconnect()
+  }, [])
 
   const keepAliveTools = useMemo(() => {
     const set = new Set<string>()
@@ -77,10 +96,11 @@ export const ContentWorkspace = () => {
     return set
   }, [contentLayout.panes])
 
-  const split =
-    contentLayout.mode === "split" &&
-    viewport === "wide" &&
-    contentLayout.panes.length > 1
+  const split = contentLayout.mode === "split" && contentLayout.panes.length > 1
+  // Only render the resize sash when the content row is wide enough for two
+  // minimum-width panes. Both panes stay mounted to preserve scroll/xterm
+  // state; the sash handle just hides when there is no room to drag it.
+  const showSash = split && canShowSash
 
   const handleSashDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -132,19 +152,21 @@ export const ContentWorkspace = () => {
         </div>
         {split ? (
           <>
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="Resize content panes"
-              tabIndex={0}
-              onPointerDown={handleSashDown}
-              className={cn(
-                "sash-line-transition relative z-10 w-1.5 shrink-0 cursor-col-resize",
-                "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-stroke-3",
-                "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_15%,transparent)]",
-                dragging && "after:bg-stroke-1",
-              )}
-            />
+            {showSash ? (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize content panes"
+                tabIndex={0}
+                onPointerDown={handleSashDown}
+                className={cn(
+                  "sash-line-transition relative z-10 w-1.5 shrink-0 cursor-col-resize",
+                  "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-stroke-3",
+                  "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_15%,transparent)]",
+                  dragging && "after:bg-stroke-1",
+                )}
+              />
+            ) : null}
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               <ContentPane paneIndex={1} keepAliveTools={keepAliveTools} />
             </div>

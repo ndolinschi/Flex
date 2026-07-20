@@ -30,7 +30,13 @@ import { BrowserToolbar } from "./browser/BrowserToolbar"
  * All session/ownership/webview-bounds/navigation logic lives in
  * `useBrowserSession` (src/hooks/useBrowserSession.ts) — this component is
  * the chrome view that consumes it. Toolbar/overflow live under `./browser/`. */
-export const BrowserTab = ({ active }: { active: boolean }) => {
+export const BrowserTab = ({
+  active,
+  sessionId,
+}: {
+  active: boolean
+  sessionId: string | null
+}) => {
   const {
     hostRef,
     contentRef,
@@ -58,7 +64,7 @@ export const BrowserTab = ({ active }: { active: boolean }) => {
     toggleDesignMode,
     browserBack,
     browserForward,
-  } = useBrowserSession(active)
+  } = useBrowserSession(active, sessionId)
 
   const [editing, setEditing] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)

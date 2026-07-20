@@ -188,7 +188,9 @@ export const moveTabBetweenPanes = (
   const [tab] = source.tabs.splice(fromIndex, 1)
   if (!tab) return layout
   if (source.activeTabId === tabId) {
-    source.activeTabId = source.tabs[source.tabs.length - 1]?.id ?? null
+    // Prefer right neighbor at the removed index, else left neighbor.
+    source.activeTabId =
+      source.tabs[fromIndex]?.id ?? source.tabs[fromIndex - 1]?.id ?? null
   }
 
   const existingIdx = target.tabs.findIndex((t) => t.id === tabId)

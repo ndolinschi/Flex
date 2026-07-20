@@ -21,12 +21,20 @@ import { cn } from "../../../lib/utils"
 
 type ChatSessionBodyProps = {
   sessionId: SessionId
-  /** When false, this pane is not focused — dim HITL overlays. */
-  active: boolean
+  /** True while this tab is the visible active tab in its pane (keeps live
+   * subscription running even when the pane is unfocused). */
+  visible: boolean
+  /** True when the pane is also the focused one — gates HITL overlays and
+   * interactive controls so they only respond in the front pane. */
+  interactive: boolean
 }
 
 /** Timeline + composer for one chat tab inside a content pane. */
-export const ChatSessionBody = ({ sessionId, active }: ChatSessionBodyProps) => {
+export const ChatSessionBody = ({
+  sessionId,
+  visible,
+  interactive,
+}: ChatSessionBodyProps) => {
   const pendingPermission = useAppStore((s) => s.pendingPermission)
   const pendingQuestion = useAppStore((s) => s.pendingQuestion)
   const [conversationEmpty, setConversationEmpty] = useState(false)
@@ -66,11 +74,11 @@ export const ChatSessionBody = ({ sessionId, active }: ChatSessionBodyProps) => 
   const heroTitle = meta ? sessionLabel(meta) : "New Agent"
 
   const questionForSession =
-    active && pendingQuestion && pendingQuestion.sessionId === sessionId
+    interactive && pendingQuestion && pendingQuestion.sessionId === sessionId
       ? pendingQuestion
       : null
   const permissionForSession =
-    active && pendingPermission && pendingPermission.sessionId === sessionId
+    interactive && pendingPermission && pendingPermission.sessionId === sessionId
       ? pendingPermission
       : null
   const dockedOverlay = questionForSession ? (
@@ -80,24 +88,24 @@ export const ChatSessionBody = ({ sessionId, active }: ChatSessionBodyProps) => 
   ) : null
 
   return (
-    <div className={cn("flex h-full min-h-0 flex-1 flex-col", !active && "opacity-90")}>
+    <div className={cn("flex h-full min-h-0 flex-1 flex-col", !interactive && "opacity-90")}>
       <ChatShell
         hideSidebar
         timeline={
           <>
             <TurnTimeline
               sessionId={sessionId}
-              active={active}
+              active={visible}
               onConversationEmpty={handleConversationEmpty}
               onLiveRows={handleLiveRows}
             />
-            {active ? <SubagentViewer /> : null}
+            {interactive ? <SubagentViewer /> : null}
           </>
         }
         composer={
           <Composer
             sessionId={sessionId}
-            interactive={active}
+            interactive={interactive}
             isHero={composerHero}
             dockedOverlay={dockedOverlay}
             workersSlot={

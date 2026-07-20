@@ -435,6 +435,10 @@ export type ContentLayoutSliceState = {
     insertAt: number,
   ) => void
   closeTabInPane: (pane: 0 | 1, tabId: string) => void
+  /** Close every tab in a pane except the specified one. */
+  closeOtherTabsInPane: (pane: 0 | 1, tabId: string) => void
+  /** Close all tabs that appear after `tabId` in a pane. */
+  closeTabsToRightInPane: (pane: 0 | 1, tabId: string) => void
   /** Focus pane + sync activeSessionId when activating a chat tab. */
   focusContentTab: (pane: 0 | 1, tabId: string) => void
 }
