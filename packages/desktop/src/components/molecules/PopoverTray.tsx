@@ -4,7 +4,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react"
-import { Search } from "lucide-react"
+import { SearchIcon } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
 
@@ -30,9 +30,18 @@ type PopoverTrayProps = {
 const ITEM_SELECTOR =
   '[role="option"]:not([disabled]), [role="menuitem"]:not([disabled])'
 
-/** Shared Esc/click-outside/↑↓ tray — Esc + click-outside + arrow keys, tray-in motion.
+/**
+ * Shared Esc/click-outside/↑↓ tray — Esc + click-outside + arrow keys, tray-in motion.
  * `onClose` is read via ref so stream-driven parent re-renders (inline closers)
- * do not tear down / rebind document listeners mid-open. */
+ * do not tear down / rebind document listeners mid-open.
+ *
+ * Note: Base UI <PopoverTrigger> / <PopoverContent> cannot be used here.
+ * Composer trays are positioned `absolute` inside a `relative` parent container
+ * (full-width `left-0 right-0`). Base UI Popover portals content to document.body
+ * via a floating Positioner — incompatible with the full-width layout and, more
+ * critically, Base UI Popup steals focus on open, breaking the `autoFocus={false}`
+ * live-filtering behavior where the textarea must retain focus while the tray shows.
+ */
 export const PopoverTray = ({
   open,
   onClose,
@@ -135,7 +144,9 @@ export const PopoverTray = ({
       aria-label={ariaLabel}
       className={cn(
         "absolute z-50 overflow-hidden rounded-md",
-        "bg-panel shadow-[var(--shadow-popover)] animate-tray-in",
+        // Chrome aligned with shadcn PopoverContent: bg-popover (= bg-panel),
+        // shadow-popover, ring-1 ring-foreground/10.
+        "bg-popover shadow-popover ring-1 ring-foreground/10 animate-tray-in",
         placement === "above" ? "bottom-full mb-1.5" : "top-full mt-1.5",
         className,
       )}
@@ -152,20 +163,21 @@ type PopoverSearchProps = {
   "aria-label"?: string
 }
 
+/** Search bar styled after CommandInput: semantic tokens, SearchIcon, border-border. */
 export const PopoverSearch = ({
   value,
   onChange,
   placeholder,
   "aria-label": ariaLabel,
 }: PopoverSearchProps) => (
-  <div className="flex items-center gap-1.5 border-b border-stroke-3 px-2.5 py-1.5">
-    <Search className="h-3 w-3 shrink-0 text-ink-faint" aria-hidden />
+  <div className="flex items-center gap-1.5 border-b border-border px-2.5 py-1.5">
+    <SearchIcon className="size-3 shrink-0 text-muted-foreground" aria-hidden />
     <input
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       aria-label={ariaLabel ?? placeholder}
-      className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
+      className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
     />
   </div>
 )
@@ -177,9 +189,10 @@ type PopoverSectionProps = {
   children?: ReactNode
 }
 
+/** Section heading styled after CommandGroup: text-muted-foreground label. */
 export const PopoverSection = ({ label, icon, children }: PopoverSectionProps) => (
   <div className="py-1">
-    <p className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-ink-faint">
+    <p className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-muted-foreground">
       {icon}
       <span className="min-w-0 truncate">{label}</span>
     </p>
@@ -196,6 +209,10 @@ type PopoverItemProps = {
   role?: "option" | "menuitem"
 }
 
+/**
+ * List item styled after CommandItem: data-selected drives bg/text via CSS,
+ * matching the Command primitive's selection state pattern.
+ */
 export const PopoverItem = ({
   active = false,
   disabled = false,
@@ -208,14 +225,16 @@ export const PopoverItem = ({
     variant="ghost"
     role={role}
     aria-selected={role === "option" ? active : undefined}
+    data-selected={active || undefined}
     disabled={disabled}
     tabIndex={disabled ? -1 : 0}
     onClick={onClick}
     className={cn(
       // Icon + label start; callers put trailing marks in children with ml-auto.
       "h-8 w-full justify-start gap-1.5 px-2.5 py-0 text-left font-normal text-sm",
-      "hover:bg-muted focus:bg-muted",
-      active ? "bg-muted text-foreground" : "text-muted-foreground",
+      // Matches CommandItem selection token pattern: data-selected:bg-muted / text-foreground
+      "text-muted-foreground hover:bg-muted hover:text-foreground focus:bg-muted focus:text-foreground",
+      "data-selected:bg-muted data-selected:text-foreground",
       className,
     )}
   >
