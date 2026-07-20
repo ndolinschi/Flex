@@ -7,6 +7,7 @@ import { isBrowserPreview, NATIVE_APP_REQUIRED } from "../../lib/browserPreview"
 import { invalidateWorkspaceQueries } from "../../lib/invalidateWorkspaceQueries"
 import { DEFAULT_SESSION_TITLE } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
+import { upsertSessionInCache } from "../../hooks/useSessions"
 import { basename, parentPathPrefix } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -102,9 +103,10 @@ export const ProjectPicker = ({
           model: selectedModelId ?? undefined,
           ...(selectedIsolation ? { isolation: selectedIsolation } : {}),
         })
-        await queryClient.invalidateQueries({ queryKey: ["sessions"] })
+        upsertSessionInCache(queryClient, meta)
         setActiveSessionId(meta.id, { panel: "closed" })
         setRoute("chat")
+        void queryClient.invalidateQueries({ queryKey: ["sessions"] })
       }
       setOpen(false)
     } catch (err) {

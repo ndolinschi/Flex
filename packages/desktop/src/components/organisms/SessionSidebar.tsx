@@ -114,6 +114,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   const {
     sessions: allSessions,
     isLoading,
+    isFetching,
     error,
     newAgent,
     renameSession,
@@ -135,8 +136,11 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
 
   // Drop persisted active/pin ids that are no longer in the sessions list
   // (engine restarted, deleted elsewhere) so status polls never target ghosts.
+  // Skip while the list is loading/refetching — a just-created session can be
+  // selected before invalidateQueries lands, and clearing would wipe the
+  // content pane to the empty "Open a chat or tool tab with +" state.
   useEffect(() => {
-    if (isLoading) return
+    if (isLoading || isFetching) return
     const known = new Set(allSessions.map((s) => s.id))
     if (activeSessionId && !known.has(activeSessionId)) {
       setActiveSessionId(null)
@@ -150,6 +154,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     }
   }, [
     isLoading,
+    isFetching,
     allSessions,
     activeSessionId,
     pinnedSessionIds,

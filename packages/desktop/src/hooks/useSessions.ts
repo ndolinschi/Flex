@@ -19,6 +19,23 @@ import { persistUiState, useAppStore } from "../stores/appStore"
 
 export const SESSIONS_KEY = ["sessions"] as const
 
+/** Insert/replace a session in the list cache so UI selection cannot race
+ * ahead of `invalidateQueries` (sidebar heal would otherwise see a missing id
+ * and call `setActiveSessionId(null)`, wiping the content pane to empty). */
+export const upsertSessionInCache = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  meta: SessionMeta,
+): void => {
+  queryClient.setQueryData<SessionMeta[]>(SESSIONS_KEY, (prev) => {
+    if (!prev) return [meta]
+    const idx = prev.findIndex((s) => s.id === meta.id)
+    if (idx === -1) return [meta, ...prev]
+    const next = prev.slice()
+    next[idx] = meta
+    return next
+  })
+}
+
 export const useSessions = () => {
   const queryClient = useQueryClient()
   const setActiveSessionId = useAppStore((s) => s.setActiveSessionId)
@@ -39,9 +56,10 @@ export const useSessions = () => {
   const createMutation = useMutation({
     mutationFn: (input: CreateSessionInput) => createSession(input),
     onSuccess: (meta: SessionMeta) => {
-      void queryClient.invalidateQueries({ queryKey: SESSIONS_KEY })
+      upsertSessionInCache(queryClient, meta)
       setActiveSessionId(meta.id, { panel: "closed" })
       setRoute("chat")
+      void queryClient.invalidateQueries({ queryKey: SESSIONS_KEY })
     },
   })
 
@@ -171,6 +189,7 @@ export const useSessions = () => {
   return {
     sessions: query.data ?? [],
     isLoading: query.isLoading,
+    isFetching: query.isFetching,
     isError: query.isError,
     error: query.error ? toInvokeError(query.error) : null,
     refetch: query.refetch,
