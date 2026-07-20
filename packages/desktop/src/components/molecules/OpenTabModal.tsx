@@ -238,8 +238,6 @@ export const OpenTabModal = ({
           ? { top: coords.top, left: coords.left }
           : { top: anchor.y + (anchor.height ?? 0) + 4, left: anchor.x }
       }
-      role="dialog"
-      aria-modal="true"
       aria-label="Open tab"
     >
       <div className="flex shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5 py-2">
@@ -262,17 +260,37 @@ export const OpenTabModal = ({
         {filtered.length === 0 ? (
           <p className="px-2.5 py-2 text-sm text-ink-muted">No matching tabs</p>
         ) : (
-          filtered.map((entry, i) => (
-            <CommandPaletteRow
-              key={entry.id}
-              index={i}
-              active={i === activeIndex}
-              label={entry.label}
-              icon={entry.icon}
-              onActivate={() => activate(entry)}
-              onHover={() => setActiveIndex(i)}
-            />
-          ))
+          (() => {
+            // When not searching, show "Chat" and "Tools" group headers.
+            const showHeaders = !query.trim()
+            let seenTool = false
+            return filtered.map((entry, i) => {
+              const isFirstTool = showHeaders && !seenTool && entry.kind === "tool"
+              if (entry.kind === "tool") seenTool = true
+              return (
+                <div key={entry.id}>
+                  {showHeaders && i === 0 && entry.kind === "chat" ? (
+                    <p className="px-2.5 pb-0.5 pt-1 text-[10px] font-medium uppercase tracking-wider text-ink-faint">
+                      Chat
+                    </p>
+                  ) : null}
+                  {isFirstTool ? (
+                    <p className="px-2.5 pb-0.5 pt-1 text-[10px] font-medium uppercase tracking-wider text-ink-faint">
+                      Tools
+                    </p>
+                  ) : null}
+                  <CommandPaletteRow
+                    index={i}
+                    active={i === activeIndex}
+                    label={entry.label}
+                    icon={entry.icon}
+                    onActivate={() => activate(entry)}
+                    onHover={() => setActiveIndex(i)}
+                  />
+                </div>
+              )
+            })
+          })()
         )}
       </div>
     </div>,

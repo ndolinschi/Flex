@@ -45,12 +45,13 @@ export const VIEWPORT_PRESETS: Array<{
  * watchdog, navigation state, session ownership, and toast side effects.
  * `BrowserTab.tsx` remains the chrome view and consumes this hook.
  *
+ * Scoped to the session that owns this content tab (prop `sessionId`).
+ *
  * Bounds map 1:1 to the empty `data-browser-webview-slot` (`contentRef`).
  * PRESERVES: the 500ms drift-watchdog + resize/scale reapply + reveal/hide
  * gating (see Effect 2 below) and all navigation behavior. */
-export const useBrowserSession = (active: boolean) => {
-  const activeSessionId = useAppStore((s) => s.activeSessionId)
-  const sessionKey = sessionScopeKey(activeSessionId)
+export const useBrowserSession = (active: boolean, sessionId: string | null) => {
+  const sessionKey = sessionScopeKey(sessionId)
 
   const browserUrl = useAppStore(
     (s) => s.browserBySession[sessionKey]?.url ?? "",
@@ -75,7 +76,7 @@ export const useBrowserSession = (active: boolean) => {
   // Slow the child-webview bounds watchdog while a turn is streaming — timeline
   // growth shifts the slot every frame and rapid set_bounds freezes WebView2.
   const sessionStreaming = useAppStore((s) =>
-    activeSessionId ? !!s.streamingSessions[activeSessionId] : false,
+    sessionId ? !!s.streamingSessions[sessionId] : false,
   )
 
   const setBrowserSessionState = useAppStore((s) => s.setBrowserSessionState)

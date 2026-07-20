@@ -164,6 +164,7 @@ const AppRoutes = () => {
     onToggleSidebar: () => {},
     onToggleRightPanel: () => {},
     onToggleCommandPalette: () => {},
+    onCloseActiveTab: () => {},
   })
   handlersRef.current = {
     onSend: () => {
@@ -191,6 +192,14 @@ const AppRoutes = () => {
     },
     onToggleCommandPalette: () => {
       setCommandPaletteOpen((v) => !v)
+    },
+    onCloseActiveTab: () => {
+      const state = useAppStore.getState()
+      if (state.route !== "chat") return
+      const layout = state.contentLayout
+      const pane = layout.panes[layout.focusedPane]
+      if (!pane?.activeTabId) return
+      state.closeTabInPane(layout.focusedPane, pane.activeTabId)
     },
     onCancel: () => {
       const state = useAppStore.getState()

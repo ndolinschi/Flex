@@ -1,16 +1,19 @@
 import { Button } from "@/components/ui/button"
 import {
+  Fragment,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { MessageSquare, Plus, X } from "lucide-react"
 import { Tab, TabStrip, Tooltip } from "../../atoms"
-import { OpenTabModal } from "../../molecules"
+import { ContextMenu, OpenTabModal, type ContextMenuItem } from "../../molecules"
 import { useSessions } from "../../../hooks/useSessions"
 import {
   startContentTabPointerDrag,
@@ -88,6 +91,14 @@ const useVisitedChatTabs = (
   return visited
 }
 
+/** Build a single CSS mask-image with optional left/right edge fades. */
+const buildScrollMask = (left: boolean, right: boolean): string | undefined => {
+  if (!left && !right) return undefined
+  const start = left ? "transparent 0px, black 20px" : "black 0px"
+  const end = right ? "black calc(100% - 20px), transparent 100%" : "black 100%"
+  return `linear-gradient(to right, ${start}, ${end})`
+}
+
 export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => {
   // Narrow selectors — avoid re-rendering this pane when only the sibling
   // pane's tabs change (structural sharing in activate/reorder/close).
@@ -96,11 +107,15 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   )
   const split = useAppStore((s) => s.contentLayout.mode === "split")
   const focusedPane = useAppStore((s) => s.contentLayout.focusedPane)
+  const viewport = useAppStore((s) => s.viewport)
   const activateTabInPane = useAppStore((s) => s.activateTabInPane)
   const closeTabInPane = useAppStore((s) => s.closeTabInPane)
+  const closeOtherTabsInPane = useAppStore((s) => s.closeOtherTabsInPane)
+  const closeTabsToRightInPane = useAppStore((s) => s.closeTabsToRightInPane)
   const closePane = useAppStore((s) => s.closePane)
   const openChatInPane = useAppStore((s) => s.openChatInPane)
   const openToolInPane = useAppStore((s) => s.openToolInPane)
+  const openTabToSide = useAppStore((s) => s.openTabToSide)
   const setFocusedPane = useAppStore((s) => s.setFocusedPane)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const { sessions } = useSessions()
@@ -112,6 +127,9 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     width: number
     height: number
   } | null>(null)
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null)
+  const [menuTabId, setMenuTabId] = useState<string | null>(null)
+  const [scrollFade, setScrollFade] = useState({ left: false, right: false })
   const tabsScrollRef = useRef<HTMLDivElement>(null)
   const visitedChats = useVisitedChatTabs(pane.tabs, pane.activeTabId)
 
@@ -119,6 +137,12 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     () => new Map(sessions.map((s) => [s.id, s])),
     [sessions],
   )
+
+  // True when tabs from more than one session are open in this pane.
+  const hasMultipleSessions = useMemo(() => {
+    const ids = new Set(pane.tabs.map((t) => t.sessionId))
+    return ids.size > 1
+  }, [pane.tabs])
 
   const contextSession: SessionId | null = (() => {
     const active = pane.tabs.find((t) => t.id === pane.activeTabId)
@@ -161,6 +185,53 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     el?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }, [pane.activeTabId, pane.tabs.length])
 
+  // Edge fade: track whether there is overflow on left/right of the tab strip.
+  const updateScrollFade = useCallback(() => {
+    const el = tabsScrollRef.current
+    if (!el) return
+    setScrollFade({
+      left: el.scrollLeft > 1,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
+    })
+  }, [])
+
+  useEffect(() => {
+    const el = tabsScrollRef.current
+    if (!el) return
+    const ro = new ResizeObserver(updateScrollFade)
+    ro.observe(el)
+    el.addEventListener("scroll", updateScrollFade, { passive: true })
+    updateScrollFade()
+    return () => {
+      ro.disconnect()
+      el.removeEventListener("scroll", updateScrollFade)
+    }
+  }, [updateScrollFade])
+
+  // Re-check fade whenever the tab count changes (scrollWidth may change).
+  useEffect(() => {
+    updateScrollFade()
+  }, [pane.tabs.length, updateScrollFade])
+
+  // Arrow-key focus navigation within the tab strip (roving tabIndex).
+  const handleTabsKeyDown = useCallback(
+    (e: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
+      const el = tabsScrollRef.current
+      if (!el) return
+      const tabs = Array.from(
+        el.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+      )
+      const idx = tabs.indexOf(document.activeElement as HTMLButtonElement)
+      if (idx === -1) return
+      e.preventDefault()
+      const next =
+        e.key === "ArrowLeft" ? tabs[idx - 1] : tabs[idx + 1]
+      next?.focus()
+    },
+    [],
+  )
+
   const dragTabId = dragUi?.dragging ? dragUi.tabId : null
   const sourceTabs = useMemo(() => {
     if (!dragUi?.dragging) return pane.tabs
@@ -181,6 +252,54 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
       ? dragUi.insertAt
       : null
 
+  // Context menu items for the right-clicked tab.
+  const contextMenuItems = useMemo((): ContextMenuItem[] => {
+    if (!menuTabId) return []
+    const idx = pane.tabs.findIndex((t) => t.id === menuTabId)
+    const menuTab = idx >= 0 ? pane.tabs[idx] : undefined
+    // Browser holds a singleton native webview — duplicating across panes races.
+    const openToSideDisabled =
+      viewport !== "wide" ||
+      (menuTab?.kind === "tool" && menuTab.tool === "browser")
+    return [
+      {
+        type: "item",
+        label: "Open to Side",
+        disabled: openToSideDisabled,
+        onSelect: () => openTabToSide(paneIndex, menuTabId),
+      },
+      { type: "separator" },
+      {
+        type: "item",
+        label: "Close",
+        onSelect: () => closeTabInPane(paneIndex, menuTabId),
+      },
+      {
+        type: "item",
+        label: "Close Others",
+        disabled: pane.tabs.length <= 1,
+        onSelect: () => closeOtherTabsInPane(paneIndex, menuTabId),
+      },
+      {
+        type: "item",
+        label: "Close to Right",
+        disabled: idx < 0 || idx >= pane.tabs.length - 1,
+        onSelect: () => closeTabsToRightInPane(paneIndex, menuTabId),
+      },
+    ]
+  }, [
+    menuTabId,
+    pane.tabs,
+    paneIndex,
+    viewport,
+    openTabToSide,
+    closeTabInPane,
+    closeOtherTabsInPane,
+    closeTabsToRightInPane,
+  ])
+
+  const scrollMask = buildScrollMask(scrollFade.left, scrollFade.right)
+
   return (
     <div
       className={cn(
@@ -193,6 +312,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
       <TabStrip
         aria-label={paneIndex === 0 ? "Left pane tabs" : "Right pane tabs"}
         className="min-w-0"
+        onKeyDown={handleTabsKeyDown}
       >
         <div
           ref={tabsScrollRef}
@@ -203,6 +323,11 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
             "flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto",
             "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           )}
+          style={
+            scrollMask
+              ? { WebkitMaskImage: scrollMask, maskImage: scrollMask }
+              : undefined
+          }
         >
           {displayTabs.map((t, index) => {
             const def =
@@ -220,34 +345,59 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                     : null
                 : null
             const label = tabLabel(t, sessionsById)
+
+            // Session ownership cue: when multiple sessions share a pane,
+            // suffix tool-tab titles with the owning session label.
+            const titleText =
+              hasMultipleSessions && t.kind === "tool"
+                ? `${label} — ${sessionLabel(sessionsById.get(t.sessionId) ?? { title: t.sessionId.slice(0, 8) } as SessionMeta)}`
+                : label
+
+            // Divider between the last chat tab and first tool tab.
+            const prev = displayTabs[index - 1]
+            const showDivider = prev?.kind === "chat" && t.kind === "tool"
+
             return (
-              <Tab
-                key={t.id}
-                selected={t.id === pane.activeTabId}
-                icon={
-                  t.kind === "chat" ? (
-                    <MessageSquare aria-hidden />
-                  ) : def?.icon ? (
-                    <def.icon aria-hidden />
-                  ) : undefined
-                }
-                className={cn(
-                  "max-w-[180px] shrink-0 transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-                  isDragged && "opacity-40",
-                )}
-                title={label}
-                tabId={t.id}
-                onSelect={() => activateTabInPane(paneIndex, t.id)}
-                onClose={() => closeTabInPane(paneIndex, t.id)}
-                closeLabel={`Close ${label}`}
-                draggable
-                dropEdge={dropEdge}
-                onPointerDown={(e) =>
-                  startContentTabPointerDrag(e, paneIndex, t.id)
-                }
-              >
-                {label}
-              </Tab>
+              <Fragment key={t.id}>
+                {showDivider ? (
+                  <span
+                    aria-hidden
+                    className="mx-0.5 h-4 w-px shrink-0 bg-stroke-3"
+                  />
+                ) : null}
+                <Tab
+                  selected={t.id === pane.activeTabId}
+                  icon={
+                    t.kind === "chat" ? (
+                      <MessageSquare aria-hidden />
+                    ) : def?.icon ? (
+                      <def.icon aria-hidden />
+                    ) : undefined
+                  }
+                  className={cn(
+                    "max-w-[180px] shrink-0 transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+                    isDragged && "opacity-40",
+                  )}
+                  title={titleText}
+                  tabId={t.id}
+                  tabIndex={t.id === pane.activeTabId ? 0 : -1}
+                  onSelect={() => activateTabInPane(paneIndex, t.id)}
+                  onClose={() => closeTabInPane(paneIndex, t.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setMenuTabId(t.id)
+                    setMenuPosition({ x: e.clientX, y: e.clientY })
+                  }}
+                  closeLabel={`Close ${label}`}
+                  draggable
+                  dropEdge={dropEdge}
+                  onPointerDown={(e) =>
+                    startContentTabPointerDrag(e, paneIndex, t.id)
+                  }
+                >
+                  {label}
+                </Tab>
+              </Fragment>
             )
           })}
         </div>
@@ -312,7 +462,8 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
               >
                 <ChatSessionBody
                   sessionId={t.sessionId}
-                  active={isActive && paneFocused}
+                  visible={isActive}
+                  interactive={isActive && paneFocused}
                 />
               </div>
             )
@@ -334,6 +485,15 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
           </div>
         ) : null}
       </div>
+
+      <ContextMenu
+        position={menuPosition}
+        items={contextMenuItems}
+        onClose={() => {
+          setMenuPosition(null)
+          setMenuTabId(null)
+        }}
+      />
 
       <OpenTabModal
         open={openTabModal}

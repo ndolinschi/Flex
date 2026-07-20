@@ -82,6 +82,19 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   )
   const toggleSessionPinned = useAppStore((s) => s.toggleSessionPinned)
   const setSessionArchived = useAppStore((s) => s.setSessionArchived)
+  const pushToast = useAppStore((s) => s.pushToast)
+  const handleSetArchived = useCallback(
+    (id: string, archived: boolean) => {
+      setSessionArchived(id, archived)
+      if (archived) {
+        pushToast("Session archived", "success", {
+          label: "Undo",
+          onAction: () => setSessionArchived(id, false),
+        })
+      }
+    },
+    [setSessionArchived, pushToast],
+  )
   const [selectError, setSelectError] = useState<string | null>(null)
   const [selectErrorId, setSelectErrorId] = useState<string | null>(null)
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
@@ -108,7 +121,6 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     isCreating,
   } = useSessions()
   const queryClient = useQueryClient()
-  const pushToast = useAppStore((s) => s.pushToast)
   // Subagent child sessions render inside their parent's feed — the sidebar
   // lists only top-level agents.
   const sessions = useMemo(
@@ -512,6 +524,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
             if (narrow) setSidebarCollapsed(true)
           }}
         />
+        <div className="my-0.5 border-t border-stroke-3" aria-hidden />
         {AUTOMATIONS_UI_ENABLED ? (
           <SidebarActionRow
             icon={Bot}
@@ -564,7 +577,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
             sidebarProjectSort !== "recency" ||
               sidebarProjectVisibility !== "all"
               ? "opacity-100"
-              : "opacity-0 group-hover/label:opacity-100 focus-visible:opacity-100",
+              : "opacity-0 group-hover/label:opacity-100 group-focus-within/label:opacity-100 focus-visible:opacity-100",
       )}
     >
       <Search className="h-3 w-3" aria-hidden />
@@ -608,7 +621,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
                     onDelete={deleteSession}
                     onNewAgentInRepo={handleNewAgentInRepo}
                     onTogglePin={toggleSessionPinned}
-                    onSetArchived={setSessionArchived}
+                    onSetArchived={handleSetArchived}
                   />
                 ))}
               </section>
@@ -641,7 +654,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
                         onDelete={deleteSession}
                         onNewAgentInRepo={handleNewAgentInRepo}
                         onTogglePin={toggleSessionPinned}
-                        onSetArchived={setSessionArchived}
+                        onSetArchived={handleSetArchived}
                       />
                     ))
                   : null}
@@ -681,7 +694,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
                         onDelete={deleteSession}
                         onNewAgentInRepo={handleNewAgentInRepo}
                         onTogglePin={toggleSessionPinned}
-                        onSetArchived={setSessionArchived}
+                        onSetArchived={handleSetArchived}
                       />
                     ))
                   : null}

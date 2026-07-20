@@ -160,6 +160,10 @@ describe("contentLayout", () => {
       rightPanelOpen: false,
       rightPanelTab: "plan",
       viewport: "wide",
+      // Ensure sidebar defaults are explicit so isSplitEligible stays stable
+      // across tests (node env: window is undefined → falls back to viewport check).
+      sidebarCollapsed: false,
+      sidebarWidth: 260,
     })
   })
 
@@ -291,6 +295,143 @@ describe("contentLayout", () => {
       planId,
     ])
     expect(layout.panes[0]!.activeTabId).toBe(planId)
+  })
+
+  it("closeTabInPane selects right neighbor when closing a middle tab", () => {
+    useAppStore.getState().openChatInPane(0, "sess-a")
+    useAppStore.getState().openToolInPane(0, "sess-a", "plan")
+    useAppStore.getState().openToolInPane(0, "sess-a", "status")
+    const planId = toolTabId("sess-a", "plan")
+    const statusId = toolTabId("sess-a", "status")
+    // Activate the middle tab (plan), then close it → should select status (right neighbor)
+    useAppStore.getState().activateTabInPane(0, planId)
+    useAppStore.getState().closeTabInPane(0, planId)
+    expect(useAppStore.getState().contentLayout.panes[0]!.activeTabId).toBe(statusId)
+  })
+
+  it("closeTabInPane selects left neighbor when closing the last tab", () => {
+    useAppStore.getState().openChatInPane(0, "sess-a")
+    useAppStore.getState().openToolInPane(0, "sess-a", "plan")
+    const planId = toolTabId("sess-a", "plan")
+    // Activate last tab (plan), then close it → should select chat (left neighbor)
+    useAppStore.getState().activateTabInPane(0, planId)
+    useAppStore.getState().closeTabInPane(0, planId)
+    expect(useAppStore.getState().contentLayout.panes[0]!.activeTabId).toBe(chatTabId("sess-a"))
+  })
+
+  it("closeOtherTabsInPane keeps only the specified tab", () => {
+    useAppStore.getState().openChatInPane(0, "sess-a")
+    useAppStore.getState().openToolInPane(0, "sess-a", "plan")
+    useAppStore.getState().openToolInPane(0, "sess-a", "status")
+    const planId = toolTabId("sess-a", "plan")
+    useAppStore.getState().closeOtherTabsInPane(0, planId)
+    const pane = useAppStore.getState().contentLayout.panes[0]!
+    expect(pane.tabs.map((t) => t.id)).toEqual([planId])
+    expect(pane.activeTabId).toBe(planId)
+  })
+
+  it("closeTabsToRightInPane removes all tabs after the specified tab", () => {
+    useAppStore.getState().openChatInPane(0, "sess-a")
+    useAppStore.getState().openToolInPane(0, "sess-a", "plan")
+    useAppStore.getState().openToolInPane(0, "sess-a", "status")
+    const chatId = chatTabId("sess-a")
+    const planId = toolTabId("sess-a", "plan")
+    const statusId = toolTabId("sess-a", "status")
+    // Close to right of plan → removes status, keeps chat+plan
+    useAppStore.getState().activateTabInPane(0, statusId)
+    useAppStore.getState().closeTabsToRightInPane(0, planId)
+    const pane = useAppStore.getState().contentLayout.panes[0]!
+    expect(pane.tabs.map((t) => t.id)).toEqual([chatId, planId])
+    // Active was to the right, so plan becomes active
+    expect(pane.activeTabId).toBe(planId)
+  })
+
+  it("closeTabsToRightInPane is a no-op when tab is already last", () => {
+    useAppStore.getState().openChatInPane(0, "sess-a")
+    useAppStore.getState().openToolInPane(0, "sess-a", "plan")
+    const planId = toolTabId("sess-a", "plan")
+    useAppStore.getState().activateTabInPane(0, planId)
+    useAppStore.getState().closeTabsToRightInPane(0, planId)
+    const pane = useAppStore.getState().contentLayout.panes[0]!
+    expect(pane.tabs).toHaveLength(2)
+  })
+
+  it("moveTabBetweenPanes selects right neighbor when active tab leaves source pane", () => {
+    useAppStore.getState().openChatInPane(0, "sess-a")
+    useAppStore.getState().openToolInPane(0, "sess-a", "plan")
+    useAppStore.getState().openToolInPane(0, "sess-a", "status")
+    useAppStore.getState().ensureSplit()
+    const planId = toolTabId("sess-a", "plan")
+    const statusId = toolTabId("sess-a", "status")
+    // Make plan the active tab in pane 0, then move it to pane 1
+    useAppStore.getState().activateTabInPane(0, planId)
+    useAppStore.getState().moveTabBetweenPanes(0, 1, planId, 0)
+    const left = useAppStore.getState().contentLayout.panes[0]!
+    // status was to the right of plan, so it becomes active
+    expect(left.activeTabId).toBe(statusId)
+  })
+
+  it("ensureSplit is a no-op when viewport is narrow (isSplitEligible guard)", () => {
+    useAppStore.setState({ viewport: "narrow" })
+    useAppStore.getState().openChatInPane(0, "sess-a")
+    useAppStore.getState().ensureSplit()
+    expect(useAppStore.getState().contentLayout.mode).toBe("single")
+  })
+
+  it("openToolBesideChat on narrow viewport opens tool in single pane", () => {
+    useAppStore.setState({ viewport: "narrow" })
+    useAppStore.getState().openChatInPane(0, "sess-a")
+    useAppStore.getState().openToolBesideChat("sess-a", "plan")
+    const layout = useAppStore.getState().contentLayout
+    expect(layout.mode).toBe("single")
+    expect(
+      layout.panes[0]!.tabs.some((t) => t.id === toolTabId("sess-a", "plan")),
+    ).toBe(true)
+  })
+
+  it("isSplitEligible: ensureSplit is a no-op when window is too narrow for two panes", () => {
+    // Simulate a narrow browser window in node env by installing a fake window.
+    const original = (globalThis as Record<string, unknown>)["window"]
+    ;(globalThis as Record<string, unknown>)["window"] = { innerWidth: 700 }
+    try {
+      useAppStore.setState({
+        viewport: "wide",
+        sidebarCollapsed: false,
+        sidebarWidth: 260,
+      })
+      // 700 - 260 = 440 < 380 * 2 = 760 → not eligible
+      useAppStore.getState().openChatInPane(0, "sess-a")
+      useAppStore.getState().ensureSplit()
+      expect(useAppStore.getState().contentLayout.mode).toBe("single")
+    } finally {
+      if (original === undefined) {
+        delete (globalThis as Record<string, unknown>)["window"]
+      } else {
+        ;(globalThis as Record<string, unknown>)["window"] = original
+      }
+    }
+  })
+
+  it("isSplitEligible: ensureSplit creates split when window is wide enough", () => {
+    const original = (globalThis as Record<string, unknown>)["window"]
+    ;(globalThis as Record<string, unknown>)["window"] = { innerWidth: 1200 }
+    try {
+      useAppStore.setState({
+        viewport: "wide",
+        sidebarCollapsed: false,
+        sidebarWidth: 260,
+      })
+      // 1200 - 260 = 940 >= 760 → eligible
+      useAppStore.getState().openChatInPane(0, "sess-a")
+      useAppStore.getState().ensureSplit()
+      expect(useAppStore.getState().contentLayout.mode).toBe("split")
+    } finally {
+      if (original === undefined) {
+        delete (globalThis as Record<string, unknown>)["window"]
+      } else {
+        ;(globalThis as Record<string, unknown>)["window"] = original
+      }
+    }
   })
 
   it("activateTabInPane keeps the sibling pane object identity", () => {

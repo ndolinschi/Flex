@@ -19,8 +19,8 @@ export const TabClose = ({
   className,
 }: TabCloseProps) => {
   return (
-    <span
-      role="button"
+    <button
+      type="button"
       aria-label={label}
       tabIndex={-1}
       onClick={(e: ReactMouseEvent) => {
@@ -46,6 +46,6 @@ export const TabClose = ({
       data-tab-no-drag
     >
       <X className="h-3 w-3" aria-hidden />
-    </span>
+    </button>
   )
 }

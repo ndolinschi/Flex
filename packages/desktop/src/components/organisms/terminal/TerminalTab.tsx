@@ -18,17 +18,19 @@ import { useNowTicker } from "./time"
 const EMPTY_TERMINALS: TerminalMeta[] = []
 
 /** Terminal right-panel tab: terminal list + xterm instances.
- * Scoped to the active session — switching sessions shows that session's own
- * terminal list. Only the active session's xterm instances stay mounted
- * (Wave 4); the terminal bus still buffers PTY output for other sessions so
- * remounting on switch restores scrollback without keeping N×xterm alive.
+ * Scoped to the session that owns this content tab (prop `sessionId`).
  * Stays mounted when inactive (parent hides via display:none).
  *
  * Opening the tab with zero workspace terminals auto-creates one PTY so the
  * user lands in a shell instead of an empty state. */
-export const TerminalTab = ({ active }: { active: boolean }) => {
-  const activeSessionId = useAppStore((s) => s.activeSessionId)
-  const sessionKey = sessionScopeKey(activeSessionId)
+export const TerminalTab = ({
+  active,
+  sessionId,
+}: {
+  active: boolean
+  sessionId: string | null
+}) => {
+  const sessionKey = sessionScopeKey(sessionId)
 
   const terminals = useAppStore(
     (s) => s.terminalsBySession[sessionKey] ?? EMPTY_TERMINALS,
@@ -45,13 +47,13 @@ export const TerminalTab = ({ active }: { active: boolean }) => {
   // Agent terminal (read-only, mirrors `exec_chunk` session-events). Lives in
   // the same `activeTerminalIdBySession` map as workspace terminals since its
   // id is just a string (`agent:${sessionId}`) — no PTY/terminalCreate behind it.
-  const agentId = activeSessionId ? agentTerminalId(activeSessionId) : null
+  const agentId = sessionId ? agentTerminalId(sessionId) : null
   const hasAgentStream = useAppStore((s) =>
     agentId ? !!s.agentStreamSessions[agentId] : false,
   )
 
   const { sessions } = useSessions()
-  const activeSession = sessions.find((s) => s.id === activeSessionId)
+  const activeSession = sessions.find((s) => s.id === sessionId)
 
   const [pendingClose, setPendingClose] = useState<string | null>(null)
   const [closing, setClosing] = useState(false)

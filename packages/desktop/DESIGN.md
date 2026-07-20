@@ -111,6 +111,10 @@ ContentPane(s)
 
 - **Single:** one pane fills the column.
 - **Split (wide only):** left | sash | right; each pane has its own tabs.
+- **Split eligibility:** entering split requires both `viewport === "wide"` AND
+  `(window.innerWidth - sidebarUsed) >= CHAT_MIN_WIDTH * 2` (760px). The sash
+  is additionally hidden in `ContentWorkspace` when the measured content row is
+  narrower than `CHAT_MIN_WIDTH * 2` (e.g. after a window resize mid-session).
 - Auto-open (plan approval, PR, files, browser, terminal) uses `openToolBesideChat`.
 - Narrow/tight: force single pane.
 
@@ -323,6 +327,26 @@ the drag threshold (ordinary clicks never publish drag UI). Within a strip,
 tabs **live-shift** on the axis as you drag; dropping on the other pane (strip
 or pane body) **moves and activates** the tab. Dropping outside any pane/strip
 is a no-op.
+
+**Tab close — adjacent activation:** closing a tab activates its right
+neighbor at the same index; if no right neighbor exists, the left neighbor
+is activated. This applies to `closeTabInPane` and the source pane in
+`moveTabBetweenPanes`.
+
+**Tab context menu (right-click):** Open to Side (wide viewport only),
+Close, Close Others, Close to Right. Rendered via the `ContextMenu` molecule.
+
+**⌘W / Ctrl+W:** closes the focused pane's active tab (via `onCloseActiveTab`
+in `useKeyboardShortcuts`). No-op on the welcome route or when no pane is
+active.
+
+**Tab strip arrow navigation:** ArrowLeft/ArrowRight move keyboard focus
+between `role="tab"` buttons. Roving tabIndex: selected tab is `tabIndex=0`,
+others are `tabIndex=-1`.
+
+**Tab strip edge fade:** when the tab strip overflows, a CSS `mask-image`
+gradient fades the left edge (when scrolled) and the right edge (when more
+tabs are hidden to the right). Dual-edge composited as two separate gradients.
 
 ---
 

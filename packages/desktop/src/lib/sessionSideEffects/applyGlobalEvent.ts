@@ -417,11 +417,7 @@ export const applyGlobalSessionEvent = (
       !autoActivatedCallIds.has(payload.call_id)
     ) {
       autoActivatedCallIds.add(payload.call_id)
-      if (!store.streamingSessions[event.session_id]) {
-        store.openToolBesideChat(event.session_id, "terminal")
-      } else {
-        store.openTab(event.session_id, "terminal")
-      }
+      store.openToolBesideChat(event.session_id, "terminal")
     }
   }
 

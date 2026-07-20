@@ -123,7 +123,7 @@ export const ToolTabBody = ({
         )}
       >
         <Suspense fallback={<PanelFallback />}>
-          <TerminalTab active={active} />
+          <TerminalTab active={active} sessionId={session?.id ?? null} />
         </Suspense>
       </div>
     )
@@ -138,7 +138,7 @@ export const ToolTabBody = ({
         )}
       >
         <Suspense fallback={<PanelFallback />}>
-          <BrowserTab active={active} />
+          <BrowserTab active={active} sessionId={session?.id ?? null} />
         </Suspense>
       </div>
     )

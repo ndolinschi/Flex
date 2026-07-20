@@ -2,7 +2,9 @@ import { memo, useCallback, useState, type KeyboardEvent, type MouseEvent } from
 import {
   ArchiveRestore,
   Archive as ArchiveIcon,
+  CircleAlert,
   Copy,
+  MessageCircleQuestion,
   Pencil,
   Pin,
   Plus,
@@ -11,7 +13,7 @@ import {
 } from "lucide-react"
 import type { GitStatusSummary, SessionMeta, WorkspaceStatusDto } from "../../lib/types"
 import { sessionLabel } from "../../lib/types"
-import { formatCompactTime, cn } from "../../lib/utils"
+import { basename, formatCompactTime, cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
 import { RunningDot, TextInput, Tooltip } from "../atoms"
 import { ConfirmDialog } from "./ConfirmDialog"
@@ -66,6 +68,14 @@ export const SessionListItem = memo(function SessionListItem({
   // or every row redraws on every other session's stream tick.
   const isRunning = useAppStore((s) => !!s.streamingSessions[session.id])
   const unread = useAppStore((s) => s.unreadBySession[session.id])
+  const needsInput = useAppStore(
+    (s) =>
+      s.pendingPermission?.sessionId === session.id ||
+      s.pendingQuestion?.sessionId === session.id,
+  )
+  const turnFailed = useAppStore(
+    (s) => s.lastTurnSummary[session.id]?.stop_reason === "error",
+  )
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(session.title ?? "")
   const [isDeleting, setIsDeleting] = useState(false)
@@ -77,6 +87,9 @@ export const SessionListItem = memo(function SessionListItem({
   const [actionsReady, setActionsReady] = useState(false)
 
   const label = sessionLabel(session)
+  const repoLabel = pinned
+    ? basename(session.base_cwd || session.cwd)
+    : undefined
 
   const armActions = useCallback(() => {
     setActionsReady(true)
@@ -193,9 +206,20 @@ export const SessionListItem = memo(function SessionListItem({
   ]
 
   const showSubtitle =
-    !isEditing && sessionRowHasSubtitle(workspaceStatus, gitStatus)
+    !isEditing &&
+    sessionRowHasSubtitle(workspaceStatus, gitStatus, repoLabel)
   // Numeric unread > 0 gets the "(N) " title prefix (reference design).
   const unreadCount = typeof unread === "number" && unread > 0 ? unread : null
+  // Status-first triage: needs-input > working > failed > unread.
+  const statusKind = needsInput
+    ? "needs-input"
+    : isRunning
+      ? "working"
+      : turnFailed
+        ? "failed"
+        : unread
+          ? "unread"
+          : null
 
   return (
     <div
@@ -228,9 +252,23 @@ export const SessionListItem = memo(function SessionListItem({
           <span
             className="flex h-5 w-5 shrink-0 items-center justify-center"
           >
-            {isRunning ? (
+            {statusKind === "needs-input" ? (
+              <Tooltip label="Needs your input">
+                <MessageCircleQuestion
+                  className="h-3.5 w-3.5 text-accent"
+                  aria-label="Needs your input"
+                />
+              </Tooltip>
+            ) : statusKind === "working" ? (
               <RunningDot />
-            ) : unread ? (
+            ) : statusKind === "failed" ? (
+              <Tooltip label="Last turn failed">
+                <CircleAlert
+                  className="h-3.5 w-3.5 text-destructive"
+                  aria-label="Last turn failed"
+                />
+              </Tooltip>
+            ) : statusKind === "unread" ? (
               <Tooltip label="Unread">
                 <span
                   className="h-[5px] w-[5px] shrink-0 rounded-full bg-accent"
@@ -287,6 +325,7 @@ export const SessionListItem = memo(function SessionListItem({
             updatedAtMs={session.updated_at_ms}
             workspaceStatus={workspaceStatus}
             gitStatus={gitStatus}
+            repoLabel={repoLabel}
           />
         ) : null}
       </span>
