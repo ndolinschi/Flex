@@ -265,59 +265,59 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Breadcrumb | ✅ done | `PlanToolbar` crumbs | `@/components/ui/breadcrumb` |
 | Bubble | ✅ done (chat kit) | user/assistant bubbles in timeline | `@/components/ui/bubble` |
 | Button | ✅ done | Call sites use `@/components/ui/button`; `atoms/Button` is a re-export only; `IconButton` removed | Compose Spinner + `disabled` instead of `isLoading` |
-| Button Group | later | composer toolbar clusters | Optional; ModePicker is Select |
+| Button Group | installed | composer toolbar | Primitives ready; Mode/Model stay distinct pill shapes (not joined) |
 | Calendar | skip | — | No date UX today |
-| Card | selective | settings cards, catalog cards | Use full Card composition only where DESIGN allows cards |
+| Card | ✅ done | `PlanCard`, `MemoryRow`, settings cards | Full `Card`/`CardHeader`/`CardContent` where DESIGN allows cards |
 | Carousel | skip | — | |
 | Chart | skip | — | No dashboards |
 | Checkbox | ✅ done | `Checkbox` atom | Base UI Checkbox + round + indeterminate; API adapter |
 | Collapsible | ✅ done | WorkGroup / tool cards via molecule adapter | `@/components/ui/collapsible`; section headers still thin |
 | Combobox | ✅ done | `ProjectPicker`, `BranchPicker` | `@/components/ui/combobox` — searchable + Open Folder (not plain Select) |
-| Command | partial | `CommandPalette`, `SearchModal`, `OpenTabModal`, PopoverTray items | Dialog hosts + PopoverItem `data-selected` Command pattern; full Command-in-Dialog cutover later |
+| Command | ✅ done | `CommandPalette`, `SearchModal`, `OpenTabModal`, ModelSelect/MultiSelect lists | `shouldFilter={false}` + fuzzyScore; cmdk owns ↑↓/Enter; `CommandPaletteRow`/`FuzzySessionRow` removed |
 | Context Menu | ✅ done | `ContextMenu` molecule → `@/components/ui/context-menu` | Imperative position API; timeline-scroll / webview-blur ignore preserved |
-| Data Table | later | DatabaseTab result grid | Paginated table — Phase 4+ |
+| Data Table | ✅ done (Table) | DatabaseTab result grid | `@/components/ui/table` + compact `text-xs` density |
 | Date Picker | skip | — | |
 | Dialog | ✅ done | `SearchModal`, `CommandPalette` | `@/components/ui/dialog` (outside-click dismiss); confirms use Alert Dialog |
 | Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
-| Drawer | skip (noted) | `SubagentViewer` (bottom overlay) | **Not mapped**: Drawer uses `fixed inset-0` portal (full viewport); SubagentViewer is `absolute` scoped to the content column — would need parent-container restructuring; follow-up spike. |
-| Dropdown Menu | ✅ done | `@/components/ui/dropdown-menu` — Mode/Model(+effort sub)/Plus/Session/TitleBar/overflow | Base UI `render` trigger; ModelPicker effort uses `DropdownMenuSub` |
-| Empty | ✅ done | `EmptyState` | `@/components/ui/empty` |
-| Field | ✅ done | `FormField` | `@/components/ui/field` (`Field`/`FieldLabel`/`FieldDescription`/`FieldError`) |
-| Hover Card | later | — | Optional enrichment on chips |
-| Input | ✅ done | `TextInput` | Re-export `@/components/ui/input` |
-| Input Group | selective | composer / search fields with addons | Composer draft stays specialized |
+| Drawer | skip (noted) | `SubagentViewer` (bottom overlay) | **Not mapped**: Drawer uses `fixed inset-0` portal; SubagentViewer is content-column-scoped `absolute` — follow-up spike |
+| Dropdown Menu | ✅ done | `@/components/ui/dropdown-menu` — Mode/Model(+effort sub)/Plus/Session/overflow | Base UI `render` trigger; ModelPicker effort uses `DropdownMenuSub` |
+| Empty | ✅ done | `EmptyState`, DatabaseTab empty grids | `@/components/ui/empty` |
+| Field | ✅ done | `FormField`, `SettingsSection` FieldRow | `@/components/ui/field` |
+| Hover Card | installed | — | Available; no first call site yet |
+| Input | ✅ done | `TextInput`, AccentColorPicker hex | Re-export / direct `@/components/ui/input` |
+| Input Group | ✅ done | SettingsNav search | `InputGroup` + `InputGroupInput` + `InputGroupAddon`; composer draft stays specialized |
 | Input OTP | skip | — | |
-| Item | later | sidebar / palette rows | Only if it simplifies without fighting density |
+| Item | installed | — | Available for future list rows |
 | Kbd | ✅ done | `Kbd` atom | Re-export `@/components/ui/kbd` |
 | Label | ✅ done | `Label` atom | Re-export `@/components/ui/label`; forms prefer `FieldLabel` |
 | Marker | ✅ done (chat kit) | `CompactionCard` / `IndexingCard` dividers | `@/components/ui/marker`; system notes |
-| Menubar | ✅ done | `TitleBarMenus` | `@/components/ui/menubar`; Base UI Menubar coordinates hover-open; `openMenu` state removed |
+| Menubar | ✅ done | `TitleBarMenus` | `@/components/ui/menubar` |
 | Message | ✅ done (chat kit) | timeline message rows | `@/components/ui/message`; composed with Bubble |
-| Message Scroller | spike only | `TurnTimeline` + `useStickToBottom` | **Do not swap blindly** — virtualizer is required at scale; spike pending |
+| Message Scroller | spike only | `TurnTimeline` + `useStickToBottom` | **Do not swap blindly** — virtualizer required at scale |
 | Native Select | skip | migrated to Select | — |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
-| Pagination | later | DatabaseTab paging | |
-| Popover | partial | `PopoverTray` | Semantic popover tokens + Command-like items; **keep custom tray** — Base UI Popover portals + focus-steals break composer `autoFocus={false}` |
-| Progress | later | indexing / update UX | Soft need |
-| Radio Group | later | `QuestionPrompt` choices | Today uses Toggle chips |
-| Resizable | ✅ done | `ContentWorkspace` split sash | `@/components/ui/resizable`; `react-resizable-panels` v4 (`onLayoutChanged` for persist, px `minSize`, imperative `setLayout` on split-activate) |
-| Scroll Area | ✅ done | `ScrollArea` atom | Thin wrap `@/components/ui/scroll-area`; **not** the virtualized timeline |
-| Select | ✅ done | Settings/forms + `IsolationPicker` + `ModePicker` | `@/components/ui/select`; ModelSelect still Combobox-candidate |
-| Separator | ✅ done | `Divider` | `@/components/ui/separator` (+ labeled composition) |
-| Sheet | maybe | settings overlay | Today settings is absolute over kept-mounted chat — Sheet may fight that |
-| Sidebar | spike (follow-up) | `SessionSidebar` | High value, high risk — density + grouping + DnD; **not in this pass** |
+| Pagination | ✅ done | DatabaseTab result pager | `@/components/ui/pagination` |
+| Popover | partial | `PopoverTray`, PlanCommentPopover | Semantic popover tokens; **keep custom tray** for composer `autoFocus={false}` |
+| Progress | installed | — | Soft need for indexing/update UX |
+| Radio Group | ✅ done | `QuestionPrompt` single-select | `@/components/ui/radio-group`; multi uses ToggleGroup |
+| Resizable | ✅ done | `ContentWorkspace` split sash | `@/components/ui/resizable` |
+| Scroll Area | ✅ done | `ScrollArea` atom | Thin wrap; **not** the virtualized timeline |
+| Select | ✅ done | Settings/forms + Isolation + ModePicker | `@/components/ui/select`; Mode/Model use `size="xs"` (`h-6` pills) |
+| Separator | ✅ done | `Divider`, DatabaseTab sidebar rule | `@/components/ui/separator` |
+| Sheet | maybe | settings overlay | Absolute over kept-mounted chat — Sheet may fight that |
+| Sidebar | ✅ partial | `SessionSidebar` | Inner `SidebarHeader`/`Content`/`Footer`/`Group`/`Menu`; outer `<aside>` keeps App overlay/sash (no full SidebarProvider — conflicts with flow layout) |
 | Skeleton | ✅ done | `Skeleton` atom | Re-export `@/components/ui/skeleton` |
 | Slider | skip | — | |
-| Sonner | ✅ done | `Toast` / ToastHost | `@/components/ui/sonner`; Zustand toast API bridged to `toast()` |
-| Spinner | ✅ done | `Spinner` atom | Thin size wrapper over `@/components/ui/spinner` |
-| Switch | ✅ done | Settings prefs + MCP/routine enabled flags | `@/components/ui/switch`; green ON (`bg-switch-on`); `Toggle` atom removed |
-| Table | later | Database results | With Data Table |
-| Tabs | careful | panel/file tabs | Prefer keep custom `Tab*` for chrome chips; shadcn Tabs for settings sections only |
-| Textarea | ✅ done | Forms, settings, commit/PR/bug dialogs, SQL | `@/components/ui/textarea`; atoms `TextArea` re-export; composer draft stays specialized raw `<textarea>` |
-| Toast | n/a | — | Use **Sonner**, not legacy Toast component |
-| Toggle | ✅ done | Bypass shield, session pin, QuestionPrompt option chips | `@/components/ui/toggle`; pressed uses `fill-4` (orange override for bypass). Distinct from Switch |
-| Toggle Group | later | QuestionPrompt multi chips (optional); ModePicker stays Select | Ideal for exclusive/multi chip sets; Mode/Isolation already Select |
-| Tooltip | ✅ done | `Tooltip` atom | Adapter over `@/components/ui/tooltip`; `TooltipProvider` in `main.tsx` |
+| Sonner | ✅ done | `Toast` / ToastHost | Zustand bridged to `toast()` |
+| Spinner | ✅ done | `Spinner` atom | Thin size wrapper |
+| Switch | ✅ done | Settings prefs + MCP/routine flags | Green ON (`bg-switch-on`) |
+| Table | ✅ done | DatabaseTab results | Compact striping retained |
+| Tabs | careful | panel/file tabs | Keep custom `Tab*` for chrome chips; shadcn Tabs for settings sections only |
+| Textarea | ✅ done | Forms, settings, commit/PR/bug, SQL | Composer draft stays specialized raw `<textarea>` |
+| Toast | n/a | — | Use **Sonner** |
+| Toggle | ✅ done | Bypass shield, session pin | Distinct from Switch |
+| Toggle Group | ✅ done | `ProviderPicker`, `QuestionPrompt` multi | `@/components/ui/toggle-group` |
+| Tooltip | ✅ done | `Tooltip` atom | Adapter; `TooltipProvider` in `main.tsx` |
 | Typography | selective | prose in settings / empty states | Do not replace `MarkdownBody` |
 
 Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
@@ -329,11 +329,12 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 |---|---|---|
 | **0 — Foundation** | ✅ `components.json` (`base-nova`), `@/` alias, `clsx`+`tailwind-merge` `cn`, shadcn semantic vars bridged to Flex tokens (`data-theme` only — no `.dark` second system) | `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
 | **1 — Atom adapters** | ✅ Input/Label/Checkbox/Badge/Kbd/Separator/Skeleton/Avatar/Tooltip/ScrollArea/Spinner + prior Button/TextArea/Switch/Toggle | Atom adapters + vitest green; `TooltipProvider` in `main.tsx` |
-| **2 — Overlays & menus** | ✅ Dialog + AlertDialog + DropdownMenu + ContextMenu + Menubar + Sonner; PopoverTray **partial** (tokens only — keep custom tray for composer focus) | Confirm/auth on AlertDialog; Search/Command on Dialog; File/Edit/View/Help on Menubar |
-| **3 — Forms & pickers** | ✅ Select + Combobox + Toggle + Field; remaining: ToggleGroup, RadioGroup, full Command-in-Dialog | Settings → Select; Project/Branch → Combobox; FormField → Field |
-| **4 — Layout** | ✅ Resizable + Collapsible + Breadcrumb + Empty; Sidebar/Sheet/Drawer spikes deferred | Split sash → `react-resizable-panels` v4 |
-| **5 — Chat kit** | ✅ Attachment + Bubble + Message + Marker; MessageScroller **spike only** | Chip/bubble/marker parity; virtualizer stays until spike proves parity |
-| **6 — Deferred** | Data Table, Pagination, Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Hover Card, Accordion, Navigation Menu, Typography-as-prose | Add only when a screen needs them |
+| **2 — Overlays & menus** | ✅ Dialog + AlertDialog + DropdownMenu + ContextMenu + Menubar + Sonner + Command (palette/search/open-tab/model lists); PopoverTray **partial** | Confirm/auth on AlertDialog; File/Edit/View/Help on Menubar |
+| **3 — Forms & pickers** | ✅ Select + Combobox + Toggle + Field + ToggleGroup + RadioGroup + InputGroup | ProviderPicker → ToggleGroup; QuestionPrompt → Radio/ToggleGroup; SettingsNav → InputGroup |
+| **4 — Layout** | ✅ Resizable + Collapsible + Breadcrumb + Empty + Sidebar (inner composition) + Table/Pagination; Sheet/Drawer deferred | Split sash; SessionSidebar inner Sidebar*; DatabaseTab Table |
+| **5 — Chat kit** | ✅ Attachment + Bubble + Message + Marker; MessageScroller **spike only** | Chip/bubble/marker parity; virtualizer stays |
+| **6 — Deferred / skip** | Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Navigation Menu, full Drawer/Sheet, MessageScroller swap | Add only when a screen needs them |
+| **7 — Spacing polish** | ✅ design-audit after migration | Compact Sidebar/Command defaults; Mode/Model `h-6` (`size=xs`); no `space-y-*` in product files |
 
 ### Adapter strategy (avoid big-bang breakage)
 
