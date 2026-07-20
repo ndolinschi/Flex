@@ -67,12 +67,12 @@ describe("DATABASE_TAB_ENABLED", () => {
 })
 
 describe("COMPONENTS_TAB_ENABLED", () => {
-  it("defaults on and appears via the UI plugin registry", () => {
+  it("defaults off so Components is hidden from the tab strip", () => {
     resetUiPluginsForTests()
     registerBuiltinUiPlugins()
-    expect(COMPONENTS_TAB_ENABLED).toBe(true)
-    expect(isRightPanelTabEnabled("components")).toBe(true)
-    expect(visibleRightPanelTabs().map((t) => t.id)).toContain("components")
+    expect(COMPONENTS_TAB_ENABLED).toBe(false)
+    expect(isRightPanelTabEnabled("components")).toBe(false)
+    expect(visibleRightPanelTabs().map((t) => t.id)).not.toContain("components")
   })
 })
 
