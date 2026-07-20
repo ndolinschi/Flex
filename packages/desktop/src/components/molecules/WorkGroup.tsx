@@ -120,7 +120,7 @@ export const WorkGroup = memo(({
     <div className={cn("flex flex-col", className)}>
       {isOpen ? (
         // Live status is not interactive (toggle is no-op while open) — use a
-        // plain row so ghost Button's `aria-expanded:bg-accent` does not paint
+        // plain row so ghost Button's `aria-expanded:bg-fill-4` does not paint
         // a full-width pill behind "Working" / "Thinking".
         <div className="flex min-h-[var(--end-of-turn-reserved-height)] items-center gap-1.5 text-base">
           <RunningDot className="-ml-1 h-4 w-4" />

@@ -339,7 +339,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
       aria-label="Refresh tables" title="Refresh tables"
       onClick={() => void refetchTables()}
       className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-foreground",
+        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -352,7 +352,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
       aria-label="Add connection" title="Add connection"
       onClick={openAddForm}
       className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-foreground",
+        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -663,7 +663,7 @@ const ConnectionRow = ({
         onDelete()
       }}
       className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-foreground",
+        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
         "absolute right-1 top-1 h-5 w-5 opacity-0 group-hover:opacity-100",
       )}
     >

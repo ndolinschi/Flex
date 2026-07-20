@@ -323,7 +323,7 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
             title="Insert section"
             onClick={() => setInsertOpen((v) => !v)}
             className={cn(
-              "text-muted-foreground hover:bg-accent hover:text-foreground",
+              "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
               "opacity-50 hover:opacity-80",
               "h-6 w-6",
             )}
@@ -360,7 +360,7 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
       aria-label={showMarks ? "Edit prompt" : "Show marks"} title={showMarks ? "Edit prompt" : "Show marks"}
       onClick={() => setShowMarks((v) => !v)}
       className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-foreground",
+        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
         "h-6 w-6", showMarks && "bg-fill-3 text-ink",
       )}
     >
@@ -381,7 +381,7 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
       disabled={!draft.trim() || busy}
       onClick={() => void runVerify()}
       className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-foreground",
+        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -401,7 +401,7 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
       onClick={sendFromEditor}
       disabled={!draft.trim()}
       className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-foreground",
+        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
         "h-6 w-6",
       )}
     >

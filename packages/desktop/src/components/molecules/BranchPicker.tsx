@@ -148,7 +148,7 @@ export const BranchPicker = ({
           onClick={() => void openExternalUrl(branchPr.url)}
           title={`${branchPr.title} — ${branchPr.checksSummary}`}
           aria-label={`Open pull request #${branchPr.number}`}
-          className="max-w-[7.5rem] gap-1 px-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="max-w-[7.5rem] gap-1 px-1.5 text-muted-foreground hover:bg-fill-4 hover:text-foreground"
         >
           <GitPullRequest className="size-3 shrink-0" aria-hidden />
           <span className="shrink-0 font-medium text-foreground">

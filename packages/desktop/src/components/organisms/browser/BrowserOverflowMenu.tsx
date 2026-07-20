@@ -51,7 +51,7 @@ export const BrowserOverflowMenu = ({
             variant="ghost"
             size="icon-xs"
             aria-label="More browser actions"
-            className="size-6 text-muted-foreground hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground"
+            className="size-6 text-muted-foreground hover:text-foreground aria-expanded:bg-fill-4 aria-expanded:text-foreground"
           />
         }
       >

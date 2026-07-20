@@ -156,8 +156,8 @@ export const TitleBarMenus = ({
                 "h-[22px] rounded-sm px-1.5 py-0 text-xs font-normal leading-none",
                 "text-muted-foreground",
                 "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-                "hover:bg-accent hover:text-foreground",
-                "aria-expanded:bg-accent aria-expanded:text-foreground",
+                "hover:bg-fill-4 hover:text-foreground",
+                "aria-expanded:bg-fill-4 aria-expanded:text-foreground",
               )}
             >
               {menu.label}
