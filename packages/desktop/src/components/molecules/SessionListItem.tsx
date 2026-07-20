@@ -11,6 +11,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react"
+import { useStoreWithEqualityFn } from "zustand/traditional"
 import type { GitStatusSummary, SessionMeta, WorkspaceStatusDto } from "../../lib/types"
 import { sessionLabel } from "../../lib/types"
 import { basename, formatCompactTime, cn } from "../../lib/utils"
@@ -64,17 +65,26 @@ export const SessionListItem = memo(function SessionListItem({
   onTogglePin,
   onSetArchived,
 }: SessionListItemProps) {
-  // Per-id selectors — parent must not pass the whole streaming/unread maps
-  // or every row redraws on every other session's stream tick.
-  const isRunning = useAppStore((s) => !!s.streamingSessions[session.id])
-  const unread = useAppStore((s) => s.unreadBySession[session.id])
-  const needsInput = useAppStore(
-    (s) =>
-      s.pendingPermission?.sessionId === session.id ||
-      s.pendingQuestion?.sessionId === session.id,
-  )
-  const turnFailed = useAppStore(
-    (s) => s.lastTurnSummary[session.id]?.stop_reason === "error",
+  // Single selector returning a tuple — one subscription instead of four,
+  // with a field-level equality check so unrelated sessions' updates are skipped.
+  const { isRunning, unread, needsInput, turnFailed } = useStoreWithEqualityFn(
+    useAppStore,
+    (s) => {
+      const id = session.id
+      return {
+        isRunning: !!s.streamingSessions[id],
+        unread: s.unreadBySession[id],
+        needsInput:
+          s.pendingPermission?.sessionId === id ||
+          s.pendingQuestion?.sessionId === id,
+        turnFailed: s.lastTurnSummary[id]?.stop_reason === "error",
+      }
+    },
+    (a, b) =>
+      a.isRunning === b.isRunning &&
+      a.unread === b.unread &&
+      a.needsInput === b.needsInput &&
+      a.turnFailed === b.turnFailed,
   )
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(session.title ?? "")

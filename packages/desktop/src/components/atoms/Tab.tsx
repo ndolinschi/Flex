@@ -78,7 +78,7 @@ export const Tab = ({
     sizeClasses[size],
     selected
       ? "bg-fill-2 text-ink"
-      : "text-ink-muted hover:bg-fill-3 hover:text-ink-secondary",
+      : "text-ink-muted hover:bg-fill-4 hover:text-ink-secondary",
     // Pointer until an active drag sets body cursor to grabbing.
     draggable ? "cursor-pointer touch-none" : null,
     className,

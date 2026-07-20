@@ -33,7 +33,7 @@ import {
  * Falls back to the viewport check alone when `window` is unavailable (SSR /
  * node test environment).
  */
-const isSplitEligible = (state: AppState): boolean => {
+export const isSplitEligible = (state: AppState): boolean => {
   if (state.viewport !== "wide") return false
   if (typeof window === "undefined" || window.innerWidth === 0) return true
   const sidebarUsed = state.sidebarCollapsed ? 0 : state.sidebarWidth
@@ -308,7 +308,7 @@ export const createContentLayoutSlice: StateCreator<
   },
 
   openTabToSide: (fromPane, tabId) => {
-    if (get().viewport !== "wide") return
+    if (!isSplitEligible(get())) return
     let layout = get().contentLayout
     const from = layout.panes[fromPane]
     const tab = from?.tabs.find((t) => t.id === tabId)

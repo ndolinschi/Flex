@@ -77,7 +77,7 @@ export const SidebarProjectFilter = ({
           />
         }
       >
-        <ListFilter className="size-3" aria-hidden />
+        <ListFilter className="size-3.5" aria-hidden />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={4} className="w-56">
         <DropdownMenuGroup>

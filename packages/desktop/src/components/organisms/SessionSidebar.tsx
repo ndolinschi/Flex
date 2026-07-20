@@ -524,7 +524,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
             if (narrow) setSidebarCollapsed(true)
           }}
         />
-        <div className="my-0.5 border-t border-stroke-3" aria-hidden />
+        <div className="border-t border-stroke-3" aria-hidden />
         {AUTOMATIONS_UI_ENABLED ? (
           <SidebarActionRow
             icon={Bot}
@@ -580,7 +580,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
               : "opacity-0 group-hover/label:opacity-100 group-focus-within/label:opacity-100 focus-visible:opacity-100",
       )}
     >
-      <Search className="h-3 w-3" aria-hidden />
+      <Search className="h-3.5 w-3.5" aria-hidden />
     </Button>
       </div>
 
