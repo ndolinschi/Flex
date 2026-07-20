@@ -7,8 +7,9 @@ import { isBrowserPreview, NATIVE_APP_REQUIRED } from "../../lib/browserPreview"
 import { invalidateWorkspaceQueries } from "../../lib/invalidateWorkspaceQueries"
 import { DEFAULT_SESSION_TITLE } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
-import { basename, parentPathPrefix } from "../../lib/utils"
+import { basename, parentPathPrefix, cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
+import { InputGroupAddon } from "@/components/ui/input-group"
 import {
   Combobox,
   ComboboxContent,
@@ -144,18 +145,16 @@ export const ProjectPicker = ({
       onOpenChange={setOpen}
       disabled={disabled || busy}
     >
-      <div
-        className="flex max-w-[10rem] items-center gap-1"
+      <ComboboxInput
+        placeholder={label}
         aria-label={`Project: ${label}`}
+        className={cn(triggerInputClassName, "max-w-[10rem]")}
+        disabled={disabled || busy}
       >
-        <Folder className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-        <ComboboxInput
-          placeholder={label}
-          aria-label={`Project: ${label}`}
-          className={triggerInputClassName}
-          disabled={disabled || busy}
-        />
-      </div>
+        <InputGroupAddon align="inline-start" className="pl-1.5 pr-0">
+          <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        </InputGroupAddon>
+      </ComboboxInput>
       <ComboboxContent className="w-80" side="top" align="start">
         <ComboboxEmpty>No recent projects</ComboboxEmpty>
         {recents.length > 0 ? (

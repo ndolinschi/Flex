@@ -57,7 +57,7 @@ export const checkForAppUpdate = async (): Promise<UpdateCheckResult> => {
     // first signed release lands. Treat as "unavailable" so Settings stays
     // calm rather than red.
     const soft =
-      /404|not found|failed to fetch|error sending request|signature|pubkey|endpoint/i.test(
+      /404|not found|failed to fetch|error sending request|signature|pubkey|endpoint|valid release json|release json/i.test(
         message,
       )
     log.warn("boot", "updater: check failed", { message, soft })

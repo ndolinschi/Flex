@@ -149,12 +149,13 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     [sessionsById, contextSession],
   )
 
-  // Only fetch PR status while the + menu is open — strip labels never need it.
+  // Never fetch PR status when opening the + menu — `gh pr view` can stall
+  // the first click. Reuse cache populated by BranchPicker / tab lifecycle.
   const prQuery = useQuery({
     queryKey: ["git-pr-status", cwd ?? ""],
     queryFn: () => gitPrStatus(cwd!),
-    enabled: !!cwd && openTabModal,
-    staleTime: 15_000,
+    enabled: false,
+    staleTime: 60_000,
   })
   const hasBranchPr = !!prQuery.data?.pr
   const catalog = useMemo(

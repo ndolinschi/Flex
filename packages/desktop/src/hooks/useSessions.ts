@@ -128,13 +128,12 @@ export const useSessions = () => {
       )
       const draft = findDraftSession(sessions, cwd)
       if (draft) {
-        try {
-          await resumeSession(draft.id)
-        } catch {
-          // Still select locally if resume fails (session already warm).
-        }
+        // Select immediately so the click feels instant; resume in background.
         setActiveSessionId(draft.id, { panel: "closed" })
         setRoute("chat")
+        void resumeSession(draft.id).catch(() => {
+          // Session may already be warm — keep the local selection.
+        })
         return draft
       }
       return handleCreate(

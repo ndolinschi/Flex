@@ -169,8 +169,10 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
 
   const handleCreate = useCallback(
     async (cwd?: string) => {
-      await newAgent(cwd)
+      // Collapse overlay immediately so the click feels responsive even when
+      // create_session waits on isolation / engine work.
       if (narrow) setSidebarCollapsed(true)
+      await newAgent(cwd)
     },
     [newAgent, narrow, setSidebarCollapsed],
   )
