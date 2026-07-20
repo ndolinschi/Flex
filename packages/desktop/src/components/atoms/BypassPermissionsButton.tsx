@@ -41,7 +41,7 @@ export const BypassPermissionsButton = ({
           "shrink-0 rounded-full",
           pressed
             ? "bg-orange/15 text-orange opacity-100 hover:bg-orange/25 hover:text-orange data-pressed:bg-orange/15 data-pressed:text-orange"
-            : "text-muted-foreground opacity-50 hover:bg-accent hover:opacity-80",
+            : "text-muted-foreground opacity-50 hover:bg-fill-4 hover:opacity-80",
         )}
       >
         <ShieldIcon />

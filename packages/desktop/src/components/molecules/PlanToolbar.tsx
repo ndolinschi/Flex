@@ -414,7 +414,7 @@ export const PlanToolbar = ({
       onClick={find.onPrev}
       disabled={find.matchCount === 0}
       className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-foreground",
+        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -428,7 +428,7 @@ export const PlanToolbar = ({
       onClick={find.onNext}
       disabled={find.matchCount === 0}
       className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-foreground",
+        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -441,7 +441,7 @@ export const PlanToolbar = ({
       aria-label="Close find" title="Close find"
       onClick={() => find.onOpenChange(false)}
       className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-foreground",
+        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
         "h-6 w-6",
       )}
     >

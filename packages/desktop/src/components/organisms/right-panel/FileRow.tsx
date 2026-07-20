@@ -275,7 +275,7 @@ export const FileRow = memo(function FileRow({
       aria-label="Open file" title="Open file"
       onClick={handleOpenFile}
       className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-foreground",
+        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -291,7 +291,7 @@ export const FileRow = memo(function FileRow({
       onClick={handleKeepFile}
       disabled={busyAction !== null}
       className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-foreground",
+        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -313,7 +313,7 @@ export const FileRow = memo(function FileRow({
             }}
       disabled={busyAction !== null}
       className={cn(
-        "text-muted-foreground hover:bg-accent hover:text-foreground",
+        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
         "h-6 w-6",
       )}
     >

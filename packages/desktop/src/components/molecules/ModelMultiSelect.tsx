@@ -131,7 +131,7 @@ export const ModelMultiSelect = ({
                     aria-label={`Move ${name} up`}
                     disabled={disabled || index === 0}
                     onClick={() => moveUp(index)}
-                    className="text-muted-foreground hover:bg-accent hover:text-foreground"
+                    className="text-muted-foreground hover:bg-fill-4 hover:text-foreground"
                   >
                     <ChevronUp aria-hidden />
                   </Button>
@@ -141,7 +141,7 @@ export const ModelMultiSelect = ({
                     aria-label={`Move ${name} down`}
                     disabled={disabled || index === value.length - 1}
                     onClick={() => moveDown(index)}
-                    className="text-muted-foreground hover:bg-accent hover:text-foreground"
+                    className="text-muted-foreground hover:bg-fill-4 hover:text-foreground"
                   >
                     <ChevronDown aria-hidden />
                   </Button>
@@ -151,7 +151,7 @@ export const ModelMultiSelect = ({
                     aria-label={`Remove ${name}`}
                     disabled={disabled}
                     onClick={() => removeAt(index)}
-                    className="text-muted-foreground hover:bg-accent hover:text-destructive"
+                    className="text-muted-foreground hover:bg-fill-4 hover:text-destructive"
                   >
                     <X aria-hidden />
                   </Button>

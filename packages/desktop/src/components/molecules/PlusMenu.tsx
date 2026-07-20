@@ -37,8 +37,8 @@ export const PlusMenu = ({
             aria-label="Add context"
             title="Add context"
             className={cn(
-              "size-6 rounded-full text-muted-foreground opacity-50 hover:bg-accent hover:opacity-80",
-              "aria-expanded:bg-accent aria-expanded:text-foreground aria-expanded:opacity-80",
+              "size-6 rounded-full text-muted-foreground opacity-50 hover:bg-fill-4 hover:opacity-80",
+              "aria-expanded:bg-fill-4 aria-expanded:text-foreground aria-expanded:opacity-80",
             )}
           />
         }
