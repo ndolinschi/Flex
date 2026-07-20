@@ -47,7 +47,18 @@ const SidebarContext = React.createContext<SidebarContextProps | null>(null)
 function useSidebar() {
   const context = React.useContext(SidebarContext)
   if (!context) {
-    throw new Error("useSidebar must be used within a SidebarProvider.")
+    // When used outside a SidebarProvider (e.g. partial inner migration
+    // where the outer shell controls collapsed state), return expanded
+    // defaults. Tooltip-on-icon-collapse logic simply won't fire.
+    return {
+      state: "expanded" as const,
+      open: true,
+      setOpen: (_open: boolean) => {},
+      openMobile: false,
+      setOpenMobile: (_open: boolean) => {},
+      isMobile: false,
+      toggleSidebar: () => {},
+    }
   }
 
   return context
