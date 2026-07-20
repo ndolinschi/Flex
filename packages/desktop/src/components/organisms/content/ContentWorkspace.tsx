@@ -59,17 +59,23 @@ export const ContentWorkspace = () => {
   const setRightPanelDragging = useAppStore((s) => s.setRightPanelDragging)
   const [dragging, setDragging] = useState(false)
   const rowRef = useRef<HTMLDivElement>(null)
-  const [rowWidth, setRowWidth] = useState(0)
+  // Threshold boolean — avoid re-rendering on every resize pixel while the
+  // sash eligibility does not change.
+  const [canShowSash, setCanShowSash] = useState(false)
 
   useEffect(() => {
     const el = rowRef.current
     if (!el) return
+    const update = (width: number) => {
+      const next = width >= CHAT_MIN_WIDTH * 2
+      setCanShowSash((prev) => (prev === next ? prev : next))
+    }
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0]
-      if (entry) setRowWidth(entry.contentRect.width)
+      if (entry) update(entry.contentRect.width)
     })
     ro.observe(el)
-    setRowWidth(el.getBoundingClientRect().width)
+    update(el.getBoundingClientRect().width)
     return () => ro.disconnect()
   }, [])
 
@@ -94,7 +100,7 @@ export const ContentWorkspace = () => {
   // Only render the resize sash when the content row is wide enough for two
   // minimum-width panes. Both panes stay mounted to preserve scroll/xterm
   // state; the sash handle just hides when there is no room to drag it.
-  const showSash = split && rowWidth >= CHAT_MIN_WIDTH * 2
+  const showSash = split && canShowSash
 
   const handleSashDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     e.preventDefault()

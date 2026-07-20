@@ -189,10 +189,11 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   const updateScrollFade = useCallback(() => {
     const el = tabsScrollRef.current
     if (!el) return
-    setScrollFade({
-      left: el.scrollLeft > 1,
-      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
-    })
+    const left = el.scrollLeft > 1
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+    setScrollFade((prev) =>
+      prev.left === left && prev.right === right ? prev : { left, right },
+    )
   }, [])
 
   useEffect(() => {
