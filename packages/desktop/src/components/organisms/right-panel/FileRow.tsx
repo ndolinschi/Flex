@@ -1,8 +1,7 @@
 import { memo, useState, type MouseEvent as ReactMouseEvent } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, ChevronRight, FileCode2, Undo2 } from "lucide-react"
-import { Checkbox, DiffStat } from "../../atoms"
-import { Spinner } from "@/components/ui/spinner"
+import { Checkbox, DiffStat, Spinner } from "../../atoms"
 import { Collapsible, ConfirmDialog, DiffView } from "../../molecules"
 import { Button } from "@/components/ui/button"
 import { invalidateReviewQueries } from "../../../hooks/useWorkspaceActions"
@@ -276,7 +275,7 @@ export const FileRow = memo(function FileRow({
       aria-label="Open file" title="Open file"
       onClick={handleOpenFile}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -292,7 +291,7 @@ export const FileRow = memo(function FileRow({
       onClick={handleKeepFile}
       disabled={busyAction !== null}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -314,12 +313,12 @@ export const FileRow = memo(function FileRow({
             }}
       disabled={busyAction !== null}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >
       {busyAction === "undo" ? (
-                <Spinner className="size-3.5" />
+                <Spinner size="sm" />
             ) : (
               <Undo2 className="h-3.5 w-3.5" aria-hidden />
             )}
@@ -330,7 +329,7 @@ export const FileRow = memo(function FileRow({
         <div className="mx-1 mb-1 overflow-hidden rounded-[var(--radius-sm)] border border-stroke-4 bg-fill-5">
           {isLoading ? (
             <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-ink-muted">
-                <Spinner className="size-3.5" /> Loading diff…
+                <Spinner size="sm" /> Loading diff…
             </div>
           ) : (
             <DiffView

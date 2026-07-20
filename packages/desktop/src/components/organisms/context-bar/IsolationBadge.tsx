@@ -52,7 +52,7 @@ export const IsolationBadge = ({
           <Button
             type="button"
             variant="ghost"
-            className="ml-1 h-6 rounded-full bg-muted px-2 text-xs font-normal text-muted-foreground hover:bg-muted/80 hover:text-foreground aria-expanded:bg-muted/80 aria-expanded:text-foreground"
+            className="ml-1 h-6 rounded-full bg-transparent px-2 text-xs font-normal text-muted-foreground hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground"
           />
         }
       >

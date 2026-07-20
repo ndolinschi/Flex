@@ -32,7 +32,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { RunningDot } from "../atoms"
+import { RunningDot, TextInput } from "../atoms"
 import { useGroupedModels, MODEL_MENU_VISIBLE_CAP } from "../../hooks/useGroupedModels"
 
 export type PlanBuildStatus = "draft" | "ready" | "building" | "built"
@@ -133,14 +133,14 @@ const PlanModelPill = ({
       {open ? (
         <DropdownMenuContent align="end" sideOffset={4} className="w-64 p-0">
           <div className="border-b border-border px-2.5 py-2">
-            <input
+            <TextInput
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.stopPropagation()}
               placeholder="Search models"
               aria-label="Search models"
-              className="h-6 w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+              className="h-6 border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0 rounded-none"
             />
           </div>
           <div className="max-h-56 overflow-y-auto py-1">
@@ -414,7 +414,7 @@ export const PlanToolbar = ({
       onClick={find.onPrev}
       disabled={find.matchCount === 0}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -428,7 +428,7 @@ export const PlanToolbar = ({
       onClick={find.onNext}
       disabled={find.matchCount === 0}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >
@@ -441,7 +441,7 @@ export const PlanToolbar = ({
       aria-label="Close find" title="Close find"
       onClick={() => find.onOpenChange(false)}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >

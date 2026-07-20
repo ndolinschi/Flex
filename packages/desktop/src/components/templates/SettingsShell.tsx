@@ -91,7 +91,7 @@ export const SettingsShell = ({
       aria-label="Back to chat" title="Back to chat"
       onClick={() => setRoute("chat")}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >

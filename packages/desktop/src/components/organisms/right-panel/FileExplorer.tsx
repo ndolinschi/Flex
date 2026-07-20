@@ -487,7 +487,7 @@ export const FileExplorer = ({
       aria-label="New file" title="New file"
       onClick={() => openCreate()}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6",
       )}
     >

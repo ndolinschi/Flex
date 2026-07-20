@@ -58,7 +58,7 @@ export const PlanCommentList = ({
       aria-label="Remove comment" title="Remove comment"
       onClick={() => onRemove(comment.id)}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100",
       )}
     >

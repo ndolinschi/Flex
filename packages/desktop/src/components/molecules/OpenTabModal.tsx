@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { MessageSquare } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-import { CommandInput as CmdkInput } from "cmdk"
+import { Input } from "@/components/ui/input"
 import {
   Command,
   CommandEmpty,
@@ -214,13 +214,13 @@ export const OpenTabModal = ({
         shouldFilter={false}
         className="rounded-none bg-transparent p-0"
       >
-        <div className="flex shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5 py-2">
-          <CmdkInput
+        <div className="flex shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5 py-1.5">
+          <Input
             value={query}
-            onValueChange={setQuery}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Open a tab…"
             autoFocus
-            className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
+            className="h-auto border-0 bg-transparent px-0 py-0 text-sm text-ink shadow-none focus-visible:ring-0 placeholder:text-ink-faint rounded-none"
           />
         </div>
         <CommandList

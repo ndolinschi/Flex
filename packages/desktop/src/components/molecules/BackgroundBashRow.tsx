@@ -82,7 +82,7 @@ export const BackgroundBashRow = ({ detail }: { detail: ToolStepDetail }) => {
       onClick={handleStop}
       disabled={stopping}
       className={cn(
-        "text-muted-foreground hover:bg-muted hover:text-foreground",
+        "text-muted-foreground hover:bg-accent hover:text-foreground",
         "ml-auto h-5 w-5",
       )}
     >

@@ -179,7 +179,7 @@ export const SessionMenu = ({
               variant="ghost"
               size="icon-xs"
               aria-label="Chat actions"
-              className="size-6 text-muted-foreground hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground"
+              className="size-6 text-muted-foreground hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground"
             />
           }
         >

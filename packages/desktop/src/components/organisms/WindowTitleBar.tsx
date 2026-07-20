@@ -114,7 +114,7 @@ const WindowTitleBarImpl = ({
               title={`${collapsed ? "Show" : "Hide"} sidebar (${mod}B)`}
               onClick={handlers.toggleSidebar}
               className={cn(
-                "text-muted-foreground hover:bg-muted hover:text-foreground",
+                "text-muted-foreground hover:bg-accent hover:text-foreground",
                 "opacity-50 hover:opacity-80",
                 "h-6 w-6 shrink-0",
               )}
@@ -148,7 +148,7 @@ const WindowTitleBarImpl = ({
                 title={`${split ? "Close split" : "Split view"} (${mod}J)`}
                 onClick={toggleSplit}
                 className={cn(
-                  "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  "text-muted-foreground hover:bg-accent hover:text-foreground",
                   "opacity-50 hover:opacity-80",
                   "h-6 w-6",
                   !split && "opacity-60",
