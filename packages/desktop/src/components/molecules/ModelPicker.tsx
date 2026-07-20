@@ -91,9 +91,8 @@ export const ModelPicker = ({
             disabled={isLoading || disabled}
             aria-label="Select model"
             className={cn(
-              // Mirror ModePicker SelectTrigger sm — same height, gap, border,
-              // transparent fill, and trailing chevron treatment.
-              "max-w-[14rem] gap-1.5 border-input bg-transparent font-normal shadow-none",
+              // h-6 pill to match ModePicker (DESIGN.md: Mode/Model pills h-6).
+              "h-6 max-w-[14rem] rounded-full border-input bg-transparent px-2 font-normal shadow-none",
             )}
           />
         }
