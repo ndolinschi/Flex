@@ -8,7 +8,11 @@ import { DEFAULT_SESSION_TITLE, isDefaultSessionTitle } from "./types"
 export const isSessionNotFoundError = (message: string): boolean =>
   /session\s+\S+\s+not found/i.test(message) || /session not found/i.test(message)
 
-/** Find an unused "New Agent" session for this project (design: one draft per cwd). */
+/** Find an unused "New Agent" session for this project (design: one draft per cwd).
+ * Matches on `base_cwd ?? cwd` so isolated drafts (cwd = worktree) still group
+ * with their project. Only returns an *unprovisioned* draft — leftover
+ * create-time worktrees from before deferred isolation must not be reused as
+ * the empty New Agent surface (they still carry WorkspaceProvisioned history). */
 export const findDraftSession = (
   sessions: SessionMeta[],
   cwd?: string | null,
@@ -16,6 +20,8 @@ export const findDraftSession = (
   const key = cwd?.trim() || ""
   return sessions.find((s) => {
     if (!isDefaultSessionTitle(s.title)) return false
+    // Already provisioned (create-time leftover or first-prompt worktree).
+    if (s.base_cwd || s.workspace_id) return false
     const sessionCwd = s.cwd?.trim() || ""
     return sessionCwd === key
   })

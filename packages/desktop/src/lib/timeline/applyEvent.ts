@@ -343,12 +343,10 @@ export const applyEventToTimeline = (
       break
     }
     case "workspace_provisioned": {
-      next.push({
-        type: "meta",
-        id: rowId("ws-prov", payload.workspace_id, seq),
-        text: `Isolated workspace · ${payload.path}`,
-        tsMs,
-      })
+      // Deliberately not a timeline row. Old sessions provisioned at
+      // create_session left this as a chat banner on empty drafts; isolation
+      // is already shown by IsolationBadge once the worktree is active, and
+      // deferred provision means new empties never need this chrome.
       break
     }
     case "workspace_integrated": {
