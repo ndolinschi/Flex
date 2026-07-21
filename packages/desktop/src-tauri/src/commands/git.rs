@@ -463,6 +463,9 @@ pub(crate) fn current_head_sha(cwd: &std::path::Path) -> String {
 pub(crate) fn capture_session_baseline(
     cwd: &std::path::Path,
 ) -> Option<crate::state::SessionBaseline> {
+    if !cwd.is_dir() {
+        return None;
+    }
     let porcelain = crate::win_console::command("git")
         .args(["status", "--porcelain"])
         .current_dir(cwd)

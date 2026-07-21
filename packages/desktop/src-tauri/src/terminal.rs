@@ -23,6 +23,10 @@ pub struct TerminalInfo {
     pub id: String,
     pub cwd: String,
     pub created_at_ms: u64,
+    /// Present when the requested session cwd was missing and the PTY fell
+    /// back to the home directory — UI can toast without guessing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd_fallback_from: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -75,10 +79,12 @@ fn default_cwd() -> String {
 
 /// Pick an existing directory for the PTY shell. Prefers the requested cwd,
 /// then a collapsed-backslash variant (Windows double-escape), then home.
-fn resolve_cwd(cwd: Option<String>) -> DesktopResult<String> {
+/// Returns `(resolved_path, fallback_from)` — `fallback_from` is set when the
+/// requested path was unusable.
+fn resolve_cwd(cwd: Option<String>) -> DesktopResult<(String, Option<String>)> {
     let raw = cwd.unwrap_or_else(default_cwd);
     if Path::new(&raw).is_dir() {
-        return Ok(raw);
+        return Ok((raw, None));
     }
 
     let collapsed = crate::path_resolve::collapse_extra_backslashes(&raw);
@@ -88,7 +94,7 @@ fn resolve_cwd(cwd: Option<String>) -> DesktopResult<String> {
             collapsed = %collapsed,
             "terminal cwd had doubled backslashes; using collapsed path"
         );
-        return Ok(collapsed);
+        return Ok((collapsed, None));
     }
 
     let fallback = default_cwd();
@@ -98,7 +104,7 @@ fn resolve_cwd(cwd: Option<String>) -> DesktopResult<String> {
             fallback = %fallback,
             "terminal cwd is missing; using default home directory"
         );
-        return Ok(fallback);
+        return Ok((fallback, Some(raw)));
     }
 
     Err(DesktopError::Message(format!(
@@ -136,7 +142,7 @@ pub async fn terminal_create(
     state: State<'_, AppState>,
     cwd: Option<String>,
 ) -> DesktopResult<TerminalInfo> {
-    let cwd = resolve_cwd(cwd)?;
+    let (cwd, cwd_fallback_from) = resolve_cwd(cwd)?;
     let cwd_path = PathBuf::from(&cwd);
 
     let id = {
@@ -231,6 +237,7 @@ pub async fn terminal_create(
         id,
         cwd,
         created_at_ms,
+        cwd_fallback_from,
     })
 }
 
@@ -315,6 +322,7 @@ pub async fn terminal_list(state: State<'_, AppState>) -> DesktopResult<Vec<Term
             id: id.clone(),
             cwd: handle.cwd.clone(),
             created_at_ms: handle.created_at_ms,
+            cwd_fallback_from: None,
         })
         .collect();
     list.sort_by(|a, b| a.id.cmp(&b.id));

@@ -32,6 +32,34 @@ pub(crate) fn schedule_session_baseline(app: tauri::AppHandle, session_id: Strin
         let Some(state) = app.try_state::<AppState>() else {
             return;
         };
+
+        {
+            let baselines = state.session_baselines.lock().await;
+            if baselines.contains_key(&session_id) {
+                return;
+            }
+        }
+        {
+            let mut inflight = state.baseline_inflight.lock().await;
+            if !inflight.insert(session_id.clone()) {
+                // Another create/subscribe path already scheduled this id.
+                return;
+            }
+        }
+
+        // Missing / deleted project folders are common (stale recents). Don't
+        // shell out to git — one clear warn, then stop.
+        if !cwd.is_dir() {
+            tracing::warn!(
+                session_id = %session_id,
+                cwd = %cwd.display(),
+                "skipping session baseline: cwd missing or not a directory"
+            );
+            let mut inflight = state.baseline_inflight.lock().await;
+            inflight.remove(&session_id);
+            return;
+        }
+
         let cwd_for_block = cwd.clone();
         let baseline =
             match tokio::task::spawn_blocking(move || capture_session_baseline(&cwd_for_block))
@@ -47,6 +75,7 @@ pub(crate) fn schedule_session_baseline(app: tauri::AppHandle, session_id: Strin
                     None
                 }
             };
+
         match baseline {
             Some(baseline) => {
                 let inserted = {
@@ -84,6 +113,9 @@ pub(crate) fn schedule_session_baseline(app: tauri::AppHandle, session_id: Strin
                 );
             }
         }
+
+        let mut inflight = state.baseline_inflight.lock().await;
+        inflight.remove(&session_id);
     });
 }
 

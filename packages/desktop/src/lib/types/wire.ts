@@ -623,7 +623,13 @@ export type RespondQuestionInput = {
 
 // Right-panel Terminal + Browser features (desktop-only, camelCase serde)
 
-export type TerminalInfo = { id: string; cwd: string; createdAtMs: number }
+export type TerminalInfo = {
+  id: string
+  cwd: string
+  createdAtMs: number
+  /** Set when the session cwd was missing and the PTY opened in home instead. */
+  cwdFallbackFrom?: string
+}
 
 export type TerminalOutputEvent = { id: string; data: string }
 
