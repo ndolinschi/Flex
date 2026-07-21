@@ -173,6 +173,7 @@ export const OpenTabModal = ({
         align="start"
         sideOffset={4}
         positionerClassName="z-[300]"
+        finalFocus={false}
         className="w-[280px] gap-0 overflow-hidden p-0"
       >
         <PopoverTitle className="sr-only">Open tab</PopoverTitle>
@@ -181,12 +182,13 @@ export const OpenTabModal = ({
           className="rounded-none bg-transparent p-0"
         >
           <div className="flex shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5 py-1.5">
-            {/* Bare field: ui/Input carries `dark:bg-input/30` which reads as a
-             * nested inset chip inside the tray. Keep the header one surface. */}
+            {/* Bare field: CommandInput wraps InputGroup with inset fill. Keep the
+             * header one surface; aria-label names the field for AT. */}
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Open a tab…"
+              aria-label="Open a tab"
               autoFocus
               className={cn(
                 "h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm text-ink shadow-none",

@@ -42,6 +42,7 @@ export const PermissionActions = ({
           <Button
             size="xs"
             disabled={isSubmitting}
+            aria-busy={pendingAction === "allow_once" || undefined}
             onClick={() => handleRespond("allow_once")}
           >
             {pendingAction === "allow_once" ? (
@@ -55,6 +56,7 @@ export const PermissionActions = ({
             size="xs"
             variant="secondary"
             disabled={isSubmitting}
+            aria-busy={pendingAction === "allow_always" || undefined}
             onClick={() => handleRespond("allow_always")}
           >
             {pendingAction === "allow_always" ? (
@@ -68,6 +70,7 @@ export const PermissionActions = ({
             size="xs"
             variant="destructive"
             disabled={isSubmitting}
+            aria-busy={pendingAction === "deny" || undefined}
             onClick={() => handleRespond("deny")}
           >
             {pendingAction === "deny" ? (

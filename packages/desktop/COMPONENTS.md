@@ -63,7 +63,7 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `BranchPicker` | List/checkout local git branches; shows current-branch PR # + checks when present | `cwd`, `onError?` | ContextBar |
 | `BranchPrStatusChip` | Current-branch PR # + title + CI summary; opens PR in browser | `pr` | ChangesTab header |
 | `CreatePrDialog` | Editable title/body modal before `gh pr create` | `open`, `initialTitle?`, `initialBody?`, `onConfirm` | ChangesTab, CommitCenter, CommitBar |
-| `PopoverTray` | Shared Esc/click-outside/↑↓ tray; used for autocomplete (slash/@) and form popovers (commit message) | `open`, `onClose`, `placement`, `children` | Composer trays, CommitBar |
+| `PopoverTray` | Shared Esc/click-outside/↑↓ tray for composer autocomplete (`autoFocus={false}`; not Base UI Popover) | `open`, `onClose`, `placement`, `children` | SlashCommandTray, AtMentionTray |
 | `ContextMenu` | Portal menu; ignores timeline scroll + webview-induced `window.blur` so it stays open mid-stream | `position`, `items`, `onClose` | ContentPane `+`, SessionListItem, FileExplorer |
 | `ConfirmDialog` | shadcn `AlertDialog` shell (rename/delete/forms) | `open`, `title`, `onConfirm`, `onCancel`, `confirmDisabled?`, `danger?` | SessionMenu, CreatePrDialog, FilesTab, … |
 | `AttachmentChip` | Pending attachment pill (file/image/directory/dom) | `attachment`, `onRemove` | Composer |
@@ -328,7 +328,7 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 |---|---|---|
 | **0 — Foundation** | ✅ `components.json` (`base-nova`), `@/` alias, `clsx`+`tailwind-merge` `cn`, shadcn semantic vars bridged to Flex tokens (`data-theme` only — no `.dark` second system) | `npx shadcn@latest info --json` healthy; visual smoke (dark/light) unchanged |
 | **1 — Atom adapters** | ✅ Input/Label/Checkbox/Badge/Kbd/Separator/Skeleton/Avatar/Tooltip/ScrollArea/Spinner + prior Button/TextArea/Switch/Toggle | Atom adapters + vitest green; `TooltipProvider` in `main.tsx` |
-| **2 — Overlays & menus** | ✅ Dialog + AlertDialog + DropdownMenu + ContextMenu + Menubar + Sonner + Command (palette/search/open-tab/model lists); PopoverTray **partial** | Confirm/auth on AlertDialog; File/Edit/View/Help on Menubar |
+| **2 — Overlays & menus** | ✅ Dialog + AlertDialog + DropdownMenu + ContextMenu + Menubar + Sonner + Command; Commit/OpenTab/PlanComment on Popover (Phase 9); PopoverTray kept for composer slash/@ | Confirm/auth on AlertDialog; File/Edit/View/Help on Menubar |
 | **3 — Forms & pickers** | ✅ Select + Combobox + Toggle + Field + ToggleGroup + RadioGroup + InputGroup | ProviderPicker → ToggleGroup; QuestionPrompt → Radio/ToggleGroup; SettingsNav → InputGroup |
 | **4 — Layout** | ✅ Resizable + Collapsible + Breadcrumb + Empty + Sidebar (inner composition) + Table/Pagination; Sheet/Drawer deferred | Split sash; SessionSidebar inner Sidebar*; DatabaseTab Table |
 | **5 — Chat kit** | ✅ Attachment + Bubble + Message + Marker; MessageScroller **spike only** | Chip/bubble/marker parity; virtualizer stays |

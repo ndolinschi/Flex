@@ -63,6 +63,7 @@ export const PlanCommentPopover = ({
         side="bottom"
         align="center"
         sideOffset={0}
+        finalFocus={false}
         data-suppress-native-webview=""
         className={cn("w-72", className)}
       >
