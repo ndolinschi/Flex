@@ -1,6 +1,6 @@
 //! Shared Tauri app state.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 // Plain (non-async) Mutex for the terminal registry: PTY I/O on the writer
@@ -181,6 +181,10 @@ pub struct AppState {
     /// the file persisted via [`save_session_baselines`]; loaded from disk
     /// once at startup in [`AppState::new`] so it survives app restart.
     pub session_baselines: Mutex<HashMap<String, SessionBaseline>>,
+    /// Session ids with an in-flight baseline capture. Prevents create +
+    /// subscribe-auto-resume from double-scheduling (and double-warning)
+    /// before the first capture finishes.
+    pub baseline_inflight: Mutex<HashSet<String>>,
     /// Pending Copilot device-flow sessions keyed by opaque session id.
     pub pending_copilot_auth: Mutex<HashMap<String, PendingCopilotAuth>>,
     /// Pending ChatGPT subscription OAuth sessions keyed by opaque session id.
@@ -213,6 +217,7 @@ impl AppState {
             browser_bounds: SyncMutex::new(None),
             browser_design_mode: SyncMutex::new(false),
             session_baselines: Mutex::new(load_session_baselines()),
+            baseline_inflight: Mutex::new(HashSet::new()),
             pending_copilot_auth: Mutex::new(HashMap::new()),
             pending_chatgpt_auth: Mutex::new(HashMap::new()),
             db_plugin: Mutex::new(crate::db_plugin::DbPluginState::load()),

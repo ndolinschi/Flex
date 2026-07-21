@@ -88,6 +88,14 @@ export const TerminalTab = ({
         createdAtMs: info.createdAtMs,
       })
       setActiveTerminalId(sessionKey, info.id)
+      if (info.cwdFallbackFrom) {
+        useAppStore
+          .getState()
+          .pushToast(
+            `Workspace folder missing — terminal opened in home instead of ${basename(info.cwdFallbackFrom) || info.cwdFallbackFrom}`,
+            "error",
+          )
+      }
     } catch {
       // Leave EmptyState / Plus button available for a manual retry.
     }

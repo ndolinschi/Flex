@@ -65,12 +65,16 @@ fn init_tracing(app: &tauri::App) {
     let debug_mode = debug::is_debug_mode_enabled(&app_data_dir);
 
     let filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        // `tauri_plugin_updater` logs ERROR on a missing latest.json channel
+        // (expected until the first signed release). Silence that crate so
+        // debug-mode consoles aren't flooded; JS still soft-fails the check.
         if debug_mode {
-            tracing_subscriber::EnvFilter::new("debug")
+            tracing_subscriber::EnvFilter::new("debug,tauri_plugin_updater=off")
         } else {
             tracing_subscriber::EnvFilter::new(
                 "info,agentloop_loop=debug,agentloop_engine=debug,\
-                 agentloop_providers=debug,agentloop_provider_bedrock=debug",
+                 agentloop_providers=debug,agentloop_provider_bedrock=debug,\
+                 tauri_plugin_updater=off",
             )
         }
     });
