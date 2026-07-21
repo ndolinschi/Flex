@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { GitBranch, GitPullRequest } from "lucide-react"
 import {
@@ -31,6 +31,18 @@ type BranchPickerProps = {
 const triggerInputClassName =
   "h-6 min-w-0 flex-1 border-0 bg-transparent shadow-none ring-0 has-[[data-slot=input-group-control]:focus-visible]:border-transparent has-[[data-slot=input-group-control]:focus-visible]:ring-0 focus-within:border-transparent focus-within:ring-0 text-sm font-normal text-muted-foreground opacity-80 hover:opacity-100 data-open:opacity-100"
 
+/** Defer `gh pr view` until the session chrome is interactive — running it on
+ * every ContextBar mount (new session / switch) stacked with git_status and
+ * blocked the UI for 1–3s. */
+const schedulePrPrefetch = (fn: () => void): (() => void) => {
+  if (typeof requestIdleCallback === "function") {
+    const id = requestIdleCallback(() => fn(), { timeout: 2_000 })
+    return () => cancelIdleCallback(id)
+  }
+  const t = window.setTimeout(fn, 600)
+  return () => window.clearTimeout(t)
+}
+
 export const BranchPicker = ({
   cwd,
   disabled = false,
@@ -38,6 +50,7 @@ export const BranchPicker = ({
 }: BranchPickerProps) => {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [prPrefetchReady, setPrPrefetchReady] = useState(false)
   const queryClient = useQueryClient()
 
   const { data: current } = useQuery({
@@ -63,10 +76,18 @@ export const BranchPicker = ({
     staleTime: 10_000,
   })
 
+  useEffect(() => {
+    setPrPrefetchReady(false)
+    if (!cwd || !hasRemote) return
+    return schedulePrPrefetch(() => setPrPrefetchReady(true))
+  }, [cwd, hasRemote])
+
   const { data: prStatus } = useQuery({
     queryKey: ["git-pr-status", cwd],
     queryFn: () => gitPrStatus(cwd!),
-    enabled: !!cwd && hasRemote,
+    // Idle-gated: Open-tab already keeps this disabled; ContextBar used to
+    // fire `gh auth status` + `gh pr view` on every new-session mount.
+    enabled: !!cwd && hasRemote && prPrefetchReady,
     staleTime: 60_000,
     refetchOnWindowFocus: true,
   })

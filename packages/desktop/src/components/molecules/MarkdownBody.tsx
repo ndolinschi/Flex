@@ -21,6 +21,12 @@ import {
 import { ChatDiffCard } from "./ChatDiffCard"
 import { StreamingCaret } from "./StreamingCaret"
 
+/** Stable identity — a fresh `[remarkGfm]` each render makes ReactMarkdown
+ * treat plugins as changed and re-run the Unified pipeline. */
+const REMARK_PLUGINS: NonNullable<
+  ComponentProps<typeof ReactMarkdown>["remarkPlugins"]
+> = [remarkGfm]
+
 type MarkdownBodyProps = {
   content: string
   className?: string
@@ -64,6 +70,14 @@ const scheduleIdle = (fn: () => void, timeoutMs = 400): (() => void) => {
   // instead of setTimeout(0) which races the GFM paint.
   const t = setTimeout(fn, Math.min(timeoutMs, 120))
   return () => clearTimeout(t)
+}
+
+/** Longer answers (repo overviews) make remark-gfm block for 1–3s. Scale the
+ * idle deadline so stream-end chrome stays interactive before that parse. */
+const gfmIdleTimeoutMs = (len: number): number => {
+  if (len < 2_000) return 280
+  if (len < 8_000) return 900
+  return 1_600
 }
 
 /** Recursively flattens a React children tree to plain text — rehype-highlight
@@ -218,7 +232,8 @@ const MARKDOWN_COMPONENTS: NonNullable<
  * - `full` — GFM + rehype-highlight (idle upgrade)
  *
  * Live→settled used to mount full GFM+highlight on the same frame the stream
- * ended, which could hitch the WebView ~1s on long answers with code fences.
+ * ended, which could hitch the WebView ~1–3s on long answers. GFM now waits
+ * for an idle deadline scaled by content length; highlight still upgrades later.
  */
 type RenderPhase = "plain" | "gfm" | "full"
 
@@ -261,7 +276,8 @@ export const MarkdownBody = memo(({ content, className, live = false }: Markdown
       return
     }
 
-    const wantsHighlight = hasCodeFence(contentRef.current)
+    const text = contentRef.current
+    const wantsHighlight = hasCodeFence(text)
     let cancelled = false
     const isCancelled = () => cancelled
 
@@ -273,24 +289,30 @@ export const MarkdownBody = memo(({ content, className, live = false }: Markdown
       return upgradeToFull(isCancelled, setPhase, setRehypePlugins)
     }
 
-    // Just finished streaming: keep plain for a frame so stream-end UI
-    // paints, then GFM without highlight (fast), then highlight on idle.
+    // Just finished streaming: keep plain until the main thread is idle so
+    // turn-end chrome (scroll, stop, git invalidate) paints before remark-gfm
+    // blocks. startTransition alone does not time-slice the Unified parse.
     wasLiveRef.current = false
-    let cancelIdle: (() => void) | null = null
-    const frame = requestAnimationFrame(() => {
+    setPhase("plain")
+    let cancelHighlight: (() => void) | null = null
+    const cancelGfm = scheduleIdle(() => {
       if (cancelled) return
       startTransition(() => {
         if (cancelled) return
         setPhase("gfm")
         if (wantsHighlight) {
-          cancelIdle = upgradeToFull(isCancelled, setPhase, setRehypePlugins)
+          cancelHighlight = upgradeToFull(
+            isCancelled,
+            setPhase,
+            setRehypePlugins,
+          )
         }
       })
-    })
+    }, gfmIdleTimeoutMs(text.length))
     return () => {
       cancelled = true
-      cancelAnimationFrame(frame)
-      cancelIdle?.()
+      cancelGfm()
+      cancelHighlight?.()
     }
   }, [live])
 
@@ -309,7 +331,7 @@ export const MarkdownBody = memo(({ content, className, live = false }: Markdown
   return (
     <div className={cn(MARKDOWN_BODY_CLASS, MARKDOWN_PROSE_CLASS, className)}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={REMARK_PLUGINS}
         rehypePlugins={plugins}
         components={MARKDOWN_COMPONENTS}
       >

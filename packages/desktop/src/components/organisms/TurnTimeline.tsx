@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react"
-import { useQueryClient } from "@tanstack/react-query"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { ArrowDown } from "lucide-react"
 import { RunningDot } from "../atoms"
@@ -15,7 +14,6 @@ import { useSessionEvents } from "../../hooks/useSessionEvents"
 import { useSessions } from "../../hooks/useSessions"
 import { useStickToBottom } from "../../hooks/useStickToBottom"
 import { useAppStore } from "../../stores/appStore"
-import { invalidateGitQueries } from "../../lib/invalidateGitQueries"
 import { cn } from "../../lib/utils"
 import {
   buildDisplayItems,
@@ -74,18 +72,20 @@ export const TurnTimeline = ({
   )
   const { sessions } = useSessions()
   const activeCwd = sessions.find((s) => s.id === sessionId)?.cwd
-  const queryClient = useQueryClient()
   const prevStreamingRef = useRef(isStreaming)
+  // Keep overscan tight for a beat after settle so historical MarkdownBody
+  // remounts don't stack on the live→GFM parse of the just-finished answer.
+  const [settleHold, setSettleHold] = useState(false)
 
-  // When a turn settles, refresh the session-scoped git baseline diff so
-  // FilesChangedCard (and the Changes tab) pick up edits without waiting
-  // for staleTime — mirrors RightPanel's streaming→idle invalidate.
   useEffect(() => {
-    if (prevStreamingRef.current && !isStreaming && sessionId) {
-      invalidateGitQueries(queryClient)
+    if (prevStreamingRef.current && !isStreaming) {
+      setSettleHold(true)
+      const t = window.setTimeout(() => setSettleHold(false), 900)
+      prevStreamingRef.current = isStreaming
+      return () => window.clearTimeout(t)
     }
     prevStreamingRef.current = isStreaming
-  }, [isStreaming, sessionId, queryClient])
+  }, [isStreaming])
 
   // Warm the highlight.js chunk while tokens stream so live→settled does
   // not wait on a dynamic import in the critical path.
@@ -210,9 +210,10 @@ export const TurnTimeline = ({
     getScrollElement: () => scrollRef.current,
     estimateSize: (index) =>
       estimateSizeForItem(displayItems[index], index === 0),
-    // Smaller overscan while streaming — WebView2 RO + remount churn on
-    // Windows freezes under a tall overscan window during tool turns.
-    overscan: isStreaming ? 4 : 10,
+    // Smaller overscan while streaming / brief post-settle hold — WebView2
+    // RO + remount churn freezes under a tall overscan window during tool
+    // turns and when the just-finished answer upgrades to GFM.
+    overscan: isStreaming || settleHold ? 4 : 10,
     getItemKey: (index) => displayItemKey(displayItems[index]),
     // Always read the live DOM height. TanStack's default measureElement
     // returns the cached size when called without a ResizeObserver entry,
@@ -480,9 +481,11 @@ export const TurnTimeline = ({
             </div>
           ) : null}
           {/* Reserved end-of-turn slot — holds height during streaming so the
-           * FilesChangedCard / summary enter doesn't jump the feed. */}
+           * FilesChangedCard / summary enter doesn't jump the feed. Mount the
+           * card only after the settle hold so its git query doesn't compete
+           * with the just-finished answer's GFM parse. */}
           <div className="mt-2 min-h-[var(--end-of-turn-reserved-height)]">
-            {!isStreaming ? (
+            {!isStreaming && !settleHold ? (
               <FilesChangedCard cwd={activeCwd} sessionId={sessionId} />
             ) : null}
           </div>

@@ -184,11 +184,15 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   const handleCreate = useCallback(
     async (cwd?: string) => {
       // Collapse overlay immediately so the click feels responsive even when
-      // create_session waits on isolation / engine work.
+      // create_session waits on isolation / engine work. Do not await —
+      // mutation onSuccess selects the new session; awaiting here left the
+      // sidebar button dead until create + post-select git/`gh` finished.
       if (narrow) setSidebarCollapsed(true)
-      await newAgent(cwd)
+      void newAgent(cwd).catch((err: unknown) => {
+        pushToast(toInvokeError(err), "error")
+      })
     },
-    [newAgent, narrow, setSidebarCollapsed],
+    [newAgent, narrow, setSidebarCollapsed, pushToast],
   )
 
   /** Everywhere `resume_session` can fail with "not found" (the session's
