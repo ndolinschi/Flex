@@ -10,23 +10,20 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 
 | Component | Purpose | Key props | Used by |
 |---|---|---|---|
-| `Button` | Re-export of `@/components/ui/button` (prefer direct ui import) | shadcn `variant`/`size` | Everywhere |
-| `Checkbox` | Round selection control (filled accent circle + check) | `checked`, `indeterminate?`, `onChange`, `label` | ChangesTab select-all, FileRow |
-| `TextInput` | Single-line text field (forwardRef) | standard input props | FormField, SessionListItem, SessionSidebar search, QuestionPrompt, ConfirmDialog |
-| `TextArea` | Re-export of `@/components/ui/textarea` | standard textarea props | Forms / settings |
-| `Label` | Accessible form label | `htmlFor`, `children` | FormField, ModelSelect |
-| `Spinner` | Indeterminate loading | `size` | SessionSidebar, ProviderSettingsForm |
-| `Tab` | Pill tab / open-buffer chip; pointer DnD reorder/move (idle `cursor-pointer`, grabbing only while dragging — HTML5 DnD broken in Tauri webviews) | `selected`, `size?`, `variant?`, `icon?`, `badge?`, `onSelect`, `onClose?`, `draggable?`, `onPointerDown?`, `dropEdge?` | ContentPane, FilesTab (`FileChip`) |
-| `TabClose` | Hover-collapse close control for tabs/chips | `label`, `onClose`, `revealOnFocusWithin?` | `Tab` |
-| `TabStrip` | Horizontal open-tabs strip; content panes scroll tabs and pin trailing actions | `children`, `className?` | ContentPane, ChatSessionTabBar |
-| `Badge` | Status / meta chip | `tone`, `children` | ToolCallChip |
+| `Badge` | Status / meta chip (tone → shadcn Badge) | `tone`, `children` | ToolCallChip |
 | `BypassPermissionsButton` | Session bypass-permissions shield (Toggle) | `composerMode`, `sessionBypass`, `onToggle` | Composer |
-| `Kbd` | Keyboard shortcut hint | `children` | WelcomePage |
-| `Divider` | Horizontal rule | `label?` | SettingsShell |
-| `HighlightedLabel` | Fuzzy-match accent spans in a label | `label`, `query` | FuzzySessionRow |
-| `Skeleton` | Placeholder shimmer | `className` | SessionSidebar, TurnTimeline |
-| `ScrollArea` | Scrollable region | `children`, `className` | SessionSidebar, TurnTimeline |
-| `ProviderIcon` | Brand mark from `public/providers/{id}.{svg,png,webp}` (letter fallback); omitted from model pickers until assets are reliable | `providerId`, `size?` | ProviderPicker, Welcome, Connections |
+| `Checkbox` | Round selection control (filled accent circle + check) | `checked`, `indeterminate?`, `onChange`, `label` | ChangesTab select-all, FileRow |
+| `DiffStat` | Git +/- visualization | summary shape | SessionRowSubtitle, FilesChangedCard, Changes |
+| `HighlightedLabel` | Fuzzy-match accent spans in a label | `label`, `query` | SearchModal |
+| `ProviderIcon` | Brand mark from `public/providers/{id}.*` | `providerId`, `size?` | ProviderPicker, Welcome, Connections |
+| `RunningDot` | Live status glyph | — | WorkGroup, timeline |
+| `Spinner` | Indeterminate loading (size map over ui/spinner) | `size` | SessionSidebar, forms |
+| `Tab` | Pill tab / open-buffer chip; pointer DnD | `selected`, `size?`, `onSelect`, `onClose?`, … | ContentPane, FilesTab |
+| `TabClose` | Hover-collapse close control | `label`, `onClose` | `Tab` |
+| `TabStrip` | Horizontal open-tabs strip | `children`, `className?` | ContentPane, ChatSessionTabBar |
+| `Tooltip` | `{label, side, children}` adapter over ui/tooltip | `label`, `side?`, `children` | Chrome controls |
+
+Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, ScrollArea, Separator, and other installed primitives — atom re-exports were removed.
 
 ## Molecules
 
@@ -255,17 +252,17 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 
 | shadcn | Migrate? | Current Flex surface | Notes |
 |---|---|---|---|
-| Accordion | later | none as primitive | Optional for settings groups; prefer `Collapsible` first |
+| Accordion | ✅ done | `MemoryScopeSection` (Global / project) | `@/components/ui/accordion`; timeline multi-open cards stay `Collapsible` |
 | Alert | ✅ done | `ErrorBanner`, `SidebarResumeError`, `ReconnectBanner`, form/field errors | `@/components/ui/alert`; no ad-hoc danger strips |
 | Alert Dialog | ✅ done | `ConfirmDialog`, auth/PR/bug/MCP/completion dialogs | `@/components/ui/alert-dialog`; danger paths use `AlertDialogMedia` |
 | Aspect Ratio | skip | — | No first-class need |
 | Attachment | ✅ done (chat kit) | `AttachmentChip` | `@/components/ui/attachment`; registry name `attachment` |
-| Avatar | ✅ done | `Avatar` atom | Thin wrap + `AvatarFallback` over `@/components/ui/avatar` |
-| Badge | ✅ done | `Badge` atom; `NewBadge` / `VerdictBadge` stay product | Tone → variant/`className` on `@/components/ui/badge`; `NewBadge` composes Badge |
+| Avatar | ✅ done | `@/components/ui/avatar` (atom re-export removed) | Prefer direct ui import |
+| Badge | ✅ done | `Badge` atom (tone adapter); `VerdictBadge` stays product | Tone → variant/`className` on `@/components/ui/badge` |
 | Breadcrumb | ✅ done | `PlanToolbar` crumbs | `@/components/ui/breadcrumb` |
-| Bubble | ✅ done (chat kit) | user/assistant bubbles in timeline | `@/components/ui/bubble` |
-| Button | ✅ done | Call sites use `@/components/ui/button`; `atoms/Button` is a re-export only; `IconButton` removed | Compose Spinner + `disabled` instead of `isLoading` |
-| Button Group | installed | composer toolbar | Primitives ready; Mode/Model stay distinct pill shapes (not joined) |
+| Bubble | ✅ done (chat kit) | user bubbles in timeline | `@/components/ui/bubble` |
+| Button | ✅ done | Call sites use `@/components/ui/button` (atom re-export removed) | Compose Spinner + `disabled` instead of `isLoading` |
+| Button Group | ✅ done | `PermissionActions` (Allow / Always / Deny) | Mode/Model/Send stay distinct pills (not joined — circle chrome) |
 | Calendar | skip | — | No date UX today |
 | Card | ✅ done | `PlanCard`, `MemoryRow`, settings cards | Full `Card`/`CardHeader`/`CardContent` where DESIGN allows cards |
 | Carousel | skip | — | |
@@ -273,52 +270,52 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Checkbox | ✅ done | `Checkbox` atom | Base UI Checkbox + round + indeterminate; API adapter |
 | Collapsible | ✅ done | WorkGroup / tool cards via molecule adapter | `@/components/ui/collapsible`; section headers still thin |
 | Combobox | ✅ done | `ProjectPicker`, `BranchPicker` | `@/components/ui/combobox` — searchable + Open Folder (not plain Select) |
-| Command | ✅ done | `CommandPalette`, `SearchModal`, `OpenTabModal`, ModelSelect/MultiSelect lists | `shouldFilter={false}` + fuzzyScore; cmdk owns ↑↓/Enter; `CommandPaletteRow`/`FuzzySessionRow` removed |
+| Command | ✅ done | `CommandPalette`, `SearchModal`, `OpenTabModal`, ModelSelect/MultiSelect lists | `shouldFilter={false}` + fuzzyScore; cmdk owns ↑↓/Enter |
 | Context Menu | ✅ done | `ContextMenu` molecule → `@/components/ui/context-menu` | Imperative position API; timeline-scroll / webview-blur ignore preserved |
 | Data Table | ✅ done (Table) | DatabaseTab result grid | `@/components/ui/table` + compact `text-xs` density |
 | Date Picker | skip | — | |
 | Dialog | ✅ done | `SearchModal`, `CommandPalette` | `@/components/ui/dialog` (outside-click dismiss); confirms use Alert Dialog |
-| Direction | skip | — | No RTL product need yet (`--rtl` only if we add it) |
-| Drawer | skip (noted) | `SubagentViewer` (bottom overlay) | **Not mapped**: Drawer uses `fixed inset-0` portal; SubagentViewer is content-column-scoped `absolute` — follow-up spike |
-| Dropdown Menu | ✅ done | `@/components/ui/dropdown-menu` — Mode/Model(+effort sub)/Plus/Session/overflow | Base UI `render` trigger; ModelPicker effort uses `DropdownMenuSub` |
+| Direction | skip | — | No RTL product need yet |
+| Drawer | skip (justified) | `SubagentViewer` (bottom overlay) | Drawer is `fixed inset-0` portal; viewer is content-column `absolute` |
+| Dropdown Menu | ✅ done | Mode/Model(+effort sub)/Plus/Session/overflow | Base UI `render` trigger; ModelPicker effort uses `DropdownMenuSub` |
 | Empty | ✅ done | `EmptyState`, DatabaseTab empty grids | `@/components/ui/empty` |
 | Field | ✅ done | `FormField`, `SettingsSection` FieldRow | `@/components/ui/field` |
-| Hover Card | ✅ done | `UsageRing` context tooltip | `@/components/ui/hover-card`; first call site |
-| Input | ✅ done | `TextInput`, AccentColorPicker hex | Re-export / direct `@/components/ui/input` |
-| Input Group | ✅ done | SettingsNav search; FileExplorer / Plan find / PopoverSearch chrome strips | `InputGroup` + `InputGroupInput` + addon buttons; chrome strips use borderless `h-6` |
+| Hover Card | ✅ done | `UsageRing` context tooltip | `@/components/ui/hover-card` |
+| Input | ✅ done | Forms, settings, Welcome, dialogs | Direct `@/components/ui/input` (atom `TextInput` removed) |
+| Input Group | ✅ done | SettingsNav; FileExplorer / Plan find / PopoverSearch chrome | Borderless `h-6` chrome strips |
 | Input OTP | skip | — | |
 | Item | ✅ done | `PlanList` plan rows | `@/components/ui/item`; hover fill-4 |
-| Kbd | ✅ done | `Kbd` atom | Re-export `@/components/ui/kbd` |
-| Label | ✅ done | `Label` atom | Re-export `@/components/ui/label`; forms prefer `FieldLabel` |
-| Marker | ✅ done (chat kit) | `CompactionCard` / `IndexingCard` dividers | `@/components/ui/marker`; system notes |
+| Kbd | ✅ done | Welcome shortcuts | Direct `@/components/ui/kbd` |
+| Label | ✅ done | ModelSelect / forms | Direct `@/components/ui/label`; forms prefer `FieldLabel` |
+| Marker | ✅ done (chat kit) | Compaction/Indexing + timeline `fallback`/`command`/`meta` | `@/components/ui/marker` |
 | Menubar | ✅ done | `TitleBarMenus` | `@/components/ui/menubar` |
 | Message | ✅ done (chat kit) | timeline message rows | `@/components/ui/message`; composed with Bubble |
-| Message Scroller | spike only | `TurnTimeline` + `useStickToBottom` | **Do not swap blindly** — virtualizer required at scale |
+| Message Scroller | skip (justified) | `TurnTimeline` + virtualizer | Virtualization + stick-to-bottom + remasure are load-bearing |
 | Native Select | skip | migrated to Select | — |
 | Navigation Menu | skip | — | Sidebar ≠ marketing nav |
 | Pagination | ✅ done | DatabaseTab result pager | `@/components/ui/pagination` |
-| Popover | partial | `PopoverTray`, PlanCommentPopover | Semantic popover tokens; **keep custom tray** for composer `autoFocus={false}` |
-| Progress | ✅ done | StatusTab context % | `@/components/ui/progress`; IndexingSection skipped (no progress field on IndexStatus) |
+| Popover | ✅ done | `PlanCommentPopover`, `OpenTabModal`, `CommitBar` form | **Keep** custom `PopoverTray` for composer slash/@ (`autoFocus={false}`) |
+| Progress | ✅ done | StatusTab context % | `@/components/ui/progress` |
 | Radio Group | ✅ done | `QuestionPrompt` single-select | `@/components/ui/radio-group`; multi uses ToggleGroup |
 | Resizable | ✅ done | `ContentWorkspace` split sash | `@/components/ui/resizable` |
-| Scroll Area | ✅ done | `ScrollArea` atom | Thin wrap; **not** the virtualized timeline |
-| Select | ✅ done | Settings/forms + Isolation + ModePicker | `@/components/ui/select`; Mode/Model use `size="xs"` (`h-6` pills) |
-| Separator | ✅ done | `Divider`, DatabaseTab sidebar rule | `@/components/ui/separator` |
-| Sheet | maybe | settings overlay | Absolute over kept-mounted chat — Sheet may fight that |
-| Sidebar | ✅ partial | `SessionSidebar` | Inner `SidebarHeader`/`Content`/`Footer`/`Group`/`Menu`; outer `<aside>` keeps App overlay/sash (no full SidebarProvider — conflicts with flow layout) |
-| Skeleton | ✅ done | `Skeleton` atom | Re-export `@/components/ui/skeleton` |
+| Scroll Area | ✅ done | Session/panel lists | Direct `@/components/ui/scroll-area` (atom wrap removed) |
+| Select | ✅ done | Settings/forms + Isolation + ModePicker | `size="xs"` (`h-6` pills) |
+| Separator | ✅ done | UsageRing / DatabaseTab / labeled rules | `@/components/ui/separator` |
+| Sheet | skip (justified) | settings overlay | Absolute over kept-mounted chat — Sheet portals fight keep-alive |
+| Sidebar | ✅ partial | `SessionSidebar` | Inner Sidebar*; outer `<aside>` keeps App overlay/sash |
+| Skeleton | ✅ done | Sidebar / timeline placeholders | Direct `@/components/ui/skeleton` |
 | Slider | skip | — | |
 | Sonner | ✅ done | `Toast` / ToastHost | Zustand bridged to `toast()` |
-| Spinner | ✅ done | `Spinner` atom | Thin size wrapper |
+| Spinner | ✅ done | `Spinner` atom | Thin size wrapper (`sm`/`md`/`lg`) over `@/components/ui/spinner` |
 | Switch | ✅ done | Settings prefs + MCP/routine flags | Green ON (`bg-switch-on`) |
 | Table | ✅ done | DatabaseTab results | Compact striping retained |
-| Tabs | careful | panel/file tabs | Keep custom `Tab*` for chrome chips; shadcn Tabs for settings sections only |
-| Textarea | ✅ done | Forms, settings, commit/PR/bug, SQL | Composer draft stays specialized raw `<textarea>` |
+| Tabs | skip (justified) | panel/file chrome | Keep custom `Tab*`; settings uses left nav (not Tabs) |
+| Textarea | ✅ done | Forms, settings, PromptTab, PR/bug | Composer draft stays specialized raw `<textarea>` |
 | Toast | n/a | — | Use **Sonner** |
 | Toggle | ✅ done | Bypass shield, session pin | Distinct from Switch |
 | Toggle Group | ✅ done | `ProviderPicker`, `QuestionPrompt` multi | `@/components/ui/toggle-group` |
-| Tooltip | ✅ done | `Tooltip` atom | Adapter; `TooltipProvider` in `main.tsx` |
-| Typography | selective | prose in settings / empty states | Do not replace `MarkdownBody` |
+| Tooltip | ✅ done | `Tooltip` atom | `{label,side,children}` adapter; `TooltipProvider` in `main.tsx` |
+| Typography | skip | — | Do not replace `MarkdownBody` |
 
 Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 `attachment`, `marker` — the “\*New” suffixes in some docs are naming noise.
@@ -336,6 +333,7 @@ Chat-kit registry ids (skill names): `message-scroller`, `message`, `bubble`,
 | **6 — Deferred / skip** | Chart, Calendar, Carousel, Input OTP, Aspect Ratio, Direction, Navigation Menu, full Drawer/Sheet, MessageScroller swap | Add only when a screen needs them |
 | **7 — Spacing polish** | ✅ design-audit after migration + fill-2/fill-4 sweep | Compact Sidebar/Command defaults; Mode/Model `h-6`; TabClose/list hovers `fill-4`; selected toggles `fill-2`; no `bg-accent` chrome hover |
 | **8 — Remaining primitives** | ✅ HoverCard (UsageRing), Item (PlanList), Progress (StatusTab context) | PermissionPrompt stays bespoke (composer seam); SettingsNav stays Button rows |
+| **9 — Finish applicable leftovers** | ✅ Popover (PlanComment/OpenTab/Commit), ButtonGroup (PermissionActions), Accordion (MemoryScope), Marker system rows, Separator (UsageRing), PromptTab Textarea, atom re-export sweep | Pure re-export atoms deleted; justified keepers only (Tab*, Checkbox round, Spinner size, Tooltip API, PopoverTray, domain chrome) |
 
 ### Adapter strategy (avoid big-bang breakage)
 
