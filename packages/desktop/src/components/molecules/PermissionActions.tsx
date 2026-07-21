@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ButtonGroup } from "@/components/ui/button-group"
 import { Spinner } from "@/components/ui/spinner"
@@ -19,6 +20,12 @@ export const PermissionActions = ({
   className,
 }: PermissionActionsProps) => {
   const { isSubmitting, respond, error } = usePermissionRespond(permission)
+  const [pendingAction, setPendingAction] = useState<string | null>(null)
+
+  const handleRespond = (decision: string) => {
+    setPendingAction(decision)
+    void respond(decision).finally(() => setPendingAction(null))
+  }
 
   return (
     <div className={cn("flex min-w-0 flex-col items-end gap-1", className)}>
@@ -35,9 +42,11 @@ export const PermissionActions = ({
           <Button
             size="xs"
             disabled={isSubmitting}
-            onClick={() => void respond("allow_once")}
+            onClick={() => handleRespond("allow_once")}
           >
-            {isSubmitting ? <Spinner data-icon="inline-start" /> : null}
+            {pendingAction === "allow_once" ? (
+              <Spinner data-icon="inline-start" />
+            ) : null}
             Allow once
           </Button>
         ) : null}
@@ -46,9 +55,11 @@ export const PermissionActions = ({
             size="xs"
             variant="secondary"
             disabled={isSubmitting}
-            onClick={() => void respond("allow_always")}
+            onClick={() => handleRespond("allow_always")}
           >
-            {isSubmitting ? <Spinner data-icon="inline-start" /> : null}
+            {pendingAction === "allow_always" ? (
+              <Spinner data-icon="inline-start" />
+            ) : null}
             Always allow
           </Button>
         ) : null}
@@ -57,9 +68,11 @@ export const PermissionActions = ({
             size="xs"
             variant="destructive"
             disabled={isSubmitting}
-            onClick={() => void respond("deny")}
+            onClick={() => handleRespond("deny")}
           >
-            {isSubmitting ? <Spinner data-icon="inline-start" /> : null}
+            {pendingAction === "deny" ? (
+              <Spinner data-icon="inline-start" />
+            ) : null}
             Deny
           </Button>
         ) : null}

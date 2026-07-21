@@ -71,6 +71,7 @@ export const PlanCommentPopover = ({
           {draft.quote}
         </p>
         <Textarea
+          autoFocus
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Add a comment…"
