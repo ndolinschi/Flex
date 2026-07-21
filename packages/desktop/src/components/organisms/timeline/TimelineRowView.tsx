@@ -116,10 +116,20 @@ export const TimelineRowView = memo(({
                 ) : null}
               </BubbleContent>
             </Bubble>
+            {/* Pre-Message migration the user column was `w-fit ml-auto`, so
+             * timestamp/copy sat under the bubble on the right. MessageContent
+             * is full-width — without `self-end`, actions `justify-start` and
+             * land on the left over the agent stream (see live QA screenshot). */}
             {showActions && !footer ? (
-              <MessageActions text={copyText} tsMs={row.tsMs} />
+              <div className="self-end">
+                <MessageActions text={copyText} tsMs={row.tsMs} />
+              </div>
             ) : null}
-            {footer ? <TurnFooter {...footer} /> : null}
+            {footer ? (
+              <div className="self-end">
+                <TurnFooter {...footer} />
+              </div>
+            ) : null}
           </MessageContent>
         </Message>
       )
