@@ -37,7 +37,7 @@ export const PlanList = ({ plans, onSelect, className }: PlanListProps) => {
             return (
               <Item
                 key={plan.id}
-                render={<button onClick={() => onSelect(plan.id)} />}
+                render={<button type="button" onClick={() => onSelect(plan.id)} />}
                 size="sm"
                 className="cursor-pointer rounded-md border-transparent px-2.5 py-2 hover:bg-fill-4 focus-visible:bg-fill-4"
               >

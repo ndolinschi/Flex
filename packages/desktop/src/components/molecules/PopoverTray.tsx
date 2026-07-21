@@ -7,6 +7,11 @@ import {
 import { SearchIcon } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group"
 
 type PopoverTrayProps = {
   open: boolean
@@ -170,15 +175,25 @@ export const PopoverSearch = ({
   placeholder,
   "aria-label": ariaLabel,
 }: PopoverSearchProps) => (
-  <div className="flex items-center gap-1.5 border-b border-border px-2.5 py-1.5">
-    <SearchIcon className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-    <input
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      aria-label={ariaLabel ?? placeholder}
-      className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-    />
+  <div className="border-b border-border px-2.5 py-1.5">
+    <InputGroup
+      className={cn(
+        "h-6 border-0 bg-transparent shadow-none dark:bg-transparent",
+        "has-[[data-slot=input-group-control]:focus-visible]:border-transparent",
+        "has-[[data-slot=input-group-control]:focus-visible]:ring-0",
+      )}
+    >
+      <InputGroupAddon align="inline-start" className="pl-0 py-0">
+        <SearchIcon className="size-3 text-muted-foreground" aria-hidden />
+      </InputGroupAddon>
+      <InputGroupInput
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={ariaLabel ?? placeholder}
+        className="h-6 px-0 text-sm"
+      />
+    </InputGroup>
   </div>
 )
 

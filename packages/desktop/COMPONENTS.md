@@ -261,7 +261,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Aspect Ratio | skip | — | No first-class need |
 | Attachment | ✅ done (chat kit) | `AttachmentChip` | `@/components/ui/attachment`; registry name `attachment` |
 | Avatar | ✅ done | `Avatar` atom | Thin wrap + `AvatarFallback` over `@/components/ui/avatar` |
-| Badge | ✅ done | `Badge` atom; `NewBadge`/`VerdictBadge` stay product | Tone → variant/`className` on `@/components/ui/badge` |
+| Badge | ✅ done | `Badge` atom; `NewBadge` / `VerdictBadge` stay product | Tone → variant/`className` on `@/components/ui/badge`; `NewBadge` composes Badge |
 | Breadcrumb | ✅ done | `PlanToolbar` crumbs | `@/components/ui/breadcrumb` |
 | Bubble | ✅ done (chat kit) | user/assistant bubbles in timeline | `@/components/ui/bubble` |
 | Button | ✅ done | Call sites use `@/components/ui/button`; `atoms/Button` is a re-export only; `IconButton` removed | Compose Spinner + `disabled` instead of `isLoading` |
@@ -285,7 +285,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Field | ✅ done | `FormField`, `SettingsSection` FieldRow | `@/components/ui/field` |
 | Hover Card | ✅ done | `UsageRing` context tooltip | `@/components/ui/hover-card`; first call site |
 | Input | ✅ done | `TextInput`, AccentColorPicker hex | Re-export / direct `@/components/ui/input` |
-| Input Group | ✅ done | SettingsNav search | `InputGroup` + `InputGroupInput` + `InputGroupAddon`; composer draft stays specialized |
+| Input Group | ✅ done | SettingsNav search; FileExplorer / Plan find / PopoverSearch chrome strips | `InputGroup` + `InputGroupInput` + addon buttons; chrome strips use borderless `h-6` |
 | Input OTP | skip | — | |
 | Item | ✅ done | `PlanList` plan rows | `@/components/ui/item`; hover fill-4 |
 | Kbd | ✅ done | `Kbd` atom | Re-export `@/components/ui/kbd` |

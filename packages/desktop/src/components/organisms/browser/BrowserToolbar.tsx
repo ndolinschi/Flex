@@ -15,6 +15,7 @@ import {
   Tablet,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Tooltip } from "../../atoms"
 import { VIEWPORT_PRESETS as VIEWPORT_PRESETS_BASE } from "../../../hooks/useBrowserSession"
 import type { BrowserViewportPreset } from "../../../stores/appStore"
@@ -178,12 +179,13 @@ export const BrowserToolbar = ({
 
       <div className="relative min-w-0 flex-1">
         {editing ? (
-          <input
+          <Input
             autoFocus
             defaultValue={browserUrl}
             onKeyDown={handleInputKeyDown}
             onBlur={() => setEditing(false)}
-            className="h-6 w-full rounded-sm bg-fill-4 px-2 text-sm text-ink outline-none focus-visible:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
+            aria-label="Browser URL"
+            className="h-6 w-full rounded-sm border-0 bg-fill-4 px-2 text-sm text-ink shadow-none focus-visible:border-transparent focus-visible:ring-1 focus-visible:ring-stroke-2"
           />
         ) : (
           <Button

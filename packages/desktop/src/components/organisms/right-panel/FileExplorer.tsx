@@ -30,6 +30,12 @@ import { Spinner, TextInput } from "../../atoms"
 import { ConfirmDialog, ContextMenu, type ContextMenuItem } from "../../molecules"
 import { STATUS_COLOR } from "./FileRow"
 import { Button } from "@/components/ui/button"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group"
 
 type FileExplorerProps = {
   sessionId: string
@@ -470,29 +476,41 @@ export const FileExplorer = ({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
-        <Search className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search files…"
-          className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
-          aria-label="Search workspace files"
-        />
-        {searchFetching ? <Spinner size="sm" /> : null}
-        <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label="New file" title="New file"
-      onClick={() => openCreate()}
-      className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
-        "h-6 w-6",
-      )}
-    >
-      <FilePlus className="h-3.5 w-3.5" aria-hidden />
-    </Button>
+        <InputGroup
+          className={cn(
+            "h-6 min-w-0 flex-1 border-0 bg-transparent shadow-none dark:bg-transparent",
+            "has-[[data-slot=input-group-control]:focus-visible]:border-transparent",
+            "has-[[data-slot=input-group-control]:focus-visible]:ring-0",
+          )}
+        >
+          <InputGroupAddon align="inline-start" className="pl-0 py-0">
+            <Search className="size-3.5 text-ink-faint" aria-hidden />
+          </InputGroupAddon>
+          <InputGroupInput
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search files…"
+            aria-label="Search workspace files"
+            className="h-6 px-0 text-sm text-ink placeholder:text-ink-faint"
+          />
+          {searchFetching ? (
+            <InputGroupAddon align="inline-end" className="pr-0 py-0">
+              <Spinner size="sm" />
+            </InputGroupAddon>
+          ) : null}
+          <InputGroupAddon align="inline-end" className="pr-0 py-0">
+            <InputGroupButton
+              size="icon-xs"
+              aria-label="New file"
+              title="New file"
+              onClick={() => openCreate()}
+              className="text-muted-foreground hover:bg-fill-4 hover:text-foreground"
+            >
+              <FilePlus aria-hidden />
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-1">
