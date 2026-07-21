@@ -89,7 +89,9 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?`, `disabled?` | SessionSidebar |
 | `SidebarProjectFilter` | Repositories sort + visibility tray | `sort`, `visibility`, `onSortChange`, `onVisibilityChange` | SessionSidebar |
 | `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle`, `onNewSession`, `indexed?` | SessionSidebar |
-| `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions | `title`, `status`, `onBuild`, `onAddComment?` | PlanTab |
+| `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions (`PlanModelPill`, `PlanFindBar`) | `title`, `status`, `onBuild`, `onAddComment?` | PlanTab |
+| `PlanModelPill` | Provider-grouped model dropdown for Plan toolbar | `models`, `value`, `onChange` | PlanToolbar |
+| `PlanFindBar` | Find-in-plan InputGroup chrome strip | `find`, `inputRef` | PlanToolbar |
 | `AppMark` / `TitleBarMenus` | Wireframe mark + in-window File/Edit/View/Help (Windows/Linux); Help → **Submit Bug…** opens `BugReportDialog` | `handlers`, `isBootstrapped`, `canSearch`, `canCommandPalette` | WindowTitleBar (non-macOS) |
 | `BugReportDialog` | Google-style Submit Bug modal: disclosure (app id + session/task ids), Terms/Privacy links, “Tell us what went wrong”, opens GitHub issue form | `open`, `onClose` | WindowTitleBar |
 | `WindowControls` / `TrafficLights` / `CaptionButtons` | Platform window controls (macOS traffic lights · Windows/Linux caption buttons) | `host?` | WindowTitleBar |
@@ -313,7 +315,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Textarea | ✅ done | Forms, settings, PromptTab, PR/bug | Composer draft stays specialized raw `<textarea>` |
 | Toast | n/a | — | Use **Sonner** |
 | Toggle | ✅ done | Bypass shield, session pin | Distinct from Switch |
-| Toggle Group | ✅ done | `ProviderPicker`, `QuestionPrompt` multi | `@/components/ui/toggle-group` |
+| Toggle Group | ✅ done | `ProviderPicker`, `QuestionPrompt` multi, BrowserToolbar viewport presets | `@/components/ui/toggle-group` |
 | Tooltip | ✅ done | `Tooltip` atom | `{label,side,children}` adapter; `TooltipProvider` in `main.tsx` |
 | Typography | skip | — | Do not replace `MarkdownBody` |
 

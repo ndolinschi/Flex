@@ -37,6 +37,9 @@ export type { PlanCommentDraft } from "./PlanCommentPopover"
 export { PlanList } from "./PlanList"
 export { PlanToolbar } from "./PlanToolbar"
 export type { PlanBuildStatus } from "./PlanToolbar"
+export { PlanModelPill } from "./PlanModelPill"
+export { PlanFindBar } from "./PlanFindBar"
+export type { PlanFindState } from "./PlanFindBar"
 export {
   PopoverItem,
   PopoverSearch,
