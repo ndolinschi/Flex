@@ -93,4 +93,25 @@ describe("TimelineRowView", () => {
     expect(html).toContain("<strong>")
     expect(html).toContain("world")
   })
+
+  it("keeps user message actions under the bubble (right-aligned)", () => {
+    const html = renderToStaticMarkup(
+      <TimelineRowView
+        row={{
+          type: "user",
+          id: "user-1",
+          messageId: "m-user-1",
+          text: "What is about this repo?",
+          tsMs: Date.now(),
+        }}
+        showActions
+      />,
+    )
+
+    expect(html).toContain("just now")
+    expect(html).toContain("Copy message")
+    // Wrapper must self-end so timestamp/copy do not sit full-bleed left
+    // under a right-aligned bubble (reads as agent chrome).
+    expect(html).toMatch(/self-end[\s\S]*Copy message/)
+  })
 })
