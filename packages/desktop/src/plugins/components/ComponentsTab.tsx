@@ -14,9 +14,7 @@ import {
   Send,
 } from "lucide-react"
 import {
-  ScrollArea,
   Tab,
-  TextInput,
   Tooltip,
 } from "../../components/atoms"
 import { EmptyState, ErrorBanner } from "../../components/molecules"
@@ -40,6 +38,8 @@ import { isDomAttachment } from "../../lib/types"
 import type { SessionMeta } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
+import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 type ComponentsTabProps = {
   active: boolean
@@ -722,7 +722,7 @@ const ComponentCanvas = ({
                 <span className="truncate font-mono text-xs text-ink-muted">
                   {prop}
                 </span>
-                <TextInput
+                <Input
                   value={styleDraft[prop] ?? ""}
                   onChange={(e) => onSetProp(prop, e.target.value)}
                   placeholder="—"

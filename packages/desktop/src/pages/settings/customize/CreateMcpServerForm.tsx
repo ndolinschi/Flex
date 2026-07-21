@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { TextInput } from "../../../components/atoms"
+
 import { ErrorBanner, FieldRow, SettingsSection } from "../../../components/molecules"
 import { emptyMcpForm, MCP_ID_RE, parseArgs, parseEnv, splitEnvSecrets, type McpFormState } from "../../../lib/mcp"
 import { mcpUpsert, toInvokeError } from "../../../lib/tauri"
 import type { McpServerDto } from "../../../lib/types"
+import { Input } from "@/components/ui/input"
 
 /** Inline create form for a new MCP server — stdio transport only (MVP). */
 export const CreateMcpServerForm = ({
@@ -70,7 +71,7 @@ export const CreateMcpServerForm = ({
         htmlFor="mcp-id"
         hint={`Kebab-case, e.g. "filesystem" — tools appear as "${form.id || "id"}__<tool>".`}
       >
-        <TextInput
+        <Input
           id="mcp-id"
           value={form.id}
           onChange={(e) => patch({ id: e.target.value })}
@@ -79,7 +80,7 @@ export const CreateMcpServerForm = ({
       </FieldRow>
 
       <FieldRow label="Command" htmlFor="mcp-command">
-        <TextInput
+        <Input
           id="mcp-command"
           value={form.command}
           onChange={(e) => patch({ command: e.target.value })}
@@ -88,7 +89,7 @@ export const CreateMcpServerForm = ({
       </FieldRow>
 
       <FieldRow label="Arguments (optional)" htmlFor="mcp-args" hint="Space-separated.">
-        <TextInput
+        <Input
           id="mcp-args"
           value={form.args}
           onChange={(e) => patch({ args: e.target.value })}

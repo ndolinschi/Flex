@@ -32,7 +32,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { RunningDot, TextInput } from "../atoms"
+import { RunningDot } from "../atoms"
 import { useGroupedModels, MODEL_MENU_VISIBLE_CAP } from "../../hooks/useGroupedModels"
 import {
   InputGroup,
@@ -41,6 +41,7 @@ import {
   InputGroupInput,
   InputGroupText,
 } from "@/components/ui/input-group"
+import { Input } from "@/components/ui/input"
 
 export type PlanBuildStatus = "draft" | "ready" | "building" | "built"
 
@@ -140,7 +141,7 @@ const PlanModelPill = ({
       {open ? (
         <DropdownMenuContent align="end" sideOffset={4} className="w-64 p-0">
           <div className="border-b border-border px-2.5 py-2">
-            <TextInput
+            <Input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}

@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ErrorBanner, ModelSelect } from "../../components/molecules"
-import { Spinner, TextInput } from "../../components/atoms"
+import { Spinner } from "../../components/atoms"
 import { useInlineCompletionPrefs } from "../../hooks/useInlineCompletionPrefs"
 import { useModels } from "../../hooks/useModels"
 import {
@@ -33,6 +33,7 @@ import {
 import type { InlineCompletionPrefs } from "../../lib/types"
 import { checkInlineCompletionConnection } from "../../lib/tauri"
 import { cn } from "../../lib/utils"
+import { Input } from "@/components/ui/input"
 
 type Path = "ollama" | "provider"
 
@@ -324,7 +325,7 @@ export const CompletionSetupModal = ({
                       placeholder={RECOMMENDED_OLLAMA_MODEL}
                     />
                   ) : (
-                    <TextInput
+                    <Input
                       type="text"
                       className="h-8 rounded-md border-stroke-3 bg-elevated px-2 text-sm text-ink focus-visible:ring-0 focus-visible:border-stroke-2"
                       value={normalizeCompletionModelId("ollama", modelId)}

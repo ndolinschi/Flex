@@ -4,9 +4,10 @@ import type { SessionMeta } from "../../../lib/types"
 import { gitPrDiff, gitPrStatus } from "../../../lib/tauri"
 import { openExternalUrl } from "../../../lib/openExternalUrl"
 import { cn } from "../../../lib/utils"
-import { ScrollArea, Spinner } from "../../atoms"
+import { Spinner } from "../../atoms"
 import { Button } from "@/components/ui/button"
 import { DiffView, EmptyState } from "../../molecules"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 type PrTabProps = {
   active: SessionMeta | undefined

@@ -10,7 +10,7 @@ import {
   Trash2,
   Unplug,
 } from "lucide-react"
-import { ScrollArea, TextInput } from "../../components/atoms"
+
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -61,6 +61,8 @@ import {
 } from "../../lib/tauri"
 import type { SessionMeta } from "../../lib/types"
 import { cn } from "../../lib/utils"
+import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 /** Rows per page for table preview (server) and query results (client). */
 const PAGE_SIZE = 50
@@ -548,7 +550,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
       >
         <div className="flex flex-col gap-3">
           <FormField label="Name" htmlFor="db-name">
-            <TextInput
+            <Input
               id="db-name"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
@@ -583,7 +585,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
             htmlFor="db-target"
             hint={engineMeta.hint}
           >
-            <TextInput
+            <Input
               id="db-target"
               value={form.target}
               onChange={(e) =>

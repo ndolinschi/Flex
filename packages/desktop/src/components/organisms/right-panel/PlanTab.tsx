@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { ScrollArea } from "../../atoms"
+
 import {
   EmptyState,
   MarkdownBody,
@@ -28,6 +28,7 @@ import { formatRelativeTime } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
 import type { SessionPlan } from "../../../stores/types"
 import { basename, cn } from "../../../lib/utils"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 const EMPTY_ENTRIES: PlanEntry[] = []
 const EMPTY_PLANS: SessionPlan[] = []

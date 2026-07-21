@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { ArrowDown } from "lucide-react"
-import { RunningDot, Skeleton } from "../atoms"
+import { RunningDot } from "../atoms"
 import { Button } from "@/components/ui/button"
 import {
   EmptyState,
@@ -31,6 +31,7 @@ import { TurnFooter } from "./timeline/TurnFooter"
 import { ReconnectBanner } from "./timeline/ReconnectBanner"
 import { remeasureMountedVirtualItems } from "./timeline/remeasureMountedVirtualItems"
 import { WorkGroupBody } from "./timeline/WorkGroupBody"
+import { Skeleton } from "@/components/ui/skeleton"
 
 type TurnTimelineProps = {
   sessionId: string | null

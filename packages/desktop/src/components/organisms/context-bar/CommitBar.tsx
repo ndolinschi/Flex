@@ -13,7 +13,7 @@ import { toastPrOutcome } from "../../../lib/prOutcomeToast"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import { useAppStore } from "../../../stores/appStore"
 import { CreatePrDialog } from "../../molecules/CreatePrDialog"
-import { DiffStat, TextInput } from "../../atoms"
+import { DiffStat } from "../../atoms"
 import { Button } from "@/components/ui/button"
 import {
   Popover,
@@ -22,6 +22,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Spinner } from "@/components/ui/spinner"
+import { Input } from "@/components/ui/input"
 
 /** Right-aligned "N changes" pill + Commit button, shown above the
  * composer for non-isolated sessions with a dirty working tree (design:
@@ -169,7 +170,7 @@ export const CommitBar = ({
         </PopoverTrigger>
         <PopoverContent side="top" align="end" className="w-72">
           <PopoverTitle className="sr-only">Commit changes</PopoverTitle>
-          <TextInput
+          <Input
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Commit message"

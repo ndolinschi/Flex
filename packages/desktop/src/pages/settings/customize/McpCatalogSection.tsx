@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { TextInput } from "../../../components/atoms"
+
 import { McpCatalogCard, McpInstallDialog, SettingsSection } from "../../../components/molecules"
 import { useAppStore } from "../../../stores/appStore"
 import {
@@ -12,6 +12,7 @@ import { buildCatalogServerDto, prefillCatalogValues } from "../../../lib/mcp"
 import { mcpList, mcpUpsert, toInvokeError } from "../../../lib/tauri"
 import type { McpServerDto } from "../../../lib/types"
 import { EMPTY_MCP_SERVERS, MCP_SERVERS_KEY } from "./mcpServersKey"
+import { Input } from "@/components/ui/input"
 
 /** Curated "Browse catalog" grid of popular MCP servers, additive above the
  * manual add-server flow below. Cards with no required args/env install
@@ -95,7 +96,7 @@ export const McpCatalogSection = () => {
         rowId="tools-mcp-catalog"
         className="mb-0"
         actions={
-          <TextInput
+          <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search catalog…"

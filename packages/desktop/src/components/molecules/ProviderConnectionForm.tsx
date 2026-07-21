@@ -9,13 +9,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Spinner } from "@/components/ui/spinner"
-import { TextInput } from "../atoms"
+
 import { ErrorBanner } from "./ErrorBanner"
 import { FieldRow, SettingsSection } from "./SettingsSection"
 import { ModelMultiSelect } from "./ModelMultiSelect"
 import { ModelSelect } from "./ModelSelect"
 import { ProviderPicker } from "./ProviderPicker"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
+import { Input } from "@/components/ui/input"
 
 const ISOLATION_ITEMS = [
   { value: "never", label: "Never" },
@@ -124,7 +125,7 @@ export const ProviderConnectionForm = ({
           htmlFor="label"
           hint='Required — a label for this connection, e.g. "GitHub Copilot" or "AWS work"'
         >
-          <TextInput
+          <Input
             id="label"
             value={label}
             onChange={(e) => onLabelChange(e.target.value)}
@@ -197,7 +198,7 @@ export const ProviderConnectionForm = ({
                     : "Paste a gho_/ghu_ token with Copilot access. Stored encrypted locally."
                 }
               >
-                <TextInput
+                <Input
                   id="apiKey"
                   type="password"
                   value={apiKey}
@@ -253,7 +254,7 @@ export const ProviderConnectionForm = ({
                     : "Stored encrypted locally, never in browser storage; see Security below for the storage backend"
               }
             >
-              <TextInput
+              <Input
                 id="apiKey"
                 type="password"
                 value={apiKey}
@@ -271,7 +272,7 @@ export const ProviderConnectionForm = ({
                 htmlFor="region"
                 hint="AWS region for Bedrock, e.g. us-east-1 or eu-west-1 (defaults to us-east-1)"
               >
-                <TextInput
+                <Input
                   id="region"
                   value={region}
                   onChange={(e) => onRegionChange(e.target.value)}
@@ -284,7 +285,7 @@ export const ProviderConnectionForm = ({
                 htmlFor="baseUrl"
                 hint="Optional host override (e.g. for Ollama or a proxy)"
               >
-                <TextInput
+                <Input
                   id="baseUrl"
                   value={baseUrl}
                   onChange={(e) => onBaseUrlChange(e.target.value)}

@@ -1,5 +1,5 @@
-import { ScrollArea } from "../../atoms"
 import { MemoryContent } from "../../../pages/settings/memory/MemoryContent"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 /** Right-panel Memory tab — same durable-notes UI as Settings → Memory.
  * Gated by `MEMORY_TAB_ENABLED` at the tab-strip / open sites; this body

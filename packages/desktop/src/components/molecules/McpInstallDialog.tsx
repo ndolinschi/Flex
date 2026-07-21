@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { TextInput } from "../atoms"
+
 import { ErrorBanner } from "./ErrorBanner"
 import { FieldRow } from "./SettingsSection"
 import type { McpCatalogEntry } from "../../lib/mcpCatalog"
@@ -15,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Input } from "@/components/ui/input"
 
 type McpInstallDialogProps = {
   entry: McpCatalogEntry | null
@@ -136,7 +137,7 @@ export const McpInstallDialog = ({
                     htmlFor={`mcp-install-arg-${arg.key}`}
                     hint={keepHint}
                   >
-                    <TextInput
+                    <Input
                       id={`mcp-install-arg-${arg.key}`}
                       type={arg.secret ? "password" : "text"}
                       autoComplete="off"
@@ -166,7 +167,7 @@ export const McpInstallDialog = ({
                     htmlFor={`mcp-install-env-${env.name}`}
                     hint={keepHint}
                   >
-                    <TextInput
+                    <Input
                       id={`mcp-install-env-${env.name}`}
                       type={env.secret ? "password" : "text"}
                       autoComplete="off"

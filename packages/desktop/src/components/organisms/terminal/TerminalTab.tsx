@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { List, Plus, Terminal as TerminalIcon } from "lucide-react"
-import { ScrollArea } from "../../atoms"
+
 import { ConfirmDialog, EmptyState } from "../../molecules"
 import { agentTerminalId } from "../../../hooks/useGlobalSessionEvents"
 import { terminalCreate, terminalKill } from "../../../lib/tauri"
@@ -13,6 +13,7 @@ import { AgentTerminalRow } from "./AgentTerminalRow"
 import { TerminalInstance } from "./TerminalInstance"
 import { TerminalRow } from "./TerminalRow"
 import { useNowTicker } from "./time"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 /** Stable empty list — inline `?? []` in a Zustand selector re-renders forever. */
 const EMPTY_TERMINALS: TerminalMeta[] = []

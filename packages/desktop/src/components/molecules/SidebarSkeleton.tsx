@@ -1,4 +1,4 @@
-import { Skeleton } from "../atoms"
+import { Skeleton } from "@/components/ui/skeleton"
 
 /** Loading placeholder that mirrors sidebar section headers + session rows
  * (h-6 headers, h-7 single-line rows, one taller two-line row). */

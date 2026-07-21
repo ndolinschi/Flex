@@ -12,7 +12,7 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { TextInput } from "../../../components/atoms"
+
 import {
   ErrorBanner,
   FieldRow,
@@ -23,6 +23,7 @@ import { useModels } from "../../../hooks/useModels"
 import { routinesUpsert, toInvokeError } from "../../../lib/tauri"
 import type { RoutineDto } from "../../../lib/types"
 import { KEBAB_RE } from "./constants"
+import { Input } from "@/components/ui/input"
 
 const TRIGGER_KIND_ITEMS = [
   { value: "cron", label: "Cron" },
@@ -129,7 +130,7 @@ export const CreateRoutineForm = ({
   return (
     <SettingsSection title="New automation" className="mb-0">
       <FieldRow label="Id" htmlFor="routine-id" hint='Kebab-case, e.g. "nightly-review"'>
-        <TextInput
+        <Input
           id="routine-id"
           value={form.id}
           onChange={(e) => patch({ id: e.target.value })}
@@ -171,7 +172,7 @@ export const CreateRoutineForm = ({
             </SelectContent>
           </Select>
 
-          <TextInput
+          <Input
             id="routine-trigger-value"
             value={form.triggerKind === "cron" ? form.expr : form.path}
             onChange={(e) =>
@@ -196,7 +197,7 @@ export const CreateRoutineForm = ({
       </FieldRow>
 
       <FieldRow label="Working directory (optional)" htmlFor="routine-cwd">
-        <TextInput
+        <Input
           id="routine-cwd"
           value={form.cwd}
           onChange={(e) => patch({ cwd: e.target.value })}
@@ -205,7 +206,7 @@ export const CreateRoutineForm = ({
       </FieldRow>
 
       <FieldRow label="Max iterations" htmlFor="routine-max-iterations">
-        <TextInput
+        <Input
           id="routine-max-iterations"
           type="number"
           min={1}
@@ -215,7 +216,7 @@ export const CreateRoutineForm = ({
       </FieldRow>
 
       <FieldRow label="Token budget (optional)" htmlFor="routine-token-budget">
-        <TextInput
+        <Input
           id="routine-token-budget"
           type="number"
           min={0}

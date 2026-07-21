@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Code2, Eye, FolderTree, Save } from "lucide-react"
-import { ScrollArea, Spinner, Tab } from "../../atoms"
+import { Spinner, Tab } from "../../atoms"
 import { ConfirmDialog, ErrorBanner, MarkdownBody } from "../../molecules"
 import { Button } from "@/components/ui/button"
 import { languageForPath } from "../../../lib/monacoLanguages"
@@ -17,6 +17,7 @@ import {
 } from "../../../stores/appStore"
 import { FileExplorer } from "./FileExplorer"
 import type { SessionMeta } from "../../../lib/types"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"))
 

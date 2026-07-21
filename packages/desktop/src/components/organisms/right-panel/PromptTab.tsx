@@ -14,7 +14,7 @@ import {
   Send,
   ShieldCheck,
 } from "lucide-react"
-import { TextInput, Tooltip } from "../../atoms"
+import { Tooltip } from "../../atoms"
 import { ErrorBanner } from "../../molecules"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -41,6 +41,7 @@ import type { SessionId } from "../../../lib/types"
 import { cn } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
 import { CompletionSetupModal } from "../../../plugins/prompt-completion"
+import { Input } from "@/components/ui/input"
 
 type PromptTabProps = {
   sessionId: SessionId
@@ -525,7 +526,7 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
             {questions.map((q) => (
               <li key={q} className="flex flex-col gap-1">
                 <label className="text-xs text-ink">{q}</label>
-                <TextInput
+                <Input
                   type="text"
                   value={answers[q] ?? ""}
                   onChange={(e) =>

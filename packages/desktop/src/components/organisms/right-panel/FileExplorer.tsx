@@ -26,7 +26,7 @@ import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import type { FileHit } from "../../../lib/types"
 import { basename, cn, fileIconForPath } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
-import { Spinner, TextInput } from "../../atoms"
+import { Spinner } from "../../atoms"
 import { ConfirmDialog, ContextMenu, type ContextMenuItem } from "../../molecules"
 import { STATUS_COLOR } from "./FileRow"
 import { Button } from "@/components/ui/button"
@@ -36,6 +36,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group"
+import { Input } from "@/components/ui/input"
 
 type FileExplorerProps = {
   sessionId: string
@@ -631,7 +632,7 @@ export const FileExplorer = ({
           if (!busy) setDialog(null)
         }}
       >
-        <TextInput
+        <Input
           value={draftPath}
           onChange={(e) => setDraftPath(e.target.value)}
           placeholder="path/to/file.ts"
@@ -661,7 +662,7 @@ export const FileExplorer = ({
           if (!busy) setDialog(null)
         }}
       >
-        <TextInput
+        <Input
           value={draftPath}
           onChange={(e) => setDraftPath(e.target.value)}
           placeholder="filename.ts"
