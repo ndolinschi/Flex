@@ -173,7 +173,9 @@ export const ToolStepGroup = memo(function ToolStepGroup({
       </Button>
 
       <Collapsible open={open}>
-        <ul className="mt-0.5 ml-1.5 flex flex-col gap-0.5 py-0.5 pl-3">
+        {/* Single `pt-0.5` under the summary — avoid stacking mt + py which
+            left an uneven air gap above the first detail (RepoMap QA). */}
+        <ul className="ml-1.5 flex flex-col gap-0.5 pt-0.5 pl-3">
           {summary.details.map((detail) => (
             <DetailRow
               key={detail.id}

@@ -133,7 +133,7 @@ export const BranchPicker = ({
           className={cn(triggerInputClassName, "max-w-[12rem]")}
           disabled={!canOpen || busy}
         >
-          <InputGroupAddon align="inline-start" className="pl-1.5 pr-0">
+          <InputGroupAddon align="inline-start" className="py-0 pl-1.5 pr-0">
             <GitBranch
               className="size-3.5 shrink-0 text-muted-foreground"
               aria-hidden

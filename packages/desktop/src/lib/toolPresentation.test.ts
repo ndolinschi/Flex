@@ -266,3 +266,42 @@ describe("SearchCode / FindSymbol presentation", () => {
     expect(findSummary.details[0]?.sublabel).toBe("1 matches")
   })
 })
+
+describe("RepoMap / bare generic tools", () => {
+  it("does not echo the tool name as a detail under itself", () => {
+    const call = makeCall({
+      tool_name: "RepoMap",
+      input: {},
+      result: {
+        content: [{ type: "markdown", text: "map" }],
+        is_error: false,
+      },
+    })
+    const summary = summarizeToolCalls([call])
+    expect(summary.title).toBe("RepoMap")
+    expect(summary.details).toEqual([])
+  })
+
+  it("keeps running state when details are filtered out", () => {
+    const call = makeCall({
+      tool_name: "RepoMap",
+      input: {},
+      status: { state: "running" },
+    })
+    const summary = summarizeToolCalls([call])
+    expect(summary.running).toBe(true)
+    expect(summary.title).toBe("Running RepoMap…")
+    expect(summary.details).toEqual([])
+  })
+
+  it("keeps a detail when the label adds a path beyond the tool name", () => {
+    const call = makeCall({
+      tool_name: "SomeTool",
+      input: { path: "/repo/src/main.ts" },
+    })
+    const summary = summarizeToolCalls([call])
+    expect(summary.details.length).toBe(1)
+    expect(summary.details[0]?.label).toContain("main.ts")
+    expect(summary.details[0]?.label).not.toBe("SomeTool")
+  })
+})

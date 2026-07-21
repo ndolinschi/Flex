@@ -129,8 +129,8 @@ export const IsolationPicker = ({
       >
         <SelectTrigger
           aria-label={`Isolation: ${currentLabel}`}
-          className="ml-1 h-6 w-auto gap-1 rounded-md border-0 bg-transparent px-1.5 text-sm font-normal text-muted-foreground opacity-80 shadow-none hover:bg-transparent hover:text-foreground hover:opacity-100 data-[size=sm]:h-6 data-open:opacity-100"
-          size="sm"
+          className="ml-1 border-0 bg-transparent text-sm font-normal text-muted-foreground opacity-80 shadow-none hover:bg-transparent hover:text-foreground hover:opacity-100 data-open:opacity-100"
+          size="xs"
         >
           <GitFork className="size-3 shrink-0" aria-hidden />
           <SelectValue />
@@ -166,8 +166,8 @@ export const IsolationPicker = ({
         >
           <SelectTrigger
             aria-label="Reuse workspace"
-            className="h-6 w-auto gap-1 rounded-md border-0 bg-transparent px-1.5 text-sm font-normal text-muted-foreground opacity-80 shadow-none hover:bg-transparent hover:text-foreground hover:opacity-100 data-[size=sm]:h-6 data-open:opacity-100"
-            size="sm"
+            className="border-0 bg-transparent text-sm font-normal text-muted-foreground opacity-80 shadow-none hover:bg-transparent hover:text-foreground hover:opacity-100 data-open:opacity-100"
+            size="xs"
           >
             <SelectValue placeholder="New workspace" />
           </SelectTrigger>

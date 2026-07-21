@@ -434,21 +434,26 @@ export const summarizeToolCalls = (calls: ToolCall[]): ToolStepSummary => {
   const details =
     kind === "plan"
       ? planDetails(calls)
-      : calls.map((call) => {
-          if (kind === "explore") return exploreDetail(call)
-          if (kind === "edit") return editDetail(call)
-          if (kind === "shell") return shellDetail(call)
-          return genericDetail(call)
-        })
+      : calls
+          .map((call) => {
+            if (kind === "explore") return exploreDetail(call)
+            if (kind === "edit") return editDetail(call)
+            if (kind === "shell") return shellDetail(call)
+            return genericDetail(call)
+          })
+          // Bare "RepoMap" under a "RepoMap" header (no path/args) is noise —
+          // same poka-yoke as plan details never echoing the tool name.
+          .filter((detail, i) => {
+            if (kind !== "generic") return true
+            const call = calls[i]
+            if (!call) return true
+            return detail.label !== call.tool_name
+          })
 
-  const running =
-    kind === "plan"
-      ? calls.some(isRunning)
-      : details.some((d) => d.running)
-  const failed =
-    kind === "plan"
-      ? calls.some(isFailed)
-      : details.some((d) => d.failed)
+  // Prefer the call list over filtered details so a bare RepoMap (no detail
+  // rows) still shows as running while in flight.
+  const running = calls.some(isRunning)
+  const failed = calls.some(isFailed)
 
   if (kind === "plan") {
     const stepCount = details.length
