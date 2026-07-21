@@ -7,6 +7,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
+import { Separator } from "@/components/ui/separator"
 
 /** Fallback context budget used for the usage ring when the selected
  * model's own context window isn't known (the reference design shows a similar %). */
@@ -146,13 +147,13 @@ export const UsageRing = ({ sessionId }: { sessionId?: string | null }) => {
           <UsageDetailRow label="Budget" value={formatTokens(budget)} />
           {summary && typeof summary.cost_usd === "number" ? (
             <>
-              <div className="my-0.5 border-t border-stroke-3" />
+              <Separator className="my-0.5 bg-stroke-3" />
               <UsageDetailRow label="Cost" value={formatCost(summary.cost_usd)} />
             </>
           ) : null}
           {totals ? (
             <>
-              <div className="my-0.5 border-t border-stroke-3" />
+              <Separator className="my-0.5 bg-stroke-3" />
               <p className="text-xs text-ink-faint">Session total</p>
               <UsageDetailRow
                 label="Tokens"

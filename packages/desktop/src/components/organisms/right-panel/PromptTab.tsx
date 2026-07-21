@@ -17,6 +17,7 @@ import {
 import { TextInput, Tooltip } from "../../atoms"
 import { ErrorBanner } from "../../molecules"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { AtMentionTray } from "../composer/AtMentionTray"
 import { SlashCommandTray } from "../composer/SlashCommandTray"
 import { useComposerAutocomplete } from "../../../hooks/useComposerAutocomplete"
@@ -486,7 +487,7 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
               ) : null}
               {"​"}
             </div>
-            <textarea
+            <Textarea
               ref={textareaRef}
               value={draft}
               onChange={(e) => {
@@ -501,9 +502,13 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
               }}
               placeholder="Write the prompt… Use @ for files/MCP and / for commands. Then Verify."
               className={cn(
-                "relative h-full w-full resize-none overflow-y-auto bg-transparent px-2.5 py-2",
+                // Overlay chrome: transparent text over the suggestion backdrop;
+                // strip Textarea surface/border/ring defaults that fight it.
+                "relative h-full min-h-0 w-full field-sizing-fixed resize-none overflow-y-auto",
+                "rounded-none border-0 bg-transparent px-2.5 py-2 shadow-none",
                 "text-sm leading-relaxed text-transparent caret-ink outline-none",
                 "placeholder:text-ink-muted",
+                "focus-visible:border-0 focus-visible:ring-0",
               )}
               aria-label="Prompt draft"
             />

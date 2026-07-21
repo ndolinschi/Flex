@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button"
+import { ButtonGroup } from "@/components/ui/button-group"
 import { Spinner } from "@/components/ui/spinner"
 import { ErrorBanner } from "./ErrorBanner"
 import type { PendingPermission } from "../../lib/types"
@@ -26,9 +27,8 @@ export const PermissionActions = ({
           <ErrorBanner message={error} />
         </div>
       ) : null}
-      <div
-        className="flex flex-wrap items-center justify-end gap-1"
-        role="group"
+      <ButtonGroup
+        className="flex-wrap justify-end"
         aria-label="Permission decision"
       >
         {permission.options.includes("allow_once") ? (
@@ -63,7 +63,7 @@ export const PermissionActions = ({
             Deny
           </Button>
         ) : null}
-      </div>
+      </ButtonGroup>
     </div>
   )
 }
