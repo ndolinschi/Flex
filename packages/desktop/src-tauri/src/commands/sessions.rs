@@ -362,7 +362,49 @@ pub async fn subscribe_session(
     }
 
     let service = require_service(&state).await?;
-    let stream = service.subscribe(&id)?;
+    // UI paints the chat immediately and resumes in the background
+    // (SessionSidebar / draft New Agent). Subscribe often races ahead of
+    // resume and would otherwise ERROR with "no live handle". Auto-resume
+    // here so the event relay attaches without forcing callers to serialize.
+    let stream = match service.subscribe(&id) {
+        Ok(stream) => stream,
+        Err(err) => {
+            let message = err.to_string();
+            if !message.contains("no live handle") {
+                return Err(DesktopError::from(err));
+            }
+            tracing::debug!(
+                session_id = %session_id,
+                "subscribe before resume; auto-resuming session"
+            );
+            if let Err(resume_err) = service.resume_session(&id).await {
+                // Match resume_session's actionable "workspace missing" mapping.
+                if let Ok(meta) = service.session_meta(&id).await {
+                    if !meta.cwd.exists() {
+                        return Err(DesktopError::Message(format!(
+                            "workspace missing: {} ({resume_err})",
+                            meta.cwd.display()
+                        )));
+                    }
+                }
+                return Err(DesktopError::from(resume_err));
+            }
+            // Backfill baseline for legacy sessions the same way resume_session
+            // does when subscribe was the first attach path.
+            let has_baseline = {
+                let baselines = state.session_baselines.lock().await;
+                baselines.contains_key(id.as_str())
+            };
+            if !has_baseline {
+                if let Ok(meta) = service.session_meta(&id).await {
+                    if meta.base_cwd.is_none() {
+                        schedule_session_baseline(app.clone(), id.to_string(), meta.cwd.clone());
+                    }
+                }
+            }
+            service.subscribe(&id)?
+        }
+    };
 
     let key = session_id.clone();
     let handle = tokio::spawn(async move {
