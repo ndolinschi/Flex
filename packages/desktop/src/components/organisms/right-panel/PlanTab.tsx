@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react"
 import {
   EmptyState,
   MarkdownBody,
-  PlanCommentButton,
   PlanCommentList,
   PlanCommentPopover,
   PlanList,
@@ -442,12 +441,13 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
         </div>
       </ScrollArea>
 
-      {!composerOpen ? (
-        <PlanCommentButton selection={selection} onComment={openComposer} />
-      ) : null}
       <PlanCommentPopover
-        draft={draft}
-        onCancel={clearSelection}
+        selection={selection}
+        open={composerOpen}
+        onOpenChange={(next) => {
+          if (next) openComposer()
+          else clearSelection()
+        }}
         onSave={handleSaveComment}
         onSaveAndSend={handleSaveAndSendComment}
       />

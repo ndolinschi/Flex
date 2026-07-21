@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { MessageSquareText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -14,17 +15,23 @@ import type { PlanSelectionAnchor } from "../../hooks/usePlanSelectionComment"
 export type PlanCommentDraft = PlanSelectionAnchor
 
 type PlanCommentPopoverProps = {
-  draft: PlanSelectionAnchor | null
-  onCancel: () => void
+  /** Current text selection; drives the floating Comment trigger position. */
+  selection: PlanSelectionAnchor | null
+  /** Whether the comment form is open (trigger stays mounted for focus return). */
+  open: boolean
+  onOpenChange: (open: boolean) => void
   onSave: (body: string) => void
   onSaveAndSend: (body: string) => void
   className?: string
 }
 
-/** Floating composer for a plan-text selection comment. */
+/** Floating Comment trigger + composer for a plan-text selection.
+ * The visible Comment button is the PopoverTrigger so aria-expanded and
+ * focus-return attach to a real control (not a virtual coord span). */
 export const PlanCommentPopover = ({
-  draft,
-  onCancel,
+  selection,
+  open,
+  onOpenChange,
   onSave,
   onSaveAndSend,
   className,
@@ -32,44 +39,58 @@ export const PlanCommentPopover = ({
   const [body, setBody] = useState("")
 
   useEffect(() => {
-    setBody("")
-  }, [draft])
+    if (open) setBody("")
+  }, [open, selection?.startOffset, selection?.endOffset])
 
-  if (!draft) return null
+  if (!selection) return null
+
+  const left = Math.min(
+    Math.max(8, selection.anchor.x - 44),
+    window.innerWidth - 100,
+  )
+  const top = Math.min(
+    Math.max(8, selection.anchor.y),
+    window.innerHeight - 40,
+  )
 
   const trimmed = body.trim()
   const canSubmit = trimmed.length > 0
 
   return (
-    <Popover
-      open
-      onOpenChange={(next) => {
-        if (!next) onCancel()
-      }}
-    >
-      {/* Virtual anchor at the selection point — public API passes coords, not a DOM node. */}
-      <PopoverTrigger
-        nativeButton={false}
-        tabIndex={-1}
-        render={
-          <span
-            aria-hidden
-            className="pointer-events-none fixed size-0"
-            style={{ left: draft.anchor.x, top: draft.anchor.y }}
-          />
-        }
-      />
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <div
+        data-suppress-native-webview=""
+        className="fixed z-50"
+        style={{ left, top }}
+      >
+        <PopoverTrigger
+          render={
+            <Button
+              variant="default"
+              size="sm"
+              aria-label="Comment on selection"
+              onMouseDown={(e) => {
+                // Keep the selection; a click would otherwise collapse it.
+                e.preventDefault()
+              }}
+              className={cn(open && "pointer-events-none opacity-0")}
+            />
+          }
+        >
+          <MessageSquareText className="h-3.5 w-3.5" aria-hidden />
+          Comment
+        </PopoverTrigger>
+      </div>
       <PopoverContent
         side="bottom"
         align="center"
-        sideOffset={0}
-        finalFocus={false}
+        sideOffset={8}
         data-suppress-native-webview=""
         className={cn("w-72", className)}
       >
         <PopoverTitle className="sr-only">Comment on plan</PopoverTitle>
         <p className="line-clamp-3 border-l-2 border-accent/40 pl-2 text-xs italic text-muted-foreground">
-          {draft.quote}
+          {selection.quote}
         </p>
         <Textarea
           autoFocus
@@ -81,7 +102,7 @@ export const PlanCommentPopover = ({
           aria-label="Comment text"
         />
         <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <Button variant="ghost" size="sm" onClick={onCancel}>
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button

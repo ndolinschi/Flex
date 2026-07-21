@@ -53,10 +53,9 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `PlanBuildBar` | Cursor-style Build CTA after ExitPlanMode | `onBuild`, `onKeepPlanning?`, `variant` | Plan tab, ChatSessionBody |
 | `PlanCard` | Checklist from `plan_updated` (Plan tool tab; not inlined in timeline) | `entries` | PlanTab |
 | `PlanList` | Multi-plan “Review plans” list for a session | `plans`, `onSelect` | PlanTab |
-| `PlanCommentButton` | Floating Comment control on plan text selection | `selection`, `onComment` | PlanTab |
-| `PlanCommentPopover` | Selection → comment form (Save / Save & send) | `draft`, `onSave`, `onSaveAndSend` | PlanTab |
+| `PlanCommentPopover` | Selection Comment trigger + form (Save / Save & send); Button is PopoverTrigger for focus/aria-expanded | `selection`, `open`, `onOpenChange`, `onSave`, `onSaveAndSend` | PlanTab |
 | `PlanCommentList` | Annotations on the open plan | `comments`, `onFocus`, `onRemove` | PlanTab |
-| `OpenTabModal` | Searchable open-tab picker anchored near ContentPane `+`; ~5 primary tabs visible, rest scroll | `open`, `onClose`, `anchor`, `paneIndex`, `sessionId`, `tabs`, `onOpenChat`, `onOpenTool` | ContentPane |
+| `OpenTabModal` | Searchable open-tab picker; `+` Button is PopoverTrigger; cmdk Input search | `open`, `onOpenChange`, `trigger`, `paneIndex`, `sessionId`, `tabs`, … | ContentPane |
 | `PermissionActions` | Composer-footer Allow once / Always allow / Deny (replaces Send) | `permission` | Composer |
 | `PlusMenu` | Attach + mode shortcuts (Plan/Ask) | `onAttachFile`, `onAttachImage`, `onSetMode?` | Composer |
 | `ProjectPicker` | Recent cwds + Open Folder | `sessionId`, `cwd`, `onError?` | ContextBar |

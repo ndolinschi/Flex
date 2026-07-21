@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react"
-import { MessageSquare } from "lucide-react"
+import { useEffect, useMemo, useState, type ReactElement } from "react"
+import { MessageSquare, Plus } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { Command as CommandPrimitive } from "cmdk"
 import {
   Command,
   CommandEmpty,
@@ -36,9 +36,12 @@ type OpenTabEntry = {
 
 type OpenTabModalProps = {
   open: boolean
-  onClose: () => void
-  /** Viewport rect of the `+` button (or click point) — menu anchors below it. */
-  anchor: { x: number; y: number; width?: number; height?: number } | null
+  onOpenChange: (open: boolean) => void
+  /**
+   * Real chrome control shell (e.g. ContentPane `+` Button without children).
+   * Becomes PopoverTrigger so aria-expanded / focus-return attach to it.
+   */
+  trigger: ReactElement
   paneIndex: 0 | 1
   sessionId: SessionId | null
   /** Visible tool tabs for this session/workspace. */
@@ -96,11 +99,11 @@ const buildEntries = (
 }
 
 /** Searchable open-tab picker for ContentPane `+` (catalog-driven).
- * Anchored near the trigger; ~5 primary tabs visible, remainder scrolls. */
+ * Anchored to the real trigger; ~5 primary tabs visible, remainder scrolls. */
 export const OpenTabModal = ({
   open,
-  onClose,
-  anchor,
+  onOpenChange,
+  trigger,
   paneIndex,
   sessionId,
   tabs,
@@ -131,49 +134,27 @@ export const OpenTabModal = ({
     } else if (entry.tool) {
       onOpenTool(paneIndex, sessionId, entry.tool)
     }
-    onClose()
+    onOpenChange(false)
   }
 
   useEffect(() => {
     if (open) setQuery("")
   }, [open])
 
-  const isOpen = open && !!anchor
   const showGroups = !query.trim()
   const chatFiltered = filtered.filter((e) => e.kind === "chat")
   const toolFiltered = filtered.filter((e) => e.kind === "tool")
 
   return (
-    <Popover
-      open={isOpen}
-      onOpenChange={(next) => {
-        if (!next) onClose()
-      }}
-    >
-      {anchor ? (
-        <PopoverTrigger
-          nativeButton={false}
-          tabIndex={-1}
-          render={
-            <span
-              aria-hidden
-              className="pointer-events-none fixed"
-              style={{
-                left: anchor.x,
-                top: anchor.y,
-                width: Math.max(anchor.width ?? 0, 1),
-                height: Math.max(anchor.height ?? 0, 1),
-              }}
-            />
-          }
-        />
-      ) : null}
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger render={trigger}>
+        <Plus className="h-3.5 w-3.5" aria-hidden />
+      </PopoverTrigger>
       <PopoverContent
         side="bottom"
         align="start"
         sideOffset={4}
         positionerClassName="z-[300]"
-        finalFocus={false}
         className="w-[280px] gap-0 overflow-hidden p-0"
       >
         <PopoverTitle className="sr-only">Open tab</PopoverTitle>
@@ -182,19 +163,16 @@ export const OpenTabModal = ({
           className="rounded-none bg-transparent p-0"
         >
           <div className="flex shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5 py-1.5">
-            {/* Bare field: CommandInput wraps InputGroup with inset fill. Keep the
-             * header one surface; aria-label names the field for AT. */}
-            <Input
+            {/* cmdk Input (not CommandInput) — CommandInput wraps an inset
+             * InputGroup that reads as a nested chip in this chrome strip. */}
+            <CommandPrimitive.Input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onValueChange={setQuery}
               placeholder="Open a tab…"
               aria-label="Open a tab"
-              autoFocus
               className={cn(
-                "h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm text-ink shadow-none",
+                "h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm text-ink outline-hidden",
                 "rounded-none placeholder:text-ink-faint",
-                "focus-visible:border-transparent focus-visible:ring-0",
-                "dark:bg-transparent dark:disabled:bg-transparent",
               )}
             />
           </div>
