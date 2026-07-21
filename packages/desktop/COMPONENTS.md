@@ -126,7 +126,7 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 |---|---|
 | `organisms/timeline/` | `buildDisplayItems` (+ `estimateSizeForItem`), `TimelineRowView`, `WorkGroupBody`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
 | `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
-| `organisms/right-panel/` | Tool tab bodies: `PlanTab`, `ChangesTab`, `PrTab`, `PromptTab`, `FilesTab`, `FileExplorer`, `FileRow`, `CommitCenter`, `tabs` catalog |
+| `organisms/right-panel/` | Tool tab bodies: `PlanTab`, `ChangesTab`, `PrTab`, `PromptTab`, `FilesTab`, `FileExplorer` (+ `TreeBranch`, `FileExplorerDialogs`, `FileExplorerSearchResults`, `fileExplorerGit`), `FileRow`, `CommitCenter`, `tabs` catalog |
 | `organisms/content/` | `ContentWorkspace`, `ContentPane`, `ChatSessionBody`, `ToolTabBody` |
 | `organisms/context-bar/` | `CommitBar` (changes chip + Commit / Commit & Push / Create PR), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
 | `organisms/browser/` | `BrowserToolbar` (Design Mode toggle), `BrowserOverflowMenu` — composed by `BrowserTab` |

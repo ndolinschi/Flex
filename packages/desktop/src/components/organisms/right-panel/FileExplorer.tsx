@@ -1,21 +1,11 @@
 import { useEffect, useMemo, useState, type MouseEvent } from "react"
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
-import {
-  ChevronDown,
-  FileCode2,
-  FilePlus,
-  Folder,
-  FolderOpen,
-  Pencil,
-  Search,
-  Trash2,
-} from "lucide-react"
+import { FilePlus, Folder, Pencil, Search, Trash2 } from "lucide-react"
 import {
   createTextFile,
   deletePath,
   gitStatusSinceBaseline,
   invalidateWorkspacePathCache,
-  listDirChildren,
   listFiles,
   renamePath,
   resolveWorkspaceCwd,
@@ -24,19 +14,28 @@ import {
 import { sortFileHits } from "../../../lib/fileTree"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import type { FileHit } from "../../../lib/types"
-import { basename, cn, fileIconForPath } from "../../../lib/utils"
+import { basename, cn } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
 import { Spinner } from "../../atoms"
-import { ConfirmDialog, ContextMenu, type ContextMenuItem } from "../../molecules"
-import { STATUS_COLOR } from "./FileRow"
-import { Button } from "@/components/ui/button"
+import { ContextMenu, type ContextMenuItem } from "../../molecules"
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group"
-import { Input } from "@/components/ui/input"
+import {
+  FileExplorerDialogs,
+  type FileExplorerDialogState,
+} from "./FileExplorerDialogs"
+import { FileExplorerSearchResults } from "./FileExplorerSearchResults"
+import {
+  buildGitStatusIndex,
+  dirPrefix,
+  isValidBasename,
+  isValidRelativeFilePath,
+} from "./fileExplorerGit"
+import { TreeBranch } from "./TreeBranch"
 
 type FileExplorerProps = {
   sessionId: string
@@ -46,228 +45,6 @@ type FileExplorerProps = {
   fallbackCwd?: string
   /** Called with a repo-relative file path (never a directory). */
   onOpenFile: (path: string) => void
-}
-
-type DialogState =
-  | { kind: "create"; prefix?: string }
-  | { kind: "rename"; path: string }
-  | { kind: "delete"; path: string }
-  | null
-
-const dirPrefix = (path: string): string => {
-  const i = path.lastIndexOf("/")
-  return i >= 0 ? path.slice(0, i + 1) : ""
-}
-
-const isValidRelativeFilePath = (path: string): boolean => {
-  const trimmed = path.trim().replace(/\\/g, "/")
-  if (!trimmed || trimmed.endsWith("/")) return false
-  if (trimmed.startsWith("/") || trimmed.includes("..")) return false
-  return true
-}
-
-const isValidBasename = (name: string): boolean => {
-  const trimmed = name.trim()
-  if (!trimmed) return false
-  if (trimmed.includes("/") || trimmed.includes("\\") || trimmed.includes("..")) {
-    return false
-  }
-  return true
-}
-
-const INDENT_PX = 12
-
-/** Map git porcelain paths → status letter; also index dirty dir prefixes. */
-const buildGitStatusIndex = (
-  files: ReadonlyArray<{ path: string; status: string }> | undefined,
-): {
-  byPath: Map<string, string>
-  dirtyDirs: Set<string>
-} => {
-  const byPath = new Map<string, string>()
-  const dirtyDirs = new Set<string>()
-  if (!files) return { byPath, dirtyDirs }
-  for (const f of files) {
-    const path = f.path.replace(/\\/g, "/")
-    byPath.set(path, f.status)
-    // Untracked dirs arrive with a trailing slash.
-    if (path.endsWith("/")) {
-      dirtyDirs.add(path.replace(/\/+$/, ""))
-    }
-    let rest = path.replace(/\/+$/, "")
-    while (rest.includes("/")) {
-      rest = rest.slice(0, rest.lastIndexOf("/"))
-      if (!rest) break
-      dirtyDirs.add(rest)
-    }
-  }
-  return { byPath, dirtyDirs }
-}
-
-const gitStatusClass = (
-  path: string,
-  isDir: boolean,
-  index: { byPath: Map<string, string>; dirtyDirs: Set<string> },
-): string | undefined => {
-  const normalized = path.replace(/\\/g, "/")
-  if (!isDir) {
-    const status = index.byPath.get(normalized)
-    return status ? (STATUS_COLOR[status] ?? undefined) : undefined
-  }
-  const dirStatus =
-    index.byPath.get(normalized) ??
-    index.byPath.get(`${normalized}/`) ??
-    (index.dirtyDirs.has(normalized) ? "M" : undefined)
-  return dirStatus ? (STATUS_COLOR[dirStatus] ?? undefined) : undefined
-}
-
-type TreeBranchProps = {
-  cwd: string
-  fallbackCwd?: string
-  dirPath: string
-  depth: number
-  expanded: Set<string>
-  gitIndex: { byPath: Map<string, string>; dirtyDirs: Set<string> }
-  onToggle: (dirPath: string) => void
-  onOpenFile: (path: string) => void
-  onContextMenu: (e: MouseEvent, hit: FileHit) => void
-}
-
-/** One directory level — loads children on demand when expanded (or root). */
-const TreeBranch = ({
-  cwd,
-  fallbackCwd,
-  dirPath,
-  depth,
-  expanded,
-  gitIndex,
-  onToggle,
-  onOpenFile,
-  onContextMenu,
-}: TreeBranchProps) => {
-  const isRoot = dirPath === ""
-  const shouldLoad = isRoot || expanded.has(dirPath)
-
-  const { data: children = [], isLoading, isFetching } = useQuery({
-    queryKey: ["workspace-dir-children", cwd, fallbackCwd ?? "", dirPath],
-    queryFn: () => listDirChildren(cwd, dirPath, fallbackCwd),
-    enabled: !!cwd && shouldLoad,
-    staleTime: 60_000,
-  })
-
-  // Hide cmd.exe artifacts like a literal `$null` file created when a
-  // PowerShell redirect (`> $null`) was run under `cmd /C`.
-  const sorted = useMemo(
-    () => sortFileHits(children.filter((h) => h.name !== "$null")),
-    [children],
-  )
-
-  if (!shouldLoad) return null
-
-  if (isLoading && sorted.length === 0) {
-    return (
-      <div
-        className="flex items-center gap-2 py-1 text-xs text-ink-muted"
-        style={{ paddingLeft: 8 + depth * INDENT_PX }}
-      >
-        <Spinner size="sm" />
-        Loading…
-      </div>
-    )
-  }
-
-  if (sorted.length === 0) {
-    if (isRoot) {
-      return (
-        <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-          <Folder className="h-6 w-6 text-ink-faint" aria-hidden />
-          <p className="text-sm text-ink-secondary">This folder is empty</p>
-          <p className="text-xs text-ink-muted">Create a file to get started.</p>
-        </div>
-      )
-    }
-    return (
-      <div
-        className="py-1 text-xs text-ink-faint"
-        style={{ paddingLeft: 8 + (depth + 1) * INDENT_PX }}
-      >
-        Empty
-      </div>
-    )
-  }
-
-  return (
-    <ul className="flex flex-col" role="list">
-      {sorted.map((hit) => {
-        const isDir = !!hit.isDir
-        const isOpen = isDir && expanded.has(hit.path)
-        const Glyph = isDir
-          ? isOpen
-            ? FolderOpen
-            : Folder
-          : fileIconForPath(hit.path)
-        const statusClass = gitStatusClass(hit.path, isDir, gitIndex)
-        return (
-          <li key={hit.path}>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                if (isDir) onToggle(hit.path)
-                else onOpenFile(hit.path)
-              }}
-              onContextMenu={(e) => onContextMenu(e, hit)}
-              title={hit.path}
-              aria-expanded={isDir ? isOpen : undefined}
-              className={cn(
-                "h-7 w-full justify-start gap-1 rounded-md pr-2 text-sm font-normal",
-                "hover:bg-fill-4",
-                statusClass ?? "text-ink-secondary hover:text-ink",
-              )}
-              style={{ paddingLeft: 8 + depth * INDENT_PX }}
-            >
-              <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-                {isDir ? (
-                  <ChevronDown
-                    className={cn(
-                      "h-3 w-3 text-icon-3 opacity-70 transition-transform",
-                      !isOpen && "-rotate-90",
-                    )}
-                    aria-hidden
-                  />
-                ) : (
-                  <span className="w-3" />
-                )}
-              </span>
-              <Glyph
-                className={cn(
-                  "h-3.5 w-3.5 shrink-0",
-                  statusClass ?? "text-ink-faint",
-                )}
-                aria-hidden
-              />
-              <span className="min-w-0 flex-1 truncate">{hit.name}</span>
-              {isDir && isFetching && isOpen ? (
-                <Spinner size="sm" />
-              ) : null}
-            </Button>
-            {isDir && isOpen ? (
-              <TreeBranch
-                cwd={cwd}
-                fallbackCwd={fallbackCwd}
-                dirPath={hit.path}
-                depth={depth + 1}
-                expanded={expanded}
-                gitIndex={gitIndex}
-                onToggle={onToggle}
-                onOpenFile={onOpenFile}
-                onContextMenu={onContextMenu}
-              />
-            ) : null}
-          </li>
-        )
-      })}
-    </ul>
-  )
 }
 
 /** VS Code–style workspace browser for the Files right-panel tab.
@@ -314,7 +91,7 @@ export const FileExplorer = ({
     x: number
     y: number
   } | null>(null)
-  const [dialog, setDialog] = useState<DialogState>(null)
+  const [dialog, setDialog] = useState<FileExplorerDialogState>(null)
   const [draftPath, setDraftPath] = useState("")
   const [busy, setBusy] = useState(false)
 
@@ -516,64 +293,17 @@ export const FileExplorer = ({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-1">
         {searching ? (
-          searchLoading && searchRows.length === 0 ? (
-            <div className="flex items-center justify-center gap-2 py-8 text-sm text-ink-muted">
-              <Spinner size="sm" />
-              Searching…
-            </div>
-          ) : searchRows.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-              <FileCode2 className="h-6 w-6 text-ink-faint" aria-hidden />
-              <p className="text-sm text-ink-secondary">No matches</p>
-              <p className="text-xs text-ink-muted">Try a different search.</p>
-            </div>
-          ) : (
-            <ul className="flex flex-col" role="list">
-              {searchRows.map((hit) => {
-                const isDir = !!hit.isDir
-                const Glyph = isDir ? Folder : fileIconForPath(hit.path)
-                const statusClass = gitStatusClass(hit.path, isDir, gitIndex)
-                return (
-                  <li key={hit.path}>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        if (isDir) {
-                          setQuery("")
-                          setExpanded((prev) => new Set(prev).add(hit.path))
-                        } else {
-                          onOpenFile(hit.path)
-                        }
-                      }}
-                      onContextMenu={(e) => handleContextMenu(e, hit)}
-                      title={hit.path}
-                      className={cn(
-                        "h-7 w-full justify-start gap-2 rounded-md px-2 text-sm font-normal",
-                        "hover:bg-fill-4",
-                        statusClass ?? "text-ink-secondary hover:text-ink",
-                      )}
-                    >
-                      <Glyph
-                        className={cn(
-                          "h-3.5 w-3.5 shrink-0",
-                          statusClass ?? "text-ink-faint",
-                        )}
-                        aria-hidden
-                      />
-                      <span className="min-w-0 flex-1 truncate">
-                        <span className="text-ink-faint">
-                          {hit.path.includes("/")
-                            ? hit.path.slice(0, hit.path.lastIndexOf("/") + 1)
-                            : ""}
-                        </span>
-                        {hit.name}
-                      </span>
-                    </Button>
-                  </li>
-                )
-              })}
-            </ul>
-          )
+          <FileExplorerSearchResults
+            loading={searchLoading}
+            rows={searchRows}
+            gitIndex={gitIndex}
+            onOpenFile={onOpenFile}
+            onOpenDir={(path) => {
+              setQuery("")
+              setExpanded((prev) => new Set(prev).add(path))
+            }}
+            onContextMenu={handleContextMenu}
+          />
         ) : resolvingCwd ? (
           <div className="flex items-center gap-2 px-4 py-8 text-xs text-ink-muted">
             <Spinner size="sm" />
@@ -620,73 +350,12 @@ export const FileExplorer = ({
         onClose={() => setMenu(null)}
       />
 
-      <ConfirmDialog
-        open={dialog?.kind === "create"}
-        title="New file"
-        description="Repo-relative path (e.g. src/utils.ts). Parent folders are created automatically."
-        confirmLabel="Create"
+      <FileExplorerDialogs
+        dialog={dialog}
+        draftPath={draftPath}
+        setDraftPath={setDraftPath}
+        busy={busy}
         confirmDisabled={confirmDisabled}
-        isLoading={busy}
-        onConfirm={() => void handleConfirm()}
-        onCancel={() => {
-          if (!busy) setDialog(null)
-        }}
-      >
-        <Input
-          value={draftPath}
-          onChange={(e) => setDraftPath(e.target.value)}
-          placeholder="path/to/file.ts"
-          aria-label="New file path"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !confirmDisabled && !busy) {
-              e.preventDefault()
-              void handleConfirm()
-            }
-          }}
-        />
-      </ConfirmDialog>
-
-      <ConfirmDialog
-        open={dialog?.kind === "rename"}
-        title="Rename file"
-        description={
-          dialog?.kind === "rename"
-            ? `Rename ${basename(dialog.path)}`
-            : undefined
-        }
-        confirmLabel="Rename"
-        confirmDisabled={confirmDisabled}
-        isLoading={busy}
-        onConfirm={() => void handleConfirm()}
-        onCancel={() => {
-          if (!busy) setDialog(null)
-        }}
-      >
-        <Input
-          value={draftPath}
-          onChange={(e) => setDraftPath(e.target.value)}
-          placeholder="filename.ts"
-          aria-label="New file name"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !confirmDisabled && !busy) {
-              e.preventDefault()
-              void handleConfirm()
-            }
-          }}
-        />
-      </ConfirmDialog>
-
-      <ConfirmDialog
-        open={dialog?.kind === "delete"}
-        title="Delete file"
-        description={
-          dialog?.kind === "delete"
-            ? `Permanently delete ${dialog.path}? This cannot be undone.`
-            : undefined
-        }
-        confirmLabel="Delete"
-        danger
-        isLoading={busy}
         onConfirm={() => void handleConfirm()}
         onCancel={() => {
           if (!busy) setDialog(null)
