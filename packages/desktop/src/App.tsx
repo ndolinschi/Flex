@@ -275,7 +275,7 @@ const AppRoutes = () => {
 
   if (!isBootstrapped) {
     return (
-      <div className="flex h-full flex-col bg-bg">
+      <div className="flex h-full flex-col">
         {titleBar}
         <div
           className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-ink-muted"
@@ -291,7 +291,7 @@ const AppRoutes = () => {
 
   if (route === "welcome") {
     return (
-      <div className="flex h-full flex-col bg-bg">
+      <div className="flex h-full flex-col">
         {titleBar}
         <div className="min-h-0 flex-1 overflow-auto">
           <WelcomePage />
@@ -308,7 +308,7 @@ const AppRoutes = () => {
   // Persistent sidebar + keep Chat mounted so timeline/subscriptions survive
   // settings round-trips (reference glass: content swap, not full remount).
   return (
-    <div className="flex h-full flex-col bg-bg">
+    <div className="flex h-full flex-col">
       {titleBar}
       <div className="relative flex min-h-0 flex-1">
         {/* Root is `relative` so SessionSidebar's mobile overlay (absolute,
@@ -363,7 +363,9 @@ const App = () => {
   if (isBrowserPreview()) return <NativeAppRequired />
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="h-full">
+      {/* Rounded, clipped shell over a transparent Tauri window — see
+          `.app-shell` in index.css and macOS vibrancy in macos_window.rs. */}
+      <div className="app-shell flex flex-col">
         <AppRoutes />
       </div>
     </QueryClientProvider>

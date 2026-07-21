@@ -72,7 +72,7 @@ Composition root: `src/App.tsx`.
 
 | Layer | Role |
 |---|---|
-| `WindowTitleBar` | Custom chrome (`decorations: false`); `--titlebar-height`; sidebar / split / session controls; drag-region double-click zooms (macOS → fullscreen); native 10px corner clip on macOS; File/Edit/View/Help in-window on Windows/Linux, native menu bar on macOS |
+| `WindowTitleBar` | Custom chrome (`decorations: false`, `transparent: true`); `--titlebar-height`; sidebar / split / session controls; drag-region double-click zooms (macOS → fullscreen); macOS vibrancy (`window_vibrancy` HudWindow) + 10px CALayer/`--window-radius` clip; File/Edit/View/Help in-window on Windows/Linux, native menu bar on macOS |
 | `SessionSidebar` | Agents list; left column (wide) or full overlay (narrow/tight) |
 | `ContentWorkspace` | Content panes (chat + tool tabs; optional split) — no secondary header |
 | `ContentPane` | Per-pane tab strip + bodies; `+` / open-to-side |
@@ -195,6 +195,7 @@ Use these gutters unless a surface documents an exception.
 | Token | Value | Surfaces |
 |---|---|---|
 | `--titlebar-height` | 30px | `WindowTitleBar` |
+| `--window-radius` | 10px | `#root` / `.app-shell` clip; macOS vibrancy + CALayer |
 | `--header-height` | 30px | Content TabStrip, tool tab subheaders |
 | `--status-bar-height` | 1.75rem (28px) | ContextBar min height |
 | `--composer-min/max-height` | 1.75rem / 10rem | Textarea grow |
@@ -268,7 +269,9 @@ on hover / focus, or when a non-default filter is active).
 `h-[var(--titlebar-height)]` · left: traffic / menus / sidebar toggle ·
 center: drag region · right: split toggle + session menu (before caption
 buttons on Windows/Linux). Quiet `h-6` icon buttons. Chat controls only
-when bootstrapped and not on the welcome route.
+when bootstrapped and not on the welcome route. Title bar paint is
+transparent so macOS HudWindow vibrancy can read through; `.app-shell`
+supplies the rounded clip (`--window-radius`) over a transparent window.
 
 ### Composer
 

@@ -88,6 +88,9 @@ qrcode = "0.14"
 # Private WKWebView inspector APIs (`_inspector` / `detach`) so DevTools opens
 # undocked instead of full-width into the main window.
 objc2 = "0.6"
+# NSVisualEffectView vibrancy + optional corner radius for undecorated windows.
+# macOS-only; Windows/Linux builds skip this target table entirely.
+window-vibrancy = "0.6"
 
 [dev-dependencies]
 # tauri's mock runtime — lets command unit tests build a real `State<AppState>`

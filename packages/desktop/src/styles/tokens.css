@@ -256,6 +256,8 @@
   --sidebar-width: 16.5rem;
   /* Custom window chrome (Cursor-style title bar above app content). */
   --titlebar-height: 30px;
+  /* Native-like window clip (macOS CALayer + vibrancy radius; CSS fallback). */
+  --window-radius: 10px;
   --header-height: 30px;
   --composer-min-height: 1.75rem;
   --composer-max-height: 10rem;
