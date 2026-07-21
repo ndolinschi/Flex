@@ -21,6 +21,8 @@ import {
   ArrowUpRight,
   Bot,
   Brain,
+  ChevronDown,
+  ChevronRight,
   Search,
   SlidersHorizontal,
   SquarePen,
@@ -380,6 +382,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         {
           type: "item",
           label: collapsedRepos[repoMenu.cwd] ? "Expand" : "Collapse",
+          icon: collapsedRepos[repoMenu.cwd] ? ChevronRight : ChevronDown,
           onSelect: () => toggleRepo(repoMenu.cwd),
         },
         { type: "separator" },

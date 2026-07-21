@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type MouseEvent } from "react"
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"
-import { FilePlus, Folder, Pencil, Search, Trash2 } from "lucide-react"
+import { ChevronDown, ChevronRight, FilePlus, Folder, Pencil, Search, Trash2 } from "lucide-react"
 import {
   createTextFile,
   deletePath,
@@ -176,6 +176,7 @@ export const FileExplorer = ({
           {
             type: "item",
             label: expanded.has(menuHit.path) ? "Collapse" : "Expand",
+            icon: expanded.has(menuHit.path) ? ChevronDown : ChevronRight,
             onSelect: () => toggleDir(menuHit.path),
           },
           {
