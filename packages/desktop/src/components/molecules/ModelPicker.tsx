@@ -21,7 +21,7 @@ import {
   MODEL_MENU_VISIBLE_CAP,
   useGroupedModels,
 } from "../../hooks/useGroupedModels"
-import { TextInput } from "../atoms"
+import { Input } from "@/components/ui/input"
 
 type ModelPickerProps = {
   models: ModelInfoDto[]
@@ -118,7 +118,7 @@ export const ModelPicker = ({
           className="w-72 p-0"
         >
           <div className="border-b border-border px-2.5 py-2">
-            <TextInput
+            <Input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}

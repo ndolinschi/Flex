@@ -3,13 +3,14 @@ import { Button } from "@/components/ui/button"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Spinner } from "@/components/ui/spinner"
-import { TextInput } from "../atoms"
+
 import { ErrorBanner } from "../molecules"
 import { respondQuestion, toInvokeError } from "../../lib/tauri"
 import type { PendingQuestion, Question } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
 import { log } from "../../lib/debug/log"
+import { Input } from "@/components/ui/input"
 
 type QuestionPromptProps = {
   question: PendingQuestion
@@ -123,7 +124,7 @@ const StepBody = ({
           </RadioGroup>
         )}
         {allowCustom ? (
-          <TextInput
+          <Input
             value={draft.custom}
             onChange={(e) => onChange({ selected: [], custom: e.target.value })}
             placeholder="Or type a custom answer…"

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
 import { Textarea } from "@/components/ui/textarea"
-import { TextInput } from "../atoms"
+
 import { ConfirmDialog } from "./ConfirmDialog"
 import { FormField } from "./FormField"
+import { Input } from "@/components/ui/input"
 
 type CreatePrDialogProps = {
   open: boolean
@@ -51,7 +52,7 @@ export const CreatePrDialog = ({
     >
       <div className="flex flex-col gap-3">
         <FormField label="Title" htmlFor="create-pr-title">
-          <TextInput
+          <Input
             id="create-pr-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}

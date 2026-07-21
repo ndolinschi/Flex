@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Check, Copy, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { TextInput } from "../../components/atoms"
+
 import { Switch } from "@/components/ui/switch"
 import { SettingsCard, SettingRow } from "../../components/molecules"
 import {
@@ -13,6 +13,7 @@ import {
   type RemoteAccessStatus,
 } from "../../lib/tauri"
 import { useAppStore } from "../../stores/appStore"
+import { Input } from "@/components/ui/input"
 
 const METHOD_LABELS: Record<keyof MethodPrefs, { title: string; description: string }> = {
   manual: {
@@ -154,7 +155,7 @@ export const RemoteAccessContent = () => {
           stacked
         >
           <div className="flex items-center gap-2">
-            <TextInput
+            <Input
               value={deviceName}
               onChange={(e) => setDeviceName(e.target.value)}
               aria-label="Device name"
@@ -177,7 +178,7 @@ export const RemoteAccessContent = () => {
           stacked
         >
           <div className="flex items-center gap-2">
-            <TextInput
+            <Input
               value={port}
               onChange={(e) => setPort(e.target.value.replace(/[^\d]/g, ""))}
               aria-label="Port"

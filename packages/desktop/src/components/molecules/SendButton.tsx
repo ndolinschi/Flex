@@ -25,6 +25,8 @@ export const SendButton = ({
   onSend,
   onStop,
 }: SendButtonProps) => {
+  // Skip ButtonGroup: its shared-edge radius/border rules fight the
+  // independent `rounded-full` h-6 circles (would flatten to joined pills).
   if (isStreaming && canQueue) {
     return (
       <div className="flex items-center gap-1.5">

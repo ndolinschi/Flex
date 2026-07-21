@@ -1,4 +1,6 @@
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { ButtonGroup } from "@/components/ui/button-group"
 import { Spinner } from "@/components/ui/spinner"
 import { ErrorBanner } from "./ErrorBanner"
 import type { PendingPermission } from "../../lib/types"
@@ -18,6 +20,12 @@ export const PermissionActions = ({
   className,
 }: PermissionActionsProps) => {
   const { isSubmitting, respond, error } = usePermissionRespond(permission)
+  const [pendingAction, setPendingAction] = useState<string | null>(null)
+
+  const handleRespond = (decision: string) => {
+    setPendingAction(decision)
+    void respond(decision).finally(() => setPendingAction(null))
+  }
 
   return (
     <div className={cn("flex min-w-0 flex-col items-end gap-1", className)}>
@@ -26,18 +34,20 @@ export const PermissionActions = ({
           <ErrorBanner message={error} />
         </div>
       ) : null}
-      <div
-        className="flex flex-wrap items-center justify-end gap-1"
-        role="group"
+      <ButtonGroup
+        className="flex-wrap justify-end"
         aria-label="Permission decision"
       >
         {permission.options.includes("allow_once") ? (
           <Button
             size="xs"
             disabled={isSubmitting}
-            onClick={() => void respond("allow_once")}
+            aria-busy={pendingAction === "allow_once" || undefined}
+            onClick={() => handleRespond("allow_once")}
           >
-            {isSubmitting ? <Spinner data-icon="inline-start" /> : null}
+            {pendingAction === "allow_once" ? (
+              <Spinner data-icon="inline-start" />
+            ) : null}
             Allow once
           </Button>
         ) : null}
@@ -46,9 +56,12 @@ export const PermissionActions = ({
             size="xs"
             variant="secondary"
             disabled={isSubmitting}
-            onClick={() => void respond("allow_always")}
+            aria-busy={pendingAction === "allow_always" || undefined}
+            onClick={() => handleRespond("allow_always")}
           >
-            {isSubmitting ? <Spinner data-icon="inline-start" /> : null}
+            {pendingAction === "allow_always" ? (
+              <Spinner data-icon="inline-start" />
+            ) : null}
             Always allow
           </Button>
         ) : null}
@@ -57,13 +70,16 @@ export const PermissionActions = ({
             size="xs"
             variant="destructive"
             disabled={isSubmitting}
-            onClick={() => void respond("deny")}
+            aria-busy={pendingAction === "deny" || undefined}
+            onClick={() => handleRespond("deny")}
           >
-            {isSubmitting ? <Spinner data-icon="inline-start" /> : null}
+            {pendingAction === "deny" ? (
+              <Spinner data-icon="inline-start" />
+            ) : null}
             Deny
           </Button>
         ) : null}
-      </div>
+      </ButtonGroup>
     </div>
   )
 }

@@ -15,6 +15,11 @@ import {
   Tablet,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group"
 import { Tooltip } from "../../atoms"
 import { VIEWPORT_PRESETS as VIEWPORT_PRESETS_BASE } from "../../../hooks/useBrowserSession"
 import type { BrowserViewportPreset } from "../../../stores/appStore"
@@ -178,12 +183,13 @@ export const BrowserToolbar = ({
 
       <div className="relative min-w-0 flex-1">
         {editing ? (
-          <input
+          <Input
             autoFocus
             defaultValue={browserUrl}
             onKeyDown={handleInputKeyDown}
             onBlur={() => setEditing(false)}
-            className="h-6 w-full rounded-sm bg-fill-4 px-2 text-sm text-ink outline-none focus-visible:[box-shadow:0_0_0_1px_var(--color-stroke-2)]"
+            aria-label="Browser URL"
+            className="h-6 w-full rounded-sm border-0 bg-fill-4 px-2 text-sm text-ink shadow-none focus-visible:border-transparent focus-visible:ring-1 focus-visible:ring-stroke-2"
           />
         ) : (
           <Button
@@ -200,26 +206,34 @@ export const BrowserToolbar = ({
         )}
       </div>
 
-      <div className="flex items-center gap-px">
+      <ToggleGroup
+        value={[viewportPreset]}
+        onValueChange={(vals) => {
+          const next = vals.find((v) => v !== viewportPreset)
+          if (next) setViewportPreset(next as BrowserViewportPreset)
+        }}
+        spacing={0}
+        aria-label="Viewport preset"
+        className="gap-px"
+      >
         {VIEWPORT_PRESETS.map(({ id, label, icon: Icon }) => (
           <Tooltip key={id} label={label}>
-            <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label={label} title={label}
-      onClick={() => setViewportPreset(id)}
-      className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
-        "h-6 w-6",
-                viewportPreset === id && "bg-surface-muted text-ink",
-      )}
-    >
-      <Icon className="h-3.5 w-3.5" aria-hidden />
-    </Button>
+            <ToggleGroupItem
+              value={id}
+              size="icon-xs"
+              aria-label={label}
+              title={label}
+              className={cn(
+                "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+                "h-6 w-6 rounded-md p-0",
+                "data-pressed:bg-surface-muted data-pressed:text-ink",
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" aria-hidden />
+            </ToggleGroupItem>
           </Tooltip>
         ))}
-      </div>
+      </ToggleGroup>
 
       <Tooltip label={browserDesignMode ? "Exit Design Mode (⌘⇧D)" : "Design Mode (⌘⇧D)"}>
         <Button

@@ -9,7 +9,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { MessageSquare, Plus, X } from "lucide-react"
+import { MessageSquare, X } from "lucide-react"
 import { Tab, TabStrip, Tooltip } from "../../atoms"
 import { ContextMenu, OpenTabModal } from "../../molecules"
 import { useSessions } from "../../../hooks/useSessions"
@@ -114,12 +114,6 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   const { sessions } = useSessions()
   const dragUi = useTabDragUi()
   const [openTabModal, setOpenTabModal] = useState(false)
-  const [openTabAnchor, setOpenTabAnchor] = useState<{
-    x: number
-    y: number
-    width: number
-    height: number
-  } | null>(null)
 
   const { tabsScrollRef, scrollMask, handleTabsWheel } = useTabStripScrollFade(
     pane.tabs.length,
@@ -329,26 +323,27 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
           })}
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Open tab"
-            title="Open tab"
-            onClick={(e: ReactMouseEvent<HTMLButtonElement>) => {
-              const r = e.currentTarget.getBoundingClientRect()
-              setOpenTabAnchor({
-                x: r.left,
-                y: r.top,
-                width: r.width,
-                height: r.height,
-              })
-              setOpenTabModal(true)
-            }}
-            className="h-6 w-6 text-muted-foreground hover:bg-fill-4 hover:text-foreground"
-          >
-            <Plus className="h-3.5 w-3.5" aria-hidden />
-          </Button>
+          <OpenTabModal
+            open={openTabModal}
+            onOpenChange={setOpenTabModal}
+            trigger={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Open tab"
+                title="Open tab"
+                className="h-6 w-6 text-muted-foreground hover:bg-fill-4 hover:text-foreground"
+              />
+            }
+            paneIndex={paneIndex}
+            sessionId={contextSession}
+            tabs={catalog}
+            onOpenChat={openChatInPane}
+            onOpenTool={(p, sid, tool) =>
+              openToolInPane(p, sid, tool as RightPanelTab)
+            }
+          />
           {split ? (
             <Tooltip label="Close pane">
               <Button
@@ -413,22 +408,6 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
         position={menuPosition}
         items={contextMenuItems}
         onClose={closeMenu}
-      />
-
-      <OpenTabModal
-        open={openTabModal}
-        onClose={() => {
-          setOpenTabModal(false)
-          setOpenTabAnchor(null)
-        }}
-        anchor={openTabAnchor}
-        paneIndex={paneIndex}
-        sessionId={contextSession}
-        tabs={catalog}
-        onOpenChat={openChatInPane}
-        onOpenTool={(p, sid, tool) =>
-          openToolInPane(p, sid, tool as RightPanelTab)
-        }
       />
     </div>
   )

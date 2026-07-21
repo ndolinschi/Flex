@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react"
 import { cn, formatTokens } from "../../lib/utils"
 import { Collapsible } from "./Collapsible"
 import { MarkdownBody } from "./MarkdownBody"
+import { Button } from "@/components/ui/button"
 import { Marker, MarkerIcon, MarkerContent } from "@/components/ui/marker"
 
 type CompactionCardProps = {
@@ -46,7 +47,17 @@ export const CompactionCard = ({
     <div className="animate-row-fade flex flex-col gap-1.5 py-1">
       <Marker
         variant="separator"
-        render={hasSummary ? <button type="button" onClick={handleToggle} aria-expanded={expanded} /> : undefined}
+        render={
+          hasSummary ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleToggle}
+              aria-expanded={expanded}
+              className="h-auto w-full justify-start rounded-none border-0 bg-transparent p-0 font-normal hover:bg-transparent"
+            />
+          ) : undefined
+        }
         className={cn(
           "text-sm text-ink-muted",
           hasSummary && "cursor-pointer hover:text-ink",

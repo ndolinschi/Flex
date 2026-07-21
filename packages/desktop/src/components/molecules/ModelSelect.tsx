@@ -16,11 +16,12 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Label, Spinner } from "../atoms"
+import { Spinner } from "../atoms"
 import {
   MODEL_MENU_VISIBLE_CAP,
   useGroupedModels,
 } from "../../hooks/useGroupedModels"
+import { Label } from "@/components/ui/label"
 
 type ModelSelectProps = {
   id: string

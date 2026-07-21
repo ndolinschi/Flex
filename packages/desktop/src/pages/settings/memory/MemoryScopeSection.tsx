@@ -1,13 +1,16 @@
-import { useState } from "react"
 import { ChevronDown } from "lucide-react"
-import { Collapsible } from "../../../components/molecules"
 import type { MemoryEntryDto } from "../../../lib/types"
 import { cn } from "../../../lib/utils"
 import type { MemoryScope } from "./constants"
 import { MemoryRow } from "./MemoryRow"
-import { Button } from "@/components/ui/button"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
-/** One collapsible "Global" or per-project section, styled like a Settings
+/** One accordion "Global" or per-project section, styled like a Settings
  * section header (title + entry count), holding a list of `MemoryRow`s
  * scoped to whichever get/remove/expiry functions the caller passes in. */
 export const MemoryScopeSection = ({
@@ -23,36 +26,40 @@ export const MemoryScopeSection = ({
   scope: MemoryScope
   defaultOpen?: boolean
 }) => {
-  const [open, setOpen] = useState(defaultOpen)
-
   return (
-    <section>
-      <Button
-        variant="ghost"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="mb-2 h-auto w-full justify-start gap-2 px-3.5 py-0 font-normal hover:bg-transparent"
-      >
-        <ChevronDown
+    <Accordion
+      multiple
+      defaultValue={defaultOpen ? ["scope"] : []}
+      className="w-full"
+    >
+      <AccordionItem value="scope" className="border-0">
+        <AccordionTrigger
           className={cn(
-            "h-3 w-3 shrink-0 text-ink-muted transition-transform duration-[var(--duration-fast)]",
-            !open && "-rotate-90",
+            "mb-2 justify-start gap-2 rounded-none px-3.5 py-0 font-normal hover:no-underline",
+            "**:data-[slot=accordion-trigger-icon]:hidden",
           )}
-          aria-hidden
-        />
-        <h2 className="text-sm leading-4 text-ink-secondary">{title}</h2>
-        <span className="text-xs text-ink-faint">{memories.length}</span>
-        {hint ? (
-          <span className="truncate text-xs text-ink-faint">{hint}</span>
-        ) : null}
-      </Button>
-      <Collapsible open={open}>
-        <div className="flex flex-col gap-1.5">
-          {memories.map((memory) => (
-            <MemoryRow key={memory.id} memory={memory} scope={scope} />
-          ))}
-        </div>
-      </Collapsible>
-    </section>
+        >
+          <ChevronDown
+            className={cn(
+              "h-3 w-3 shrink-0 text-ink-muted transition-transform duration-[var(--duration-fast)]",
+              "-rotate-90 group-aria-expanded/accordion-trigger:rotate-0",
+            )}
+            aria-hidden
+          />
+          <span className="text-sm leading-4 text-ink-secondary">{title}</span>
+          <span className="text-xs text-ink-faint">{memories.length}</span>
+          {hint ? (
+            <span className="truncate text-xs text-ink-faint">{hint}</span>
+          ) : null}
+        </AccordionTrigger>
+        <AccordionContent className="pb-0">
+          <div className="flex flex-col gap-1.5">
+            {memories.map((memory) => (
+              <MemoryRow key={memory.id} memory={memory} scope={scope} />
+            ))}
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
   )
 }

@@ -26,9 +26,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { TextInput } from "../atoms"
+
 import { ConfirmDialog } from "./ConfirmDialog"
 import { ErrorBanner } from "./ErrorBanner"
+import { Input } from "@/components/ui/input"
 
 type SessionMenuProps = {
   sessionId: string
@@ -258,7 +259,7 @@ export const SessionMenu = ({
         onCancel={() => setRenameOpen(false)}
         onConfirm={() => void handleRename()}
       >
-        <TextInput
+        <Input
           value={renameValue}
           onChange={(e) => setRenameValue(e.target.value)}
           aria-label="Session title"

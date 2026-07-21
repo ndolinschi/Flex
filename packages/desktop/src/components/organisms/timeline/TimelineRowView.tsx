@@ -18,6 +18,7 @@ import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
 import { Message, MessageContent } from "@/components/ui/message"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
+import { Marker, MarkerContent } from "@/components/ui/marker"
 import { ThinkingBlock } from "./ThinkingBlock"
 import { MessageActions } from "./MessageActions"
 import { CheckpointChip } from "./CheckpointChip"
@@ -163,22 +164,28 @@ export const TimelineRowView = memo(({
       return null
     case "fallback":
       return (
-        <p className="text-sm text-ink-muted animate-row-fade">
-          Model fallback: {row.from}
-          {row.to ? ` → ${row.to}` : ""}
-          {row.reason ? ` (${row.reason})` : ""}
-        </p>
+        <Marker className="animate-row-fade text-sm text-ink-muted">
+          <MarkerContent>
+            Model fallback: {row.from}
+            {row.to ? ` → ${row.to}` : ""}
+            {row.reason ? ` (${row.reason})` : ""}
+          </MarkerContent>
+        </Marker>
       )
     case "command":
       return (
-        <p className="text-sm text-ink-muted animate-row-fade">
-          /{row.name}
-          {row.args ? ` ${row.args}` : ""}
-        </p>
+        <Marker className="animate-row-fade text-sm text-ink-muted">
+          <MarkerContent>
+            /{row.name}
+            {row.args ? ` ${row.args}` : ""}
+          </MarkerContent>
+        </Marker>
       )
     case "meta":
       return (
-        <p className="text-sm text-ink-faint animate-row-fade">{row.text}</p>
+        <Marker className="animate-row-fade text-sm text-ink-faint">
+          <MarkerContent>{row.text}</MarkerContent>
+        </Marker>
       )
     case "compaction":
       return (

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react"
 import { open as openDialog } from "@tauri-apps/plugin-dialog"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
-import { Kbd, Skeleton, TextInput } from "../components/atoms"
+
 import {
   ChatgptSignInDialog,
   CopilotSignInDialog,
@@ -21,6 +21,9 @@ import { newAgentCreateInput } from "../lib/sessions"
 import type { ProviderProfileInput } from "../lib/types"
 import { useAppStore } from "../stores/appStore"
 import { cn } from "../lib/utils"
+import { Input } from "@/components/ui/input"
+import { Kbd } from "@/components/ui/kbd"
+import { Skeleton } from "@/components/ui/skeleton"
 
 type Step = "provider" | "model" | "project"
 
@@ -270,7 +273,7 @@ export const WelcomePage = () => {
                 </div>
                 {showCopilotToken ? (
                   <FormField label="GitHub Copilot token" htmlFor="welcome-copilot-token">
-                    <TextInput
+                    <Input
                       id="welcome-copilot-token"
                       type="password"
                       autoComplete="off"
@@ -304,7 +307,7 @@ export const WelcomePage = () => {
               </div>
             ) : requiresKey ? (
               <FormField label="API key" htmlFor="welcome-api-key">
-                <TextInput
+                <Input
                   id="welcome-api-key"
                   type="password"
                   autoComplete="off"

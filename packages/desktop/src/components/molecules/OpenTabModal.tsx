@@ -1,8 +1,7 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
-import { createPortal } from "react-dom"
-import { MessageSquare } from "lucide-react"
+import { useEffect, useMemo, useState, type ReactElement } from "react"
+import { MessageSquare, Plus } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { Command as CommandPrimitive } from "cmdk"
 import {
   Command,
   CommandEmpty,
@@ -10,6 +9,12 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { fuzzyScore } from "../../lib/fuzzySearch"
 import type { SessionId } from "../../lib/types"
 import { cn } from "../../lib/utils"
@@ -31,9 +36,12 @@ type OpenTabEntry = {
 
 type OpenTabModalProps = {
   open: boolean
-  onClose: () => void
-  /** Viewport rect of the `+` button (or click point) — menu anchors below it. */
-  anchor: { x: number; y: number; width?: number; height?: number } | null
+  onOpenChange: (open: boolean) => void
+  /**
+   * Real chrome control shell (e.g. ContentPane `+` Button without children).
+   * Becomes PopoverTrigger so aria-expanded / focus-return attach to it.
+   */
+  trigger: ReactElement
   paneIndex: 0 | 1
   sessionId: SessionId | null
   /** Visible tool tabs for this session/workspace. */
@@ -45,9 +53,6 @@ type OpenTabModalProps = {
     tool: RightPanelTab,
   ) => void
 }
-
-const MENU_WIDTH = 280
-const MARGIN = 8
 
 /** Prefer everyday workspace tabs first; everything else follows catalog order. */
 const PRIMARY_TOOL_ORDER: readonly RightPanelTab[] = [
@@ -94,11 +99,11 @@ const buildEntries = (
 }
 
 /** Searchable open-tab picker for ContentPane `+` (catalog-driven).
- * Anchored near the trigger; ~5 primary tabs visible, remainder scrolls. */
+ * Anchored to the real trigger; ~5 primary tabs visible, remainder scrolls. */
 export const OpenTabModal = ({
   open,
-  onClose,
-  anchor,
+  onOpenChange,
+  trigger,
   paneIndex,
   sessionId,
   tabs,
@@ -106,12 +111,6 @@ export const OpenTabModal = ({
   onOpenTool,
 }: OpenTabModalProps) => {
   const [query, setQuery] = useState("")
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(
-    null,
-  )
-  const panelRef = useRef<HTMLDivElement>(null)
-  const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
 
   const entries = useMemo(
     () => buildEntries(tabs, !!sessionId),
@@ -135,147 +134,91 @@ export const OpenTabModal = ({
     } else if (entry.tool) {
       onOpenTool(paneIndex, sessionId, entry.tool)
     }
-    onClose()
+    onOpenChange(false)
   }
 
   useEffect(() => {
     if (open) setQuery("")
   }, [open])
 
-  // Anchor below the `+` button; flip/clamp to stay in the viewport.
-  useLayoutEffect(() => {
-    if (!open || !anchor) {
-      setCoords(null)
-      return
-    }
-    const el = panelRef.current
-    const h = el?.offsetHeight ?? 220
-    const w = el?.offsetWidth ?? MENU_WIDTH
-    const aw = anchor.width ?? 0
-    const ah = anchor.height ?? 0
-    let left = anchor.x
-    let top = anchor.y + ah + 4
-    if (left + w + MARGIN > window.innerWidth) {
-      left = Math.max(MARGIN, anchor.x + aw - w)
-    }
-    if (top + h + MARGIN > window.innerHeight) {
-      top = Math.max(MARGIN, anchor.y - h - 4)
-    }
-    left = Math.max(MARGIN, Math.min(left, window.innerWidth - w - MARGIN))
-    setCoords({ top, left })
-  }, [open, anchor, filtered.length])
-
-  useEffect(() => {
-    if (!open) return
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        onCloseRef.current()
-      }
-    }
-
-    const handlePointerDown = (e: PointerEvent) => {
-      const target = e.target as Node
-      if (panelRef.current?.contains(target)) return
-      onCloseRef.current()
-    }
-
-    window.addEventListener("keydown", handleKey)
-    window.addEventListener("pointerdown", handlePointerDown, true)
-    return () => {
-      window.removeEventListener("keydown", handleKey)
-      window.removeEventListener("pointerdown", handlePointerDown, true)
-    }
-  }, [open])
-
-  if (!open || !anchor) return null
-
   const showGroups = !query.trim()
   const chatFiltered = filtered.filter((e) => e.kind === "chat")
   const toolFiltered = filtered.filter((e) => e.kind === "tool")
 
-  return createPortal(
-    <div
-      ref={panelRef}
-      className={cn(
-        "fixed z-[300] flex w-[280px] flex-col overflow-hidden",
-        "rounded-lg bg-panel shadow-[var(--shadow-popover)] animate-tray-in",
-        !coords && "invisible",
-      )}
-      style={
-        coords
-          ? { top: coords.top, left: coords.left }
-          : { top: anchor.y + (anchor.height ?? 0) + 4, left: anchor.x }
-      }
-      aria-label="Open tab"
-    >
-      <Command
-        shouldFilter={false}
-        className="rounded-none bg-transparent p-0"
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger render={trigger}>
+        <Plus className="h-3.5 w-3.5" aria-hidden />
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        align="start"
+        sideOffset={4}
+        positionerClassName="z-[300]"
+        className="w-[280px] gap-0 overflow-hidden p-0"
       >
-        <div className="flex shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5 py-1.5">
-          {/* Bare field: ui/Input carries `dark:bg-input/30` which reads as a
-           * nested inset chip inside the tray. Keep the header one surface. */}
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Open a tab…"
-            autoFocus
-            className={cn(
-              "h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm text-ink shadow-none",
-              "rounded-none placeholder:text-ink-faint",
-              "focus-visible:border-transparent focus-visible:ring-0",
-              "dark:bg-transparent dark:disabled:bg-transparent",
-            )}
-          />
-        </div>
-        <CommandList
-          className="py-1"
-          style={{ maxHeight: 160 }}
+        <PopoverTitle className="sr-only">Open tab</PopoverTitle>
+        <Command
+          shouldFilter={false}
+          className="rounded-none bg-transparent p-0"
         >
-          <CommandEmpty className="px-2.5 py-2 text-sm text-ink-muted">
-            No matching tabs
-          </CommandEmpty>
-          {chatFiltered.length > 0 && (
-            <CommandGroup heading={showGroups ? "Chat" : undefined}>
-              {chatFiltered.map((entry) => {
-                const Icon = entry.icon
-                return (
-                  <CommandItem
-                    key={entry.id}
-                    value={entry.id}
-                    onSelect={() => activate(entry)}
-                    className="px-2.5"
-                  >
-                    <Icon aria-hidden />
-                    <span className="min-w-0 truncate">{entry.label}</span>
-                  </CommandItem>
-                )
-              })}
-            </CommandGroup>
-          )}
-          {toolFiltered.length > 0 && (
-            <CommandGroup heading={showGroups ? "Tools" : undefined}>
-              {toolFiltered.map((entry) => {
-                const Icon = entry.icon
-                return (
-                  <CommandItem
-                    key={entry.id}
-                    value={entry.id}
-                    onSelect={() => activate(entry)}
-                    className="px-2.5"
-                  >
-                    <Icon aria-hidden />
-                    <span className="min-w-0 truncate">{entry.label}</span>
-                  </CommandItem>
-                )
-              })}
-            </CommandGroup>
-          )}
-        </CommandList>
-      </Command>
-    </div>,
-    document.body,
+          <div className="flex shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5 py-1.5">
+            {/* cmdk Input (not CommandInput) — CommandInput wraps an inset
+             * InputGroup that reads as a nested chip in this chrome strip. */}
+            <CommandPrimitive.Input
+              value={query}
+              onValueChange={setQuery}
+              placeholder="Open a tab…"
+              aria-label="Open a tab"
+              className={cn(
+                "h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm text-ink outline-hidden",
+                "rounded-none placeholder:text-ink-faint",
+              )}
+            />
+          </div>
+          <CommandList className="py-1" style={{ maxHeight: 160 }}>
+            <CommandEmpty className="px-2.5 py-2 text-sm text-ink-muted">
+              No matching tabs
+            </CommandEmpty>
+            {chatFiltered.length > 0 && (
+              <CommandGroup heading={showGroups ? "Chat" : undefined}>
+                {chatFiltered.map((entry) => {
+                  const Icon = entry.icon
+                  return (
+                    <CommandItem
+                      key={entry.id}
+                      value={entry.id}
+                      onSelect={() => activate(entry)}
+                      className="px-2.5"
+                    >
+                      <Icon aria-hidden />
+                      <span className="min-w-0 truncate">{entry.label}</span>
+                    </CommandItem>
+                  )
+                })}
+              </CommandGroup>
+            )}
+            {toolFiltered.length > 0 && (
+              <CommandGroup heading={showGroups ? "Tools" : undefined}>
+                {toolFiltered.map((entry) => {
+                  const Icon = entry.icon
+                  return (
+                    <CommandItem
+                      key={entry.id}
+                      value={entry.id}
+                      onSelect={() => activate(entry)}
+                      className="px-2.5"
+                    >
+                      <Icon aria-hidden />
+                      <span className="min-w-0 truncate">{entry.label}</span>
+                    </CommandItem>
+                  )
+                })}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }

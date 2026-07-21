@@ -30,13 +30,15 @@ export { ModelSelect } from "./ModelSelect"
 export { ModelMultiSelect } from "./ModelMultiSelect"
 export { PlanBuildBar } from "./PlanBuildBar"
 export { PlanCard, PlanStatusIcon } from "./PlanCard"
-export { PlanCommentButton } from "./PlanCommentButton"
 export { PlanCommentList } from "./PlanCommentList"
 export { PlanCommentPopover } from "./PlanCommentPopover"
 export type { PlanCommentDraft } from "./PlanCommentPopover"
 export { PlanList } from "./PlanList"
 export { PlanToolbar } from "./PlanToolbar"
 export type { PlanBuildStatus } from "./PlanToolbar"
+export { PlanModelPill } from "./PlanModelPill"
+export { PlanFindBar } from "./PlanFindBar"
+export type { PlanFindState } from "./PlanFindBar"
 export {
   PopoverItem,
   PopoverSearch,

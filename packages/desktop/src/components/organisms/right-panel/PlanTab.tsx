@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react"
-import { ScrollArea } from "../../atoms"
+
 import {
   EmptyState,
   MarkdownBody,
-  PlanCommentButton,
   PlanCommentList,
   PlanCommentPopover,
   PlanList,
@@ -28,6 +27,7 @@ import { formatRelativeTime } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
 import type { SessionPlan } from "../../../stores/types"
 import { basename, cn } from "../../../lib/utils"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 const EMPTY_ENTRIES: PlanEntry[] = []
 const EMPTY_PLANS: SessionPlan[] = []
@@ -441,12 +441,13 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
         </div>
       </ScrollArea>
 
-      {!composerOpen ? (
-        <PlanCommentButton selection={selection} onComment={openComposer} />
-      ) : null}
       <PlanCommentPopover
-        draft={draft}
-        onCancel={clearSelection}
+        selection={selection}
+        open={composerOpen}
+        onOpenChange={(next) => {
+          if (next) openComposer()
+          else clearSelection()
+        }}
         onSave={handleSaveComment}
         onSaveAndSend={handleSaveAndSendComment}
       />

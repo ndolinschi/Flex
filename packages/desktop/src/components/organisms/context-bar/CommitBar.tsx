@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { GitMerge, GitPullRequest } from "lucide-react"
 import {
@@ -13,10 +13,16 @@ import { toastPrOutcome } from "../../../lib/prOutcomeToast"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
 import { useAppStore } from "../../../stores/appStore"
 import { CreatePrDialog } from "../../molecules/CreatePrDialog"
-import { PopoverTray } from "../../molecules/PopoverTray"
-import { DiffStat, TextInput } from "../../atoms"
+import { DiffStat } from "../../atoms"
 import { Button } from "@/components/ui/button"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Spinner } from "@/components/ui/spinner"
+import { Input } from "@/components/ui/input"
 
 /** Right-aligned "N changes" pill + Commit button, shown above the
  * composer for non-isolated sessions with a dirty working tree (design:
@@ -38,7 +44,6 @@ export const CommitBar = ({
   const [prDialogOpen, setPrDialogOpen] = useState(false)
   const [message, setMessage] = useState("Update from agent session")
   const [busy, setBusy] = useState<"commit" | "push" | "pr" | null>(null)
-  const rootRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const pushToast = useAppStore((s) => s.pushToast)
   const openToolBesideChat = useAppStore((s) => s.openToolBesideChat)
@@ -135,7 +140,7 @@ export const CommitBar = ({
   if (totalCount === 0) return null
 
   return (
-    <div ref={rootRef} className="relative flex shrink-0 items-center gap-1.5">
+    <div className="relative flex shrink-0 items-center gap-1.5">
       <Button
         variant="secondary"
         size="xs"
@@ -150,80 +155,82 @@ export const CommitBar = ({
         <DiffStat summary={totals} />
       </Button>
 
-      <Button
-        variant="default"
-        size="xs"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="shrink-0 gap-1 font-normal"
-      >
-        <GitMerge data-icon="inline-start" aria-hidden />
-        {primaryLabel}
-      </Button>
-
-      <PopoverTray
-        open={open}
-        onClose={() => setOpen(false)}
-        anchorRef={rootRef}
-        placement="above"
-        role="dialog"
-        aria-label="Commit changes"
-        className="right-0 w-72 p-2.5"
-      >
-        <TextInput
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Commit message"
-          aria-label="Commit message"
-          autoFocus
-        />
-        <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
-          {hasRemote ? (
-            <>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={busy !== null || !trimmed}
-                onClick={() => void handleCommit(false)}
-              >
-                {busy === "commit" ? <Spinner data-icon="inline-start" /> : null}
-                Commit
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={busy !== null || !trimmed}
-                onClick={() => void handleCommit(true)}
-              >
-                {busy === "push" ? <Spinner data-icon="inline-start" /> : null}
-                Commit & Push
-              </Button>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          render={
+            <Button
+              variant="default"
+              size="xs"
+              className="shrink-0 gap-1 font-normal"
+            />
+          }
+        >
+          <GitMerge data-icon="inline-start" aria-hidden />
+          {primaryLabel}
+        </PopoverTrigger>
+        <PopoverContent side="top" align="end" className="w-72">
+          <PopoverTitle className="sr-only">Commit changes</PopoverTitle>
+          <Input
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Commit message"
+            aria-label="Commit message"
+            autoFocus
+          />
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            {hasRemote ? (
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={busy !== null || !trimmed}
+                  onClick={() => void handleCommit(false)}
+                >
+                  {busy === "commit" ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : null}
+                  Commit
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={busy !== null || !trimmed}
+                  onClick={() => void handleCommit(true)}
+                >
+                  {busy === "push" ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : null}
+                  Commit & Push
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  disabled={busy !== null || !trimmed}
+                  onClick={() => {
+                    setOpen(false)
+                    setPrDialogOpen(true)
+                  }}
+                >
+                  <GitPullRequest className="h-3 w-3" aria-hidden />
+                  Create PR
+                </Button>
+              </>
+            ) : (
               <Button
                 variant="default"
                 size="sm"
                 disabled={busy !== null || !trimmed}
-                onClick={() => {
-                  setOpen(false)
-                  setPrDialogOpen(true)
-                }}
+                onClick={() => void handleCommit(false)}
               >
-                <GitPullRequest className="h-3 w-3" aria-hidden />
-                Create PR
+                {busy === "commit" ? (
+                  <Spinner data-icon="inline-start" />
+                ) : null}
+                Commit
               </Button>
-            </>
-          ) : (
-            <Button
-              variant="default"
-              size="sm"
-              disabled={busy !== null || !trimmed}
-              onClick={() => void handleCommit(false)}
-            >
-              {busy === "commit" ? <Spinner data-icon="inline-start" /> : null}
-              Commit
-            </Button>
-          )}
-        </div>
-      </PopoverTray>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
 
       <CreatePrDialog
         open={prDialogOpen}

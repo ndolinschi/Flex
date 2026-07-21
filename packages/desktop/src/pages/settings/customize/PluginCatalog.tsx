@@ -10,12 +10,13 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Spinner as ButtonSpinner } from "@/components/ui/spinner"
-import { Spinner, TextInput } from "../../../components/atoms"
+import { Spinner } from "../../../components/atoms"
 import { Switch } from "@/components/ui/switch"
 import { ErrorBanner, SettingsSection } from "../../../components/molecules"
 import { useProviderConfig } from "../../../hooks/useProviderConfig"
 import type { PluginPrefs } from "../../../lib/types"
 import { cn } from "../../../lib/utils"
+import { Input } from "@/components/ui/input"
 
 type PluginKey = Exclude<
   keyof PluginPrefs,
@@ -156,7 +157,7 @@ export const PluginCatalog = () => {
   )
 
   const searchInput = (
-    <TextInput
+    <Input
       value={query}
       onChange={(e) => setQuery(e.target.value)}
       placeholder="Search plugins…"

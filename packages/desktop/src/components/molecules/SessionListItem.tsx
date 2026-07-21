@@ -16,7 +16,7 @@ import type { GitStatusSummary, SessionMeta, WorkspaceStatusDto } from "../../li
 import { sessionLabel } from "../../lib/types"
 import { basename, formatCompactTime, cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
-import { RunningDot, TextInput, Tooltip } from "../atoms"
+import { RunningDot, Tooltip } from "../atoms"
 import { ConfirmDialog } from "./ConfirmDialog"
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu"
 import { SessionRowActions } from "./SessionRowActions"
@@ -24,6 +24,7 @@ import {
   SessionRowSubtitle,
   sessionRowHasSubtitle,
 } from "./SessionRowSubtitle"
+import { Input } from "@/components/ui/input"
 
 type SessionListItemProps = {
   session: SessionMeta
@@ -289,7 +290,7 @@ export const SessionListItem = memo(function SessionListItem({
           </span>
 
           {isEditing ? (
-            <TextInput
+            <Input
               autoFocus
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
