@@ -304,13 +304,10 @@ export const SessionListItem = memo(function SessionListItem({
             <Tooltip label={label}>
               <p
                 className={cn(
-                  "min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-sm",
-                  // Soft edge always; on hover/focus widen the dissolve so the
-                  // title fades under the trailing action tray. Keep the fade
-                  // short/soft so dark themes don't read a bright tip.
-                  "[mask-image:linear-gradient(to_right,black_0%,black_calc(100%-8px),transparent_100%)]",
-                  "group-hover:[mask-image:linear-gradient(to_right,black_0%,black_calc(100%-72px),transparent_100%)]",
-                  "group-focus-within:[mask-image:linear-gradient(to_right,black_0%,black_calc(100%-72px),transparent_100%)]",
+                  // Plain ellipsis — no mask-image fade on hover (DESIGN: quiet chrome).
+                  "min-w-0 flex-1 truncate text-left text-sm",
+                  // Reserve room for absolute trailing actions so "…" stops before them.
+                  "group-hover:pr-[5.5rem] group-focus-within:pr-[5.5rem]",
                   isActive ? "text-ink" : "text-ink-secondary",
                 )}
               >
@@ -340,24 +337,6 @@ export const SessionListItem = memo(function SessionListItem({
           />
         ) : null}
       </span>
-
-      {/* Surface scrub under trailing actions — long titles dissolve into the
-          row chrome instead of sitting under the pin/archive/more icons. */}
-      {isEditing ? null : (
-        <span
-          aria-hidden
-          className={cn(
-            "pointer-events-none absolute inset-y-0 right-0 z-[1] w-[5.75rem] rounded-r-sm",
-            "opacity-0 transition-opacity duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-            "group-hover:opacity-100 group-focus-within:opacity-100",
-            // Match the sidebar panel exactly — translucent fills read as a
-            // bright tip on dark themes.
-            "bg-surface",
-            // Soft left edge so the title fades into the sidebar toward the buttons.
-            "[mask-image:linear-gradient(to_left,black_0%,black_55%,transparent_100%)]",
-          )}
-        />
-      )}
 
       {isEditing ? null : (
         <SessionRowActions
