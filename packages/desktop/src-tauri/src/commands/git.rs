@@ -982,12 +982,40 @@ pub struct CreatePrOutcome {
 }
 
 /// Whether `gh` is installed and authenticated for this cwd.
-pub(crate) fn gh_available(cwd: &std::path::Path) -> bool {
-    let gh_check = crate::win_console::command("gh")
-        .args(["auth", "status"])
-        .current_dir(cwd)
-        .output();
-    matches!(&gh_check, Ok(out) if out.status.success())
+/// Cheap, process-wide cache for "is `gh` on PATH?". Avoids re-spawning
+/// `gh` on every BranchPicker / PR-tab poll. Auth failures are still handled
+/// by callers treating a failed `gh pr view` as "no PR".
+fn gh_bin_available() -> bool {
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+
+    static CACHE: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
+    const TTL: Duration = Duration::from_secs(120);
+
+    if let Ok(guard) = CACHE.lock() {
+        if let Some((at, ok)) = *guard {
+            if at.elapsed() < TTL {
+                return ok;
+            }
+        }
+    }
+
+    // `gh --version` is local and fast; do **not** use `gh auth status` here —
+    // that was a multi-hundred-ms (sometimes network) tax on every new session.
+    let ok = crate::win_console::command("gh")
+        .arg("--version")
+        .output()
+        .map(|out| out.status.success())
+        .unwrap_or(false);
+
+    if let Ok(mut guard) = CACHE.lock() {
+        *guard = Some((Instant::now(), ok));
+    }
+    ok
+}
+
+pub(crate) fn gh_available(_cwd: &std::path::Path) -> bool {
+    gh_bin_available()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1064,7 +1092,13 @@ pub(crate) fn summarize_status_checks(rollup: &[serde_json::Value]) -> String {
 /// for the common "no PR yet" case, so the Changes UI can poll safely.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
-pub fn git_pr_status(cwd: String) -> DesktopResult<BranchPrStatus> {
+pub async fn git_pr_status(cwd: String) -> DesktopResult<BranchPrStatus> {
+    tokio::task::spawn_blocking(move || git_pr_status_sync(cwd))
+        .await
+        .map_err(|e| DesktopError::Message(format!("git_pr_status worker failed: {e}")))?
+}
+
+fn git_pr_status_sync(cwd: String) -> DesktopResult<BranchPrStatus> {
     let path = std::path::PathBuf::from(&cwd);
     if !gh_available(&path) {
         return Ok(BranchPrStatus {
