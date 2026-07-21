@@ -98,9 +98,12 @@ are; the transcript is always derived.
   `InjectionScanHook` (prompt-injection scanning of tool results, off by default).
 - **Workspace isolation & snapshots** — `core::Workspaces`
   (`packages/engine/crates/core/src/workspace.rs`); sole implementation shells out to git
-  (`packages/engine/crates/workspace/src/lib.rs`). Root sessions can get a git worktree
-  (verify-then-merge lifecycle); per-turn snapshots back `/undo`/`/redo`. Spawnable roles
-  with `isolation != Never` get per-subagent worktrees.
+  (`packages/engine/crates/workspace/src/lib.rs`). Root sessions record an isolation
+  policy at `create_session` but **defer** worktree provision/attach until the first
+  `prompt` (`loop/src/workspace_ensure.rs`); callers can reuse an existing worktree via
+  `NewSessionParams.reuse_workspace_id`, capped per project (`GitWorktrees::max_per_base`,
+  default 5). Per-turn snapshots back `/undo`/`/redo`. Spawnable roles with
+  `isolation != Never` get per-subagent worktrees.
 - **Command execution** — `core::Executor` (`packages/engine/crates/core/src/executor.rs`)
   with backends in `packages/engine/crates/executors/src/` (local `/bin/sh`, docker, ssh,
   apptainer, serverless stub). `BashTool` takes an `Arc<dyn Executor>`; only

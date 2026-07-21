@@ -12,6 +12,10 @@ pub struct CreateSessionInput {
     pub cwd: Option<String>,
     /// `never` | `optional` | `required` — falls back to prefs.default_isolation.
     pub isolation: Option<String>,
+    /// Attach an existing worktree (see `list_workspaces`) on the first
+    /// prompt instead of provisioning a new one. Ignored when the resolved
+    /// isolation policy doesn't want a workspace.
+    pub reuse_workspace_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -109,6 +113,7 @@ pub async fn create_session(
             model,
             cwd,
             isolation,
+            reuse_workspace_id: input.reuse_workspace_id.filter(|s| !s.is_empty()),
             ..NewSessionParams::default()
         })
         .await?;

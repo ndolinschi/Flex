@@ -30,6 +30,7 @@ mod subagent;
 mod tool_results;
 mod turn;
 mod workflow;
+mod workspace_ensure;
 
 pub use agent::NativeAgent;
 pub use builder::{LoopLimits, NativeAgentBuilder, RetryPolicy};

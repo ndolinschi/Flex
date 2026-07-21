@@ -354,7 +354,11 @@ pub fn build_service(
                 // Opt-in isolation per session; backend always available for undo snapshots.
                 let worktrees = worktrees_dir()
                     .unwrap_or_else(|_| std::env::temp_dir().join("agentloop-desktop-worktrees"));
-                config.workspace = Some(Arc::new(GitWorktrees::new(worktrees)));
+                let mut backend = GitWorktrees::new(worktrees);
+                if let Some(cap) = cfg.prefs.max_workspaces_per_project {
+                    backend = backend.with_max_per_base(cap.max(1) as usize);
+                }
+                config.workspace = Some(Arc::new(backend));
                 // User-configured MCP servers (`~/.config/agentloop/mcp/*.toml`,
                 // managed by the "MCP Servers" section of the Customize page).
                 // Loading them here means a saved add/remove/toggle only takes

@@ -71,9 +71,12 @@ that anatomy, and it helps to name where each lives:
 
 Isolation is opt-in and top-level only: a root session whose effective
 `IsolationPolicy` (from `NewSessionParams.isolation`, else its role's policy,
-else the engine default) asks for it is provisioned a git worktree at
-`create_session` (depth 0); `EngineService::{integrate,discard}_session` verify
-and merge it back or drop it. Subagents never provision their own — they share
+else the engine default) asks for it records the policy at `create_session`
+(depth 0) but **defers** worktree provision/attach until the first `prompt`
+(`loop::workspace_ensure`); `NewSessionParams.reuse_workspace_id` can attach an
+existing worktree instead of creating one, capped per project
+(`GitWorktrees::max_per_base`, default 5). `EngineService::{integrate,discard}_session`
+verify and merge it back or drop it. Subagents never provision their own — they share
 the parent's tree. The loop stays free of process code: it calls the injected
 `Workspaces` trait, whose only implementation (`workspace` crate) shells out to
 `git`. `Workspaces::{snapshot,restore}` back per-turn checkpoints: the loop
@@ -291,15 +294,18 @@ at the composition root (`AgentBuilder::enable_plugin("search")`).
   with VS Code/JetBrains sign-ins (merge-upsert, never clobber).
 - **Workspace isolation is an injected trait, top-level only, opt-in**: `core::Workspaces`
   (impl `workspace` crate, the sole `git` edge) keeps process code out of `loop`, mirroring
-  `SessionStore`/`Provider` injection. Only depth-0 sessions provision a worktree (subagents
-  inherit the parent's cwd — no per-child worktrees, no N-way merge); redirecting the single
-  `SessionMeta.cwd → ToolContext.cwd` value sandboxes every tool with no tool changes.
-  Trigger is role-declared (`RoleSpec.isolation`) with a `NewSessionParams.isolation` /
-  `--isolate` override; default `Never` keeps behavior byte-identical. Lifecycle is
-  verify-then-merge (`integrate_session` commits, runs the configured verify command, and
-  fast-forwards the base — else keeps the worktree); `SessionMeta.base_cwd` lets resume fall
-  back when a workspace is gone. Wire additions (`IsolationPolicy`, the `Workspace*` events,
-  `SessionMeta.{isolation,workspace_id,base_cwd}`) are additive.
+  `SessionStore`/`Provider` injection. Only depth-0 sessions get an isolated worktree
+  (subagents inherit the parent's cwd — no per-child worktrees, no N-way merge); the
+  policy is recorded at `create_session` but provision/attach runs on the first `prompt`
+  (`workspace_ensure`), with optional `reuse_workspace_id` and a per-project cap
+  (`max_per_base`, default 5). Redirecting the single `SessionMeta.cwd → ToolContext.cwd`
+  value sandboxes every tool with no tool changes. Trigger is role-declared
+  (`RoleSpec.isolation`) with a `NewSessionParams.isolation` / `--isolate` override;
+  default `Never` keeps behavior byte-identical. Lifecycle is verify-then-merge
+  (`integrate_session` commits, runs the configured verify command, and fast-forwards
+  the base — else keeps the worktree); `SessionMeta.base_cwd` lets resume fall back when
+  a workspace is gone. Wire additions (`IsolationPolicy`, the `Workspace*` events,
+  `SessionMeta.{isolation,workspace_id,base_cwd,reuse_workspace_id}`) are additive.
 - **Engine roadmap** (north star: true parallelism and fault isolation via actors,
   distribution by default, swarms/metaswarms of any models, no bloat):
   - **Session actor** — shipped: the tool worker pool, a single-writer `SessionActor` mailbox

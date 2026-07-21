@@ -61,7 +61,11 @@ export const ContextBar = ({
           <IsolationBadge sessionId={sessionId} onError={onError} />
         ) : null}
         {!isolated && sessionId ? (
-          <IsolationPicker sessionId={sessionId} disabled={disabled} />
+          <IsolationPicker
+            sessionId={sessionId}
+            projectCwd={projectCwd || cwd}
+            disabled={disabled}
+          />
         ) : null}
       </div>
 

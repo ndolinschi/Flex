@@ -145,27 +145,41 @@ mod run_goal {
 
 /// An `EngineService` wired to a mock isolation backend that provisions
 /// successfully, over a real (empty) native agent and an in-memory store.
+/// Returns the typed `NativeAgent` alongside the service so tests can drive
+/// deferred first-turn provisioning without a mock provider.
 fn isolated_service(
     store: std::sync::Arc<MemoryStore>,
-) -> (EngineService, std::sync::Arc<MockWorkspaces>) {
+) -> (
+    EngineService,
+    std::sync::Arc<agentloop_loop::NativeAgent>,
+    std::sync::Arc<MockWorkspaces>,
+) {
     let mock = std::sync::Arc::new(MockWorkspaces::new());
     let agent = NativeAgentBuilder::new(store.clone())
         .workspace(mock.clone())
         .build();
-    let mut service = EngineService::new(agent, store);
+    let mut service = EngineService::new(agent.clone(), store);
     service.workspace = Some(mock.clone());
     service.isolation_default = IsolationPolicy::Required;
-    (service, mock)
+    (service, agent, mock)
 }
 
-async fn open_isolated(service: &EngineService) -> SessionId {
-    service
+async fn open_isolated(service: &EngineService, agent: &agentloop_loop::NativeAgent) -> SessionId {
+    let id = service
         .create_session(NewSessionParams {
             cwd: Some(PathBuf::from("/repo")),
             ..NewSessionParams::default()
         })
         .await
-        .expect("isolated session opens")
+        .expect("isolated session opens");
+    // Deferred isolation: create doesn't provision. Drive the same first-turn
+    // ensure step run_turn would, so the rest of these tests see the
+    // provisioned workspace they expect.
+    agent
+        .ensure_workspace_for_test(&id)
+        .await
+        .expect("first-turn workspace provision");
+    id
 }
 
 #[tokio::test]
@@ -222,8 +236,8 @@ async fn delete_session_removes_from_store() {
 #[tokio::test]
 async fn integrate_repoints_cwd_and_records_outcome() {
     let store = std::sync::Arc::new(MemoryStore::new());
-    let (service, mock) = isolated_service(store.clone());
-    let id = open_isolated(&service).await;
+    let (service, agent, mock) = isolated_service(store.clone());
+    let id = open_isolated(&service, &agent).await;
     assert_ne!(
         store.get_meta(&id).await.expect("meta").cwd,
         PathBuf::from("/repo")
@@ -245,8 +259,8 @@ async fn integrate_repoints_cwd_and_records_outcome() {
 #[tokio::test]
 async fn discard_repoints_cwd_to_base() {
     let store = std::sync::Arc::new(MemoryStore::new());
-    let (service, mock) = isolated_service(store.clone());
-    let id = open_isolated(&service).await;
+    let (service, agent, mock) = isolated_service(store.clone());
+    let id = open_isolated(&service, &agent).await;
 
     service.discard_session(&id).await.expect("discard");
     assert_eq!(mock.discard_calls(), 1);
@@ -258,8 +272,8 @@ async fn discard_repoints_cwd_to_base() {
 #[tokio::test]
 async fn status_reports_for_isolated_only() {
     let store = std::sync::Arc::new(MemoryStore::new());
-    let (service, _mock) = isolated_service(store.clone());
-    let id = open_isolated(&service).await;
+    let (service, agent, _mock) = isolated_service(store.clone());
+    let id = open_isolated(&service, &agent).await;
     assert!(
         service
             .workspace_status(&id)
@@ -292,8 +306,8 @@ async fn integrate_on_a_non_isolated_session_errors() {
 #[tokio::test]
 async fn revert_restores_workspace_and_records_marker() {
     let store = std::sync::Arc::new(MemoryStore::new());
-    let (service, mock) = isolated_service(store.clone());
-    let id = open_isolated(&service).await;
+    let (service, agent, mock) = isolated_service(store.clone());
+    let id = open_isolated(&service, &agent).await;
 
     service.revert(&id, "snap-abc").await.expect("revert ok");
     assert_eq!(mock.restore_calls(), 1, "workspace restored once");

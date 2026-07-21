@@ -1,15 +1,27 @@
 //! Isolated-workspace lifecycle: integrate, discard, revert, status.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use agentloop_contracts::{AgentEvent, IntegrationOutcome, SessionId, SessionMeta};
-use agentloop_core::WorkspaceStatus;
+use agentloop_core::{Workspace, WorkspaceStatus};
 
 use crate::EngineResult;
 use crate::error::EngineServiceError;
 use crate::service::EngineService;
 
 impl EngineService {
+    /// Enumerate provisioned workspaces that belong to `base` (still on
+    /// disk), for the UI's "reuse workspace" picker. `Ok(vec![])` when no
+    /// workspace backend is configured, `base` isn't a git repo, or the
+    /// backend can't enumerate — never an error for those "nothing there"
+    /// cases.
+    pub async fn list_workspaces(&self, base: &Path) -> EngineResult<Vec<Workspace>> {
+        match &self.workspace {
+            Some(backend) => Ok(backend.list(base).await?),
+            None => Ok(Vec::new()),
+        }
+    }
+
     /// Whether the session currently runs in an isolated workspace (still
     /// pointing at its worktree — false once integrated/discarded).
     pub async fn is_isolated(&self, session: &SessionId) -> EngineResult<bool> {

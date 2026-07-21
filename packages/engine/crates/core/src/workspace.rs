@@ -109,4 +109,33 @@ pub trait Workspaces: Send + Sync {
     /// or any branch — the restored state simply appears as pending changes.
     /// Fails with [`WorkspaceError::NotFound`] if the snapshot id is unknown.
     async fn restore(&self, root: &Path, snapshot_id: &str) -> Result<(), WorkspaceError>;
+
+    /// List provisioned workspaces that belong to `base` and are still on
+    /// disk. Empty when the backend cannot enumerate (`base` not a git repo,
+    /// no worktrees provisioned yet); errors are reserved for hard I/O
+    /// failures. Used by the UI's reuse-workspace picker.
+    async fn list(&self, base: &Path) -> Result<Vec<Workspace>, WorkspaceError>;
+
+    /// Attach an existing workspace by `workspace_id` to `session` instead of
+    /// provisioning a fresh one. Semantics mirror [`Self::provision`]:
+    /// `Ok(Some(_))` when the named workspace exists and can be attached,
+    /// `Ok(None)` when it's missing and `policy` is
+    /// [`IsolationPolicy::Optional`], `Err` when it's missing (or attachment
+    /// fails) and `policy` is [`IsolationPolicy::Required`].
+    async fn attach(
+        &self,
+        base: &Path,
+        workspace_id: &str,
+        session: &SessionId,
+        policy: IsolationPolicy,
+    ) -> Result<Option<Workspace>, WorkspaceError>;
+
+    /// Maximum live worktrees allowed per base project before
+    /// [`Self::provision`] refuses to create a new one. Default: 5. The
+    /// caller-visible signal on hitting the cap is a
+    /// [`WorkspaceError::GitFailed`] whose message names the cap and
+    /// suggests reusing or discarding an existing workspace.
+    fn max_per_base(&self) -> usize {
+        5
+    }
 }

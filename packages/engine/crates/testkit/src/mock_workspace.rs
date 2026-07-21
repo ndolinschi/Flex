@@ -2,6 +2,7 @@
 //! loop/engine tests can assert isolation behavior without spawning `git`.
 
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
@@ -21,11 +22,18 @@ pub struct MockWorkspaces {
     root_prefix: PathBuf,
     /// Canned result for `integrate`.
     integrate_outcome: IntegrationOutcome,
+    /// (base, workspace) pairs recorded from `provision` for `list`/`attach`
+    /// to serve back — Mutex is enough since tests don't hit this hot.
+    provisioned: Mutex<Vec<(PathBuf, Workspace)>>,
+    /// Cap this backend advertises via [`Workspaces::max_per_base`].
+    max_per_base: usize,
     provision_calls: AtomicUsize,
     integrate_calls: AtomicUsize,
     discard_calls: AtomicUsize,
     snapshot_calls: AtomicUsize,
     restore_calls: AtomicUsize,
+    attach_calls: AtomicUsize,
+    list_calls: AtomicUsize,
 }
 
 impl Default for MockWorkspaces {
@@ -35,11 +43,15 @@ impl Default for MockWorkspaces {
             snapshots_available: true,
             root_prefix: PathBuf::from("/tmp/mock-workspaces"),
             integrate_outcome: IntegrationOutcome::Merged { files_changed: 1 },
+            provisioned: Mutex::new(Vec::new()),
+            max_per_base: 5,
             provision_calls: AtomicUsize::new(0),
             integrate_calls: AtomicUsize::new(0),
             discard_calls: AtomicUsize::new(0),
             snapshot_calls: AtomicUsize::new(0),
             restore_calls: AtomicUsize::new(0),
+            attach_calls: AtomicUsize::new(0),
+            list_calls: AtomicUsize::new(0),
         }
     }
 }
@@ -71,6 +83,23 @@ impl MockWorkspaces {
         self
     }
 
+    /// Advertise a specific per-base cap (default 5).
+    pub fn with_max_per_base(mut self, cap: usize) -> Self {
+        self.max_per_base = cap.max(1);
+        self
+    }
+
+    /// Seed a workspace as if it had been provisioned earlier — useful for
+    /// exercising the `attach` and `list` paths from tests without going
+    /// through `provision` first.
+    pub fn seed_workspace(self, base: impl Into<PathBuf>, workspace: Workspace) -> Self {
+        self.provisioned
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .push((base.into(), workspace));
+        self
+    }
+
     pub fn provision_calls(&self) -> usize {
         self.provision_calls.load(Ordering::SeqCst)
     }
@@ -85,6 +114,12 @@ impl MockWorkspaces {
     }
     pub fn restore_calls(&self) -> usize {
         self.restore_calls.load(Ordering::SeqCst)
+    }
+    pub fn attach_calls(&self) -> usize {
+        self.attach_calls.load(Ordering::SeqCst)
+    }
+    pub fn list_calls(&self) -> usize {
+        self.list_calls.load(Ordering::SeqCst)
     }
 }
 
@@ -104,11 +139,16 @@ impl Workspaces for MockWorkspaces {
                 Ok(None)
             };
         }
-        Ok(Some(Workspace {
+        let workspace = Workspace {
             id: format!("ws-{session}"),
             root: self.root_prefix.join(session.to_string()),
             base_ref: "mockbase".to_owned(),
-        }))
+        };
+        self.provisioned
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .push((base.to_path_buf(), workspace.clone()));
+        Ok(Some(workspace))
     }
 
     async fn status(&self, _root: &Path) -> Result<WorkspaceStatus, WorkspaceError> {
@@ -145,5 +185,53 @@ impl Workspaces for MockWorkspaces {
     async fn restore(&self, _root: &Path, _snapshot_id: &str) -> Result<(), WorkspaceError> {
         self.restore_calls.fetch_add(1, Ordering::SeqCst);
         Ok(())
+    }
+
+    async fn list(&self, base: &Path) -> Result<Vec<Workspace>, WorkspaceError> {
+        self.list_calls.fetch_add(1, Ordering::SeqCst);
+        let provisioned = self
+            .provisioned
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone();
+        Ok(provisioned
+            .into_iter()
+            .filter_map(|(b, w)| (b == base).then_some(w))
+            .collect())
+    }
+
+    async fn attach(
+        &self,
+        base: &Path,
+        workspace_id: &str,
+        _session: &SessionId,
+        policy: IsolationPolicy,
+    ) -> Result<Option<Workspace>, WorkspaceError> {
+        self.attach_calls.fetch_add(1, Ordering::SeqCst);
+        if !self.available {
+            return if policy.is_required() {
+                Err(WorkspaceError::NotAGitRepo(base.to_path_buf()))
+            } else {
+                Ok(None)
+            };
+        }
+        let found = self
+            .provisioned
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .iter()
+            .find(|(b, w)| b == base && w.id == workspace_id)
+            .map(|(_, w)| w.clone());
+        match found {
+            Some(w) => Ok(Some(w)),
+            None if policy.is_required() => Err(WorkspaceError::NotFound(
+                self.root_prefix.join(workspace_id),
+            )),
+            None => Ok(None),
+        }
+    }
+
+    fn max_per_base(&self) -> usize {
+        self.max_per_base
     }
 }

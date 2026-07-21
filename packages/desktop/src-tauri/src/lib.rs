@@ -341,6 +341,7 @@ pub fn run() {
             components_plugin::components_detail,
             commands::is_isolated,
             commands::workspace_status,
+            commands::list_workspaces,
             commands::integrate_session,
             commands::discard_session,
             commands::revert,

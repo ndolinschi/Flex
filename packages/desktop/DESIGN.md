@@ -304,7 +304,7 @@ FilesChangedCard) sits **outside** the virtual window. Scroll-down FAB:
 | Changes | Quiet title row (no `border-b`); select toolbar `h-6` (dedicated row, not `--header-height`); file list `px-2` / rows `px-2.5` |
 | Pull Request | Title / # / state / checks; Open in browser; DiffView of `gh pr diff` (tab only when branch has a PR) |
 | Files | Open-buffer chips (`Tab` sm, strip `gap-1.5` + `border-b`) + Monaco / explorer (explorer header borderless under chips/TabStrip) |
-| Terminal | Title row borderless under TabStrip; New / List; agent subtitle separate bordered row |
+| Terminal | Title row **keeps** `border-b` (separates chrome from xterm, same rationale as BrowserToolbar); New / List; agent subtitle separate bordered row |
 | Components | Count + List/Refresh (borderless under TabStrip); Files-style open chips with `gap-1.5` + `border-b`; bottom mini-prompt + Send |
 | Browser | Toolbar `z-20` over webview slot — **keeps** `border-b` (separates chrome from native webview) |
 | Database | Connection count chrome (borderless under TabStrip when present); schema chips `py-1.5` |

@@ -127,8 +127,11 @@ export const TerminalTab = ({
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Header — fixed chrome height so tab switches don't jump; agent
-          subtitle lives on a separate non-chrome row below. */}
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 px-2.5">
+          subtitle lives on a separate non-chrome row below. Keep `border-b`
+          like BrowserToolbar: this row separates chrome from the xterm
+          surface (a native-like body), not a second rule under TabStrip
+          with only hairline content between. */}
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5">
         <span className="min-w-0 flex-1 truncate text-sm text-ink">
           {isAgentSelected
             ? "Agent terminal"

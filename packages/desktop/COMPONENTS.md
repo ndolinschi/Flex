@@ -310,7 +310,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Spinner | ✅ done | `Spinner` atom | Thin size wrapper (`sm`/`md`/`lg`) over `@/components/ui/spinner` |
 | Switch | ✅ done | Settings prefs + MCP/routine flags | Green ON (`bg-switch-on`) |
 | Table | ✅ done | DatabaseTab results | Compact striping retained |
-| Tabs | skip (justified) | panel/file chrome | Keep custom `Tab*`; settings uses left nav (not Tabs) |
+| Tabs | skip (justified) | panel/file chrome | Keep custom `Tab*`/`TabStrip` (`h-6`, `px-2.5`, `fill-2` selected) — content-pane open tabs + file chips need DnD, close, overscan masks; shadcn `Tabs` is for in-page section switching. All pane/tool strips share the same atom so heights/gutters stay aligned. |
 | Textarea | ✅ done | Forms, settings, PromptTab, PR/bug | Composer draft stays specialized raw `<textarea>` |
 | Toast | n/a | — | Use **Sonner** |
 | Toggle | ✅ done | Bypass shield, session pin | Distinct from Switch |

@@ -186,6 +186,9 @@ impl SessionStore for JsonlStore {
             model,
             mode,
             cwd,
+            workspace_id,
+            base_cwd,
+            reuse_workspace_id,
         } = patch;
         if let Some(title) = title {
             next.title = Some(title);
@@ -201,6 +204,29 @@ impl SessionStore for JsonlStore {
         }
         if let Some(mode) = mode {
             next.mode = Some(mode);
+        }
+        // Empty string / empty path clears; a non-empty value sets. Matches
+        // the convention in `MemoryStore::update_meta` — see there.
+        if let Some(workspace_id) = workspace_id {
+            next.workspace_id = if workspace_id.is_empty() {
+                None
+            } else {
+                Some(workspace_id)
+            };
+        }
+        if let Some(base_cwd) = base_cwd {
+            next.base_cwd = if base_cwd.as_os_str().is_empty() {
+                None
+            } else {
+                Some(base_cwd)
+            };
+        }
+        if let Some(reuse_workspace_id) = reuse_workspace_id {
+            next.reuse_workspace_id = if reuse_workspace_id.is_empty() {
+                None
+            } else {
+                Some(reuse_workspace_id)
+            };
         }
         next.updated_at_ms = now_ms();
         self.append_record(&next.id, &LineRecord::Meta { meta: next.clone() })?;
@@ -423,6 +449,7 @@ mod tests {
             workspace_id: None,
             executor: None,
             base_cwd: None,
+            reuse_workspace_id: None,
             created_at_ms: 1,
             updated_at_ms: 1,
         }
@@ -553,8 +580,7 @@ mod tests {
                         title: Some("updated".to_owned()),
                         provider_session_id: Some("remote".to_owned()),
                         model: Some(ModelRef::from("anthropic/model-x")),
-                        mode: None,
-                        cwd: None,
+                        ..Default::default()
                     },
                 )
                 .await

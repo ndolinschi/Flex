@@ -63,6 +63,12 @@ pub struct SessionMeta {
     /// tells integration where to merge back. `None` when not isolated.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_cwd: Option<PathBuf>,
+    /// Deferred-provision hint: when isolation is requested at create time we
+    /// don't provision yet; the workspace is created (or attached) on the
+    /// first prompt. `Some(id)` = attach the existing workspace with that id
+    /// instead of creating a new one; cleared once provisioning has run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reuse_workspace_id: Option<String>,
     pub created_at_ms: u64,
     pub updated_at_ms: u64,
 }
@@ -82,6 +88,20 @@ pub struct SessionMetaPatch {
     /// after an isolated workspace was integrated or removed).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cwd: Option<PathBuf>,
+    /// Set/clear the provisioned workspace id (e.g. after first-prompt
+    /// provisioning attaches or creates a worktree). `Some(String::new())`
+    /// clears the field; `Some(id)` sets it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
+    /// Set/clear the original project directory. Same clear-with-empty
+    /// convention as [`Self::workspace_id`]: `Some(PathBuf::new())` clears,
+    /// `Some(path)` sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_cwd: Option<PathBuf>,
+    /// Set/clear the pending reuse hint. `Some(String::new())` clears it;
+    /// `Some(id)` sets it. Cleared once first-prompt provisioning has run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reuse_workspace_id: Option<String>,
 }
 
 /// Token accounting for one model call or aggregated over a turn.

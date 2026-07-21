@@ -670,6 +670,18 @@ export const workspaceStatus = (
 ): Promise<WorkspaceStatusDto | null> =>
   invoke("workspace_status", { sessionId })
 
+export type WorkspaceInfo = {
+  id: string
+  path: string
+  baseRef: string
+}
+
+/** Enumerate provisioned workspaces for `cwd`. Empty when no worktrees have
+ * been created for this project yet — the UI's reuse picker treats that as
+ * "New workspace" being the only option. */
+export const listWorkspaces = (cwd: string): Promise<WorkspaceInfo[]> =>
+  invoke("list_workspaces", { cwd })
+
 export const integrateSession = (sessionId: string): Promise<unknown> =>
   invoke("integrate_session", { sessionId })
 

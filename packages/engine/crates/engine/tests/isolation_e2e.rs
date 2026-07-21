@@ -1,14 +1,16 @@
 //! End-to-end isolation over a real git repo and the real `GitWorktrees`
-//! backend: `EngineService` provisions a worktree on session creation, an edit
-//! there stays out of the base tree, and `integrate_session` merges it back.
+//! backend: `EngineService` provisions a worktree on the first prompt of an
+//! isolated session (deferred from `create_session`), an edit there stays out
+//! of the base tree, and `integrate_session` merges it back.
 
 use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
 
-use agentloop_contracts::{IsolationPolicy, NewSessionParams};
+use agentloop_contracts::{IsolationPolicy, ModelRef, NewSessionParams, PromptInput, TurnOptions};
 use agentloop_core::ProviderRegistry;
 use agentloop_engine::{EngineConfig, EngineService};
+use agentloop_testkit::{MOCK_MODEL, MOCK_PROVIDER_ID, MockProvider};
 use agentloop_workspace::GitWorktrees;
 
 #[allow(clippy::expect_used)]
@@ -37,9 +39,13 @@ async fn engine_provisions_a_real_worktree_and_merges_it_back() {
     let worktrees = tempfile::tempdir().expect("worktrees");
     init_repo(base.path());
 
+    let mut providers = ProviderRegistry::new();
+    providers.register(Arc::new(MockProvider::new()));
+    let default_model = Some(ModelRef(format!("{MOCK_PROVIDER_ID}/{MOCK_MODEL}")));
+
     let service = EngineService::native(
-        ProviderRegistry::new(),
-        None,
+        providers,
+        default_model,
         EngineConfig {
             cwd: Some(base.path().to_path_buf()),
             workspace: Some(Arc::new(GitWorktrees::new(worktrees.path()))),
@@ -56,10 +62,31 @@ async fn engine_provisions_a_real_worktree_and_merges_it_back() {
         })
         .await
         .expect("isolated session opens");
-    assert!(service.is_isolated(&session).await.expect("meta"));
 
+    // Deferred: create does not provision yet.
+    assert!(
+        !service.is_isolated(&session).await.expect("meta"),
+        "workspace not provisioned until the first prompt"
+    );
+    assert!(
+        !worktrees.path().join(session.to_string()).exists(),
+        "no worktree directory yet"
+    );
+
+    // Drive one prompt: the MockProvider's default turn is a no-tool end-turn,
+    // so this executes just far enough to run the first-turn workspace ensure.
+    service
+        .prompt(&session, PromptInput::text("hello"), TurnOptions::default())
+        .await
+        .expect("first turn drives workspace ensure");
+
+    assert!(service.is_isolated(&session).await.expect("meta"));
     let worktree = worktrees.path().join(session.to_string());
-    assert!(worktree.is_dir(), "a real worktree was created");
+    assert!(
+        worktree.is_dir(),
+        "worktree provisioned on first prompt at {}",
+        worktree.display()
+    );
     std::fs::write(worktree.join("added.txt"), "from the agent\n").expect("write in worktree");
     assert!(
         !base.path().join("added.txt").exists(),

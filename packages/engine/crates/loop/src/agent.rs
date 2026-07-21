@@ -54,6 +54,22 @@ impl NativeAgent {
         self.install_handle(id, 0)
     }
 
+    /// Drive first-prompt workspace provisioning for a session without
+    /// running a full turn. Intended for tests that want to exercise the
+    /// deferred-isolation path without going through a mock provider.
+    ///
+    /// Semantics match what [`crate::turn::run_turn`] does on the first
+    /// prompt of an isolated root session: no-op for non-isolated sessions
+    /// or ones already provisioned; provisions (or attaches a reuse hint)
+    /// otherwise, updates `SessionMeta`, and emits `WorkspaceProvisioned`.
+    #[doc(hidden)]
+    pub async fn ensure_workspace_for_test(&self, id: &SessionId) -> Result<(), AgentError> {
+        let handle = self.handle(id)?;
+        let meta = self.deps.store.get_meta(id).await?;
+        crate::workspace_ensure::ensure_root_workspace(&self.deps, &handle, meta).await?;
+        Ok(())
+    }
+
     /// Relay a child's persisted/control events into the parent stream as
     /// [`AgentEvent::SubagentEvent`], until `stop` is tripped. Token deltas
     /// are dropped — the tree renders from materialized child events.
@@ -167,49 +183,26 @@ impl Agent for NativeAgent {
             .isolation
             .unwrap_or_else(|| self.deps.roles.isolation(role.as_deref()));
 
-        let mut cwd = base_cwd.clone();
-        let mut isolation = None;
-        let mut workspace_id = None;
-        let mut base = None;
-        let mut provisioned_event = None;
-        if policy.wants_isolation() {
-            isolation = Some(policy);
-            match &self.deps.workspace {
-                Some(backend) => match backend.provision(&base_cwd, &id, policy).await {
-                    Ok(Some(workspace)) => {
-                        cwd = workspace.root.clone();
-                        base = Some(base_cwd.clone());
-                        workspace_id = Some(workspace.id.clone());
-                        provisioned_event = Some(AgentEvent::WorkspaceProvisioned {
-                            workspace_id: workspace.id,
-                            path: workspace.root,
-                            base_ref: workspace.base_ref,
-                        });
-                    }
-                    Ok(None) => tracing::warn!(
-                        target: "workspace", session = %id,
-                        "isolation optional but base cannot be isolated; continuing in place"
-                    ),
-                    Err(err) if policy.is_required() => {
-                        return Err(AgentError::Other(format!(
-                            "isolation required but could not be provisioned: {err}"
-                        )));
-                    }
-                    Err(err) => tracing::warn!(
-                        target: "workspace", session = %id,
-                        "isolation failed; continuing in place: {err}"
-                    ),
-                },
-                None if policy.is_required() => {
-                    return Err(AgentError::Other(
-                        "isolation required but no workspace backend is configured".to_owned(),
-                    ));
-                }
-                None => tracing::warn!(
-                    target: "workspace", session = %id,
-                    "isolation requested but no workspace backend configured; continuing in place"
-                ),
-            }
+        // Deferred isolation: when a session asks to be isolated we record
+        // the policy (and any reuse hint) but keep `cwd` on the project
+        // directory with `workspace_id`/`base_cwd` empty. The actual worktree
+        // is created (or attached) on the first prompt — see
+        // `ensure_root_workspace`. This lets a user pick between "new" and
+        // an existing workspace after create_session returns, and avoids
+        // spawning `git` on the create hot path.
+        let isolation = policy.wants_isolation().then_some(policy);
+        let reuse_workspace_id = if policy.wants_isolation() {
+            params.reuse_workspace_id
+        } else {
+            None
+        };
+        if policy.is_required() && self.deps.workspace.is_none() {
+            // Fail fast: required isolation without a backend can never be
+            // satisfied — better to reject at create than to reject the
+            // first prompt after the user has already typed one.
+            return Err(AgentError::Other(
+                "isolation required but no workspace backend is configured".to_owned(),
+            ));
         }
 
         let meta = SessionMeta {
@@ -219,7 +212,7 @@ impl Agent for NativeAgent {
             parent_id: None,
             depth: 0,
             provider_session_id: None,
-            cwd,
+            cwd: base_cwd.clone(),
             model: params
                 .model
                 .or_else(|| self.deps.roles.chain(role.as_deref()).first().cloned())
@@ -232,9 +225,10 @@ impl Agent for NativeAgent {
             role,
             mode: params.mode,
             isolation,
-            workspace_id,
+            workspace_id: None,
             executor: self.deps.executor_id.clone(),
-            base_cwd: base,
+            base_cwd: None,
+            reuse_workspace_id,
             created_at_ms: now,
             updated_at_ms: now,
         };
@@ -243,9 +237,6 @@ impl Agent for NativeAgent {
         handle
             .emit_persistent(None, AgentEvent::SessionCreated { meta })
             .await?;
-        if let Some(event) = provisioned_event {
-            handle.emit_persistent(None, event).await?;
-        }
         handle
             .emit_persistent(
                 None,

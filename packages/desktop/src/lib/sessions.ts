@@ -38,6 +38,7 @@ export const newAgentCreateInput = (
   cwd?: string,
   model?: string | null,
   isolation?: IsolationPolicy | null,
+  reuseWorkspaceId?: string | null,
 ): CreateSessionInput => ({
   title: DEFAULT_SESSION_TITLE,
   ...(cwd ? { cwd } : {}),
@@ -45,4 +46,7 @@ export const newAgentCreateInput = (
   // Omitted when unset — `create_session` then falls back to the provider
   // profile's `default_isolation` (see commands.rs::create_session).
   ...(isolation ? { isolation } : {}),
+  // Only forwarded when the user picked an existing worktree; the backend
+  // ignores the hint unless the resolved isolation policy wants one.
+  ...(reuseWorkspaceId ? { reuseWorkspaceId } : {}),
 })

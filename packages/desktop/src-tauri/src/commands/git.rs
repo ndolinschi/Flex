@@ -1938,6 +1938,7 @@ mod commit_center_tests {
             workspace_id: None,
             executor: None,
             base_cwd: None,
+            reuse_workspace_id: None,
             created_at_ms: now,
             updated_at_ms: now,
         };
