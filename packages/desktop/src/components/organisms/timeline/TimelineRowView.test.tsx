@@ -100,6 +100,7 @@ describe("TimelineRowView", () => {
         row={{
           type: "user",
           id: "user-1",
+          messageId: "m-user-1",
           text: "What is about this repo?",
           tsMs: Date.now(),
         }}
