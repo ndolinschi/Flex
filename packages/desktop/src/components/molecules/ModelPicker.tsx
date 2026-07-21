@@ -93,7 +93,9 @@ export const ModelPicker = ({
             aria-label="Select model"
             className={cn(
               // h-6 pill to match ModePicker (DESIGN.md: Mode/Model pills h-6).
-              "h-6 max-w-[14rem] rounded-full border-input bg-transparent px-2 font-normal shadow-none",
+              // pl/pr asymmetric so leading icon and trailing chevron optically
+              // balance (same recipe as SelectTrigger size=xs).
+              "h-6 max-w-[14rem] gap-1 rounded-full border-input bg-transparent py-0 pl-2 pr-1.5 font-normal shadow-none",
             )}
           />
         }
@@ -106,7 +108,7 @@ export const ModelPicker = ({
           </span>
         ) : null}
         <ChevronDown
-          className="pointer-events-none size-4 shrink-0 text-muted-foreground"
+          className="pointer-events-none size-3 shrink-0 text-muted-foreground"
           aria-hidden
         />
       </DropdownMenuTrigger>

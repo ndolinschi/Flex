@@ -232,7 +232,7 @@ Use **padding** (`pt-*`), not margin — virtualizer `measureElement` must inclu
 | `IconButton` | `h-7 w-7` | Override **`h-6 w-6`**; icon `h-3.5 w-3.5` |
 | `Button` sm / md / lg | `h-7` / `h-8` / `h-9` | Prefer `h-6` override in panel headers |
 | Composer Plus / Bypass / Send | — | **`h-6 w-6`** circles |
-| Mode / Model pills | — | **`h-6`** `rounded-full px-2` |
+| Mode / Model pills | — | **`h-6`** `rounded-full pl-2 pr-1.5 gap-1`; trailing chevron `size-3` |
 | `Tab` md (panel) | **`h-6`** `px-2 rounded-md text-sm` | Must clear strip edges |
 | `Tab` sm (file chips) | **`h-6`** tighter pad, `text-xs` | Same strip |
 | `TextInput` | `h-8` | Settings search `h-7`; Welcome `h-9` |
@@ -274,7 +274,9 @@ when bootstrapped and not on the welcome route.
 
 1. Outer `px-3` → rail `max-w-[var(--content-rail)]`
 2. Optional `workersSlot` / HITL docked flush above the bubble
-3. ContextBar above bubble (`mb-1`, min-height status bar)
+3. ContextBar above bubble (`mb-1`, min-height status bar) — project/branch
+   comboboxes are `h-6` with addon `py-0` so folder/branch icons sit on the
+   text baseline (default InputGroupAddon `py-1.5` is for `h-8` forms)
 4. Bubble: `--radius-composer`, shadow-composer
 5. Textarea + toolbar both `px-2.5`
 
