@@ -1,6 +1,12 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { cn } from "../../lib/utils"
 import type { PlanSelectionAnchor } from "../../hooks/usePlanSelectionComment"
 
@@ -24,82 +30,76 @@ export const PlanCommentPopover = ({
   className,
 }: PlanCommentPopoverProps) => {
   const [body, setBody] = useState("")
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     setBody("")
-    if (draft) {
-      requestAnimationFrame(() => textareaRef.current?.focus())
-    }
   }, [draft])
-
-  useEffect(() => {
-    if (!draft) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault()
-        onCancel()
-      }
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [draft, onCancel])
 
   if (!draft) return null
 
   const trimmed = body.trim()
   const canSubmit = trimmed.length > 0
 
-  // Keep the popover inside the viewport.
-  const left = Math.min(Math.max(8, draft.anchor.x), window.innerWidth - 320)
-  const top = Math.min(Math.max(8, draft.anchor.y), window.innerHeight - 220)
-
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Comment on plan"
-      data-suppress-native-webview=""
-      className={cn(
-        "fixed z-50 flex w-72 flex-col gap-2 rounded-lg bg-popover p-2.5",
-        "text-popover-foreground shadow-md ring-1 ring-foreground/10",
-        className,
-      )}
-      style={{ left, top }}
+    <Popover
+      open
+      onOpenChange={(next) => {
+        if (!next) onCancel()
+      }}
     >
-      <p className="line-clamp-3 border-l-2 border-accent/40 pl-2 text-xs italic text-muted-foreground">
-        {draft.quote}
-      </p>
-      <Textarea
-        ref={textareaRef}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder="Add a comment…"
-        rows={3}
-        className="w-full text-sm"
-        aria-label="Comment text"
+      {/* Virtual anchor at the selection point — public API passes coords, not a DOM node. */}
+      <PopoverTrigger
+        nativeButton={false}
+        tabIndex={-1}
+        render={
+          <span
+            aria-hidden
+            className="pointer-events-none fixed size-0"
+            style={{ left: draft.anchor.x, top: draft.anchor.y }}
+          />
+        }
       />
-      <div className="flex flex-wrap items-center justify-end gap-1.5">
-        <Button variant="ghost" size="sm" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={!canSubmit}
-          onClick={() => canSubmit && onSave(trimmed)}
-        >
-          Save
-        </Button>
-        <Button
-          variant="default"
-          size="sm"
-          disabled={!canSubmit}
-          onClick={() => canSubmit && onSaveAndSend(trimmed)}
-        >
-          Save &amp; send
-        </Button>
-      </div>
-    </div>
+      <PopoverContent
+        side="bottom"
+        align="center"
+        sideOffset={0}
+        data-suppress-native-webview=""
+        className={cn("w-72", className)}
+      >
+        <PopoverTitle className="sr-only">Comment on plan</PopoverTitle>
+        <p className="line-clamp-3 border-l-2 border-accent/40 pl-2 text-xs italic text-muted-foreground">
+          {draft.quote}
+        </p>
+        <Textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Add a comment…"
+          rows={3}
+          className="w-full text-sm"
+          aria-label="Comment text"
+        />
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!canSubmit}
+            onClick={() => canSubmit && onSave(trimmed)}
+          >
+            Save
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            disabled={!canSubmit}
+            onClick={() => canSubmit && onSaveAndSend(trimmed)}
+          >
+            Save &amp; send
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
