@@ -120,13 +120,8 @@ where
         .create_session(NewSessionParams {
             title: request.title,
             cwd: request.cwd,
-            model: None,
             fallback_models: request.fallback_models,
-            mode: None,
-            permission_mode: None,
-            isolation: None,
-            role: None,
-            extra: Default::default(),
+            ..NewSessionParams::default()
         })
         .await?;
     let mut events = service.subscribe(&session)?;

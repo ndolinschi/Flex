@@ -94,6 +94,13 @@
         "null"
       ]
     },
+    "reuse_workspace_id": {
+      "description": "Deferred-provision hint: when isolation is requested at create time we\ndon't provision yet; the workspace is created (or attached) on the\nfirst prompt. `Some(id)` = attach the existing workspace with that id\ninstead of creating a new one; cleared once provisioning has run.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "role": {
       "description": "The role this session serves (e.g. `searcher`); `None` = main.",
       "type": [

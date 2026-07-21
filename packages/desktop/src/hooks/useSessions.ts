@@ -156,7 +156,12 @@ export const useSessions = () => {
         return draft
       }
       return handleCreate(
-        newAgentCreateInput(cwd, state.selectedModelId, state.selectedIsolation),
+        newAgentCreateInput(
+          cwd,
+          state.selectedModelId,
+          state.selectedIsolation,
+          state.selectedReuseWorkspaceId,
+        ),
       )
     },
     [handleCreate, query.data, setActiveSessionId, setRoute],

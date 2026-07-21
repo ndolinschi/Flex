@@ -92,7 +92,15 @@ pub(crate) async fn run_turn(
     opts: TurnOptions,
     done: tokio::sync::oneshot::Sender<()>,
 ) -> Result<TurnSummary, AgentError> {
-    let meta = deps.store.get_meta(&handle.id).await?;
+    let initial_meta = deps.store.get_meta(&handle.id).await?;
+    // Deferred isolation: for a depth-0 session with an isolation policy
+    // that wants a workspace but hasn't been provisioned yet, provision (or
+    // attach a reuse hint) now. This is a no-op for every other case,
+    // including subagents (depth != 0) which inherit their parent's cwd.
+    // On success the returned meta reflects the new cwd/workspace_id so the
+    // rest of the turn — attachments, tool cwd, snapshot label — uses the
+    // worktree instead of the base project directory.
+    let meta = crate::workspace_ensure::ensure_root_workspace(deps, &handle, initial_meta).await?;
     let turn_id = TurnId::generate();
     let cancel = CancellationToken::new();
     *handle

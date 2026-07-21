@@ -434,6 +434,10 @@ export type CreateSessionInput = {
   model?: string
   cwd?: string
   isolation?: IsolationPolicy
+  /** Attach an existing worktree (from `listWorkspaces`) on first prompt
+   * instead of provisioning a new one. Ignored when `isolation` doesn't
+   * resolve to a policy that wants isolation. */
+  reuseWorkspaceId?: string | null
 }
 
 export type UpdateSessionInput = {

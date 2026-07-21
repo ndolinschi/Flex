@@ -3,7 +3,11 @@ import { useQuery } from "@tanstack/react-query"
 import { ArrowRight, ChevronDown, ChevronRight } from "lucide-react"
 import { gitStatusSinceBaseline } from "../../lib/tauri"
 import { useIsGitRepo } from "../../hooks/useIsGitRepo"
-import { sessionScopeKey, useAppStore } from "../../stores/appStore"
+import {
+  sessionHasActivity,
+  sessionScopeKey,
+  useAppStore,
+} from "../../stores/appStore"
 import { basename, cn, fileIconForPath } from "../../lib/utils"
 import { DiffStat } from "../atoms"
 import { Button } from "@/components/ui/button"
@@ -30,13 +34,19 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
   const [expanded, setExpanded] = useState(false)
   const openToolBesideChat = useAppStore((s) => s.openToolBesideChat)
   const openWorkspaceFile = useAppStore((s) => s.openWorkspaceFile)
+  // Empty drafts must not surface pre-existing repo dirt (or a freshly
+  // provisioned worktree's noise) as "N files changed" before the agent
+  // has done any work.
+  const hasActivity = useAppStore((s) =>
+    sessionId ? sessionHasActivity(s, sessionId) : false,
+  )
 
   const { data: isRepo } = useIsGitRepo(cwd)
 
   const { data: summary } = useQuery({
     queryKey: ["git-status", cwd ?? "", sessionId ?? null],
     queryFn: () => gitStatusSinceBaseline(sessionId!),
-    enabled: !!cwd && !!sessionId && isRepo !== false,
+    enabled: !!cwd && !!sessionId && isRepo !== false && hasActivity,
     staleTime: 30_000,
   })
 
@@ -44,7 +54,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
   const files = summary?.files ?? []
   const truncated = summary?.truncated ?? false
 
-  if (!isRepo || totalCount === 0) return null
+  if (!hasActivity || !isRepo || totalCount === 0) return null
 
   const totals = {
     added: summary?.totalAdded ?? 0,

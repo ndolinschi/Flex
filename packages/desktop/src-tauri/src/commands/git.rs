@@ -985,14 +985,24 @@ pub struct CreatePrOutcome {
 /// Cheap, process-wide cache for "is `gh` on PATH?". Avoids re-spawning
 /// `gh` on every BranchPicker / PR-tab poll. Auth failures are still handled
 /// by callers treating a failed `gh pr view` as "no PR".
+/// Process-wide cache for "is `gh` on PATH?". Shared by availability probes
+/// and spawn-failure invalidation so a missing binary does not keep retrying
+/// `gh pr view` for the full TTL after a stale `true`.
+fn gh_bin_cache() -> &'static std::sync::Mutex<Option<(std::time::Instant, bool)>> {
+    use std::sync::{Mutex, OnceLock};
+    static CACHE: OnceLock<Mutex<Option<(std::time::Instant, bool)>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(None))
+}
+
+/// Cheap, process-wide cache for "is `gh` on PATH?". Avoids re-spawning
+/// `gh` on every BranchPicker / PR-tab poll. Auth failures are still handled
+/// by callers treating a failed `gh pr view` as "no PR".
 fn gh_bin_available() -> bool {
-    use std::sync::Mutex;
     use std::time::{Duration, Instant};
 
-    static CACHE: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
     const TTL: Duration = Duration::from_secs(120);
 
-    if let Ok(guard) = CACHE.lock() {
+    if let Ok(guard) = gh_bin_cache().lock() {
         if let Some((at, ok)) = *guard {
             if at.elapsed() < TTL {
                 return ok;
@@ -1008,10 +1018,17 @@ fn gh_bin_available() -> bool {
         .map(|out| out.status.success())
         .unwrap_or(false);
 
-    if let Ok(mut guard) = CACHE.lock() {
+    if let Ok(mut guard) = gh_bin_cache().lock() {
         *guard = Some((Instant::now(), ok));
     }
     ok
+}
+
+/// Forget a cached availability result after a spawn failure.
+fn invalidate_gh_bin_cache() {
+    if let Ok(mut guard) = gh_bin_cache().lock() {
+        *guard = None;
+    }
 }
 
 pub(crate) fn gh_available(_cwd: &std::path::Path) -> bool {
@@ -1107,7 +1124,7 @@ fn git_pr_status_sync(cwd: String) -> DesktopResult<BranchPrStatus> {
         });
     }
 
-    let out = crate::win_console::command("gh")
+    let out = match crate::win_console::command("gh")
         .args([
             "pr",
             "view",
@@ -1116,7 +1133,20 @@ fn git_pr_status_sync(cwd: String) -> DesktopResult<BranchPrStatus> {
         ])
         .current_dir(&path)
         .output()
-        .map_err(|e| DesktopError::Message(format!("gh pr view failed: {e}")))?;
+    {
+        Ok(out) => out,
+        // Missing binary / PATH race (common in GUI apps): never surface as
+        // a hard IPC error — BranchPicker polls this and instrument(err)
+        // would log ERROR on every session switch.
+        Err(err) => {
+            tracing::debug!(error = %err, "gh pr view spawn failed; treating as unavailable");
+            invalidate_gh_bin_cache();
+            return Ok(BranchPrStatus {
+                gh_available: false,
+                pr: None,
+            });
+        }
+    };
 
     if !out.status.success() {
         // No PR for this branch (or other non-fatal gh exits) — treat as empty.
@@ -1127,13 +1157,23 @@ fn git_pr_status_sync(cwd: String) -> DesktopResult<BranchPrStatus> {
     }
 
     let raw = String::from_utf8_lossy(&out.stdout);
-    let value: serde_json::Value = serde_json::from_str(raw.trim())
-        .map_err(|e| DesktopError::Message(format!("gh pr view returned invalid JSON: {e}")))?;
+    let value: serde_json::Value = match serde_json::from_str(raw.trim()) {
+        Ok(v) => v,
+        Err(err) => {
+            tracing::debug!(error = %err, "gh pr view returned invalid JSON; treating as no PR");
+            return Ok(BranchPrStatus {
+                gh_available: true,
+                pr: None,
+            });
+        }
+    };
 
-    let number = value
-        .get("number")
-        .and_then(|v| v.as_u64())
-        .ok_or_else(|| DesktopError::Message("gh pr view missing number".into()))?;
+    let Some(number) = value.get("number").and_then(|v| v.as_u64()) else {
+        return Ok(BranchPrStatus {
+            gh_available: true,
+            pr: None,
+        });
+    };
     let title = value
         .get("title")
         .and_then(|v| v.as_str())
@@ -1178,11 +1218,18 @@ pub fn git_pr_diff(cwd: String) -> DesktopResult<String> {
         return Ok(String::new());
     }
 
-    let out = crate::win_console::command("gh")
+    let out = match crate::win_console::command("gh")
         .args(["pr", "diff"])
         .current_dir(&path)
         .output()
-        .map_err(|e| DesktopError::Message(format!("gh pr diff failed: {e}")))?;
+    {
+        Ok(out) => out,
+        Err(err) => {
+            tracing::debug!(error = %err, "gh pr diff spawn failed; treating as unavailable");
+            invalidate_gh_bin_cache();
+            return Ok(String::new());
+        }
+    };
 
     if !out.status.success() {
         return Ok(String::new());
@@ -1938,6 +1985,7 @@ mod commit_center_tests {
             workspace_id: None,
             executor: None,
             base_cwd: None,
+            reuse_workspace_id: None,
             created_at_ms: now,
             updated_at_ms: now,
         };

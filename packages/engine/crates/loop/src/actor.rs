@@ -137,6 +137,7 @@ mod tests {
             workspace_id: None,
             executor: None,
             base_cwd: None,
+            reuse_workspace_id: None,
             created_at_ms: 1,
             updated_at_ms: 1,
         }

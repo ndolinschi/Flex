@@ -161,6 +161,7 @@ impl NativeAgent {
             workspace_id,
             executor: parent_meta.executor.clone(),
             base_cwd,
+            reuse_workspace_id: None,
             created_at_ms: now,
             updated_at_ms: now,
         };

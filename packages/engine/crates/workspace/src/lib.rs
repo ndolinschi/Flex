@@ -31,17 +31,33 @@ fn hide_console(command: &mut Command) {
     let _ = command;
 }
 
+/// Default cap on live worktrees per base project — see
+/// [`GitWorktrees::with_max_per_base`].
+const DEFAULT_MAX_PER_BASE: usize = 5;
+
 /// Provisions git-worktree-backed isolated workspaces under `root`.
 pub struct GitWorktrees {
     /// Directory under which per-session worktrees are created.
     root: PathBuf,
+    /// Cap on the number of live worktrees per base project.
+    max_per_base: usize,
 }
 
 impl GitWorktrees {
     /// Create a provisioner that places worktrees under `root` (e.g.
     /// `~/.local/state/<slug>/worktrees`).
     pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+        Self {
+            root: root.into(),
+            max_per_base: DEFAULT_MAX_PER_BASE,
+        }
+    }
+
+    /// Override the cap on live worktrees per base project (default 5).
+    /// Zero is clamped to 1 (a base can always host at least one workspace).
+    pub fn with_max_per_base(mut self, cap: usize) -> Self {
+        self.max_per_base = cap.max(1);
+        self
     }
 
     /// The commit message for the single squash-style commit that captures a
@@ -114,6 +130,24 @@ impl Workspaces for GitWorktrees {
             Ok(sha) => sha,
             Err(_) => return cannot_isolate(policy, base),
         };
+
+        // Cap: refuse to spawn a new worktree once the base project already
+        // has `max_per_base` live ones. `list` is best-effort — if git
+        // enumeration fails we fall through and let `git worktree add` run
+        // (its own errors surface); the cap is a soft guardrail, not a
+        // security boundary.
+        if let Ok(existing) = self.list(base).await {
+            if existing.len() >= self.max_per_base {
+                return Err(WorkspaceError::GitFailed(format!(
+                    "workspace cap reached: {} live worktrees under {} \
+                     (max {}); reuse one via NewSessionParams.reuse_workspace_id \
+                     or discard/integrate one first",
+                    existing.len(),
+                    toplevel.display(),
+                    self.max_per_base
+                )));
+            }
+        }
 
         tokio::fs::create_dir_all(&self.root)
             .await
@@ -266,6 +300,102 @@ impl Workspaces for GitWorktrees {
         );
         Ok(())
     }
+
+    async fn list(&self, base: &Path) -> Result<Vec<Workspace>, WorkspaceError> {
+        // Not a git repo? No workspaces belong to it.
+        let toplevel = match git(base, &["rev-parse", "--show-toplevel"]).await {
+            Ok(top) => PathBuf::from(top),
+            Err(_) => return Ok(Vec::new()),
+        };
+        let porcelain = match git(&toplevel, &["worktree", "list", "--porcelain"]).await {
+            Ok(text) => text,
+            Err(_) => return Ok(Vec::new()),
+        };
+        Ok(parse_worktrees(&porcelain, &self.root))
+    }
+
+    async fn attach(
+        &self,
+        base: &Path,
+        workspace_id: &str,
+        _session: &SessionId,
+        policy: IsolationPolicy,
+    ) -> Result<Option<Workspace>, WorkspaceError> {
+        let existing = self.list(base).await.unwrap_or_default();
+        match existing.into_iter().find(|w| w.id == workspace_id) {
+            Some(mut workspace) => {
+                // Refresh `base_ref` to the workspace's actual HEAD so callers
+                // don't rely on the porcelain-reported value (it's already
+                // real; this is a no-op belt-and-braces read).
+                if let Ok(sha) = git(&workspace.root, &["rev-parse", "HEAD"]).await {
+                    workspace.base_ref = sha;
+                }
+                tracing::info!(
+                    target: "workspace",
+                    workspace_id = %workspace_id,
+                    worktree = %workspace.root.display(),
+                    "attached to existing isolated workspace"
+                );
+                Ok(Some(workspace))
+            }
+            None if policy.is_required() => Err(WorkspaceError::NotFound(
+                self.root.join(workspace_id.replace('/', "_")),
+            )),
+            None => Ok(None),
+        }
+    }
+
+    fn max_per_base(&self) -> usize {
+        self.max_per_base
+    }
+}
+
+/// Parse `git worktree list --porcelain` output and keep only worktrees that
+/// live under `root_prefix` (this backend's own worktree root). Each stanza
+/// is separated by a blank line and lists `worktree`, `HEAD`, and `branch`
+/// on their own lines; the branch line is the workspace id (with the
+/// `refs/heads/` prefix stripped).
+fn parse_worktrees(porcelain: &str, root_prefix: &Path) -> Vec<Workspace> {
+    let mut out = Vec::new();
+    let mut cur_path: Option<PathBuf> = None;
+    let mut cur_head: Option<String> = None;
+    let mut cur_branch: Option<String> = None;
+
+    let flush = |path: &mut Option<PathBuf>,
+                 head: &mut Option<String>,
+                 branch: &mut Option<String>,
+                 out: &mut Vec<Workspace>| {
+        if let (Some(p), Some(h), Some(b)) = (path.take(), head.take(), branch.take()) {
+            if p.starts_with(root_prefix) {
+                out.push(Workspace {
+                    id: b,
+                    root: p,
+                    base_ref: h,
+                });
+            }
+        }
+        *path = None;
+        *head = None;
+        *branch = None;
+    };
+
+    for line in porcelain.lines() {
+        let line = line.trim_end();
+        if line.is_empty() {
+            flush(&mut cur_path, &mut cur_head, &mut cur_branch, &mut out);
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("worktree ") {
+            flush(&mut cur_path, &mut cur_head, &mut cur_branch, &mut out);
+            cur_path = Some(PathBuf::from(rest));
+        } else if let Some(rest) = line.strip_prefix("HEAD ") {
+            cur_head = Some(rest.to_owned());
+        } else if let Some(rest) = line.strip_prefix("branch ") {
+            cur_branch = Some(rest.strip_prefix("refs/heads/").unwrap_or(rest).to_owned());
+        }
+    }
+    flush(&mut cur_path, &mut cur_head, &mut cur_branch, &mut out);
+    out
 }
 
 /// Run a verify command via `sh -c` in `root`. Returns `Ok(None)` on success,

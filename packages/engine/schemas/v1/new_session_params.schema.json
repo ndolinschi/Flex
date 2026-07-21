@@ -59,6 +59,13 @@
         }
       ]
     },
+    "reuse_workspace_id": {
+      "description": "Reuse an existing provisioned workspace by id on first prompt rather\nthan creating a new one. Honored only when [`Self::isolation`] resolves\nto a policy that wants isolation and only on the deferred first-turn\nprovisioning path (subagents inherit their parent's cwd and ignore\nthis). `None` = provision fresh.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "role": {
       "description": "Role this root session runs as (e.g. `searcher`). Selects the role's\ntool profile and model chain; `None` = the main role. Unknown role\nnames are rejected at session creation.",
       "type": [

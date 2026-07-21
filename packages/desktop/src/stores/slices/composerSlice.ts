@@ -16,6 +16,7 @@ export const createComposerSlice: StateCreator<
   sessionBypassBySession: {},
   selectedModelId: null,
   selectedIsolation: null,
+  selectedReuseWorkspaceId: null,
   selectedEffort: null,
   effortByModel: {},
   attachments: [],
@@ -60,6 +61,12 @@ export const createComposerSlice: StateCreator<
   setSelectedIsolation: (isolation) => {
     set({ selectedIsolation: isolation })
     void persistUiState({ selectedIsolation: isolation })
+  },
+  setSelectedReuseWorkspaceId: (id) => {
+    // Never persisted to disk: a workspace id is only meaningful for the
+    // very next `create_session` this draft becomes. Persisting it across
+    // restarts would carry a stale reference into the next launch.
+    set({ selectedReuseWorkspaceId: id })
   },
   setSelectedEffort: (effort) => {
     set({ selectedEffort: effort })

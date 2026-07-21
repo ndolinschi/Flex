@@ -144,6 +144,13 @@ pub struct NewSessionParams {
     /// their parent's working directory.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub isolation: Option<IsolationPolicy>,
+    /// Reuse an existing provisioned workspace by id on first prompt rather
+    /// than creating a new one. Honored only when [`Self::isolation`] resolves
+    /// to a policy that wants isolation and only on the deferred first-turn
+    /// provisioning path (subagents inherit their parent's cwd and ignore
+    /// this). `None` = provision fresh.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reuse_workspace_id: Option<String>,
     /// Role this root session runs as (e.g. `searcher`). Selects the role's
     /// tool profile and model chain; `None` = the main role. Unknown role
     /// names are rejected at session creation.

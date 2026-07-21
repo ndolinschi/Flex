@@ -138,12 +138,15 @@ export const useGlobalSessionEvents = () => {
           // `useComposerSend.ts`) waiting out its full timeout on every send
           // for this session, and any live events for it are silently
           // dropped (no subscriber attached on the backend's broadcast
-          // channel). Surface it loudly but don't let it become an
-          // unhandled promise rejection.
+          // channel). Backend subscribe now auto-resumes missing handles;
+          // remaining failures are still worth surfacing.
           log.error("session", "subscribe_session failed", {
             sessionId: id,
             err,
           })
+          // Allow a later activeSession effect to retry: drop from the local
+          // "already subscribed" set so toAdd can fire again on next run.
+          prev.delete(id)
         })
     }
     for (const id of toRemove) {

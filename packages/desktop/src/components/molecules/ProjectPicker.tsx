@@ -50,6 +50,9 @@ export const ProjectPicker = ({
   const setRoute = useAppStore((s) => s.setRoute)
   const selectedModelId = useAppStore((s) => s.selectedModelId)
   const selectedIsolation = useAppStore((s) => s.selectedIsolation)
+  const selectedReuseWorkspaceId = useAppStore(
+    (s) => s.selectedReuseWorkspaceId,
+  )
 
   const label = cwd ? basename(cwd) : "Project"
 
@@ -103,6 +106,9 @@ export const ProjectPicker = ({
           cwd: nextCwd,
           model: selectedModelId ?? undefined,
           ...(selectedIsolation ? { isolation: selectedIsolation } : {}),
+          ...(selectedReuseWorkspaceId && selectedIsolation
+            ? { reuseWorkspaceId: selectedReuseWorkspaceId }
+            : {}),
         })
         upsertSessionInCache(queryClient, meta)
         setActiveSessionId(meta.id, { panel: "closed" })

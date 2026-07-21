@@ -222,6 +222,12 @@ pub struct ProviderPrefs {
     /// but this top-level one still governs session creation defaults).
     #[serde(default)]
     pub default_isolation: Option<String>,
+    /// Cap on the number of live isolated worktrees per base project. `None`
+    /// = the engine backend's default (5). Provisioning a further workspace
+    /// past the cap returns a `GitFailed` error asking the caller to reuse
+    /// or discard an existing one first.
+    #[serde(default)]
+    pub max_workspaces_per_project: Option<u32>,
     /// Named provider connections. Populated by migrating the legacy fields
     /// above on first load if empty (see `ProviderConfig::migrate`).
     #[serde(default)]

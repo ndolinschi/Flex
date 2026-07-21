@@ -11,7 +11,7 @@ import {
 } from "../../../lib/tauri"
 import { toastPrOutcome } from "../../../lib/prOutcomeToast"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
-import { useAppStore } from "../../../stores/appStore"
+import { sessionHasActivity, useAppStore } from "../../../stores/appStore"
 import { CreatePrDialog } from "../../molecules/CreatePrDialog"
 import { DiffStat } from "../../atoms"
 import { Button } from "@/components/ui/button"
@@ -47,11 +47,13 @@ export const CommitBar = ({
   const queryClient = useQueryClient()
   const pushToast = useAppStore((s) => s.pushToast)
   const openToolBesideChat = useAppStore((s) => s.openToolBesideChat)
+  // Hide pre-turn repo dirt on a brand-new chat (same gate as FilesChangedCard).
+  const hasActivity = useAppStore((s) => sessionHasActivity(s, sessionId))
 
   const { data: summary } = useQuery({
     queryKey: ["git-status", cwd ?? "", sessionId ?? null],
     queryFn: () => gitStatusSinceBaseline(sessionId),
-    enabled: !!cwd && !!sessionId,
+    enabled: !!cwd && !!sessionId && hasActivity,
     staleTime: 5_000,
   })
 

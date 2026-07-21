@@ -10,6 +10,38 @@ pub struct WorkspaceStatusDto {
     pub summary: String,
 }
 
+/// One provisioned workspace that belongs to a base project directory,
+/// returned by [`list_workspaces`] for the UI's reuse picker.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceInfo {
+    /// Stable identifier — pass this back as `reuseWorkspaceId` on
+    /// `create_session` to attach an existing worktree.
+    pub id: String,
+    /// Absolute path of the worktree root.
+    pub path: String,
+    /// Commit the worktree currently has checked out (workspace's HEAD).
+    pub base_ref: String,
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn list_workspaces(
+    state: State<'_, AppState>,
+    cwd: String,
+) -> DesktopResult<Vec<WorkspaceInfo>> {
+    let service = require_service(&state).await?;
+    let workspaces = service.list_workspaces(std::path::Path::new(&cwd)).await?;
+    Ok(workspaces
+        .into_iter()
+        .map(|w| WorkspaceInfo {
+            id: w.id,
+            path: w.root.to_string_lossy().into_owned(),
+            base_ref: w.base_ref,
+        })
+        .collect())
+}
+
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn is_isolated(state: State<'_, AppState>, session_id: String) -> DesktopResult<bool> {

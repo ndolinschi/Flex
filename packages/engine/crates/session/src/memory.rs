@@ -133,6 +133,9 @@ impl SessionStore for MemoryStore {
             model,
             mode,
             cwd,
+            workspace_id,
+            base_cwd,
+            reuse_workspace_id,
         } = patch;
         if let Some(title) = title {
             record.meta.title = Some(title);
@@ -148,6 +151,31 @@ impl SessionStore for MemoryStore {
         }
         if let Some(mode) = mode {
             record.meta.mode = Some(mode);
+        }
+        // Convention on the string/path patch fields for `workspace_id`,
+        // `base_cwd`, and `reuse_workspace_id`: `Some(empty)` clears the
+        // underlying `Option`; a non-empty value sets it. Callers that don't
+        // want to touch the field leave the outer `Option` as `None`.
+        if let Some(workspace_id) = workspace_id {
+            record.meta.workspace_id = if workspace_id.is_empty() {
+                None
+            } else {
+                Some(workspace_id)
+            };
+        }
+        if let Some(base_cwd) = base_cwd {
+            record.meta.base_cwd = if base_cwd.as_os_str().is_empty() {
+                None
+            } else {
+                Some(base_cwd)
+            };
+        }
+        if let Some(reuse_workspace_id) = reuse_workspace_id {
+            record.meta.reuse_workspace_id = if reuse_workspace_id.is_empty() {
+                None
+            } else {
+                Some(reuse_workspace_id)
+            };
         }
         record.meta.updated_at_ms = now_ms();
         Ok(())
@@ -228,6 +256,7 @@ mod tests {
             workspace_id: None,
             executor: None,
             base_cwd: None,
+            reuse_workspace_id: None,
             created_at_ms: 1,
             updated_at_ms: 1,
         }
@@ -404,10 +433,8 @@ mod tests {
                 &id,
                 SessionMetaPatch {
                     title: Some("hello".to_owned()),
-                    provider_session_id: None,
                     model: Some(ModelRef::from("anthropic/model-x")),
-                    mode: None,
-                    cwd: None,
+                    ..Default::default()
                 },
             )
             .await

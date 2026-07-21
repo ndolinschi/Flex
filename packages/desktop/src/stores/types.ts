@@ -337,6 +337,11 @@ export type ComposerSliceState = {
   sessionBypassBySession: Record<SessionId, boolean>
   selectedModelId: string | null
   selectedIsolation: IsolationPolicy | null
+  /** Which existing worktree (if any) the next session should reuse instead
+   * of provisioning a fresh one. `null` = "New workspace" (default). Only
+   * consulted when `selectedIsolation` resolves to a policy that wants
+   * isolation. */
+  selectedReuseWorkspaceId: string | null
   selectedEffort: string | null
   effortByModel: Record<string, string>
   attachments: ComposerAttachment[]
@@ -347,6 +352,7 @@ export type ComposerSliceState = {
   setSessionBypass: (sessionId: SessionId, enabled: boolean) => void
   setSelectedModelId: (id: string | null) => void
   setSelectedIsolation: (isolation: IsolationPolicy | null) => void
+  setSelectedReuseWorkspaceId: (id: string | null) => void
   setSelectedEffort: (effort: string | null) => void
   setEffortForModel: (modelId: string, effort: string | null) => void
   getEffortForModel: (modelId: string | null) => string | null
