@@ -1,16 +1,15 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Play, Trash2 } from "lucide-react"
+import { ChevronDown, Play, Trash2 } from "lucide-react"
 import { Badge, Spinner } from "../../../components/atoms"
 import { Button } from "@/components/ui/button"
-import { Button as ShadcnButton } from "@/components/ui/button"
 import {
   Collapsible,
   ConfirmDialog,
 } from "../../../components/molecules"
 import { routinesHistory, routinesRemove, routinesRun } from "../../../lib/tauri"
 import type { RoutineDto } from "../../../lib/types"
-import { formatRelativeTime } from "../../../lib/utils"
+import { cn, formatRelativeTime } from "../../../lib/utils"
 import { EMPTY_HISTORY, ROUTINES_KEY } from "./constants"
 import { TriggerSummary } from "./TriggerSummary"
 
@@ -50,25 +49,36 @@ export const RoutineRow = ({ routine }: { routine: RoutineDto }) => {
   return (
     <div className="flex flex-col">
       <div className="flex items-start gap-3 px-3.5 py-3">
-        <ShadcnButton
+        <Button
           variant="ghost"
           onClick={() => setExpanded((v) => !v)}
-          className="h-auto min-w-0 flex-1 justify-start px-0 py-0 font-normal hover:bg-transparent"
+          className="h-auto min-w-0 flex-1 flex-col items-start justify-start gap-0.5 px-0 py-0 font-normal hover:bg-transparent"
           aria-label={expanded ? "Collapse run history" : "Expand run history"}
           aria-expanded={expanded}
         >
-          <p className="truncate text-base text-ink">{routine.title ?? routine.id}</p>
-          <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-ink-muted">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 shrink-0 text-icon-3 transition-transform duration-[var(--duration-fast)]",
+                !expanded && "-rotate-90",
+              )}
+              aria-hidden
+            />
+            <p className="min-w-0 truncate text-base text-ink">
+              {routine.title ?? routine.id}
+            </p>
+          </span>
+          <p className="flex min-w-0 items-center gap-1.5 truncate pl-5 text-xs text-ink-muted">
             <TriggerSummary trigger={routine.trigger} />
             <span aria-hidden>·</span>
             <span className="truncate">{routine.prompt}</span>
           </p>
           {ranNote ? (
-            <p className="mt-1 text-xs text-accent">
+            <p className="pl-5 text-xs text-accent">
               Started — a new session will appear in the sidebar.
             </p>
           ) : null}
-        </ShadcnButton>
+        </Button>
 
         <div className="flex shrink-0 items-center gap-1.5">
           {historyQuery.isSuccess && lastRun ? (

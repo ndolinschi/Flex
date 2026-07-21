@@ -217,9 +217,8 @@ export const SubagentGroup = memo(function SubagentGroup({
           >
             <ChevronRight
               className={cn(
-                "h-2.5 w-2.5 text-icon-3 opacity-0 transition-[transform,opacity] duration-[var(--duration-fast)]",
-                "group-hover:opacity-100",
-                open && "rotate-90 opacity-100",
+                "h-2.5 w-2.5 text-icon-3 transition-transform duration-[var(--duration-fast)]",
+                open && "rotate-90",
               )}
               aria-hidden
             />
