@@ -277,13 +277,16 @@ const AppRoutes = () => {
     return (
       <div className="flex h-full flex-col">
         {titleBar}
+        {/* Drag anywhere during bootstrap — title bar alone is easy to miss
+            while the spinner fills the window (same idea as #boot-splash). */}
         <div
-          className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-ink-muted"
+          className="flex min-h-0 flex-1 cursor-default items-center justify-center gap-2 text-sm text-ink-muted"
+          data-tauri-drag-region
           role="status"
           aria-live="polite"
         >
-          <Spinner size="md" />
-          Loading…
+          <Spinner size="md" className="pointer-events-none" />
+          <span className="pointer-events-none">Loading…</span>
         </div>
       </div>
     )

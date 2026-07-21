@@ -5,7 +5,9 @@
     <link rel="icon" type="image/svg+xml" href="/tauri.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- First paint before Vite CSS/JS: transparent window + rounded opaque
-         splash so cold start never flashes WebView white or square corners. -->
+         splash so cold start never flashes WebView white or square corners.
+         Full-splash drag region so the undecorated window can move before
+         React mounts (no WindowTitleBar yet). -->
     <style>
       html,
       body,
@@ -20,6 +22,7 @@
         border-radius: 10px;
       }
       #boot-splash {
+        position: relative;
         display: flex;
         height: 100%;
         align-items: center;
@@ -29,6 +32,20 @@
         border: 1px solid rgba(255, 255, 255, 0.06);
         font: 400 13px / 1.4 ui-sans-serif, system-ui, -apple-system, sans-serif;
         -webkit-font-smoothing: antialiased;
+        -webkit-app-region: drag;
+        app-region: drag;
+        user-select: none;
+        cursor: default;
+      }
+      /* Title-bar strip mirrors WindowTitleBar height for a predictable grab. */
+      #boot-drag {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 30px;
+        -webkit-app-region: drag;
+        app-region: drag;
       }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -50,7 +67,10 @@
 
   <body>
     <div id="root">
-      <div id="boot-splash" role="status" aria-live="polite">Loading…</div>
+      <div id="boot-splash" data-tauri-drag-region role="status" aria-live="polite">
+        <div id="boot-drag" data-tauri-drag-region aria-hidden="true"></div>
+        Loading…
+      </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
