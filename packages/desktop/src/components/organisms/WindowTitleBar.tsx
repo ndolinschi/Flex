@@ -83,7 +83,9 @@ const WindowTitleBarImpl = ({
       <header
         className={cn(
           "flex h-[var(--titlebar-height)] shrink-0 items-center select-none",
-          "border-b border-stroke-3 bg-bg",
+          // Background comes from `.app-shell` / macOS vibrancy CSS — keep this
+          // bar paint-free so HudWindow can read through as soft glass.
+          "border-b border-stroke-3 bg-transparent",
           className,
         )}
         role="banner"

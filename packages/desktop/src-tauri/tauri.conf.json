@@ -13,13 +13,16 @@
     "macOSPrivateApi": true,
     "windows": [
       {
+        "label": "main",
         "title": "Flex",
         "width": 1280,
         "height": 800,
         "minWidth": 900,
         "minHeight": 600,
-        "backgroundColor": "#141414",
+        "resizable": true,
+        "fullscreen": false,
         "decorations": false,
+        "transparent": true,
         "shadow": true
       }
     ],

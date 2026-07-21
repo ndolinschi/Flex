@@ -182,11 +182,11 @@ pub fn run() {
                 let min_size = LogicalSize::new(MAIN_WINDOW_MIN_WIDTH, MAIN_WINDOW_MIN_HEIGHT);
                 let _ = window.set_min_size(Some(min_size));
 
-                // Undecorated macOS windows are square by default — clip the
-                // content view to the system corner radius so the shell matches
-                // native apps.
+                // Undecorated macOS windows are square by default — apply
+                // NSVisualEffectView vibrancy (with corner radius) and clip the
+                // content view so the shell matches native utility apps.
                 #[cfg(target_os = "macos")]
-                macos_window::apply_rounded_corners(&window);
+                macos_window::apply_macos_chrome(&window);
 
                 if let Ok(scale) = window.scale_factor() {
                     if let Ok(current) = window.inner_size() {
