@@ -20,6 +20,21 @@ import {
 const LEFT_PANEL_ID = "content-left"
 const RIGHT_PANEL_ID = "content-right"
 
+/** Layout passed to `ResizablePanelGroup` for the current pane count.
+ * Must match rendered panel count — a leftover `[50, 50]` under a single
+ * panel throws `Invalid 1 panel layout: 50%, 50%`. */
+export const contentWorkspaceDefaultLayout = (
+  split: boolean,
+  splitRatio: number,
+): Record<string, number> => {
+  if (!split) return { [LEFT_PANEL_ID]: 100 }
+  const left = Math.round(clampSplitRatio(splitRatio) * 100)
+  return {
+    [LEFT_PANEL_ID]: left,
+    [RIGHT_PANEL_ID]: 100 - left,
+  }
+}
+
 /** Floating label that follows the pointer while a tab is dragged. */
 const TabDragGhost = () => {
   const dragUi = useTabDragUi()
@@ -101,31 +116,29 @@ export const ContentWorkspace = () => {
 
   const split = contentLayout.mode === "split" && contentLayout.panes.length > 1
   // Only show the resize handle when the container is wide enough for two
-  // minimum-width panes. Both panes stay mounted to preserve scroll/xterm
-  // state; the handle just hides when there is no room to drag it.
+  // minimum-width panes. Both panes stay mounted while split to preserve
+  // scroll/xterm; the handle just hides when there is no room to drag it.
   const showSash = split && canShowSash
 
-  // When split mode is activated, push the stored ratio to the panel group so
-  // the newly mounted right panel starts at the correct size.
-  useEffect(() => {
-    if (!split) return
-    const ref = groupImperativeRef.current
-    if (!ref) return
-    const left = Math.round(clampSplitRatio(contentLayout.splitRatio) * 100)
-    ref.setLayout({ [LEFT_PANEL_ID]: left, [RIGHT_PANEL_ID]: 100 - left })
-    // Intentionally excludes contentLayout.splitRatio: we only want to sync
-    // on split mode activation, not on every drag update (which would fight
-    // the panel group's own layout tracking).
+  // Snapshot sizes for the *current* panel count. Remount via `key` + matching
+  // `defaultLayout` so collapsing split→single never validates a stale
+  // two-size layout against one panel (see `contentWorkspaceDefaultLayout`).
+  const defaultLayout = useMemo(
+    () => contentWorkspaceDefaultLayout(split, contentLayout.splitRatio),
+    // Ratio is snapshotted at mode change only — drag updates must not remount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [split])
+    [split],
+  )
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
       <TabDragGhost />
       <ResizablePanelGroup
+        key={split ? "split" : "single"}
         orientation="horizontal"
         elementRef={containerRef}
         groupRef={groupImperativeRef}
+        defaultLayout={defaultLayout}
         onLayoutChange={(layout) => {
           if (!split) return
           const leftPct = layout[LEFT_PANEL_ID]
