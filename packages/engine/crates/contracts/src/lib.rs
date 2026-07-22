@@ -48,7 +48,8 @@ pub use goal::{GoalOutcome, GoalSpec, GoalStopReason};
 pub use hello::{EngineIdentity, Hello, PROTOCOL_VERSION};
 pub use hook::{HookOutcomeKind, HookPoint};
 pub use ids::{
-    MessageId, PermissionRequestId, ProviderId, QuestionId, SessionId, ToolCallId, TurnId,
+    MessageId, ModeSwitchId, PeerMessageId, PermissionRequestId, ProviderId, QuestionId, SessionId,
+    ToolCallId, TurnId,
 };
 pub use permission::{
     Answer, PermissionDecision, PermissionDecisionKind, PermissionMode, PermissionRule, Question,
@@ -60,8 +61,8 @@ pub use request::{
     Effort, ExpandedCommand, NewSessionParams, PromptInput, ThinkingConfig, TurnOptions,
 };
 pub use session::{
-    CompactionSummary, PlanEntry, PlanStatus, SessionMeta, SessionMetaPatch, StopReason,
-    TokenUsage, TurnStopReason, TurnSummary,
+    CompactionMode, CompactionSummary, PlanEntry, PlanStatus, SessionMeta, SessionMetaPatch,
+    StopReason, TokenUsage, TurnStopReason, TurnSummary,
 };
 pub use time::now_ms;
 pub use tool_call::{ToolCall, ToolCallOrigin, ToolCallStatus, ToolCallTiming, ToolOutput};

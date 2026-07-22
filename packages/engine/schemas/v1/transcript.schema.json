@@ -88,10 +88,36 @@
         }
       ]
     },
+    "CompactionMode": {
+      "description": "How a context compaction condensed the turn history.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "standard"
+          ]
+        },
+        {
+          "description": "Compact user↔assistant turn pairs into shorter nicknamed summaries.",
+          "type": "string",
+          "const": "turn_pair"
+        }
+      ]
+    },
     "CompactionSummary": {
       "description": "Record of a context compaction.",
       "type": "object",
       "properties": {
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CompactionMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "strategy": {
           "description": "Which strategy produced it (`\"summarize_oldest\"`, `\"truncate\"`, ...).",
           "type": "string"

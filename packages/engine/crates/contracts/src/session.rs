@@ -195,6 +195,17 @@ pub struct PlanEntry {
     pub status: PlanStatus,
 }
 
+/// How a context compaction condensed the turn history.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum CompactionMode {
+    #[default]
+    Standard,
+    /// Compact user↔assistant turn pairs into shorter nicknamed summaries.
+    TurnPair,
+}
+
 /// Record of a context compaction.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct CompactionSummary {
@@ -207,4 +218,6 @@ pub struct CompactionSummary {
     pub tokens_before: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tokens_after: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<CompactionMode>,
 }

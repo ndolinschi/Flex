@@ -80,8 +80,9 @@ impl Tool for RepoMapTool {
         let call_id = ctx.call_id.clone();
         let cancel = ctx.cancel.clone();
         let open_mode = self.open_mode;
-        let handle =
-            tokio::task::spawn_blocking(move || run_map(&cwd, budget, &events, &call_id, open_mode));
+        let handle = tokio::task::spawn_blocking(move || {
+            run_map(&cwd, budget, &events, &call_id, open_mode)
+        });
         let rendered = tokio::select! {
             _ = cancel.cancelled() => return Err(ToolError::Cancelled),
             result = handle => result.map_err(|err| {

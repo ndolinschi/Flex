@@ -329,6 +329,50 @@ pub(crate) fn build_prompt_input(input: &PromptCommandInput) -> PromptInput {
 /// rather than `0` (which would mean "use the 8k default").
 const PROJECT_MEMORY_PROMPT_BUDGET_CHARS: usize = 4_000;
 
+/// Character budget for project instructions loaded from the working
+/// directory each turn. Set well below the default (12k) so the combined
+/// per-turn system-prompt overhead stays bounded even in projects with many
+/// instruction files. Silent if empty — no UI spinner is shown.
+const PROJECT_INSTRUCTIONS_BUDGET_CHARS: usize = 12_000;
+
+/// Default delegation rules injected when Auto mode is active and the project
+/// has no `delegation.md`. Teaches the model when to self-execute vs. delegate
+/// and when to propose a mode switch. Project-level `delegation.md` (picked up
+/// by the existing project_instructions preflight) overrides this entirely.
+const DEFAULT_DELEGATION_RULES: &str = "\
+# Delegation rules (system defaults — project delegation.md overrides)
+
+Use `Agent` (subagent) for:
+- Any task that touches more than 5 files
+- Work that benefits from isolation (risky refactors, large rewrites)
+- Parallel independent sub-tasks (spawn multiple workers)
+
+Use `SwitchMode` when the user's intent clearly matches a different mode:
+- Planning without execution → propose `plan`
+- Debugging a concrete failure → propose `debug`
+- Pure question with no edits → propose `ask`
+- Do NOT switch modes mid-task without a clear signal
+
+Use `GetActiveAgents` before editing a path another agent is modifying —
+coordinate by exchanging messages with `SendMessage` / `GetMessages`.
+
+When in doubt, self-execute rather than delegate.";
+
+/// Brief Auto-mode fragment appended to every Auto-mode turn's system prompt.
+/// Teaches the model its coordination tools without replacing the delegation
+/// rules or project instructions.
+const AUTO_MODE_PROMPT: &str = "\
+# Auto mode
+
+You have coordination tools available:
+- `GetActiveAgents` — see which other agents are running and what they are working on
+- `SendMessage` / `GetMessages` — exchange notes with a peer agent about a shared file
+- `SwitchMode(mode, reason)` — propose a composer-mode change; the user sees a brief \
+countdown and can veto it
+
+Apply the delegation rules above. Prefer self-execution for small tasks; \
+delegate large or parallel work via `Agent`.";
+
 /// System prompt appended for the Flex composer mode, instructing the model
 /// to act as an orchestrator over the `planner` / `plan-reviewer` /
 /// `flex-worker` roles registered in `compose.rs::flex_composer_roles`. The
@@ -559,17 +603,41 @@ pub(crate) async fn prompt_inner(
             budget_chars: PROJECT_MEMORY_PROMPT_BUDGET_CHARS,
         })
     });
+    let project_instructions = meta.as_ref().and_then(|meta| {
+        let loaded = agentloop_prompts::load_project_instructions(
+            &meta.cwd,
+            PROJECT_INSTRUCTIONS_BUDGET_CHARS,
+        );
+        agentloop_prompts::format_project_instructions_section(&loaded)
+    });
     let mut system_append = match (cwd_notice, project_memory) {
         (Some(a), Some(b)) => Some(format!("{a}\n\n{b}")),
         (Some(a), None) => Some(a),
         (None, Some(b)) => Some(b),
         (None, None) => None,
     };
+    if let Some(instr) = project_instructions {
+        system_append = append_system(system_append, &instr);
+    }
     if input.composer_mode.as_deref() == Some("flex") {
         system_append = append_system(system_append, FLEX_ORCHESTRATOR_PROMPT);
     }
     if input.composer_mode.as_deref() == Some("plan") {
         system_append = append_system(system_append, FLEX_PLAN_PROMPT);
+    }
+    if input.composer_mode.as_deref() == Some("auto") {
+        // Delegation rules: user-configured takes priority over built-in defaults.
+        let delegation_fragment = {
+            let cfg = state.config.lock().await;
+            let r = cfg.prefs.plugins.delegation_rules.trim().to_owned();
+            if r.is_empty() {
+                DEFAULT_DELEGATION_RULES.to_owned()
+            } else {
+                r
+            }
+        };
+        system_append = append_system(system_append, &delegation_fragment);
+        system_append = append_system(system_append, AUTO_MODE_PROMPT);
     }
     if input.composer_mode.as_deref() == Some("debug") {
         system_append = append_system(system_append, DEBUG_MODE_PROMPT);
@@ -588,8 +656,21 @@ pub(crate) async fn prompt_inner(
         };
         system_append = append_system(system_append, vision_frag);
     }
+    // "auto" is a UI sentinel for the Auto routing mode; resolve it to the
+    // configured router model (or None to use the session default).
+    let resolved_model = match input.model.as_deref() {
+        Some("auto") => {
+            let cfg = state.config.lock().await;
+            cfg.prefs
+                .plugins
+                .auto_mode_router_model
+                .clone()
+                .filter(|m| !m.is_empty())
+        }
+        other => other.map(str::to_owned),
+    };
     let opts = TurnOptions {
-        model: input.model.clone().map(ModelRef),
+        model: resolved_model.map(ModelRef),
         permission_mode: parse_permission_mode(input.permission_mode.as_deref()),
         system_append,
         effort: parse_effort(input.effort.as_deref()),
@@ -755,6 +836,33 @@ pub struct RespondQuestionInput {
 pub struct AnswerDto {
     pub question: String,
     pub selected: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RespondModeSwitchInput {
+    pub session_id: String,
+    pub id: String,
+    pub allow: bool,
+}
+
+/// Respond to a pending `ModeSwitchProposed` event — mirror of
+/// `respond_permission` / `respond_question` for the SwitchMode HITL loop.
+/// `allow: true` applies the switch; `allow: false` rejects it.
+/// Calling this after the engine has already auto-applied or auto-rejected
+/// (timeout) is a no-op (the engine's pending map is one-shot).
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn respond_mode_switch(
+    state: State<'_, AppState>,
+    input: RespondModeSwitchInput,
+) -> DesktopResult<()> {
+    let service = require_service(&state).await?;
+    let session_id = SessionId::from(input.session_id);
+    let switch_id = ModeSwitchId::from(input.id);
+    Ok(service
+        .respond_mode_switch(&session_id, switch_id, input.allow)
+        .await?)
 }
 
 #[tracing::instrument(level = "debug", skip_all, err)]

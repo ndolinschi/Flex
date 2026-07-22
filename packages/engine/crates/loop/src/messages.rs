@@ -268,6 +268,7 @@ mod tests {
                     strategy: "summarize_oldest".to_owned(),
                     tokens_before: None,
                     tokens_after: None,
+                    mode: None,
                 },
             },
             AgentEvent::UserMessage {

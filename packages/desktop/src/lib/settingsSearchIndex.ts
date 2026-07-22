@@ -95,6 +95,54 @@ const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     title: "Secret storage",
     description: "Where the encryption key for your stored API keys lives",
   },
+  {
+    section: "behavior",
+    rowId: "behavior-auto-mode",
+    title: "Auto routing",
+    description: "Show an Auto option in the model picker for automatic mode routing",
+  },
+  {
+    section: "behavior",
+    rowId: "behavior-auto-router-model",
+    title: "Router model",
+    description: "Model used when Auto mode is selected in the composer",
+  },
+  {
+    section: "behavior",
+    rowId: "behavior-delegation-rules",
+    title: "Delegation rules",
+    description: "System rules injected for Auto mode when the project has no delegation.md",
+  },
+  {
+    section: "behavior",
+    rowId: "behavior-mode-switch-veto-ms",
+    title: "Mode switch veto window",
+    description: "How long the countdown shows before auto-accepting a SwitchMode proposal",
+  },
+  {
+    section: "behavior",
+    rowId: "behavior-auto-compact",
+    title: "Auto compact",
+    description: "Proactively compact context when usage nears the threshold",
+  },
+  {
+    section: "behavior",
+    rowId: "behavior-compact-threshold",
+    title: "Compaction threshold",
+    description: "Context % at which proactive compaction fires (default 85)",
+  },
+  {
+    section: "behavior",
+    rowId: "behavior-compaction-mode",
+    title: "Compaction strategy",
+    description: "Standard or Turn pair compaction mode",
+  },
+  {
+    section: "tools-mcp",
+    rowId: "tools-coordination-plugins",
+    title: "Coordination plugins",
+    description: "Agent messaging, SwitchMode, and council review plugins",
+  },
   // Remote Access
   {
     section: "remote-access",

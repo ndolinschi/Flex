@@ -9,7 +9,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use agentloop_contracts::{IsolationPolicy, ModelRef};
+use agentloop_contracts::{CompactionMode, IsolationPolicy, ModelRef};
 use agentloop_core::{Executor, NetworkPolicy, Plugin, SessionStore, Workspaces};
 use agentloop_hooks::{DiagnosticsConfig, FormatterSpec};
 use agentloop_loop::RetryPolicy;
@@ -94,11 +94,30 @@ pub struct EngineConfig {
     /// orchestration needs more cheaply and predictably; this is an escape
     /// hatch for plans whose full multi-step shape is already known.
     pub enable_workflow_tool: bool,
+    /// Register the peer-messaging tools (`GetActiveAgents`, `SendMessage`,
+    /// `GetMessages`). Off by default. Enable via `AgentBuilder::enable_plugin("messaging")`
+    /// or `AgentBuilder::peer_messaging(true)`.
+    pub enable_peer_messaging: bool,
+    /// Register the `SwitchMode` tool and wire the `respond_mode_switch`
+    /// reply path. Off by default. Enable via `AgentBuilder::enable_plugin("messaging")`
+    /// or `AgentBuilder::switch_mode(true)`.
+    pub enable_switch_mode: bool,
     /// Escalating backoff schedule for RETRYABLE provider/network failures
     /// (dropped connections, timeouts, mid-stream cuts, 5xx, rate limits).
     /// `None` keeps the engine default (see [`RetryPolicy::default`]) — about
     /// 10 attempts total, spaced 30s/30s/30s/60s/60s/300s/300s/300s/300s.
     pub retry_policy: Option<RetryPolicy>,
+    /// Enable proactive auto-compaction when estimated context usage nears the
+    /// threshold. Defaults to `true`. When `false`, compaction is still
+    /// triggered reactively on a hard context-overflow error from the provider.
+    pub auto_compact: bool,
+    /// Percentage of the resolved context window at which proactive
+    /// auto-compaction fires (1–100; default 85). Values outside the valid
+    /// range are clamped. Has no effect when `auto_compact` is `false`.
+    pub auto_compact_threshold_percent: u8,
+    /// How the conversation is condensed during compaction.
+    /// Defaults to [`CompactionMode::Standard`].
+    pub compaction_mode: CompactionMode,
 }
 
 impl Default for EngineConfig {
@@ -123,7 +142,12 @@ impl Default for EngineConfig {
             verbosity: OutputVerbosity::default(),
             default_fallback_models: Vec::new(),
             enable_workflow_tool: false,
+            enable_peer_messaging: false,
+            enable_switch_mode: false,
             retry_policy: None,
+            auto_compact: true,
+            auto_compact_threshold_percent: 85,
+            compaction_mode: CompactionMode::Standard,
         }
     }
 }

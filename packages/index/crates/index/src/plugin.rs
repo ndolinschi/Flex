@@ -101,7 +101,9 @@ impl Plugin for IndexPlugin {
 
     fn hooks(&self) -> Vec<Arc<dyn Hook>> {
         if self.auto_context {
-            vec![Arc::new(AutoContextHook::new(true).with_open_mode(self.open_mode()))]
+            vec![Arc::new(
+                AutoContextHook::new(true).with_open_mode(self.open_mode()),
+            )]
         } else {
             Vec::new()
         }

@@ -145,3 +145,22 @@ export type TimelineRow =
       turnId?: TurnId
       tsMs: number
     }
+  | {
+      type: "peer_message"
+      id: string
+      from: SessionId
+      to?: SessionId
+      threadId?: string
+      content: string
+      aboutPath?: string
+      tsMs: number
+    }
+  | {
+      type: "mode_switch"
+      id: string
+      /** "proposed" | "applied" | "rejected" */
+      state: string
+      mode: string
+      reason?: string
+      tsMs: number
+    }

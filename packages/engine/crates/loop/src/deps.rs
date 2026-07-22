@@ -3,7 +3,9 @@
 
 use std::sync::{Arc, Weak};
 
-use agentloop_contracts::{Answer, ModelRef, PermissionDecision, PermissionRequestId, QuestionId};
+use agentloop_contracts::{
+    Answer, ModeSwitchId, ModelRef, PermissionDecision, PermissionRequestId, QuestionId,
+};
 use agentloop_core::{Hook, PendingMap, ProviderRegistry, SessionStore, ToolRegistry, Workspaces};
 
 use crate::builder::LoopLimits;
@@ -39,4 +41,8 @@ pub(crate) struct TurnDeps {
     pub(crate) executor_id: Option<String>,
     pub(crate) pending_permissions: Arc<PendingMap<PermissionRequestId, PermissionDecision>>,
     pub(crate) pending_questions: Arc<PendingMap<QuestionId, Vec<Answer>>>,
+    /// Pending mode-switch proposals waiting for a `respond_mode_switch`
+    /// reply. Always present; only populated when `SwitchMode` is registered
+    /// (`EngineConfig::enable_switch_mode`).
+    pub(crate) pending_mode_switches: Arc<PendingMap<ModeSwitchId, bool>>,
 }

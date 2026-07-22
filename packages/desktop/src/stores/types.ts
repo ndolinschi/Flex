@@ -15,6 +15,7 @@ import type {
   PlanEntry,
   VerificationVerdict,
 } from "../lib/types"
+import type { PendingModeSwitch, PeerMessage } from "../lib/types/ui"
 import type { ModelUsageMap } from "../lib/modelUsage"
 import type { SettingsSectionId } from "../lib/settingsSearchIndex"
 
@@ -209,6 +210,10 @@ export type SessionSliceState = {
   sessionLogRows: Record<SessionId, Array<{ id: string; text: string; tsMs: number }>>
   pendingPermission: PendingPermission | null
   pendingQuestion: PendingQuestion | null
+  /** Active mode-switch veto countdown, keyed to the active session. */
+  pendingModeSwitch: PendingModeSwitch | null
+  /** Peer messages received per session. */
+  peerMessagesBySession: Record<SessionId, PeerMessage[]>
   pendingPlanApproval: {
     sessionId: SessionId
     planId: string
@@ -288,6 +293,8 @@ export type SessionSliceState = {
   addSessionLogRow: (sessionId: SessionId, text: string) => void
   setPendingPermission: (permission: PendingPermission | null) => void
   setPendingQuestion: (question: PendingQuestion | null) => void
+  setPendingModeSwitch: (modeSwitch: PendingModeSwitch | null) => void
+  addPeerMessage: (sessionId: SessionId, msg: PeerMessage) => void
   setPendingPlanApproval: (
     approval: { sessionId: SessionId; planId: string; plan: string } | null,
   ) => void

@@ -7,6 +7,8 @@ import {
   ShieldCheck,
   Search,
   AppWindow,
+  MessageSquare,
+  Users,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Spinner as ButtonSpinner } from "@/components/ui/spinner"
@@ -24,6 +26,13 @@ type PluginKey = Exclude<
   | "autoUpdateIndex"
   | "learningRequireHumanApproval"
   | "learningRequireVerifiedMemory"
+  | "autoMode"
+  | "autoModeRouterModel"
+  | "autoCompact"
+  | "autoCompactThresholdPercent"
+  | "compactionMode"
+  | "modeSwitchVetoMs"
+  | "delegationRules"
 >
 
 type PluginCardSpec = {
@@ -63,6 +72,22 @@ const PLUGIN_CATALOG: PluginCardSpec[] = [
     description: "Independent grading of results: Verify / SubmitVerdict tools.",
     icon: ShieldCheck,
     category: "Engine plugins",
+  },
+  {
+    key: "messaging",
+    name: "Agent messaging",
+    description:
+      "Peer coordination: GetActiveAgents / SendMessage / GetMessages / SwitchMode — lets agents communicate and propose mode changes.",
+    icon: MessageSquare,
+    category: "Coordination",
+  },
+  {
+    key: "council",
+    name: "Council",
+    description:
+      "Second-opinion verification on another model — enables the Verifier plugin automatically.",
+    icon: Users,
+    category: "Coordination",
   },
   {
     key: "browser",
@@ -132,6 +157,14 @@ export const PluginCatalog = () => {
             plugins.learningRequireVerifiedMemory ?? false,
           browser: plugins.browser ?? false,
           computer: plugins.computer ?? false,
+          messaging: plugins.messaging ?? false,
+          council: plugins.council ?? false,
+          autoMode: plugins.autoMode ?? false,
+          autoCompact: plugins.autoCompact ?? true,
+          autoCompactThresholdPercent: plugins.autoCompactThresholdPercent ?? 85,
+          compactionMode: plugins.compactionMode ?? "standard",
+          modeSwitchVetoMs: plugins.modeSwitchVetoMs ?? 2000,
+          delegationRules: plugins.delegationRules ?? "",
           ...patch,
         },
       })
@@ -149,6 +182,10 @@ export const PluginCatalog = () => {
 
   const engineVisible = useMemo(
     () => visible.filter((p) => p.category === "Engine plugins"),
+    [visible],
+  )
+  const coordinationVisible = useMemo(
+    () => visible.filter((p) => p.category === "Coordination"),
     [visible],
   )
   const desktopVisible = useMemo(
@@ -256,6 +293,20 @@ export const PluginCatalog = () => {
           </p>
         ) : null}
 
+        {plugin.key === "messaging" && added ? (
+          <p className="ml-11 text-xs text-ink-faint">
+            Agents can coordinate on shared files. SwitchMode shows a veto countdown in the composer.
+            Restart sessions after enabling.
+          </p>
+        ) : null}
+
+        {plugin.key === "council" && added ? (
+          <p className="ml-11 text-xs text-ink-faint">
+            Enables the Verifier automatically. Verify tool routes to a separate model for grading.
+            Restart sessions after enabling.
+          </p>
+        ) : null}
+
         {plugin.key === "browser" && added ? (
           <p className="ml-11 text-xs text-ink-faint">
             Needs an open Browser tab. Screenshots work on macOS, Linux (grim /
@@ -277,6 +328,7 @@ export const PluginCatalog = () => {
   const loadingOrEmpty = isLoading || !plugins
   const showEngine =
     loadingOrEmpty || visible.length === 0 || engineVisible.length > 0
+  const showCoordination = !loadingOrEmpty && coordinationVisible.length > 0
   const showDesktop = !loadingOrEmpty && desktopVisible.length > 0
 
   return (
@@ -302,6 +354,17 @@ export const PluginCatalog = () => {
           ) : (
             engineVisible.map(renderPluginRow)
           )}
+        </SettingsSection>
+      ) : null}
+
+      {showCoordination ? (
+        <SettingsSection
+          title="Coordination"
+          description="Multi-agent coordination: peer messaging, mode switching, and council review."
+          rowId="tools-coordination-plugins"
+          className="mb-0"
+        >
+          {coordinationVisible.map(renderPluginRow)}
         </SettingsSection>
       ) : null}
 

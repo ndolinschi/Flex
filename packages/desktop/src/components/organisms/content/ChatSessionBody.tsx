@@ -6,7 +6,7 @@ import {
   SubagentViewer,
   TurnTimeline,
 } from ".."
-import { WorkingAgentsPill } from "../../molecules"
+import { ModeSwitchChip, WorkingAgentsPill } from "../../molecules"
 import { ChatShell } from "../../templates"
 import type { SessionId, TimelineRow } from "../../../lib/types"
 import { sessionLabel } from "../../../lib/types"
@@ -37,6 +37,7 @@ export const ChatSessionBody = ({
 }: ChatSessionBodyProps) => {
   const pendingPermission = useAppStore((s) => s.pendingPermission)
   const pendingQuestion = useAppStore((s) => s.pendingQuestion)
+  const pendingModeSwitch = useAppStore((s) => s.pendingModeSwitch)
   const [conversationEmpty, setConversationEmpty] = useState(false)
   const [runningWorkers, setRunningWorkers] = useState<SubagentTimelineRow[]>(
     [],
@@ -81,10 +82,16 @@ export const ChatSessionBody = ({
     interactive && pendingPermission && pendingPermission.sessionId === sessionId
       ? pendingPermission
       : null
+  const modeSwitchForSession =
+    interactive && pendingModeSwitch && pendingModeSwitch.sessionId === sessionId
+      ? pendingModeSwitch
+      : null
   const dockedOverlay = questionForSession ? (
     <QuestionPrompt question={questionForSession} />
   ) : permissionForSession ? (
     <PermissionPrompt permission={permissionForSession} />
+  ) : modeSwitchForSession ? (
+    <ModeSwitchChip />
   ) : null
 
   return (

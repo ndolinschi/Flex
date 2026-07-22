@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use agentloop_contracts::{Answer, QuestionId};
+use agentloop_contracts::{Answer, ModeSwitchId, QuestionId};
 use agentloop_core::{
     BackgroundProcessRegistry, DemoteRegistry, Executor, NetworkPolicy, PendingMap, ToolRegistry,
 };
@@ -17,6 +17,12 @@ pub struct BaseTools {
     pub registry: ToolRegistry,
     pub fs_state: Arc<FsState>,
     pub pending_questions: Arc<PendingMap<QuestionId, Vec<Answer>>>,
+    /// Pending mode-switch proposals waiting for the client to accept or
+    /// veto. Always created; only populated when the `SwitchMode` tool is
+    /// registered (i.e. `EngineConfig::enable_switch_mode` is true). The
+    /// composition root threads this through to `NativeAgentBuilder` so
+    /// `respond_mode_switch` can reach the same map the tool waits on.
+    pub pending_mode_switches: Arc<PendingMap<ModeSwitchId, bool>>,
     /// Background processes started via `Bash`'s `run_in_background`,
     /// keyed by session. `None` when the read-only tool set is used (no
     /// `Bash`, so nothing ever populates it). The composition root threads
@@ -37,6 +43,7 @@ pub struct BaseTools {
 pub fn base_tools_read_only() -> BaseTools {
     let fs_state = Arc::new(FsState::new());
     let pending_questions = Arc::new(PendingMap::new());
+    let pending_mode_switches = Arc::new(PendingMap::new());
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(ReadTool::new(fs_state.clone())));
     registry.register(Arc::new(GlobTool));
@@ -49,6 +56,7 @@ pub fn base_tools_read_only() -> BaseTools {
         registry,
         fs_state,
         pending_questions,
+        pending_mode_switches,
         background_processes: None,
         demote_processes: None,
     }
@@ -60,6 +68,7 @@ pub fn base_tools_read_only() -> BaseTools {
 pub fn base_tools(executor: Arc<dyn Executor>, network: NetworkPolicy) -> BaseTools {
     let fs_state = Arc::new(FsState::new());
     let pending_questions = Arc::new(PendingMap::new());
+    let pending_mode_switches = Arc::new(PendingMap::new());
     let background_processes = Arc::new(BackgroundProcessRegistry::new());
     let demote_processes = Arc::new(DemoteRegistry::new());
     let registry = registry_with_questions_and_background(
@@ -74,6 +83,7 @@ pub fn base_tools(executor: Arc<dyn Executor>, network: NetworkPolicy) -> BaseTo
         registry,
         fs_state,
         pending_questions,
+        pending_mode_switches,
         background_processes: Some(background_processes),
         demote_processes: Some(demote_processes),
     }

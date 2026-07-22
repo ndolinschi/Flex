@@ -73,6 +73,14 @@ id_type!(
     /// Identifies one user-question round-trip.
     QuestionId
 );
+id_type!(
+    /// Identifies one peer-to-peer agent message.
+    PeerMessageId
+);
+id_type!(
+    /// Identifies one composer mode-switch proposal round-trip.
+    ModeSwitchId
+);
 
 /// Identifies an LLM provider implementation (`"anthropic"`, `"openai"`, ...).
 ///

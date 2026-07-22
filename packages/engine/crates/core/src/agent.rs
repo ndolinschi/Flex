@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use futures::Stream;
 
 use agentloop_contracts::{
-    AgentCaps, AgentInfo, Answer, CompactionSummary, EngineError, NewSessionParams,
+    AgentCaps, AgentInfo, Answer, CompactionSummary, EngineError, ModeSwitchId, NewSessionParams,
     PermissionDecision, PermissionMode, PermissionRequestId, PromptInput, QuestionId, SessionEvent,
     SessionId, SessionMeta, TurnOptions, TurnSummary,
 };
@@ -144,5 +144,23 @@ pub trait Agent: Send + Sync {
         Err(AgentError::Other(
             "this agent implementation does not support context compaction".to_owned(),
         ))
+    }
+
+    /// Resolve a pending `ModeSwitchProposed` event (`SwitchMode` tool).
+    ///
+    /// `allow = true` → the switch is applied (`ModeSwitchApplied` will be
+    /// emitted by the tool). `allow = false` → the user vetoed it
+    /// (`ModeSwitchRejected`). Default: not supported (the `SwitchMode` tool
+    /// is disabled by default; enable via `EngineConfig::enable_switch_mode`).
+    async fn respond_mode_switch(
+        &self,
+        _session: &SessionId,
+        id: ModeSwitchId,
+        _allow: bool,
+    ) -> Result<(), AgentError> {
+        Err(AgentError::Other(format!(
+            "this agent implementation does not support mode-switch responses \
+             (pending id {id}; enable_switch_mode must be set in EngineConfig)"
+        )))
     }
 }

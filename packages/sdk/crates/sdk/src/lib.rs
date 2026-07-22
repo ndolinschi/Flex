@@ -136,9 +136,10 @@ impl AgentBuilder {
     }
 
     /// Enable a built-in plugin by id. Currently recognizes `"search"`,
-    /// `"index"`, `"learning"`, and `"verifier"` (when the matching feature
-    /// is enabled); unknown or feature-disabled ids are ignored with a
-    /// warning. Use [`AgentBuilder::plugin`] for custom plugins.
+    /// `"index"`, `"learning"`, `"verifier"`, and `"messaging"` (when the
+    /// matching feature is enabled); unknown or feature-disabled ids are
+    /// ignored with a warning. Use [`AgentBuilder::plugin`] for custom
+    /// plugins.
     pub fn enable_plugin(mut self, id: &str) -> Self {
         let mut matched = false;
         #[cfg(feature = "search")]
@@ -165,9 +166,30 @@ impl AgentBuilder {
             self.plugins.push(Arc::new(VerifierPlugin));
             matched = true;
         }
+        if id == "messaging" {
+            self.config.enable_peer_messaging = true;
+            self.config.enable_switch_mode = true;
+            matched = true;
+        }
         if !matched {
             tracing::warn!(plugin = id, "unknown or feature-disabled plugin ignored");
         }
+        self
+    }
+
+    /// Register the peer-messaging tools (`GetActiveAgents`, `SendMessage`,
+    /// `GetMessages`). Off by default; also enabled by
+    /// `enable_plugin("messaging")`.
+    pub fn peer_messaging(mut self, on: bool) -> Self {
+        self.config.enable_peer_messaging = on;
+        self
+    }
+
+    /// Register the `SwitchMode` tool and wire the `respond_mode_switch`
+    /// reply path. Off by default; also enabled by
+    /// `enable_plugin("messaging")`.
+    pub fn switch_mode(mut self, on: bool) -> Self {
+        self.config.enable_switch_mode = on;
         self
     }
 

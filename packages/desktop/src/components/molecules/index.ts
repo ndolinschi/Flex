@@ -95,3 +95,5 @@ export {
 } from "../../lib/toolPresentation"
 export { WorkGroup } from "./WorkGroup"
 export { WorkflowGroup } from "./WorkflowGroup"
+export { ModeSwitchChip } from "./ModeSwitchChip"
+export { PeerMessageCard } from "./PeerMessageCard"

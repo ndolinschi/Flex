@@ -138,9 +138,8 @@ fn fetch_hits(
     open_mode: IndexOpenMode,
 ) -> Result<Vec<Hit>, String> {
     let store = match events {
-        Some(sink) => {
-            open_and_build_with_events_mode(cwd, sink, None, open_mode).map_err(|e| e.to_string())?
-        }
+        Some(sink) => open_and_build_with_events_mode(cwd, sink, None, open_mode)
+            .map_err(|e| e.to_string())?,
         None => open_and_build_with_mode(cwd, open_mode).map_err(|e| e.to_string())?,
     };
     search_hybrid(&store, query, k).map_err(|e| e.to_string())

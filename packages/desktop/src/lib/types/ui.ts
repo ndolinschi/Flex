@@ -128,3 +128,25 @@ export const sessionLabel = (meta: SessionMeta): string => {
   if (meta.title?.trim()) return meta.title.trim()
   return DEFAULT_SESSION_TITLE
 }
+
+/** A pending `mode_switch_proposed` awaiting user veto or auto-accept. */
+export type PendingModeSwitch = {
+  sessionId: string
+  id: string
+  mode: string
+  reason: string
+  /** Absolute timestamp (Date.now()) after which the UI auto-accepts. */
+  deadlineMs: number
+}
+
+/** A persisted peer message received from another agent. */
+export type PeerMessage = {
+  id: string
+  sessionId: string
+  from: string
+  to?: string
+  threadId?: string
+  content: string
+  aboutPath?: string
+  tsMs: number
+}

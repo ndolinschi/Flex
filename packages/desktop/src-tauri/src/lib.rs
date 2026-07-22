@@ -298,6 +298,7 @@ pub fn run() {
             commands::respond_permission,
             commands::set_turn_permission_mode,
             commands::respond_question,
+            commands::respond_mode_switch,
             commands::is_configured,
             commands::git_is_repo,
             commands::git_has_remote,

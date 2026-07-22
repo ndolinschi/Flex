@@ -953,6 +953,133 @@
           ]
         },
         {
+          "description": "Peer-to-peer agent message (persisted on the recipient session log).",
+          "type": "object",
+          "properties": {
+            "about_path": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "content": {
+              "type": "string"
+            },
+            "from": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "id": {
+              "$ref": "#/$defs/PeerMessageId"
+            },
+            "kind": {
+              "type": "string",
+              "const": "peer_message"
+            },
+            "thread_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "to": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SessionId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "from",
+            "content"
+          ]
+        },
+        {
+          "description": "Auto/router proposed a composer-mode switch; UI shows a veto window.\nPersisted so chat history can display the decision chip on resume.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/ModeSwitchId"
+            },
+            "kind": {
+              "type": "string",
+              "const": "mode_switch_proposed"
+            },
+            "mode": {
+              "description": "One of `\"agent\"`, `\"plan\"`, `\"ask\"`, `\"debug\"`.",
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "timeout_ms": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "mode",
+            "reason",
+            "timeout_ms"
+          ]
+        },
+        {
+          "description": "The proposed mode switch was accepted and applied.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/ModeSwitchId"
+            },
+            "kind": {
+              "type": "string",
+              "const": "mode_switch_applied"
+            },
+            "mode": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "mode"
+          ]
+        },
+        {
+          "description": "The proposed mode switch was vetoed by the user or timed out.",
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/ModeSwitchId"
+            },
+            "kind": {
+              "type": "string",
+              "const": "mode_switch_rejected"
+            },
+            "mode": {
+              "type": "string"
+            },
+            "reason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "mode"
+          ]
+        },
+        {
           "description": "A live subscriber lagged and missed events; re-sync from the store\nstarting at `from_seq`. Never persisted.",
           "type": "object",
           "properties": {
@@ -1145,10 +1272,36 @@
         }
       ]
     },
+    "CompactionMode": {
+      "description": "How a context compaction condensed the turn history.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "standard"
+          ]
+        },
+        {
+          "description": "Compact user↔assistant turn pairs into shorter nicknamed summaries.",
+          "type": "string",
+          "const": "turn_pair"
+        }
+      ]
+    },
     "CompactionSummary": {
       "description": "Record of a context compaction.",
       "type": "object",
       "properties": {
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CompactionMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "strategy": {
           "description": "Which strategy produced it (`\"summarize_oldest\"`, `\"truncate\"`, ...).",
           "type": "string"
@@ -1589,6 +1742,10 @@
         "id"
       ]
     },
+    "ModeSwitchId": {
+      "description": "Identifies one composer mode-switch proposal round-trip.",
+      "type": "string"
+    },
     "ModelDiscovery": {
       "description": "How an agent's model list is discovered.",
       "oneOf": [
@@ -1676,6 +1833,10 @@
     },
     "ModelRef": {
       "description": "Reference to a model, optionally provider-qualified:\n`\"anthropic/claude-sonnet-4-5\"` or a bare `\"claude-sonnet-4-5\"`.",
+      "type": "string"
+    },
+    "PeerMessageId": {
+      "description": "Identifies one peer-to-peer agent message.",
       "type": "string"
     },
     "PermissionCaps": {

@@ -318,6 +318,15 @@ export const setTurnPermissionMode = (
 export const respondQuestion = (input: RespondQuestionInput): Promise<void> =>
   invoke("respond_question", { input })
 
+/** Respond to a pending `ModeSwitchProposed` — `allow: true` applies the
+ * switch; `allow: false` rejects it. A double-resolve (engine already
+ * auto-applied / auto-rejected) is a safe no-op (oneshot pending map). */
+export const respondModeSwitch = (
+  sessionId: string,
+  id: string,
+  allow: boolean,
+): Promise<void> => invoke("respond_mode_switch", { input: { sessionId, id, allow } })
+
 export const isConfigured = (): Promise<boolean> => invoke("is_configured")
 
 /** Whether `cwd` is inside a git repository at all (`git rev-parse
