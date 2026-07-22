@@ -63,6 +63,13 @@ const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     description:
       "Primary buttons and focus rings — neutral by default, or blue, green, orange, burgundy, custom hex",
   },
+  {
+    section: "appearance",
+    rowId: "appearance-theme-library",
+    title: "Custom themes",
+    description:
+      "Named color themes — import JSON, create in the editor, or export. Token overrides layered on the factory palette.",
+  },
   // Models & Connections
   {
     section: "models",

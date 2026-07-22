@@ -1,6 +1,6 @@
 import { Moon, Sun } from "lucide-react"
 import { SettingsShell } from "../components/templates"
-import { SettingsCard, SettingRow, SETTINGS_NAV_ITEMS, AccentColorPicker } from "../components/molecules"
+import { SettingsCard, SettingRow, SETTINGS_NAV_ITEMS, AccentColorPicker, ThemeLibrary } from "../components/molecules"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -139,6 +139,18 @@ const AppearanceContent = () => {
           stacked
         >
           <AccentColorPicker />
+        </SettingRow>
+      </SettingsCard>
+
+      <SettingsCard label="Color themes">
+        <SettingRow
+          rowId="appearance-theme-library"
+          title="Custom themes"
+          description="Named token overrides layered on top of the factory dark/light palette. Import JSON or create in the editor."
+          first
+          stacked
+        >
+          <ThemeLibrary />
         </SettingRow>
       </SettingsCard>
     </div>

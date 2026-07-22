@@ -509,6 +509,10 @@ export type UiSliceState = {
     kind: "success" | "error"
     action?: { label: string; onAction: () => void }
   }>
+  /** Active custom theme id (`"factory"` = built-in palette, no overrides). */
+  activeThemeId: string
+  /** User-defined named themes. Persisted in `ui.json`. */
+  customThemes: import("../lib/themeTokens").ThemeSpec[]
   setRoute: (route: AppRoute) => void
   setSettingsSection: (section: SettingsSectionId) => void
   setTheme: (theme: UiTheme) => void
@@ -546,6 +550,14 @@ export type UiSliceState = {
     action?: { label: string; onAction: () => void },
   ) => void
   dismissToast: (id: string) => void
+  /** Switch the active theme by id (`"factory"` clears all overrides). */
+  setActiveTheme: (id: string) => void
+  /** Add or replace a named theme (upsert by `spec.id`). */
+  upsertCustomTheme: (spec: import("../lib/themeTokens").ThemeSpec) => void
+  /** Delete a custom theme by id. Switches to factory if it was active. */
+  deleteCustomTheme: (id: string) => void
+  /** Parse + import a JSON string as a ThemeSpec; returns the parse result. */
+  importThemeJson: (raw: string) => import("../lib/themeTokens").ThemeParseResult
 }
 
 export type PanelExtrasSliceState = {

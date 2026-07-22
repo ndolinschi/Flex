@@ -7,10 +7,18 @@ import {
   DEFAULT_CUSTOM_ACCENT,
   normalizeAccentHex,
 } from "../../lib/accent"
+import {
+  applyThemeTokensToDom,
+  clearThemeTokensFromDom,
+  parseThemeJson,
+} from "../../lib/themeTokens"
+import type { ThemeSpec } from "../../lib/themeTokens"
 import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import { persistUiState } from "../persist"
 import { syncCrashReportingFlag, syncDebugFlag } from "../../lib/debug/log"
 import { toast } from "sonner"
+
+const FACTORY_THEME_ID = "factory"
 
 const applyThemeToDom = (theme: UiTheme) => {
   if (typeof document === "undefined") return
@@ -23,6 +31,24 @@ const syncAccentToDom = (state: {
   theme: UiTheme
 }) => {
   applyAccentToDom(state.accentId, state.accentCustomHex, state.theme)
+}
+
+/** Apply the custom theme tokens for the current mode, or clear if factory. */
+const syncCustomThemeToDom = (
+  activeThemeId: string,
+  customThemes: ThemeSpec[],
+  mode: UiTheme,
+): void => {
+  if (activeThemeId === FACTORY_THEME_ID) {
+    clearThemeTokensFromDom()
+    return
+  }
+  const spec = customThemes.find((t) => t.id === activeThemeId)
+  if (!spec) {
+    clearThemeTokensFromDom()
+    return
+  }
+  applyThemeTokensToDom(mode, spec.tokens?.[mode])
 }
 
 let toastCounter = 0
@@ -51,6 +77,8 @@ export const createUiSlice: StateCreator<
   openChatSessionIds: [],
   unreadBySession: {},
   toasts: [],
+  activeThemeId: FACTORY_THEME_ID,
+  customThemes: [],
   setRoute: (route) =>
     set((state) => {
       // Automations UI is feature-flagged off by default — treat the legacy
@@ -93,8 +121,9 @@ export const createUiSlice: StateCreator<
     applyThemeToDom(theme)
     set({ theme })
     void persistUiState({ theme })
-    const { accentId, accentCustomHex } = get()
+    const { accentId, accentCustomHex, activeThemeId, customThemes } = get()
     syncAccentToDom({ accentId, accentCustomHex, theme })
+    syncCustomThemeToDom(activeThemeId, customThemes, theme)
   },
   toggleTheme: () => {
     const next = get().theme === "dark" ? "light" : "dark"
@@ -237,5 +266,44 @@ export const createUiSlice: StateCreator<
   dismissToast: (id) => {
     toast.dismiss(id)
     set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }))
+  },
+  setActiveTheme: (id) => {
+    const { customThemes, theme } = get()
+    set({ activeThemeId: id })
+    void persistUiState({ activeThemeId: id })
+    syncCustomThemeToDom(id, customThemes, theme)
+  },
+  upsertCustomTheme: (spec) => {
+    set((state) => {
+      const next = state.customThemes.some((t) => t.id === spec.id)
+        ? state.customThemes.map((t) => (t.id === spec.id ? spec : t))
+        : [...state.customThemes, spec]
+      void persistUiState({ customThemes: next })
+      return { customThemes: next }
+    })
+    // Re-apply if this theme is currently active.
+    const { activeThemeId, theme } = get()
+    if (activeThemeId === spec.id) {
+      syncCustomThemeToDom(spec.id, get().customThemes, theme)
+    }
+  },
+  deleteCustomTheme: (id) => {
+    set((state) => {
+      const customThemes = state.customThemes.filter((t) => t.id !== id)
+      const activeThemeId =
+        state.activeThemeId === id ? FACTORY_THEME_ID : state.activeThemeId
+      void persistUiState({ customThemes, activeThemeId })
+      if (activeThemeId === FACTORY_THEME_ID) {
+        clearThemeTokensFromDom()
+      }
+      return { customThemes, activeThemeId }
+    })
+  },
+  importThemeJson: (raw) => {
+    const result = parseThemeJson(raw)
+    if (!result.ok) return result
+    get().upsertCustomTheme(result.spec)
+    get().setActiveTheme(result.spec.id)
+    return result
   },
 })

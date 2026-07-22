@@ -55,6 +55,15 @@ export const useBootstrap = (
         useAppStore.setState({ accentCustomHex })
         useAppStore.getState().setAccentId(accentId)
 
+        // Restore custom themes before applying active theme so DOM reflects
+        // the persisted state on first paint.
+        if (Array.isArray(ui.customThemes) && ui.customThemes.length > 0) {
+          useAppStore.setState({ customThemes: ui.customThemes })
+        }
+        if (typeof ui.activeThemeId === "string") {
+          useAppStore.getState().setActiveTheme(ui.activeThemeId)
+        }
+
         if (!configured) {
           log.info("boot", "bootstrap: not configured, routing to welcome")
           setRoute("welcome")

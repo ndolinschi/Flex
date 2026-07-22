@@ -1,4 +1,5 @@
 export { AccentColorPicker } from "./AccentColorPicker"
+export { ThemeLibrary } from "./ThemeLibrary"
 export { ArchivedSectionHeader } from "./ArchivedSectionHeader"
 export { AttachmentChip } from "./AttachmentChip"
 export { BranchPicker } from "./BranchPicker"

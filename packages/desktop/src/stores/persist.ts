@@ -51,6 +51,10 @@ export type UiPersisted = {
   openChatSessionIds?: string[]
   /** Plan-tab annotations + last-opened plan id, keyed by session id. */
   planAnnotationsBySession?: Record<string, PlanAnnotationsPersisted>
+  /** Active custom theme id, or `"factory"` for the built-in palette. */
+  activeThemeId?: string
+  /** User-defined named themes (allowlisted token overrides). */
+  customThemes?: import("../lib/themeTokens").ThemeSpec[]
 }
 
 export const UI_STORE_FILE = "ui.json"

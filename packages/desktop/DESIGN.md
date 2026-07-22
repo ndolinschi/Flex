@@ -42,8 +42,11 @@ conflict. Live aliases in `src/index.css`:
 | `--destructive` | `--color-danger` |
 | `--radius` | `0.5rem` base; role radii stay Flex `--radius-*` |
 
-Do not introduce a second theme system. Keep `data-theme="dark"|"light"` and
-Settings → Appearance accent overrides as the only runtime theme knobs.
+The system has exactly one theme layer: `data-theme="dark"|"light"` drives the
+factory palette, accent overrides (`accent.ts`) apply on top, and the optional
+`ThemeLibrary` (`lib/themeTokens.ts`) layers allowlisted inline CSS-var overrides
+on `<html>` — all three operate together as one system and never conflict.
+Do not introduce additional theme-switching mechanisms outside this contract.
 shadcn’s `--accent` means muted hover fill (`--color-fill-4`), **not** the
 product accent (`--color-accent` / `bg-primary`).
 
