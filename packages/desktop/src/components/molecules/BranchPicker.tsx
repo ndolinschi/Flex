@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { GitBranch, GitPullRequest } from "lucide-react"
+import { Check, GitBranch, GitPullRequest } from "lucide-react"
+import { Command as CommandPrimitive } from "cmdk"
 import {
   gitBranch,
   gitCheckout,
@@ -10,16 +11,22 @@ import {
   toInvokeError,
 } from "../../lib/tauri"
 import { openExternalUrl } from "../../lib/openExternalUrl"
+import { fuzzyScore } from "../../lib/fuzzySearch"
+import { HighlightedLabel } from "../atoms"
 import { Button } from "@/components/ui/button"
-import { InputGroupAddon } from "@/components/ui/input-group"
 import {
-  Combobox,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
-} from "@/components/ui/combobox"
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { cn } from "../../lib/utils"
 
 type BranchPickerProps = {
@@ -28,8 +35,8 @@ type BranchPickerProps = {
   onError?: (message: string) => void
 }
 
-const triggerInputClassName =
-  "h-6 min-w-0 flex-1 border-0 bg-transparent shadow-none ring-0 has-[[data-slot=input-group-control]:focus-visible]:border-transparent has-[[data-slot=input-group-control]:focus-visible]:ring-0 focus-within:border-transparent focus-within:ring-0 text-sm font-normal text-muted-foreground opacity-80 hover:opacity-100 data-open:opacity-100"
+const triggerClassName =
+  "h-6 max-w-[12rem] gap-1 px-1.5 text-sm font-normal text-muted-foreground opacity-80 hover:bg-fill-4 hover:opacity-100 data-popup-open:bg-fill-4 data-popup-open:opacity-100"
 
 /** Defer `gh pr view` until the session chrome is interactive — running it on
  * every ContextBar mount (new session / switch) stacked with git_status and
@@ -50,6 +57,7 @@ export const BranchPicker = ({
 }: BranchPickerProps) => {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [query, setQuery] = useState("")
   const [prPrefetchReady, setPrPrefetchReady] = useState(false)
   const queryClient = useQueryClient()
 
@@ -96,6 +104,22 @@ export const BranchPicker = ({
   const label = current ?? "No branch"
   const canOpen = !!cwd && !disabled
 
+  const filtered = useMemo(() => {
+    const q = query.trim()
+    if (!q) return branches
+    return branches
+      .map((branch) => ({ branch, score: fuzzyScore(q, branch) }))
+      .filter(
+        (r): r is { branch: string; score: number } => r.score !== null,
+      )
+      .sort((a, b) => a.score - b.score)
+      .map((r) => r.branch)
+  }, [branches, query])
+
+  useEffect(() => {
+    if (open) setQuery("")
+  }, [open])
+
   const handleSelect = async (branch: string) => {
     if (!cwd || branch === current) {
       setOpen(false)
@@ -117,50 +141,91 @@ export const BranchPicker = ({
 
   return (
     <div className="relative flex items-center gap-1">
-      <Combobox
-        items={open ? branches : []}
-        value={current ?? null}
-        onValueChange={(next) => {
-          if (typeof next === "string" && next) void handleSelect(next)
-        }}
-        open={open}
-        onOpenChange={setOpen}
-        disabled={!canOpen || busy}
-      >
-        <ComboboxInput
-          placeholder={label}
-          aria-label={`Branch: ${label}`}
-          className={cn(triggerInputClassName, "max-w-[12rem]")}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
           disabled={!canOpen || busy}
-        >
-          <InputGroupAddon align="inline-start" className="py-0 pl-1.5 pr-0">
-            <GitBranch
-              className="size-3.5 shrink-0 text-muted-foreground"
-              aria-hidden
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              aria-label={`Branch: ${label}`}
+              title={label}
+              className={cn(triggerClassName, open && "bg-fill-4 opacity-100")}
+              disabled={!canOpen || busy}
             />
-          </InputGroupAddon>
-        </ComboboxInput>
-        <ComboboxContent className="w-72" side="top" align="start">
-          <ComboboxEmpty>
-            {isFetching ? "Loading branches…" : "No branches found"}
-          </ComboboxEmpty>
-          <ComboboxList>
-            {(branch) => {
-              const active = branch === current
-              return (
-                <ComboboxItem key={branch} value={branch} disabled={busy}>
-                  <span className="min-w-0 truncate">{branch}</span>
-                  {active ? (
-                    <span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                      Current
-                    </span>
-                  ) : null}
-                </ComboboxItem>
-              )
-            }}
-          </ComboboxList>
-        </ComboboxContent>
-      </Combobox>
+          }
+        >
+          <GitBranch
+            className="size-3.5 shrink-0 text-muted-foreground"
+            aria-hidden
+          />
+          <span className="min-w-0 truncate">{label}</span>
+        </PopoverTrigger>
+        <PopoverContent
+          side="top"
+          align="start"
+          sideOffset={4}
+          className="w-72 gap-0 overflow-hidden p-0"
+        >
+          <PopoverTitle className="sr-only">Select branch</PopoverTitle>
+          <Command
+            shouldFilter={false}
+            className="rounded-none bg-transparent p-0"
+          >
+            <div className="flex shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5 py-1.5">
+              <CommandPrimitive.Input
+                value={query}
+                onValueChange={setQuery}
+                placeholder="Search branches…"
+                aria-label="Search branches"
+                className={cn(
+                  "h-auto min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm text-ink outline-hidden",
+                  "rounded-none placeholder:text-ink-faint",
+                )}
+              />
+            </div>
+            <CommandList className="py-1" style={{ maxHeight: 200 }}>
+              <CommandEmpty className="px-2.5 py-2 text-sm text-ink-muted">
+                {isFetching ? "Loading branches…" : "No branches found"}
+              </CommandEmpty>
+              {filtered.length > 0 ? (
+                <CommandGroup>
+                  {filtered.map((branch) => {
+                    const active = branch === current
+                    return (
+                      <CommandItem
+                        key={branch}
+                        value={branch}
+                        disabled={busy}
+                        onSelect={() => void handleSelect(branch)}
+                        className="px-2.5"
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {query.trim() ? (
+                            <HighlightedLabel label={branch} query={query} />
+                          ) : (
+                            branch
+                          )}
+                        </span>
+                        {active ? (
+                          <span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                            Current
+                            <Check
+                              className="size-3 shrink-0 text-primary"
+                              aria-hidden
+                            />
+                          </span>
+                        ) : null}
+                      </CommandItem>
+                    )
+                  })}
+                </CommandGroup>
+              ) : null}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
 
       {branchPr ? (
         <Button

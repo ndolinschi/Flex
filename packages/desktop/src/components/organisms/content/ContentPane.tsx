@@ -278,13 +278,10 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                 ? `${label} — ${sessionLabel(sessionsById.get(t.sessionId) ?? { title: t.sessionId.slice(0, 8) } as SessionMeta)}`
                 : label
 
-            // Divider between the last chat tab and first tool tab.
-            const prev = displayTabs[index - 1]
-            const showDivider = prev?.kind === "chat" && t.kind === "tool"
-
+            // Hairline between every adjacent tab (quiet Cursor-style separator).
             return (
               <Fragment key={t.id}>
-                {showDivider ? (
+                {index > 0 ? (
                   <span
                     aria-hidden
                     className="h-4 w-px shrink-0 bg-stroke-3"

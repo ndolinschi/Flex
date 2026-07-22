@@ -278,8 +278,9 @@ supplies the rounded clip (`--window-radius`) over a transparent window.
 1. Outer `px-3` → rail `max-w-[var(--content-rail)]`
 2. Optional `workersSlot` / HITL docked flush above the bubble
 3. ContextBar above bubble (`mb-1`, min-height status bar) — project/branch
-   comboboxes are `h-6` with addon `py-0` so folder/branch icons sit on the
-   text baseline (default InputGroupAddon `py-1.5` is for `h-8` forms)
+   are `h-6` ghost popover triggers (Folder/GitBranch + label; opacity
+   0.8→1); search lives in the panel (OpenTabModal-style cmdk strip), not
+   in the closed trigger
 4. Bubble: `--radius-composer`, shadow-composer
 5. Textarea + toolbar both `px-2.5`
 
@@ -292,7 +293,9 @@ FilesChangedCard) sits **outside** the virtual window. Scroll-down FAB:
 
 ### RightPanel
 
-1. **TabStrip** — `px-2.5 gap-1.5`, tabs `h-6`
+1. **TabStrip** — `px-2.5 gap-1.5`, tabs `h-6`; hairline `h-4 w-px bg-stroke-3`
+   between every adjacent tab (quiet Cursor-style separator; same token as the
+   split sash)
 2. Tab chrome rows — same `px-2.5` / 30px height; **omit `border-b`** on
    the first tool subheader under TabStrip (TabStrip already owns the strip
    border — stacking a second `border-b` with only the hairline between reads

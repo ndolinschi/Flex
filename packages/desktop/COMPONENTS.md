@@ -57,9 +57,9 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `PlanCommentList` | Annotations on the open plan | `comments`, `onFocus`, `onRemove` | PlanTab |
 | `OpenTabModal` | Searchable open-tab picker; `+` Button is PopoverTrigger; cmdk Input search | `open`, `onOpenChange`, `trigger`, `paneIndex`, `sessionId`, `tabs`, … | ContentPane |
 | `PermissionActions` | Composer-footer Allow once / Always allow / Deny (replaces Send) | `permission` | Composer |
-| `PlusMenu` | Attach + mode shortcuts (Plan/Ask) | `onAttachFile`, `onAttachImage`, `onSetMode?` | Composer |
-| `ProjectPicker` | Recent cwds + Open Folder | `sessionId`, `cwd`, `onError?` | ContextBar |
-| `BranchPicker` | List/checkout local git branches; shows current-branch PR # + checks when present | `cwd`, `onError?` | ContextBar |
+| `PlusMenu` | Attach file / image menu (ghost circle trigger) | `onAttachFile`, `onAttachImage`, `disabled?` | Composer |
+| `ProjectPicker` | Stable Folder+name trigger; Popover + cmdk search strip over fuzzy recents + Open Folder | `sessionId`, `cwd`, `onError?` | ContextBar |
+| `BranchPicker` | Stable GitBranch+name trigger; Popover + cmdk search strip; PR # + checks chip when present | `cwd`, `onError?` | ContextBar |
 | `BranchPrStatusChip` | Current-branch PR # + title + CI summary; opens PR in browser | `pr` | ChangesTab header |
 | `CreatePrDialog` | Editable title/body modal before `gh pr create` | `open`, `initialTitle?`, `initialBody?`, `onConfirm` | ChangesTab, CommitCenter, CommitBar |
 | `PopoverTray` | Shared Esc/click-outside/↑↓ tray for composer autocomplete (`autoFocus={false}`; not Base UI Popover) | `open`, `onClose`, `placement`, `children` | SlashCommandTray, AtMentionTray |
@@ -214,15 +214,16 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 - Motion: hover 100ms ease; trays `animate-tray-in`; pane swaps `animate-pane-fade`; timeline rows `animate-row-fade`; end-of-turn `animate-end-turn-in` (160ms); HITL cards `animate-modal-in` (scale .97→1); overlays `animate-backdrop-in`.
 - Composer: `--radius-composer` 14px, soft elevation + stroke focus (no accent glow), compact auto-grow (~28–160px) + unified toolbar (`text-sm` input; Plus / Bypass / Send `h-6` circles with `h-3.5` icons; Mode/Model `h-6` pills; left cluster `gap-1`, Bypass↔Send `gap-1.5`); quiet toolbar opacity (0.5→0.8); mode/model pills neutral fill + stroke.
 - Content rail: `--content-rail` 840px (`52.5rem`).
-- ContextBar sits above the composer (project / branch / context %) — Flex Canon.
+- ContextBar sits above the composer (project / branch / context %) — Flex Canon. Project/branch are `h-6` ghost popover triggers; search lives in the panel (same chrome strip as `OpenTabModal`), not in the closed trigger.
 - Sidebar footer = theme + settings (Flex Canon); rows use fill-4 hover / fill-2 selected.
-- Right panel tabs = Plan / Changes / Pull Request (when current branch has a PR) / Terminal / Browser (Flex Canon); pill tabs via shared `Tab`/`TabStrip`/`TabClose` atoms (`TabStrip` `px-2.5`/`gap-1.5`; `Tab` md/sm both `h-6` so selected fills clear the 30px strip edges; Files open-buffer chips compose the same `Tab` at `size="sm"`); sash hover white-alpha.
+- Right panel tabs = Plan / Changes / Pull Request (when current branch has a PR) / Terminal / Browser (Flex Canon); pill tabs via shared `Tab`/`TabStrip`/`TabClose` atoms (`TabStrip` `px-2.5`/`gap-1.5` + `h-4 w-px bg-stroke-3` hairlines between adjacent tabs; `Tab` md/sm both `h-6` so selected fills clear the 30px strip edges; Files open-buffer chips compose the same `Tab` at `size="sm"`); sash hover white-alpha.
 - Focus policy: interactive chrome uses the global neutral `stroke-2` outline; form fields and chrome search inputs use a matching neutral stroke ring (never accent glow).
 - Prior user bubbles dim to 50% (hover restores); hairline stroke-2; message actions reveal on row hover.
 - Sessions: default title `New Agent`; one draft per project; first prompt renames the session.
 - Engine settings: plugin toggles (search/index/learning/verifier), Indexing section
   (status/rebuild/auto-update-on-search/auto-context), fallback models, default isolation.
 - Composer `/` opens slash-command tray; SessionMenu supports undo/redo files + integrate/discard when isolated.
+- Composer Cursor-parity follow-ups (deferred): Plus menu @ code/docs/web/past chats; extract shared chrome-search-popover from OpenTabModal + Project/Branch; ContextBar-above-bubble and WorkingAgentsPill / Maximize→Prompt stay Flex-specific.
 
 ## shadcn/ui migration map
 
@@ -270,8 +271,8 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Chart | skip | — | No dashboards |
 | Checkbox | ✅ done | `Checkbox` atom | Base UI Checkbox + round + indeterminate; API adapter |
 | Collapsible | ✅ done | WorkGroup / tool cards via molecule adapter | `@/components/ui/collapsible`; section headers still thin |
-| Combobox | ✅ done | `ProjectPicker`, `BranchPicker` | `@/components/ui/combobox` — searchable + Open Folder (not plain Select) |
-| Command | ✅ done | `CommandPalette`, `SearchModal`, `OpenTabModal`, ModelSelect/MultiSelect lists | `shouldFilter={false}` + fuzzyScore; cmdk owns ↑↓/Enter |
+| Combobox | ✅ done | Remaining searchable selects (if any); ContextBar pickers moved off Combobox | Prefer Popover+Command when the closed trigger must stay a label (not a filter input) |
+| Command | ✅ done | `CommandPalette`, `SearchModal`, `OpenTabModal`, `ProjectPicker`, `BranchPicker`, ModelSelect/MultiSelect lists | `shouldFilter={false}` + fuzzyScore; cmdk owns ↑↓/Enter; chrome search uses raw `CommandPrimitive.Input` (not inset `CommandInput`) |
 | Context Menu | ✅ done | `ContextMenu` molecule → `@/components/ui/context-menu` | Imperative position API; timeline-scroll / webview-blur ignore preserved |
 | Data Table | ✅ done (Table) | DatabaseTab result grid | `@/components/ui/table` + compact `text-xs` density |
 | Date Picker | skip | — | |
