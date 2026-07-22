@@ -10,6 +10,12 @@ import {
 import { Tooltip } from "../../atoms"
 import { Button } from "@/components/ui/button"
 import {
+  Popover,
+  PopoverContent,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
   appendPromptSection,
   PROMPT_SECTION_TEMPLATES,
 } from "../../../lib/promptEngineering"
@@ -30,7 +36,8 @@ type PromptTabHeaderProps = {
   onSend: () => void
 }
 
-/** Prompt pad chrome: title, token count, insert/marks/verify/send controls. */
+/** Prompt pad chrome: title, token count, insert/marks/verify/send controls.
+ * Matches Browser/Changes 30px header recipe (`px-2.5`, `h-6` icon buttons). */
 export const PromptTabHeader = ({
   chars,
   tokens,
@@ -51,43 +58,51 @@ export const PromptTabHeader = ({
     <span className="shrink-0 text-xs text-ink-muted [font-variant-numeric:tabular-nums]">
       {chars.toLocaleString()} · ~{tokens.toLocaleString()} tok
     </span>
-    <div className="relative">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Insert section"
-        title="Insert section"
-        onClick={() => setInsertOpen((v) => !v)}
-        className={cn(
-          "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
-          "opacity-50 hover:opacity-80",
-          "h-6 w-6",
-        )}
+    <Popover
+      open={insertOpen}
+      onOpenChange={(open) => setInsertOpen(open)}
+    >
+      <PopoverTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Insert section"
+            title="Insert section"
+            className={cn(
+              "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+              "opacity-50 hover:opacity-80",
+              "h-6 w-6",
+            )}
+          />
+        }
       >
         <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-      </Button>
-      {insertOpen ? (
-        <div
-          className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-md bg-panel shadow-[var(--shadow-popover)]"
-          data-popover-outside-ignore
-        >
-          {PROMPT_SECTION_TEMPLATES.map((t) => (
-            <Button
-              key={t.id}
-              variant="ghost"
-              onClick={() => {
-                setDraft(appendPromptSection(draft, t.markdown))
-                setInsertOpen(false)
-              }}
-              className="h-auto w-full justify-start px-2.5 py-1.5 text-xs text-ink-secondary font-normal hover:bg-fill-4 hover:text-ink"
-            >
-              {t.label}
-            </Button>
-          ))}
-        </div>
-      ) : null}
-    </div>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        side="bottom"
+        sideOffset={4}
+        className="w-44 gap-0 overflow-hidden p-1"
+      >
+        <PopoverTitle className="sr-only">Insert section</PopoverTitle>
+        {PROMPT_SECTION_TEMPLATES.map((t) => (
+          <Button
+            key={t.id}
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setDraft(appendPromptSection(draft, t.markdown))
+              setInsertOpen(false)
+            }}
+            className="h-auto w-full justify-start px-2.5 py-1.5 text-xs text-ink-secondary font-normal hover:bg-fill-4 hover:text-ink"
+          >
+            {t.label}
+          </Button>
+        ))}
+      </PopoverContent>
+    </Popover>
     {annotationsCount > 0 ? (
       <Tooltip label={showMarks ? "Edit text (@ /)" : "Show highlighted marks"}>
         <Button
@@ -139,8 +154,8 @@ export const PromptTabHeader = ({
         size="icon-sm"
         aria-label="Send prompt"
         title="Send prompt"
+        disabled={!draft.trim() || busy}
         onClick={onSend}
-        disabled={!draft.trim()}
         className={cn(
           "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
           "h-6 w-6",

@@ -35,12 +35,6 @@ import {
   PaginationItem,
 } from "@/components/ui/pagination"
 import { Separator } from "@/components/ui/separator"
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty"
 import { ConfirmDialog, EmptyState, ErrorBanner, FormField } from "../../components/molecules"
 import {
   dbActiveConnection,
@@ -330,7 +324,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
           Empty state owns the Add CTA; chrome only appears once there are
           connections (count + refresh/add), so stacked headers stay balanced. */}
       {connections.length > 0 ? (
-        <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 px-2.5">
+        <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
           <span className="min-w-0 flex-1 truncate text-sm text-ink-muted">
             {connectionCountLabel}
           </span>
@@ -472,7 +466,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
             {selectedId ? (
               <Button
                 variant="ghost"
-                className="h-auto justify-start gap-1.5 rounded-none border-t border-stroke-3 px-2.5 py-2 text-xs text-ink-muted font-normal hover:bg-transparent hover:text-ink"
+                className="h-auto justify-start gap-1.5 rounded-none border-t border-stroke-3 px-2.5 py-2 text-xs text-ink-muted font-normal hover:bg-fill-4 hover:text-ink"
                 onClick={() => {
                   void dbDisconnect(selectedId)
                   setSelectedId(null)
@@ -489,16 +483,19 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
 
           <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
             {!selectedId ? (
-              <div className="flex flex-1 items-center justify-center px-4 text-center text-sm text-ink-muted">
-                Select a connection to browse tables.
-              </div>
+              <EmptyState
+                className="min-h-0 flex-1"
+                title="Select a connection"
+                description="Pick a connection on the left to browse tables and run SQL."
+              />
             ) : (
               <>
-                <div className="flex shrink-0 flex-col border-b border-stroke-3 p-2">
+                <div className="flex shrink-0 flex-col border-b border-stroke-3 px-2.5 py-2">
                   <div className="mb-1.5 flex shrink-0 justify-end">
                     <Button
                       size="sm"
                       variant="default"
+                      className="h-6 gap-1 px-2 text-[11px]"
                       onClick={() => void runSql()}
                     >
                       <Play className="h-3 w-3" aria-hidden />
@@ -689,23 +686,19 @@ const ResultGrid = ({
 }) => {
   if (!result) {
     return (
-      <Empty className="flex-1 rounded-none border-none">
-        <EmptyHeader>
-          <EmptyDescription>Pick a table or run a query.</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <EmptyState
+        className="flex-1 rounded-none border-none"
+        title="Pick a table or run a query"
+      />
     )
   }
   if (result.columns.length === 0) {
     return (
-      <Empty className="flex-1 rounded-none border-none">
-        <EmptyHeader>
-          <EmptyTitle>No columns returned</EmptyTitle>
-          <EmptyDescription>
-            Query returned {result.rowCount} rows.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <EmptyState
+        className="flex-1 rounded-none border-none"
+        title="No columns returned"
+        description={`Query returned ${result.rowCount} rows.`}
+      />
     )
   }
 

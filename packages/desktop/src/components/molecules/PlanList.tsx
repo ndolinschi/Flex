@@ -8,6 +8,7 @@ import {
   ItemGroup,
   ItemTitle,
 } from "@/components/ui/item"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 type PlanListProps = {
   plans: SessionPlan[]
@@ -30,7 +31,8 @@ export const PlanList = ({ plans, onSelect, className }: PlanListProps) => {
           </span>
         </h2>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2">
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="px-2.5 py-2">
         <ItemGroup className="gap-0.5">
           {ordered.map((plan) => {
             const commentCount = plan.comments.length
@@ -67,7 +69,8 @@ export const PlanList = ({ plans, onSelect, className }: PlanListProps) => {
             )
           })}
         </ItemGroup>
-      </div>
+        </div>
+      </ScrollArea>
     </div>
   )
 }

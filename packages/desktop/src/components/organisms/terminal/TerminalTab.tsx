@@ -139,7 +139,7 @@ export const TerminalTab = ({
           like BrowserToolbar: this row separates chrome from the xterm
           surface (a native-like body), not a second rule under TabStrip
           with only hairline content between. */}
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5">
         <span className="min-w-0 flex-1 truncate text-sm text-ink">
           {isAgentSelected
             ? "Agent terminal"

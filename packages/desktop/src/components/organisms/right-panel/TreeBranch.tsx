@@ -6,6 +6,7 @@ import { sortFileHits } from "../../../lib/fileTree"
 import type { FileHit } from "../../../lib/types"
 import { cn, fileIconForPath } from "../../../lib/utils"
 import { Spinner } from "../../atoms"
+import { EmptyState } from "../../molecules"
 import { Button } from "@/components/ui/button"
 import { gitStatusClass, type GitStatusIndex } from "./fileExplorerGit"
 
@@ -69,11 +70,11 @@ export const TreeBranch = ({
   if (sorted.length === 0) {
     if (isRoot) {
       return (
-        <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-          <Folder className="h-6 w-6 text-ink-faint" aria-hidden />
-          <p className="text-sm text-ink-secondary">This folder is empty</p>
-          <p className="text-xs text-ink-muted">Create a file to get started.</p>
-        </div>
+        <EmptyState
+          icon={<Folder className="h-6 w-6" aria-hidden />}
+          title="This folder is empty"
+          description="Create a file to get started."
+        />
       )
     }
     return (

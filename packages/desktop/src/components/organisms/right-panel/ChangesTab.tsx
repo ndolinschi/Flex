@@ -4,7 +4,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { GitMerge, RefreshCw, XCircle } from "lucide-react"
 import { Checkbox, DiffStat } from "../../atoms"
-import { BranchPrStatusChip, ConfirmDialog, CreatePrDialog, ErrorBanner } from "../../molecules"
+import { BranchPrStatusChip, ConfirmDialog, CreatePrDialog, EmptyState, ErrorBanner } from "../../molecules"
 import { useWorkspaceActions } from "../../../hooks/useWorkspaceActions"
 import { useIsGitRepo } from "../../../hooks/useIsGitRepo"
 import {
@@ -181,9 +181,11 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
 
   if (!active) {
     return (
-      <div className="flex flex-1 items-center justify-center px-4 text-center">
-        <p className="text-sm text-ink-muted">No active session.</p>
-      </div>
+      <EmptyState
+        className="min-h-0 flex-1"
+        title="No active session"
+        description="Select a session to review working-tree changes."
+      />
     )
   }
 
@@ -194,27 +196,14 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
   // picked up without leaving and re-entering the tab.
   if (!isRepo) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 text-center">
-        <GitMerge className="h-7 w-7 text-ink-faint opacity-70" aria-hidden />
-        <p className="text-sm text-ink-secondary">Not a git repository</p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Refresh changes"
-          title="Refresh changes"
-          onClick={handleRefresh}
-          className={cn(
-            "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
-            "h-7 w-7",
-          )}
-        >
-          <RefreshCw
-            className={cn("h-3.5 w-3.5", isRepoFetching && "animate-spin")}
-            aria-hidden
-          />
-        </Button>
-      </div>
+      <EmptyState
+        className="min-h-0 flex-1"
+        icon={<GitMerge className="h-6 w-6" aria-hidden />}
+        title="Not a git repository"
+        description="Initialize a git repo in this project to track changes."
+        actionLabel="Refresh"
+        onAction={handleRefresh}
+      />
     )
   }
 
@@ -227,11 +216,11 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       : `${totalCount} file${totalCount === 1 ? "" : "s"} changed`
 
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col">
       {/* Quiet chrome row — title / branch / PR / diffstat / refresh.
           Selection lives on a dedicated toolbar below so the header stays
           balanced with Plan / Files / Terminal. */}
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 px-2.5 [font-variant-numeric:tabular-nums]">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5 [font-variant-numeric:tabular-nums]">
         <div className="min-w-0 flex-1 truncate">
           <span className="text-sm text-ink">{headline}</span>
           {branch ? (
@@ -310,18 +299,11 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
 
       <ScrollArea className="min-h-0 flex-1">
         {totalCount === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center">
-            <GitMerge
-              className="h-7 w-7 text-ink-faint opacity-70"
-              aria-hidden
-            />
-            <p className="text-sm text-ink-secondary">
-              Working tree clean
-              {branch ? (
-                <span className="text-ink-faint"> on {branch}</span>
-              ) : null}
-            </p>
-          </div>
+          <EmptyState
+            icon={<GitMerge className="h-6 w-6" aria-hidden />}
+            title="Working tree clean"
+            description={branch ? `on ${branch}` : undefined}
+          />
         ) : (
           <ul className="flex flex-col gap-0.5 px-2 py-1.5">
             {files.map((file) => (
@@ -423,7 +405,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
           void handleCreatePr(title, body)
         }}
       />
-    </>
+    </div>
   )
 }
 

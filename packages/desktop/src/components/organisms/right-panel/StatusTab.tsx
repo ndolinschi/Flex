@@ -5,6 +5,7 @@ import { sessionLabel, type SessionMeta } from "../../../lib/types"
 import { cn, formatTokens } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
 import { Progress } from "@/components/ui/progress"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 const CONTEXT_BUDGET_TOKENS = 200_000
 /** Stable empty — inline `?? []` in a Zustand selector re-renders forever. */
@@ -112,7 +113,8 @@ export const StatusTab = ({ session, active }: StatusTabProps) => {
         <span className="min-w-0 flex-1 truncate text-sm text-ink">Status</span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3">
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="px-2.5 py-3">
         <h2 className="mb-3 text-sm font-semibold text-ink">
           {sessionLabel(session)}
         </h2>
@@ -173,7 +175,8 @@ export const StatusTab = ({ session, active }: StatusTabProps) => {
             ))}
           </ul>
         )}
-      </div>
+        </div>
+      </ScrollArea>
     </div>
   )
 }

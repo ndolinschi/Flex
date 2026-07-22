@@ -14,7 +14,8 @@ type PrTabProps = {
 }
 
 /** Right-panel PR review — only meaningful when `gitPrStatus` finds a PR for
- * the session cwd's current branch. Header metadata + full `gh pr diff`. */
+ * the session cwd's current branch. Header metadata + full `gh pr diff`.
+ * Chrome matches Browser/Changes: 30px `--header-height` row + `px-2.5`. */
 export const PrTab = ({ active }: PrTabProps) => {
   const cwd = active?.cwd
 
@@ -39,7 +40,7 @@ export const PrTab = ({ active }: PrTabProps) => {
   if (!cwd) {
     return (
       <EmptyState
-        icon={<GitPullRequest className="h-7 w-7" aria-hidden />}
+        icon={<GitPullRequest className="h-6 w-6" aria-hidden />}
         title="No project"
         description="Open a session with a project to review a pull request."
       />
@@ -57,7 +58,7 @@ export const PrTab = ({ active }: PrTabProps) => {
   if (!pr) {
     return (
       <EmptyState
-        icon={<GitPullRequest className="h-7 w-7" aria-hidden />}
+        icon={<GitPullRequest className="h-6 w-6" aria-hidden />}
         title="No pull request"
         description="Create a PR for this branch and it will show up here for review."
       />
@@ -66,58 +67,55 @@ export const PrTab = ({ active }: PrTabProps) => {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 flex-col gap-1.5 px-2.5 py-2">
-        <div className="flex items-start gap-2">
-          <GitPullRequest
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-icon-3"
-            aria-hidden
-          />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm text-ink">
-              <span className="font-medium">#{pr.number}</span>{" "}
-              <span className="text-ink-secondary">{pr.title}</span>
-            </p>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink-muted">
-              <span className="uppercase tracking-[var(--tracking-caption)]">
-                {pr.state}
-              </span>
-              <span
-                className={cn(
-                  failing
-                    ? "text-destructive"
-                    : pending
-                      ? "text-ink-muted"
-                      : "text-success",
-                )}
-              >
-                {pr.checksSummary}
-              </span>
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="shrink-0"
-            onClick={() => void openExternalUrl(pr.url)}
-          >
-            <ExternalLink className="h-3 w-3" aria-hidden />
-            Open
-          </Button>
-        </div>
+      {/* Primary chrome — fixed 30px row (Browser recipe). */}
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
+        <GitPullRequest
+          className="h-3.5 w-3.5 shrink-0 text-ink-faint"
+          aria-hidden
+        />
+        <span className="min-w-0 flex-1 truncate text-sm text-ink">
+          <span className="font-medium">#{pr.number}</span>{" "}
+          <span className="text-ink-secondary">{pr.title}</span>
+        </span>
+        <span
+          className={cn(
+            "shrink-0 text-xs uppercase tracking-[var(--tracking-caption)]",
+            failing
+              ? "text-destructive"
+              : pending
+                ? "text-ink-muted"
+                : "text-success",
+          )}
+          title={`${pr.state} · ${pr.checksSummary}`}
+        >
+          {pr.checksSummary}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-6 shrink-0 gap-1 px-2 text-xs"
+          onClick={() => void openExternalUrl(pr.url)}
+          aria-label={`Open pull request #${pr.number}`}
+        >
+          <ExternalLink className="h-3 w-3" aria-hidden />
+          Open
+        </Button>
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
         {diffQuery.isLoading ? (
-          <div className="flex items-center justify-center gap-2 px-3 py-8 text-sm text-ink-muted">
+          <div className="flex items-center justify-center gap-2 px-2.5 py-8 text-sm text-ink-muted">
             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
             Loading diff…
           </div>
         ) : diffQuery.data && diffQuery.data.trim().length > 0 ? (
           <DiffView diff={diffQuery.data} />
         ) : (
-          <p className="px-3 py-6 text-center text-sm text-ink-muted">
-            No diff for this pull request.
-          </p>
+          <EmptyState
+            title="No diff"
+            description="No diff for this pull request."
+          />
         )}
       </ScrollArea>
     </div>

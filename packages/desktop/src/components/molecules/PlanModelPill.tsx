@@ -55,10 +55,10 @@ export const PlanModelPill = ({
             size="xs"
             disabled={isLoading}
             className={cn(
-              "max-w-[12rem] rounded-full border border-border px-2 text-muted-foreground",
+              "max-w-[12rem] rounded-full border border-stroke-3 px-2 text-muted-foreground",
               "transition-colors duration-[var(--duration-fast)]",
-              "hover:border-border hover:bg-transparent hover:text-foreground",
-              "aria-expanded:border-border aria-expanded:text-foreground",
+              "hover:border-stroke-3 hover:bg-fill-4 hover:text-foreground",
+              "aria-expanded:border-stroke-3 aria-expanded:text-foreground",
             )}
           />
         }
@@ -68,7 +68,7 @@ export const PlanModelPill = ({
       </DropdownMenuTrigger>
       {open ? (
         <DropdownMenuContent align="end" sideOffset={4} className="w-64 p-0">
-          <div className="border-b border-border px-2.5 py-2">
+          <div className="border-b border-stroke-3 px-2.5 py-2">
             <Input
               type="search"
               value={query}

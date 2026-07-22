@@ -376,8 +376,8 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
   return (
     <div className="absolute inset-0 flex flex-col">
       {/* Header — Terminal pattern */}
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1 px-2.5">
-        <span className="min-w-0 flex-1 truncate text-xs text-ink-muted">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
+        <span className="min-w-0 flex-1 truncate text-sm text-ink">
           {list
             ? `${list.components.length} component${list.components.length === 1 ? "" : "s"} · ${frameworkLabel(list.frameworks ?? detect?.frameworks)}`
             : busy
@@ -577,7 +577,7 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
       onClick={sendToAgent}
       className={cn(
         "text-ink-secondary hover:bg-fill-4 hover:text-ink",
-        "h-8 w-8 shrink-0",
+        "h-6 w-6 shrink-0",
       )}
     >
       <Send className="h-3.5 w-3.5" aria-hidden />

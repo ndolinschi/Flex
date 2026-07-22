@@ -17,13 +17,14 @@ import type { FileHit } from "../../../lib/types"
 import { basename, cn } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
 import { Spinner } from "../../atoms"
-import { ContextMenu, type ContextMenuItem } from "../../molecules"
+import { ContextMenu, EmptyState, type ContextMenuItem } from "../../molecules"
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   FileExplorerDialogs,
   type FileExplorerDialogState,
@@ -292,7 +293,8 @@ export const FileExplorer = ({
         </InputGroup>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-1">
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="px-2.5 py-1">
         {searching ? (
           <FileExplorerSearchResults
             loading={searchLoading}
@@ -311,25 +313,15 @@ export const FileExplorer = ({
             Opening folder…
           </div>
         ) : !resolvedCwd ? (
-          <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-            <Folder className="h-6 w-6 text-ink-faint" aria-hidden />
-            <p className="text-sm text-ink-secondary">Workspace folder missing</p>
-            <p className="max-w-sm text-xs text-ink-muted">
-              Could not open{" "}
-              <span className="break-all text-ink-secondary">{cwd}</span>
-              {fallbackCwd ? (
-                <>
-                  {" "}
-                  (or fallback{" "}
-                  <span className="break-all text-ink-secondary">
-                    {fallbackCwd}
-                  </span>
-                  )
-                </>
-              ) : null}
-              . Re-open the project folder for this agent.
-            </p>
-          </div>
+          <EmptyState
+            icon={<Folder className="h-6 w-6" aria-hidden />}
+            title="Workspace folder missing"
+            description={
+              fallbackCwd
+                ? `Could not open ${cwd} (or fallback ${fallbackCwd}). Re-open the project folder for this agent.`
+                : `Could not open ${cwd}. Re-open the project folder for this agent.`
+            }
+          />
         ) : (
           <TreeBranch
             cwd={cwd}
@@ -343,7 +335,8 @@ export const FileExplorer = ({
             onContextMenu={handleContextMenu}
           />
         )}
-      </div>
+        </div>
+      </ScrollArea>
 
       <ContextMenu
         position={menu ? { x: menu.x, y: menu.y } : null}

@@ -307,14 +307,17 @@ FilesChangedCard) sits **outside** the virtual window. Scroll-down FAB:
 
 | Tab | Header notes |
 |---|---|
-| Plan | `PlanToolbar` breadcrumbs + Build (`h-6` controls); find bar is a secondary `h-8` row with `border-y` |
-| Changes | Quiet title row (no `border-b`); select toolbar `h-6` (dedicated row, not `--header-height`); file list `px-2` / rows `px-2.5` |
-| Pull Request | Title / # / state / checks; Open in browser; DiffView of `gh pr diff` (tab only when branch has a PR) |
-| Files | Open-buffer chips (`Tab` sm, strip `gap-1.5` + `border-b`) + Monaco / explorer (explorer header borderless under chips/TabStrip) |
+| Plan | `PlanToolbar` breadcrumbs + Build (`h-6` controls); find bar is a secondary `h-8` row with `border-y border-stroke-3` |
+| Changes | Quiet title row (no `border-b`); select toolbar `h-6` (dedicated row, not `--header-height`); file list `px-2` / rows `px-2.5`; empties use shared `EmptyState` |
+| Pull Request | Fixed `--header-height` chrome (`#` · title · checks · Open `h-6`); body `ScrollArea` + `DiffView` / `EmptyState` |
+| Files | Open-buffer chips (`Tab` sm, strip `gap-1.5` + `border-b`) + Monaco / explorer (explorer header borderless under chips/TabStrip); explorer body prefers `ScrollArea` |
+| Status | Quiet title row + body `ScrollArea` (session metrics) |
+| Prompt | Quiet title row (`h-6` icon controls; Insert uses shadcn `Popover`); marks / findings scroll via `ScrollArea` |
+| Memory | Quiet title row + body `ScrollArea` reusing Settings `MemoryContent` |
 | Terminal | Title row **keeps** `border-b` (separates chrome from xterm, same rationale as BrowserToolbar); New / List; agent subtitle separate bordered row |
-| Components | Count + List/Refresh (borderless under TabStrip); Files-style open chips with `gap-1.5` + `border-b`; bottom mini-prompt + Send |
-| Browser | Toolbar `z-20` over webview slot — **keeps** `border-b` (separates chrome from native webview) |
-| Database | Connection count chrome (borderless under TabStrip when present); schema chips `py-1.5` |
+| Components | Count + List/Refresh (borderless under TabStrip); Files-style open chips with `gap-1.5` + `border-b`; bottom mini-prompt + Send `h-6` |
+| Browser | Toolbar `z-20` over webview slot — **keeps** `border-b` (separates chrome from native webview); reference chrome recipe |
+| Database | Connection count chrome (borderless under TabStrip when present); schema chips `py-1.5`; SQL strip `px-2.5` + Run `h-6`; Disconnect `hover:bg-fill-4` |
 
 ### Settings
 
