@@ -303,6 +303,18 @@ pub enum AgentEvent {
         reason: Option<String>,
     },
 
+    /// Auto/router changed the session's model and/or effort mid-work.
+    /// Persisted so the timeline can display a "routing changed" chip on
+    /// resume, mirroring `ModeSwitchApplied`.
+    RoutingChanged {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
+        /// Wire values: `low` | `medium` | `high` | `xhigh` | `max`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effort: Option<String>,
+        reason: String,
+    },
+
     /// A live subscriber lagged and missed events; re-sync from the store
     /// starting at `from_seq`. Never persisted.
     Gap {
@@ -387,6 +399,7 @@ impl AgentEvent {
             Self::ModeSwitchProposed { .. } => "mode_switch_proposed",
             Self::ModeSwitchApplied { .. } => "mode_switch_applied",
             Self::ModeSwitchRejected { .. } => "mode_switch_rejected",
+            Self::RoutingChanged { .. } => "routing_changed",
             Self::Gap { .. } => "gap",
             Self::Unknown { .. } => "unknown",
         }

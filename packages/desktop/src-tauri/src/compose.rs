@@ -362,6 +362,14 @@ pub fn build_service(
                     "turn_pair" => CompactionMode::TurnPair,
                     _ => CompactionMode::Standard,
                 };
+                // Cost-tier routing: enable SetRouting when auto_mode is on.
+                if cfg.prefs.plugins.auto_mode {
+                    config.enable_set_routing = true;
+                }
+                config.cost_mode = cfg.prefs.plugins.cost_mode.clone();
+                config.cost_models_low = cfg.prefs.plugins.cost_models_low.clone();
+                config.cost_models_medium = cfg.prefs.plugins.cost_models_medium.clone();
+                config.cost_models_high = cfg.prefs.plugins.cost_models_high.clone();
                 // Opt-in isolation per session; backend always available for undo snapshots.
                 let worktrees = worktrees_dir()
                     .unwrap_or_else(|_| std::env::temp_dir().join("agentloop-desktop-worktrees"));

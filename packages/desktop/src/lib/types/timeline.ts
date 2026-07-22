@@ -164,3 +164,11 @@ export type TimelineRow =
       reason?: string
       tsMs: number
     }
+  | {
+      type: "routing_changed"
+      id: string
+      model?: string
+      effort?: string
+      reason: string
+      tsMs: number
+    }

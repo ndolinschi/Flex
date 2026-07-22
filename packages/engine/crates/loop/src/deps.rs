@@ -6,7 +6,9 @@ use std::sync::{Arc, Weak};
 use agentloop_contracts::{
     Answer, ModeSwitchId, ModelRef, PermissionDecision, PermissionRequestId, QuestionId,
 };
-use agentloop_core::{Hook, PendingMap, ProviderRegistry, SessionStore, ToolRegistry, Workspaces};
+use agentloop_core::{
+    Hook, PendingMap, ProviderRegistry, RoutingTable, SessionStore, ToolRegistry, Workspaces,
+};
 
 use crate::builder::LoopLimits;
 use crate::permission::PermissionPolicy;
@@ -45,4 +47,8 @@ pub(crate) struct TurnDeps {
     /// reply. Always present; only populated when `SwitchMode` is registered
     /// (`EngineConfig::enable_switch_mode`).
     pub(crate) pending_mode_switches: Arc<PendingMap<ModeSwitchId, bool>>,
+    /// Routing overrides written by `SetRouting` mid-turn and consumed at the
+    /// start of the next model iteration. Always present; populated only when
+    /// `EngineConfig::enable_set_routing` is `true`.
+    pub(crate) routing: Arc<RoutingTable>,
 }

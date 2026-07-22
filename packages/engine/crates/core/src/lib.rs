@@ -17,6 +17,7 @@ pub mod pending;
 pub mod plugin;
 pub mod provider;
 pub mod registry;
+pub mod routing;
 pub mod store;
 pub mod tool;
 pub mod workspace;
@@ -36,6 +37,7 @@ pub use provider::{
     ToolChoice, ToolSpec,
 };
 pub use registry::{ProviderRegistry, ToolFilter, ToolRegistry};
+pub use routing::{RoutingOverride, RoutingTable};
 pub use store::{SessionStore, StoreError, StoredEvent};
 pub use tool::{
     PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError, typed_tool,

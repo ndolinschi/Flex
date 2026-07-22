@@ -132,6 +132,10 @@ pub(crate) async fn run_turn(
         handle.set_turn_permission_mode(opts.permission_mode);
         handle.set_turn_disable_tools(opts.disable_tools);
         handle.set_turn_effort(opts.effort);
+        // Clear any routing override left from a previous turn so each turn
+        // starts from scratch (Auto mode re-establishes it once it classifies
+        // the new task).
+        deps.routing.clear(&handle.id);
 
         // Sink is created before UserPromptSubmit so hooks (e.g. auto-context
         // indexing) can emit live progress into the same drain as tools.

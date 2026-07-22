@@ -5,12 +5,13 @@ mod compose;
 use std::sync::Arc;
 
 use agentloop_contracts::{ModelRef, PermissionMode};
-use agentloop_core::{PluginRegistry, ProviderRegistry, SessionStore};
+use agentloop_core::{PluginRegistry, ProviderRegistry, RoutingTable, SessionStore};
 use agentloop_loop::roles::RoleRegistry;
 use agentloop_loop::{LoopLimits, NativeAgentBuilder};
 use agentloop_session::MemoryStore;
 use agentloop_tools::{
-    BaseTools, GetActiveAgentsTool, GetMessagesTool, PeerMailbox, SendMessageTool, SwitchModeTool,
+    AllowedRouting, BaseTools, GetActiveAgentsTool, GetMessagesTool, PeerMailbox, SendMessageTool,
+    SetRoutingTool, SwitchModeTool,
 };
 
 use crate::paths::resolve_max_iterations;
@@ -93,6 +94,20 @@ impl EngineService {
             None
         };
 
+        // SetRouting: create a shared RoutingTable and hand it to both the
+        // tool (so it can write overrides) and the builder (so the loop can
+        // read them next iteration).
+        let routing = Arc::new(RoutingTable::new());
+        if config.enable_set_routing {
+            let allowed = Arc::new(AllowedRouting {
+                cost_mode: config.cost_mode.clone(),
+                low: config.cost_models_low.clone(),
+                medium: config.cost_models_medium.clone(),
+                high: config.cost_models_high.clone(),
+            });
+            tools.register(Arc::new(SetRoutingTool::new(routing.clone(), allowed)));
+        }
+
         let limits = LoopLimits {
             max_iterations: resolve_max_iterations(config.max_iterations),
             retry: config.retry_policy.clone().unwrap_or_default(),
@@ -106,6 +121,7 @@ impl EngineService {
             .tools(tools)
             .questions(pending_questions)
             .mode_switches(pending_mode_switches)
+            .routing(routing)
             .system_prompt(system_prompt)
             .commands(commands.infos())
             .roles(roles)

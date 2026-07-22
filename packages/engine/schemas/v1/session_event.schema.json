@@ -1080,6 +1080,36 @@
           ]
         },
         {
+          "description": "Auto/router changed the session's model and/or effort mid-work.\nPersisted so the timeline can display a \"routing changed\" chip on\nresume, mirroring `ModeSwitchApplied`.",
+          "type": "object",
+          "properties": {
+            "effort": {
+              "description": "Wire values: `low` | `medium` | `high` | `xhigh` | `max`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "routing_changed"
+            },
+            "model": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "reason"
+          ]
+        },
+        {
           "description": "A live subscriber lagged and missed events; re-sync from the store\nstarting at `from_seq`. Never persisted.",
           "type": "object",
           "properties": {

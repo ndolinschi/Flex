@@ -261,6 +261,8 @@ export type AgentEvent =
   | { kind: "mode_switch_applied"; id: string; mode: string }
   /** The proposed mode switch was vetoed by the user or timed out. */
   | { kind: "mode_switch_rejected"; id: string; mode: string; reason?: string }
+  /** Auto/router changed the session's model and/or effort mid-turn. */
+  | { kind: "routing_changed"; model?: string; effort?: string; reason: string }
   | { kind: "gap"; from_seq: number }
   | { kind: "unknown"; raw: unknown }
 
@@ -318,6 +320,17 @@ export type PluginPrefs = {
   modeSwitchVetoMs: number
   /** System delegation rules for Auto mode (empty = use built-in defaults). */
   delegationRules: string
+
+  // --- Cost-tier routing ---
+
+  /** Which cost tier SetRouting may escalate to: "low" | "medium" | "high" | "auto". Default "auto". */
+  costMode: string
+  /** Models at the low cost tier (fast, cheap). Auto starts here. */
+  costModelsLow: string[]
+  /** Models at the medium cost tier (balanced). */
+  costModelsMedium: string[]
+  /** Models at the high cost tier (powerful, expensive). */
+  costModelsHigh: string[]
 }
 
 /** Desktop UI prefs for ghost-text prompt completion (not an engine plugin). */

@@ -606,9 +606,20 @@ export const applyEventToTimeline = (
       }
       break
     }
+    case "routing_changed": {
+      next.push({
+        type: "routing_changed",
+        id: rowId("routing", String(seq), seq),
+        model: payload.model,
+        effort: payload.effort,
+        reason: payload.reason,
+        tsMs,
+      })
+      break
+    }
     default:
       break
-  }
+    }
 
   return next
 }

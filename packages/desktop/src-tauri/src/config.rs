@@ -142,6 +142,52 @@ pub struct PluginPrefs {
     /// defaults.
     #[serde(default)]
     pub delegation_rules: String,
+
+    // --- Cost-tier routing ---
+
+    /// Which cost tier `SetRouting` may escalate to in Auto mode.
+    /// `"low"` | `"medium"` | `"high"` | `"auto"` (default: `"auto"`).
+    #[serde(default = "default_cost_mode")]
+    pub cost_mode: String,
+    /// Model ids available at the low cost tier (fast, cheap).
+    #[serde(default = "default_cost_models_low")]
+    pub cost_models_low: Vec<String>,
+    /// Model ids available at the medium cost tier (balanced).
+    #[serde(default = "default_cost_models_medium")]
+    pub cost_models_medium: Vec<String>,
+    /// Model ids available at the high cost tier (powerful, expensive).
+    #[serde(default = "default_cost_models_high")]
+    pub cost_models_high: Vec<String>,
+}
+
+fn default_cost_mode() -> String {
+    "auto".to_owned()
+}
+
+fn default_cost_models_low() -> Vec<String> {
+    vec![
+        "anthropic/claude-haiku-4-5".to_owned(),
+        "openai/gpt-4.1-mini".to_owned(),
+        "deepseek/deepseek-v4-flash".to_owned(),
+        "gemini/gemini-2.0-flash".to_owned(),
+    ]
+}
+
+fn default_cost_models_medium() -> Vec<String> {
+    vec![
+        "anthropic/claude-sonnet-4-5".to_owned(),
+        "openai/gpt-4.1".to_owned(),
+        "deepseek/deepseek-v4-pro".to_owned(),
+        "gemini/gemini-2.5-pro".to_owned(),
+    ]
+}
+
+fn default_cost_models_high() -> Vec<String> {
+    vec![
+        "anthropic/claude-opus-4-5".to_owned(),
+        "openai/o3".to_owned(),
+        "openai/o1".to_owned(),
+    ]
 }
 
 fn default_true() -> bool {
@@ -182,6 +228,10 @@ impl Default for PluginPrefs {
             compaction_mode: "standard".to_owned(),
             mode_switch_veto_ms: 2000,
             delegation_rules: String::new(),
+            cost_mode: default_cost_mode(),
+            cost_models_low: default_cost_models_low(),
+            cost_models_medium: default_cost_models_medium(),
+            cost_models_high: default_cost_models_high(),
         }
     }
 }

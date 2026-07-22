@@ -102,6 +102,20 @@ pub struct EngineConfig {
     /// reply path. Off by default. Enable via `AgentBuilder::enable_plugin("messaging")`
     /// or `AgentBuilder::switch_mode(true)`.
     pub enable_switch_mode: bool,
+    /// Register the `SetRouting` tool, which lets the model escalate to a
+    /// stronger model and/or higher effort mid-turn. Off by default.
+    /// Enable for Auto-mode sessions so the router can pick a stronger tier
+    /// once it has classified the task.
+    pub enable_set_routing: bool,
+    /// Cost tier that governs which models and effort levels `SetRouting` may
+    /// pick. `"low"` | `"medium"` | `"high"` | `"auto"` (default: `"auto"`).
+    pub cost_mode: String,
+    /// Models allowed at the *low* cost tier (cheap/fast).
+    pub cost_models_low: Vec<String>,
+    /// Models allowed at the *medium* cost tier (balanced).
+    pub cost_models_medium: Vec<String>,
+    /// Models allowed at the *high* cost tier (powerful/expensive).
+    pub cost_models_high: Vec<String>,
     /// Escalating backoff schedule for RETRYABLE provider/network failures
     /// (dropped connections, timeouts, mid-stream cuts, 5xx, rate limits).
     /// `None` keeps the engine default (see [`RetryPolicy::default`]) — about
@@ -144,6 +158,25 @@ impl Default for EngineConfig {
             enable_workflow_tool: false,
             enable_peer_messaging: false,
             enable_switch_mode: false,
+            enable_set_routing: false,
+            cost_mode: "auto".to_owned(),
+            cost_models_low: vec![
+                "anthropic/claude-haiku-4-5".to_owned(),
+                "openai/gpt-4.1-mini".to_owned(),
+                "deepseek/deepseek-v4-flash".to_owned(),
+                "gemini/gemini-2.0-flash".to_owned(),
+            ],
+            cost_models_medium: vec![
+                "anthropic/claude-sonnet-4-5".to_owned(),
+                "openai/gpt-4.1".to_owned(),
+                "deepseek/deepseek-v4-pro".to_owned(),
+                "gemini/gemini-2.5-pro".to_owned(),
+            ],
+            cost_models_high: vec![
+                "anthropic/claude-opus-4-5".to_owned(),
+                "openai/o3".to_owned(),
+                "openai/o1".to_owned(),
+            ],
             retry_policy: None,
             auto_compact: true,
             auto_compact_threshold_percent: 85,
