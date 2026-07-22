@@ -184,6 +184,7 @@ const useSavePlugins = () => {
         autoUpdateIndex: plugins.autoUpdateIndex ?? false,
         learningRequireHumanApproval: plugins.learningRequireHumanApproval ?? false,
         learningRequireVerifiedMemory: plugins.learningRequireVerifiedMemory ?? false,
+        artifacts: plugins.artifacts ?? true,
         browser: plugins.browser ?? false,
         computer: plugins.computer ?? false,
         messaging: plugins.messaging ?? false,

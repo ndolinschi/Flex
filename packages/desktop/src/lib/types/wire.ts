@@ -295,6 +295,8 @@ export type PluginPrefs = {
    */
   learningRequireVerifiedMemory: boolean
   verifier: boolean
+  /** Office deliverables: CreateDocument / CreateSpreadsheet / CreatePresentation. Default on. */
+  artifacts: boolean
   /** Embedded Browser panel tools (navigate / screenshot / eval / console). Default off. */
   browser: boolean
   /** OS computer-use tools with animated agent cursor. Default off. */
