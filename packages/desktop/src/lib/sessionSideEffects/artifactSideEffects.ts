@@ -9,8 +9,16 @@ import { pathFromInput } from "../toolPresentation"
 import { toSessionRelativePath } from "../utils"
 import { artifactsRegister } from "../tauri"
 
-/** Tool names that write files and may produce artifacts. */
-const WRITE_TOOLS = new Set(["write", "edit", "multiedit"])
+/** Tool names that write files and may produce artifacts.
+ *  Lowercase matches against `call.tool_name.toLowerCase()`. */
+const WRITE_TOOLS = new Set([
+  "write",
+  "edit",
+  "multiedit",
+  "createdocument",
+  "createspreadsheet",
+  "createpresentation",
+])
 
 /** Per-session turn marker for which we already opened the Artifacts tab —
  *  prevents spamming the tab open on every Write in a single turn. */

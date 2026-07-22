@@ -12,6 +12,7 @@ publish = true
 
 [workspace.dependencies]
 # engine (path deps into the sibling engine workspace)
+agentloop-artifacts = { path = "../engine/crates/artifacts", version = "0.1.0" }
 agentloop-contracts = { path = "../engine/crates/contracts", version = "0.1.0" }
 agentloop-core = { path = "../engine/crates/core", version = "0.1.0" }
 agentloop-engine = { path = "../engine/crates/engine", version = "0.1.0" }

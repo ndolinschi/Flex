@@ -28,6 +28,8 @@ use agentloop_providers::{
     ProviderOptions, connect_bedrock, resolve_available_providers, resolve_real_providers,
 };
 
+#[cfg(feature = "artifacts")]
+pub use agentloop_artifacts::{self as artifacts, ArtifactsPlugin};
 pub use agentloop_engine::{
     EngineConfig, EngineResult, EngineService, EngineServiceError, OutputVerbosity, RoleSpec,
     RoleToolProfile,
@@ -135,10 +137,10 @@ impl AgentBuilder {
         self
     }
 
-    /// Enable a built-in plugin by id. Currently recognizes `"search"`,
-    /// `"index"`, `"learning"`, `"verifier"`, and `"messaging"` (when the
-    /// matching feature is enabled); unknown or feature-disabled ids are
-    /// ignored with a warning. Use [`AgentBuilder::plugin`] for custom
+    /// Enable a built-in plugin by id. Currently recognizes `"artifacts"`,
+    /// `"search"`, `"index"`, `"learning"`, `"verifier"`, and `"messaging"`
+    /// (when the matching feature is enabled); unknown or feature-disabled ids
+    /// are ignored with a warning. Use [`AgentBuilder::plugin`] for custom
     /// plugins.
     pub fn enable_plugin(mut self, id: &str) -> Self {
         let mut matched = false;
@@ -164,6 +166,11 @@ impl AgentBuilder {
         #[cfg(feature = "verifier")]
         if id == "verifier" {
             self.plugins.push(Arc::new(VerifierPlugin));
+            matched = true;
+        }
+        #[cfg(feature = "artifacts")]
+        if id == "artifacts" {
+            self.plugins.push(Arc::new(ArtifactsPlugin::default()));
             matched = true;
         }
         if id == "messaging" {

@@ -7,7 +7,8 @@ use agentloop_contracts::{CompactionMode, IsolationPolicy};
 use agentloop_engine::{RoleSpec, RoleToolProfile};
 use agentloop_sdk::mcp_store::default_mcp_dir;
 use agentloop_sdk::{
-    AgentBuilder, EngineService, IndexPlugin, LearningPlugin, McpBridgeConfig, McpServerConfig,
+    AgentBuilder, ArtifactsPlugin, EngineService, IndexPlugin, LearningPlugin, McpBridgeConfig,
+    McpServerConfig,
 };
 use agentloop_session::JsonlStore;
 use agentloop_workspace::GitWorktrees;
@@ -348,6 +349,9 @@ pub fn build_service(
             }
             if cfg.prefs.plugins.computer {
                 builder = builder.plugin(ComputerPlugin::new(app.clone()));
+            }
+            if cfg.prefs.plugins.artifacts {
+                builder = builder.plugin(ArtifactsPlugin::default());
             }
 
             {

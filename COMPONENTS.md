@@ -56,6 +56,13 @@ Built-in lifecycle hooks: `diagnostics.rs` (`DiagnosticsHook`, `CheckSpec`), `fo
 (`FormatOnEditHook`, `FormatterSpec`), `injection.rs` (`InjectionScanHook`, `scan_text`
 prompt-injection heuristics).
 
+### artifacts (`agentloop-artifacts`) — `crates/artifacts/src/`
+`ArtifactsPlugin` (office document generation): `word.rs` (`WordDocument` — `.docx` via `docx-rs`),
+`spreadsheet.rs` (`SpreadsheetDocument` — `.xlsx` via `rust_xlsxwriter`),
+`presentation.rs` (`PresentationDocument` — `.pptx` as minimal OOXML ZIP via `zip` 0.6),
+`office.rs` (`OfficeArtifact` trait + `ArtifactBuildSpec`), `path.rs` (path resolution),
+`tools/` (`CreateDocument`, `CreateSpreadsheet`, `CreatePresentation`).
+
 ### learning (`agentloop-learning`) — `crates/learning/src/`
 `LearningPlugin` (self-learning skills + local memory): `save.rs` (`SkillSave` tool),
 `memory.rs` (`MemoryWrite`, `~/.config/agentloop/memory/*.md`), `hook.rs` (Stop-point

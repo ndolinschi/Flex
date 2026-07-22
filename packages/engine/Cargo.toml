@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/artifacts",
     "crates/contracts",
     "crates/core",
     "crates/engine",
@@ -30,6 +31,7 @@ publish = true
 
 [workspace.dependencies]
 # internal
+agentloop-artifacts = { path = "crates/artifacts", version = "0.1.0" }
 agentloop-contracts = { path = "crates/contracts", version = "0.1.0" }
 agentloop-core = { path = "crates/core", version = "0.1.0" }
 agentloop-engine = { path = "crates/engine", version = "0.1.0" }
@@ -86,6 +88,10 @@ rmcp = { version = "2.1.0", default-features = false, features = [
     "transport-streamable-http-client-reqwest",
 ] }
 http = "1"
+# office artifact generation
+docx-rs = "0.4"
+rust_xlsxwriter = "0.96"
+zip = "0.6"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

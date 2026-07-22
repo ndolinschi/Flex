@@ -101,6 +101,11 @@ pub struct PluginPrefs {
     #[serde(default)]
     pub computer: bool,
 
+    /// Office artifact generation tools (`CreateDocument`, `CreateSpreadsheet`,
+    /// `CreatePresentation`). Default on.
+    #[serde(default = "default_true")]
+    pub artifacts: bool,
+
     // --- Agent coordination / auto mode ---
 
     /// Peer agent messaging: `GetActiveAgents`, `SendMessage`, `GetMessages`,

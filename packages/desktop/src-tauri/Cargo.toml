@@ -55,7 +55,7 @@ regex = "1"
 csv = "1"
 
 # Composition root — never call EngineService::native or providers::resolve_* here.
-agentloop-sdk = { path = "../../sdk/crates/sdk", features = ["search", "index", "learning", "verifier"] }
+agentloop-sdk = { path = "../../sdk/crates/sdk", features = ["search", "index", "learning", "verifier", "artifacts"] }
 # Wire DTOs for command payloads (not re-exported by the SDK).
 agentloop-contracts = { path = "../../engine/crates/contracts" }
 # Persistent session log across app restarts / provider rebuilds.

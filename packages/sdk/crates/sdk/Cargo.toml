@@ -23,6 +23,7 @@ agentloop-transport-stdio = { workspace = true }
 agentloop-transport-http = { workspace = true }
 agentloop-providers = { workspace = true }
 agentloop-eval = { workspace = true }
+agentloop-artifacts = { workspace = true, optional = true }
 agentloop-search = { workspace = true, optional = true }
 agentloop-index = { workspace = true, optional = true }
 agentloop-learning = { workspace = true, optional = true }
@@ -49,7 +50,8 @@ tempfile = { workspace = true }
 reqwest = { workspace = true }
 
 [features]
-default = ["search", "index", "learning", "verifier"]
+default = ["search", "index", "learning", "verifier", "artifacts"]
+artifacts = ["agentloop-artifacts"]
 search = ["agentloop-search"]
 index = ["agentloop-index"]
 learning = ["agentloop-learning"]
