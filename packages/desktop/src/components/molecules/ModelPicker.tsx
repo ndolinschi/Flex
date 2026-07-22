@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
-import { Box, Check, ChevronDown, Gauge } from "lucide-react"
+import { Box, Check, ChevronDown, Gauge, Shuffle } from "lucide-react"
 import { EFFORT_LEVELS, effortLabel } from "../../lib/types"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
+import { useProviderConfig } from "../../hooks/useProviderConfig"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -53,9 +54,15 @@ export const ModelPicker = ({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
 
+  const { config } = useProviderConfig()
+  const autoModeEnabled = config?.plugins?.autoMode ?? false
+
   const selected = models.find((m) => m.id === value)
   const selectedEffort = value && effortFor ? effortFor(value) : null
-  const label = selected?.displayName ?? selected?.id ?? "Select model"
+  const isAutoSelected = value === "auto"
+  const label = isAutoSelected
+    ? "Auto"
+    : (selected?.displayName ?? selected?.id ?? "Select model")
 
   // Group/filter only while open — closed composer re-renders stay cheap.
   const { groups, truncated, totalMatched } = useGroupedModels(
@@ -100,7 +107,11 @@ export const ModelPicker = ({
           />
         }
       >
-        <Box className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        {isAutoSelected ? (
+          <Shuffle className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        ) : (
+          <Box className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        )}
         <span className="min-w-0 truncate">{label}</span>
         {selectedEffort ? (
           <span className="shrink-0 text-muted-foreground">
@@ -131,10 +142,30 @@ export const ModelPicker = ({
             />
           </div>
           <div className="max-h-56 overflow-y-auto py-1">
+            {autoModeEnabled && !query ? (
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Auto</DropdownMenuLabel>
+                <div className="mx-1">
+                  <DropdownMenuItem
+                    className="gap-1.5"
+                    onClick={() => applyModel("auto")}
+                  >
+                    <Shuffle className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="flex-1">Auto</span>
+                    <span className="text-xs text-muted-foreground">delegates per rules</span>
+                    {isAutoSelected ? (
+                      <Check className="ml-auto size-3 shrink-0 text-primary" aria-hidden />
+                    ) : null}
+                  </DropdownMenuItem>
+                </div>
+              </DropdownMenuGroup>
+            ) : null}
             {groups.length === 0 ? (
-              <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">
-                No models found
-              </p>
+              query || !autoModeEnabled ? (
+                <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">
+                  No models found
+                </p>
+              ) : null
             ) : (
               groups.map((group) => (
                 <DropdownMenuGroup key={group.providerId}>

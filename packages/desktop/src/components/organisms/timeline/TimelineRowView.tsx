@@ -6,6 +6,7 @@ import {
   IndexingCard,
   MarkdownBody,
   MentionText,
+  PeerMessageCard,
   SubagentGroup,
   ToolCallChip,
   VerdictBadge,
@@ -270,6 +271,29 @@ export const TimelineRowView = memo(({
           snapshotId={row.snapshotId}
           disabled={checkpointsDisabled}
         />
+      )
+    case "peer_message":
+      return (
+        <PeerMessageCard
+          from={row.from}
+          to={row.to}
+          content={row.content}
+          aboutPath={row.aboutPath}
+          tsMs={row.tsMs}
+        />
+      )
+    case "mode_switch":
+      return (
+        <div className="flex items-center gap-1.5 rounded-md border border-stroke-3 bg-fill-3 px-3 py-1.5 text-xs text-ink-muted">
+          <span>
+            Mode switch <strong className="text-ink-secondary">{row.mode}</strong>{" "}
+            {row.state === "applied"
+              ? "applied"
+              : row.state === "rejected"
+                ? `rejected${row.reason ? ` — ${row.reason}` : ""}`
+                : "proposed"}
+          </span>
+        </div>
       )
     default:
       return null
