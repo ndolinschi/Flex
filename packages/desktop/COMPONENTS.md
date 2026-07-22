@@ -72,6 +72,8 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `MentionText` | Plain text with `@mention` accent pills (composer-matching cue) | `text`, `knownNames?` | TurnTimeline user bubble |
 | `CompactionCard` | Settled context-compaction boundary (divider + expandable summary) | `summaryMarkdown`, `strategy`, `tokensBefore?`, `tokensAfter?` | TurnTimeline (`TimelineRowView`) |
 | `IndexingCard` | Settled code-index boundary (divider + file counts) | `added`, `changed`, `removed`, `unchanged` | TurnTimeline (`TimelineRowView`) |
+| `PeerMessageCard` | Timeline card for a `peer_message` event — from/to agent ids + content + optional `aboutPath` | `from`, `to?`, `content`, `aboutPath?`, `tsMs` | TurnTimeline (`TimelineRowView`) |
+| `ModeSwitchChip` | Docked chip above the composer for a pending `ModeSwitchProposed` — shows mode + reason + countdown; cancel invokes `respondModeSwitch(false)`; auto-accepts on timeout | — | ChatSessionBody (via `dockedOverlay`) |
 | `FilesChangedCard` | End-of-turn git diff headline; expand file list (click → Files/Monaco), Review opens Changes | `cwd?`, `sessionId?` | TurnTimeline |
 | `EmptyState` | Empty async surface | `title`, `description?`, `action?` | SessionSidebar, TurnTimeline |
 | `ToolCallChip` | Single tool as Cursor-style step | `call` | TurnTimeline |
