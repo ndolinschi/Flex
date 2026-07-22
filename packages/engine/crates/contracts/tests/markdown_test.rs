@@ -13,6 +13,7 @@ fn markdown_projection_snapshot() {
             strategy: "summarize_oldest".to_owned(),
             tokens_before: Some(500),
             tokens_after: Some(60),
+            mode: None,
         },
     });
     events.push(AgentEvent::UserMessage {

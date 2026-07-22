@@ -17,7 +17,10 @@ use crate::capability::AgentCaps;
 use crate::content::{ContentBlock, Role};
 use crate::error::EngineError;
 use crate::hook::{HookOutcomeKind, HookPoint};
-use crate::ids::{MessageId, PermissionRequestId, QuestionId, SessionId, ToolCallId, TurnId};
+use crate::ids::{
+    MessageId, ModeSwitchId, PeerMessageId, PermissionRequestId, QuestionId, SessionId,
+    ToolCallId, TurnId,
+};
 use crate::permission::{Answer, PermissionDecision, PermissionDecisionKind, Question};
 use crate::session::{CompactionSummary, PlanEntry, SessionMeta, TurnSummary};
 use crate::tool_call::ToolCall;
@@ -266,6 +269,40 @@ pub enum AgentEvent {
         snapshot_id: String,
     },
 
+    /// Peer-to-peer agent message (persisted on the recipient session log).
+    PeerMessage {
+        id: PeerMessageId,
+        from: SessionId,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to: Option<SessionId>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        thread_id: Option<String>,
+        content: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        about_path: Option<String>,
+    },
+    /// Auto/router proposed a composer-mode switch; UI shows a veto window.
+    /// Persisted so chat history can display the decision chip on resume.
+    ModeSwitchProposed {
+        id: ModeSwitchId,
+        /// One of `"agent"`, `"plan"`, `"ask"`, `"debug"`.
+        mode: String,
+        reason: String,
+        timeout_ms: u64,
+    },
+    /// The proposed mode switch was accepted and applied.
+    ModeSwitchApplied {
+        id: ModeSwitchId,
+        mode: String,
+    },
+    /// The proposed mode switch was vetoed by the user or timed out.
+    ModeSwitchRejected {
+        id: ModeSwitchId,
+        mode: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+    },
+
     /// A live subscriber lagged and missed events; re-sync from the store
     /// starting at `from_seq`. Never persisted.
     Gap {
@@ -346,6 +383,10 @@ impl AgentEvent {
             Self::WorkspaceDiscarded { .. } => "workspace_discarded",
             Self::SnapshotCreated { .. } => "snapshot_created",
             Self::SnapshotRestored { .. } => "snapshot_restored",
+            Self::PeerMessage { .. } => "peer_message",
+            Self::ModeSwitchProposed { .. } => "mode_switch_proposed",
+            Self::ModeSwitchApplied { .. } => "mode_switch_applied",
+            Self::ModeSwitchRejected { .. } => "mode_switch_rejected",
             Self::Gap { .. } => "gap",
             Self::Unknown { .. } => "unknown",
         }

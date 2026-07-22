@@ -129,6 +129,7 @@ pub(crate) async fn compact_session(
         strategy: strategy.to_owned(),
         tokens_before: Some(tokens_before),
         tokens_after: Some(tokens_after),
+        mode: None,
     };
 
     handle
@@ -239,6 +240,7 @@ mod tests {
                 strategy: "summarize_oldest".to_owned(),
                 tokens_before: None,
                 tokens_after: None,
+                mode: None,
             }),
             boundary_index: Some(0),
         };

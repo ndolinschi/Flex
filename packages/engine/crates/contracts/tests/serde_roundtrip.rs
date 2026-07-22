@@ -104,6 +104,7 @@ fn all_variants() -> Vec<AgentEvent> {
                 strategy: "summarize_oldest".to_owned(),
                 tokens_before: Some(90_000),
                 tokens_after: Some(12_000),
+                mode: None,
             },
         },
         AgentEvent::CompactionStarted {

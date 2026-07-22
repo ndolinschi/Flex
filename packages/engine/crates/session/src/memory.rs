@@ -393,6 +393,7 @@ mod tests {
                         strategy: "truncate".to_owned(),
                         tokens_before: None,
                         tokens_after: None,
+                        mode: None,
                     },
                 )
                 .await
@@ -470,6 +471,7 @@ mod tests {
             strategy: "summarize_oldest".to_owned(),
             tokens_before: Some(1000),
             tokens_after: Some(100),
+            mode: None,
         };
         store.record_compaction(&id, summary.clone()).await.unwrap();
 

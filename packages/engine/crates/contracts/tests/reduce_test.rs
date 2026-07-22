@@ -80,6 +80,7 @@ fn compaction_boundary_shapes_context_view() {
             strategy: "summarize_oldest".to_owned(),
             tokens_before: None,
             tokens_after: None,
+            mode: None,
         },
     });
     events.push(AgentEvent::UserMessage {
