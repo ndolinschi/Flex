@@ -362,9 +362,11 @@ pub fn build_service(
                     "turn_pair" => CompactionMode::TurnPair,
                     _ => CompactionMode::Standard,
                 };
-                // Cost-tier routing: enable SetRouting when auto_mode is on.
+                // Cost-tier routing: enable SetRouting + SwitchMode when Auto
+                // is on. Peer messaging stays opt-in via the Messaging plugin.
                 if cfg.prefs.plugins.auto_mode {
                     config.enable_set_routing = true;
+                    config.enable_switch_mode = true;
                 }
                 config.cost_mode = cfg.prefs.plugins.cost_mode.clone();
                 config.cost_models_low = cfg.prefs.plugins.cost_models_low.clone();

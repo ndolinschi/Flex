@@ -235,8 +235,9 @@ pub fn format_project_instructions_section(loaded: &ProjectInstructions) -> Opti
 
     let mut section = String::from(
         "# Project instructions (preflight)\n\
-         The following configuration files were discovered in the project \
-         working directory. Follow them in addition to your base instructions.\n",
+         Discovered in the project working directory (Rust scan — not model-fetched). \
+         Follow them in addition to your base instructions. Later files in this list \
+         refine earlier ones when they conflict.\n",
     );
 
     for file in &loaded.files {
