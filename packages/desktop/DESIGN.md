@@ -336,7 +336,7 @@ Color palette constants (`lib/sessionColor.ts`): `GROUP_PALETTE` (8 colors for g
 | Components | Count + List/Refresh (borderless under TabStrip); Files-style open chips with `gap-1.5` + `border-b`; bottom mini-prompt + Send `h-6` |
 | Browser | Toolbar `z-20` over webview slot — **keeps** `border-b` (separates chrome from native webview); reference chrome recipe |
 | Database | Connection count chrome (borderless under TabStrip when present); schema chips `py-1.5`; SQL strip `px-2.5` + Run `h-6`; Disconnect `hover:bg-fill-4` |
-| Artifacts | Quiet count chrome + 180px list (agent affinity labels) + preview pane; CSV/image in-app, others external |
+| Artifacts | Quiet count chrome + 180px list (agent affinity labels) + preview pane; CSV/image in-app, others external. Agent creates `.docx`/`.xlsx`/`.pptx` via `CreateDocument` / `CreateSpreadsheet` / `CreatePresentation` (`OfficeArtifact` trait in `agentloop-artifacts`) |
 
 ### Settings
 

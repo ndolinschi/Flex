@@ -224,6 +224,7 @@ impl Default for PluginPrefs {
             verifier: false,
             browser: false,
             computer: false,
+            artifacts: true,
             messaging: false,
             council: false,
             auto_mode: false,
@@ -1100,6 +1101,10 @@ mod tests {
         assert!(!prefs.learning_require_human_approval);
         assert!(!prefs.learning_require_verified_memory);
         assert!(!prefs.verifier);
+        assert!(
+            prefs.artifacts,
+            "artifacts office tools must default on so agents can create docx/xlsx/pptx"
+        );
     }
 
     #[test]

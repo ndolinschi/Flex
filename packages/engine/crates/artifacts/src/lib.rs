@@ -13,6 +13,7 @@
 
 pub mod error;
 pub mod kind;
+pub mod mcp;
 pub mod office;
 pub mod path;
 pub mod presentation;
@@ -22,6 +23,7 @@ pub mod word;
 
 pub use error::ArtifactError;
 pub use kind::ArtifactKind;
+pub use mcp::{ArtifactMcpCapability, mcp_capabilities};
 pub use office::{ArtifactBuildSpec, OfficeArtifact, Slide};
 pub use presentation::PresentationDocument;
 pub use spreadsheet::SpreadsheetDocument;
