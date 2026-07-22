@@ -26,3 +26,6 @@ HANDOFF-*.md
 *.pending-snap
 .cursor/
 .playwright-mcp/
+
+# Local Cursor→Flex design workstream (not committed)
+TMP/

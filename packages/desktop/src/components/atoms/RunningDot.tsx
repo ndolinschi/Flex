@@ -1,17 +1,19 @@
+import type { CSSProperties } from "react"
 import { cn } from "../../lib/utils"
 
 /**
  * Diagonal wave: delay grows with (row + col) so the pulse sweeps top-left →
  * bottom-right as a coherent ripple instead of scattered blinking.
+ * Animation lives on `.animate-dot-grid-pulse` so reduced-motion can kill it.
  */
-const WAVE_STEP_MS = 90
+const WAVE_STEP_MS = 100
 const dotDelay = (i: number) => (Math.floor(i / 3) + (i % 3)) * WAVE_STEP_MS
 
 type RunningDotProps = {
   className?: string
 }
 
-/** animated 3×3 dot grid inside a 20px status slot. */
+/** Subtle 3×3 wave pulse in a 20px status slot (session row / live work). */
 export const RunningDot = ({ className }: RunningDotProps) => {
   return (
     <span
@@ -23,10 +25,8 @@ export const RunningDot = ({ className }: RunningDotProps) => {
         {Array.from({ length: 9 }, (_, i) => (
           <span
             key={i}
-            className="h-[3px] w-[3px] rounded-full bg-icon-1"
-            style={{
-              animation: `dot-grid-pulse 1.6s ease-in-out ${dotDelay(i)}ms infinite`,
-            }}
+            className="animate-dot-grid-pulse h-[3px] w-[3px] rounded-full bg-icon-1 opacity-60"
+            style={{ "--dot-delay": `${dotDelay(i)}ms` } as CSSProperties}
           />
         ))}
       </span>

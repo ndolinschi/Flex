@@ -258,6 +258,7 @@ export const WelcomePage = () => {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button
+                    size="lg"
                     onClick={() => setCopilotSignInOpen(true)}
                     disabled={busy}
                   >
@@ -265,6 +266,7 @@ export const WelcomePage = () => {
                   </Button>
                   <Button
                     variant="ghost"
+                    size="lg"
                     onClick={() => setShowCopilotToken((v) => !v)}
                     disabled={busy}
                   >
@@ -298,6 +300,7 @@ export const WelcomePage = () => {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button
+                    size="lg"
                     onClick={() => setChatgptSignInOpen(true)}
                     disabled={busy}
                   >
@@ -379,6 +382,7 @@ export const WelcomePage = () => {
               <div className="mt-3">
                 <Button
                   variant="secondary"
+                  size="lg"
                   onClick={() => void handlePickFolder()}
                   disabled={busy}
                 >

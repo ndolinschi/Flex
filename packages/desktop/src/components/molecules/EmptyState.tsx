@@ -33,26 +33,30 @@ export const EmptyState = ({
 }: EmptyStateProps) => {
   const defaultAction =
     actionLabel && onAction ? (
-      <Button size="sm" onClick={onAction} disabled={actionDisabled}>
+      <Button variant="secondary" size="sm" onClick={onAction} disabled={actionDisabled}>
         {actionLabel}
       </Button>
     ) : null
 
   return (
     <Empty className={className}>
-      <EmptyHeader>
+      <EmptyHeader className="gap-1.5">
         {icon ? (
-          <EmptyMedia variant="icon" aria-hidden="true">
+          <EmptyMedia variant="icon" className="mb-0 text-xl text-ink-faint" aria-hidden="true">
             {icon}
           </EmptyMedia>
         ) : null}
-        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyTitle className="text-sm font-medium tracking-[var(--tracking-caption)] text-ink-secondary">
+          {title}
+        </EmptyTitle>
         {description ? (
-          <EmptyDescription>{description}</EmptyDescription>
+          <EmptyDescription className="max-w-sm text-xs leading-normal text-ink-muted">
+            {description}
+          </EmptyDescription>
         ) : null}
       </EmptyHeader>
       {action || defaultAction ? (
-        <EmptyContent>{action ?? defaultAction}</EmptyContent>
+        <EmptyContent className="mt-0.5">{action ?? defaultAction}</EmptyContent>
       ) : null}
     </Empty>
   )

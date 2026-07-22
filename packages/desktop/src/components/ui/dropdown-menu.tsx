@@ -90,7 +90,7 @@ function DropdownMenuLabel({
       data-slot="dropdown-menu-label"
       data-inset={inset}
       className={cn(
-        "px-1.5 py-1 text-xs font-medium text-muted-foreground data-inset:pl-7",
+        "px-1.5 py-1 text-xs font-medium text-ink-muted data-inset:pl-7",
         className,
       )}
       {...props}
@@ -156,7 +156,7 @@ function DropdownMenuSubTrigger({
       {...props}
     >
       {children}
-      <ChevronRightIcon className="ml-auto text-muted-foreground" />
+      <ChevronRightIcon className="ml-auto text-ink-muted" />
     </MenuPrimitive.SubmenuTrigger>
   )
 }
@@ -173,7 +173,7 @@ function DropdownMenuSubContent({
     <DropdownMenuContent
       data-slot="dropdown-menu-sub-content"
       className={cn(
-        "w-auto min-w-[96px] rounded-md bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10",
+        "w-auto min-w-[96px] rounded-md bg-popover p-1 text-popover-foreground shadow-popover ring-1 ring-foreground/10",
         className,
       )}
       align={align}
@@ -271,7 +271,7 @@ function DropdownMenuSeparator({
   return (
     <MenuPrimitive.Separator
       data-slot="dropdown-menu-separator"
-      className={cn("-mx-1 my-1 h-px bg-border", className)}
+      className={cn("-mx-1 my-1 h-px bg-stroke-3", className)}
       {...props}
     />
   )
@@ -285,7 +285,7 @@ function DropdownMenuShortcut({
     <span
       data-slot="dropdown-menu-shortcut"
       className={cn(
-        "ml-auto text-xs tracking-widest text-muted-foreground group-data-highlighted/dropdown-menu-item:text-ink group-focus/dropdown-menu-item:text-ink",
+        "ml-auto text-xs tracking-widest text-ink-muted group-data-highlighted/dropdown-menu-item:text-ink group-focus/dropdown-menu-item:text-ink",
         className,
       )}
       {...props}

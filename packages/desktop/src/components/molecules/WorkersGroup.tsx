@@ -81,7 +81,9 @@ export const WorkersGroup = memo(function WorkersGroup({
           anyRunning && "cursor-default",
         )}
       >
-        <Network className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
+        <span className="flex h-[18px] w-4 shrink-0 items-center justify-center">
+          <Network className="h-3.5 w-3.5 text-ink-faint" aria-hidden />
+        </span>
         <span
           className={cn(
             "min-w-0 truncate text-ink-secondary",

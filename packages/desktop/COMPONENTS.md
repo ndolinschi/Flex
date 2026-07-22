@@ -81,7 +81,7 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `ToolStepGroup` | Aggregated explore/edit/shell summary + card expand; single settled Edit/Write auto-expands `ChatDiffCard` | `calls` | TurnTimeline (via ToolStepList) |
 | `ToolStepList` | Clusters consecutive same-kind tool rows | `rows`, `renderOther` | TurnTimeline |
 | `DetailRow` / `BackgroundBashRow` / `ExecTail` | Tool-step detail / background bash / exec tail; Open file → Files tab when path known | — | ToolStepGroup |
-| `StreamingCaret` | Streaming caret | — | TurnTimeline |
+| `StreamingCaret` | Thin muted streaming caret | — | TurnTimeline |
 | `SubagentGroup` | Nested subagent work block — status glyph, live activity, tool-count · duration; click opens `SubagentViewer` | `task`, `role?`, `phase`, `nestedRows?`, `compact?`, `onOpenViewer?` | TurnTimeline, WorkersGroup, WorkflowGroup |
 | `WorkersGroup` | Parallel Agent fan-out card ("Working with N agents") expanding to enriched worker rows | `workers`, `onOpenViewer`, `anchorId?` | TurnTimeline (via ToolStepList) |
 | `WorkingAgentsPill` | Composer-adjacent "N Working" glance — menu of running worker titles + jump to group | `rows`, `onScrollToWorkers?` | ChatSessionBody → Composer `workersSlot` |
@@ -213,10 +213,10 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 
 ## Theme & motion
 
-- Themes: `data-theme="dark"|"light"` on `<html>` (Cursor-tight premium palettes — neutral charcoal / clean white, close surface steps, whisper fills, neutral monochrome accent by default; colored accents via Settings → Appearance).
-- Feel principles ([DESIGN.md](./DESIGN.md)): compact density, quiet chrome, whisper fills, opacity hover, micro-motion, alpha hierarchy, keyboard focus, weight 590 + micro tracking, alpha borders, radius-by-role, neutral interactive chrome, thin scrollbars. Interactive chrome leans solid-pill (AI Studio–inspired) without a full layout redesign.
+- Themes: `data-theme="dark"|"light"` on `<html>` (premium palettes — cool charcoal dark / clean white light, close surface steps, whisper fills, neutral monochrome accent by default; colored accents via Settings → Appearance). See DESIGN.md **Reference extraction** for Cursor glass → Flex mapping.
+- Feel principles ([DESIGN.md](./DESIGN.md)): compact density, quiet chrome, whisper fills, opacity hover, mode tint, cool dark, micro-motion, alpha hierarchy, keyboard focus, weight 590 + micro tracking, alpha borders, radius-by-role, thin scrollbars.
 - Motion: hover 100ms ease; trays `animate-tray-in`; pane swaps `animate-pane-fade`; timeline rows `animate-row-fade`; end-of-turn `animate-end-turn-in` (160ms); HITL cards `animate-modal-in` (scale .97→1); overlays `animate-backdrop-in`.
-- Composer: `--radius-composer` 14px, soft elevation + stroke focus (no accent glow), compact auto-grow (~28–160px) + unified toolbar (`text-sm` input; Plus / Bypass / Send `h-6` circles with `h-3.5` icons; Mode/Model `h-6` pills; left cluster `gap-1`, Bypass↔Send `gap-1.5`); quiet toolbar opacity (0.5→0.8); mode/model pills neutral fill + stroke.
+- Composer: `--radius-composer` 14px, soft elevation + stroke focus (no accent glow), compact auto-grow (~28–160px) + unified toolbar (`text-sm` input; Plus / Bypass / Send `h-6` circles with `h-3.5` icons; Mode tinted `h-6` pill + Model quiet `h-6` pill; left cluster `gap-1`, Bypass↔Send `gap-1.5`); mode/model idle opacity 0.8→1.
 - Content rail: `--content-rail` 840px (`52.5rem`).
 - ContextBar sits above the composer (project / branch / context %) — Flex Canon.
 - Sidebar footer = theme + settings (Flex Canon); rows use fill-4 hover / fill-2 selected.

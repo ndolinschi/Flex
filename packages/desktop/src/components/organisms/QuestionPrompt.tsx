@@ -239,7 +239,7 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
           // round only the top corners and drop the bottom shadow layer so
           // the seam where this card meets the composer reads as one solid
           // panel, not two stacked cards.
-          "rounded-t-[var(--radius-composer)] border border-b-0 border-stroke-3",
+          "rounded-t-[var(--radius-composer)] border border-b-0 border-stroke-2",
           "bg-user-bubble shadow-[0_-4px_16px_-4px_var(--shadow-color)]",
           CARD_PAD,
         )}

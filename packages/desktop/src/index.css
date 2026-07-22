@@ -71,6 +71,7 @@
   --color-accent-text: var(--color-accent-text);
   --color-link: var(--color-link);
   --color-user-bubble: var(--color-user-bubble);
+  --color-user-bubble-hover: var(--color-user-bubble-hover);
   --color-code-bg: var(--color-code-bg);
   --color-success: var(--color-success);
   --color-success-subtle: var(--color-success-subtle);
@@ -81,6 +82,16 @@
   --color-thinking: var(--color-thinking);
   --color-settings-card: var(--color-settings-card);
   --color-switch-on: var(--color-switch-on);
+
+  /* Composer mode tints (Cursor mode semantic map). */
+  --color-mode-agent-bg: var(--color-mode-agent-bg);
+  --color-mode-agent-fg: var(--color-mode-agent-fg);
+  --color-mode-plan-bg: var(--color-mode-plan-bg);
+  --color-mode-plan-fg: var(--color-mode-plan-fg);
+  --color-mode-ask-bg: var(--color-mode-ask-bg);
+  --color-mode-ask-fg: var(--color-mode-ask-fg);
+  --color-mode-flex-bg: var(--color-mode-flex-bg);
+  --color-mode-flex-fg: var(--color-mode-flex-fg);
 
   --spacing-1: var(--space-1);
   --spacing-2: var(--space-2);
@@ -296,6 +307,9 @@ mark[data-plan-comment-id].plan-comment-mark-active {
  * `@tanstack/react-virtual` already unmounts off-screen rows, and
  * `content-visibility: auto` on the mounted overscan window races with
  * ResizeObserver measurement on WebView2 (Windows scroll overlap).
+ *
+ * DO NOT re-enable cv on virtualized TurnTimeline rows (see shouldSkipCv).
+ * Safe elsewhere: SessionSidebar rows, settings lists, static panels.
  */
 .cv-auto {
   content-visibility: auto;
@@ -393,7 +407,7 @@ mark[data-plan-comment-id].plan-comment-mark-active {
 }
 
 .animate-tool-step-in {
-  animation: tool-step-in 150ms var(--easing-out) both;
+  animation: tool-step-in var(--duration-normal) var(--easing-out) both;
 }
 
 /* Soft content fade for pane swaps (settings ↔ chat) */
@@ -572,11 +586,17 @@ mark[data-plan-comment-id].plan-comment-mark-active {
 }
 
 .animate-modal-in {
-  animation: modal-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* Overlay enter: fade + scale 0.97→1 over --duration-slow (200ms). */
+  animation: modal-in var(--duration-slow) var(--easing-out-strong) both;
 }
 
 .animate-toast-in {
-  animation: toast-in 300ms var(--easing-out) both;
+  animation: toast-in var(--duration-slower) var(--easing-out) both;
+}
+
+/* RunningDot diagonal wave — delay via --dot-delay so reduced-motion can kill it. */
+.animate-dot-grid-pulse {
+  animation: dot-grid-pulse 1.8s ease-in-out var(--dot-delay, 0ms) infinite;
 }
 
 /* Settings search "jump to result" pulse (DESIGN.md Settings) —
@@ -622,16 +642,27 @@ mark[data-plan-comment-id].plan-comment-mark-active {
     animation: none;
   }
 
+  .animate-dot-grid-pulse {
+    opacity: 0.7;
+  }
+
   .subagent-viewer-mask {
     transition: none;
   }
 
-  /* Keep the shimmer text readable (not transparent) without the sweep. */
+  /* Keep shimmer text readable (not transparent) without the sweep. */
   .animate-shimmer-text {
     animation: none;
     background: none;
     -webkit-text-fill-color: currentColor;
     color: var(--color-ink-secondary);
+  }
+
+  /* tw-animate enter/exit used by shadcn overlays (dialog, popover, select…). */
+  .animate-in,
+  .animate-out {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
   }
 
   body {

@@ -95,7 +95,7 @@ function ContextMenuLabel({
       data-slot="context-menu-label"
       data-inset={inset}
       className={cn(
-        "px-1.5 py-1 text-xs font-medium text-muted-foreground data-inset:pl-7",
+        "px-1.5 py-1 text-xs font-medium text-ink-muted data-inset:pl-7",
         className,
       )}
       {...props}
@@ -163,7 +163,7 @@ function ContextMenuSubTrigger({
       {...props}
     >
       {children}
-      <ChevronRightIcon className="ml-auto text-muted-foreground" />
+      <ChevronRightIcon className="ml-auto text-ink-muted" />
     </ContextMenuPrimitive.SubmenuTrigger>
   )
 }
@@ -174,7 +174,7 @@ function ContextMenuSubContent({
   return (
     <ContextMenuContent
       data-slot="context-menu-sub-content"
-      className="w-auto min-w-[96px] rounded-md bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10"
+      className="w-auto min-w-[96px] rounded-md bg-popover p-1 text-popover-foreground shadow-popover ring-1 ring-foreground/10"
       side="right"
       {...props}
     />
@@ -263,7 +263,7 @@ function ContextMenuSeparator({
   return (
     <ContextMenuPrimitive.Separator
       data-slot="context-menu-separator"
-      className={cn("-mx-1 my-1 h-px bg-border", className)}
+      className={cn("-mx-1 my-1 h-px bg-stroke-3", className)}
       {...props}
     />
   )
@@ -277,7 +277,7 @@ function ContextMenuShortcut({
     <span
       data-slot="context-menu-shortcut"
       className={cn(
-        "ml-auto text-xs tracking-widest text-muted-foreground group-data-highlighted/context-menu-item:text-ink group-focus/context-menu-item:text-ink",
+        "ml-auto text-xs tracking-widest text-ink-muted group-data-highlighted/context-menu-item:text-ink group-focus/context-menu-item:text-ink",
         className,
       )}
       {...props}

@@ -307,7 +307,7 @@ export const Composer = ({
                   "rounded-b-[var(--radius-composer)] rounded-t-none",
                   // Continue the docked card's side/bottom stroke; omit the top
                   // ring from --shadow-composer so the seam stays clean.
-                  "border-x border-b border-stroke-3",
+                  "border-x border-b border-stroke-2",
                   DOCKED_BUBBLE_SHADOW,
                   DOCKED_BUBBLE_SHADOW_FOCUS,
                 )
@@ -317,7 +317,7 @@ export const Composer = ({
                   "focus-within:shadow-[var(--shadow-composer-focus)]",
                 ),
             "transition-[box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-            "hover:bg-[color-mix(in_srgb,var(--color-user-bubble)_97%,white)]",
+            "hover:bg-user-bubble-hover",
             "focus-within:hover:bg-user-bubble",
           )}
         >

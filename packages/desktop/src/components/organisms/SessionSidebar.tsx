@@ -513,8 +513,8 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
             className={cn(
               "sash-line-transition absolute -right-[5px] inset-y-0 z-10 w-2.5 cursor-col-resize",
               "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent",
-              // Sash hover = white-alpha focusBorder, never accent (Feel: Quiet chrome).
-              "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_15%,transparent)]",
+              // Quiet sash: white-alpha hover only — never accent (Feel: Quiet chrome).
+              "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_12%,transparent)]",
               dragging && "after:bg-stroke-1",
             )}
           />

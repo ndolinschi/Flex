@@ -15,13 +15,17 @@ const toneClasses: Record<BadgeTone, string> = {
   success: "bg-success-subtle text-success border-transparent",
   warning: "bg-warning-subtle text-warning border-transparent",
   danger: "bg-destructive/10 text-destructive border-transparent",
-  muted: "bg-muted text-muted-foreground border-transparent",
+  muted: "bg-fill-3 text-ink-muted border-transparent",
 }
 
 export const Badge = ({ variant = "default", children, className }: BadgeProps) => (
   <BadgePrimitive
     variant="outline"
-    className={cn(toneClasses[variant], className)}
+    className={cn(
+      "tracking-[var(--tracking-caption)]",
+      toneClasses[variant],
+      className,
+    )}
   >
     {children}
   </BadgePrimitive>

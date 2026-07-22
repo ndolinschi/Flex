@@ -165,12 +165,14 @@ export const SubagentGroup = memo(function SubagentGroup({
             (onOpenViewer || phase !== "started" || compact) ? "cursor-pointer" : "cursor-default",
           )}
         >
-          <span className="flex min-w-0 items-center gap-1.5 text-base">
-            {compact ? (
-              <StatusGlyph status={status} />
-            ) : (
-              <Bot className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
-            )}
+          <span className="flex min-w-0 items-center gap-1 text-base leading-[1.5]">
+            <span className="flex h-[18px] w-4 shrink-0 items-center justify-center">
+              {compact ? (
+                <StatusGlyph status={status} />
+              ) : (
+                <Bot className="h-3.5 w-3.5 text-ink-faint" aria-hidden />
+              )}
+            </span>
             <span
               className={cn(
                 "min-w-0 truncate text-ink-secondary",
@@ -181,7 +183,7 @@ export const SubagentGroup = memo(function SubagentGroup({
               {title}
             </span>
             {metaParts.length > 0 ? (
-              <span className="shrink-0 text-base text-ink-faint [font-variant-numeric:tabular-nums]">
+              <span className="shrink-0 text-xs text-ink-faint [font-variant-numeric:tabular-nums]">
                 {metaParts.join(" · ")}
               </span>
             ) : null}
@@ -198,7 +200,8 @@ export const SubagentGroup = memo(function SubagentGroup({
           {activityLine ? (
             <span
               className={cn(
-                "min-w-0 truncate pl-5 text-base leading-[1.4] text-ink-faint",
+                // Indent under icon slot (16px) + gap (4px).
+                "min-w-0 truncate pl-5 text-xs leading-[1.5] text-ink-faint",
                 status === "running" && "animate-shimmer-text",
               )}
             >

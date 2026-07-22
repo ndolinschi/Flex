@@ -1,38 +1,41 @@
 :root,
 [data-theme="dark"] {
-  /* ── Cursor-tight premium dark ────────────────────────────────────────────
-     Neutral charcoal surfaces (not Nord blue-black). Steps between chrome /
-     panel / elevated stay close so chrome reads continuous and quiet. Text,
-     fills, and strokes use white-alpha hierarchy — whisper, not chalk. */
+  /* ── Premium dark (Cursor glass–adapted) ────────────────────────────────
+     Cool charcoal surfaces (not pure gray, not Nord blue-black). Steps
+     between chrome / panel / elevated stay close so chrome reads continuous.
+     Text/icon/stroke use cool white-alpha hierarchy — whisper, not chalk.
+     Extracted rhythm from Cursor glass workbench; brand colors stay Flex. */
   /* Primary ink on dark / surfaces on light — kept as a raw token for
    * non-Tailwind use. Not exposed as `--color-base` in `@theme` (that name
    * steals the `text-base` font-size utility). */
   --color-base: #f2f2f2;
-  --color-chrome: #141414; /* chat pane / main surface */
-  --color-panel: #181818; /* sidebar + popovers */
-  --color-editor: #141414;
-  --color-elevated: #1c1c1c; /* chat bubbles / raised tiles */
+  --color-chrome: #0f1114; /* chat pane / main surface */
+  --color-panel: #14171c; /* sidebar + popovers */
+  --color-editor: #0f1114;
+  --color-elevated: #1a1d24; /* chat bubbles / raised tiles */
 
-  --color-text-1: rgb(250 250 250 / 0.92);
-  --color-text-2: rgb(250 250 250 / 0.58);
-  --color-text-3: rgb(250 250 250 / 0.4);
-  --color-text-4: rgb(250 250 250 / 0.26);
+  /* Cool white ink (Cursor glass icon stack: ~236 241 250). */
+  --color-text-1: rgb(236 241 250 / 0.92);
+  --color-text-2: rgb(226 233 244 / 0.58);
+  --color-text-3: rgb(226 233 244 / 0.4);
+  --color-text-4: rgb(226 233 244 / 0.26);
 
-  --color-icon-1: rgb(250 250 250 / 0.9);
-  --color-icon-2: rgb(250 250 250 / 0.58);
-  --color-icon-3: rgb(250 250 250 / 0.4);
-  --color-icon-4: rgb(250 250 250 / 0.26);
+  --color-icon-1: rgb(236 241 250 / 0.88);
+  --color-icon-2: rgb(226 233 244 / 0.62);
+  --color-icon-3: rgb(226 233 244 / 0.42);
+  --color-icon-4: rgb(226 233 244 / 0.3);
 
-  /* Whisper fills — hover ≈5–6%, selected ≈7% (Feel: Whisper fills). */
+  /* Whisper fills — hover ≈5–6%, selected ≈8% (Cursor tertiary/quaternary). */
   --color-fill-1: rgb(255 255 255 / 0.09);
-  --color-fill-2: rgb(255 255 255 / 0.07); /* selected / active */
+  --color-fill-2: rgb(255 255 255 / 0.08); /* selected / active */
   --color-fill-3: rgb(255 255 255 / 0.045);
-  --color-fill-4: rgb(255 255 255 / 0.055); /* list hover */
+  --color-fill-4: rgb(255 255 255 / 0.06); /* list hover */
   --color-fill-5: rgb(255 255 255 / 0.025);
 
-  --color-stroke-1: rgb(255 255 255 / 0.14);
-  --color-stroke-2: rgb(255 255 255 / 0.1);
-  --color-stroke-3: rgb(255 255 255 / 0.07);
+  /* Stroke ladder — secondary strong enough for human-message rings. */
+  --color-stroke-1: rgb(255 255 255 / 0.16);
+  --color-stroke-2: rgb(255 255 255 / 0.12);
+  --color-stroke-3: rgb(255 255 255 / 0.09);
   --color-stroke-4: rgb(255 255 255 / 0.04);
 
   /* Neutral high-contrast accent (white) — factory default. Colored accents
@@ -52,52 +55,64 @@
   --color-diff-added: #7fd97a33;
   --color-diff-removed: #f0717833;
 
-  --color-user-bubble: #1c1c1c;
+  --color-user-bubble: #1a1d24;
+  /* Slight lift on hover without chalk white-mix (theme-aware). */
+  --color-user-bubble-hover: color-mix(in srgb, var(--color-user-bubble) 92%, white);
   --color-code-inline: rgb(255 255 255 / 0.07);
   --color-send: #f2f2f2;
-  --color-send-fg: #141414;
+  --color-send-fg: #0f1114;
 
   /* Settings shell — one quiet step past panel, still alpha-notched. */
   --color-settings-card: rgb(255 255 255 / 0.03);
   /* Toggle ON track — green, not accent-blue. */
   --color-switch-on: #7fd97a;
 
+  /* Composer mode semantics (Cursor mode tint: green/yellow/cyan/purple). */
+  --color-mode-agent-bg: color-mix(in srgb, var(--color-green) 22%, transparent);
+  --color-mode-agent-fg: var(--color-green);
+  --color-mode-plan-bg: color-mix(in srgb, var(--color-yellow) 22%, transparent);
+  --color-mode-plan-fg: var(--color-yellow);
+  --color-mode-ask-bg: color-mix(in srgb, var(--color-cyan) 22%, transparent);
+  --color-mode-ask-fg: var(--color-cyan);
+  --color-mode-flex-bg: color-mix(in srgb, var(--color-purple) 16%, transparent);
+  --color-mode-flex-fg: var(--color-purple);
+
   /* Elevation — soft on near-black; avoid heavy black slabs. */
-  --shadow-color: rgb(0 0 0 / 0.4);
-  --shadow-ambient: rgb(0 0 0 / 0.18);
+  --shadow-color: rgb(0 0 0 / 0.45);
+  --shadow-ambient: rgb(0 0 0 / 0.2);
 }
 
 [data-theme="light"] {
-  /* ── Cursor-tight premium light ───────────────────────────────────────────
-     Clean white chrome, barely-warm panel gray, hairline strokes. Surfaces
-     stay close so the shell feels continuous rather than card-stacked. */
-  --color-base: #1a1a1a;
+  /* ── Premium light (Cursor-density adapted) ───────────────────────────────
+     White chrome, cool gray panel, off-white elevated — three readable steps
+     so shell / sidebar / bubbles don't collapse into one flat plane. */
+  --color-base: #171717;
   --color-chrome: #ffffff;
-  --color-panel: #f7f7f7;
+  --color-panel: #f3f3f4;
   --color-editor: #ffffff;
-  --color-elevated: #ffffff;
+  --color-elevated: #fafafa;
 
-  --color-text-1: rgb(20 20 20 / 0.94);
-  --color-text-2: rgb(20 20 20 / 0.68);
-  --color-text-3: rgb(20 20 20 / 0.48);
-  --color-text-4: rgb(20 20 20 / 0.32);
+  --color-text-1: rgb(23 23 23 / 0.94);
+  --color-text-2: rgb(23 23 23 / 0.68);
+  --color-text-3: rgb(23 23 23 / 0.48);
+  --color-text-4: rgb(23 23 23 / 0.32);
 
-  --color-icon-1: rgb(20 20 20 / 0.92);
-  --color-icon-2: rgb(20 20 20 / 0.62);
-  --color-icon-3: rgb(20 20 20 / 0.46);
-  --color-icon-4: rgb(20 20 20 / 0.28);
+  --color-icon-1: rgb(23 23 23 / 0.92);
+  --color-icon-2: rgb(23 23 23 / 0.62);
+  --color-icon-3: rgb(23 23 23 / 0.46);
+  --color-icon-4: rgb(23 23 23 / 0.28);
 
-  /* Whisper fills — hover ≈5–7%, selected slightly stronger. */
-  --color-fill-1: rgb(20 20 20 / 0.1);
-  --color-fill-2: rgb(20 20 20 / 0.07); /* selected / active */
-  --color-fill-3: rgb(20 20 20 / 0.04);
-  --color-fill-4: rgb(20 20 20 / 0.055); /* list hover */
-  --color-fill-5: rgb(20 20 20 / 0.02);
+  /* Whisper fills — selected slightly stronger than hover. */
+  --color-fill-1: rgb(23 23 23 / 0.1);
+  --color-fill-2: rgb(23 23 23 / 0.08); /* selected / active */
+  --color-fill-3: rgb(23 23 23 / 0.04);
+  --color-fill-4: rgb(23 23 23 / 0.055); /* list hover */
+  --color-fill-5: rgb(23 23 23 / 0.025);
 
-  --color-stroke-1: rgb(20 20 20 / 0.14);
-  --color-stroke-2: rgb(20 20 20 / 0.09);
-  --color-stroke-3: rgb(20 20 20 / 0.06);
-  --color-stroke-4: rgb(20 20 20 / 0.03);
+  --color-stroke-1: rgb(23 23 23 / 0.16);
+  --color-stroke-2: rgb(23 23 23 / 0.11);
+  --color-stroke-3: rgb(23 23 23 / 0.07);
+  --color-stroke-4: rgb(23 23 23 / 0.04);
 
   /* Neutral high-contrast accent (black) — factory default. */
   --color-accent: #1a1a1a;
@@ -115,13 +130,24 @@
   --color-diff-added: #1a7f4b33;
   --color-diff-removed: #d94a5b33;
 
-  --color-user-bubble: rgb(20 20 20 / 0.035);
-  --color-code-inline: rgb(20 20 20 / 0.05);
-  --color-send: #1a1a1a;
+  --color-user-bubble: #f0f0f1;
+  --color-user-bubble-hover: #e8e8ea;
+  --color-code-inline: rgb(23 23 23 / 0.05);
+  --color-send: #171717;
   --color-send-fg: #ffffff;
 
-  --color-settings-card: rgb(20 20 20 / 0.025);
+  --color-settings-card: rgb(23 23 23 / 0.03);
   --color-switch-on: #1a7f4b;
+
+  /* Mode tints stronger on light so pills don't wash out. */
+  --color-mode-agent-bg: color-mix(in srgb, var(--color-green) 18%, transparent);
+  --color-mode-agent-fg: var(--color-green);
+  --color-mode-plan-bg: color-mix(in srgb, var(--color-yellow) 20%, transparent);
+  --color-mode-plan-fg: var(--color-yellow);
+  --color-mode-ask-bg: color-mix(in srgb, var(--color-cyan) 18%, transparent);
+  --color-mode-ask-fg: var(--color-cyan);
+  --color-mode-flex-bg: color-mix(in srgb, var(--color-purple) 16%, transparent);
+  --color-mode-flex-fg: var(--color-purple);
 
   /* Elevation — soft graphite, not near-black slabs on white. */
   --shadow-color: rgb(20 20 20 / 0.12);
@@ -216,14 +242,15 @@
     0 0 0 1px var(--color-stroke-3),
     0 0 4px var(--shadow-ambient),
     0 16px 32px -4px var(--shadow-color);
-  /* Composer: crisp 1px ring + soft drop so the box reads grounded, not floating. */
+  /* Composer: crisp 1px ring + soft drop so the box reads grounded, not floating.
+   * Ring strength tracks Cursor human-message (stroke-secondary idle → primary focus). */
   --shadow-composer:
-    0 0 0 1px var(--color-stroke-3),
+    0 0 0 1px var(--color-stroke-2),
     0 1px 2px var(--shadow-ambient),
     0 8px 24px -6px var(--shadow-color);
-  /* the reference design has no accent glow on composer focus — neutral ring only. */
+  /* Reference glass: no accent glow on composer focus — neutral ring only. */
   --shadow-composer-focus:
-    0 0 0 1px var(--color-stroke-2),
+    0 0 0 1px var(--color-stroke-1),
     0 1px 2px var(--shadow-ambient),
     0 10px 28px -6px var(--shadow-color);
   /* Popover chrome — the reference design's box-shadow-xl (borderless, 4-layer). */

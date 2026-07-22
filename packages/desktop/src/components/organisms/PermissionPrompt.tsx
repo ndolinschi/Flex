@@ -55,7 +55,8 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
     >
       <div
         className={cn(
-          "rounded-t-[var(--radius-composer)] border border-b-0 border-stroke-3",
+          // Match docked composer stroke-2 so HITL+bubble read as one panel.
+          "rounded-t-[var(--radius-composer)] border border-b-0 border-stroke-2",
           "bg-user-bubble px-3 pt-3 pb-3 shadow-[0_-4px_16px_-4px_var(--shadow-color)]",
         )}
       >

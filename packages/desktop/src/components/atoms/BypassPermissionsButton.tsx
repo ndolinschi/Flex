@@ -38,10 +38,11 @@ export const BypassPermissionsButton = ({
         aria-label={shieldLabel}
         onPressedChange={() => onToggle()}
         className={cn(
-          "shrink-0 rounded-full",
+          "shrink-0 rounded-full transition-[opacity,background-color,color,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+          "active:translate-y-px",
           pressed
-            ? "bg-orange/15 text-orange opacity-100 hover:bg-orange/25 hover:text-orange data-pressed:bg-orange/15 data-pressed:text-orange"
-            : "text-muted-foreground opacity-50 hover:bg-fill-4 hover:opacity-80",
+            ? "bg-orange/15 text-orange opacity-100 hover:bg-orange/25 hover:text-orange active:bg-orange/30 data-pressed:bg-orange/15 data-pressed:text-orange"
+            : "text-icon-2 opacity-50 hover:bg-fill-3 hover:opacity-80 active:opacity-80",
         )}
       >
         <ShieldIcon />

@@ -17,8 +17,8 @@ type ErrorBannerProps = {
 }
 
 /**
- * App-wide inline error callout — shadcn Alert (destructive).
- * Prefer this over ad-hoc danger strips.
+ * Quiet inline error callout — dismissible, no loud red slabs. Prefer this
+ * over modals for recoverable failures (composer, settings, timeline).
  */
 export const ErrorBanner = ({
   message,
@@ -29,10 +29,21 @@ export const ErrorBanner = ({
   if (!message) return null
 
   return (
-    <Alert variant="destructive" className={cn(className)}>
-      <AlertCircleIcon />
-      {title ? <AlertTitle>{title}</AlertTitle> : null}
-      <AlertDescription className="text-destructive">{message}</AlertDescription>
+    <Alert
+      variant="destructive"
+      className={cn(
+        // Whisper danger: thin tint border + subtle fill, not a solid red block.
+        "border-danger/15 bg-danger-subtle/70 py-1.5 text-danger",
+        className,
+      )}
+    >
+      <AlertCircleIcon className="size-3.5 opacity-80" aria-hidden />
+      {title ? <AlertTitle>{title}</AlertTitle> : (
+        <AlertTitle className="sr-only">Error</AlertTitle>
+      )}
+      <AlertDescription className="text-xs leading-snug text-danger/90">
+        {message}
+      </AlertDescription>
       {onDismiss ? (
         <AlertAction>
           <Button
@@ -41,9 +52,9 @@ export const ErrorBanner = ({
             size="icon-xs"
             aria-label="Dismiss error"
             onClick={onDismiss}
-            className="text-destructive hover:bg-destructive/15 hover:text-destructive"
+            className="text-danger/80 opacity-70 hover:bg-danger/10 hover:text-danger hover:opacity-100"
           >
-            <XIcon />
+            <XIcon className="size-3.5" aria-hidden />
           </Button>
         </AlertAction>
       ) : null}

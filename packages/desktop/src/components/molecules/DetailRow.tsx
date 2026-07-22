@@ -160,35 +160,37 @@ export const DetailRow = ({
             : undefined
         }
         className={cn(
+          // Cursor tool detail: secondary label + tertiary meta, gap 4.
           "group/detail flex min-h-6 items-center gap-1 text-base leading-[1.5] text-ink-muted",
-          canExpand && "cursor-pointer",
+          "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+          canExpand && "cursor-pointer hover:text-ink-secondary",
         )}
       >
         {/* Fixed-size leading slot — running→done swaps the spinner for a
          * chevron (or nothing, when not expandable) in place, so the box
          * itself never changes size and the row never shifts. */}
-        <span className="flex h-3 w-3 shrink-0 items-center justify-center">
+        <span className="flex h-[18px] w-4 shrink-0 items-center justify-center">
           {detail.running ? (
             <LoaderCircle className="h-3 w-3 animate-spin" aria-hidden />
           ) : canExpand ? (
             <ChevronRight
               className={cn(
-                "h-2.5 w-2.5 text-icon-3 transition-transform duration-[var(--duration-fast)]",
+                "h-2.5 w-2.5 text-icon-3 transition-transform duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                 expanded && "rotate-90",
               )}
               aria-hidden
             />
           ) : null}
         </span>
-        <span className="min-w-0 shrink truncate text-sm [font-variant-numeric:tabular-nums] text-ink-secondary">
+        <span className="min-w-0 shrink truncate text-base [font-variant-numeric:tabular-nums] text-ink-secondary">
           {detail.label}
         </span>
         {note ? (
-          <span className="min-w-0 shrink truncate text-ink-faint">
+          <span className="min-w-0 shrink truncate text-xs text-ink-faint">
             {note}
           </span>
         ) : detail.sublabel ? (
-          <span className="shrink-0 text-ink-faint">{detail.sublabel}</span>
+          <span className="shrink-0 text-xs text-ink-faint">{detail.sublabel}</span>
         ) : null}
         <DiffBadge added={detail.added} removed={detail.removed} />
         {canOpenFile ? (

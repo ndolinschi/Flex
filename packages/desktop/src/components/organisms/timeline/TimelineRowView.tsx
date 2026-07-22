@@ -94,7 +94,7 @@ export const TimelineRowView = memo(({
             >
               <BubbleContent
                 className={cn(
-                  "border-stroke-2 px-2.5 py-2",
+                  "border-stroke-1 px-2.5 py-2",
                   "hover:border-stroke-1 hover:bg-[color-mix(in_srgb,var(--color-user-bubble)_96%,white)]",
                 )}
               >

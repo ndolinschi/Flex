@@ -148,11 +148,15 @@ export const ToolStepGroup = memo(function ToolStepGroup({
           summary.failed && "text-destructive",
         )}
       >
-        <KindIcon kind={summary.kind} running={summary.running} />
+        {/* Fixed icon slot ~16×18 (Cursor primary-toolcall-icon). */}
+        <span className="flex h-[18px] w-4 shrink-0 items-center justify-center">
+          <KindIcon kind={summary.kind} running={summary.running} />
+        </span>
         <span
           className={cn(
-            "min-w-0 flex-1 truncate",
+            "min-w-0 flex-1 truncate text-ink-secondary",
             summary.running && "animate-shimmer-text",
+            summary.failed && "text-danger",
           )}
         >
           {summary.title}

@@ -80,7 +80,8 @@ export const ChatDiffCard = ({
   return (
     <div
       className={cn(
-        "my-1.5 overflow-hidden rounded-lg border border-stroke-3 bg-panel first:mt-0 last:mb-0",
+        // Cursor tool card: radius-lg 10, hairline border, panel surface.
+        "my-1.5 overflow-hidden rounded-[var(--radius-lg)] border border-stroke-3 bg-panel first:mt-0 last:mb-0",
         className,
       )}
       data-chat-diff-card

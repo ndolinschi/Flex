@@ -196,7 +196,7 @@ export const FileRow = memo(function FileRow({
     <li>
       <div
         className={cn(
-          "group relative flex h-8 w-full items-center gap-2 rounded-[var(--radius-sm)] px-2.5",
+          "group relative flex h-7 w-full items-center gap-1.5 rounded-sm px-2",
           "transition-colors duration-[var(--duration-fast)] hover:bg-fill-4",
           expanded && "bg-fill-5",
           selectable && selected && "bg-fill-2",

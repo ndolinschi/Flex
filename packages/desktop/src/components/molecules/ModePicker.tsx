@@ -24,7 +24,10 @@ type ModeOption = {
   label: string
   description: string
   icon: typeof Sparkles
+  /** Icon/label hue in the menu list. */
   accent: string
+  /** Selected trigger pill — tinted surface + text (Cursor mode semantics). */
+  triggerClass: string
 }
 
 const MODES: ModeOption[] = [
@@ -33,21 +36,27 @@ const MODES: ModeOption[] = [
     label: "Agent",
     description: "Build and edit with full tools",
     icon: Sparkles,
-    accent: "text-green",
+    accent: "text-mode-agent-fg",
+    triggerClass:
+      "border-transparent bg-mode-agent-bg text-mode-agent-fg hover:bg-mode-agent-bg",
   },
   {
     id: "plan",
     label: "Plan",
     description: "Design before coding (read-only)",
     icon: ListTodo,
-    accent: "text-yellow",
+    accent: "text-mode-plan-fg",
+    triggerClass:
+      "border-transparent bg-mode-plan-bg text-mode-plan-fg hover:bg-mode-plan-bg",
   },
   {
     id: "ask",
     label: "Ask",
     description: "Questions without making changes",
     icon: MessageCircle,
-    accent: "text-cyan",
+    accent: "text-mode-ask-fg",
+    triggerClass:
+      "border-transparent bg-mode-ask-bg text-mode-ask-fg hover:bg-mode-ask-bg",
   },
   {
     id: "debug",
@@ -55,13 +64,17 @@ const MODES: ModeOption[] = [
     description: "Reproduce, probe, fix, then clean up",
     icon: Bug,
     accent: "text-orange",
+    triggerClass:
+      "border-transparent bg-orange/15 text-orange hover:bg-orange/15",
   },
   {
     id: "flex",
     label: "Flex",
     description: "Plan, review, and run isolated workers",
     icon: Network,
-    accent: "text-purple",
+    accent: "text-mode-flex-fg",
+    triggerClass:
+      "border-transparent bg-mode-flex-bg text-mode-flex-fg hover:bg-mode-flex-bg",
   },
 ]
 
@@ -109,9 +122,13 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
       <SelectTrigger
         size="xs"
         aria-label={`Mode: ${selected.label}`}
-        className="border-0 bg-transparent shadow-none opacity-70 hover:bg-transparent hover:opacity-100 data-open:bg-transparent data-open:opacity-100"
+        className={cn(
+          // Quiet idle opacity; mode-tinted fill (Cursor mode semantics).
+          "border shadow-none opacity-80 hover:opacity-100 data-open:opacity-100",
+          selected.triggerClass,
+        )}
       >
-        <Icon className={cn("size-3.5", selected.accent)} aria-hidden />
+        <Icon className="size-3.5" aria-hidden />
         <SelectValue />
       </SelectTrigger>
       <SelectContent side="top" align="start" alignItemWithTrigger={false} className="min-w-64">
@@ -126,7 +143,7 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
                 />
                 <span className="min-w-0 flex-1 text-left">
                   <span className="block text-sm text-foreground">{mode.label}</span>
-                  <span className="block whitespace-normal text-xs text-muted-foreground">
+                  <span className="block whitespace-normal text-xs text-ink-muted">
                     {mode.description}
                   </span>
                 </span>

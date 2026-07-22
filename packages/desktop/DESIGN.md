@@ -24,7 +24,7 @@ audit and fix UI against this file. For shadcn adds/rewrites, also load the
 | Whisper fills | Selected `fill-2`, hover `fill-4` (list rows, tabs, chrome buttons) |
 | Opacity hover | Quiet `IconButton`: idle `.5` → hover `.8` |
 | 4px grid | Spacing tokens `--space-1`…`--space-12` (4–48px) |
-| Radius by role | Controls `rounded-md` (8); composer/bubbles 14; settings cards 12; pills full |
+| Radius by role | Controls `rounded-md` (8); composer/bubbles 14; settings cards 12; pills full; sidebar rows 6 |
 | Keyboard focus | Neutral `stroke-2` ring; no accent glow |
 | Semibold = 590 | Plus micro tracking on captions |
 
@@ -240,11 +240,39 @@ Use **padding** (`pt-*`), not margin — virtualizer `measureElement` must inclu
 | `Tab` md (panel) | **`h-6`** `px-2 rounded-md text-sm` | Must clear strip edges |
 | `Tab` sm (file chips) | **`h-6`** tighter pad, `text-xs` | Same strip |
 | `TextInput` | `h-8` | Settings search `h-7`; Welcome `h-9` |
-| Sidebar session row | `min-h-7` `px-2 py-1.5` | Status slot `h-5 w-5` |
+| Sidebar session row | `min-h-7` `px-2 py-1.5` `rounded-sm` | Status slot `h-5 w-5`; hover `fill-4` / selected `fill-2` |
+| File tree / Changes file row | `h-7` `px-2` `rounded-sm` | Same whisper fills as sidebar cells |
+| Tool-call line | `gap-1` `text-base` `leading-[1.5]` icon slot `16×18` | Idle `text-ink-muted` → hover secondary; title secondary |
 | Section headers (sidebar) | `h-6` `px-2` | — |
 
 **Rule:** never put `h-7` pills inside a `--header-height` (30px) bar — they
 read flush against the border. Use `h-6` (3px inset each side).
+
+---
+
+## States (empty / loading / error / blocking)
+
+Cursor-style: compact, muted titles, short descriptions, one quiet CTA.
+Skeletons whisper fills (no bright shimmer). Errors stay **inline**, never
+modal. HITL docks as a composer-adjacent blocking surface, not a dialog.
+
+| State | Component | Recipe |
+|---|---|---|
+| Empty | `EmptyState` | `py-6`; title `text-sm text-ink-secondary`; description `text-xs text-ink-muted`; CTA `Button secondary sm` |
+| Hero empty | `ChatShell` `composerHero` | Title ~22px; hint `text-sm muted`; quiet pill chips `text-xs` |
+| Onboarding | `WelcomePage` | Primary controls **`h-9`** (`Button size="lg"`, inputs `h-9`); errors via `ErrorBanner` |
+| Loading list | `SidebarSkeleton` | Rows `min-h-7` / two-line `h-10`; headers `h-6`; `rounded-md` whisper fills |
+| Loading block | `Skeleton` | `bg-surface-muted` (fill-3) + soft pulse; opacity dampened |
+| Indeterminate | `Spinner` | `text-ink-muted`; sizes sm/md/lg |
+| Live work | `RunningDot` | 3×3 wave, 1.8s, base opacity-60; reduced-motion kills animation |
+| Streaming | `StreamingCaret` | Thin `w-px h-3.5` pulse on `ink-muted`, not a block accent cursor |
+| Error inline | `ErrorBanner` | `border-danger/15 bg-danger-subtle/70`; body `text-xs`; dismissible quiet X |
+| Resume error | `SidebarResumeError` | Same quiet danger; Retry ghost + dismiss |
+| Progress | `Progress` (settings indexing) | Track `h-1 bg-fill-3`; indeterminate bar only while rebuilding |
+| Blocking HITL | `PermissionPrompt` / `QuestionPrompt` | Docked above composer bubble (`Composer.dockedOverlay`); same rail width; actions in composer footer (`PermissionActions`) or card footer |
+
+**Do not:** full-screen error modals for recoverable IPC failures; primary-filled
+empty CTAs; bright skeleton shimmer; loud red alert slabs.
 
 ---
 

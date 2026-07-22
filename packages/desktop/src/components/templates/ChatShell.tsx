@@ -71,12 +71,13 @@ export const ChatShell = ({
 
         {composerHero ? (
           <div className="flex min-h-0 flex-1 flex-col justify-center overflow-y-auto">
+            {/* Hero empty: compact like EmptyState — muted title hierarchy + quiet chips. */}
             <div className="mx-auto mb-5 w-full max-w-[var(--content-rail)] px-3 text-center">
-              <h2 className="mb-4 truncate text-[28px] font-semibold leading-none tracking-[-0.04em] text-ink">
+              <h2 className="mb-2 truncate text-[22px] font-semibold leading-none tracking-[-0.03em] text-ink">
                 {heroTitle}
               </h2>
-              <p className="text-base text-ink-muted">{heroHint}</p>
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <p className="text-sm text-ink-muted">{heroHint}</p>
+              <div className="mt-3 flex flex-wrap justify-center gap-1.5">
                 {QUICKSTART_SUGGESTIONS.map((suggestion) => (
                   <Button
                     key={suggestion}
