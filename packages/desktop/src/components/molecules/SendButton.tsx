@@ -11,11 +11,17 @@ type SendButtonProps = {
   onStop: () => void
 }
 
-const circleClass = cn(
-  "size-6 shrink-0 rounded-full bg-send text-send-fg opacity-80",
-  "hover:opacity-100 hover:bg-send hover:text-send-fg",
+/** Solid high-contrast circle when armed; quiet fill when empty (Cursor send). */
+const armedClass = cn(
+  "size-6 shrink-0 rounded-full border-0 bg-send text-send-fg shadow-none",
+  "hover:bg-send hover:text-send-fg hover:opacity-90",
+  "active:translate-y-px",
 )
-const disabledCircleClass = cn(circleClass, "disabled:opacity-30")
+const idleClass = cn(
+  "size-6 shrink-0 rounded-full border-0 bg-send text-send-fg shadow-none",
+  "opacity-35 hover:opacity-50",
+  "disabled:pointer-events-none disabled:opacity-30",
+)
 
 /** 24px circle send / stop / queue — shadcn Button icon shell. */
 export const SendButton = ({
@@ -36,7 +42,7 @@ export const SendButton = ({
           size="icon-xs"
           onClick={onStop}
           aria-label="Stop generation"
-          className={circleClass}
+          className={armedClass}
         >
           <SquareIcon className="size-2.5 fill-current" />
         </Button>
@@ -46,7 +52,7 @@ export const SendButton = ({
           size="icon-xs"
           onClick={onSend}
           aria-label="Queue message"
-          className={circleClass}
+          className={armedClass}
         >
           <ArrowUpIcon className="size-3.5" strokeWidth={2.5} />
         </Button>
@@ -62,7 +68,7 @@ export const SendButton = ({
         size="icon-xs"
         onClick={onStop}
         aria-label="Stop generation"
-        className={circleClass}
+        className={armedClass}
       >
         <SquareIcon className="size-2.5 fill-current" />
       </Button>
@@ -77,7 +83,7 @@ export const SendButton = ({
       onClick={onSend}
       disabled={disabled}
       aria-label="Send message"
-      className={disabledCircleClass}
+      className={disabled ? idleClass : armedClass}
     >
       <ArrowUpIcon className="size-3.5" strokeWidth={2.5} />
     </Button>

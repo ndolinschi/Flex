@@ -37,8 +37,12 @@ export const PlusMenu = ({
             aria-label="Add context"
             title="Add context"
             className={cn(
-              "size-6 rounded-full text-ink-muted opacity-50 transition-[opacity,background-color,color,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)] hover:bg-fill-3 hover:opacity-80 active:translate-y-px active:opacity-80",
-              "aria-expanded:bg-fill-4 aria-expanded:text-ink aria-expanded:opacity-80",
+              // Quiet + circle — matches Bypass/Send hit target, not a filled chip.
+              "size-6 rounded-full text-ink-muted opacity-60",
+              "transition-[opacity,background-color,color,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+              "hover:bg-fill-4 hover:text-ink hover:opacity-100",
+              "active:translate-y-px active:opacity-100",
+              "aria-expanded:bg-fill-4 aria-expanded:text-ink aria-expanded:opacity-100",
             )}
           />
         }

@@ -70,15 +70,14 @@ const ComposerSendButton = ({
   )
 }
 
-/** Drop-shadow only — no 1px ring — so a docked Permission/Question card can
- * share a continuous surface without a hairline at the seam. Side/bottom
- * stroke is painted with real borders instead. */
-const DOCKED_BUBBLE_SHADOW =
-  "shadow-[0_1px_2px_var(--shadow-ambient),0_8px_24px_-6px_var(--shadow-color)]"
+/** Soft ambient only — docked HITL paints the side/bottom stroke so the seam
+ * with Permission/Question stays continuous (no top border/ring). */
+const DOCKED_BUBBLE_SHADOW = "shadow-[var(--shadow-composer)]"
 const DOCKED_BUBBLE_SHADOW_FOCUS =
-  "focus-within:shadow-[0_1px_2px_var(--shadow-ambient),0_10px_28px_-6px_var(--shadow-color)]"
+  "focus-within:shadow-[var(--shadow-composer-focus)]"
 
-/** reference glass expanded prompt — fill surface, soft elevation, no harsh outline.
+/** Cursor glass prompt anatomy: elevated fill, real 1px border (tertiary→
+ * secondary on focus), soft ambient — not a heavy floaty shadow ring.
  * Draft subscription lives in `ComposerInput` / `ComposerSendButton` so
  * ContextBar + ModelPicker stay stable across keystrokes. */
 export const Composer = ({
@@ -300,27 +299,32 @@ export const Composer = ({
             // w-full is required: without a fixed width the pill sizes to content,
             // and the textarea's w-full creates a circular dependency that collapses
             // width (→ placeholder wraps → scrollHeight inflates → height locks at max).
-            "relative flex w-full flex-col",
+            //
+            // Anatomy (Cursor full-input-box / ui-prompt-input):
+            // column + gap · editor · bottom toolbar · real border · soft ambient.
+            // group/composer: expand-icon reveals on focus-within.
+            "group/composer relative flex w-full flex-col gap-1.5",
             "bg-user-bubble",
             hasDockedOverlay
               ? cn(
                   "rounded-b-[var(--radius-composer)] rounded-t-none",
                   // Continue the docked card's side/bottom stroke; omit the top
-                  // ring from --shadow-composer so the seam stays clean.
+                  // border so the seam with Permission/Question stays clean.
                   "border-x border-b border-stroke-2",
                   DOCKED_BUBBLE_SHADOW,
                   DOCKED_BUBBLE_SHADOW_FOCUS,
                 )
               : cn(
                   "rounded-[var(--radius-composer)]",
+                  // Real border (tertiary → secondary on focus) + soft ambient.
+                  // No shadow-ring: double-painted rings read harsh vs Cursor.
+                  "border border-stroke-3",
                   "shadow-[var(--shadow-composer)]",
+                  "focus-within:border-stroke-1",
                   "focus-within:shadow-[var(--shadow-composer-focus)]",
                 ),
-            // Hover fill only @ 100ms. Exclude box-shadow so focus ring is instant
-            // (same rule as Button: never ease outline/ring/shadow on focus).
-            "transition-[background-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-            "hover:bg-user-bubble-hover",
-            "focus-within:hover:bg-user-bubble",
+            // Instant focus border; only ambient shadow may ease if themed later.
+            "transition-[border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
           )}
         >
           <ComposerInput
@@ -344,7 +348,8 @@ export const Composer = ({
             textareaRefOut={textareaRef}
           />
 
-          <div className="flex items-center justify-between gap-2 px-2.5 pb-1.5 pt-1">
+          {/* Bottom toolbar — Cursor gap ~0.55rem between clusters; h-6 controls. */}
+          <div className="flex items-center justify-between gap-2 px-2.5 pb-1.5">
             <div className="flex min-w-0 items-center gap-1">
               {!pendingPermission ? (
                 <>

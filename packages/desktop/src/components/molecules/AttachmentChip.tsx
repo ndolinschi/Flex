@@ -28,19 +28,32 @@ export const AttachmentChip = ({ attachment, onRemove }: AttachmentChipProps) =>
             : FileIcon
 
   return (
-    <Attachment size="xs" state="done" orientation="horizontal">
-      <AttachmentMedia variant="icon">
+    <Attachment
+      size="xs"
+      state="done"
+      orientation="horizontal"
+      // Composer chips are compact pills (Cursor density), not mini-cards.
+      // Override kit `min-w-40` / card surface for the toolbar strip.
+      className="min-w-0 max-w-[12rem] gap-1 rounded-md border-stroke-3 bg-fill-3 py-0 text-xs text-ink-secondary shadow-none"
+    >
+      <AttachmentMedia
+        variant="icon"
+        className="size-4 w-4 rounded-sm bg-transparent text-ink-muted [&_svg:not([class*='size-'])]:size-3"
+      >
         <Icon aria-hidden />
       </AttachmentMedia>
-      <AttachmentContent>
-        <AttachmentTitle>{attachment.name}</AttachmentTitle>
+      <AttachmentContent className="min-w-0 py-0.5">
+        <AttachmentTitle className="truncate font-normal text-ink-secondary">
+          {attachment.name}
+        </AttachmentTitle>
       </AttachmentContent>
       <AttachmentActions>
         <AttachmentAction
           aria-label={`Remove ${attachment.name}`}
           onClick={() => onRemove(attachment.id)}
+          className="size-4 text-ink-faint hover:bg-fill-4 hover:text-ink-muted"
         >
-          <X aria-hidden />
+          <X className="size-3" aria-hidden />
         </AttachmentAction>
       </AttachmentActions>
     </Attachment>

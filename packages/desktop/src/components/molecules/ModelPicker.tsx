@@ -94,17 +94,17 @@ export const ModelPicker = ({
         render={
           <Button
             type="button"
-            variant="outline"
-            size="sm"
+            variant="ghost"
+            size="xs"
             disabled={isLoading || disabled}
             aria-label="Select model"
             className={cn(
-              // h-6 pill to match ModePicker (DESIGN.md: Mode/Model pills h-6).
-              // pl/pr asymmetric so leading icon and trailing chevron optically
-              // balance (same recipe as SelectTrigger size=xs).
-              "h-6 max-w-[14rem] gap-1 rounded-full border-stroke-3 bg-transparent py-0 pl-2 pr-1.5 font-normal shadow-none",
-              // Quiet idle opacity matching ModePicker; full opacity on hover/open.
+              // Quiet model pill (Cursor density): h-6 · text-xs · no hard outline.
+              // pl/pr asymmetric so leading icon and trailing chevron balance.
+              "h-6 max-w-[14rem] gap-1 rounded-full border border-transparent bg-transparent py-0 pl-2 pr-1.5 font-normal text-ink-secondary shadow-none",
+              "hover:border-stroke-3 hover:bg-fill-4 hover:text-ink",
               "opacity-80 hover:opacity-100 aria-expanded:opacity-100",
+              "aria-expanded:border-stroke-3 aria-expanded:bg-fill-4 aria-expanded:text-ink",
             )}
           />
         }

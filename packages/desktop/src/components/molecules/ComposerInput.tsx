@@ -273,25 +273,28 @@ export const ComposerInput = ({
         </div>
       ) : null}
 
-      {/* Rich input: a transparent textarea over a highlight backdrop that
-          renders @mentions as inline pills (aligned 1:1 by sharing metrics). */}
+      {/* Rich input: transparent textarea over a highlight backdrop that
+          renders @mentions as inline pills (aligned 1:1 by sharing metrics).
+          Padding matches Cursor full-input-box editor: 8px top · 10px sides. */}
       <div className="relative">
         {activeSessionId && enabled ? (
-          <div className="absolute right-1.5 top-1.5 z-10">
+          <div className="absolute right-1 top-1 z-10">
             <Tooltip label="Open prompt editor">
               <Button
                 type="button"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs"
                 aria-label="Open prompt editor"
                 title="Open prompt editor"
                 onClick={() => openToolBesideChat(activeSessionId, "prompt")}
                 className={cn(
-                  "h-6 w-6 bg-user-bubble/80 opacity-50",
-                  "text-ink-muted hover:bg-fill-4 hover:text-ink hover:opacity-80",
+                  "size-5 rounded-md text-ink-faint opacity-0",
+                  "hover:bg-fill-4 hover:text-ink-muted hover:opacity-100",
+                  "focus-visible:opacity-100",
+                  "group-focus-within/composer:opacity-60",
                 )}
               >
-                <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+                <Maximize2 className="size-3" aria-hidden />
               </Button>
             </Tooltip>
           </div>
@@ -302,9 +305,9 @@ export const ComposerInput = ({
           className={cn(
             "pointer-events-none absolute inset-0 overflow-hidden",
             "min-h-[var(--composer-min-height)] max-h-[var(--composer-max-height)]",
-            "whitespace-pre-wrap break-words px-2.5 pt-2 pb-1 text-sm leading-snug text-ink",
+            "whitespace-pre-wrap break-words px-2.5 pt-2 text-sm leading-[1.45] text-ink",
             "[overflow-wrap:break-word] [word-break:normal]",
-            activeSessionId && enabled && "pr-9",
+            activeSessionId && enabled && "pr-8",
           )}
         >
           {mentionSegments.map((seg, i) =>
@@ -357,9 +360,9 @@ export const ComposerInput = ({
             "relative min-h-[var(--composer-min-height)] max-h-[var(--composer-max-height)]",
             "w-full resize-none overflow-y-auto border-0 bg-transparent text-transparent caret-ink",
             "[overflow-wrap:break-word] [word-break:normal]",
-            "px-2.5 pt-2 pb-1 text-sm leading-snug outline-none transition-none",
-            "placeholder:text-ink-muted",
-            activeSessionId && enabled && "pr-9",
+            "px-2.5 pt-2 text-sm leading-[1.45] outline-none transition-none",
+            "placeholder:text-ink-muted/80",
+            activeSessionId && enabled && "pr-8",
           )}
         />
       </div>

@@ -55,10 +55,11 @@ Cursor's icon primary/secondary stack — not pure `#fafafa`.
 | Cursor | Flex |
 |---|---|
 | stroke tertiary ~9%, secondary ~16% | `stroke-3` 9%, `stroke-2` 12%, `stroke-1` 16% |
-| Human message border = stroke-secondary | User `Bubble` + composer ring use stronger stroke |
+| Human message border = stroke-secondary | User `Bubble` stronger stroke; composer uses real `border` |
 | Composer max-width 840px | `--content-rail` 52.5rem (840px) |
 | Bubble radius `radius-xl` 14px | `--radius-bubble` / `--radius-composer` 14px |
-| Box shadows = 1px stroke ring + layered ambient | `--shadow-composer` / `--shadow-popover` |
+| Composer elevation = soft ambient (not heavy ring-shadow) | `--shadow-composer` ambient; ring = CSS border |
+| Popover elevation = stroke ring + layered ambient | `--shadow-popover` |
 
 ### Mode semantics (composer)
 
@@ -235,7 +236,7 @@ Use these gutters unless a surface documents an exception.
 | **Content pane chrome** (TabStrip, tool tab headers, banners, CommitCenter) | `px-2.5` (10px) | Rows = `--header-height` (30px) |
 | **Session sidebar** (actions, list, section headers) | `px-2` (8px) | Actions `pt-2 pb-2 gap-0.5`; sections `gap-2` |
 | **Sidebar footer** | `px-2.5` | `py-1.5` |
-| **Composer toolbar / textarea** | `px-2.5` | Toolbar `pt-1 pb-1.5`; textarea `pt-2 pb-1` |
+| **Composer toolbar / textarea** | `px-2.5` | Bubble `gap-1.5`; toolbar `pb-1.5` (no top pad — gap owns it); textarea `pt-2` |
 | **Settings shell** | `px-4` | Nav↔content `gap-6`; cards `gap-3` |
 | **Settings rows / card labels** | `px-3.5` | Rows `py-3`; dividers `before:inset-x-3.5` |
 | **Welcome** | `px-4` | `py-8`; form `gap-3` |
@@ -258,7 +259,7 @@ Use these gutters unless a surface documents an exception.
 | `--window-radius` | 10px | `#root` / `.app-shell` clip; macOS vibrancy + CALayer |
 | `--header-height` | 30px | Content TabStrip, tool tab subheaders |
 | `--status-bar-height` | 1.75rem (28px) | ContextBar min height |
-| `--composer-min/max-height` | 1.75rem / 10rem | Textarea grow |
+| `--composer-min/max-height` | 1.5rem / 10rem | Textarea grow |
 
 ### Gaps (chrome)
 
@@ -370,13 +371,22 @@ supplies the rounded clip (`--window-radius`) over a transparent window.
 
 ### Composer
 
+Cursor glass anatomy (adapted, not cloned): elevated fill, **real 1px border**
+(`stroke-3` idle → `stroke-1` focus), soft ambient only (`--shadow-composer`),
+column + `gap-1.5`, bottom toolbar of `h-6` controls.
+
 1. Outer `px-3` → rail `max-w-[var(--content-rail)]`
 2. Optional `workersSlot` / HITL docked flush above the bubble
 3. ContextBar above bubble (`mb-1`, min-height status bar) — project/branch
    comboboxes are `h-6` with addon `py-0` so folder/branch icons sit on the
    text baseline (default InputGroupAddon `py-1.5` is for `h-8` forms)
-4. Bubble: `--radius-composer`, shadow-composer
-5. Textarea + toolbar both `px-2.5`
+4. Bubble: `--radius-composer` · `bg-user-bubble` · `border-stroke-3` ·
+   `focus-within:border-stroke-1` · `shadow-composer` (ambient, **not** a
+   shadow-painted ring). Docked HITL uses side/bottom stroke only.
+5. Textarea + toolbar both `px-2.5`; Mode pill tinted + hairline; Model quiet
+   ghost pill (`text-xs`); Plus / Bypass / Send `h-6` circles; attachment
+   chips are compact `h-6`-ish pills (not kit mini-cards)
+6. Expand (prompt editor) icon: reveal on focus-within / hover, `size-5`
 
 ### TurnTimeline
 

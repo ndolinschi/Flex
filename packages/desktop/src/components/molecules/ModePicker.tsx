@@ -38,7 +38,7 @@ const MODES: ModeOption[] = [
     icon: Sparkles,
     accent: "text-mode-agent-fg",
     triggerClass:
-      "border-transparent bg-mode-agent-bg text-mode-agent-fg hover:bg-mode-agent-bg",
+      "border-mode-agent-fg/15 bg-mode-agent-bg text-mode-agent-fg hover:bg-mode-agent-bg hover:border-mode-agent-fg/25",
   },
   {
     id: "plan",
@@ -47,7 +47,7 @@ const MODES: ModeOption[] = [
     icon: ListTodo,
     accent: "text-mode-plan-fg",
     triggerClass:
-      "border-transparent bg-mode-plan-bg text-mode-plan-fg hover:bg-mode-plan-bg",
+      "border-mode-plan-fg/15 bg-mode-plan-bg text-mode-plan-fg hover:bg-mode-plan-bg hover:border-mode-plan-fg/25",
   },
   {
     id: "ask",
@@ -56,7 +56,7 @@ const MODES: ModeOption[] = [
     icon: MessageCircle,
     accent: "text-mode-ask-fg",
     triggerClass:
-      "border-transparent bg-mode-ask-bg text-mode-ask-fg hover:bg-mode-ask-bg",
+      "border-mode-ask-fg/15 bg-mode-ask-bg text-mode-ask-fg hover:bg-mode-ask-bg hover:border-mode-ask-fg/25",
   },
   {
     id: "debug",
@@ -65,7 +65,7 @@ const MODES: ModeOption[] = [
     icon: Bug,
     accent: "text-orange",
     triggerClass:
-      "border-transparent bg-orange/15 text-orange hover:bg-orange/15",
+      "border-orange/20 bg-orange/12 text-orange hover:bg-orange/15 hover:border-orange/30",
   },
   {
     id: "flex",
@@ -74,7 +74,7 @@ const MODES: ModeOption[] = [
     icon: Network,
     accent: "text-mode-flex-fg",
     triggerClass:
-      "border-transparent bg-mode-flex-bg text-mode-flex-fg hover:bg-mode-flex-bg",
+      "border-mode-flex-fg/15 bg-mode-flex-bg text-mode-flex-fg hover:bg-mode-flex-bg hover:border-mode-flex-fg/25",
   },
 ]
 
@@ -123,12 +123,13 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
         size="xs"
         aria-label={`Mode: ${selected.label}`}
         className={cn(
-          // Quiet idle opacity; mode-tinted fill (Cursor mode semantics).
-          "border shadow-none opacity-80 hover:opacity-100 data-open:opacity-100",
+          // Cursor mode pill: 12px type, h-6 rounded-full, whisper tint + hairline.
+          // triggerClass owns bg + hover (overrides SelectTrigger fill-4 hover).
+          "border shadow-none opacity-90 hover:opacity-100 data-open:opacity-100",
           selected.triggerClass,
         )}
       >
-        <Icon className="size-3.5" aria-hidden />
+        <Icon className="size-3.5 shrink-0" aria-hidden />
         <SelectValue />
       </SelectTrigger>
       <SelectContent side="top" align="start" alignItemWithTrigger={false} className="min-w-64">

@@ -67,14 +67,15 @@
   /* Toggle ON track — green, not accent-blue. */
   --color-switch-on: #7fd97a;
 
-  /* Composer mode semantics (Cursor mode tint: green/yellow/cyan/purple). */
-  --color-mode-agent-bg: color-mix(in srgb, var(--color-green) 22%, transparent);
+  /* Composer mode semantics (Cursor mode tint: green/yellow/cyan/purple).
+   * Whisper secondary fills (~12–14%) so pills read tinted, not neon slabs. */
+  --color-mode-agent-bg: color-mix(in srgb, var(--color-green) 14%, transparent);
   --color-mode-agent-fg: var(--color-green);
-  --color-mode-plan-bg: color-mix(in srgb, var(--color-yellow) 22%, transparent);
+  --color-mode-plan-bg: color-mix(in srgb, var(--color-yellow) 14%, transparent);
   --color-mode-plan-fg: var(--color-yellow);
-  --color-mode-ask-bg: color-mix(in srgb, var(--color-cyan) 22%, transparent);
+  --color-mode-ask-bg: color-mix(in srgb, var(--color-cyan) 14%, transparent);
   --color-mode-ask-fg: var(--color-cyan);
-  --color-mode-flex-bg: color-mix(in srgb, var(--color-purple) 16%, transparent);
+  --color-mode-flex-bg: color-mix(in srgb, var(--color-purple) 12%, transparent);
   --color-mode-flex-fg: var(--color-purple);
 
   /* Elevation — soft on near-black; avoid heavy black slabs. */
@@ -140,13 +141,13 @@
   --color-switch-on: #1a7f4b;
 
   /* Mode tints stronger on light so pills don't wash out. */
-  --color-mode-agent-bg: color-mix(in srgb, var(--color-green) 18%, transparent);
+  --color-mode-agent-bg: color-mix(in srgb, var(--color-green) 14%, transparent);
   --color-mode-agent-fg: var(--color-green);
-  --color-mode-plan-bg: color-mix(in srgb, var(--color-yellow) 20%, transparent);
+  --color-mode-plan-bg: color-mix(in srgb, var(--color-yellow) 16%, transparent);
   --color-mode-plan-fg: var(--color-yellow);
-  --color-mode-ask-bg: color-mix(in srgb, var(--color-cyan) 18%, transparent);
+  --color-mode-ask-bg: color-mix(in srgb, var(--color-cyan) 14%, transparent);
   --color-mode-ask-fg: var(--color-cyan);
-  --color-mode-flex-bg: color-mix(in srgb, var(--color-purple) 16%, transparent);
+  --color-mode-flex-bg: color-mix(in srgb, var(--color-purple) 14%, transparent);
   --color-mode-flex-fg: var(--color-purple);
 
   /* Elevation — soft graphite, not near-black slabs on white. */
@@ -242,17 +243,14 @@
     0 0 0 1px var(--color-stroke-3),
     0 0 4px var(--shadow-ambient),
     0 16px 32px -4px var(--shadow-color);
-  /* Composer: crisp 1px ring + soft drop so the box reads grounded, not floating.
-   * Ring strength tracks Cursor human-message (stroke-secondary idle → primary focus). */
-  --shadow-composer:
-    0 0 0 1px var(--color-stroke-2),
-    0 1px 2px var(--shadow-ambient),
-    0 8px 24px -6px var(--shadow-color);
-  /* Reference glass: no accent glow on composer focus — neutral ring only. */
+  /* Composer: Cursor glass elevation — soft ambient only.
+   * The 1px ring is a real border (stroke-3 idle → stroke-1 focus), not a
+   * shadow ring — double-painting a ring via box-shadow reads floaty/harsh. */
+  --shadow-composer: 0 1px 2px 0 var(--shadow-ambient);
+  /* Focus: slightly deeper ambient; border color carries the focus cue. */
   --shadow-composer-focus:
-    0 0 0 1px var(--color-stroke-1),
-    0 1px 2px var(--shadow-ambient),
-    0 10px 28px -6px var(--shadow-color);
+    0 1px 2px 0 var(--shadow-ambient),
+    0 6px 18px -6px var(--shadow-color);
   /* Popover chrome — the reference design's box-shadow-xl (borderless, 4-layer). */
   --shadow-popover:
     0 0 0 1px var(--color-stroke-3),
@@ -286,7 +284,8 @@
   /* Native-like window clip (macOS CALayer + vibrancy radius; CSS fallback). */
   --window-radius: 10px;
   --header-height: 30px;
-  --composer-min-height: 1.75rem;
+  /* Editor grow — Cursor ~one line min; max ~10rem keeps the rail grounded. */
+  --composer-min-height: 1.5rem;
   --composer-max-height: 10rem;
   --timeline-row-min-height: 1.25rem;
   --status-bar-height: 1.75rem;
