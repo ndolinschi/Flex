@@ -7,9 +7,9 @@ pub(crate) use std::sync::Arc;
 pub(crate) use agentloop_channel::{RoutineSpec, RoutineStore, RoutineTrigger};
 pub(crate) use agentloop_contracts::{
     Answer, BlobSource, CommandInfo, ContentBlock, Effort, GoalSpec, IntegrationOutcome,
-    IsolationPolicy, Message, ModelRef, NewSessionParams, PermissionDecision, PermissionMode,
-    PermissionRequestId, PromptInput, QuestionId, SessionEvent, SessionId, SessionMeta,
-    SessionMetaPatch, TurnOptions, TurnSummary,
+    IsolationPolicy, Message, ModelRef, ModeSwitchId, NewSessionParams, PermissionDecision,
+    PermissionMode, PermissionRequestId, PromptInput, QuestionId, SessionEvent, SessionId,
+    SessionMeta, SessionMetaPatch, TurnOptions, TurnSummary,
 };
 pub(crate) use agentloop_core::{
     BackgroundEntrySummary, ChatRequest, ProviderStreamEvent, WorkspaceStatus,

@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use agentloop_contracts::IsolationPolicy;
+use agentloop_contracts::{CompactionMode, IsolationPolicy};
 use agentloop_engine::{RoleSpec, RoleToolProfile};
 use agentloop_sdk::mcp_store::default_mcp_dir;
 use agentloop_sdk::{
@@ -337,8 +337,11 @@ pub fn build_service(
                     tracing::warn!("learning plugin enabled but home dir unresolved; skipping");
                 }
             }
-            if cfg.prefs.plugins.verifier {
+            if cfg.prefs.plugins.verifier || cfg.prefs.plugins.council {
                 builder = builder.enable_plugin("verifier");
+            }
+            if cfg.prefs.plugins.messaging {
+                builder = builder.enable_plugin("messaging");
             }
             if cfg.prefs.plugins.browser {
                 builder = builder.plugin(BrowserPlugin::new(app.clone()));
@@ -351,6 +354,14 @@ pub fn build_service(
                 let config = builder.config_mut();
                 config.session_store = Some(store.clone());
                 config.verbosity = agentloop_sdk::OutputVerbosity::High;
+                // Auto-compact config from prefs.
+                config.auto_compact = cfg.prefs.plugins.auto_compact;
+                config.auto_compact_threshold_percent =
+                    cfg.prefs.plugins.auto_compact_threshold_percent;
+                config.compaction_mode = match cfg.prefs.plugins.compaction_mode.as_str() {
+                    "turn_pair" => CompactionMode::TurnPair,
+                    _ => CompactionMode::Standard,
+                };
                 // Opt-in isolation per session; backend always available for undo snapshots.
                 let worktrees = worktrees_dir()
                     .unwrap_or_else(|_| std::env::temp_dir().join("agentloop-desktop-worktrees"));

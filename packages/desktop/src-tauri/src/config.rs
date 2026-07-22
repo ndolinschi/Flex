@@ -100,10 +100,64 @@ pub struct PluginPrefs {
     /// default off (Accessibility / screen-recording permissions).
     #[serde(default)]
     pub computer: bool,
+
+    // --- Agent coordination / auto mode ---
+
+    /// Peer agent messaging: `GetActiveAgents`, `SendMessage`, `GetMessages`,
+    /// and `SwitchMode` tools. Default off.
+    #[serde(default)]
+    pub messaging: bool,
+    /// Council mode: enables the Verifier for second-opinion grading.
+    /// Equivalent to enabling `verifier`; kept as a semantic alias so the
+    /// UI can present it as a distinct concept. Default off.
+    #[serde(default)]
+    pub council: bool,
+    /// Composer Auto routing enabled. When true the model picker shows an
+    /// "Auto" option that resolves to `auto_mode_router_model`. Default off.
+    #[serde(default)]
+    pub auto_mode: bool,
+    /// Model id used when the composer is in Auto mode (e.g.
+    /// `"anthropic/claude-sonnet-4-5"`). `None` falls back to the session's
+    /// configured default model.
+    #[serde(default)]
+    pub auto_mode_router_model: Option<String>,
+    /// Proactive auto-compaction when context usage nears the threshold.
+    /// Mirrors `EngineConfig::auto_compact`. Default true.
+    #[serde(default = "default_true")]
+    pub auto_compact: bool,
+    /// Percentage of context window at which compaction fires (1–100).
+    /// Mirrors `EngineConfig::auto_compact_threshold_percent`. Default 85.
+    #[serde(default = "default_auto_compact_threshold")]
+    pub auto_compact_threshold_percent: u8,
+    /// How the conversation is condensed: `"standard"` or `"turn_pair"`.
+    /// Mirrors `EngineConfig::compaction_mode`. Default `"standard"`.
+    #[serde(default = "default_compaction_mode")]
+    pub compaction_mode: String,
+    /// How long (ms) the UI shows a veto countdown on a `ModeSwitchProposed`
+    /// event before auto-accepting. Default 2000.
+    #[serde(default = "default_mode_switch_veto_ms")]
+    pub mode_switch_veto_ms: u32,
+    /// System-level delegation rules injected when composer mode is Auto
+    /// and the project has no `delegation.md`. Empty string = use built-in
+    /// defaults.
+    #[serde(default)]
+    pub delegation_rules: String,
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_auto_compact_threshold() -> u8 {
+    85
+}
+
+fn default_compaction_mode() -> String {
+    "standard".to_owned()
+}
+
+fn default_mode_switch_veto_ms() -> u32 {
+    2000
 }
 
 impl Default for PluginPrefs {
@@ -119,6 +173,15 @@ impl Default for PluginPrefs {
             verifier: false,
             browser: false,
             computer: false,
+            messaging: false,
+            council: false,
+            auto_mode: false,
+            auto_mode_router_model: None,
+            auto_compact: true,
+            auto_compact_threshold_percent: 85,
+            compaction_mode: "standard".to_owned(),
+            mode_switch_veto_ms: 2000,
+            delegation_rules: String::new(),
         }
     }
 }
@@ -982,6 +1045,65 @@ mod tests {
         assert!(!prefs.learning_require_human_approval);
         assert!(!prefs.learning_require_verified_memory);
         assert!(!prefs.verifier);
+    }
+
+    #[test]
+    fn coordination_defaults() {
+        let prefs = PluginPrefs::default();
+        assert!(!prefs.messaging, "messaging must default off");
+        assert!(!prefs.council, "council must default off");
+        assert!(!prefs.auto_mode, "auto_mode must default off");
+        assert!(prefs.auto_mode_router_model.is_none());
+        assert!(prefs.auto_compact, "auto_compact must default on");
+        assert_eq!(prefs.auto_compact_threshold_percent, 85);
+        assert_eq!(prefs.compaction_mode, "standard");
+        assert_eq!(prefs.mode_switch_veto_ms, 2000);
+        assert!(prefs.delegation_rules.is_empty());
+    }
+
+    #[test]
+    fn coordination_fields_round_trip_json() {
+        let prefs = PluginPrefs {
+            messaging: true,
+            council: true,
+            auto_mode: true,
+            auto_mode_router_model: Some("anthropic/claude-sonnet-4-5".into()),
+            auto_compact: false,
+            auto_compact_threshold_percent: 70,
+            compaction_mode: "turn_pair".into(),
+            mode_switch_veto_ms: 3000,
+            delegation_rules: "use Agent role for sub-tasks".into(),
+            ..PluginPrefs::default()
+        };
+        let json = serde_json::to_string(&prefs).unwrap();
+        let back: PluginPrefs = serde_json::from_str(&json).unwrap();
+        assert!(back.messaging);
+        assert!(back.council);
+        assert!(back.auto_mode);
+        assert_eq!(
+            back.auto_mode_router_model.as_deref(),
+            Some("anthropic/claude-sonnet-4-5")
+        );
+        assert!(!back.auto_compact);
+        assert_eq!(back.auto_compact_threshold_percent, 70);
+        assert_eq!(back.compaction_mode, "turn_pair");
+        assert_eq!(back.mode_switch_veto_ms, 3000);
+        assert_eq!(back.delegation_rules, "use Agent role for sub-tasks");
+    }
+
+    #[test]
+    fn coordination_fields_backward_compat_missing_from_json() {
+        // A persisted JSON without the new fields must deserialize without errors,
+        // with defaults applied.
+        let old_json = r#"{"search":true,"index":true,"autoContext":false,"autoUpdateIndex":false,"learning":false,"learningRequireHumanApproval":false,"learningRequireVerifiedMemory":false,"verifier":false,"browser":false,"computer":false}"#;
+        let prefs: PluginPrefs = serde_json::from_str(old_json).unwrap();
+        assert!(!prefs.messaging);
+        assert!(!prefs.council);
+        assert!(!prefs.auto_mode);
+        assert!(prefs.auto_compact);
+        assert_eq!(prefs.auto_compact_threshold_percent, 85);
+        assert_eq!(prefs.compaction_mode, "standard");
+        assert_eq!(prefs.mode_switch_veto_ms, 2000);
     }
 
     #[test]
