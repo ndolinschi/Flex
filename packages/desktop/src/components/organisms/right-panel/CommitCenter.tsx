@@ -220,7 +220,7 @@ export const CommitCenter = ({
                     size="sm"
                     disabled={disabled}
                     aria-label="Commit options"
-                    className="w-7 rounded-none px-0"
+                    className="h-7 w-6 rounded-none px-0"
                   />
                 }
               >

@@ -3,6 +3,7 @@ import { FileCode2, Folder } from "lucide-react"
 import type { FileHit } from "../../../lib/types"
 import { cn, fileIconForPath } from "../../../lib/utils"
 import { Spinner } from "../../atoms"
+import { EmptyState } from "../../molecules"
 import { Button } from "@/components/ui/button"
 import { gitStatusClass, type GitStatusIndex } from "./fileExplorerGit"
 
@@ -34,11 +35,12 @@ export const FileExplorerSearchResults = ({
 
   if (rows.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-        <FileCode2 className="h-6 w-6 text-ink-faint" aria-hidden />
-        <p className="text-sm text-ink-secondary">No matches</p>
-        <p className="text-xs text-ink-muted">Try a different search.</p>
-      </div>
+      <EmptyState
+        className="py-12"
+        icon={<FileCode2 className="h-6 w-6" aria-hidden />}
+        title="No matches"
+        description="Try a different search."
+      />
     )
   }
 

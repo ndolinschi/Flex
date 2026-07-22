@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button"
-import { ChevronDown, Folder, Plus } from "lucide-react"
+import { ChevronDown, Folder, Loader2, Plus } from "lucide-react"
 import { cn } from "../../lib/utils"
 
 type RepoSectionHeaderProps = {
@@ -9,6 +9,8 @@ type RepoSectionHeaderProps = {
   onNewSession: () => void
   /** Low-cost "indexed" affordance when the code index is ready for this repo. */
   indexed?: boolean
+  /** Disable "+" and show a spinner while a session create is in flight. */
+  isCreating?: boolean
 }
 
 /** Repository group head: always-visible expand chevron + name + hover "+". */
@@ -18,6 +20,7 @@ export const RepoSectionHeader = ({
   onToggle,
   onNewSession,
   indexed = false,
+  isCreating = false,
 }: RepoSectionHeaderProps) => {
   return (
     <div
@@ -55,21 +58,29 @@ export const RepoSectionHeader = ({
         </span>
       ) : null}
       <Button
-      type="button"
-      variant="ghost"
-      size="icon-2xs"
-      aria-label="New agent in this repository" title="New agent in this repository"
-      onClick={(e) => {
+        type="button"
+        variant="ghost"
+        size="icon-2xs"
+        aria-label="New agent in this repository"
+        title="New agent in this repository"
+        disabled={isCreating}
+        aria-busy={isCreating || undefined}
+        onClick={(e) => {
           e.stopPropagation()
-          onNewSession()
+          if (!isCreating) onNewSession()
         }}
-      className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
-        "shrink-0 opacity-40 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100",
-      )}
-    >
-      <Plus className="h-3.5 w-3.5" aria-hidden />
-    </Button>
+        className={cn(
+          "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+          "shrink-0 opacity-40 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100",
+          isCreating && "opacity-100",
+        )}
+      >
+        {isCreating ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+        ) : (
+          <Plus className="h-3.5 w-3.5" aria-hidden />
+        )}
+      </Button>
     </div>
   )
 }

@@ -20,7 +20,7 @@ import {
 } from "lucide-react"
 import type { OnMount } from "@monaco-editor/react"
 import { Spinner, Tab } from "../../atoms"
-import { ConfirmDialog, ErrorBanner, MarkdownBody } from "../../molecules"
+import { ConfirmDialog, EmptyState, ErrorBanner, MarkdownBody } from "../../molecules"
 import { Button } from "@/components/ui/button"
 import { languageForPath } from "../../../lib/monacoLanguages"
 import {
@@ -415,9 +415,11 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
 
   if (!activeSessionId) {
     return (
-      <div className="flex h-full items-center justify-center px-4 text-center text-sm text-ink-muted">
-        Select a session to open files.
-      </div>
+      <EmptyState
+        className="min-h-0 flex-1"
+        title="Select a session"
+        description="Select a session to open files."
+      />
     )
   }
 
@@ -465,13 +467,12 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
             }}
           />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
-            <FolderTree className="h-7 w-7 text-ink-faint" aria-hidden />
-            <p className="text-sm text-ink-secondary">No project folder</p>
-            <p className="text-xs text-ink-muted">
-              Pick a working directory for this session to browse files.
-            </p>
-          </div>
+          <EmptyState
+            className="min-h-0 flex-1"
+            icon={<FolderTree className="h-6 w-6" aria-hidden />}
+            title="No project folder"
+            description="Pick a working directory for this session to browse files."
+          />
         )}
         {closeConfirm}
       </div>

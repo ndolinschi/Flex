@@ -544,7 +544,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
           ) : null}
 
           {/* Action rows: New Agent / Search / separator / nav links */}
-          <div className="flex flex-col gap-0.5 px-2 pt-2 pb-2">
+          <div className="flex flex-col gap-0.5 pt-2 pb-2">
             <SidebarMenu className="gap-0.5">
               <SidebarMenuItem>
                 <SidebarActionRow
@@ -553,6 +553,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
                   kbd={isMac ? "⌘N" : "Ctrl+N"}
                   onClick={() => void handleCreate()}
                   disabled={isCreating}
+                  loading={isCreating}
                 />
               </SidebarMenuItem>
               <SidebarMenuItem>
@@ -647,7 +648,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         ) : null}
 
         {/* ── SidebarContent: scrollable session list ── */}
-        <SidebarContent className="px-2 pb-2">
+        <SidebarContent className="pb-2">
           {isLoading ? (
             <SidebarSkeleton />
           ) : sessions.length === 0 ? (
@@ -656,12 +657,13 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
               description="Create an agent to start working on tasks."
               actionLabel="New Agent"
               onAction={() => void handleCreate()}
+              actionDisabled={isCreating}
             />
           ) : (
             <div className="flex flex-col gap-2">
               {pinnedSessions.length > 0 ? (
                 <SidebarGroup className="p-0 gap-0">
-                  <SidebarGroupLabel className="h-6 px-2 text-xs font-normal tracking-normal text-ink-secondary">
+                  <SidebarGroupLabel className="h-6 px-2 text-xs font-normal tracking-[var(--tracking-caption)] text-ink-muted">
                     Pinned
                   </SidebarGroupLabel>
                   <SidebarMenu className="gap-px">
@@ -698,6 +700,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
                       onToggle={() => toggleRepo(group.cwd)}
                       onNewSession={() => void handleCreate(group.cwd)}
                       indexed={!!indexedRepos[group.cwd]}
+                      isCreating={isCreating}
                     />
                   </div>
                   {!collapsedRepos[group.cwd] ? (

@@ -27,7 +27,7 @@ type PlanFindBarProps = {
 
 /** Inline find-in-plan chrome strip (InputGroup, h-6). */
 export const PlanFindBar = ({ find, inputRef }: PlanFindBarProps) => (
-  <div className="flex h-8 items-center border-y border-border px-2.5">
+  <div className="flex h-8 items-center border-y border-stroke-3 px-2.5">
     <InputGroup
       className={cn(
         "h-6 min-w-0 flex-1 border-0 bg-transparent shadow-none dark:bg-transparent",

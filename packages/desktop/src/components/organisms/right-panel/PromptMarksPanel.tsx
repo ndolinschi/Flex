@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import type {
   PromptAnnotation,
   PromptSegment,
@@ -38,13 +39,14 @@ export const PromptMarksPanel = ({
 
   return (
     <>
-      <div
-        className={cn(
-          "h-full overflow-y-auto whitespace-pre-wrap break-words",
-          "px-2.5 py-2 text-sm leading-relaxed text-ink",
-        )}
-        onMouseLeave={() => setHoverTip(null)}
-      >
+      <ScrollArea className="h-full">
+        <div
+          className={cn(
+            "whitespace-pre-wrap break-words",
+            "px-2.5 py-2 text-sm leading-relaxed text-ink",
+          )}
+          onMouseLeave={() => setHoverTip(null)}
+        >
         {segments.map((seg, i) =>
           seg.kind === "text" ? (
             <span key={i}>{seg.value}</span>
@@ -81,7 +83,8 @@ export const PromptMarksPanel = ({
             </span>
           ),
         )}
-      </div>
+        </div>
+      </ScrollArea>
       <PromptHoverTip tip={hoverTip} />
     </>
   )
@@ -105,7 +108,7 @@ export const PromptFindingsList = ({
 }: PromptFindingsListProps) => {
   if (hasReview && annotations.length > 0) {
     return (
-      <div className="max-h-[36%] shrink-0 overflow-y-auto border-t border-stroke-3">
+      <ScrollArea className="max-h-[36%] shrink-0 border-t border-stroke-3">
         <ul className="flex flex-col gap-0.5 px-2.5 py-2">
           {annotations.map((a, i) => (
             <li
@@ -152,7 +155,7 @@ export const PromptFindingsList = ({
             </li>
           ))}
         </ul>
-      </div>
+      </ScrollArea>
     )
   }
 
