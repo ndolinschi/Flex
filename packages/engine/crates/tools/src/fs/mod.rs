@@ -62,6 +62,7 @@ mod tests {
     use agentloop_core::ToolError;
     use std::path::Path;
 
+    #[test]
     fn records_and_recalls_mtime() {
         let state = FsState::new();
         let path = PathBuf::from("/tmp/a.txt");
