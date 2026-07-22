@@ -359,8 +359,8 @@ coordinate by exchanging messages with `SendMessage` / `GetMessages`.
 When in doubt, self-execute rather than delegate.";
 
 /// Brief Auto-mode fragment appended to every Auto-mode turn's system prompt.
-/// Teaches the model its coordination tools without replacing the delegation
-/// rules or project instructions.
+/// Teaches the model its coordination tools (including `SetRouting`) without
+/// replacing the delegation rules or project instructions.
 const AUTO_MODE_PROMPT: &str = "\
 # Auto mode
 
@@ -369,6 +369,27 @@ You have coordination tools available:
 - `SendMessage` / `GetMessages` — exchange notes with a peer agent about a shared file
 - `SwitchMode(mode, reason)` — propose a composer-mode change; the user sees a brief \
 countdown and can veto it
+
+## Cost-tier routing
+
+This turn started with a **low-cost model and low reasoning effort**. \
+After reading the task, call `SetRouting` ONCE (early in the turn, before doing \
+significant work) when you determine that the default routing is insufficient:
+
+```
+SetRouting({
+  model: \"<provider/model from the allowed list>\",  // optional
+  effort: \"low|medium|high|xhigh|max\",              // optional
+  reason: \"one-sentence justification\"
+})
+```
+
+Routing guidelines:
+- **Low (default)**: quick answers, single-file changes, lookups — stay here.
+- **Medium**: multi-step tasks, moderate code changes — escalate model and/or effort.
+- **High**: complex refactors, multi-file features, anything requiring deep reasoning.
+- Do NOT call `SetRouting` more than once per turn; the first call wins.
+- The `SetRouting` tool's description lists the exact model ids available.
 
 Apply the delegation rules above. Prefer self-execution for small tasks; \
 delegate large or parallel work via `Agent`.";
@@ -657,23 +678,42 @@ pub(crate) async fn prompt_inner(
         system_append = append_system(system_append, vision_frag);
     }
     // "auto" is a UI sentinel for the Auto routing mode; resolve it to the
-    // configured router model (or None to use the session default).
-    let resolved_model = match input.model.as_deref() {
-        Some("auto") => {
-            let cfg = state.config.lock().await;
-            cfg.prefs
-                .plugins
-                .auto_mode_router_model
-                .clone()
-                .filter(|m| !m.is_empty())
-        }
-        other => other.map(str::to_owned),
+    // cheapest configured low-cost model (so SetRouting can escalate from
+    // there), falling back to the configured router model, then the session
+    // default.
+    let is_auto_model = input.model.as_deref() == Some("auto");
+    let is_auto_mode = input.composer_mode.as_deref() == Some("auto") || is_auto_model;
+    let resolved_model = if is_auto_model {
+        let cfg = state.config.lock().await;
+        // Start at the cheapest available model in auto mode.
+        cfg.prefs
+            .plugins
+            .cost_models_low
+            .first()
+            .cloned()
+            .filter(|m| !m.is_empty())
+            .or_else(|| {
+                cfg.prefs
+                    .plugins
+                    .auto_mode_router_model
+                    .clone()
+                    .filter(|m| !m.is_empty())
+            })
+    } else {
+        input.model.as_deref().map(str::to_owned)
+    };
+    // Force low effort at the start of every Auto-mode turn so SetRouting
+    // can escalate exactly as much as the task warrants.
+    let effort = if is_auto_mode && input.effort.is_none() {
+        Some(Effort::Low)
+    } else {
+        parse_effort(input.effort.as_deref())
     };
     let opts = TurnOptions {
         model: resolved_model.map(ModelRef),
         permission_mode: parse_permission_mode(input.permission_mode.as_deref()),
         system_append,
-        effort: parse_effort(input.effort.as_deref()),
+        effort,
         ..TurnOptions::default()
     };
     let prompt_input = build_prompt_input(&input);
