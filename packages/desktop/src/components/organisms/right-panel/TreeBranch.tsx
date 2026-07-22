@@ -71,6 +71,7 @@ export const TreeBranch = ({
     if (isRoot) {
       return (
         <EmptyState
+          className="py-12"
           icon={<Folder className="h-6 w-6" aria-hidden />}
           title="This folder is empty"
           description="Create a file to get started."

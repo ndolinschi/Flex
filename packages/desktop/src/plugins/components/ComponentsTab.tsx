@@ -432,15 +432,16 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
         />
       ) : null}
 
-      {!list || list.components.length === 0 ? (
+      {!list && busy ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center gap-2 px-2.5 text-sm text-ink-muted">
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden />
+          Scanning…
+        </div>
+      ) : !list || list.components.length === 0 ? (
         <EmptyState
           className="min-h-0 flex-1"
-          title={busy ? "Scanning…" : "No components found"}
-          description={
-            busy
-              ? "Looking for PascalCase exports in .tsx / .jsx files."
-              : "No PascalCase React exports under src/, app/, or components/."
-          }
+          title="No components found"
+          description="No PascalCase React exports under src/, app/, or components/."
         />
       ) : (
         <div className="flex min-h-0 flex-1">

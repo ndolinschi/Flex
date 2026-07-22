@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   ChevronLeft,
   ChevronRight,
+  Loader2,
   Play,
   Plus,
   RefreshCw,
@@ -194,14 +195,20 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
     queryKey: ["db-schemas", selectedId],
     queryFn: () => dbListSchemas(selectedId!),
     enabled: active && !!selectedId,
+    staleTime: 30_000,
   })
 
   const activeSchema = schema ?? schemas[0]?.name ?? null
 
-  const { data: tables = [], refetch: refetchTables } = useQuery({
+  const {
+    data: tables = [],
+    isFetching: tablesFetching,
+    refetch: refetchTables,
+  } = useQuery({
     queryKey: ["db-tables", selectedId, activeSchema],
     queryFn: () => dbListTables(selectedId!, activeSchema ?? undefined),
     enabled: active && !!selectedId,
+    staleTime: 15_000,
   })
 
   const connectMut = useMutation({
@@ -393,6 +400,11 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
           title="No project folder"
           description="Pick a working directory for this session to manage database connections for that project."
         />
+      ) : isFetching && connections.length === 0 ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center gap-2 px-2.5 text-sm text-ink-muted">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+          Loading connections…
+        </div>
       ) : connections.length === 0 ? (
         <EmptyState
           className="min-h-0 flex-1"
@@ -426,7 +438,12 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
                   <div className="flex h-6 shrink-0 items-center px-2.5 text-xs text-ink-muted">
                     <span>{tableCountLabel}</span>
                   </div>
-                  {tables.length === 0 ? (
+                  {tablesFetching && tables.length === 0 ? (
+                    <div className="flex items-center gap-1.5 px-2.5 py-2 text-xs text-ink-faint">
+                      <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                      Loading tables…
+                    </div>
+                  ) : tables.length === 0 ? (
                     <p className="px-2.5 py-2 text-xs text-ink-faint">No tables</p>
                   ) : (
                     <ul>

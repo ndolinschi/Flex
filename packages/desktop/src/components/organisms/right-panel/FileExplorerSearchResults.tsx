@@ -36,6 +36,7 @@ export const FileExplorerSearchResults = ({
   if (rows.length === 0) {
     return (
       <EmptyState
+        className="py-12"
         icon={<FileCode2 className="h-6 w-6" aria-hidden />}
         title="No matches"
         description="Try a different search."

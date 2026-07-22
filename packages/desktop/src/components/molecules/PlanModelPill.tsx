@@ -63,7 +63,9 @@ export const PlanModelPill = ({
           />
         }
       >
-        <span className="min-w-0 truncate">{label}</span>
+        <span className="min-w-0 truncate">
+          {isLoading ? "Loading…" : label}
+        </span>
         <ChevronDown className="size-2.5 shrink-0 text-muted-foreground" aria-hidden />
       </DropdownMenuTrigger>
       {open ? (

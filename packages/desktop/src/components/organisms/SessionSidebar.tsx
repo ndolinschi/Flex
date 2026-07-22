@@ -553,6 +553,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
                   kbd={isMac ? "⌘N" : "Ctrl+N"}
                   onClick={() => void handleCreate()}
                   disabled={isCreating}
+                  loading={isCreating}
                 />
               </SidebarMenuItem>
               <SidebarMenuItem>
@@ -656,6 +657,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
               description="Create an agent to start working on tasks."
               actionLabel="New Agent"
               onAction={() => void handleCreate()}
+              actionDisabled={isCreating}
             />
           ) : (
             <div className="flex flex-col gap-2">
@@ -698,6 +700,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
                       onToggle={() => toggleRepo(group.cwd)}
                       onNewSession={() => void handleCreate(group.cwd)}
                       indexed={!!indexedRepos[group.cwd]}
+                      isCreating={isCreating}
                     />
                   </div>
                   {!collapsedRepos[group.cwd] ? (

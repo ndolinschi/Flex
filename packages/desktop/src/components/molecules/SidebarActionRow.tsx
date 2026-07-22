@@ -1,4 +1,5 @@
 import type { ComponentType } from "react"
+import { Loader2 } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
 
@@ -15,6 +16,8 @@ type SidebarActionRowProps = {
   trailingIcon?: ComponentType<{ className?: string; "aria-hidden"?: boolean }>
   onClick?: () => void
   disabled?: boolean
+  /** Swap the leading icon for a spinner while an async action runs. */
+  loading?: boolean
 }
 
 /** 28px sidebar action row: icon + label flush start + trailing shortcut.
@@ -27,19 +30,29 @@ export const SidebarActionRow = ({
   trailingIcon: TrailingIcon,
   onClick,
   disabled = false,
+  loading = false,
 }: SidebarActionRowProps) => {
   return (
     <Button
       variant="ghost"
       size="sm"
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={cn(
         "h-7 w-full justify-start gap-1.5 rounded-sm px-2 font-normal",
         "text-ink-secondary hover:bg-fill-4 hover:text-ink",
       )}
     >
-      <Icon data-icon="inline-start" className="text-ink-secondary" aria-hidden />
+      {loading ? (
+        <Loader2
+          data-icon="inline-start"
+          className="animate-spin text-ink-secondary"
+          aria-hidden
+        />
+      ) : (
+        <Icon data-icon="inline-start" className="text-ink-secondary" aria-hidden />
+      )}
       <span className="min-w-0 truncate">{label}</span>
       {TrailingIcon ? (
         <TrailingIcon

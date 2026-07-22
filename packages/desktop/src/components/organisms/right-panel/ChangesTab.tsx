@@ -201,8 +201,25 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
         icon={<GitMerge className="h-6 w-6" aria-hidden />}
         title="Not a git repository"
         description="Initialize a git repo in this project to track changes."
-        actionLabel="Refresh"
-        onAction={handleRefresh}
+        action={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Refresh changes"
+            title="Refresh changes"
+            onClick={handleRefresh}
+            className={cn(
+              "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+              "h-6 w-6",
+            )}
+          >
+            <RefreshCw
+              className={cn("h-3.5 w-3.5", isRepoFetching && "animate-spin")}
+              aria-hidden
+            />
+          </Button>
+        }
       />
     )
   }
@@ -300,6 +317,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       <ScrollArea className="min-h-0 flex-1">
         {totalCount === 0 ? (
           <EmptyState
+            className="py-12"
             icon={<GitMerge className="h-6 w-6" aria-hidden />}
             title="Working tree clean"
             description={branch ? `on ${branch}` : undefined}

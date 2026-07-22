@@ -23,6 +23,7 @@ export const PrTab = ({ active }: PrTabProps) => {
     queryKey: ["git-pr-status", cwd ?? ""],
     queryFn: () => gitPrStatus(cwd!),
     enabled: !!cwd,
+    staleTime: 60_000,
     refetchInterval: 30_000,
   })
 
@@ -30,6 +31,7 @@ export const PrTab = ({ active }: PrTabProps) => {
     queryKey: ["git-pr-diff", cwd ?? "", prQuery.data?.pr?.number ?? 0],
     queryFn: () => gitPrDiff(cwd!),
     enabled: !!cwd && !!prQuery.data?.pr,
+    staleTime: 30_000,
     refetchInterval: 60_000,
   })
 
@@ -39,17 +41,20 @@ export const PrTab = ({ active }: PrTabProps) => {
 
   if (!cwd) {
     return (
-      <EmptyState
-        icon={<GitPullRequest className="h-6 w-6" aria-hidden />}
-        title="No project"
-        description="Open a session with a project to review a pull request."
-      />
+      <div className="flex h-full min-h-0 flex-col">
+        <EmptyState
+          className="min-h-0 flex-1"
+          icon={<GitPullRequest className="h-6 w-6" aria-hidden />}
+          title="No project"
+          description="Open a session with a project to review a pull request."
+        />
+      </div>
     )
   }
 
   if (prQuery.isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center gap-2 text-sm text-ink-muted">
+      <div className="flex h-full min-h-0 flex-col items-center justify-center gap-2 text-sm text-ink-muted">
         <Spinner size="sm" /> Looking up pull request…
       </div>
     )
@@ -57,16 +62,19 @@ export const PrTab = ({ active }: PrTabProps) => {
 
   if (!pr) {
     return (
-      <EmptyState
-        icon={<GitPullRequest className="h-6 w-6" aria-hidden />}
-        title="No pull request"
-        description="Create a PR for this branch and it will show up here for review."
-      />
+      <div className="flex h-full min-h-0 flex-col">
+        <EmptyState
+          className="min-h-0 flex-1"
+          icon={<GitPullRequest className="h-6 w-6" aria-hidden />}
+          title="No pull request"
+          description="Create a PR for this branch and it will show up here for review."
+        />
+      </div>
     )
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Primary chrome — fixed 30px row (Browser recipe). */}
       <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
         <GitPullRequest
@@ -103,21 +111,24 @@ export const PrTab = ({ active }: PrTabProps) => {
         </Button>
       </div>
 
-      <ScrollArea className="min-h-0 flex-1">
-        {diffQuery.isLoading ? (
-          <div className="flex items-center justify-center gap-2 px-2.5 py-8 text-sm text-ink-muted">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-            Loading diff…
-          </div>
-        ) : diffQuery.data && diffQuery.data.trim().length > 0 ? (
-          <DiffView diff={diffQuery.data} />
-        ) : (
-          <EmptyState
-            title="No diff"
-            description="No diff for this pull request."
-          />
-        )}
-      </ScrollArea>
+      {diffQuery.isLoading ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-ink-muted">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+          Loading diff…
+        </div>
+      ) : (
+        <ScrollArea className="min-h-0 flex-1">
+          {diffQuery.data && diffQuery.data.trim().length > 0 ? (
+            <DiffView diff={diffQuery.data} />
+          ) : (
+            <EmptyState
+              className="py-12"
+              title="No diff"
+              description="No diff for this pull request."
+            />
+          )}
+        </ScrollArea>
+      )}
     </div>
   )
 }

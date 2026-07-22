@@ -4,7 +4,7 @@ import { List, Plus, Terminal as TerminalIcon } from "lucide-react"
 
 import { ConfirmDialog, EmptyState } from "../../molecules"
 import { agentTerminalId } from "../../../hooks/useGlobalSessionEvents"
-import { terminalCreate, terminalKill } from "../../../lib/tauri"
+import { terminalCreate, terminalKill, toInvokeError } from "../../../lib/tauri"
 import { dropTerminalBuffer, ensureTerminalBus } from "../../../lib/terminalBus"
 import { useSessions } from "../../../hooks/useSessions"
 import { useAppStore, sessionScopeKey, type TerminalMeta } from "../../../stores/appStore"
@@ -96,8 +96,10 @@ export const TerminalTab = ({
             "error",
           )
       }
-    } catch {
-      // Leave EmptyState / Plus button available for a manual retry.
+    } catch (err) {
+      useAppStore
+        .getState()
+        .pushToast(toInvokeError(err) || "Could not open terminal", "error")
     }
   }
 
