@@ -219,7 +219,7 @@ export const ProjectPicker = ({
           </div>
           <CommandList className="py-1" style={{ maxHeight: 200 }}>
             <CommandEmpty className="px-2.5 py-2 text-sm text-ink-muted">
-              No recent projects
+              {query.trim() ? "No matching projects" : "No recent projects"}
             </CommandEmpty>
             {filtered.length > 0 ? (
               <CommandGroup heading={query.trim() ? undefined : "Recents"}>

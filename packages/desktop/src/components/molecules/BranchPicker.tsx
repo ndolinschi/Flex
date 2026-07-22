@@ -187,7 +187,11 @@ export const BranchPicker = ({
             </div>
             <CommandList className="py-1" style={{ maxHeight: 200 }}>
               <CommandEmpty className="px-2.5 py-2 text-sm text-ink-muted">
-                {isFetching ? "Loading branches…" : "No branches found"}
+                {isFetching
+                  ? "Loading branches…"
+                  : query.trim()
+                    ? "No matching branches"
+                    : "No branches found"}
               </CommandEmpty>
               {filtered.length > 0 ? (
                 <CommandGroup>
