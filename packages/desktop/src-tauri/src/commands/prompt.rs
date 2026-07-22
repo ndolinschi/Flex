@@ -335,11 +335,9 @@ const PROJECT_MEMORY_PROMPT_BUDGET_CHARS: usize = 4_000;
 /// instruction files. Silent if empty — no UI spinner is shown.
 const PROJECT_INSTRUCTIONS_BUDGET_CHARS: usize = 12_000;
 
-/// Default delegation rules injected when Auto mode is active and the project
-/// has no `delegation.md`. Teaches the model when to self-execute vs. delegate
-/// and when to propose a mode switch. Project-level `delegation.md` (picked up
-/// by the existing project_instructions preflight) overrides this entirely.
-const DEFAULT_DELEGATION_RULES: &str = "\
+/// Built-in delegation rules (no assumption that peer-messaging tools exist).
+/// Project-level `delegation.md` (via project-instructions preflight) overrides.
+const DEFAULT_DELEGATION_RULES_CORE: &str = "\
 # Delegation rules (system defaults — project delegation.md overrides)
 
 Use `Agent` (subagent) for:
@@ -347,34 +345,22 @@ Use `Agent` (subagent) for:
 - Work that benefits from isolation (risky refactors, large rewrites)
 - Parallel independent sub-tasks (spawn multiple workers)
 
-Use `SwitchMode` when the user's intent clearly matches a different mode:
+Use `SwitchMode` when available and the user's intent clearly matches a different mode:
 - Planning without execution → propose `plan`
 - Debugging a concrete failure → propose `debug`
 - Pure question with no edits → propose `ask`
 - Do NOT switch modes mid-task without a clear signal
 
-Use `GetActiveAgents` before editing a path another agent is modifying —
-coordinate by exchanging messages with `SendMessage` / `GetMessages`.
-
 When in doubt, self-execute rather than delegate.";
 
-/// Brief Auto-mode fragment appended to every Auto-mode turn's system prompt.
-/// Teaches the model its coordination tools (including `SetRouting`) without
-/// replacing the delegation rules or project instructions.
-const AUTO_MODE_PROMPT: &str = "\
+/// Core Auto fragment: cost-tier routing via `SetRouting`. Always appended when
+/// Auto is active (ModelPicker `"auto"` or composer mode `"auto"`).
+const AUTO_MODE_ROUTING_PROMPT: &str = "\
 # Auto mode
-
-You have coordination tools available:
-- `GetActiveAgents` — see which other agents are running and what they are working on
-- `SendMessage` / `GetMessages` — exchange notes with a peer agent about a shared file
-- `SwitchMode(mode, reason)` — propose a composer-mode change; the user sees a brief \
-countdown and can veto it
-
-## Cost-tier routing
 
 This turn started with a **low-cost model and low reasoning effort**. \
 After reading the task, call `SetRouting` ONCE (early in the turn, before doing \
-significant work) when you determine that the default routing is insufficient:
+significant work) when the default routing is insufficient:
 
 ```
 SetRouting({
@@ -385,14 +371,28 @@ SetRouting({
 ```
 
 Routing guidelines:
-- **Low (default)**: quick answers, single-file changes, lookups — stay here.
+- **Low (default)**: quick answers, single-file reads/lookups, tiny edits — stay here.
 - **Medium**: multi-step tasks, moderate code changes — escalate model and/or effort.
-- **High**: complex refactors, multi-file features, anything requiring deep reasoning.
+- **High**: complex refactors, multi-file features, deep reasoning — escalate further.
 - Do NOT call `SetRouting` more than once per turn; the first call wins.
-- The `SetRouting` tool's description lists the exact model ids available.
+- Prefer staying low-cost when the task is only reading or answering.
+- The `SetRouting` tool description lists the exact model ids for this session.
+
+You also have `SwitchMode(mode, reason)` — propose switching to plan / ask / debug / agent. \
+The user sees a brief veto countdown.
 
 Apply the delegation rules above. Prefer self-execution for small tasks; \
 delegate large or parallel work via `Agent`.";
+
+/// Appended only when peer messaging is enabled (those tools are registered).
+const AUTO_MODE_MESSAGING_PROMPT: &str = "\
+## Peer coordination
+
+You also have:
+- `GetActiveAgents` — see which other agents are running and what they are working on
+- `SendMessage` / `GetMessages` — exchange notes with a peer about a shared file
+
+Use `GetActiveAgents` before editing a path another agent may be modifying.";
 
 /// System prompt appended for the Flex composer mode, instructing the model
 /// to act as an orchestrator over the `planner` / `plan-reviewer` /
@@ -595,6 +595,19 @@ pub(crate) fn append_system(existing: Option<String>, fragment: &str) -> Option<
     })
 }
 
+fn join_models(models: &[String]) -> String {
+    let cleaned: Vec<&str> = models
+        .iter()
+        .map(|m| m.trim())
+        .filter(|m| !m.is_empty())
+        .collect();
+    if cleaned.is_empty() {
+        "_(none configured)_".to_owned()
+    } else {
+        cleaned.join(", ")
+    }
+}
+
 #[tracing::instrument(level = "debug", skip_all)]
 pub(crate) async fn prompt_inner(
     state: State<'_, AppState>,
@@ -631,6 +644,16 @@ pub(crate) async fn prompt_inner(
         );
         agentloop_prompts::format_project_instructions_section(&loaded)
     });
+    // Per-turn system_append stack (order matters — later sections override
+    // earlier guidance when they conflict):
+    //   1. session cwd notice
+    //   2. project memory (`.agent/memory`)
+    //   3. project instructions preflight (AGENTS.md / CLAUDE.md / …)
+    //   4. composer-mode overlays (flex / plan / auto / debug)
+    // Auto is selected via ModelPicker `"auto"` (composer mode usually stays
+    // `agent`). Also accept composer_mode `"auto"` for symmetry.
+    let is_auto_model = input.model.as_deref() == Some("auto");
+    let is_auto_mode = input.composer_mode.as_deref() == Some("auto") || is_auto_model;
     let mut system_append = match (cwd_notice, project_memory) {
         (Some(a), Some(b)) => Some(format!("{a}\n\n{b}")),
         (Some(a), None) => Some(a),
@@ -646,19 +669,38 @@ pub(crate) async fn prompt_inner(
     if input.composer_mode.as_deref() == Some("plan") {
         system_append = append_system(system_append, FLEX_PLAN_PROMPT);
     }
-    if input.composer_mode.as_deref() == Some("auto") {
-        // Delegation rules: user-configured takes priority over built-in defaults.
-        let delegation_fragment = {
+    if is_auto_mode {
+        let (delegation_fragment, messaging_on, cost_lists) = {
             let cfg = state.config.lock().await;
             let r = cfg.prefs.plugins.delegation_rules.trim().to_owned();
-            if r.is_empty() {
-                DEFAULT_DELEGATION_RULES.to_owned()
+            let delegation = if r.is_empty() {
+                DEFAULT_DELEGATION_RULES_CORE.to_owned()
             } else {
                 r
-            }
+            };
+            let lists = format!(
+                "## Configured cost-tier models\n\
+                 - **low**: {}\n\
+                 - **medium**: {}\n\
+                 - **high**: {}\n\
+                 - **cost mode**: `{}`",
+                join_models(&cfg.prefs.plugins.cost_models_low),
+                join_models(&cfg.prefs.plugins.cost_models_medium),
+                join_models(&cfg.prefs.plugins.cost_models_high),
+                cfg.prefs.plugins.cost_mode,
+            );
+            (
+                delegation,
+                cfg.prefs.plugins.messaging,
+                lists,
+            )
         };
         system_append = append_system(system_append, &delegation_fragment);
-        system_append = append_system(system_append, AUTO_MODE_PROMPT);
+        system_append = append_system(system_append, AUTO_MODE_ROUTING_PROMPT);
+        system_append = append_system(system_append, &cost_lists);
+        if messaging_on {
+            system_append = append_system(system_append, AUTO_MODE_MESSAGING_PROMPT);
+        }
     }
     if input.composer_mode.as_deref() == Some("debug") {
         system_append = append_system(system_append, DEBUG_MODE_PROMPT);
@@ -681,8 +723,6 @@ pub(crate) async fn prompt_inner(
     // cheapest configured low-cost model (so SetRouting can escalate from
     // there), falling back to the configured router model, then the session
     // default.
-    let is_auto_model = input.model.as_deref() == Some("auto");
-    let is_auto_mode = input.composer_mode.as_deref() == Some("auto") || is_auto_model;
     let resolved_model = if is_auto_model {
         let cfg = state.config.lock().await;
         // Start at the cheapest available model in auto mode.
