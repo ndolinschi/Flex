@@ -182,7 +182,7 @@ export const CopilotSignInDialog = ({
 
         {auth ? (
           <div className="flex flex-col gap-3">
-            <div className="rounded-md border border-border bg-surface px-3 py-3 text-center">
+            <div className="rounded-md border border-stroke-3 bg-elevated px-3 py-3 text-center">
               <p className="text-xs font-medium uppercase tracking-widest text-ink-faint">
                 User code
               </p>

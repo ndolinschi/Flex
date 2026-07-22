@@ -34,13 +34,13 @@ export const RepoSectionHeader = ({
       className={cn(
         "group flex h-6 w-full cursor-default items-center gap-1.5 rounded-sm px-2",
         "text-xs tracking-[var(--tracking-caption)] text-ink-muted",
-        "transition-colors duration-[var(--duration-fast)] hover:bg-fill-4 hover:text-ink-secondary",
+        "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)] hover:bg-fill-4 hover:text-ink-secondary",
       )}
     >
       <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
         <ChevronDown
           className={cn(
-            "h-3.5 w-3.5 text-icon-3 opacity-70 transition-[opacity,transform] group-hover:opacity-100",
+            "h-3.5 w-3.5 text-icon-3 opacity-70 transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)] group-hover:opacity-100",
             collapsed && "-rotate-90",
           )}
           aria-hidden
@@ -71,7 +71,7 @@ export const RepoSectionHeader = ({
         }}
         className={cn(
           "text-ink-muted hover:bg-fill-4 hover:text-ink",
-          "shrink-0 opacity-40 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100",
+          "shrink-0 opacity-40 transition-opacity duration-[var(--duration-fast)] ease-[var(--easing-default)] group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100",
           isCreating && "opacity-100",
         )}
       >

@@ -80,7 +80,7 @@ const ENGINE_OPTIONS: Array<{
   {
     id: "sqlite",
     label: "SQLite",
-    hint: "C:\\path\\to\\data.db  or  /path/to/data.db",
+    hint: "C:\\path\\to\\data.db or /path/to/data.db",
     defaultTarget: (cwd) => (cwd ? `${cwd}/data.db` : ""),
     description: "Absolute path to a .db / .sqlite file on disk.",
   },

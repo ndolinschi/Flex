@@ -102,7 +102,7 @@ export const IsolationPicker = ({
   if (hasTurns) {
     return (
       <span
-        className="ml-1 flex h-6 items-center gap-1 rounded-md px-1.5 text-sm text-muted-foreground opacity-60"
+        className="ml-1 flex h-6 items-center gap-1 rounded-md px-1.5 text-sm text-ink-muted opacity-60"
         title="Isolation is fixed for this session"
       >
         <GitFork className="size-3 shrink-0" aria-hidden />
@@ -129,7 +129,7 @@ export const IsolationPicker = ({
       >
         <SelectTrigger
           aria-label={`Isolation: ${currentLabel}`}
-          className="ml-1 border-0 bg-transparent text-sm font-normal text-muted-foreground opacity-80 shadow-none hover:bg-transparent hover:text-foreground hover:opacity-100 data-open:opacity-100"
+          className="ml-1 border-0 bg-transparent text-sm font-normal text-ink-muted opacity-80 shadow-none hover:bg-transparent hover:text-ink hover:opacity-100 data-open:opacity-100"
           size="xs"
         >
           <GitFork className="size-3 shrink-0" aria-hidden />
@@ -142,7 +142,7 @@ export const IsolationPicker = ({
               <SelectItem key={opt.value} value={opt.value}>
                 <span className="flex flex-col gap-0.5">
                   <span>{opt.label}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-ink-muted">
                     {opt.description}
                   </span>
                 </span>
@@ -166,7 +166,7 @@ export const IsolationPicker = ({
         >
           <SelectTrigger
             aria-label="Reuse workspace"
-            className="border-0 bg-transparent text-sm font-normal text-muted-foreground opacity-80 shadow-none hover:bg-transparent hover:text-foreground hover:opacity-100 data-open:opacity-100"
+            className="border-0 bg-transparent text-sm font-normal text-ink-muted opacity-80 shadow-none hover:bg-transparent hover:text-ink hover:opacity-100 data-open:opacity-100"
             size="xs"
           >
             <SelectValue placeholder="New workspace" />
@@ -177,7 +177,7 @@ export const IsolationPicker = ({
               <SelectItem value={NEW_WORKSPACE_VALUE}>
                 <span className="flex flex-col gap-0.5">
                   <span>New workspace</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-ink-muted">
                     Provision a fresh worktree on the first prompt.
                   </span>
                 </span>
@@ -186,7 +186,7 @@ export const IsolationPicker = ({
                 <SelectItem key={w.id} value={w.id}>
                   <span className="flex flex-col gap-0.5">
                     <span>{w.id}</span>
-                    <span className="truncate text-xs text-muted-foreground">
+                    <span className="truncate text-xs text-ink-muted">
                       {w.path}
                     </span>
                   </span>

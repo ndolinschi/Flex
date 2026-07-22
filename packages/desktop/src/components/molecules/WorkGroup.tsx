@@ -44,7 +44,7 @@ type WorkGroupProps = {
    * as a small glyph next to the duration so it's visible even collapsed. */
   verdict?: VerificationVerdict
   /** Reference-style resume when collapsed, e.g. "Edited 3 files · Explored 2
-   * files · Ran 1 command". Falls back to "Worked for Xs" when absent. */
+ * files · Ran 1 command". Falls back to "Worked for Xs" when absent. */
   resumeLine?: string | null
   /** True when the turn ended via Stop / cancel — collapsed header reads
    * "Stopped" instead of the usual resume / "Worked for" line. */

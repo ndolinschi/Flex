@@ -34,10 +34,12 @@ export const Checkbox = ({
     disabled={disabled}
     onClick={onClick}
     className={cn(
-      "peer relative flex size-4 shrink-0 items-center justify-center rounded-full border border-stroke-3 transition-colors outline-none",
+      "peer relative flex size-4 shrink-0 items-center justify-center rounded-full border border-stroke-3 bg-elevated outline-none",
       "transition-[color,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+      "after:absolute after:-inset-x-3 after:-inset-y-2",
       "focus-visible:border-stroke-2 focus-visible:ring-1 focus-visible:ring-stroke-2",
       "disabled:cursor-not-allowed disabled:opacity-50",
+      "aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/30",
       "data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground",
       "data-indeterminate:border-primary data-indeterminate:bg-primary data-indeterminate:text-primary-foreground",
       className,

@@ -68,7 +68,7 @@ const GroupSwatchBar = ({ onPickColor }: GroupSwatchBarProps) => (
     role="group"
     aria-label="Pick group color"
   >
-    <span className="mr-0.5 text-[10px] text-ink-muted">Group:</span>
+    <span className="mr-0.5 text-xs text-ink-muted">Group:</span>
     {GROUP_PALETTE.map((color) => (
       <button
         key={color}

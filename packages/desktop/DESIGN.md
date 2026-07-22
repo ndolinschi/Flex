@@ -326,6 +326,8 @@ modal. HITL docks as a composer-adjacent blocking surface, not a dialog.
 | Streaming | `StreamingCaret` | Thin `w-px h-3.5` pulse on `ink-muted`, not a block accent cursor |
 | Error inline | `ErrorBanner` | `border-danger/15 bg-danger-subtle/70`; body `text-xs`; dismissible quiet X |
 | Resume error | `SidebarResumeError` | Same quiet danger; Retry ghost + dismiss (edge-to-edge in sidebar) |
+| Error alert | `ui/alert` destructive | Same whisper danger tokens (BrowserTab load-error, setup check) — never solid red slabs |
+| Error detail | code/`pre` panels | `bg-fill-3 text-ink-muted` (not `bg-muted`) |
 | Transient | `ReconnectBanner` | `border-stroke-3 bg-fill-5`; title `text-xs secondary`; no muted slab |
 | Progress | `Progress` | Track `h-1 bg-fill-3`; indicator **`bg-ink-faint/50`** (never primary) |
 | Disabled | controls | `opacity-50` + `pointer-events-none` / `cursor-not-allowed` (Button, Input, Switch, menus) |

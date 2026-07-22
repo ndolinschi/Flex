@@ -102,7 +102,7 @@ export const ModelPicker = ({
               // h-6 pill to match ModePicker (DESIGN.md: Mode/Model pills h-6).
               // pl/pr asymmetric so leading icon and trailing chevron optically
               // balance (same recipe as SelectTrigger size=xs).
-              "h-6 max-w-[14rem] gap-1 rounded-full border-input bg-transparent py-0 pl-2 pr-1.5 font-normal shadow-none",
+              "h-6 max-w-[14rem] gap-1 rounded-full border-stroke-3 bg-transparent py-0 pl-2 pr-1.5 font-normal shadow-none",
               // Quiet idle opacity matching ModePicker; full opacity on hover/open.
               "opacity-80 hover:opacity-100 aria-expanded:opacity-100",
             )}
@@ -132,7 +132,7 @@ export const ModelPicker = ({
           sideOffset={6}
           className="w-72 p-0"
         >
-          <div className="border-b border-border px-2.5 py-2">
+          <div className="border-b border-stroke-3 px-2.5 py-1.5">
             <Input
               type="search"
               value={query}

@@ -91,7 +91,9 @@ export const SettingsShell = ({
       aria-label="Back to chat" title="Back to chat"
       onClick={() => setRoute("chat")}
       className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+        // Quiet chrome: same recipe as WindowTitleBar / SessionSidebar h-6 icons.
+        "text-ink-muted hover:bg-fill-4 hover:text-ink",
+        "opacity-50 hover:opacity-80",
         "h-6 w-6",
       )}
     >
@@ -129,7 +131,7 @@ export const SettingsShell = ({
             ref={contentRef}
             className={cn(
               "flex flex-col gap-3 pb-12",
-              "[&_[data-settings-row]]:transition-shadow",
+              "[&_[data-settings-row]]:transition-shadow [&_[data-settings-row]]:duration-[var(--duration-fast)]",
             )}
           >
             <HighlightScope rowId={highlightRowId}>{activeContent}</HighlightScope>

@@ -21,11 +21,11 @@ const buttonVariants = cva(
         // pairs with `text-accent-foreground` (dark). `text-foreground` on that
         // fill is white-on-white (ModelPicker / Mode open state).
         outline:
-          "border-border bg-background hover:bg-fill-4 hover:text-foreground aria-expanded:bg-fill-4 aria-expanded:text-foreground",
+          "border-border bg-background hover:bg-fill-4 hover:text-ink aria-expanded:bg-fill-4 aria-expanded:text-ink",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-fill-4 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
-          "hover:bg-fill-4 hover:text-foreground aria-expanded:bg-fill-4 aria-expanded:text-foreground",
+          "hover:bg-fill-4 hover:text-ink aria-expanded:bg-fill-4 aria-expanded:text-ink",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20",
         link: "text-primary underline-offset-4 hover:underline active:opacity-80",

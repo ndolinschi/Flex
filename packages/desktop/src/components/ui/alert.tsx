@@ -14,7 +14,8 @@ const alertVariants = cva(
       variant: {
         default: "border-border bg-card text-card-foreground",
         destructive:
-          "border-destructive/20 bg-destructive/10 text-destructive *:data-[slot=alert-description]:text-destructive *:[svg]:text-destructive",
+          // Whisper danger — product tokens, not a solid red slab (ErrorBanner canon).
+          "border-danger/15 bg-danger-subtle/70 text-danger *:data-[slot=alert-description]:text-danger/90 *:[svg]:text-danger",
         warning:
           "border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-50 *:data-[slot=alert-description]:text-current *:[svg]:text-current",
       },
@@ -45,7 +46,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="alert-title"
       className={cn(
-        "font-medium group-has-[>svg]/alert:col-start-2 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground",
+        "font-medium group-has-[>svg]/alert:col-start-2 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-ink",
         className,
       )}
       {...props}
@@ -61,7 +62,7 @@ function AlertDescription({
     <div
       data-slot="alert-description"
       className={cn(
-        "text-sm text-balance text-muted-foreground md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-2",
+        "text-sm text-balance text-ink-muted md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-ink [&_p:not(:last-child)]:mb-2",
         className,
       )}
       {...props}

@@ -246,10 +246,21 @@ export const CompletionSetupModal = ({
 
         {error ? <ErrorBanner message={error} onDismiss={() => setError(null)} /> : null}
         {checkMessage ? (
-          <Alert variant={checkOk ? "default" : "destructive"}>
-            {checkOk ? <CheckCircle2Icon /> : <AlertCircleIcon />}
+          <Alert
+            variant={checkOk ? "default" : "destructive"}
+            className={
+              checkOk
+                ? undefined
+                : "border-danger/15 bg-danger-subtle/70 py-1.5 text-danger"
+            }
+          >
+            {checkOk ? <CheckCircle2Icon /> : <AlertCircleIcon className="size-3.5 opacity-80" />}
             <AlertDescription
-              className={checkOk ? "text-foreground" : "text-destructive"}
+              className={
+                checkOk
+                  ? "text-ink text-xs"
+                  : "text-xs leading-snug text-danger/90"
+              }
             >
               {checkMessage}
             </AlertDescription>

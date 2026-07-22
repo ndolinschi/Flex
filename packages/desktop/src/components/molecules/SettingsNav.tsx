@@ -160,7 +160,9 @@ export const SettingsNav = ({
                   // Sidebar-cell pad 6×8 r6; selected fill-2 / hover fill-4.
                   "h-auto w-full flex-col items-start gap-0 rounded-sm px-2 py-1.5 text-left leading-[1.5]",
                   "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-                  i === resultIndex ? "bg-fill-2 text-ink" : "hover:bg-fill-4",
+                  i === resultIndex
+                    ? "bg-fill-2 text-ink hover:bg-fill-2"
+                    : "hover:bg-fill-4",
                 )}
               >
                 <span className="truncate text-sm leading-[1.5] text-ink-secondary">{entry.title}</span>

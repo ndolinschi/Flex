@@ -118,7 +118,7 @@ export const ContextMenu = ({ position, items, onClose }: ContextMenuProps) => {
                 {Icon ? (
                   <Icon
                     data-icon="inline-start"
-                    className="text-muted-foreground"
+                    className="text-ink-muted"
                     aria-hidden
                   />
                 ) : null}

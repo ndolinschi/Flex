@@ -55,10 +55,10 @@ export const PlanModelPill = ({
             size="xs"
             disabled={isLoading}
             className={cn(
-              "max-w-[12rem] rounded-full border border-stroke-3 px-2 text-muted-foreground",
+              "max-w-[12rem] rounded-full border border-stroke-3 px-2 text-ink-muted",
               "transition-colors duration-[var(--duration-fast)]",
-              "hover:border-stroke-3 hover:bg-fill-4 hover:text-foreground",
-              "aria-expanded:border-stroke-3 aria-expanded:text-foreground",
+              "hover:border-stroke-3 hover:bg-fill-4 hover:text-ink",
+              "aria-expanded:border-stroke-3 aria-expanded:text-ink",
             )}
           />
         }
@@ -66,11 +66,11 @@ export const PlanModelPill = ({
         <span className="min-w-0 truncate">
           {isLoading ? "Loading…" : label}
         </span>
-        <ChevronDown className="size-2.5 shrink-0 text-muted-foreground" aria-hidden />
+        <ChevronDown className="size-2.5 shrink-0 text-ink-muted" aria-hidden />
       </DropdownMenuTrigger>
       {open ? (
         <DropdownMenuContent align="end" sideOffset={4} className="w-64 p-0">
-          <div className="border-b border-stroke-3 px-2.5 py-2">
+          <div className="border-b border-stroke-3 px-2.5 py-1.5">
             <Input
               type="search"
               value={query}
@@ -83,7 +83,7 @@ export const PlanModelPill = ({
           </div>
           <div className="max-h-56 overflow-y-auto py-1">
             {groups.length === 0 ? (
-              <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">
+              <p className="px-2.5 py-3 text-center text-xs text-ink-muted">
                 No models found
               </p>
             ) : (
@@ -114,7 +114,7 @@ export const PlanModelPill = ({
               ))
             )}
             {truncated ? (
-              <p className="px-2.5 py-2 text-xs text-muted-foreground">
+              <p className="px-2.5 py-2 text-xs text-ink-muted">
                 Showing {MODEL_MENU_VISIBLE_CAP} of {totalMatched}. Type to
                 narrow.
               </p>

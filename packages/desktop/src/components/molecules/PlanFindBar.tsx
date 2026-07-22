@@ -36,7 +36,7 @@ export const PlanFindBar = ({ find, inputRef }: PlanFindBarProps) => (
       )}
     >
       <InputGroupAddon align="inline-start" className="pl-0 py-0">
-        <Search className="size-3.5 text-muted-foreground" aria-hidden />
+        <Search className="size-3.5 text-ink-muted" aria-hidden />
       </InputGroupAddon>
       <InputGroupInput
         ref={inputRef}
@@ -71,7 +71,7 @@ export const PlanFindBar = ({ find, inputRef }: PlanFindBarProps) => (
           title="Previous match"
           onClick={find.onPrev}
           disabled={find.matchCount === 0}
-          className="text-muted-foreground hover:bg-fill-4 hover:text-foreground"
+          className="text-ink-muted hover:bg-fill-4 hover:text-ink"
         >
           <ChevronDown className="rotate-180" aria-hidden />
         </InputGroupButton>
@@ -81,7 +81,7 @@ export const PlanFindBar = ({ find, inputRef }: PlanFindBarProps) => (
           title="Next match"
           onClick={find.onNext}
           disabled={find.matchCount === 0}
-          className="text-muted-foreground hover:bg-fill-4 hover:text-foreground"
+          className="text-ink-muted hover:bg-fill-4 hover:text-ink"
         >
           <ChevronDown aria-hidden />
         </InputGroupButton>
@@ -90,7 +90,7 @@ export const PlanFindBar = ({ find, inputRef }: PlanFindBarProps) => (
           aria-label="Close find"
           title="Close find"
           onClick={() => find.onOpenChange(false)}
-          className="text-muted-foreground hover:bg-fill-4 hover:text-foreground"
+          className="text-ink-muted hover:bg-fill-4 hover:text-ink"
         >
           <X aria-hidden />
         </InputGroupButton>

@@ -258,7 +258,8 @@ export const SessionListItem = memo(function SessionListItem({
         // Safe here (fixed-ish row height); NEVER apply on virtualized timeline.
         "cv-auto-meta",
         // Whisper fills: selected fill-2 (~8%) stronger than hover fill-4 (~6%).
-        isActive ? "bg-fill-2" : "hover:bg-fill-4",
+        // Pin selected on hover so fill-4 never overrides (SettingsNav pattern).
+        isActive ? "bg-fill-2 hover:bg-fill-2" : "hover:bg-fill-4",
         archived && "opacity-60",
       )}
     >

@@ -168,14 +168,14 @@ type PopoverSearchProps = {
   "aria-label"?: string
 }
 
-/** Search bar styled after CommandInput: semantic tokens, SearchIcon, border-border. */
+/** Search bar styled after CommandInput: semantic tokens, SearchIcon, stroke-3. */
 export const PopoverSearch = ({
   value,
   onChange,
   placeholder,
   "aria-label": ariaLabel,
 }: PopoverSearchProps) => (
-  <div className="border-b border-border px-2.5 py-1.5">
+  <div className="border-b border-stroke-3 px-2.5 py-1.5">
     <InputGroup
       className={cn(
         "h-6 border-0 bg-transparent shadow-none dark:bg-transparent",
@@ -184,7 +184,7 @@ export const PopoverSearch = ({
       )}
     >
       <InputGroupAddon align="inline-start" className="pl-0 py-0">
-        <SearchIcon className="size-3 text-muted-foreground" aria-hidden />
+        <SearchIcon className="size-3 text-ink-muted" aria-hidden />
       </InputGroupAddon>
       <InputGroupInput
         value={value}
@@ -204,10 +204,10 @@ type PopoverSectionProps = {
   children?: ReactNode
 }
 
-/** Section heading styled after CommandGroup: text-muted-foreground label. */
+/** Section heading styled after CommandGroup: text-ink-muted label. */
 export const PopoverSection = ({ label, icon, children }: PopoverSectionProps) => (
   <div className="py-1">
-    <p className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+    <p className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-ink-muted">
       {icon}
       <span className="min-w-0 truncate">{label}</span>
     </p>

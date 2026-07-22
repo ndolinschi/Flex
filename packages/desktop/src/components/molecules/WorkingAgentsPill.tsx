@@ -52,7 +52,7 @@ export const WorkingAgentsPill = ({
               variant="outline"
               size="sm"
               aria-label="Running workers"
-              className="h-6 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+              className="h-6 gap-1.5 px-2 text-ink-muted hover:text-ink"
             />
           }
         >
@@ -113,7 +113,7 @@ export const WorkingAgentsPill = ({
                         {title}
                       </span>
                       {activity.latestLabel ? (
-                        <span className="block truncate text-xs text-muted-foreground">
+                        <span className="block truncate text-xs text-ink-muted">
                           {activity.latestLabel}
                         </span>
                       ) : null}

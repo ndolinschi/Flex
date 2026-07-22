@@ -528,7 +528,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
             // requires an explicit close control once the sidebar fills the
             // chat area).
             <div className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b border-sidebar-border px-4">
-              <span className="text-sm text-sidebar-foreground/70">Sessions</span>
+              <span className="text-sm text-ink-muted">Sessions</span>
               <Button
                 type="button"
                 variant="ghost"
@@ -537,7 +537,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
                 title="Close sidebar"
                 onClick={() => setSidebarCollapsed(true)}
                 className={cn(
-                  "h-6 w-6 text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+                  "h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink",
                   "opacity-50 hover:opacity-80",
                 )}
               >
@@ -631,7 +631,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
               title="Search agents"
               onClick={onOpenSearch}
               className={cn(
-                "h-6 w-6 text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+                "h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink",
                 "transition-opacity duration-[var(--duration-fast)]",
                 // Reveal on hover; when filter is non-default stay fully visible.
                 sidebarProjectSort !== "recency" ||

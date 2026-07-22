@@ -210,7 +210,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             title="Refresh changes"
             onClick={handleRefresh}
             className={cn(
-              "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+              "text-ink-muted hover:bg-fill-4 hover:text-ink",
               "h-6 w-6",
             )}
           >
@@ -265,7 +265,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
           title="Refresh changes"
           onClick={handleRefresh}
           className={cn(
-            "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+            "text-ink-muted hover:bg-fill-4 hover:text-ink",
             "h-6 w-6",
           )}
         >

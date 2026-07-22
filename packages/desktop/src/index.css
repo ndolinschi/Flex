@@ -676,6 +676,13 @@ mark[data-plan-comment-id].plan-comment-mark-active {
     animation-delay: 0s !important;
   }
 
+  /* tw-animate accordion height open/close (ui/accordion) — not covered by .animate-in. */
+  .animate-accordion-down,
+  .animate-accordion-up {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+  }
+
   body {
     transition: none;
   }

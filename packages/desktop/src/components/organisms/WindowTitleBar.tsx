@@ -150,11 +150,12 @@ const WindowTitleBarImpl = ({
                 aria-label={`${split ? "Close split" : "Split view"} (${mod}J)`}
                 title={`${split ? "Close split" : "Split view"} (${mod}J)`}
                 onClick={toggleSplit}
+                aria-pressed={split}
                 className={cn(
-                  "text-ink-muted hover:bg-fill-4 hover:text-ink",
-                  "opacity-50 hover:opacity-80",
-                  "h-6 w-6",
-                  !split && "opacity-60",
+                  // Quiet title-bar icon recipe; pressed = split active (fill-2, full ink).
+                  "h-6 w-6 text-ink-muted opacity-50 hover:bg-fill-4 hover:text-ink hover:opacity-80",
+                  split &&
+                    "bg-fill-2 text-ink opacity-80 hover:bg-fill-2 hover:opacity-100",
                 )}
               >
                 <Columns2 className="h-3.5 w-3.5" aria-hidden />

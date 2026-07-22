@@ -137,7 +137,7 @@ export const PlanToolbar = ({
               ›
             </BreadcrumbSeparator>
             <BreadcrumbItem className="min-w-0 shrink overflow-hidden">
-              <BreadcrumbPage className="min-w-0 truncate text-foreground/80 font-normal">
+              <BreadcrumbPage className="min-w-0 truncate text-ink/80 font-normal">
                 {title}
               </BreadcrumbPage>
             </BreadcrumbItem>

@@ -93,7 +93,7 @@ const ProblemsStrip = ({
         className={cn(
           "flex w-full items-center gap-1.5 px-2.5 py-1",
           "text-xs text-ink-secondary hover:bg-fill-3",
-          "select-none transition-colors",
+          "select-none transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
         )}
         aria-expanded={open}
       >
@@ -138,7 +138,7 @@ const ProblemsStrip = ({
                   onClick={() => onGoToMarker(m)}
                   className={cn(
                     "flex w-full items-start gap-2 px-2.5 py-1 text-left",
-                    "text-xs hover:bg-fill-3 transition-colors",
+                    "text-xs hover:bg-fill-3 transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                   )}
                 >
                   {m.severity === MarkerSeverity.Error ? (
@@ -493,7 +493,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
       aria-label="Browse files" title="Browse files"
       onClick={() => setBrowseMode(true)}
       className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+        "text-ink-muted hover:bg-fill-4 hover:text-ink",
         "h-6 w-6 shrink-0",
       )}
     >
@@ -509,7 +509,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
       aria-label={previewMode ? "Edit markdown" : "Preview markdown"} title={previewMode ? "Edit markdown" : "Preview markdown"}
       onClick={toggleMarkdownPreview}
       className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+        "text-ink-muted hover:bg-fill-4 hover:text-ink",
         "h-6 w-6", previewMode && "bg-fill-2 text-ink",
       )}
     >
@@ -528,7 +528,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
       disabled={!dirty || saving || !path}
       onClick={() => void handleSave()}
       className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+        "text-ink-muted hover:bg-fill-4 hover:text-ink",
         "h-6 w-6",
       )}
     >

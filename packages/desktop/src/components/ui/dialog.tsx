@@ -101,7 +101,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-lg border-t border-stroke-3 bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-lg border-t border-stroke-3 bg-fill-4 p-4 sm:flex-row sm:justify-end",
         className
       )}
       {...props}
@@ -137,7 +137,7 @@ function DialogDescription({
     <DialogPrimitive.Description
       data-slot="dialog-description"
       className={cn(
-        "text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
+        "text-sm text-ink-muted *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-ink",
         className
       )}
       {...props}

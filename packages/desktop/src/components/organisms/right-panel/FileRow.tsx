@@ -200,7 +200,7 @@ export const FileRow = memo(function FileRow({
           "group relative flex h-7 w-full items-center gap-1.5 rounded-sm px-2",
           "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
           selectable && selected
-            ? "bg-fill-2"
+            ? "bg-fill-2 hover:bg-fill-2"
             : expanded
               ? "bg-fill-5 hover:bg-fill-4"
               : "hover:bg-fill-4",
@@ -266,67 +266,62 @@ export const FileRow = memo(function FileRow({
         <span
           className={cn(
             "absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5",
-            "rounded-md bg-panel/90 px-0.5 opacity-0 shadow-sm backdrop-blur-[2px]",
+            // Solid panel chip — no backdrop-blur (list-row GPU tax); opacity-only reveal.
+            "rounded-md bg-panel px-0.5 opacity-0 shadow-sm",
             "transition-opacity duration-[var(--duration-fast)]",
             "group-hover:opacity-100 focus-within:opacity-100",
           )}
         >
           {!isDir && file.status !== "D" ? (
             <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label="Open file" title="Open file"
-      onClick={handleOpenFile}
-      className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
-        "h-6 w-6",
-      )}
-    >
-      <FileCode2 className="h-3.5 w-3.5" aria-hidden />
-    </Button>
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Open file"
+              title="Open file"
+              onClick={handleOpenFile}
+              className="h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink"
+            >
+              <FileCode2 className="h-3.5 w-3.5" aria-hidden />
+            </Button>
           ) : null}
           {isolated ? (
             <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label="Keep" title="Keep"
-      onClick={handleKeepFile}
-      disabled={busyAction !== null}
-      className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
-        "h-6 w-6",
-      )}
-    >
-      {busyAction === "keep" ? (
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Keep"
+              title="Keep"
+              onClick={handleKeepFile}
+              disabled={busyAction !== null}
+              className="h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink"
+            >
+              {busyAction === "keep" ? (
                 <Spinner />
               ) : (
                 <Check className="h-3.5 w-3.5" aria-hidden />
               )}
-    </Button>
+            </Button>
           ) : null}
           <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label="Undo" title="Undo"
-      onClick={(e) => {
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Undo"
+            title="Undo"
+            onClick={(e) => {
               e.stopPropagation()
               setConfirmUndo(true)
             }}
-      disabled={busyAction !== null}
-      className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
-        "h-6 w-6",
-      )}
-    >
-      {busyAction === "undo" ? (
-                <Spinner size="sm" />
+            disabled={busyAction !== null}
+            className="h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink"
+          >
+            {busyAction === "undo" ? (
+              <Spinner size="sm" />
             ) : (
               <Undo2 className="h-3.5 w-3.5" aria-hidden />
             )}
-    </Button>
+          </Button>
         </span>
       </div>
       <Collapsible open={expanded}>

@@ -111,11 +111,13 @@ export const TreeBranch = ({
               title={hit.path}
               aria-expanded={isDir ? isOpen : undefined}
               className={cn(
-                // File-tree cell: h-7, r6, whisper hover — matches Changes FileRow.
+                // File-tree cell: h-7, r6, whisper fills — open dirs read selected (fill-2).
                 "h-7 w-full justify-start gap-1.5 rounded-sm pr-2 text-sm font-normal leading-[1.5]",
                 "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-                "hover:bg-fill-4",
-                statusClass ?? "text-ink-secondary hover:text-ink",
+                isOpen
+                  ? "bg-fill-2 text-ink hover:bg-fill-2"
+                  : "hover:bg-fill-4",
+                statusClass ?? (!isOpen && "text-ink-secondary hover:text-ink"),
               )}
               style={{ paddingLeft: 8 + depth * INDENT_PX }}
             >

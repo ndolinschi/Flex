@@ -117,12 +117,12 @@ export const ModelMultiSelect = ({
             return (
               <li
                 key={`${modelId}-${index}`}
-                className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1.5"
+                className="flex items-center gap-2 rounded-md border border-border bg-fill-5 px-2 py-1.5"
               >
-                <span className="w-4 shrink-0 text-center text-xs text-muted-foreground">
+                <span className="w-4 shrink-0 text-center text-xs text-ink-muted">
                   {index + 1}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-left text-sm text-muted-foreground">
+                <span className="min-w-0 flex-1 truncate text-left text-sm text-ink-muted">
                   {name}
                 </span>
                 <div className="flex shrink-0 items-center gap-0.5">
@@ -132,7 +132,7 @@ export const ModelMultiSelect = ({
                     aria-label={`Move ${name} up`}
                     disabled={disabled || index === 0}
                     onClick={() => moveUp(index)}
-                    className="text-muted-foreground hover:bg-fill-4 hover:text-foreground"
+                    className="text-ink-muted hover:bg-fill-4 hover:text-ink"
                   >
                     <ChevronUp aria-hidden />
                   </Button>
@@ -142,7 +142,7 @@ export const ModelMultiSelect = ({
                     aria-label={`Move ${name} down`}
                     disabled={disabled || index === value.length - 1}
                     onClick={() => moveDown(index)}
-                    className="text-muted-foreground hover:bg-fill-4 hover:text-foreground"
+                    className="text-ink-muted hover:bg-fill-4 hover:text-ink"
                   >
                     <ChevronDown aria-hidden />
                   </Button>
@@ -152,7 +152,7 @@ export const ModelMultiSelect = ({
                     aria-label={`Remove ${name}`}
                     disabled={disabled}
                     onClick={() => removeAt(index)}
-                    className="text-muted-foreground hover:bg-fill-4 hover:text-destructive"
+                    className="text-ink-muted hover:bg-fill-4 hover:text-destructive"
                   >
                     <X aria-hidden />
                   </Button>
@@ -162,7 +162,7 @@ export const ModelMultiSelect = ({
           })}
         </ul>
       ) : (
-        <p className="text-xs text-muted-foreground">No fallbacks configured</p>
+        <p className="text-xs text-ink-muted">No fallbacks configured</p>
       )}
 
       <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -211,7 +211,7 @@ export const ModelMultiSelect = ({
                 ))}
               </CommandList>
               {truncated ? (
-                <p className="px-2.5 py-2 text-xs text-muted-foreground">
+                <p className="px-2.5 py-2 text-xs text-ink-muted">
                   Showing {MODEL_MENU_VISIBLE_CAP} of {totalMatched}. Type to
                   narrow.
                 </p>

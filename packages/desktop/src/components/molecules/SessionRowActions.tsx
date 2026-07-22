@@ -97,60 +97,54 @@ export const SessionRowActions = memo(function SessionRowActions({
             {archived ? (
               <Tooltip label="Restore">
                 <Button
-      type="button"
-      variant="ghost"
-      size="icon-2xs"
-      aria-label="Restore session" title="Restore session"
-      disabled={!canSetArchived}
-      onClick={(e) => {
+                  type="button"
+                  variant="ghost"
+                  size="icon-2xs"
+                  aria-label="Restore session"
+                  title="Restore session"
+                  disabled={!canSetArchived}
+                  onClick={(e) => {
                     e.stopPropagation()
                     onSetArchived?.(e, false)
                   }}
-      className={cn(
-        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
-        "opacity-50 hover:opacity-80",
-      )}
-    >
-      <ArchiveRestore className="h-3 w-3" aria-hidden />
-    </Button>
+                  className="text-ink-secondary opacity-50 hover:bg-fill-4 hover:opacity-80 hover:text-ink"
+                >
+                  <ArchiveRestore className="h-3 w-3" aria-hidden />
+                </Button>
               </Tooltip>
             ) : (
               <Tooltip label="Archive">
                 <Button
-      type="button"
-      variant="ghost"
-      size="icon-2xs"
-      aria-label="Archive session" title="Archive session"
-      disabled={!canSetArchived}
-      onClick={(e) => {
+                  type="button"
+                  variant="ghost"
+                  size="icon-2xs"
+                  aria-label="Archive session"
+                  title="Archive session"
+                  disabled={!canSetArchived}
+                  onClick={(e) => {
                     e.stopPropagation()
                     onSetArchived?.(e, true)
                   }}
-      className={cn(
-        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
-        "opacity-50 hover:opacity-80",
-      )}
-    >
-      <ArchiveIcon className="h-3 w-3" aria-hidden />
-    </Button>
+                  className="text-ink-secondary opacity-50 hover:bg-fill-4 hover:opacity-80 hover:text-ink"
+                >
+                  <ArchiveIcon className="h-3 w-3" aria-hidden />
+                </Button>
               </Tooltip>
             )}
             <Button
-      type="button"
-      variant="ghost"
-      size="icon-2xs"
-      aria-label="More actions" title="More actions"
-      onClick={(e) => {
+              type="button"
+              variant="ghost"
+              size="icon-2xs"
+              aria-label="More actions"
+              title="More actions"
+              onClick={(e) => {
                 e.stopPropagation()
                 onOpenMenu(e)
               }}
-      className={cn(
-        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
-        "opacity-50 hover:opacity-80",
-      )}
-    >
-      <MoreHorizontal className="h-3 w-3" aria-hidden />
-    </Button>
+              className="text-ink-secondary opacity-50 hover:bg-fill-4 hover:opacity-80 hover:text-ink"
+            >
+              <MoreHorizontal className="h-3 w-3" aria-hidden />
+            </Button>
           </>
         ) : null}
       </span>

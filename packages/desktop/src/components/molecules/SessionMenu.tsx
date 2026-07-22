@@ -17,6 +17,7 @@ import {
   toInvokeError,
 } from "../../lib/tauri"
 import { useAppStore } from "../../stores/appStore"
+import { cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -180,11 +181,15 @@ export const SessionMenu = ({
               variant="ghost"
               size="icon-xs"
               aria-label="Chat actions"
-              className="size-6 text-ink-muted hover:text-ink aria-expanded:bg-fill-4 aria-expanded:text-ink"
+              className={cn(
+                // Quiet title-bar icon recipe (DESIGN: idle .5 → hover .8 + fill-4).
+                "size-6 text-ink-muted opacity-50 hover:bg-fill-4 hover:text-ink hover:opacity-80",
+                "aria-expanded:bg-fill-4 aria-expanded:text-ink aria-expanded:opacity-100",
+              )}
             />
           }
         >
-          <Ellipsis className="size-3" aria-hidden />
+          <Ellipsis className="size-3.5" aria-hidden />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" sideOffset={4} className="w-48">
           <DropdownMenuGroup>

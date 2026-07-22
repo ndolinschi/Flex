@@ -512,8 +512,8 @@ export const TurnTimeline = ({
           aria-label="Scroll to bottom"
           className={cn(
             "absolute bottom-3 left-1/2 z-20 -translate-x-1/2",
-            "rounded-full border border-stroke-2",
-            "bg-panel text-ink-secondary hover:text-ink",
+            // Floating chrome: panel + shadow-popover (ring lives in the shadow).
+            "rounded-full bg-panel text-ink-secondary shadow-popover hover:text-ink",
             "animate-tray-in",
           )}
         >

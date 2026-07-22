@@ -57,7 +57,7 @@ export const ModeSwitchChip = () => {
     >
       <Shuffle className="h-3.5 w-3.5 shrink-0 text-icon-2" aria-hidden />
       <span className="flex-1 truncate text-ink-secondary">
-        Switching to&nbsp;<strong className="text-ink-primary">{modeLabel}</strong>
+        Switching to&nbsp;<strong className="text-ink">{modeLabel}</strong>
         {pending.reason ? (
           <span className="text-ink-muted"> · {pending.reason}</span>
         ) : null}
@@ -71,7 +71,7 @@ export const ModeSwitchChip = () => {
         onClick={handleCancel}
         aria-label="Cancel mode switch"
         title="Cancel mode switch"
-        className="h-5 w-5 shrink-0 p-0 text-ink-muted hover:text-ink-primary"
+        className="h-5 w-5 shrink-0 p-0 text-ink-muted hover:text-ink"
       >
         <X className="h-3 w-3" aria-hidden />
       </Button>

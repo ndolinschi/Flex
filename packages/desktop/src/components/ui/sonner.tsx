@@ -44,7 +44,8 @@ const Toaster = ({ theme = "system", ...props }: ToasterProps) => {
       }
       toastOptions={{
         classNames: {
-          toast: "cn-toast border-stroke-3 bg-panel text-ink shadow-popover",
+          // shadow-popover already includes the 1px stroke ring — no border.
+          toast: "cn-toast bg-panel text-ink shadow-popover",
           description: "text-ink-muted",
           actionButton: "bg-fill-2 text-ink",
           cancelButton: "bg-fill-4 text-ink-muted",

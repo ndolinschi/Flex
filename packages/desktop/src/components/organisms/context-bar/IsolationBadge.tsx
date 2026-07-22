@@ -52,7 +52,7 @@ export const IsolationBadge = ({
           <Button
             type="button"
             variant="ghost"
-            className="ml-1 h-6 rounded-full bg-transparent px-2 text-xs font-normal text-muted-foreground hover:bg-fill-4 hover:text-foreground aria-expanded:bg-fill-4 aria-expanded:text-foreground"
+            className="ml-1 h-6 rounded-full bg-transparent px-2 text-xs font-normal text-ink-muted hover:bg-fill-4 hover:text-ink aria-expanded:bg-fill-4 aria-expanded:text-ink"
           />
         }
       >
@@ -60,10 +60,10 @@ export const IsolationBadge = ({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top" sideOffset={6} className="w-64">
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="font-medium text-foreground">
+          <DropdownMenuLabel className="font-medium text-ink">
             Isolated workspace
           </DropdownMenuLabel>
-          <div className="px-1.5 pb-1.5 text-xs text-muted-foreground">
+          <div className="px-1.5 pb-1.5 text-xs text-ink-muted">
             {isLoading
               ? "Checking changes…"
               : status

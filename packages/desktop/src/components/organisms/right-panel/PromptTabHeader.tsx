@@ -71,7 +71,7 @@ export const PromptTabHeader = ({
             aria-label="Insert section"
             title="Insert section"
             className={cn(
-              "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+              "text-ink-muted hover:bg-fill-4 hover:text-ink",
               "opacity-50 hover:opacity-80",
               "h-6 w-6",
             )}
@@ -96,7 +96,7 @@ export const PromptTabHeader = ({
               setDraft(appendPromptSection(draft, t.markdown))
               setInsertOpen(false)
             }}
-            className="h-auto w-full justify-start px-2.5 py-1.5 text-xs text-ink-secondary font-normal hover:bg-fill-4 hover:text-ink"
+            className="h-auto w-full justify-start px-2.5 py-1 text-xs text-ink-secondary font-normal hover:bg-fill-4 hover:text-ink"
           >
             {t.label}
           </Button>
@@ -113,7 +113,7 @@ export const PromptTabHeader = ({
           title={showMarks ? "Edit prompt" : "Show marks"}
           onClick={() => setShowMarks((v) => !v)}
           className={cn(
-            "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+            "text-ink-muted hover:bg-fill-4 hover:text-ink",
             "h-6 w-6",
             showMarks && "bg-fill-2 text-ink",
           )}
@@ -136,7 +136,7 @@ export const PromptTabHeader = ({
         disabled={!draft.trim() || busy}
         onClick={onVerify}
         className={cn(
-          "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+          "text-ink-muted hover:bg-fill-4 hover:text-ink",
           "h-6 w-6",
         )}
       >
@@ -157,7 +157,7 @@ export const PromptTabHeader = ({
         disabled={!draft.trim() || busy}
         onClick={onSend}
         className={cn(
-          "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+          "text-ink-muted hover:bg-fill-4 hover:text-ink",
           "h-6 w-6",
         )}
       >

@@ -29,7 +29,7 @@ type BranchPickerProps = {
 }
 
 const triggerInputClassName =
-  "h-6 min-w-0 flex-1 border-0 bg-transparent shadow-none ring-0 has-[[data-slot=input-group-control]:focus-visible]:border-transparent has-[[data-slot=input-group-control]:focus-visible]:ring-0 focus-within:border-transparent focus-within:ring-0 text-sm font-normal text-muted-foreground opacity-80 hover:opacity-100 data-open:opacity-100"
+  "h-6 min-w-0 flex-1 border-0 bg-transparent shadow-none ring-0 has-[[data-slot=input-group-control]:focus-visible]:border-transparent has-[[data-slot=input-group-control]:focus-visible]:ring-0 focus-within:border-transparent focus-within:ring-0 text-sm font-normal text-ink-muted opacity-80 hover:opacity-100 data-open:opacity-100"
 
 /** Defer `gh pr view` until the session chrome is interactive — running it on
  * every ContextBar mount (new session / switch) stacked with git_status and
@@ -135,7 +135,7 @@ export const BranchPicker = ({
         >
           <InputGroupAddon align="inline-start" className="py-0 pl-1.5 pr-0">
             <GitBranch
-              className="size-3.5 shrink-0 text-muted-foreground"
+              className="size-3.5 shrink-0 text-ink-muted"
               aria-hidden
             />
           </InputGroupAddon>
@@ -151,7 +151,7 @@ export const BranchPicker = ({
                 <ComboboxItem key={branch} value={branch} disabled={busy}>
                   <span className="min-w-0 truncate">{branch}</span>
                   {active ? (
-                    <span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                    <span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-ink-muted">
                       Current
                     </span>
                   ) : null}
@@ -169,7 +169,7 @@ export const BranchPicker = ({
           onClick={() => void openExternalUrl(branchPr.url)}
           title={`${branchPr.title} — ${branchPr.checksSummary}`}
           aria-label={`Open pull request #${branchPr.number}`}
-          className="max-w-[7.5rem] gap-1 px-1.5 text-muted-foreground hover:bg-fill-4 hover:text-foreground"
+          className="max-w-[7.5rem] gap-1 px-1.5 text-ink-muted hover:bg-fill-4 hover:text-ink"
         >
           <GitPullRequest className="size-3 shrink-0" aria-hidden />
           <span className="shrink-0 font-medium text-foreground">
@@ -181,7 +181,7 @@ export const BranchPicker = ({
               branchPr.checksSummary.includes("failing")
                 ? "text-destructive"
                 : branchPr.checksSummary.includes("pending")
-                  ? "text-muted-foreground"
+                  ? "text-ink-muted"
                   : "text-success",
             )}
           >

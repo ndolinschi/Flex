@@ -153,10 +153,15 @@ export const BrowserTab = ({
               </div>
             ) : showLiveContent && loadError ? (
               <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
-                <Alert variant="destructive" className="max-w-md">
-                  <AlertTriangleIcon />
-                  <AlertTitle>Can't connect to server</AlertTitle>
-                  <AlertDescription>{loadError.message}</AlertDescription>
+                <Alert
+                  variant="destructive"
+                  className="max-w-md border-danger/15 bg-danger-subtle/70 py-1.5 text-danger"
+                >
+                  <AlertTriangleIcon className="size-3.5 opacity-80" />
+                  <AlertTitle className="text-sm">Can't connect to server</AlertTitle>
+                  <AlertDescription className="text-xs leading-snug text-danger/90">
+                    {loadError.message}
+                  </AlertDescription>
                 </Alert>
                 <div className="flex items-center gap-2">
                   <Button variant="default" size="sm" onClick={handleAskAgent}>
@@ -171,7 +176,7 @@ export const BrowserTab = ({
                   </Button>
                 </div>
                 {showErrorDetails ? (
-                  <pre className="max-w-[420px] overflow-x-auto rounded-md bg-muted px-3 py-2 text-left text-xs text-muted-foreground">
+                  <pre className="max-w-[420px] overflow-x-auto rounded-md bg-fill-3 px-3 py-2 text-left text-xs text-ink-muted">
                     {`GET ${browserUrl}\n${loadError.host} refused to connect\n${loadError.message}`}
                   </pre>
                 ) : null}

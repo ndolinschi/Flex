@@ -89,7 +89,7 @@ export const PlanCommentPopover = ({
         className={cn("w-72", className)}
       >
         <PopoverTitle className="sr-only">Comment on plan</PopoverTitle>
-        <p className="line-clamp-3 border-l-2 border-accent/40 pl-2 text-xs italic text-muted-foreground">
+        <p className="line-clamp-3 border-l-2 border-accent/40 pl-2 text-xs italic text-ink-muted">
           {selection.quote}
         </p>
         <Textarea

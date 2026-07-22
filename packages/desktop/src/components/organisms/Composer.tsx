@@ -316,7 +316,9 @@ export const Composer = ({
                   "shadow-[var(--shadow-composer)]",
                   "focus-within:shadow-[var(--shadow-composer-focus)]",
                 ),
-            "transition-[box-shadow,background-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+            // Hover fill only @ 100ms. Exclude box-shadow so focus ring is instant
+            // (same rule as Button: never ease outline/ring/shadow on focus).
+            "transition-[background-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
             "hover:bg-user-bubble-hover",
             "focus-within:hover:bg-user-bubble",
           )}

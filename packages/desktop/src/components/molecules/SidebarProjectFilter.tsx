@@ -68,11 +68,13 @@ export const SidebarProjectFilter = ({
             size="icon-xs"
             aria-label="Filter projects"
             className={cn(
-              "size-6 transition-opacity duration-[var(--duration-fast)]",
+              // Quiet sidebar chrome icon: ink-muted + fill-4 hover; open = fill-2 selected.
+              "size-6 text-ink-muted hover:bg-fill-4 hover:text-ink",
+              "transition-opacity duration-[var(--duration-fast)] ease-[var(--easing-default)]",
               isFiltered || open
                 ? "opacity-100"
                 : "opacity-0 group-hover/label:opacity-100 group-focus-within/label:opacity-100 focus-visible:opacity-100",
-              open && "bg-fill-3",
+              open && "bg-fill-2 text-ink",
             )}
           />
         }
@@ -110,10 +112,10 @@ export const SidebarProjectFilter = ({
                 onClick={() => onVisibilityChange(option.id)}
               >
                 <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5 text-sm text-foreground">
+                  <span className="flex items-center gap-1.5 text-sm text-ink">
                     <span className="min-w-0 flex-1 truncate">{option.label}</span>
                     {isActive ? (
-                      <Check className="size-3 shrink-0 text-primary" aria-hidden />
+                      <Check className="size-3 shrink-0 text-ink" aria-hidden />
                     ) : null}
                   </span>
                   <span className="block text-xs text-ink-muted">

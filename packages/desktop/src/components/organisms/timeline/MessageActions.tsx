@@ -35,9 +35,9 @@ export const MessageActions = ({
   return (
     <div
       className={cn(
-        // Always visible (not hover-reveal) — space is reserved up front so
-        // the row never shifts when it mounts.
-        "mt-1 flex h-7 items-center justify-start gap-0.5",
+        // Always visible (not hover-reveal) — reserve h-6 so 30px-adjacent
+        // chrome density holds and the row never shifts on mount.
+        "mt-1 flex h-6 items-center justify-start gap-0.5",
       )}
     >
       {hideTimestamp ? null : (

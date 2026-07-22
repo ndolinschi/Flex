@@ -27,17 +27,13 @@ const DemoteButton = ({ callId }: { callId: string }) => {
       type="button"
       variant="ghost"
       size="icon-sm"
-      aria-label="Move to background" title="Move to background"
+      aria-label="Move to background"
+      title="Move to background"
       onClick={handleDemote}
       disabled={demoting}
-      className={cn(
-        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
-        "ml-1 h-5 w-5 shrink-0",
-      )}
+      className="ml-1 h-5 w-5 shrink-0 text-ink-secondary hover:bg-fill-4 hover:text-ink"
     >
-      {demoting ? <Spinner /> : (
-        <ListEnd className="h-3 w-3" aria-hidden />
-      )}
+      {demoting ? <Spinner /> : <ListEnd className="h-3 w-3" aria-hidden />}
     </Button>
   )
 }
@@ -139,7 +135,7 @@ export const DetailRow = ({
     <li
       className={cn(
         "flex flex-col animate-tool-step-in",
-        detail.failed && "text-destructive",
+        detail.failed && "text-danger",
         detail.running && "text-ink-faint",
       )}
     >
@@ -194,18 +190,19 @@ export const DetailRow = ({
         <DiffBadge added={detail.added} removed={detail.removed} />
         {canOpenFile ? (
           <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label="Open file" title="Open file"
-      onClick={handleOpenFile}
-      className={cn(
-        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
-        "ml-auto h-5 w-5 shrink-0 opacity-0 group-hover/detail:opacity-100",
-      )}
-    >
-      <FileCode2 className="h-3 w-3" aria-hidden />
-    </Button>
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Open file"
+            title="Open file"
+            onClick={handleOpenFile}
+            className={cn(
+              "ml-auto h-5 w-5 shrink-0 text-ink-secondary opacity-0",
+              "hover:bg-fill-4 hover:text-ink group-hover/detail:opacity-100",
+            )}
+          >
+            <FileCode2 className="h-3 w-3" aria-hidden />
+          </Button>
         ) : null}
         {detail.canDemote ? <DemoteButton callId={detail.id} /> : null}
       </div>
@@ -225,7 +222,7 @@ export const DetailRow = ({
                 Loading diff…
               </div>
             ) : error ? (
-              <div className="rounded-[var(--radius-lg)] border border-stroke-3 bg-panel px-2.5 py-1.5 text-xs leading-[1.5] text-destructive">
+              <div className="rounded-[var(--radius-lg)] border border-danger/15 bg-danger-subtle/70 px-2.5 py-1.5 text-xs leading-[1.5] text-danger">
                 Diff unavailable — {error}
               </div>
             ) : diff ? (
