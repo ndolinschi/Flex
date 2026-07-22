@@ -48,8 +48,8 @@ pub use goal::{GoalOutcome, GoalSpec, GoalStopReason};
 pub use hello::{EngineIdentity, Hello, PROTOCOL_VERSION};
 pub use hook::{HookOutcomeKind, HookPoint};
 pub use ids::{
-    MessageId, ModeSwitchId, PeerMessageId, PermissionRequestId, ProviderId, QuestionId,
-    SessionId, ToolCallId, TurnId,
+    MessageId, ModeSwitchId, PeerMessageId, PermissionRequestId, ProviderId, QuestionId, SessionId,
+    ToolCallId, TurnId,
 };
 pub use permission::{
     Answer, PermissionDecision, PermissionDecisionKind, PermissionMode, PermissionRule, Question,

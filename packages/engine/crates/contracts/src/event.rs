@@ -18,8 +18,8 @@ use crate::content::{ContentBlock, Role};
 use crate::error::EngineError;
 use crate::hook::{HookOutcomeKind, HookPoint};
 use crate::ids::{
-    MessageId, ModeSwitchId, PeerMessageId, PermissionRequestId, QuestionId, SessionId,
-    ToolCallId, TurnId,
+    MessageId, ModeSwitchId, PeerMessageId, PermissionRequestId, QuestionId, SessionId, ToolCallId,
+    TurnId,
 };
 use crate::permission::{Answer, PermissionDecision, PermissionDecisionKind, Question};
 use crate::session::{CompactionSummary, PlanEntry, SessionMeta, TurnSummary};
