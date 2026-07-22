@@ -19,6 +19,7 @@ export type {
   AppState,
   ContentLayout,
   ContentTab,
+  TabGroup,
 } from "./types"
 export { sessionScopeKey, sessionHasActivity } from "./types"
 export { persistUiState, restoreUiState } from "./persist"

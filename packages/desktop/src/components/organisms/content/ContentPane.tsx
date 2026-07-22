@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
@@ -33,6 +34,7 @@ import { visibleRightPanelTabs } from "../right-panel/tabs"
 import { ChatSessionBody } from "./ChatSessionBody"
 import { ToolTabBody } from "./ToolTabBody"
 import { cn } from "../../../lib/utils"
+import { sessionColor, GROUP_PALETTE } from "../../../lib/sessionColor"
 
 type ContentPaneProps = {
   paneIndex: 0 | 1
@@ -45,6 +47,33 @@ const STRIP_CATALOG = visibleRightPanelTabs({ hasBranchPr: true })
 
 /** Stable fallback when a pane index is missing (must keep object identity). */
 const EMPTY_PANE = emptyPane()
+
+// ─── Group color swatch bar ───────────────────────────────────────────────────
+
+type GroupSwatchBarProps = {
+  onPickColor: (color: string) => void
+}
+
+const GroupSwatchBar = ({ onPickColor }: GroupSwatchBarProps) => (
+  <div
+    className="flex shrink-0 items-center gap-1 px-1"
+    role="group"
+    aria-label="Pick group color"
+  >
+    <span className="mr-0.5 text-[10px] text-ink-muted">Group:</span>
+    {GROUP_PALETTE.map((color) => (
+      <button
+        key={color}
+        type="button"
+        aria-label={`Group with color ${color}`}
+        title={`Group tabs — ${color}`}
+        onClick={() => onPickColor(color)}
+        className="h-3.5 w-3.5 shrink-0 rounded-full transition-transform hover:scale-125 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stroke-2"
+        style={{ backgroundColor: color }}
+      />
+    ))}
+  </div>
+)
 
 const tabLabel = (
   tab: ContentTab,
@@ -111,9 +140,40 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   const openTabToSide = useAppStore((s) => s.openTabToSide)
   const setFocusedPane = useAppStore((s) => s.setFocusedPane)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
+  const streamingSessions = useAppStore((s) => s.streamingSessions)
+  const browserOwnerSessionId = useAppStore((s) => s.browserOwnerSessionId)
+  const stampTabGroup = useAppStore((s) => s.stampTabGroup)
+  const removeTabsFromGroup = useAppStore((s) => s.removeTabsFromGroup)
   const { sessions } = useSessions()
   const dragUi = useTabDragUi()
   const [openTabModal, setOpenTabModal] = useState(false)
+
+  // ─── SHIFT range-select state ──────────────────────────────────────────────
+  // Ephemeral — not persisted; clears when the pane unmounts or on plain click.
+  const [selectedTabIds, setSelectedTabIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
+  const anchorTabIdRef = useRef<string | null>(null)
+
+  const clearSelection = useCallback(() => {
+    setSelectedTabIds(new Set())
+    anchorTabIdRef.current = null
+  }, [])
+
+  // ─── Group picker ──────────────────────────────────────────────────────────
+  const groupIdCounter = useRef(0)
+
+  const handlePickGroupColor = useCallback(
+    (color: string) => {
+      const ids = Array.from(selectedTabIds)
+      if (ids.length < 2) return
+      groupIdCounter.current += 1
+      const groupId = `g${Date.now()}_${groupIdCounter.current}`
+      stampTabGroup(paneIndex, ids, groupId, color)
+      clearSelection()
+    },
+    [selectedTabIds, paneIndex, stampTabGroup, clearSelection],
+  )
 
   const { tabsScrollRef, scrollMask, handleTabsWheel } = useTabStripScrollFade(
     pane.tabs.length,
@@ -158,15 +218,24 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   )
   const paneFocused = focusedPane === paneIndex
 
+  const handleUngroup = useCallback(
+    (tabId: string) => {
+      removeTabsFromGroup(paneIndex, [tabId])
+    },
+    [paneIndex, removeTabsFromGroup],
+  )
+
   const { menuPosition, contextMenuItems, onTabContextMenu, closeMenu } =
     useContentPaneContextMenu({
       paneIndex,
       paneTabs: pane.tabs,
+      paneGroups: pane.groups ?? {},
       splitEligible,
       openTabToSide,
       closeTabInPane,
       closeOtherTabsInPane,
       closeTabsToRightInPane,
+      onRemoveFromGroup: handleUngroup,
     })
 
   // Keep the active tab visible when it changes or tabs are added.
@@ -225,6 +294,8 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
       ? dragUi.insertAt
       : null
 
+  const showGroupBar = selectedTabIds.size >= 2
+
   return (
     <div
       className={cn(
@@ -282,6 +353,58 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
             const prev = displayTabs[index - 1]
             const showDivider = prev?.kind === "chat" && t.kind === "tool"
 
+            // Session affinity dot: shown when multiple sessions share the pane.
+            const dotColor = hasMultipleSessions
+              ? sessionColor(t.sessionId)
+              : undefined
+
+            // Activity indicators: streaming chat tabs + browser-owner tool tabs.
+            const isBrowser = t.kind === "tool" && t.tool === "browser"
+            const isStreaming = streamingSessions[t.sessionId] ?? false
+            const isBrowserOwner =
+              isBrowser && browserOwnerSessionId === t.sessionId
+            const showActivity = isStreaming || isBrowserOwner
+
+            // Group underbar: read color from the pane's groups map.
+            const groupColor =
+              t.groupId != null && pane.groups?.[t.groupId] != null
+                ? pane.groups[t.groupId]!.color
+                : undefined
+
+            // SHIFT range-selection highlight.
+            const isRangeSelected = selectedTabIds.has(t.id)
+
+            // SHIFT+click opens range selection; plain click activates + clears.
+            const handleTabClick = (e: ReactMouseEvent<HTMLElement>) => {
+              if (e.shiftKey) {
+                e.preventDefault()
+                const anchor = anchorTabIdRef.current
+                if (!anchor) {
+                  anchorTabIdRef.current = t.id
+                  setSelectedTabIds(new Set([t.id]))
+                } else {
+                  const anchorIdx = displayTabs.findIndex(
+                    (dt) => dt.id === anchor,
+                  )
+                  if (anchorIdx < 0) {
+                    anchorTabIdRef.current = t.id
+                    setSelectedTabIds(new Set([t.id]))
+                  } else {
+                    const lo = Math.min(anchorIdx, index)
+                    const hi = Math.max(anchorIdx, index)
+                    setSelectedTabIds(
+                      new Set(
+                        displayTabs.slice(lo, hi + 1).map((dt) => dt.id),
+                      ),
+                    )
+                  }
+                }
+              } else {
+                clearSelection()
+                activateTabInPane(paneIndex, t.id)
+              }
+            }
+
             return (
               <Fragment key={t.id}>
                 {showDivider ? (
@@ -307,14 +430,21 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                   tabId={t.id}
                   tabIndex={t.id === pane.activeTabId ? 0 : -1}
                   onSelect={() => activateTabInPane(paneIndex, t.id)}
+                  onClick={handleTabClick}
                   onClose={() => closeTabInPane(paneIndex, t.id)}
                   onContextMenu={(e) => onTabContextMenu(e, t.id)}
                   closeLabel={`Close ${label}`}
                   draggable
                   dropEdge={dropEdge}
-                  onPointerDown={(e) =>
+                  onPointerDown={(e) => {
+                    // Skip DnD initiation when SHIFT is held (range-select gesture).
+                    if (e.shiftKey) return
                     startContentTabPointerDrag(e, paneIndex, t.id)
-                  }
+                  }}
+                  groupColor={groupColor}
+                  activityDot={showActivity}
+                  sessionColor={dotColor}
+                  rangeSelected={isRangeSelected}
                 >
                   {label}
                 </Tab>
@@ -323,6 +453,9 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
           })}
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
+          {showGroupBar ? (
+            <GroupSwatchBar onPickColor={handlePickGroupColor} />
+          ) : null}
           <OpenTabModal
             open={openTabModal}
             onOpenChange={setOpenTabModal}

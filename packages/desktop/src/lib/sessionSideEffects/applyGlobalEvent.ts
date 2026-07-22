@@ -15,6 +15,7 @@ import {
 } from "./agentTerminal"
 import { maybeToastDevServerUrl } from "./devServerToast"
 import { maybeAutoTitleSession } from "./autoTitle"
+import { maybeRegisterArtifact } from "./artifactSideEffects"
 import { invalidateGitQueries } from "../invalidateGitQueries"
 import {
   invalidateWorkspaceQueries,
@@ -354,6 +355,11 @@ export const applyGlobalSessionEvent = (
     ) {
       invalidateWorkspaceQueries(opts.queryClient)
     }
+  }
+
+  // Auto-register artifacts when a Write/Edit completes for an artifact path.
+  if (!opts?.ignoreStreaming && payload.kind === "tool_call_updated") {
+    maybeRegisterArtifact(event, store.activeSessionId)
   }
 
   // Background-completion notification + unread dot: only for live events

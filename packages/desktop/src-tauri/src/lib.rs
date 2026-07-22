@@ -1,3 +1,4 @@
+mod artifacts_plugin;
 mod browser;
 mod commands;
 mod components_plugin;
@@ -341,6 +342,11 @@ pub fn run() {
             db_plugin::db_preview_table,
             db_plugin::db_query,
             db_plugin::db_mention_tables,
+            artifacts_plugin::artifacts_list,
+            artifacts_plugin::artifacts_register,
+            artifacts_plugin::artifacts_remove,
+            artifacts_plugin::artifacts_preview_csv,
+            artifacts_plugin::artifacts_open_external,
             components_plugin::components_detect,
             components_plugin::components_list,
             components_plugin::components_detail,

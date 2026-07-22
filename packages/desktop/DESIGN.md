@@ -303,6 +303,21 @@ FilesChangedCard) sits **outside** the virtual window. Scroll-down FAB:
 3. Body — `relative flex-1` + absolute tab hosts
 4. Terminal / Database / Components — optional **180px** left list (`px-2.5 py-1.5 text-xs` rows)
 
+### TabStrip — tab groups and agent affinity
+
+**Tab groups** (`ContentTab.groupId`, `PaneState.groups`):
+- SHIFT+click selects a range of tabs; a `GroupSwatchBar` (6–8 color swatches, `h-3.5 w-3.5` circles, `gap-1`) appears inline in the trailing TabStrip actions when ≥ 2 tabs are selected.
+- Picking a color creates a `TabGroup` record in `PaneState.groups` and stamps each tab's `groupId`.
+- Member tabs show a **2px underbar** (`h-0.5 rounded-b-md`) in the group color along their bottom edge.
+- Context menu: "Remove from Group" appears when the right-clicked tab has a `groupId`. Individual close still works normally.
+- Groups persist via `contentLayout → ui.json` (additive wire fields).
+
+**Agent affinity dots**:
+- **Session color dot** (`h-1.5 w-1.5 rounded-full`) — shown only when ≥ 2 sessions share the pane. Color is deterministic via `djb2(sessionId) % SESSION_PALETTE.length` from `lib/sessionColor.ts`. Appears before the tab icon.
+- **Activity dot** (`h-1.5 w-1.5 animate-pulse rounded-full bg-accent`) — shown on chat tabs whose `sessionId` has `streamingSessions[sessionId] === true`, and on the browser tool tab when `browserOwnerSessionId === t.sessionId`. Appears after the label text.
+
+Color palette constants (`lib/sessionColor.ts`): `GROUP_PALETTE` (8 colors for group picker), `SESSION_PALETTE` (12 colors for affinity dots).
+
 | Tab | Header notes |
 |---|---|
 | Plan | `PlanToolbar` breadcrumbs + Build (`h-6` controls); find bar is a secondary `h-8` row with `border-y` |

@@ -1,6 +1,24 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Code2, Eye, FolderTree, Save } from "lucide-react"
+import {
+  AlertCircle,
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  Code2,
+  Eye,
+  FolderTree,
+  Save,
+} from "lucide-react"
+import type { OnMount } from "@monaco-editor/react"
 import { Spinner, Tab } from "../../atoms"
 import { ConfirmDialog, ErrorBanner, MarkdownBody } from "../../molecules"
 import { Button } from "@/components/ui/button"
@@ -18,8 +36,137 @@ import {
 import { FileExplorer } from "./FileExplorer"
 import type { SessionMeta } from "../../../lib/types"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  useMonacoMarkers,
+  MarkerSeverity,
+  type MonacoMarker,
+} from "../../../hooks/useMonacoMarkers"
+import { useInlineCompletionPrefs } from "../../../hooks/useInlineCompletionPrefs"
+import { INLINE_COMPLETION_ENABLED } from "../../../lib/featureFlags"
+import { hasInlineCompletionPlugin } from "../../../plugins/registry"
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"))
+
+// ── Problems strip ────────────────────────────────────────────────────────────
+
+type ProblemsStripProps = {
+  markers: MonacoMarker[]
+  errorCount: number
+  warningCount: number
+  hasProblems: boolean
+  open: boolean
+  onToggle: () => void
+  onGoToMarker: (m: MonacoMarker) => void
+}
+
+/** Collapsible IDE-style Problems panel docked below the Monaco editor.
+ * Accept inline suggestions with Tab; click any row to jump to the line. */
+const ProblemsStrip = ({
+  markers,
+  errorCount,
+  warningCount,
+  hasProblems,
+  open,
+  onToggle,
+  onGoToMarker,
+}: ProblemsStripProps) => {
+  const label =
+    hasProblems
+      ? [
+          errorCount > 0
+            ? `${errorCount} error${errorCount !== 1 ? "s" : ""}`
+            : "",
+          warningCount > 0
+            ? `${warningCount} warning${warningCount !== 1 ? "s" : ""}`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : "No problems"
+
+  return (
+    <div className="shrink-0 border-t border-stroke-3">
+      {/* Header row */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className={cn(
+          "flex w-full items-center gap-1.5 px-2.5 py-1",
+          "text-xs text-ink-secondary hover:bg-fill-3",
+          "select-none transition-colors",
+        )}
+        aria-expanded={open}
+      >
+        {open ? (
+          <ChevronDown className="h-3 w-3 shrink-0 text-ink-faint" aria-hidden />
+        ) : (
+          <ChevronRight className="h-3 w-3 shrink-0 text-ink-faint" aria-hidden />
+        )}
+        <span className="font-medium">Problems</span>
+        {hasProblems ? (
+          <span className="ml-1 text-ink-muted">{label}</span>
+        ) : (
+          <span className="ml-1 text-ink-faint">{label}</span>
+        )}
+        {errorCount > 0 ? (
+          <AlertCircle
+            className="ml-auto h-3 w-3 shrink-0 text-red-500"
+            aria-label={`${errorCount} error${errorCount !== 1 ? "s" : ""}`}
+          />
+        ) : warningCount > 0 ? (
+          <AlertTriangle
+            className="ml-auto h-3 w-3 shrink-0 text-yellow-500"
+            aria-label={`${warningCount} warning${warningCount !== 1 ? "s" : ""}`}
+          />
+        ) : null}
+      </button>
+
+      {/* Expanded marker list */}
+      {open && hasProblems ? (
+        <ul className="max-h-36 overflow-y-auto" role="list">
+          {markers
+            .filter(
+              (m) =>
+                m.severity === MarkerSeverity.Error ||
+                m.severity === MarkerSeverity.Warning,
+            )
+            .map((m, i) => (
+              <li key={i}>
+                <button
+                  type="button"
+                  onClick={() => onGoToMarker(m)}
+                  className={cn(
+                    "flex w-full items-start gap-2 px-2.5 py-1 text-left",
+                    "text-xs hover:bg-fill-3 transition-colors",
+                  )}
+                >
+                  {m.severity === MarkerSeverity.Error ? (
+                    <AlertCircle
+                      className="mt-px h-3 w-3 shrink-0 text-red-500"
+                      aria-label="Error"
+                    />
+                  ) : (
+                    <AlertTriangle
+                      className="mt-px h-3 w-3 shrink-0 text-yellow-500"
+                      aria-label="Warning"
+                    />
+                  )}
+                  <span className="min-w-0 flex-1 truncate text-ink">
+                    {m.message}
+                  </span>
+                  <span className="shrink-0 text-ink-faint">
+                    {m.startLineNumber}:{m.startColumn}
+                  </span>
+                </button>
+              </li>
+            ))}
+        </ul>
+      ) : null}
+    </div>
+  )
+}
+
+// ── FilesTab ──────────────────────────────────────────────────────────────────
 
 type FilesTabProps = {
   /** True when the Files panel body is the visible right-panel tab. */
@@ -88,13 +235,44 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
   )
   const hadOpenFilesRef = useRef(openFiles.length > 0)
 
+  // Stable ref to the current Monaco editor instance (for click-to-navigate).
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
+
+  // Problems strip.
+  const [problemsOpen, setProblemsOpen] = useState(false)
+
+  // Inline completion: gate by feature flag + plugin + prefs.
+  const { prefs: completionPrefs } = useInlineCompletionPrefs()
+  const completionEnabled =
+    INLINE_COMPLETION_ENABLED &&
+    hasInlineCompletionPlugin() &&
+    !!completionPrefs?.enabled &&
+    !!(completionPrefs?.providerId && completionPrefs?.modelId)
+
   useEffect(() => {
     // Monaco (~3MB) stays out of the initial graph — wire workers on first Files mount.
-    void import("../../../lib/monacoEnv").then((m) => m.ensureMonaco())
+    void import("../../../lib/monacoEnv").then((m) => {
+      m.ensureMonaco()
+      m.setMonacoCompletionEnabled(completionEnabled)
+    })
+  }, [completionEnabled])
+
+  const handleEditorMount: OnMount = useCallback((editor) => {
+    editorRef.current = editor
   }, [])
 
   const path =
     activePath && openFiles.includes(activePath) ? activePath : openFiles[0] ?? null
+
+  // Markers for the active file — drives the Problems strip.
+  const markers = useMonacoMarkers(path)
+  const errorCount = markers.filter(
+    (m) => m.severity === MarkerSeverity.Error,
+  ).length
+  const warningCount = markers.filter(
+    (m) => m.severity === MarkerSeverity.Warning,
+  ).length
+  const hasProblems = errorCount + warningCount > 0
 
   // Only tear down the Files tool tab after the user closes the last buffer —
   // never when they open an empty Files tab to browse.
@@ -360,72 +538,98 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1">
-        {isLoading ? (
-          <div className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted">
-            <Spinner size="sm" />
-            Loading…
-          </div>
-        ) : loadError ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
-            <ErrorBanner message={loadError} className="max-w-md" />
-            <Button
-              variant="link"
-              onClick={() => void refetch()}
-              className="h-auto px-0 py-0 text-xs font-normal"
-            >
-              Retry
-            </Button>
-          </div>
-        ) : path && previewMode ? (
-          <ScrollArea className="h-full">
-            <div className="px-2.5 py-2">
-              {value.trim().length === 0 ? (
-                <p className="text-sm text-ink-muted">Empty file</p>
-              ) : (
-                <MarkdownBody content={value} />
-              )}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="relative min-h-0 flex-1">
+          {isLoading ? (
+            <div className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted">
+              <Spinner size="sm" />
+              Loading…
             </div>
-          </ScrollArea>
-        ) : path && active ? (
-          <Suspense
-            fallback={
-              <div className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted">
-                <Spinner size="sm" />
-                Loading editor…
+          ) : loadError ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
+              <ErrorBanner message={loadError} className="max-w-md" />
+              <Button
+                variant="link"
+                onClick={() => void refetch()}
+                className="h-auto px-0 py-0 text-xs font-normal"
+              >
+                Retry
+              </Button>
+            </div>
+          ) : path && previewMode ? (
+            <ScrollArea className="h-full">
+              <div className="px-2.5 py-2">
+                {value.trim().length === 0 ? (
+                  <p className="text-sm text-ink-muted">Empty file</p>
+                ) : (
+                  <MarkdownBody content={value} />
+                )}
               </div>
-            }
-          >
-            <MonacoEditor
-              height="100%"
-              path={path}
-              language={language}
-              theme={theme === "light" ? "vs" : "vs-dark"}
-              value={value}
-              onChange={handleChange}
-              options={{
-                fontSize: 13,
-                fontFamily: "var(--font-mono), ui-monospace, monospace",
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-              wordWrap: "on",
-              automaticLayout: true,
-              tabSize: 2,
-              renderWhitespace: "selection",
-              padding: { top: 8, bottom: 8 },
-              bracketPairColorization: { enabled: true },
+            </ScrollArea>
+          ) : path && active ? (
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted">
+                  <Spinner size="sm" />
+                  Loading editor…
+                </div>
+              }
+            >
+              <MonacoEditor
+                height="100%"
+                path={path}
+                language={language}
+                theme={theme === "light" ? "vs" : "vs-dark"}
+                value={value}
+                onChange={handleChange}
+                onMount={handleEditorMount}
+                options={{
+                  fontSize: 13,
+                  fontFamily: "var(--font-mono), ui-monospace, monospace",
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  wordWrap: "on",
+                  automaticLayout: true,
+                  tabSize: 2,
+                  renderWhitespace: "selection",
+                  padding: { top: 8, bottom: 8 },
+                  bracketPairColorization: { enabled: true },
+                  inlineSuggest: { enabled: true },
+                }}
+                loading={
+                  <div className="flex h-full items-center justify-center text-sm text-ink-muted">
+                    Loading editor…
+                  </div>
+                }
+              />
+            </Suspense>
+          ) : path ? (
+            // Keep-alive host is hidden — skip Monaco so automaticLayout / workers
+            // do not run off-screen. Drafts stay in the store.
+            <div className="h-full" aria-hidden />
+          ) : null}
+        </div>
+
+        {/* Problems strip — collapsible; only rendered when the editor is active */}
+        {path && active && !previewMode ? (
+          <ProblemsStrip
+            markers={markers}
+            errorCount={errorCount}
+            warningCount={warningCount}
+            hasProblems={hasProblems}
+            open={problemsOpen}
+            onToggle={() => setProblemsOpen((v) => !v)}
+            onGoToMarker={(m) => {
+              const editor = editorRef.current
+              if (!editor) return
+              editor.revealLineInCenterIfOutsideViewport(m.startLineNumber)
+              editor.setPosition({
+                lineNumber: m.startLineNumber,
+                column: m.startColumn,
+              })
+              editor.focus()
             }}
-            loading={
-              <div className="flex h-full items-center justify-center text-sm text-ink-muted">
-                Loading editor…
-              </div>
-            }
           />
-          </Suspense>
-        ) : path ? (
-          // Keep-alive host is hidden — skip Monaco so automaticLayout / workers
-          // do not run off-screen. Drafts stay in the store.
-          <div className="h-full" aria-hidden />
         ) : null}
       </div>
 

@@ -36,11 +36,17 @@ export const COMPONENTS_TAB_ENABLED = envBool("VITE_COMPONENTS_TAB", false)
  * Disable with `VITE_INLINE_COMPLETION=false`. */
 export const INLINE_COMPLETION_ENABLED = envBool("VITE_INLINE_COMPLETION", true)
 
+/** Right-panel Artifacts UI plugin (AI-created non-code deliverables).
+ * Default on — first-party plugin tab.
+ * Disable with `VITE_ARTIFACTS_TAB=false`. */
+export const ARTIFACTS_TAB_ENABLED = envBool("VITE_ARTIFACTS_TAB", true)
+
 /** Flag-gated built-in right-panel tabs. Plugin tabs use their own
  * `enabled` bit on the UI plugin registry. */
 export const isRightPanelTabEnabled = (tab: string): boolean => {
   if (tab === "memory") return MEMORY_TAB_ENABLED
   if (tab === "database") return DATABASE_TAB_ENABLED
   if (tab === "components") return COMPONENTS_TAB_ENABLED
+  if (tab === "artifacts") return ARTIFACTS_TAB_ENABLED
   return true
 }

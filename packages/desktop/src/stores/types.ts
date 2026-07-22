@@ -91,6 +91,7 @@ export type {
   ContentTab,
   ContentLayout,
   PaneState,
+  TabGroup,
   ToolTabId,
 } from "./contentLayoutModel"
 
@@ -454,6 +455,19 @@ export type ContentLayoutSliceState = {
   closeTabsToRightInPane: (pane: 0 | 1, tabId: string) => void
   /** Focus pane + sync activeSessionId when activating a chat tab. */
   focusContentTab: (pane: 0 | 1, tabId: string) => void
+  /**
+   * Stamp a color group onto a set of tabs. Creates / updates the group record
+   * in `pane.groups` and sets each tab's `groupId`. Persists to `ui.json`.
+   */
+  stampTabGroup: (
+    pane: 0 | 1,
+    tabIds: string[],
+    groupId: string,
+    color: string,
+    name?: string,
+  ) => void
+  /** Clear `groupId` from the given tabs; prunes orphaned group records. */
+  removeTabsFromGroup: (pane: 0 | 1, tabIds: string[]) => void
 }
 
 export type UiSliceState = {

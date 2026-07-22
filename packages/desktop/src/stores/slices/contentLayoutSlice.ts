@@ -23,6 +23,7 @@ import {
   type ContentLayout,
   type ContentTab,
   type PaneState,
+  type TabGroup,
 } from "../contentLayoutModel"
 
 /**
@@ -87,6 +88,7 @@ const clonePanes = (layout: ContentLayout): PaneState[] =>
   layout.panes.map((p) => ({
     tabs: [...p.tabs],
     activeTabId: p.activeTabId,
+    groups: p.groups ? { ...p.groups } : {},
   }))
 
 export const createContentLayoutSlice: StateCreator<
@@ -545,6 +547,50 @@ export const createContentLayoutSlice: StateCreator<
 
   focusContentTab: (pane, tabId) => {
     get().activateTabInPane(pane, tabId)
+  },
+
+  stampTabGroup: (pane, tabIds, groupId, color, name) => {
+    const layout = get().contentLayout
+    const p = layout.panes[pane]
+    if (!p) return
+    const group: TabGroup = { id: groupId, color, ...(name ? { name } : {}) }
+    const groups: Record<string, TabGroup> = { ...(p.groups ?? {}), [groupId]: group }
+    const tabIdSet = new Set(tabIds)
+    const tabs = p.tabs.map((t) =>
+      tabIdSet.has(t.id) ? { ...t, groupId } : t,
+    )
+    const nextPane: PaneState = { ...p, tabs, groups }
+    const next: ContentLayout = {
+      ...layout,
+      panes: replacePane(layout, pane, nextPane),
+    }
+    set({ contentLayout: next })
+    persistLayout(next)
+  },
+
+  removeTabsFromGroup: (pane, tabIds) => {
+    const layout = get().contentLayout
+    const p = layout.panes[pane]
+    if (!p) return
+    const tabIdSet = new Set(tabIds)
+    const tabs = p.tabs.map((t) =>
+      tabIdSet.has(t.id) ? { ...t, groupId: undefined } : t,
+    )
+    // Prune groups that have no remaining members.
+    const liveGroupIds = new Set(
+      tabs.map((t) => t.groupId).filter(Boolean) as string[],
+    )
+    const groups: Record<string, TabGroup> = {}
+    for (const [id, g] of Object.entries(p.groups ?? {})) {
+      if (liveGroupIds.has(id)) groups[id] = g
+    }
+    const nextPane: PaneState = { ...p, tabs, groups }
+    const next: ContentLayout = {
+      ...layout,
+      panes: replacePane(layout, pane, nextPane),
+    }
+    set({ contentLayout: next })
+    persistLayout(next)
   },
 })
 

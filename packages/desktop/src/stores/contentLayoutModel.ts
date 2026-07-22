@@ -4,13 +4,23 @@ import type { RightPanelTab } from "./types"
 /** Tool surfaces formerly hosted in the right panel. */
 export type ToolTabId = RightPanelTab
 
+/** A named color group that tabs can belong to. Persists in `PaneState.groups`. */
+export type TabGroup = {
+  id: string
+  name?: string
+  /** CSS color — drawn as a 2px underbar on member tabs. */
+  color: string
+}
+
 export type ContentTab =
-  | { id: string; kind: "chat"; sessionId: SessionId }
-  | { id: string; kind: "tool"; tool: ToolTabId; sessionId: SessionId }
+  | { id: string; kind: "chat"; sessionId: SessionId; groupId?: string }
+  | { id: string; kind: "tool"; tool: ToolTabId; sessionId: SessionId; groupId?: string }
 
 export type PaneState = {
   tabs: ContentTab[]
   activeTabId: string | null
+  /** Named color groups for this pane's tabs. Keyed by group id. */
+  groups?: Record<string, TabGroup>
 }
 
 export type ContentLayout = {
@@ -26,7 +36,7 @@ export const chatTabId = (sessionId: SessionId): string => `chat:${sessionId}`
 export const toolTabId = (sessionId: SessionId, tool: ToolTabId): string =>
   `tool:${sessionId}:${tool}`
 
-export const emptyPane = (): PaneState => ({ tabs: [], activeTabId: null })
+export const emptyPane = (): PaneState => ({ tabs: [], activeTabId: null, groups: {} })
 
 /** Replace one pane; keep the sibling pane's object identity for React. */
 export const replacePane = (

@@ -51,6 +51,8 @@ tokio-postgres = "0.7"
 mysql_async = "0.34"
 # Components UI plugin — TSX export / import heuristics.
 regex = "1"
+# Artifacts plugin — CSV preview parsing.
+csv = "1"
 
 # Composition root — never call EngineService::native or providers::resolve_* here.
 agentloop-sdk = { path = "../../sdk/crates/sdk", features = ["search", "index", "learning", "verifier"] }

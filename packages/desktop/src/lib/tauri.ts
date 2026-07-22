@@ -932,6 +932,66 @@ export const reviewFileDiff = (
   path: string,
 ): Promise<string> => invoke("review_file_diff", { sessionId, path })
 
+// ── Artifacts plugin ──────────────────────────────────────────────────────────
+
+export type ArtifactKind =
+  | "presentation"
+  | "spreadsheet"
+  | "csv"
+  | "diagram"
+  | "image"
+  | "document"
+  | "other"
+
+export type Artifact = {
+  id: string
+  projectKey: string
+  sessionId: string
+  kind: ArtifactKind
+  relativePath: string
+  title: string
+  createdAt: string
+  mimeType?: string
+}
+
+export type CsvPreview = {
+  columns: string[]
+  rows: string[][]
+  truncated: boolean
+  rowCount: number
+}
+
+export const artifactsList = (projectKey: string): Promise<Artifact[]> =>
+  invoke("artifacts_list", { projectKey })
+
+export const artifactsRegister = (
+  projectKey: string,
+  sessionId: string,
+  relativePath: string,
+  title?: string,
+): Promise<Artifact> =>
+  invoke("artifacts_register", {
+    projectKey,
+    sessionId,
+    relativePath,
+    title: title ?? null,
+  })
+
+export const artifactsRemove = (projectKey: string, id: string): Promise<void> =>
+  invoke("artifacts_remove", { projectKey, id })
+
+export const artifactsPreviewCsv = (
+  projectKey: string,
+  id: string,
+  maxRows?: number,
+): Promise<CsvPreview> =>
+  invoke("artifacts_preview_csv", { projectKey, id, maxRows: maxRows ?? null })
+
+export const artifactsOpenExternal = (
+  projectKey: string,
+  id: string,
+): Promise<void> => invoke("artifacts_open_external", { projectKey, id })
+
 export const toInvokeError = (err: unknown): string => {
   if (typeof err === "string") return err
   if (err instanceof Error) return err.message

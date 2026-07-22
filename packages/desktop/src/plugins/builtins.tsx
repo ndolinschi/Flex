@@ -1,10 +1,12 @@
-import { Boxes, Database } from "lucide-react"
+import { Boxes, Database, Package } from "lucide-react"
 import { DatabaseTab } from "./database/DatabaseTab"
 import { ComponentsTab } from "./components/ComponentsTab"
+import { ArtifactsTab } from "./artifacts/ArtifactsTab"
 import { searchDatabaseMentions } from "./database/mentions"
 import { searchMcpMentions } from "./mcp/mentions"
 import { registerUiPlugin } from "./registry"
 import {
+  ARTIFACTS_TAB_ENABLED,
   COMPONENTS_TAB_ENABLED,
   DATABASE_TAB_ENABLED,
   INLINE_COMPLETION_ENABLED,
@@ -43,6 +45,21 @@ export const registerBuiltinUiPlugins = (): void => {
         enabled: COMPONENTS_TAB_ENABLED,
         render: ({ active, session }) => (
           <ComponentsTab active={active} session={session} />
+        ),
+      },
+    ],
+  })
+
+  registerUiPlugin({
+    id: "artifacts",
+    tabs: [
+      {
+        id: "artifacts",
+        label: "Artifacts",
+        icon: Package,
+        enabled: ARTIFACTS_TAB_ENABLED,
+        render: ({ active, session }) => (
+          <ArtifactsTab active={active} session={session} />
         ),
       },
     ],
