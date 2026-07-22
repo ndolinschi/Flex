@@ -145,7 +145,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   const closeTabsToRightInPane = useAppStore((s) => s.closeTabsToRightInPane)
   const closePane = useAppStore((s) => s.closePane)
   const openChatInPane = useAppStore((s) => s.openChatInPane)
-  const openToolInPane = useAppStore((s) => s.openToolInPane)
+  const openToolBesideChat = useAppStore((s) => s.openToolBesideChat)
   const openTabToSide = useAppStore((s) => s.openTabToSide)
   const setFocusedPane = useAppStore((s) => s.setFocusedPane)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
@@ -311,7 +311,8 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   return (
     <div
       className={cn(
-        // Continuous chrome surface (`--color-chrome` via bg-bg); no card stack.
+        // Continuous chrome surface (`--color-chrome` via bg-bg); tool work
+        // surfaces can layer `bg-editor` inside their own hosts.
         "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-bg",
         paneFocused ? "z-[1]" : "z-0",
       )}
@@ -490,8 +491,8 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
             sessionId={contextSession}
             tabs={catalog}
             onOpenChat={openChatInPane}
-            onOpenTool={(p, sid, tool) =>
-              openToolInPane(p, sid, tool as RightPanelTab)
+            onOpenTool={(_p, sid, tool) =>
+              openToolBesideChat(sid, tool as RightPanelTab)
             }
           />
           {split ? (

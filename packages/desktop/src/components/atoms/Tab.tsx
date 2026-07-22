@@ -110,6 +110,7 @@ export const Tab = ({
     selected
       ? "bg-fill-2 text-ink"
       : "text-ink-muted hover:bg-fill-4 hover:text-ink-secondary",
+    selected && variant === "chip" && "border-l-2 border-l-accent pl-[calc(0.375rem-2px)]",
     rangeSelected && !selected && "ring-1 ring-inset ring-stroke-2",
     // Pointer until an active drag sets body cursor to grabbing.
     draggable ? "cursor-pointer touch-none" : null,

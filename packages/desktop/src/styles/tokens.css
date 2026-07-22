@@ -9,9 +9,9 @@
    * non-Tailwind use. Not exposed as `--color-base` in `@theme` (that name
    * steals the `text-base` font-size utility). */
   --color-base: #f2f2f2;
-  --color-chrome: #0f1114; /* chat pane / main surface */
-  --color-panel: #14171c; /* sidebar + popovers */
-  --color-editor: #0f1114;
+  --color-chrome: #0f1114; /* chat rail / shell */
+  --color-panel: #14171c; /* sidebar + explorer + popovers */
+  --color-editor: #12151a; /* Monaco / work surface — shade step above chrome */
   --color-elevated: #1a1d24; /* chat bubbles / raised tiles */
 
   /* Cool white ink (Cursor glass icon stack: ~236 241 250). */
@@ -90,7 +90,7 @@
   --color-base: #171717;
   --color-chrome: #ffffff;
   --color-panel: #f3f3f4;
-  --color-editor: #ffffff;
+  --color-editor: #f7f7f8; /* work surface — quiet step off pure white chrome */
   --color-elevated: #fafafa;
 
   --color-text-1: rgb(23 23 23 / 0.94);

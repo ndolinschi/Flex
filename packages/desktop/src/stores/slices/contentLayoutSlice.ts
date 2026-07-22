@@ -13,6 +13,7 @@ import {
   defaultContentLayout,
   emptyPane,
   ensureChatInPane,
+  makeChatTab,
   moveTabBetweenPanes as moveTabBetweenPanesModel,
   normalizeLayout,
   otherPaneIndex,
@@ -246,16 +247,8 @@ export const createContentLayoutSlice: StateCreator<
   openToolBesideChat: (sessionId, tool) => {
     if (!isRightPanelTabEnabled(tool)) return
     let layout = get().contentLayout
-
-    // Prefer existing tool tab wherever it already lives.
     const existingId = toolTabId(sessionId, tool)
-    for (let i = 0; i < layout.panes.length; i++) {
-      const pane = layout.panes[i]
-      if (pane?.tabs.some((t) => t.id === existingId)) {
-        get().activateTabInPane(i as 0 | 1, existingId)
-        return
-      }
-    }
+    const chatId = chatTabId(sessionId)
 
     if (!isSplitEligible(get())) {
       // Not wide enough for a split: open tool in the single pane.
@@ -267,31 +260,8 @@ export const createContentLayoutSlice: StateCreator<
       return
     }
 
-    // Prefer the pane that already hosts this session's chat so we don't
-    // clobber a right-pane chat by forcing the tool into pane 1.
-    const chatId = chatTabId(sessionId)
-    let chatPane: 0 | 1 = 0
-    const focused = layout.focusedPane
-    if (layout.panes[focused]?.tabs.some((t) => t.id === chatId)) {
-      chatPane = focused
-    } else {
-      for (let i = 0; i < layout.panes.length; i++) {
-        if (layout.panes[i]?.tabs.some((t) => t.id === chatId)) {
-          chatPane = i as 0 | 1
-          break
-        }
-      }
-    }
-
-    layout = ensureChatInPane(layout, chatPane, sessionId)
-    const chatSide = layout.panes[chatPane]!
-    if (
-      !chatSide.activeTabId ||
-      !chatSide.tabs.some((t) => t.id === chatSide.activeTabId)
-    ) {
-      chatSide.activeTabId = chatId
-    }
-
+    // Wide: keep chat as the left rail, tools on the right — even when the
+    // tool tab already coexists in the chat pane (activate must not bury chat).
     if (layout.mode !== "split") {
       layout = {
         ...layout,
@@ -299,13 +269,78 @@ export const createContentLayoutSlice: StateCreator<
         focusedPane: 1,
         panes: [layout.panes[0]!, emptyPane()],
       }
-      chatPane = 0
     }
 
-    const toolPane = otherPaneIndex(chatPane)
-    const next = upsertToolInPane(layout, toolPane, sessionId, tool)
-    set({ contentLayout: next, ...syncCompatFlags(next) })
-    persistLayout(next)
+    // Prefer chat in pane 0.
+    const chatWhere = layout.panes[0]?.tabs.some((t) => t.id === chatId)
+      ? 0
+      : layout.panes[1]?.tabs.some((t) => t.id === chatId)
+        ? 1
+        : null
+    if (chatWhere === 1) {
+      layout = moveTabBetweenPanesModel(
+        layout,
+        1,
+        0,
+        chatId,
+        layout.panes[0]?.tabs.length ?? 0,
+      )
+    } else if (chatWhere === null) {
+      layout = ensureChatInPane(layout, 0, sessionId)
+    }
+
+    // Pin chat as the active tab in its pane.
+    {
+      const panes = clonePanes(layout)
+      const chatPane = panes[0]!
+      if (!chatPane.tabs.some((t) => t.id === chatId)) {
+        chatPane.tabs.push(makeChatTab(sessionId))
+      }
+      chatPane.activeTabId = chatId
+      layout = {
+        ...layout,
+        mode: "split",
+        panes: [panes[0]!, panes[1] ?? emptyPane()],
+      }
+    }
+
+    // Move existing tool out of the chat pane, or upsert on the tool side.
+    const toolWhere = layout.panes[0]?.tabs.some((t) => t.id === existingId)
+      ? 0
+      : layout.panes[1]?.tabs.some((t) => t.id === existingId)
+        ? 1
+        : null
+    if (toolWhere === 0) {
+      layout = moveTabBetweenPanesModel(
+        layout,
+        0,
+        1,
+        existingId,
+        layout.panes[1]?.tabs.length ?? 0,
+      )
+      // Re-pin chat active after the move (move may have shifted activeTabId).
+      const panes = clonePanes(layout)
+      if (panes[0]) panes[0].activeTabId = chatId
+      layout = {
+        ...layout,
+        mode: "split",
+        focusedPane: 1,
+        panes: [panes[0]!, panes[1] ?? emptyPane()],
+      }
+    } else {
+      layout = upsertToolInPane(layout, 1, sessionId, tool)
+      const panes = clonePanes(layout)
+      if (panes[0]) panes[0].activeTabId = chatId
+      layout = {
+        ...layout,
+        mode: "split",
+        focusedPane: 1,
+        panes: [panes[0]!, panes[1] ?? emptyPane()],
+      }
+    }
+
+    set({ contentLayout: layout, ...syncCompatFlags(layout) })
+    persistLayout(layout)
     get().openTab(sessionId, tool)
   },
 
@@ -353,6 +388,21 @@ export const createContentLayoutSlice: StateCreator<
         void persistUiState({ activeSessionId: tab.sessionId })
       }
       return
+    }
+    // Wide: leaving the chat tab for a tool must not bury the composer —
+    // promote that tool beside chat. Switching between co-located tools stays.
+    if (
+      tab?.kind === "tool" &&
+      isSplitEligible(get()) &&
+      p.tabs.some(
+        (t) => t.kind === "chat" && t.sessionId === tab.sessionId,
+      )
+    ) {
+      const active = p.tabs.find((t) => t.id === p.activeTabId)
+      if (active?.kind === "chat") {
+        get().openToolBesideChat(tab.sessionId, tab.tool)
+        return
+      }
     }
     // Keep the same tabs array when only activeTabId changes so the sibling
     // pane retains object identity and inactive ContentPane skips re-render.

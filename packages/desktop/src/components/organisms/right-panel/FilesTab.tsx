@@ -230,7 +230,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
   const fallbackCwd = session?.base_cwd
   const [saving, setSaving] = useState(false)
   const [confirmClosePath, setConfirmClosePath] = useState<string | null>(null)
-  const [explorerOpen, setExplorerOpen] = useState(false)
+  const [explorerOpen, setExplorerOpen] = useState(true)
   /** Per-path edit vs preview for markdown buffers. */
   const [previewByPath, setPreviewByPath] = useState<Record<string, boolean>>(
     {},
@@ -475,8 +475,19 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
 
   const loadError = error ? toInvokeError(error) : null
 
+  const breadcrumbSegments = useMemo(() => {
+    if (!path) return [] as string[]
+    const normalized = path.replace(/\\/g, "/")
+    const root = (cwd || "").replace(/\\/g, "/").replace(/\/$/, "")
+    const rel =
+      root && (normalized === root || normalized.startsWith(`${root}/`))
+        ? normalized.slice(root.length).replace(/^\//, "")
+        : normalized
+    return rel.split("/").filter(Boolean)
+  }, [cwd, path])
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col bg-editor">
       <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-stroke-3 px-2.5">
         <Button
           type="button"
@@ -533,6 +544,35 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
           </Button>
         </div>
       </div>
+
+      {breadcrumbSegments.length > 0 ? (
+        <nav
+          aria-label="File path"
+          className="flex h-6 shrink-0 items-center gap-1 overflow-x-auto border-b border-stroke-4 px-2.5 text-xs text-ink-faint"
+        >
+          {breadcrumbSegments.map((seg, i) => {
+            const last = i === breadcrumbSegments.length - 1
+            return (
+              <span key={`${seg}-${i}`} className="flex min-w-0 items-center gap-1">
+                {i > 0 ? (
+                  <ChevronRight
+                    className="h-3 w-3 shrink-0 opacity-60"
+                    aria-hidden
+                  />
+                ) : null}
+                <span
+                  className={cn(
+                    "truncate",
+                    last ? "text-ink-muted" : "text-ink-faint",
+                  )}
+                >
+                  {seg}
+                </span>
+              </span>
+            )
+          })}
+        </nav>
+      ) : null}
 
       <div className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">
@@ -637,7 +677,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
         {cwd ? (
           <aside
             className={cn(
-              "w-[clamp(180px,32%,240px)] shrink-0 border-l border-stroke-3 bg-panel",
+              "w-[clamp(160px,28%,220px)] shrink-0 border-l border-stroke-3 bg-panel",
               !explorerOpen && "hidden",
             )}
             aria-label="File explorer"

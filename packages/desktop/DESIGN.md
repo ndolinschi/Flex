@@ -221,7 +221,9 @@ Sashes never shrink a content pane below `CHAT_MIN_WIDTH` when split.
 Browser / Terminal always fill remaining height.
 
 **Closed-panel mini tabs:** removed — the right column no longer exists.
-Tool surfaces open as content tabs (optionally beside chat in split mode).
+On wide viewports, tool surfaces open **beside chat** (chat left rail ≈38%,
+work surface right) so the composer stays visible — matching IDE chat|editor
+density rather than swapping peer tabs in one pane.
 
 
 ---
@@ -317,7 +319,7 @@ modal. HITL docks as a composer-adjacent blocking surface, not a dialog.
 | State | Component | Recipe |
 |---|---|---|
 | Empty | `EmptyState` | `py-6 gap-3`; title `text-sm text-ink-secondary`; description `text-xs text-ink-muted`; CTA `Button secondary sm`; icon chip `bg-fill-3 text-ink-faint` |
-| Hero empty | `ChatShell` `composerHero` | Title ~22px; hint `text-sm muted`; quiet pill chips `size="xs"` `text-xs` opacity `.8→1` |
+| Hero empty | `ChatShell` empty rail | Compact top-weighted title + chips; composer stays docked at bottom |
 | Onboarding | `WelcomePage` | Primary controls **`h-9`** (`Button size="lg"`, inputs `h-9`); errors via `ErrorBanner` |
 | Loading list | `SidebarSkeleton` | Rows `min-h-7` / two-line `h-10`; headers `h-6`; `rounded-sm` whisper fills; `px-2` gutter |
 | Loading block | `Skeleton` | `bg-surface-muted` (fill-3) + soft pulse; **`opacity-70`** dampen |
@@ -548,7 +550,7 @@ Tailwind `p-*` / `gap-*` map through `@theme` in `src/index.css`.
 | Item | Why |
 |---|---|
 | Content pane / composer `px-2.5` (10px) | Documented gutter on the 4px grid (`--space-2` + half) |
-| Settings title `text-[17px]` / Chat empty hero `text-[28px]` / Plan `text-[22px]` | Display sizes between token steps; keep until a display scale is added |
+| Settings title `text-[17px]` / Plan display sizes | Display sizes between token steps; keep until a display scale is added |
 | Status / Database / Components micro-captions `text-[10px]`–`text-[11px]` | Capitals under `text-xs` (11px); section labels stay tighter |
 | Window traffic-light cluster `gap-[6px]` | Platform chrome alignment (macOS spacing), not app gutter |
 | SessionMenu error toast `mt-10` | Clears the title-bar control hit target |

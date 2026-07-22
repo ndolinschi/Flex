@@ -181,14 +181,15 @@ export const TreeBranch = ({
               aria-selected={!isDir ? isActive : undefined}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                // File-tree cell: h-7, r6, whisper fills — open dirs read selected (fill-2).
+                // File-tree cell: h-7, r6, whisper fills — active file gets a
+                // thin accent leading edge (IDE selection cue).
                 "h-7 w-full justify-start gap-1.5 rounded-sm pr-2 text-sm font-normal leading-[1.5]",
                 "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                 isActive
-                  ? "bg-fill-2 text-ink hover:bg-fill-2"
+                  ? "border-l-2 border-l-accent bg-fill-2 text-ink hover:bg-fill-2"
                   : isOpen
-                    ? "bg-fill-4 text-ink hover:bg-fill-4"
-                  : "hover:bg-fill-4",
+                    ? "border-l-2 border-l-transparent bg-fill-4 text-ink hover:bg-fill-4"
+                    : "border-l-2 border-l-transparent hover:bg-fill-4",
                 statusClass ??
                   (!(isOpen || isActive) && "text-ink-secondary hover:text-ink"),
               )}

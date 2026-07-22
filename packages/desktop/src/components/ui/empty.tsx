@@ -7,8 +7,9 @@ function Empty({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="empty"
       className={cn(
-        // Compact empty: py-6 / gap-3 (DESIGN.md States) — not a padded card.
-        "flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-3 rounded-xl border-dashed py-6 px-4 text-center text-balance",
+        // Compact empty: top-weighted utility void (IDE), not a full-viewport
+        // marketing hero. Callers that need flex-1 centering pass it explicitly.
+        "flex w-full min-w-0 flex-col items-center gap-3 rounded-xl border-dashed px-4 py-10 text-center text-balance",
         className
       )}
       {...props}

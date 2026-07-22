@@ -434,6 +434,18 @@ describe("contentLayout", () => {
     }
   })
 
+  it("activateTabInPane promotes a tool beside chat when leaving chat", () => {
+    useAppStore.getState().openChatInPane(0, "sess-a")
+    useAppStore.getState().openToolInPane(0, "sess-a", "plan")
+    // Return to chat, then click Plan — should split rather than bury composer.
+    useAppStore.getState().activateTabInPane(0, chatTabId("sess-a"))
+    useAppStore.getState().activateTabInPane(0, toolTabId("sess-a", "plan"))
+    const layout = useAppStore.getState().contentLayout
+    expect(layout.mode).toBe("split")
+    expect(layout.panes[0]!.activeTabId).toBe(chatTabId("sess-a"))
+    expect(layout.panes[1]!.activeTabId).toBe(toolTabId("sess-a", "plan"))
+  })
+
   it("activateTabInPane keeps the sibling pane object identity", () => {
     useAppStore.getState().openChatInPane(0, "sess-a")
     useAppStore.getState().openToolBesideChat("sess-a", "plan")

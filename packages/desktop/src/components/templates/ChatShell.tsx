@@ -19,11 +19,16 @@ type ChatShellProps = {
    * section. Prefer `Composer.dockedOverlay` for Permission/Question cards
    * that must merge with the bubble (avoids a page-bg gap at the seam). */
   overlayDocked?: boolean
+  /** Empty conversation — compact top-weighted empty, composer stays docked. */
   composerHero?: boolean
   heroTitle?: string
   heroHint?: string
 }
 
+/**
+ * Chat column shell. Composer always docks at the bottom (IDE rail), even
+ * when the conversation is empty — never a centered marketing hero.
+ */
 export const ChatShell = ({
   sidebar,
   hideSidebar = false,
@@ -54,67 +59,53 @@ export const ChatShell = ({
   const pane = (
     <div
       className={cn(
-        "flex h-full min-h-0 min-w-0 flex-1 flex-col",
+        "flex h-full min-h-0 min-w-0 flex-1 flex-col bg-bg",
         wide && "min-w-[380px]",
       )}
       style={Object.keys(paneStyle).length > 0 ? paneStyle : undefined}
     >
       <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div
-          className={cn(
-            "flex min-h-0 flex-col overflow-hidden",
-            composerHero ? "hidden" : "min-h-0 flex-1",
-          )}
-        >
-          {timeline}
-        </div>
-
-        {composerHero ? (
-          <div className="flex min-h-0 flex-1 flex-col justify-center overflow-y-auto">
-            {/* Hero empty: compact like EmptyState — muted title hierarchy + quiet chips. */}
-            <div className="mx-auto mb-5 w-full max-w-[var(--content-rail)] px-3 text-center">
-              <h2 className="mb-2 truncate text-[22px] font-semibold leading-none tracking-[-0.03em] text-ink">
-                {heroTitle}
-              </h2>
-              <p className="text-sm text-ink-muted">{heroHint}</p>
-              <div className="mt-3 flex flex-wrap justify-center gap-1.5">
-                {QUICKSTART_SUGGESTIONS.map((suggestion) => (
-                  <Button
-                    key={suggestion}
-                    variant="outline"
-                    size="xs"
-                    onClick={() => handleQuickstart(suggestion)}
-                    className="rounded-full border-stroke-3 text-xs text-ink-secondary opacity-80 hover:border-stroke-2 hover:bg-fill-4 hover:text-ink-secondary hover:opacity-100"
-                  >
-                    {suggestion}
-                  </Button>
-                ))}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {composerHero ? (
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-6">
+              <div className="mx-auto w-full max-w-[var(--content-rail)]">
+                <h2 className="truncate text-sm font-medium text-ink">
+                  {heroTitle}
+                </h2>
+                <p className="mt-1 text-xs text-ink-muted">{heroHint}</p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {QUICKSTART_SUGGESTIONS.map((suggestion) => (
+                    <Button
+                      key={suggestion}
+                      variant="outline"
+                      size="xs"
+                      onClick={() => handleQuickstart(suggestion)}
+                      className="rounded-md border-stroke-3 text-xs text-ink-secondary opacity-80 hover:border-stroke-2 hover:bg-fill-4 hover:text-ink-secondary hover:opacity-100"
+                    >
+                      {suggestion}
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
-            {composer}
-            <div className="pb-2" />
-          </div>
-        ) : (
-          <div className="relative z-50 shrink-0 pb-2">
-            {overlay ? (
-              <div
-                className={cn(
-                  "absolute inset-x-0 bottom-full z-50 flex justify-center px-3",
-                  overlayDocked ? "mb-0" : "mb-3",
-                )}
-              >
-                {overlay}
-              </div>
-            ) : null}
-            {composer}
-          </div>
-        )}
+          ) : (
+            timeline
+          )}
+        </div>
 
-        {composerHero && overlay ? (
-          <div className="absolute inset-x-0 bottom-6 z-50 flex justify-center px-3">
-            {overlay}
-          </div>
-        ) : null}
+        <div className="relative z-50 shrink-0 pb-2">
+          {overlay ? (
+            <div
+              className={cn(
+                "absolute inset-x-0 bottom-full z-50 flex justify-center px-3",
+                overlayDocked ? "mb-0" : "mb-3",
+              )}
+            >
+              {overlay}
+            </div>
+          ) : null}
+          {composer}
+        </div>
       </main>
     </div>
   )
