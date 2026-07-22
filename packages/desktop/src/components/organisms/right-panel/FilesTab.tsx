@@ -123,7 +123,8 @@ const ProblemsStrip = ({
 
       {/* Expanded marker list */}
       {open && hasProblems ? (
-        <ul className="max-h-36 overflow-y-auto" role="list">
+        <ScrollArea className="max-h-36">
+          <ul role="list">
           {markers
             .filter(
               (m) =>
@@ -160,7 +161,8 @@ const ProblemsStrip = ({
                 </button>
               </li>
             ))}
-        </ul>
+          </ul>
+        </ScrollArea>
       ) : null}
     </div>
   )

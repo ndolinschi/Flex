@@ -273,7 +273,7 @@ const ArtifactPreview = ({
       ) : null}
 
       {/* Body */}
-      <div className="min-h-0 flex-1 overflow-auto">
+      <ScrollArea className="min-h-0 flex-1">
         {artifact.kind === "csv" ? (
           <CsvPreviewPanel preview={csvPreview} />
         ) : artifact.kind === "image" ? (
@@ -281,7 +281,7 @@ const ArtifactPreview = ({
         ) : (
           <GenericPreviewPanel artifact={artifact} onOpen={onOpenExternal} />
         )}
-      </div>
+      </ScrollArea>
     </div>
   )
 }
@@ -368,7 +368,7 @@ const ImagePreviewPanel = ({ artifact }: { artifact: Artifact }) => {
   }
 
   return (
-    <div className="flex h-full items-center justify-center overflow-auto p-2">
+    <div className="flex h-full items-center justify-center p-2">
       <img
         src={`https://asset.localhost/${artifact.relativePath}`}
         alt={artifact.title}
