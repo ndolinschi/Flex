@@ -52,7 +52,7 @@ const TabDragGhost = () => {
       aria-hidden
       className={cn(
         // Match Tab md pill density (h-6, rounded-md, caption tracking).
-        "pointer-events-none fixed z-[9999] flex h-6 max-w-[180px] items-center truncate rounded-md",
+        "pointer-events-none fixed z-[var(--z-overlay)] flex h-6 max-w-[180px] items-center truncate rounded-md",
         // Floating chrome: panel + shadow-popover (stroke ring lives in the shadow).
         "bg-panel px-2 text-sm tracking-[var(--tracking-caption)] text-ink shadow-popover",
         "opacity-90",

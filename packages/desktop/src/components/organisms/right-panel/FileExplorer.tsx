@@ -311,7 +311,7 @@ export const FileExplorer = ({
             onContextMenu={handleContextMenu}
           />
         ) : resolvingCwd ? (
-          <div className="flex items-center gap-2 px-4 py-8 text-xs text-ink-muted">
+          <div className="flex items-center gap-2 px-2.5 py-6 text-xs text-ink-muted">
             <Spinner size="sm" />
             Opening folder…
           </div>

@@ -182,7 +182,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
   if (!active) {
     return (
       <EmptyState
-        className="px-2.5 py-10"
+        className="px-2.5"
         title="No active session"
         description="Select a session to review working-tree changes."
       />
@@ -197,7 +197,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
   if (!isRepo) {
     return (
       <EmptyState
-        className="px-2.5 py-10"
+        className="px-2.5"
         icon={<GitMerge className="h-6 w-6" aria-hidden />}
         title="Not a git repository"
         description="Initialize a git repo in this project to track changes."
@@ -317,13 +317,13 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       <ScrollArea className="min-h-0 flex-1">
         {totalCount === 0 ? (
           <EmptyState
-            className="px-2.5 py-10"
+            className="px-2.5"
             icon={<GitMerge className="h-6 w-6" aria-hidden />}
             title="Working tree clean"
             description={branch ? `on ${branch}` : undefined}
           />
         ) : (
-          <ul className="flex flex-col gap-0.5 py-1.5">
+          <ul className="flex flex-col gap-0.5 px-2 py-1.5">
             {files.map((file) => (
               <FileRow
                 key={file.path}

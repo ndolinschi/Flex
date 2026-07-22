@@ -318,7 +318,7 @@ modal. HITL docks as a composer-adjacent blocking surface, not a dialog.
 
 | State | Component | Recipe |
 |---|---|---|
-| Empty | `EmptyState` | `py-6 gap-3`; title `text-sm text-ink-secondary`; description `text-xs text-ink-muted`; CTA `Button secondary sm`; icon chip `bg-fill-3 text-ink-faint` |
+| Empty | `EmptyState` | Top-weighted utility void: `py-10 gap-3` (not full-viewport `justify-center`); title `text-sm text-ink-secondary`; description `text-xs text-ink-muted`; CTA `Button secondary sm`; icon chip `bg-fill-3 text-ink-faint` |
 | Hero empty | `ChatShell` empty rail | Compact top-weighted title + chips; composer stays docked at bottom |
 | Onboarding | `WelcomePage` | Primary controls **`h-9`** (`Button size="lg"`, inputs `h-9`); errors via `ErrorBanner` |
 | Loading list | `SidebarSkeleton` | Rows `min-h-7` / two-line `h-10`; headers `h-6`; `rounded-sm` whisper fills; `px-2` gutter |
@@ -430,7 +430,7 @@ Color palette constants (`lib/sessionColor.ts`): `GROUP_PALETTE` (8 colors for g
 | Plan | `PlanToolbar` breadcrumbs + Build (`h-6` controls); find bar is a secondary `h-8` row with `border-y border-stroke-3` |
 | Changes | Quiet title row (no `border-b`); select toolbar `h-6` (dedicated row, not `--header-height`); file list `px-2` / rows `px-2.5`; empties use shared `EmptyState` |
 | Pull Request | Fixed `--header-height` chrome (`#` · title · checks · Open `h-6`); body `ScrollArea` + `DiffView` / `EmptyState` |
-| Files | Open-buffer chips (`Tab` sm, strip `gap-1.5` + `border-b`) + Monaco with inline completions + Problems strip; Explorer toggle keeps a compact right-side tree (`clamp(180px, 32%, 240px)`) beside an open editor, highlights the active buffer with `fill-2`, and uses the explorer full-width while empty |
+| Files | Open-buffer chips (`Tab` sm, strip `gap-1.5` + `border-b`) + path breadcrumbs (`h-6`) + Monaco (`bg-editor`) with inline completions + Problems strip; Explorer toggle keeps a compact right-side tree (`clamp(160px, 28%, 220px)`) open by default beside an editor; active buffer uses `fill-2` + 2px `border-l-accent` edge; explorer is full-width while empty |
 | Status | Quiet title row + body `ScrollArea` (session metrics) |
 | Prompt | Quiet title row (`h-6` icon controls; Insert uses Base UI `Popover`); marks / findings scroll via `ScrollArea` |
 | Memory | Quiet title row + body `ScrollArea` reusing Settings `MemoryContent` |

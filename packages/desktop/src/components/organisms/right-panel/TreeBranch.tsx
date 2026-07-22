@@ -187,9 +187,7 @@ export const TreeBranch = ({
                 "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                 isActive
                   ? "border-l-2 border-l-accent bg-fill-2 text-ink hover:bg-fill-2"
-                  : isOpen
-                    ? "border-l-2 border-l-transparent bg-fill-4 text-ink hover:bg-fill-4"
-                    : "border-l-2 border-l-transparent hover:bg-fill-4",
+                  : "border-l-2 border-l-transparent hover:bg-fill-4",
                 statusClass ??
                   (!(isOpen || isActive) && "text-ink-secondary hover:text-ink"),
               )}

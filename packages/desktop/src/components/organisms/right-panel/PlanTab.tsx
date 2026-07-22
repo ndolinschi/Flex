@@ -247,7 +247,7 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
   if (!active || (sessionPlans.length === 0 && entries.length === 0)) {
     return (
       <EmptyState
-        className="px-2.5 py-10"
+        className="px-2.5"
         title="No plan yet"
         description="Switch the composer to Plan mode and ask for a plan."
       />
