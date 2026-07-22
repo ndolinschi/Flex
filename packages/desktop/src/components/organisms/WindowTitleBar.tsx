@@ -15,6 +15,7 @@ import { useSessions } from "../../hooks/useSessions"
 import { detectWindowHost, toggleZoomWindow } from "../../lib/windowChrome"
 import { sessionLabel } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
+import { isSplitEligible } from "../../stores/slices/contentLayoutSlice"
 import { cn } from "../../lib/utils"
 
 type WindowTitleBarProps = {
@@ -47,6 +48,7 @@ const WindowTitleBarImpl = ({
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   // Narrow — full `contentLayout` changes on every tab switch.
   const split = useAppStore((s) => s.contentLayout.mode === "split")
+  const splitEligible = useAppStore(isSplitEligible)
   const toggleSplit = useAppStore((s) => s.toggleSplit)
   const viewport = useAppStore((s) => s.viewport)
 
@@ -112,14 +114,14 @@ const WindowTitleBarImpl = ({
             <Button
               type="button"
               variant="ghost"
-              size="icon-sm"
+              size="icon-xs"
               aria-label={`${collapsed ? "Show" : "Hide"} sidebar (${mod}B)`}
               title={`${collapsed ? "Show" : "Hide"} sidebar (${mod}B)`}
               onClick={handlers.toggleSidebar}
               className={cn(
                 "text-ink-muted hover:bg-fill-4 hover:text-ink",
                 "opacity-50 hover:opacity-80",
-                "h-6 w-6 shrink-0",
+                "shrink-0",
               )}
             >
               <PanelLeft className="h-3.5 w-3.5" aria-hidden />
@@ -131,29 +133,24 @@ const WindowTitleBarImpl = ({
           className="h-full min-w-[48px] flex-1"
           data-tauri-drag-region
           aria-hidden
-          onMouseDown={(e) => {
-            if (e.button === 0 && e.detail === 2) {
-              e.preventDefault()
-              void toggleZoomWindow()
-            }
-          }}
           onDoubleClick={() => void toggleZoomWindow()}
         />
 
         {showChatChrome ? (
           <div className="flex h-full shrink-0 items-center gap-0.5 pr-1">
-            {viewport === "wide" ? (
+            {viewport === "wide" && (split || splitEligible) ? (
               <Button
                 type="button"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs"
                 aria-label={`${split ? "Close split" : "Split view"} (${mod}J)`}
                 title={`${split ? "Close split" : "Split view"} (${mod}J)`}
                 onClick={toggleSplit}
+                disabled={!split && !splitEligible}
                 aria-pressed={split}
                 className={cn(
                   // Quiet title-bar icon recipe; pressed = split active (fill-2, full ink).
-                  "h-6 w-6 text-ink-muted opacity-50 hover:bg-fill-4 hover:text-ink hover:opacity-80",
+                  "text-ink-muted opacity-50 hover:bg-fill-4 hover:text-ink hover:opacity-80",
                   split &&
                     "bg-fill-2 text-ink opacity-80 hover:bg-fill-2 hover:opacity-100",
                 )}

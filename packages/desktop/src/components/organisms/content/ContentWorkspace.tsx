@@ -179,7 +179,7 @@ export const ContentWorkspace = () => {
                 "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-stroke-3",
                 // Quiet sash: white-alpha 12% hover only — never accent (Feel: Quiet chrome).
                 "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_12%,transparent)]",
-                "focus-visible:ring-0 focus-visible:outline-none",
+                "focus-visible:ring-1 focus-visible:ring-stroke-2 focus-visible:outline-none",
                 rightPanelDragging && "after:bg-stroke-1",
                 !showSash && "invisible pointer-events-none",
               )}

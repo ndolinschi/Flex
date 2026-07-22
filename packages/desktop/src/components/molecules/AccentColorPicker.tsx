@@ -67,7 +67,7 @@ export const AccentColorPicker = () => {
               className={cn(
                 "rounded-md ring-1 ring-stroke-2 transition-[box-shadow,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)] motion-reduce:transition-none motion-reduce:hover:scale-100",
                 "hover:scale-[1.04] hover:bg-transparent",
-                "focus-visible:ring-2 focus-visible:ring-ink",
+                "focus-visible:ring-1 focus-visible:ring-stroke-2",
                 selected && "ring-2 ring-ink",
               )}
               style={{ backgroundColor: swatch }}
@@ -96,8 +96,8 @@ export const AccentColorPicker = () => {
           }}
           className={cn(
             "rounded-md bg-fill-3 ring-1 ring-stroke-2 transition-[box-shadow,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)] motion-reduce:transition-none motion-reduce:hover:scale-100",
-            "hover:scale-[1.04] hover:bg-fill-3",
-            "focus-visible:ring-2 focus-visible:ring-ink",
+            "hover:scale-[1.04] hover:bg-fill-4",
+            "focus-visible:ring-1 focus-visible:ring-stroke-2",
             accentId === "custom" && "ring-2 ring-ink",
           )}
         >

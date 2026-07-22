@@ -14,6 +14,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react"
@@ -61,7 +62,11 @@ import type { SessionMeta } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { persistUiState, useAppStore } from "../../stores/appStore"
 import { log } from "../../lib/debug/log"
-import { SIDEBAR_DEFAULT_WIDTH } from "../../stores/layoutConstants"
+import {
+  SIDEBAR_DEFAULT_WIDTH,
+  SIDEBAR_MAX_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+} from "../../stores/layoutConstants"
 
 const isMac =
   typeof navigator !== "undefined" &&
@@ -471,6 +476,22 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     setSidebarWidth(SIDEBAR_DEFAULT_WIDTH, true)
   }
 
+  const handleSashKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 32 : 8
+    let next: number | null = null
+    if (e.key === "ArrowLeft") next = sidebarWidth - step
+    if (e.key === "ArrowRight") next = sidebarWidth + step
+    if (e.key === "Home") next = SIDEBAR_MIN_WIDTH
+    if (e.key === "End") next = SIDEBAR_MAX_WIDTH
+    if (e.key === "Escape") {
+      e.currentTarget.blur()
+      return
+    }
+    if (next === null) return
+    e.preventDefault()
+    setSidebarWidth(next, true)
+  }
+
   const expanded = !collapsed
   return (
     <>
@@ -486,7 +507,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         className={cn(
           "relative flex h-full shrink-0 flex-col overflow-hidden bg-sidebar",
           !dragging &&
-            "transition-[width,opacity] duration-[var(--duration-normal)] ease-[var(--easing-default)]",
+            "transition-[width,opacity] duration-[var(--duration-normal)] ease-[var(--easing-default)] motion-reduce:transition-none",
           collapsed
             ? "w-0 border-r-0 opacity-0 pointer-events-none"
             : "border-r border-sidebar-border opacity-100",
@@ -506,10 +527,13 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
             role="separator"
             aria-orientation="vertical"
             aria-label="Resize sessions sidebar"
+            aria-valuemin={SIDEBAR_MIN_WIDTH}
+            aria-valuemax={SIDEBAR_MAX_WIDTH}
             aria-valuenow={sidebarWidth}
             tabIndex={0}
             onPointerDown={handleSashDown}
             onDoubleClick={handleSashDoubleClick}
+            onKeyDown={handleSashKeyDown}
             className={cn(
               "sash-line-transition absolute -right-[5px] inset-y-0 z-10 w-2.5 cursor-col-resize",
               "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent",
@@ -532,12 +556,12 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
               <Button
                 type="button"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs"
                 aria-label="Close sidebar"
                 title="Close sidebar"
                 onClick={() => setSidebarCollapsed(true)}
                 className={cn(
-                  "h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink",
+                  "text-ink-muted hover:bg-fill-4 hover:text-ink",
                   "opacity-50 hover:opacity-80",
                 )}
               >

@@ -58,6 +58,8 @@ const AppRoutes = () => {
   const toggleSidebarCollapsed = useAppStore((s) => s.toggleSidebarCollapsed)
   const toggleSplit = useAppStore((s) => s.toggleSplit)
   const setTheme = useAppStore((s) => s.setTheme)
+  const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed)
+  const viewport = useAppStore((s) => s.viewport)
   const { newAgent } = useSessions()
   useGlobalSessionEvents()
   // Gated on isBootstrapped so the first classification runs after
@@ -67,6 +69,8 @@ const AppRoutes = () => {
   useViewportWidth(isBootstrapped)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [searchModalOpen, setSearchModalOpen] = useState(false)
+  const contentBlocked =
+    route !== "chat" || (viewport !== "wide" && !sidebarCollapsed)
 
   // Dev QA: Rust emits `qa-open-browser` when FLEX_BROWSER_QA=1 so we can
   // validate native webview bounds without flaky UI automation.
@@ -323,10 +327,11 @@ const AppRoutes = () => {
           <div
             className={cn(
               "flex h-full min-h-0 flex-1 flex-col",
-              "transition-opacity duration-[var(--duration-normal)] ease-[var(--easing-default)]",
+              "transition-opacity duration-[var(--duration-normal)] ease-[var(--easing-default)] motion-reduce:transition-none",
               route !== "chat" && "pointer-events-none opacity-0",
             )}
-            aria-hidden={route !== "chat"}
+            aria-hidden={contentBlocked}
+            inert={contentBlocked}
           >
             <ContentWorkspace />
           </div>
@@ -337,7 +342,11 @@ const AppRoutes = () => {
             <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
               <Suspense
                 fallback={
-                  <div className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted">
+                  <div
+                    className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted"
+                    role="status"
+                    aria-live="polite"
+                  >
                     <Spinner size="md" />
                     Loading…
                   </div>

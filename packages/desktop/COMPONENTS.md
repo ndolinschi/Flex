@@ -17,7 +17,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `HighlightedLabel` | Fuzzy-match accent spans in a label | `label`, `query` | SearchModal |
 | `ProviderIcon` | Brand mark from `public/providers/{id}.*` | `providerId`, `size?` | ProviderPicker, Welcome, Connections |
 | `RunningDot` | Live status glyph | — | WorkGroup, timeline |
-| `Spinner` | Indeterminate loading (size map over ui/spinner) | `size` | SessionSidebar, forms |
+| `Spinner` | Indeterminate loading (size map over ui/spinner) | `size`, `label?` | SessionSidebar, forms |
 | `Tab` | Pill tab / open-buffer chip; pointer DnD | `selected`, `size?`, `onSelect`, `onClick?`, `onClose?`, `groupColor?`, `activityDot?`, `sessionColor?`, `rangeSelected?`, … | ContentPane, FilesTab |
 | `TabClose` | Hover-collapse close control | `label`, `onClose` | `Tab` |
 | `TabStrip` | Horizontal open-tabs strip | `children`, `className?` | ContentPane, ChatSessionTabBar |
@@ -119,7 +119,7 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `PromptTab` | Session prompt pad: write with `@`/`/` + optional ghost-text completion → **Verify** (session model grill) → apply/dismiss findings without ending review; coach questions + re-verify; synced to `draftsBySession`. Panels: `PromptTabHeader`, `PromptMarksPanel` (+ `PromptFindingsList`), `PromptQuestionsForm`, `PromptHoverTip` | `sessionId`, `active` | ToolTabBody |
 | `StatusTab` | OpenCode-style session status: model, context approx, tokens, queue, per-model usage | `session`, `active` | ToolTabBody |
 | `WindowTitleBar` | Compact custom window chrome (`decorations: false`, `transparent: true`, 30px): traffic lights / caption buttons + sidebar / split / session controls + drag region (double-click zooms — fullscreen on macOS, maximize elsewhere); in-window File/Edit/View/Help on Windows/Linux; native macOS menu bar via `useNativeAppMenu`; macOS HudWindow vibrancy + 10px corner clip (`macos_window` + `--window-radius`) | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
-| `BrowserTab` | Embedded browser panel; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | ToolTabBody |
+| `BrowserTab` | Embedded browser panel; shared `EmptyState` / `Spinner` / quiet error actions; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | ToolTabBody |
 | `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/`. Opening the tab with zero workspace PTYs auto-creates one shell. | — | ToolTabBody |
 | `CommandPalette` | ⌘K-style action palette (nav, theme, new agent); rows via `CommandPaletteRow`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell |
 | `SearchModal` | Fuzzy session search overlay; rows via `FuzzySessionRow` + `HighlightedLabel`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell (via SessionSidebar's `onOpenSearch`) |

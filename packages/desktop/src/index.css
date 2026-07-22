@@ -170,6 +170,7 @@ body {
   font-size: var(--text-base);
   line-height: var(--leading-normal);
   font-weight: 400;
+  letter-spacing: var(--tracking-body);
   color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
   /* Native <select>/<option> popups inherit this — without it, WebView2 on
@@ -649,7 +650,8 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   }
 
   /* Tailwind pulse: streaming caret, tab activity, skeletons, live dots. */
-  .animate-pulse {
+  .animate-pulse,
+  .animate-spin {
     animation: none;
   }
 

@@ -184,12 +184,8 @@
     sans-serif;
   --font-mono: Menlo, Monaco, ui-monospace, "SF Mono", "Courier New", monospace;
 
-  /* reference canon (DESIGN.md Feel principles: "Semibold canonical weight
-     = 590; 600 only in 3 minor, apparently-stale spots"). Needs the matching
-     `--font-weight-semibold: var(--font-weight-semibold);` line added to the
-     `@theme` block in src/index.css for Tailwind's `font-semibold` utility to
-     actually emit 590 (out of scope here — see report). 600 kept as a
-     documented fallback in case the 590 reading is ever contested. */
+  /* Reference canon (DESIGN.md Feel principles). Registered in the
+     `@theme` block in src/index.css so Tailwind's `font-semibold` emits 590. */
   --font-weight-semibold: 590; /* fallback 600 */
 
   --text-xs: 0.6875rem;

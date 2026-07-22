@@ -322,7 +322,7 @@ modal. HITL docks as a composer-adjacent blocking surface, not a dialog.
 | Loading list | `SidebarSkeleton` | Rows `min-h-7` / two-line `h-10`; headers `h-6`; `rounded-sm` whisper fills; `px-2` gutter |
 | Loading block | `Skeleton` | `bg-surface-muted` (fill-3) + soft pulse; **`opacity-70`** dampen |
 | Timeline load | `TurnTimeline` | Short bubble placeholders (`h-8`–`h-14`), dampened skeleton base |
-| Indeterminate | `Spinner` | `text-ink-muted`; sizes sm/md/lg (inline HITL spinners also muted) |
+| Indeterminate | `Spinner` | `text-ink-muted`; sizes sm/md/lg; contextual `label` for screen readers (inline HITL spinners also muted) |
 | Live work | `RunningDot` | 3×3 wave, 1.8s, base opacity-60; reduced-motion kills animation |
 | Streaming | `StreamingCaret` | Thin `w-px h-3.5` pulse on `ink-muted`, not a block accent cursor |
 | Error inline | `ErrorBanner` | `border-danger/15 bg-danger-subtle/70`; body `text-xs`; dismissible quiet X |
@@ -493,6 +493,11 @@ tabs are hidden to the right). Dual-edge composited as two separate gradients.
 Native Browser webview stacks above DOM — use
 `data-suppress-native-webview` / `aria-modal` intersection (see
 `nativeWebviewGate.ts`) when a modal must cover it.
+Shared portaled popups (`Dialog`, `AlertDialog`, `DropdownMenu`, `Popover`,
+`Select`, `Combobox`, and `Tooltip`) put the suppress marker on the actual
+popup node, and `ToastHost` puts it on the Sonner root; never mark a full-screen
+backdrop because its bounds would hide the Browser when the visible panel does
+not intersect it.
 
 ---
 

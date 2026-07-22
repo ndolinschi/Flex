@@ -11,7 +11,7 @@ const buttonVariants = cva(
   // `text-left` overrides the UA `<button>` default (`text-align: center`) —
   // otherwise a flex-1 label sits far from its leading icon (sidebar / menus).
   // Hover: color/fill only @ 100ms. Exclude box-shadow so focus ring is instant.
-  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-left text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,opacity,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)] outline-none select-none focus-visible:border-stroke-2 focus-visible:ring-1 focus-visible:ring-stroke-2 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-left text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,opacity,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)] outline-none select-none focus-visible:border-stroke-2 focus-visible:ring-1 focus-visible:ring-stroke-2 active:not-aria-[haspopup]:translate-y-px motion-reduce:active:translate-y-0 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -23,7 +23,7 @@ const buttonVariants = cva(
         outline:
           "border-border bg-background hover:bg-fill-4 hover:text-ink aria-expanded:bg-fill-4 aria-expanded:text-ink",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-fill-4 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+          "bg-secondary text-secondary-foreground hover:bg-fill-4 aria-expanded:bg-fill-4 aria-expanded:text-ink",
         ghost:
           "hover:bg-fill-4 hover:text-ink aria-expanded:bg-fill-4 aria-expanded:text-ink",
         destructive:

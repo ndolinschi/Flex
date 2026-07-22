@@ -92,7 +92,7 @@ const ProblemsStrip = ({
         onClick={onToggle}
         className={cn(
           "flex w-full items-center gap-1.5 px-2.5 py-1",
-          "text-xs text-ink-secondary hover:bg-fill-3",
+          "text-xs text-ink-secondary hover:bg-fill-4",
           "select-none transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
         )}
         aria-expanded={open}
@@ -110,12 +110,12 @@ const ProblemsStrip = ({
         )}
         {errorCount > 0 ? (
           <AlertCircle
-            className="ml-auto h-3 w-3 shrink-0 text-red-500"
+            className="ml-auto h-3 w-3 shrink-0 text-danger"
             aria-label={`${errorCount} error${errorCount !== 1 ? "s" : ""}`}
           />
         ) : warningCount > 0 ? (
           <AlertTriangle
-            className="ml-auto h-3 w-3 shrink-0 text-yellow-500"
+            className="ml-auto h-3 w-3 shrink-0 text-warning"
             aria-label={`${warningCount} warning${warningCount !== 1 ? "s" : ""}`}
           />
         ) : null}
@@ -138,17 +138,17 @@ const ProblemsStrip = ({
                   onClick={() => onGoToMarker(m)}
                   className={cn(
                     "flex w-full items-start gap-2 px-2.5 py-1 text-left",
-                    "text-xs hover:bg-fill-3 transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+                    "text-xs hover:bg-fill-4 transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                   )}
                 >
                   {m.severity === MarkerSeverity.Error ? (
                     <AlertCircle
-                      className="mt-px h-3 w-3 shrink-0 text-red-500"
+                      className="mt-px h-3 w-3 shrink-0 text-danger"
                       aria-label="Error"
                     />
                   ) : (
                     <AlertTriangle
-                      className="mt-px h-3 w-3 shrink-0 text-yellow-500"
+                      className="mt-px h-3 w-3 shrink-0 text-warning"
                       aria-label="Warning"
                     />
                   )}
@@ -489,13 +489,10 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
         <Button
       type="button"
       variant="ghost"
-      size="icon-sm"
+      size="icon-xs"
       aria-label="Browse files" title="Browse files"
       onClick={() => setBrowseMode(true)}
-      className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "h-6 w-6 shrink-0",
-      )}
+      className="shrink-0 text-ink-muted hover:bg-fill-4 hover:text-ink"
     >
       <FolderTree className="h-3.5 w-3.5" aria-hidden />
     </Button>
@@ -505,12 +502,12 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
             <Button
       type="button"
       variant="ghost"
-      size="icon-sm"
+      size="icon-xs"
       aria-label={previewMode ? "Edit markdown" : "Preview markdown"} title={previewMode ? "Edit markdown" : "Preview markdown"}
       onClick={toggleMarkdownPreview}
       className={cn(
         "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "h-6 w-6", previewMode && "bg-fill-2 text-ink",
+        previewMode && "bg-fill-2 text-ink",
       )}
     >
       {previewMode ? (
@@ -523,14 +520,11 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
           <Button
       type="button"
       variant="ghost"
-      size="icon-sm"
+      size="icon-xs"
       aria-label={dirty ? "Save" : "Save (no changes)"} title={dirty ? "Save" : "Save (no changes)"}
       disabled={!dirty || saving || !path}
       onClick={() => void handleSave()}
-      className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "h-6 w-6",
-      )}
+      className="text-ink-muted hover:bg-fill-4 hover:text-ink"
     >
       {saving ? (
               <Spinner size="sm" />

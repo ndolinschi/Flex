@@ -33,4 +33,14 @@ describe("Button", () => {
     expect(html).toContain("disabled")
     expect(html).toContain("Working")
   })
+
+  it("uses whisper open state and reduced-motion press fallback", () => {
+    const html = renderToStaticMarkup(
+      <Button variant="secondary" aria-expanded>
+        Options
+      </Button>,
+    )
+    expect(html).toContain("aria-expanded:bg-fill-4")
+    expect(html).toContain("motion-reduce:active:translate-y-0")
+  })
 })

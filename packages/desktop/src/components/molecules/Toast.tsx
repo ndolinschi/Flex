@@ -14,8 +14,10 @@ export const ToastHost = () => {
   const theme = useAppStore((s) => s.theme)
 
   return (
-    <div data-suppress-native-webview="">
-      <Toaster theme={theme} position="bottom-right" />
-    </div>
+    <Toaster
+      theme={theme}
+      position="bottom-right"
+      data-suppress-native-webview=""
+    />
   )
 }

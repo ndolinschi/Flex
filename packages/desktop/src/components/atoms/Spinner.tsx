@@ -6,6 +6,7 @@ type SpinnerSize = "sm" | "md" | "lg"
 type SpinnerProps = {
   size?: SpinnerSize
   className?: string
+  label?: string
 }
 
 const sizeMap: Record<SpinnerSize, string> = {
@@ -15,6 +16,13 @@ const sizeMap: Record<SpinnerSize, string> = {
 }
 
 /** Indeterminate loading — muted ink, not a bright accent spinner. */
-export const Spinner = ({ size = "md", className }: SpinnerProps) => (
-  <SpinnerPrimitive className={cn(sizeMap[size], "text-ink-muted", className)} />
+export const Spinner = ({
+  size = "md",
+  className,
+  label = "Loading",
+}: SpinnerProps) => (
+  <SpinnerPrimitive
+    aria-label={label}
+    className={cn(sizeMap[size], "text-ink-muted", className)}
+  />
 )

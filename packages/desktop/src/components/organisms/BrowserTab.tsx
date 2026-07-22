@@ -2,7 +2,6 @@ import { useEffect, useState } from "react"
 import {
   AlertTriangleIcon,
   Globe,
-  Loader2,
 } from "lucide-react"
 import {
   Alert,
@@ -10,6 +9,8 @@ import {
   AlertTitle,
 } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "../atoms"
+import { EmptyState } from "../molecules"
 import { useBrowserSession } from "../../hooks/useBrowserSession"
 import { NATIVE_APP_REQUIRED } from "../../lib/browserPreview"
 import { BrowserToolbar } from "./browser/BrowserToolbar"
@@ -126,31 +127,26 @@ export const BrowserTab = ({
         {showOverlay ? (
           <div className="absolute inset-0 z-10 bg-bg">
             {preview ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
-                <Globe className="h-6 w-6 text-ink-faint opacity-60" aria-hidden />
-                <p className="text-sm font-medium text-ink">Browser</p>
-                <p className="max-w-[320px] text-center text-sm text-ink-muted">
-                  {NATIVE_APP_REQUIRED}
-                </p>
-              </div>
+              <EmptyState
+                className="h-full"
+                icon={<Globe aria-hidden />}
+                title="Browser"
+                description={NATIVE_APP_REQUIRED}
+              />
             ) : !browserStarted ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
-                <Globe className="h-6 w-6 text-ink-faint opacity-60" aria-hidden />
-                <p className="text-sm font-medium text-ink">Browser</p>
-                <p className="max-w-[300px] text-center text-sm text-ink-muted">
-                  Enter a URL above, or instruct the Agent to navigate and use the
-                  browser
-                </p>
-              </div>
+              <EmptyState
+                className="h-full"
+                icon={<Globe aria-hidden />}
+                title="Browser"
+                description="Enter a URL above, or instruct the Agent to navigate and use the browser."
+              />
             ) : showElsewhere ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3">
-                <p className="max-w-[280px] text-center text-sm text-ink-muted">
-                  Page is open in another chat
-                </p>
-                <Button variant="secondary" size="sm" onClick={handleReclaim}>
-                  Reload here
-                </Button>
-              </div>
+              <EmptyState
+                className="h-full"
+                title="Page is open in another chat"
+                actionLabel="Reload here"
+                onAction={handleReclaim}
+              />
             ) : showLiveContent && loadError ? (
               <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
                 <Alert
@@ -164,7 +160,7 @@ export const BrowserTab = ({
                   </AlertDescription>
                 </Alert>
                 <div className="flex items-center gap-2">
-                  <Button variant="default" size="sm" onClick={handleAskAgent}>
+                  <Button variant="secondary" size="sm" onClick={handleAskAgent}>
                     Ask Agent
                   </Button>
                   <Button
@@ -186,10 +182,7 @@ export const BrowserTab = ({
         ) : null}
         {showLiveContent && !loadError && browserLoading ? (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-            <Loader2
-              className="h-5 w-5 animate-spin text-ink-muted"
-              aria-label="Loading page"
-            />
+            <Spinner size="lg" label="Loading page" />
           </div>
         ) : null}
       </div>

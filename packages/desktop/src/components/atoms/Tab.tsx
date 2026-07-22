@@ -103,6 +103,7 @@ export const Tab = ({
   const shell = cn(
     "group relative flex items-center tracking-[var(--tracking-caption)]",
     "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+    "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stroke-2",
     sizeClasses[size],
     // Whisper fills (DESIGN Feel): selected fill-2 (~8%), idle hover fill-4 (~6%).
     // Selected stays fill-2 on hover — no fill-3 / accent swap.
@@ -180,12 +181,18 @@ export const Tab = ({
 
   if (variant === "chip") {
     return (
-      <div className={shell} data-tab-id={tabId}>
+      <div
+        className={cn(
+          shell,
+          "focus-within:ring-1 focus-within:ring-stroke-2",
+        )}
+        data-tab-id={tabId}
+      >
         {dropMarker}
         {groupBar}
         <button
           type="button"
-          className="min-w-0 flex-1 truncate py-0.5 text-left"
+          className="min-w-0 flex-1 truncate py-0.5 text-left outline-none"
           title={title}
           onClick={onSelect}
         >
