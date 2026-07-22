@@ -257,6 +257,8 @@ read flush against the border. Use `h-6` (3px inset each side).
 
 Selected row: `bg-fill-2`. Hover: `bg-fill-4`. Applies uniformly to all interactive list rows, tab pills, and chrome icon buttons.
 
+**Row-level gutter rule:** the `px-2` gutter is carried by each interactive row/button/label, NOT by a wrapper container. Do not add `px-2` to `SidebarContent` or the action-rows div — that doubles the effective indent to 16px and narrows the hover fills away from the sidebar edge.
+
 Filter tray (Repositories row): Sort — Last updated / Name A–Z; Show —
 Active projects (updated within 14 days) / All projects. Prefs persist in
 `ui.json` (`sidebarProjectSort`, `sidebarProjectVisibility`). When Active

@@ -544,7 +544,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
           ) : null}
 
           {/* Action rows: New Agent / Search / separator / nav links */}
-          <div className="flex flex-col gap-0.5 px-2 pt-2 pb-2">
+          <div className="flex flex-col gap-0.5 pt-2 pb-2">
             <SidebarMenu className="gap-0.5">
               <SidebarMenuItem>
                 <SidebarActionRow
@@ -647,7 +647,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         ) : null}
 
         {/* ── SidebarContent: scrollable session list ── */}
-        <SidebarContent className="px-2 pb-2">
+        <SidebarContent className="pb-2">
           {isLoading ? (
             <SidebarSkeleton />
           ) : sessions.length === 0 ? (
@@ -661,7 +661,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
             <div className="flex flex-col gap-2">
               {pinnedSessions.length > 0 ? (
                 <SidebarGroup className="p-0 gap-0">
-                  <SidebarGroupLabel className="h-6 px-2 text-xs font-normal tracking-normal text-ink-secondary">
+                  <SidebarGroupLabel className="h-6 px-2 text-xs font-normal tracking-[var(--tracking-caption)] text-ink-muted">
                     Pinned
                   </SidebarGroupLabel>
                   <SidebarMenu className="gap-px">
