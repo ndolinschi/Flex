@@ -7,7 +7,9 @@ use std::time::Duration;
 use agentloop_contracts::{
     Answer, CommandInfo, CompactionMode, ModeSwitchId, ModelRef, PermissionMode, QuestionId,
 };
-use agentloop_core::{Hook, PendingMap, ProviderRegistry, SessionStore, ToolRegistry, Workspaces};
+use agentloop_core::{
+    Hook, PendingMap, ProviderRegistry, RoutingTable, SessionStore, ToolRegistry, Workspaces,
+};
 use agentloop_mcp::McpManager;
 
 use crate::agent::NativeAgent;
@@ -136,6 +138,7 @@ pub struct NativeAgentBuilder {
     mcp: Option<std::sync::Arc<McpManager>>,
     workspace: Option<Arc<dyn Workspaces>>,
     executor_id: Option<String>,
+    routing: Arc<RoutingTable>,
 }
 
 impl NativeAgentBuilder {
@@ -157,6 +160,7 @@ impl NativeAgentBuilder {
             mcp: None,
             workspace: None,
             executor_id: None,
+            routing: Arc::new(RoutingTable::new()),
         }
     }
 
@@ -249,6 +253,14 @@ impl NativeAgentBuilder {
         self
     }
 
+    /// Share a [`RoutingTable`] with the `SetRouting` tool: build the table
+    /// first, hand a clone to the tool, and a clone here so the loop sees
+    /// mid-turn overrides written by the tool.
+    pub fn routing(mut self, routing: Arc<RoutingTable>) -> Self {
+        self.routing = routing;
+        self
+    }
+
     pub fn build(self) -> Arc<NativeAgent> {
         let mut tools = self.tools;
         if let Some(manager) = &self.mcp {
@@ -278,6 +290,7 @@ impl NativeAgentBuilder {
                 pending_permissions: Arc::new(PendingMap::new()),
                 pending_questions: self.pending_questions,
                 pending_mode_switches: self.pending_mode_switches,
+                routing: self.routing,
             }),
             command_infos: self.command_infos,
             sessions: Mutex::new(HashMap::new()),

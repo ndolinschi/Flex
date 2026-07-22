@@ -31,9 +31,13 @@ pub(in crate::turn) async fn run_iteration(
     num_tool_calls: &mut u32,
     last_model: &mut Option<String>,
 ) -> Result<IterationOutcome, AgentError> {
-    let primary = opts
-        .model
-        .clone()
+    // Check for a routing override written by `SetRouting` earlier this turn.
+    let routing_ov = deps.routing.get(&handle.id);
+
+    let primary = routing_ov
+        .as_ref()
+        .and_then(|ov| ov.model.clone())
+        .or_else(|| opts.model.clone())
         .or_else(|| meta.model.clone())
         .or_else(|| deps.default_model.clone())
         .ok_or_else(|| {
@@ -54,6 +58,19 @@ pub(in crate::turn) async fn run_iteration(
             chain.push(candidate.clone());
         }
     }
+
+    // Build effective opts: apply routing override for effort if present.
+    let effective_opts_storage;
+    let opts = match routing_ov.as_ref().and_then(|ov| ov.effort) {
+        Some(override_effort) => {
+            effective_opts_storage = TurnOptions {
+                effort: Some(override_effort),
+                ..opts.clone()
+            };
+            &effective_opts_storage
+        }
+        None => opts,
+    };
 
     match stream_model_response(deps, handle, meta, turn_id, opts, cancel, sink, &chain).await? {
         StreamResult::Stop(outcome) => Ok(outcome),
