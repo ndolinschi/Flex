@@ -295,6 +295,23 @@ export const TimelineRowView = memo(({
           </span>
         </div>
       )
+    case "routing_changed": {
+      const bits = [
+        row.model ? `model ${row.model}` : null,
+        row.effort ? `effort ${row.effort}` : null,
+      ].filter(Boolean)
+      return (
+        <div className="flex items-center gap-1.5 rounded-md border border-stroke-3 bg-fill-3 px-3 py-1.5 text-xs text-ink-muted">
+          <span>
+            Routing →{" "}
+            <strong className="text-ink-secondary">
+              {bits.length > 0 ? bits.join(" · ") : "updated"}
+            </strong>
+            {row.reason ? ` — ${row.reason}` : null}
+          </span>
+        </div>
+      )
+    }
     default:
       return null
   }
