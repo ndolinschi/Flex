@@ -96,6 +96,8 @@ export const createSessionSlice: StateCreator<
   sessionLogRows: {},
   pendingPermission: null,
   pendingQuestion: null,
+  pendingModeSwitch: null,
+  peerMessagesBySession: {},
   pendingPlanApproval: null,
   plansBySession: {},
   planDocsBySession: {},
@@ -361,6 +363,14 @@ export const createSessionSlice: StateCreator<
     }),
   setPendingPermission: (permission) => set({ pendingPermission: permission }),
   setPendingQuestion: (question) => set({ pendingQuestion: question }),
+  setPendingModeSwitch: (modeSwitch) => set({ pendingModeSwitch: modeSwitch }),
+  addPeerMessage: (sessionId, msg) =>
+    set((s) => ({
+      peerMessagesBySession: {
+        ...s.peerMessagesBySession,
+        [sessionId]: [...(s.peerMessagesBySession[sessionId] ?? []), msg],
+      },
+    })),
   setPendingPlanApproval: (approval) => {
     if (approval) {
       set({ pendingPlanApproval: approval })

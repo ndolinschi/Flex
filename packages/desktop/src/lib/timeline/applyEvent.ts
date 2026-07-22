@@ -547,6 +547,65 @@ export const applyEventToTimeline = (
       })
       break
     }
+    case "peer_message": {
+      next.push({
+        type: "peer_message",
+        id: rowId("peer_msg", payload.id, seq),
+        from: payload.from,
+        to: payload.to,
+        threadId: payload.thread_id,
+        content: payload.content,
+        aboutPath: payload.about_path,
+        tsMs,
+      })
+      break
+    }
+    case "mode_switch_proposed": {
+      next.push({
+        type: "mode_switch",
+        id: rowId("mode_switch", payload.id, seq),
+        state: "proposed",
+        mode: payload.mode,
+        reason: payload.reason,
+        tsMs,
+      })
+      break
+    }
+    case "mode_switch_applied": {
+      const existing = next.findIndex(
+        (r) => r.type === "mode_switch" && (r as { id: string; state: string }).id.includes(payload.id),
+      )
+      if (existing >= 0) {
+        next[existing] = { ...next[existing], state: "applied" } as typeof next[0]
+      } else {
+        next.push({
+          type: "mode_switch",
+          id: rowId("mode_switch", payload.id, seq),
+          state: "applied",
+          mode: payload.mode,
+          tsMs,
+        })
+      }
+      break
+    }
+    case "mode_switch_rejected": {
+      const existingIdx = next.findIndex(
+        (r) => r.type === "mode_switch" && (r as { id: string; state: string }).id.includes(payload.id),
+      )
+      if (existingIdx >= 0) {
+        next[existingIdx] = { ...next[existingIdx], state: "rejected" } as typeof next[0]
+      } else {
+        next.push({
+          type: "mode_switch",
+          id: rowId("mode_switch", payload.id, seq),
+          state: "rejected",
+          mode: payload.mode,
+          reason: payload.reason,
+          tsMs,
+        })
+      }
+      break
+    }
     default:
       break
   }

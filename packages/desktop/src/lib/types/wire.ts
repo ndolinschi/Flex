@@ -253,6 +253,14 @@ export type AgentEvent =
   | { kind: "workspace_discarded"; workspace_id: string }
   | { kind: "snapshot_created"; snapshot_id: string; turn_id: TurnId }
   | { kind: "snapshot_restored"; snapshot_id: string }
+  /** Peer-to-peer agent message — persisted on the recipient session log. */
+  | { kind: "peer_message"; id: string; from: SessionId; to?: SessionId; thread_id?: string; content: string; about_path?: string }
+  /** Auto/router proposed a composer-mode switch; UI shows a veto countdown. */
+  | { kind: "mode_switch_proposed"; id: string; mode: string; reason: string; timeout_ms: number }
+  /** The proposed mode switch was accepted and applied. */
+  | { kind: "mode_switch_applied"; id: string; mode: string }
+  /** The proposed mode switch was vetoed by the user or timed out. */
+  | { kind: "mode_switch_rejected"; id: string; mode: string; reason?: string }
   | { kind: "gap"; from_seq: number }
   | { kind: "unknown"; raw: unknown }
 
@@ -289,6 +297,27 @@ export type PluginPrefs = {
   browser: boolean
   /** OS computer-use tools with animated agent cursor. Default off. */
   computer: boolean
+
+  // --- Agent coordination / auto mode ---
+
+  /** Peer agent messaging + SwitchMode tools. Default off. */
+  messaging: boolean
+  /** Council mode — enables Verifier for second-opinion grading. Default off. */
+  council: boolean
+  /** Composer Auto routing — shows "Auto" in the model picker. Default off. */
+  autoMode: boolean
+  /** Model used in Auto mode (e.g. "anthropic/claude-sonnet-4-5"). */
+  autoModeRouterModel?: string
+  /** Proactive auto-compaction when context nears threshold. Default true. */
+  autoCompact: boolean
+  /** Context % threshold for proactive compaction (1–100). Default 85. */
+  autoCompactThresholdPercent: number
+  /** Compaction strategy: "standard" | "turn_pair". Default "standard". */
+  compactionMode: string
+  /** Ms the UI waits before auto-accepting a ModeSwitchProposed. Default 2000. */
+  modeSwitchVetoMs: number
+  /** System delegation rules for Auto mode (empty = use built-in defaults). */
+  delegationRules: string
 }
 
 /** Desktop UI prefs for ghost-text prompt completion (not an engine plugin). */

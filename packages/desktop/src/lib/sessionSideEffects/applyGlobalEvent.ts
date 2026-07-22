@@ -421,6 +421,48 @@ export const applyGlobalSessionEvent = (
     }
   }
 
+  // Peer messages — persist per session regardless of streaming mode.
+  if (payload.kind === "peer_message") {
+    store.addPeerMessage(event.session_id, {
+      id: payload.id,
+      sessionId: event.session_id,
+      from: payload.from,
+      to: payload.to,
+      threadId: payload.thread_id,
+      content: payload.content,
+      aboutPath: payload.about_path,
+      tsMs: event.ts_ms,
+    })
+  }
+
+  // Mode-switch HITL events — live only (like permission_requested).
+  if (payload.kind === "mode_switch_proposed" && !opts?.ignoreStreaming) {
+    log.info("session", "mode switch proposed", {
+      sessionId: event.session_id,
+      id: payload.id,
+      mode: payload.mode,
+      reason: payload.reason,
+      timeoutMs: payload.timeout_ms,
+    })
+    const prefs = opts?.queryClient?.getQueryData<{ plugins?: { modeSwitchVetoMs?: number } }>(["provider-config"])
+    const vetoMs = prefs?.plugins?.modeSwitchVetoMs ?? payload.timeout_ms ?? 2000
+    store.setPendingModeSwitch({
+      sessionId: event.session_id,
+      id: payload.id,
+      mode: payload.mode,
+      reason: payload.reason,
+      deadlineMs: Date.now() + vetoMs,
+    })
+  }
+  if (
+    (payload.kind === "mode_switch_applied" || payload.kind === "mode_switch_rejected") &&
+    !opts?.ignoreStreaming
+  ) {
+    if (store.pendingModeSwitch?.id === payload.id) {
+      store.setPendingModeSwitch(null)
+    }
+  }
+
   if (payload.kind === "unknown") {
     // Forward-compat fallback — surface it instead of dropping silently.
     log.warn("session", "unrecognized event kind", { raw: payload.raw })
