@@ -428,7 +428,7 @@ Color palette constants (`lib/sessionColor.ts`): `GROUP_PALETTE` (8 colors for g
 | Plan | `PlanToolbar` breadcrumbs + Build (`h-6` controls); find bar is a secondary `h-8` row with `border-y border-stroke-3` |
 | Changes | Quiet title row (no `border-b`); select toolbar `h-6` (dedicated row, not `--header-height`); file list `px-2` / rows `px-2.5`; empties use shared `EmptyState` |
 | Pull Request | Fixed `--header-height` chrome (`#` · title · checks · Open `h-6`); body `ScrollArea` + `DiffView` / `EmptyState` |
-| Files | Open-buffer chips (`Tab` sm, strip `gap-1.5` + `border-b`) + Monaco with inline completions + Problems strip; explorer body prefers `ScrollArea` |
+| Files | Open-buffer chips (`Tab` sm, strip `gap-1.5` + `border-b`) + Monaco with inline completions + Problems strip; Explorer toggle keeps a compact right-side tree (`clamp(180px, 32%, 240px)`) beside an open editor, while an empty Files tab uses the explorer full-width |
 | Status | Quiet title row + body `ScrollArea` (session metrics) |
 | Prompt | Quiet title row (`h-6` icon controls; Insert uses Base UI `Popover`); marks / findings scroll via `ScrollArea` |
 | Memory | Quiet title row + body `ScrollArea` reusing Settings `MemoryContent` |

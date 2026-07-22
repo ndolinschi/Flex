@@ -230,7 +230,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
   const fallbackCwd = session?.base_cwd
   const [saving, setSaving] = useState(false)
   const [confirmClosePath, setConfirmClosePath] = useState<string | null>(null)
-  const [browseMode, setBrowseMode] = useState(false)
+  const [explorerOpen, setExplorerOpen] = useState(false)
   /** Per-path edit vs preview for markdown buffers. */
   const [previewByPath, setPreviewByPath] = useState<Record<string, boolean>>(
     {},
@@ -293,13 +293,6 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
     })
   }, [openFiles.length, activeSessionId, closeTabInPane])
 
-  // Opening a file leaves browse mode so the editor is visible. Depend only
-  // on length: reopening an already-open path must not rely on this effect
-  // (length is unchanged) — `onOpenFile` clears browseMode explicitly.
-  useEffect(() => {
-    if (openFiles.length > 0) setBrowseMode(false)
-  }, [openFiles.length])
-
   const requestCloseFile = useCallback(
     (p: string) => {
       if (drafts[p] !== undefined) {
@@ -319,7 +312,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
   } = useQuery({
     queryKey: ["workspace-file", activeSessionId, path],
     queryFn: () => readTextFile(activeSessionId!, path!),
-    enabled: !!activeSessionId && !!path && !browseMode,
+    enabled: !!activeSessionId && !!path,
     staleTime: 60_000,
   })
 
@@ -425,7 +418,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
     )
   }
 
-  const showExplorer = browseMode || openFiles.length === 0 || !path
+  const showStandaloneExplorer = openFiles.length === 0 || !path
 
   const fileChips =
     openFiles.length > 0 ? (
@@ -434,10 +427,9 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
           <FileChip
             key={p}
             path={p}
-            active={p === path && !browseMode}
+            active={p === path}
             dirty={drafts[p] !== undefined}
             onSelect={() => {
-              setBrowseMode(false)
               setActive(sessionKey, p)
             }}
             onClose={() => requestCloseFile(p)}
@@ -446,7 +438,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
       </>
     ) : null
 
-  if (showExplorer) {
+  if (showStandaloneExplorer) {
     return (
       <div className="flex h-full min-h-0 flex-col">
         {openFiles.length > 0 ? (
@@ -461,10 +453,9 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
             cwd={cwd}
             fallbackCwd={fallbackCwd}
             onOpenFile={(p) => {
-              // Always leave browse mode — openWorkspaceFile is a no-op on
-              // openFiles when `p` is already open, so the length-based effect
-              // above would not clear browseMode on its own.
-              setBrowseMode(false)
+              // Preserve the tree beside the editor after opening the first
+              // file so navigation remains visible and spatially stable.
+              setExplorerOpen(true)
               openWorkspaceFile(sessionKey, p)
             }}
           />
@@ -487,146 +478,172 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-stroke-3 px-2.5">
         <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      aria-label="Browse files" title="Browse files"
-      onClick={() => setBrowseMode(true)}
-      className="shrink-0 text-ink-muted hover:bg-fill-4 hover:text-ink"
-    >
-      <FolderTree className="h-3.5 w-3.5" aria-hidden />
-    </Button>
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label={explorerOpen ? "Hide file explorer" : "Show file explorer"}
+          title={explorerOpen ? "Hide file explorer" : "Show file explorer"}
+          aria-pressed={explorerOpen}
+          onClick={() => setExplorerOpen((open) => !open)}
+          className={cn(
+            "shrink-0 text-ink-muted hover:bg-fill-4 hover:text-ink",
+            explorerOpen && "bg-fill-2 text-ink hover:bg-fill-2",
+          )}
+        >
+          <FolderTree className="h-3.5 w-3.5" aria-hidden />
+        </Button>
         {fileChips}
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
           {isMarkdown && path ? (
             <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      aria-label={previewMode ? "Edit markdown" : "Preview markdown"} title={previewMode ? "Edit markdown" : "Preview markdown"}
-      onClick={toggleMarkdownPreview}
-      className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        previewMode && "bg-fill-2 text-ink",
-      )}
-    >
-      {previewMode ? (
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={previewMode ? "Edit markdown" : "Preview markdown"}
+              title={previewMode ? "Edit markdown" : "Preview markdown"}
+              onClick={toggleMarkdownPreview}
+              className={cn(
+                "text-ink-muted hover:bg-fill-4 hover:text-ink",
+                previewMode && "bg-fill-2 text-ink",
+              )}
+            >
+              {previewMode ? (
                 <Code2 className="h-3 w-3" aria-hidden />
               ) : (
                 <Eye className="h-3 w-3" aria-hidden />
               )}
-    </Button>
+            </Button>
           ) : null}
           <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      aria-label={dirty ? "Save" : "Save (no changes)"} title={dirty ? "Save" : "Save (no changes)"}
-      disabled={!dirty || saving || !path}
-      onClick={() => void handleSave()}
-      className="text-ink-muted hover:bg-fill-4 hover:text-ink"
-    >
-      {saving ? (
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={dirty ? "Save" : "Save (no changes)"}
+            title={dirty ? "Save" : "Save (no changes)"}
+            disabled={!dirty || saving || !path}
+            onClick={() => void handleSave()}
+            className="text-ink-muted hover:bg-fill-4 hover:text-ink"
+          >
+            {saving ? (
               <Spinner size="sm" />
             ) : (
               <Save className="h-3 w-3" aria-hidden />
             )}
-    </Button>
+          </Button>
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="relative min-h-0 flex-1">
-          {isLoading ? (
-            <div className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted">
-              <Spinner size="sm" />
-              Loading…
-            </div>
-          ) : loadError ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
-              <ErrorBanner message={loadError} className="max-w-md" />
-              <Button
-                variant="link"
-                onClick={() => void refetch()}
-                className="h-auto px-0 py-0 text-xs font-normal"
-              >
-                Retry
-              </Button>
-            </div>
-          ) : path && previewMode ? (
-            <ScrollArea className="h-full">
-              <div className="px-2.5 py-2">
-                {value.trim().length === 0 ? (
-                  <p className="text-sm text-ink-muted">Empty file</p>
-                ) : (
-                  <MarkdownBody content={value} />
-                )}
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="relative min-h-0 flex-1">
+            {isLoading ? (
+              <div className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted">
+                <Spinner size="sm" />
+                Loading…
               </div>
-            </ScrollArea>
-          ) : path && active ? (
-            <Suspense
-              fallback={
-                <div className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted">
-                  <Spinner size="sm" />
-                  Loading editor…
+            ) : loadError ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
+                <ErrorBanner message={loadError} className="max-w-md" />
+                <Button
+                  variant="link"
+                  onClick={() => void refetch()}
+                  className="h-auto px-0 py-0 text-xs font-normal"
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : path && previewMode ? (
+              <ScrollArea className="h-full">
+                <div className="px-2.5 py-2">
+                  {value.trim().length === 0 ? (
+                    <p className="text-sm text-ink-muted">Empty file</p>
+                  ) : (
+                    <MarkdownBody content={value} />
+                  )}
                 </div>
-              }
-            >
-              <MonacoEditor
-                height="100%"
-                path={path}
-                language={language}
-                theme={theme === "light" ? "vs" : "vs-dark"}
-                value={value}
-                onChange={handleChange}
-                onMount={handleEditorMount}
-                options={{
-                  fontSize: 13,
-                  fontFamily: "var(--font-mono), ui-monospace, monospace",
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                  wordWrap: "on",
-                  automaticLayout: true,
-                  tabSize: 2,
-                  renderWhitespace: "selection",
-                  padding: { top: 8, bottom: 8 },
-                  bracketPairColorization: { enabled: true },
-                  inlineSuggest: { enabled: true },
-                }}
-                loading={
+              </ScrollArea>
+            ) : path && active ? (
+              <Suspense
+                fallback={
                   <div className="flex h-full items-center justify-center text-sm text-ink-muted">
+                    <Spinner size="sm" className="mr-2" />
                     Loading editor…
                   </div>
                 }
-              />
-            </Suspense>
-          ) : path ? (
-            // Keep-alive host is hidden — skip Monaco so automaticLayout / workers
-            // do not run off-screen. Drafts stay in the store.
-            <div className="h-full" aria-hidden />
+              >
+                <MonacoEditor
+                  height="100%"
+                  path={path}
+                  language={language}
+                  theme={theme === "light" ? "vs" : "vs-dark"}
+                  value={value}
+                  onChange={handleChange}
+                  onMount={handleEditorMount}
+                  options={{
+                    fontSize: 13,
+                    fontFamily: "var(--font-mono), ui-monospace, monospace",
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    wordWrap: "on",
+                    automaticLayout: true,
+                    tabSize: 2,
+                    renderWhitespace: "selection",
+                    padding: { top: 8, bottom: 8 },
+                    bracketPairColorization: { enabled: true },
+                    inlineSuggest: { enabled: true },
+                  }}
+                  loading={
+                    <div className="flex h-full items-center justify-center text-sm text-ink-muted">
+                      Loading editor…
+                    </div>
+                  }
+                />
+              </Suspense>
+            ) : path ? (
+              // Keep-alive host is hidden — skip Monaco so automaticLayout / workers
+              // do not run off-screen. Drafts stay in the store.
+              <div className="h-full" aria-hidden />
+            ) : null}
+          </div>
+
+          {/* Problems strip — collapsible; only rendered when the editor is active */}
+          {path && active && !previewMode ? (
+            <ProblemsStrip
+              markers={markers}
+              errorCount={errorCount}
+              warningCount={warningCount}
+              hasProblems={hasProblems}
+              open={problemsOpen}
+              onToggle={() => setProblemsOpen((v) => !v)}
+              onGoToMarker={(m) => {
+                const editor = editorRef.current
+                if (!editor) return
+                editor.revealLineInCenterIfOutsideViewport(m.startLineNumber)
+                editor.setPosition({
+                  lineNumber: m.startLineNumber,
+                  column: m.startColumn,
+                })
+                editor.focus()
+              }}
+            />
           ) : null}
         </div>
 
-        {/* Problems strip — collapsible; only rendered when the editor is active */}
-        {path && active && !previewMode ? (
-          <ProblemsStrip
-            markers={markers}
-            errorCount={errorCount}
-            warningCount={warningCount}
-            hasProblems={hasProblems}
-            open={problemsOpen}
-            onToggle={() => setProblemsOpen((v) => !v)}
-            onGoToMarker={(m) => {
-              const editor = editorRef.current
-              if (!editor) return
-              editor.revealLineInCenterIfOutsideViewport(m.startLineNumber)
-              editor.setPosition({
-                lineNumber: m.startLineNumber,
-                column: m.startColumn,
-              })
-              editor.focus()
-            }}
-          />
+        {explorerOpen && cwd ? (
+          <aside
+            className="w-[clamp(180px,32%,240px)] shrink-0 border-l border-stroke-3 bg-panel"
+            aria-label="File explorer"
+          >
+            <FileExplorer
+              sessionId={activeSessionId}
+              sessionKey={sessionKey}
+              cwd={cwd}
+              fallbackCwd={fallbackCwd}
+              onOpenFile={(nextPath) =>
+                openWorkspaceFile(sessionKey, nextPath)
+              }
+            />
+          </aside>
         ) : null}
       </div>
 
