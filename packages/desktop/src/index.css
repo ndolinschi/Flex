@@ -539,10 +539,10 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   animation: subagent-viewer-out var(--duration-normal) var(--easing-out) both;
 }
 
-/* Feed dim mask behind the open subagent viewer — independent, hardcoded
- * .16s timing (not tied to --duration-normal), matching the reference design. */
+/* Feed dim mask behind the open subagent viewer — tokenized to end-turn
+ * duration (160ms) so reduced-motion / design audit stay consistent. */
 .subagent-viewer-mask {
-  transition: opacity 0.16s ease-out;
+  transition: opacity var(--duration-end-turn) var(--easing-out);
 }
 
 .animate-pane-fade {
@@ -622,7 +622,7 @@ mark[data-plan-comment-id].plan-comment-mark-active {
  * `::after` highlight line, since Tailwind's `after:` variant can't apply an
  * arbitrary custom class. */
 .sash-line-transition::after {
-  transition: background-color 0.1s ease-out;
+  transition: background-color var(--duration-fast) var(--easing-out);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -642,11 +642,22 @@ mark[data-plan-comment-id].plan-comment-mark-active {
     animation: none;
   }
 
+  /* Live activity grid — freeze mid-opacity; do not leave the keyframe running. */
   .animate-dot-grid-pulse {
+    animation: none;
     opacity: 0.7;
   }
 
+  /* Tailwind pulse: streaming caret, tab activity, skeletons, live dots. */
+  .animate-pulse {
+    animation: none;
+  }
+
   .subagent-viewer-mask {
+    transition: none;
+  }
+
+  .sash-line-transition::after {
     transition: none;
   }
 
@@ -671,6 +682,15 @@ mark[data-plan-comment-id].plan-comment-mark-active {
 
   [data-composer] {
     transition: none !important;
+  }
+
+  /* Sheet / drawer slide+fade (base-ui data-starting/ending-style). Instant. */
+  [data-slot="sheet-overlay"],
+  [data-slot="sheet-content"],
+  [data-slot="drawer-overlay"],
+  [data-slot="drawer-content"],
+  [data-slot="drawer-popup"] {
+    transition-duration: 0.01ms !important;
   }
 }
 

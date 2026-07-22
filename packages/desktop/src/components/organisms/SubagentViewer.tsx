@@ -34,7 +34,7 @@ export const SubagentViewer = () => {
         variant="ghost"
         aria-label="Close subagent view"
         onClick={closeSubagentViewer}
-        className="subagent-viewer-mask absolute inset-0 z-10 h-auto w-auto cursor-default rounded-none bg-bg/45 hover:bg-bg/45"
+        className="subagent-viewer-mask absolute inset-0 z-10 h-auto w-auto cursor-default rounded-none bg-black/30 hover:bg-black/30"
       />
       <section
         role="dialog"
@@ -43,7 +43,7 @@ export const SubagentViewer = () => {
         className={[
           "absolute inset-x-0 bottom-0 z-20 flex max-h-[70dvh] min-h-[220px] flex-col overflow-hidden",
           "h-[70dvh] rounded-t-lg border-t border-stroke-3 bg-panel",
-          "shadow-[var(--shadow-popover)] animate-subagent-viewer-in",
+          "shadow-popover animate-subagent-viewer-in",
         ].join(" ")}
       >
         <header className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5">

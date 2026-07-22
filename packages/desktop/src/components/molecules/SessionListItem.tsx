@@ -251,13 +251,13 @@ export const SessionListItem = memo(function SessionListItem({
       onPointerEnter={armActions}
       onFocusCapture={armActions}
       className={cn(
-        // Cursor agent-sidebar-cell: padding 6×8, radius 6 (sm), gap 12.
+        // Cursor agent-sidebar-cell: pad 6×8, radius 6 (sm), gap 12.
         "group relative flex min-h-7 items-center gap-3 rounded-sm px-2 py-1.5",
         "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
         // Non-virtualized list: skip paint for off-screen rows in ScrollArea.
         // Safe here (fixed-ish row height); NEVER apply on virtualized timeline.
         "cv-auto-meta",
-        // Selected stronger than hover (Feel: Whisper fills) — fill-2 ≈8%, fill-4 ≈6%.
+        // Whisper fills: selected fill-2 (~8%) stronger than hover fill-4 (~6%).
         isActive ? "bg-fill-2" : "hover:bg-fill-4",
         archived && "opacity-60",
       )}

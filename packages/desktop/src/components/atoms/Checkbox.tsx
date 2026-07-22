@@ -34,8 +34,9 @@ export const Checkbox = ({
     disabled={disabled}
     onClick={onClick}
     className={cn(
-      "peer relative flex size-4 shrink-0 items-center justify-center rounded-full border border-input transition-colors outline-none",
-      "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+      "peer relative flex size-4 shrink-0 items-center justify-center rounded-full border border-stroke-3 transition-colors outline-none",
+      "transition-[color,background-color,border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+      "focus-visible:border-stroke-2 focus-visible:ring-1 focus-visible:ring-stroke-2",
       "disabled:cursor-not-allowed disabled:opacity-50",
       "data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground",
       "data-indeterminate:border-primary data-indeterminate:bg-primary data-indeterminate:text-primary-foreground",

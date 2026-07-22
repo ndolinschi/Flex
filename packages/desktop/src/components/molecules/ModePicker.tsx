@@ -88,7 +88,7 @@ type ModePickerProps = {
   disabled?: boolean
 }
 
-/** Agent / Plan / Ask (/ Flex when flagged) mode picker for the composer footer. */
+/** Agent / Plan / Ask / Debug (/ Flex when flagged) mode picker for the composer footer. */
 export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
   const modes = useMemo(() => visibleComposerModes(), [])
   const items = useMemo(

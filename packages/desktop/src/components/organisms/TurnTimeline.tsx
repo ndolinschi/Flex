@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { ArrowDown } from "lucide-react"
 import { RunningDot } from "../atoms"
@@ -11,8 +12,9 @@ import {
   preloadMarkdownHighlight,
 } from "../molecules"
 import { useSessionEvents } from "../../hooks/useSessionEvents"
-import { useSessions } from "../../hooks/useSessions"
+import { SESSIONS_KEY } from "../../hooks/useSessions"
 import { useStickToBottom } from "../../hooks/useStickToBottom"
+import { listSessions } from "../../lib/tauri"
 import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
 import {
@@ -70,8 +72,16 @@ export const TurnTimeline = ({
   const sessionLogRows = useAppStore((s) =>
     sessionId ? s.sessionLogRows[sessionId] : undefined,
   )
-  const { sessions } = useSessions()
-  const activeCwd = sessions.find((s) => s.id === sessionId)?.cwd
+  // Narrow sessions subscription: only re-render when *this* session's cwd
+  // changes — not when any other session's title/updated_at mutates mid-stream.
+  const { data: activeCwd } = useQuery({
+    queryKey: SESSIONS_KEY,
+    queryFn: listSessions,
+    retry: 1,
+    staleTime: 30_000,
+    select: (list) =>
+      sessionId ? list.find((s) => s.id === sessionId)?.cwd : undefined,
+  })
   const prevStreamingRef = useRef(isStreaming)
   // Keep overscan tight for a beat after settle so historical MarkdownBody
   // remounts don't stack on the live→GFM parse of the just-finished answer.
@@ -331,14 +341,15 @@ export const TurnTimeline = ({
     return (
       <div className="flex flex-1 flex-col px-3 py-3">
         <div
-          className="mx-auto flex w-full max-w-[var(--content-rail)] flex-col gap-3"
+          className="mx-auto flex w-full max-w-[var(--content-rail)] flex-col gap-2.5"
           role="status"
           aria-label="Loading conversation"
         >
-          <Skeleton className="ml-auto h-12 w-3/5 rounded-[var(--radius-bubble)]" />
-          <Skeleton className="h-20 w-full rounded-[var(--radius-bubble)]" />
-          <Skeleton className="ml-auto h-10 w-2/5 rounded-[var(--radius-bubble)]" />
-          <Skeleton className="h-16 w-4/5 rounded-[var(--radius-bubble)]" />
+          {/* Quiet bubble placeholders — shorter + dampened skeleton base. */}
+          <Skeleton className="ml-auto h-10 w-1/2 rounded-[var(--radius-bubble)]" />
+          <Skeleton className="h-14 w-[88%] rounded-[var(--radius-bubble)]" />
+          <Skeleton className="ml-auto h-8 w-2/5 rounded-[var(--radius-bubble)]" />
+          <Skeleton className="h-12 w-3/4 rounded-[var(--radius-bubble)]" />
         </div>
       </div>
     )

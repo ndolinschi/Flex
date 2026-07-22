@@ -24,16 +24,18 @@ export const ReconnectBanner = ({
   const remainingSec = Math.round(remainingMs / 1000)
 
   return (
-    <Alert className="mt-1 grid-cols-[auto_1fr] gap-x-2 border-border bg-muted/40">
+    <Alert className="mt-1 grid-cols-[auto_1fr] gap-x-2 border-stroke-3 bg-fill-5 py-1.5">
       <RunningDot className="mt-0.5 h-4 w-4" />
-      <AlertTitle className="font-normal">
+      <AlertTitle className="text-xs font-medium text-ink-secondary">
         <Tooltip label={status.error}>
           <span className="animate-shimmer-text">
             {`Reconnecting — attempt ${status.attempt}/${status.maxAttempts}, retrying in ${remainingSec}s`}
           </span>
         </Tooltip>
       </AlertTitle>
-      <AlertDescription className="col-start-2">{status.error}</AlertDescription>
+      <AlertDescription className="col-start-2 text-xs leading-snug text-ink-muted">
+        {status.error}
+      </AlertDescription>
     </Alert>
   )
 }

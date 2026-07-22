@@ -136,7 +136,7 @@ export const BrowserToolbar = ({
       disabled={!showLiveContent}
       onClick={browserBack}
       className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+        "text-ink-muted hover:bg-fill-4 hover:text-ink",
         "h-6 w-6",
       )}
     >
@@ -150,7 +150,7 @@ export const BrowserToolbar = ({
       disabled={!showLiveContent}
       onClick={browserForward}
       className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+        "text-ink-muted hover:bg-fill-4 hover:text-ink",
         "h-6 w-6",
       )}
     >
@@ -171,7 +171,7 @@ export const BrowserToolbar = ({
       disabled={!showLiveContent}
       onClick={handleReload}
       className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+        "text-ink-muted hover:bg-fill-4 hover:text-ink",
         "h-6 w-6",
       )}
     >
@@ -224,7 +224,7 @@ export const BrowserToolbar = ({
               aria-label={label}
               title={label}
               className={cn(
-                "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+                "text-ink-muted hover:bg-fill-4 hover:text-ink",
                 "h-6 w-6 rounded-md p-0",
                 "data-pressed:bg-surface-muted data-pressed:text-ink",
               )}
@@ -244,7 +244,7 @@ export const BrowserToolbar = ({
       disabled={!showLiveContent}
       onClick={() => void toggleDesignMode()}
       className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+        "text-ink-muted hover:bg-fill-4 hover:text-ink",
         "h-6 w-6",
             browserDesignMode && "bg-surface-muted text-ink",
       )}
@@ -262,7 +262,7 @@ export const BrowserToolbar = ({
       disabled={!showLiveContent}
       onClick={handleOpenDevtools}
       className={cn(
-        "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+        "text-ink-muted hover:bg-fill-4 hover:text-ink",
         "h-6 w-6",
       )}
     >

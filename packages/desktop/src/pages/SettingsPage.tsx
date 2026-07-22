@@ -365,7 +365,7 @@ const BehaviorContent = () => {
             value={plugins?.costMode ?? "auto"}
             onChange={(e) => void savePlugins({ costMode: e.target.value })}
             disabled={isLoading || !plugins}
-            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-9 rounded-md border border-stroke-3 bg-elevated px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stroke-2 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Cost mode"
           >
             <option value="auto">Auto (escalate freely)</option>

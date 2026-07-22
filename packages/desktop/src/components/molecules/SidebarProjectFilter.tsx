@@ -72,7 +72,7 @@ export const SidebarProjectFilter = ({
               isFiltered || open
                 ? "opacity-100"
                 : "opacity-0 group-hover/label:opacity-100 group-focus-within/label:opacity-100 focus-visible:opacity-100",
-              open && "bg-muted",
+              open && "bg-fill-3",
             )}
           />
         }
@@ -116,7 +116,7 @@ export const SidebarProjectFilter = ({
                       <Check className="size-3 shrink-0 text-primary" aria-hidden />
                     ) : null}
                   </span>
-                  <span className="block text-xs text-muted-foreground">
+                  <span className="block text-xs text-ink-muted">
                     {option.description}
                   </span>
                 </span>

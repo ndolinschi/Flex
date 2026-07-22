@@ -1,7 +1,5 @@
+import { lazy, Suspense, type ReactNode } from "react"
 import { Boxes, Database, Package } from "lucide-react"
-import { DatabaseTab } from "./database/DatabaseTab"
-import { ComponentsTab } from "./components/ComponentsTab"
-import { ArtifactsTab } from "./artifacts/ArtifactsTab"
 import { searchDatabaseMentions } from "./database/mentions"
 import { searchMcpMentions } from "./mcp/mentions"
 import { registerUiPlugin } from "./registry"
@@ -11,6 +9,32 @@ import {
   DATABASE_TAB_ENABLED,
   INLINE_COMPLETION_ENABLED,
 } from "../lib/featureFlags"
+
+/** Plugin tool tabs — lazy so the chat-shell graph does not pay for them
+ * until the user opens the tab (mirrors Files/Terminal/Browser). */
+const DatabaseTab = lazy(() =>
+  import("./database/DatabaseTab").then((m) => ({ default: m.DatabaseTab })),
+)
+const ComponentsTab = lazy(() =>
+  import("./components/ComponentsTab").then((m) => ({
+    default: m.ComponentsTab,
+  })),
+)
+const ArtifactsTab = lazy(() =>
+  import("./artifacts/ArtifactsTab").then((m) => ({ default: m.ArtifactsTab })),
+)
+
+const LazyPluginTab = ({ children }: { children: ReactNode }) => (
+  <Suspense
+    fallback={
+      <div className="flex h-full items-center justify-center text-sm text-ink-muted">
+        Loading…
+      </div>
+    }
+  >
+    {children}
+  </Suspense>
+)
 
 /** Register built-in UI plugins. Safe to call once at app boot. */
 export const registerBuiltinUiPlugins = (): void => {
@@ -23,7 +47,9 @@ export const registerBuiltinUiPlugins = (): void => {
         icon: Database,
         enabled: DATABASE_TAB_ENABLED,
         render: ({ active, session }) => (
-          <DatabaseTab active={active} session={session} />
+          <LazyPluginTab>
+            <DatabaseTab active={active} session={session} />
+          </LazyPluginTab>
         ),
       },
     ],
@@ -44,7 +70,9 @@ export const registerBuiltinUiPlugins = (): void => {
         icon: Boxes,
         enabled: COMPONENTS_TAB_ENABLED,
         render: ({ active, session }) => (
-          <ComponentsTab active={active} session={session} />
+          <LazyPluginTab>
+            <ComponentsTab active={active} session={session} />
+          </LazyPluginTab>
         ),
       },
     ],
@@ -59,7 +87,9 @@ export const registerBuiltinUiPlugins = (): void => {
         icon: Package,
         enabled: ARTIFACTS_TAB_ENABLED,
         render: ({ active, session }) => (
-          <ArtifactsTab active={active} session={session} />
+          <LazyPluginTab>
+            <ArtifactsTab active={active} session={session} />
+          </LazyPluginTab>
         ),
       },
     ],

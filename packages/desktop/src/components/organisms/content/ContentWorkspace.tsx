@@ -75,6 +75,8 @@ export const ContentWorkspace = () => {
   const contentLayout = useAppStore((s) => s.contentLayout)
   const setSplitRatio = useAppStore((s) => s.setSplitRatio)
   const setRightPanelDragging = useAppStore((s) => s.setRightPanelDragging)
+  // Local drag paint only — store flag is also read by browser bounds logic.
+  const rightPanelDragging = useAppStore((s) => s.rightPanelDragging)
   const groupImperativeRef = useGroupRef()
   const containerRef = useRef<HTMLDivElement | null>(null)
   // Threshold boolean — avoid re-rendering on every resize pixel while the
@@ -169,9 +171,14 @@ export const ContentWorkspace = () => {
             <ResizableHandle
               disabled={!showSash}
               className={cn(
+                // Hit target w-1.5; paint only the 1px ::after hairline.
+                // Neutralize shadcn ResizableHandle defaults (bg-border, after:w-1).
                 "sash-line-transition z-10 w-1.5 shrink-0 cursor-col-resize bg-transparent",
                 "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-stroke-3",
+                // Quiet sash: white-alpha 12% hover only — never accent (Feel: Quiet chrome).
                 "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_12%,transparent)]",
+                "focus-visible:ring-0 focus-visible:outline-none",
+                rightPanelDragging && "after:bg-stroke-1",
                 !showSash && "invisible pointer-events-none",
               )}
               onPointerDown={() => setRightPanelDragging(true)}

@@ -315,21 +315,24 @@ modal. HITL docks as a composer-adjacent blocking surface, not a dialog.
 
 | State | Component | Recipe |
 |---|---|---|
-| Empty | `EmptyState` | `py-6`; title `text-sm text-ink-secondary`; description `text-xs text-ink-muted`; CTA `Button secondary sm` |
-| Hero empty | `ChatShell` `composerHero` | Title ~22px; hint `text-sm muted`; quiet pill chips `text-xs` |
+| Empty | `EmptyState` | `py-6 gap-3`; title `text-sm text-ink-secondary`; description `text-xs text-ink-muted`; CTA `Button secondary sm`; icon chip `bg-fill-3 text-ink-faint` |
+| Hero empty | `ChatShell` `composerHero` | Title ~22px; hint `text-sm muted`; quiet pill chips `size="xs"` `text-xs` opacity `.8→1` |
 | Onboarding | `WelcomePage` | Primary controls **`h-9`** (`Button size="lg"`, inputs `h-9`); errors via `ErrorBanner` |
-| Loading list | `SidebarSkeleton` | Rows `min-h-7` / two-line `h-10`; headers `h-6`; `rounded-md` whisper fills |
-| Loading block | `Skeleton` | `bg-surface-muted` (fill-3) + soft pulse; opacity dampened |
-| Indeterminate | `Spinner` | `text-ink-muted`; sizes sm/md/lg |
+| Loading list | `SidebarSkeleton` | Rows `min-h-7` / two-line `h-10`; headers `h-6`; `rounded-sm` whisper fills; `px-2` gutter |
+| Loading block | `Skeleton` | `bg-surface-muted` (fill-3) + soft pulse; **`opacity-70`** dampen |
+| Timeline load | `TurnTimeline` | Short bubble placeholders (`h-8`–`h-14`), dampened skeleton base |
+| Indeterminate | `Spinner` | `text-ink-muted`; sizes sm/md/lg (inline HITL spinners also muted) |
 | Live work | `RunningDot` | 3×3 wave, 1.8s, base opacity-60; reduced-motion kills animation |
 | Streaming | `StreamingCaret` | Thin `w-px h-3.5` pulse on `ink-muted`, not a block accent cursor |
 | Error inline | `ErrorBanner` | `border-danger/15 bg-danger-subtle/70`; body `text-xs`; dismissible quiet X |
-| Resume error | `SidebarResumeError` | Same quiet danger; Retry ghost + dismiss |
-| Progress | `Progress` (settings indexing) | Track `h-1 bg-fill-3`; indeterminate bar only while rebuilding |
-| Blocking HITL | `PermissionPrompt` / `QuestionPrompt` | Docked above composer bubble (`Composer.dockedOverlay`); same rail width; actions in composer footer (`PermissionActions`) or card footer |
+| Resume error | `SidebarResumeError` | Same quiet danger; Retry ghost + dismiss (edge-to-edge in sidebar) |
+| Transient | `ReconnectBanner` | `border-stroke-3 bg-fill-5`; title `text-xs secondary`; no muted slab |
+| Progress | `Progress` | Track `h-1 bg-fill-3`; indicator **`bg-ink-faint/50`** (never primary) |
+| Disabled | controls | `opacity-50` + `pointer-events-none` / `cursor-not-allowed` (Button, Input, Switch, menus) |
+| Blocking HITL | `PermissionPrompt` / `QuestionPrompt` | Docked above composer bubble (`Composer.dockedOverlay`); same rail width; title `font-medium`; options whisper fill selected (`fill-2`), not accent slabs; actions in composer footer (`PermissionActions`) or card footer |
 
 **Do not:** full-screen error modals for recoverable IPC failures; primary-filled
-empty CTAs; bright skeleton shimmer; loud red alert slabs.
+empty CTAs; bright skeleton shimmer; loud red alert slabs; accent-filled quiz options.
 
 ---
 

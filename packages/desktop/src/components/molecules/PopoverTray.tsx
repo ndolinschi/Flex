@@ -149,9 +149,9 @@ export const PopoverTray = ({
       aria-label={ariaLabel}
       className={cn(
         "absolute z-50 overflow-hidden rounded-md",
-        // Chrome aligned with shadcn PopoverContent: bg-popover (= bg-panel),
-        // shadow-popover, ring-1 ring-foreground/10.
-        "bg-popover shadow-popover ring-1 ring-foreground/10 animate-tray-in",
+        // Chrome aligned with PopoverContent: solid panel + shadow-popover
+        // (1px stroke lives in the shadow — no extra ring).
+        "bg-panel shadow-popover animate-tray-in",
         placement === "above" ? "bottom-full mb-1.5" : "top-full mt-1.5",
         className,
       )}

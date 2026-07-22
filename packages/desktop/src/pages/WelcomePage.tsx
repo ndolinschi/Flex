@@ -333,7 +333,9 @@ export const WelcomePage = () => {
                 disabled={!provider || busy || isUpserting}
                 onClick={() => void handleProviderNext()}
               >
-                {(busy || isUpserting) ? <Spinner data-icon="inline-start" /> : null}
+                {(busy || isUpserting) ? (
+                  <Spinner data-icon="inline-start" className="text-ink-muted" />
+                ) : null}
                 Continue
               </Button>
             </div>
@@ -401,7 +403,9 @@ export const WelcomePage = () => {
                   disabled={busy}
                   onClick={() => void handleFinish(false)}
                 >
-                  {busy && !projectPath ? <Spinner data-icon="inline-start" /> : null}
+                  {busy && !projectPath ? (
+                    <Spinner data-icon="inline-start" className="text-ink-muted" />
+                  ) : null}
                   Skip & start chatting
                 </Button>
                 <Button
@@ -409,7 +413,9 @@ export const WelcomePage = () => {
                   disabled={busy || !projectPath}
                   onClick={() => void handleFinish(true)}
                 >
-                  {busy && !!projectPath ? <Spinner data-icon="inline-start" /> : null}
+                  {busy && !!projectPath ? (
+                    <Spinner data-icon="inline-start" className="text-ink-muted" />
+                  ) : null}
                   Start in folder
                 </Button>
               </div>

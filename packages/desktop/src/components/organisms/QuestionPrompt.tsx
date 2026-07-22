@@ -23,10 +23,10 @@ type DraftAnswer = {
 
 const emptyDraft = (): DraftAnswer => ({ selected: [], custom: "" })
 
-/** Shared vertical rhythm for the docked quiz card (8px / 12px steps). */
-const CARD_PAD = "px-3 pt-3 pb-3"
-const SECTION_GAP = "mt-2.5"
-const STACK_GAP = "gap-2"
+/** Shared vertical rhythm for the docked quiz card (compact 8px steps). */
+const CARD_PAD = "px-3 pt-2.5 pb-2.5"
+const SECTION_GAP = "mt-2"
+const STACK_GAP = "gap-1.5"
 
 const StepBody = ({
   q,
@@ -69,12 +69,12 @@ const StepBody = ({
                 key={opt.label}
                 value={opt.label}
                 className={cn(
-                  "h-auto w-full justify-start rounded-md border px-3 py-2 text-left text-sm leading-snug",
+                  "h-auto w-full justify-start rounded-md border px-2.5 py-1.5 text-left text-sm leading-snug",
                   "border-stroke-3 bg-fill-5 text-ink-secondary",
                   "transition-colors duration-[var(--duration-fast)]",
                   "hover:border-stroke-2 hover:bg-fill-4 hover:text-ink-secondary",
-                  "data-[pressed]:border-accent data-[pressed]:bg-accent-subtle data-[pressed]:text-ink",
-                  "data-[pressed]:hover:bg-accent-subtle",
+                  "data-[pressed]:border-stroke-2 data-[pressed]:bg-fill-2 data-[pressed]:text-ink",
+                  "data-[pressed]:hover:bg-fill-2",
                 )}
               >
                 <span className="flex flex-col items-start gap-1">
@@ -102,10 +102,10 @@ const StepBody = ({
                 <label
                   key={opt.label}
                   className={cn(
-                    "flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-sm leading-snug",
+                    "flex cursor-pointer items-start gap-2 rounded-md border px-2.5 py-1.5 text-sm leading-snug",
                     "transition-colors duration-[var(--duration-fast)]",
                     active
-                      ? "border-accent bg-accent-subtle text-ink"
+                      ? "border-stroke-2 bg-fill-2 text-ink"
                       : "border-stroke-3 bg-fill-5 text-ink-secondary hover:border-stroke-2 hover:bg-fill-4",
                   )}
                 >
@@ -246,7 +246,7 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex flex-col gap-0.5">
-            <h3 id="question-title" className="text-sm font-semibold leading-snug text-ink">
+            <h3 id="question-title" className="text-sm font-medium leading-snug text-ink">
               Agent needs your input
             </h3>
             <p className="text-xs leading-snug text-ink-muted">
@@ -312,7 +312,9 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
                 disabled={!currentStepFilled || isSubmitting}
                 onClick={handleAdvance}
               >
-                {isSubmitting ? <Spinner data-icon="inline-start" /> : null}
+                {isSubmitting ? (
+                  <Spinner data-icon="inline-start" className="text-ink-muted" />
+                ) : null}
                 {isLastStep ? "Submit" : "Next"}
               </Button>
             ) : null}

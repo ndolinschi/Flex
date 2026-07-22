@@ -264,7 +264,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
     >
       <DialogContent
         showCloseButton={false}
-        className="top-[10vh] max-w-[min(100%,560px)] translate-y-0 gap-0 overflow-hidden border-stroke-3 bg-panel p-0 shadow-[var(--shadow-popover)] sm:max-w-[560px]"
+        className="top-[10vh] max-w-[min(100%,560px)] translate-y-0 gap-0 overflow-hidden bg-panel p-0 shadow-popover sm:max-w-[560px]"
       >
         <DialogHeader className="sr-only">
           <DialogTitle>Command palette</DialogTitle>

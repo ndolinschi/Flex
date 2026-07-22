@@ -5,11 +5,11 @@ import { cn } from "@/lib/utils"
 
 const toggleVariants = cva(
   [
-    "group/toggle inline-flex items-center justify-center gap-1 rounded-md text-sm font-medium whitespace-nowrap transition-colors outline-none",
+    "group/toggle inline-flex items-center justify-center gap-1 rounded-md text-sm font-medium whitespace-nowrap transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)] outline-none",
     "hover:bg-fill-4 hover:text-ink",
     "focus-visible:border-stroke-2 focus-visible:ring-1 focus-visible:ring-stroke-2",
     "disabled:pointer-events-none disabled:opacity-50",
-    "aria-invalid:border-destructive aria-invalid:ring-destructive/20",
+    "aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/30",
     // Pressed = fill-4 (same as menu/select highlight — never brand accent).
     "aria-pressed:bg-fill-4 aria-pressed:text-ink data-pressed:bg-fill-4 data-pressed:text-ink",
     "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",

@@ -42,17 +42,13 @@ export const EmptyState = ({
     <Empty className={className}>
       <EmptyHeader className="gap-1.5">
         {icon ? (
-          <EmptyMedia variant="icon" className="mb-0 text-xl text-ink-faint" aria-hidden="true">
+          <EmptyMedia variant="icon" className="mb-0" aria-hidden="true">
             {icon}
           </EmptyMedia>
         ) : null}
-        <EmptyTitle className="text-sm font-medium tracking-[var(--tracking-caption)] text-ink-secondary">
-          {title}
-        </EmptyTitle>
+        <EmptyTitle>{title}</EmptyTitle>
         {description ? (
-          <EmptyDescription className="max-w-sm text-xs leading-normal text-ink-muted">
-            {description}
-          </EmptyDescription>
+          <EmptyDescription className="max-w-sm">{description}</EmptyDescription>
         ) : null}
       </EmptyHeader>
       {action || defaultAction ? (

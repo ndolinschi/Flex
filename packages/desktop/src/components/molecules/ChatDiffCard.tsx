@@ -91,7 +91,7 @@ export const ChatDiffCard = ({
           variant="ghost"
           title={path ?? basename}
           onClick={onOpenFile}
-          className="h-auto w-full justify-start gap-1.5 rounded-none border-b border-stroke-3 px-2.5 py-1.5 font-normal hover:bg-fill-4"
+          className="h-auto w-full justify-start gap-1.5 rounded-none border-b border-stroke-3 px-2.5 py-1.5 font-normal transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)] hover:bg-fill-4"
         >
           {headerInner}
         </Button>

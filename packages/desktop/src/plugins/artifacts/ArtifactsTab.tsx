@@ -132,7 +132,7 @@ export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
             title="Refresh artifacts"
             onClick={() => void refetch()}
             className={cn(
-              "h-6 w-6 text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+              "h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink",
               isFetching && "pointer-events-none",
             )}
           >
@@ -256,7 +256,7 @@ const ArtifactPreview = ({
           title="Open externally"
           disabled={isOpeningExternal}
           onClick={onOpenExternal}
-          className="h-6 w-6 text-muted-foreground hover:bg-fill-4 hover:text-foreground"
+          className="h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink"
         >
           <ExternalLink className="h-3.5 w-3.5" aria-hidden />
         </Button>

@@ -108,11 +108,11 @@ export const PlanToolbar = ({
         <Breadcrumb className="min-w-0 flex-1 overflow-hidden">
           <BreadcrumbList className="flex-nowrap overflow-hidden gap-1.5">
             <BreadcrumbItem className="min-w-0 shrink overflow-hidden">
-              <BreadcrumbPage className="min-w-0 truncate text-muted-foreground font-normal">
+              <BreadcrumbPage className="min-w-0 truncate text-ink-muted font-normal">
                 {repo}
               </BreadcrumbPage>
             </BreadcrumbItem>
-            <BreadcrumbSeparator className="shrink-0 text-muted-foreground/60">
+            <BreadcrumbSeparator className="shrink-0 text-ink-muted/60">
               ›
             </BreadcrumbSeparator>
             <BreadcrumbItem className="shrink-0">
@@ -123,17 +123,17 @@ export const PlanToolbar = ({
                       type="button"
                       variant="link"
                       onClick={onBackToPlans}
-                      className="h-auto p-0 text-muted-foreground hover:text-foreground"
+                      className="h-auto p-0 text-ink-muted hover:text-ink"
                     />
                   }
                 >
                   Plans
                 </BreadcrumbLink>
               ) : (
-                <span className="text-muted-foreground">Plans</span>
+                <span className="text-ink-muted">Plans</span>
               )}
             </BreadcrumbItem>
-            <BreadcrumbSeparator className="shrink-0 text-muted-foreground/60">
+            <BreadcrumbSeparator className="shrink-0 text-ink-muted/60">
               ›
             </BreadcrumbSeparator>
             <BreadcrumbItem className="min-w-0 shrink overflow-hidden">
@@ -173,7 +173,7 @@ export const PlanToolbar = ({
             </span>
           ) : status === "building" ? (
             <span
-              className="flex h-6 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground"
+              className="flex h-6 items-center gap-1.5 rounded-md px-2 text-sm text-ink-muted"
               data-testid="plan-build-status"
             >
               <RunningDot className="h-4 w-4" /> Building…

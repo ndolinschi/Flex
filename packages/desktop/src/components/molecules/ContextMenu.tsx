@@ -97,7 +97,7 @@ export const ContextMenu = ({ position, items, onClose }: ContextMenuProps) => {
           alignOffset={0}
           data-suppress-native-webview=""
           className={cn(
-            "z-[300] min-w-[180px] border-none bg-panel shadow-[var(--shadow-popover)] animate-modal-in",
+            "z-[300] min-w-[180px] bg-panel shadow-popover animate-tray-in",
           )}
         >
           {items.map((item, i) => {

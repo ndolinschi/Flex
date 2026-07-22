@@ -70,7 +70,7 @@ export const RepoSectionHeader = ({
           if (!isCreating) onNewSession()
         }}
         className={cn(
-          "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+          "text-ink-muted hover:bg-fill-4 hover:text-ink",
           "shrink-0 opacity-40 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100",
           isCreating && "opacity-100",
         )}

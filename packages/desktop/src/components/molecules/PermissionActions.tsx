@@ -46,7 +46,7 @@ export const PermissionActions = ({
             onClick={() => handleRespond("allow_once")}
           >
             {pendingAction === "allow_once" ? (
-              <Spinner data-icon="inline-start" />
+              <Spinner data-icon="inline-start" className="text-ink-muted" />
             ) : null}
             Allow once
           </Button>
@@ -60,7 +60,7 @@ export const PermissionActions = ({
             onClick={() => handleRespond("allow_always")}
           >
             {pendingAction === "allow_always" ? (
-              <Spinner data-icon="inline-start" />
+              <Spinner data-icon="inline-start" className="text-ink-muted" />
             ) : null}
             Always allow
           </Button>
@@ -74,7 +74,7 @@ export const PermissionActions = ({
             onClick={() => handleRespond("deny")}
           >
             {pendingAction === "deny" ? (
-              <Spinner data-icon="inline-start" />
+              <Spinner data-icon="inline-start" className="text-ink-muted" />
             ) : null}
             Deny
           </Button>

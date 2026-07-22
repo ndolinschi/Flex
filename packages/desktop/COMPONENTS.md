@@ -44,8 +44,8 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `SessionRowSubtitle` | Diff + relative-time under a session title | `updatedAtMs`, `workspaceStatus?`, `gitStatus?`, `repoLabel?` | SessionListItem |
 | `SessionRowActions` | Hover pin / archive / more trailing actions | `pinned`, `archived`, `onTogglePin`, … | SessionListItem |
 | `SidebarFooter` | Theme + settings chrome (+ optional creating spinner) | `theme`, `onToggleTheme`, `onOpenSettings`, `isCreating?` | SessionSidebar |
-| `ErrorBanner` | shadcn `Alert` (destructive) inline error | `message`, `onDismiss?`, `title?` | Composer, Settings, timeline, dialogs |
-| `SidebarResumeError` | shadcn `Alert` + Retry/Dismiss actions | `message`, `onRetry`, `onDismiss` | SessionSidebar |
+| `ErrorBanner` | Quiet danger `Alert` (`border-danger/15 bg-danger-subtle/70`, text-xs) | `message`, `onDismiss?`, `title?` | Composer, Settings, timeline, dialogs |
+| `SidebarResumeError` | Same quiet danger + Retry/Dismiss; edge-to-edge sidebar | `message`, `onRetry`, `onDismiss` | SessionSidebar |
 | `ArchivedSectionHeader` | Collapsible Archived group header | `count`, `collapsed`, `onToggle` | SessionSidebar |
 | `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays + optional ghost-text inline completion (isolates keystrokes from ModelPicker/ContextBar) | `composerMode`, `anchorRef`, `attachments`, `onSend` | Composer |
 | `ModelSelect` | Simple model `<select>` | `models`, `value`, `onChange` | ProviderSettingsForm |
@@ -76,7 +76,7 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `PeerMessageCard` | Timeline card for a `peer_message` event — from/to agent ids + content + optional `aboutPath` | `from`, `to?`, `content`, `aboutPath?`, `tsMs` | TurnTimeline (`TimelineRowView`) |
 | `ModeSwitchChip` | Docked chip above the composer for a pending `ModeSwitchProposed` — shows mode + reason + countdown; cancel invokes `respondModeSwitch(false)`; auto-accepts on timeout | — | ChatSessionBody (via `dockedOverlay`) |
 | `FilesChangedCard` | End-of-turn git diff headline; expand file list (click → Files/Monaco), Review opens Changes | `cwd?`, `sessionId?` | TurnTimeline |
-| `EmptyState` | Empty async surface | `title`, `description?`, `action?` | SessionSidebar, TurnTimeline |
+| `EmptyState` | Compact empty (`py-6`, muted title/desc, secondary sm CTA) | `title`, `description?`, `action?` | SessionSidebar, TurnTimeline |
 | `ToolCallChip` | Single tool as Cursor-style step | `call` | TurnTimeline |
 | `ToolStepGroup` | Aggregated explore/edit/shell summary + card expand; single settled Edit/Write auto-expands `ChatDiffCard` | `calls` | TurnTimeline (via ToolStepList) |
 | `ToolStepList` | Clusters consecutive same-kind tool rows | `rows`, `renderOther` | TurnTimeline |

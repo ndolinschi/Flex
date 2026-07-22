@@ -82,9 +82,9 @@ export const ChatShell = ({
                   <Button
                     key={suggestion}
                     variant="outline"
-                    size="sm"
+                    size="xs"
                     onClick={() => handleQuickstart(suggestion)}
-                    className="rounded-full border-stroke-3 text-ink-secondary hover:border-stroke-2 hover:bg-fill-4 hover:text-ink-secondary"
+                    className="rounded-full border-stroke-3 text-xs text-ink-secondary opacity-80 hover:border-stroke-2 hover:bg-fill-4 hover:text-ink-secondary hover:opacity-100"
                   >
                     {suggestion}
                   </Button>

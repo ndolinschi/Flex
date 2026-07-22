@@ -148,7 +148,7 @@ export const SubagentGroup = memo(function SubagentGroup({
 
   return (
     <div className="flex flex-col">
-      <div className="group flex min-h-7 w-full items-start gap-1.5">
+      <div className="group flex min-h-[var(--timeline-row-min-height)] w-full items-start gap-1">
         <Button
           variant="ghost"
           onClick={() => {
@@ -161,7 +161,7 @@ export const SubagentGroup = memo(function SubagentGroup({
           }}
           className={cn(
             "h-auto min-w-0 flex-1 flex-col items-start justify-start gap-0.5 px-0 py-0 font-normal",
-            "hover:bg-transparent",
+            "text-ink-muted hover:bg-transparent hover:text-ink-secondary",
             (onOpenViewer || phase !== "started" || compact) ? "cursor-pointer" : "cursor-default",
           )}
         >

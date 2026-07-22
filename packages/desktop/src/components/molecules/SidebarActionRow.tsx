@@ -20,9 +20,10 @@ type SidebarActionRowProps = {
   loading?: boolean
 }
 
-/** 28px sidebar action row: icon + label flush start + trailing shortcut.
- * Same layout as shadcn DropdownMenuItem + DropdownMenuShortcut — no flex-1
- * on the label (that + UA `text-align:center` centers the text mid-row). */
+/** Sidebar action row density (Cursor agent-sidebar-cell rhythm):
+ * `h-7` · `px-2` · `gap-1.5` · `rounded-sm` (6) · hover `fill-4`.
+ * Icon + label flush start + trailing shortcut — no flex-1 on the label
+ * (that + UA `text-align:center` centers the text mid-row). */
 export const SidebarActionRow = ({
   icon: Icon,
   label,
@@ -40,8 +41,10 @@ export const SidebarActionRow = ({
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
+        // Override Button sm (rounded-md / px-2.5) to sidebar cell recipe.
         "h-7 w-full justify-start gap-1.5 rounded-sm px-2 font-normal",
         "text-ink-secondary hover:bg-fill-4 hover:text-ink",
+        "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
       )}
     >
       {loading ? (

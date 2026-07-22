@@ -104,7 +104,8 @@ export const Tab = ({
     "group relative flex items-center tracking-[var(--tracking-caption)]",
     "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
     sizeClasses[size],
-    // Whisper fills: selected fill-2 (~8%), hover fill-4 (~6%).
+    // Whisper fills (DESIGN Feel): selected fill-2 (~8%), idle hover fill-4 (~6%).
+    // Selected stays fill-2 on hover — no fill-3 / accent swap.
     selected
       ? "bg-fill-2 text-ink"
       : "text-ink-muted hover:bg-fill-4 hover:text-ink-secondary",

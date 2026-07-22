@@ -143,7 +143,8 @@ export const ToolStepGroup = memo(function ToolStepGroup({
         onClick={handleToggle}
         onKeyDown={handleKeyDown}
         className={cn(
-          "h-auto w-full justify-start gap-1 rounded-md px-0 py-px font-normal text-base",
+          // Cursor ui-tool-call-line: gap 4, text-base, lh 1.5; idle muted → hover secondary.
+          "h-auto w-full justify-start gap-1 rounded-sm px-0 py-px font-normal text-base leading-[1.5]",
           "text-ink-muted hover:bg-transparent hover:text-ink-secondary aria-expanded:bg-transparent",
           summary.failed && "text-destructive",
         )}

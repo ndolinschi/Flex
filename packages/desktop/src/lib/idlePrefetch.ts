@@ -24,6 +24,12 @@ export const startDesktopIdlePrefetch = (): void => {
     void import("../components/organisms/right-panel/FilesTab")
     void import("../components/organisms/terminal/TerminalTab")
     void import("../components/organisms/BrowserTab")
+    void import("../components/organisms/right-panel/StatusTab")
     void import("../lib/markdownHighlight")
+    // Plugin tool tabs (feature-flagged; import is cheap if tree-shaken away
+    // later — always warm the modules so first open is not a cold chunk).
+    void import("../plugins/database/DatabaseTab")
+    void import("../plugins/components/ComponentsTab")
+    void import("../plugins/artifacts/ArtifactsTab")
   })
 }

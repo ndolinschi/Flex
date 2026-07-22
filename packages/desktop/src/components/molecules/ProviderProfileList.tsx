@@ -55,8 +55,8 @@ export const ProviderProfileList = ({
               // Denser than generic settings rows: closer to sidebar-cell rhythm.
               "flex cursor-pointer items-center justify-between gap-3 px-3.5 py-2 text-left",
               "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-              "hover:bg-fill-4",
-              editingId === p.id && "bg-fill-2",
+              // Selected wins over hover (whisper fills: fill-2 > fill-4).
+              editingId === p.id ? "bg-fill-2" : "hover:bg-fill-4",
             )}
           >
             <div className="min-w-0 flex-1">

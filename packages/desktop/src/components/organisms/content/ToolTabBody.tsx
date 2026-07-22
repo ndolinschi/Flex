@@ -7,11 +7,11 @@ import { ChangesTab } from "../right-panel/ChangesTab"
 import { MemoryTab } from "../right-panel/MemoryTab"
 import { PrTab } from "../right-panel/PrTab"
 import { PromptTab } from "../right-panel/PromptTab"
-import { StatusTab } from "../right-panel/StatusTab"
 import { Spinner } from "../../atoms"
 import { cn } from "../../../lib/utils"
 
-/** Heavy panels — keep out of the initial JS graph (Monaco ~3MB, xterm, browser). */
+/** Heavy / secondary panels — keep out of the initial JS graph (Monaco ~3MB,
+ * xterm, browser). Status is light but still not needed until opened. */
 const FilesTab = lazy(() =>
   import("../right-panel/FilesTab").then((m) => ({ default: m.FilesTab })),
 )
@@ -20,6 +20,9 @@ const TerminalTab = lazy(() =>
 )
 const BrowserTab = lazy(() =>
   import("../BrowserTab").then((m) => ({ default: m.BrowserTab })),
+)
+const StatusTab = lazy(() =>
+  import("../right-panel/StatusTab").then((m) => ({ default: m.StatusTab })),
 )
 
 type ToolTabBodyProps = {
@@ -51,7 +54,9 @@ export const ToolTabBody = ({
     if (!session) return null
     return active ? (
       <div className="absolute inset-0 flex flex-col">
-        <StatusTab session={session} active={active} />
+        <Suspense fallback={<PanelFallback />}>
+          <StatusTab session={session} active={active} />
+        </Suspense>
       </div>
     ) : null
   }

@@ -536,7 +536,10 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
                 aria-label="Close sidebar"
                 title="Close sidebar"
                 onClick={() => setSidebarCollapsed(true)}
-                className="h-6 w-6 text-muted-foreground hover:bg-fill-4 hover:text-foreground"
+                className={cn(
+                  "h-6 w-6 text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+                  "opacity-50 hover:opacity-80",
+                )}
               >
                 <X className="h-3.5 w-3.5" aria-hidden />
               </Button>
@@ -630,6 +633,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
               className={cn(
                 "h-6 w-6 text-muted-foreground hover:bg-fill-4 hover:text-foreground",
                 "transition-opacity duration-[var(--duration-fast)]",
+                // Reveal on hover; when filter is non-default stay fully visible.
                 sidebarProjectSort !== "recency" ||
                   sidebarProjectVisibility !== "all"
                   ? "opacity-100"

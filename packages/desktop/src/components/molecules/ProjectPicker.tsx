@@ -33,7 +33,7 @@ type ProjectPickerProps = {
 const RECENT_CAP = 10
 
 const triggerInputClassName =
-  "h-6 min-w-0 flex-1 border-0 bg-transparent shadow-none ring-0 has-[[data-slot=input-group-control]:focus-visible]:border-transparent has-[[data-slot=input-group-control]:focus-visible]:ring-0 focus-within:border-transparent focus-within:ring-0 text-sm font-normal text-muted-foreground opacity-80 hover:opacity-100 data-open:opacity-100"
+  "h-6 min-w-0 flex-1 border-0 bg-transparent shadow-none ring-0 has-[[data-slot=input-group-control]:focus-visible]:border-transparent has-[[data-slot=input-group-control]:focus-visible]:ring-0 focus-within:border-transparent focus-within:ring-0 text-sm font-normal text-ink-muted opacity-80 hover:opacity-100 data-open:opacity-100"
 
 export const ProjectPicker = ({
   sessionId,
@@ -160,7 +160,7 @@ export const ProjectPicker = ({
         disabled={disabled || busy}
       >
         <InputGroupAddon align="inline-start" className="py-0 pl-1.5 pr-0">
-          <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <Folder className="size-3.5 shrink-0 text-ink-muted" aria-hidden />
         </InputGroupAddon>
       </ComboboxInput>
       <ComboboxContent className="w-80" side="top" align="start">
@@ -175,12 +175,12 @@ export const ProjectPicker = ({
                 return (
                   <ComboboxItem key={path} value={path} disabled={busy}>
                     <Folder
-                      className="size-3.5 shrink-0 text-muted-foreground"
+                      className="size-3.5 shrink-0 text-ink-muted"
                       aria-hidden
                     />
                     <span className="min-w-0 truncate" aria-label={path}>
                       {parent ? (
-                        <span className="text-muted-foreground">{parent}</span>
+                        <span className="text-ink-muted">{parent}</span>
                       ) : null}
                       <span className="text-foreground">{name}</span>
                     </span>

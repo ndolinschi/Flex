@@ -76,7 +76,7 @@ const GroupSwatchBar = ({ onPickColor }: GroupSwatchBarProps) => (
         aria-label={`Group with color ${color}`}
         title={`Group tabs — ${color}`}
         onClick={() => onPickColor(color)}
-        className="h-3.5 w-3.5 shrink-0 rounded-full transition-transform hover:scale-125 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stroke-2"
+        className="h-3.5 w-3.5 shrink-0 rounded-full transition-transform duration-[var(--duration-fast)] ease-[var(--easing-default)] hover:scale-125 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stroke-2 motion-reduce:transition-none motion-reduce:hover:scale-100"
         style={{ backgroundColor: color }}
       />
     ))}
@@ -311,6 +311,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   return (
     <div
       className={cn(
+        // Continuous chrome surface (`--color-chrome` via bg-bg); no card stack.
         "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-bg",
         paneFocused ? "z-[1]" : "z-0",
       )}
@@ -319,6 +320,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     >
       <TabStrip
         aria-label={paneIndex === 0 ? "Left pane tabs" : "Right pane tabs"}
+        // gap/height owned by TabStrip (1.5 / 30px); do not override.
         className="min-w-0"
         onKeyDown={handleTabsKeyDown}
       >
@@ -478,7 +480,10 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                 size="icon-xs"
                 aria-label="Open tab"
                 title="Open tab"
-                className="h-6 w-6 text-muted-foreground hover:bg-fill-4 hover:text-foreground"
+                className={cn(
+                  "h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink",
+                  "opacity-50 hover:opacity-80",
+                )}
               />
             }
             paneIndex={paneIndex}
@@ -501,7 +506,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                   e.stopPropagation()
                   closePane(paneIndex)
                 }}
-                className="h-6 w-6 text-muted-foreground opacity-50 hover:bg-fill-4 hover:text-foreground hover:opacity-80"
+                className="h-6 w-6 text-ink-muted opacity-50 hover:bg-fill-4 hover:text-ink hover:opacity-80"
               >
                 <X className="h-3.5 w-3.5" aria-hidden />
               </Button>

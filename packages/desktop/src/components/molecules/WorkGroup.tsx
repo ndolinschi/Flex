@@ -122,7 +122,7 @@ export const WorkGroup = memo(({
         // Live status is not interactive (toggle is no-op while open) — use a
         // plain row so ghost Button's `aria-expanded:bg-fill-4` does not paint
         // a full-width pill behind "Working" / "Thinking".
-        <div className="flex min-h-[var(--end-of-turn-reserved-height)] items-center gap-1.5 text-base">
+        <div className="flex min-h-[var(--end-of-turn-reserved-height)] items-center gap-1 text-base leading-[1.5]">
           <RunningDot className="-ml-1 h-4 w-4" />
           <span className="animate-shimmer-text">{openLabel}</span>
         </div>
@@ -132,7 +132,8 @@ export const WorkGroup = memo(({
           onClick={handleToggle}
           aria-expanded={expanded}
           className={cn(
-            "group h-auto w-full justify-start gap-1.5 px-0 py-0 font-normal text-base",
+            // Tool-line density: gap 4, lh 1.5 (Cursor ui-tool-call-line).
+            "group h-auto w-full justify-start gap-1 px-0 py-0 font-normal text-base leading-[1.5]",
             "min-h-[var(--end-of-turn-reserved-height)]",
             "hover:bg-transparent aria-expanded:bg-transparent",
             "cursor-pointer animate-end-turn-in",

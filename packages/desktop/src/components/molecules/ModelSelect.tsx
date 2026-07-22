@@ -89,7 +89,7 @@ export const ModelSelect = ({
           <span
             className={cn(
               "min-w-0 flex-1 truncate text-left",
-              !selected && "text-muted-foreground",
+              !selected && "text-ink-muted",
             )}
           >
             {triggerLabel}
@@ -97,7 +97,7 @@ export const ModelSelect = ({
           {isLoading ? (
             <Spinner size="sm" />
           ) : (
-            <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+            <ChevronDown className="size-3.5 shrink-0 text-ink-muted" aria-hidden />
           )}
         </DropdownMenuTrigger>
         {open ? (
@@ -139,7 +139,7 @@ export const ModelSelect = ({
                 ))}
               </CommandList>
               {truncated ? (
-                <p className="px-2.5 py-2 text-xs text-muted-foreground">
+                <p className="px-2.5 py-2 text-xs text-ink-muted">
                   Showing {MODEL_MENU_VISIBLE_CAP} of {totalMatched}. Type to
                   narrow.
                 </p>

@@ -79,9 +79,9 @@ describe("QuestionPrompt layout", () => {
     )
     expect(html).toContain("data-question-prompt")
     expect(html).toContain("px-3")
-    expect(html).toContain("pt-3")
-    expect(html).toContain("pb-3")
-    expect(html).toContain("gap-2")
-    expect(html).toContain("mt-2.5")
+    // Quiet denser HITL card (wave-2 states): pt-2.5 pb-2.5.
+    expect(html).toContain("pt-2.5")
+    expect(html).toContain("pb-2.5")
+    expect(html).toContain("mt-2")
   })
 })

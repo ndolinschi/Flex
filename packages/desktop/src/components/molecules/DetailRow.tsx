@@ -1,7 +1,6 @@
 import { useEffect, useState, type MouseEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ChevronRight, FileCode2, ListEnd, LoaderCircle } from "lucide-react"
 import { backgroundDemote, reviewFileDiff, toInvokeError } from "../../lib/tauri"
 import { cn, toSessionRelativePath } from "../../lib/utils"
@@ -220,13 +219,15 @@ export const DetailRow = ({
         <Collapsible open={expanded}>
           <div className="ml-3.5 mt-0.5">
             {loading ? (
-              <Alert>
-                <AlertDescription>Loading diff…</AlertDescription>
-              </Alert>
+              // Match ChatDiffCard shell (r-lg, pad 10×6, hairline) so expand
+              // states don't jump chrome density.
+              <div className="rounded-[var(--radius-lg)] border border-stroke-3 bg-panel px-2.5 py-1.5 text-xs leading-[1.5] text-ink-faint">
+                Loading diff…
+              </div>
             ) : error ? (
-              <Alert variant="destructive">
-                <AlertDescription>Diff unavailable — {error}</AlertDescription>
-              </Alert>
+              <div className="rounded-[var(--radius-lg)] border border-stroke-3 bg-panel px-2.5 py-1.5 text-xs leading-[1.5] text-destructive">
+                Diff unavailable — {error}
+              </div>
             ) : diff ? (
               <ChatDiffCard
                 diff={diff}
@@ -245,9 +246,9 @@ export const DetailRow = ({
                 }
               />
             ) : (
-              <Alert>
-                <AlertDescription>No changes vs HEAD</AlertDescription>
-              </Alert>
+              <div className="rounded-[var(--radius-lg)] border border-stroke-3 bg-panel px-2.5 py-1.5 text-xs leading-[1.5] text-ink-faint">
+                No changes vs HEAD
+              </div>
             )}
           </div>
         </Collapsible>

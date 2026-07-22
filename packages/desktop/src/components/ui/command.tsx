@@ -23,7 +23,7 @@ function Command({
     <CommandPrimitive
       data-slot="command"
       className={cn(
-        "flex size-full flex-col overflow-hidden rounded-xl! bg-popover p-0 text-popover-foreground",
+        "flex size-full flex-col overflow-hidden rounded-lg! bg-panel p-0 text-ink",
         className
       )}
       {...props}
@@ -53,7 +53,7 @@ function CommandDialog({
       </DialogHeader>
       <DialogContent
         className={cn(
-          "top-1/3 translate-y-0 overflow-hidden rounded-xl! p-0",
+          "top-[10vh] max-w-[min(100%,560px)] translate-y-0 overflow-hidden rounded-lg! bg-panel p-0 shadow-popover sm:max-w-[560px]",
           className
         )}
         showCloseButton={showCloseButton}
@@ -69,18 +69,18 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
-    <div data-slot="command-input-wrapper" className="px-2.5 py-1.5">
-      <InputGroup className="h-7! rounded-md! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
+    <div data-slot="command-input-wrapper" className="px-2 py-1.5">
+      <InputGroup className="h-7! rounded-md! border-stroke-3/40 bg-fill-4 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(
-            "w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
+            "h-7 w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
             className
           )}
           {...props}
         />
         <InputGroupAddon>
-          <SearchIcon className="size-3.5 shrink-0 opacity-50" />
+          <SearchIcon className="size-3.5 shrink-0 text-ink-muted opacity-70" />
         </InputGroupAddon>
       </InputGroup>
     </div>
@@ -124,7 +124,7 @@ function CommandGroup({
     <CommandPrimitive.Group
       data-slot="command-group"
       className={cn(
-        "overflow-hidden p-1 text-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-ink-muted",
+        "overflow-hidden p-1 text-ink **:[[cmdk-group-heading]]:px-2.5 **:[[cmdk-group-heading]]:py-1 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-ink-muted",
         className
       )}
       {...props}
@@ -139,7 +139,7 @@ function CommandSeparator({
   return (
     <CommandPrimitive.Separator
       data-slot="command-separator"
-      className={cn("-mx-1 h-px bg-border", className)}
+      className={cn("-mx-1 h-px bg-stroke-3", className)}
       {...props}
     />
   )
@@ -154,9 +154,8 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        // Same rule as dropdown-menu / PopoverTray: whisper fill + ink text.
-        // Never `bg-accent` / `text-foreground` — Flex accent is near-white brand.
-        "group/command-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-ink outline-hidden select-none in-data-[slot=dialog-content]:rounded-lg! data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-fill-2 data-selected:text-ink aria-selected:bg-fill-2 aria-selected:text-ink [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:[&_svg:not([class*='text-'])]:text-ink aria-selected:[&_svg:not([class*='text-'])]:text-ink",
+        // Dense rows (py-1) + selected fill-2. Never bg-accent (brand near-white).
+        "group/command-item relative mx-1 flex cursor-default items-center gap-2 rounded-md px-2.5 py-1 text-sm text-ink outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-fill-2 data-selected:text-ink aria-selected:bg-fill-2 aria-selected:text-ink [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 data-selected:[&_svg:not([class*='text-'])]:text-ink aria-selected:[&_svg:not([class*='text-'])]:text-ink",
         className
       )}
       {...props}
@@ -175,7 +174,7 @@ function CommandShortcut({
     <span
       data-slot="command-shortcut"
       className={cn(
-        "ml-auto text-xs tracking-widest text-ink-muted group-data-selected/command-item:text-foreground",
+        "ml-auto text-xs tracking-[var(--tracking-caption)] text-ink-muted group-data-selected/command-item:text-ink-secondary",
         className
       )}
       {...props}

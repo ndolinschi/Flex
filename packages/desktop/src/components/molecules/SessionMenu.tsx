@@ -180,7 +180,7 @@ export const SessionMenu = ({
               variant="ghost"
               size="icon-xs"
               aria-label="Chat actions"
-              className="size-6 text-muted-foreground hover:text-foreground aria-expanded:bg-fill-4 aria-expanded:text-foreground"
+              className="size-6 text-ink-muted hover:text-ink aria-expanded:bg-fill-4 aria-expanded:text-ink"
             />
           }
         >
@@ -246,7 +246,7 @@ export const SessionMenu = ({
           <ErrorBanner
             message={error}
             onDismiss={() => setError(null)}
-            className="py-1.5 text-xs shadow-md"
+            className="py-1.5 text-xs shadow-popover"
           />
         </div>
       ) : null}

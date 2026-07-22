@@ -196,10 +196,14 @@ export const FileRow = memo(function FileRow({
     <li>
       <div
         className={cn(
+          // Changes file row: h-7 px-2 r6; selected fill-2, hover fill-4 only when idle.
           "group relative flex h-7 w-full items-center gap-1.5 rounded-sm px-2",
-          "transition-colors duration-[var(--duration-fast)] hover:bg-fill-4",
-          expanded && "bg-fill-5",
-          selectable && selected && "bg-fill-2",
+          "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+          selectable && selected
+            ? "bg-fill-2"
+            : expanded
+              ? "bg-fill-5 hover:bg-fill-4"
+              : "hover:bg-fill-4",
         )}
       >
         {/* Reserve checkbox column so selectable + non-selectable rows share

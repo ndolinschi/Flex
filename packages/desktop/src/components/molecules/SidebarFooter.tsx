@@ -19,7 +19,8 @@ export const SidebarFooter = ({
 }: SidebarFooterProps) => {
   return (
     <>
-      <div className="flex items-center justify-end gap-0.5 border-t border-stroke-3 px-2.5 py-1.5">
+      {/* Continuous sidebar surface: hairline uses sidebar-border (= stroke-3). */}
+      <div className="flex items-center justify-end gap-0.5 border-t border-sidebar-border px-2.5 py-1.5">
         <Button
           type="button"
           variant="ghost"
@@ -61,7 +62,7 @@ export const SidebarFooter = ({
       </div>
 
       {isCreating ? (
-        <div className="flex items-center gap-2 border-t border-stroke-3 px-2.5 py-1.5 text-xs text-ink-muted">
+        <div className="flex items-center gap-2 border-t border-sidebar-border px-2.5 py-1.5 text-xs text-ink-muted">
           <Spinner size="sm" />
           Creating…
         </div>

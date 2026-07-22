@@ -3,6 +3,7 @@ import {
   Alert,
   AlertAction,
   AlertDescription,
+  AlertTitle,
 } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -23,10 +24,14 @@ export const SidebarResumeError = ({
   return (
     <Alert
       variant="destructive"
-      className={cn("rounded-none border-x-0 border-b-0 border-t")}
+      className={cn(
+        // Edge-to-edge in the sidebar stack, same whisper danger as ErrorBanner.
+        "rounded-none border-x-0 border-b-0 border-t border-danger/15 bg-danger-subtle/70 py-1.5 text-danger",
+      )}
     >
-      <AlertCircleIcon />
-      <AlertDescription className="text-xs text-destructive">
+      <AlertCircleIcon className="size-3.5 opacity-80" aria-hidden />
+      <AlertTitle className="sr-only">Resume error</AlertTitle>
+      <AlertDescription className="text-xs leading-snug text-danger/90">
         {message}
       </AlertDescription>
       <AlertAction className="flex items-center gap-0.5">
@@ -34,10 +39,10 @@ export const SidebarResumeError = ({
           type="button"
           variant="ghost"
           size="xs"
-          className="text-destructive hover:bg-destructive/15 hover:text-destructive"
+          className="text-danger/80 opacity-70 hover:bg-danger/10 hover:text-danger hover:opacity-100"
           onClick={onRetry}
         >
-          <RotateCwIcon data-icon="inline-start" />
+          <RotateCwIcon data-icon="inline-start" className="size-3" aria-hidden />
           Retry
         </Button>
         <Button
@@ -45,10 +50,10 @@ export const SidebarResumeError = ({
           variant="ghost"
           size="icon-xs"
           aria-label="Dismiss error"
-          className="text-destructive hover:bg-destructive/15 hover:text-destructive"
+          className="text-danger/80 opacity-70 hover:bg-danger/10 hover:text-danger hover:opacity-100"
           onClick={onDismiss}
         >
-          <XIcon />
+          <XIcon className="size-3.5" aria-hidden />
         </Button>
       </AlertAction>
     </Alert>

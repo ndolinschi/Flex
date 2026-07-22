@@ -111,7 +111,9 @@ export const TreeBranch = ({
               title={hit.path}
               aria-expanded={isDir ? isOpen : undefined}
               className={cn(
-                "h-7 w-full justify-start gap-1 rounded-md pr-2 text-sm font-normal",
+                // File-tree cell: h-7, r6, whisper hover — matches Changes FileRow.
+                "h-7 w-full justify-start gap-1.5 rounded-sm pr-2 text-sm font-normal leading-[1.5]",
+                "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                 "hover:bg-fill-4",
                 statusClass ?? "text-ink-secondary hover:text-ink",
               )}
@@ -121,7 +123,7 @@ export const TreeBranch = ({
                 {isDir ? (
                   <ChevronDown
                     className={cn(
-                      "h-3 w-3 text-icon-3 opacity-70 transition-transform",
+                      "h-3 w-3 text-icon-3 opacity-70 transition-transform duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                       !isOpen && "-rotate-90",
                     )}
                     aria-hidden

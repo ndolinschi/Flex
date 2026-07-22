@@ -146,7 +146,7 @@ export const SettingsNav = ({
       {searching ? (
         <div className="flex flex-col gap-0.5 px-1" role="listbox" aria-label="Search results">
           {results.length === 0 ? (
-            <p className="px-1.5 py-1 text-xs text-ink-faint">No results found.</p>
+            <p className="px-2 py-1.5 text-xs text-ink-faint">No results found.</p>
           ) : (
             results.map((entry, i) => (
               <Button
@@ -157,13 +157,15 @@ export const SettingsNav = ({
                 onClick={() => onResultSelect(entry)}
                 onMouseEnter={() => onResultIndexChange(i)}
                 className={cn(
-                  "h-auto w-full flex-col items-start gap-0 rounded-sm px-1.5 py-1 text-left",
+                  // Sidebar-cell pad 6×8 r6; selected fill-2 / hover fill-4.
+                  "h-auto w-full flex-col items-start gap-0 rounded-sm px-2 py-1.5 text-left leading-[1.5]",
+                  "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                   i === resultIndex ? "bg-fill-2 text-ink" : "hover:bg-fill-4",
                 )}
               >
-                <span className="truncate text-sm leading-4 text-ink-secondary">{entry.title}</span>
+                <span className="truncate text-sm leading-[1.5] text-ink-secondary">{entry.title}</span>
                 {entry.description ? (
-                  <span className="truncate text-xs text-ink-faint">
+                  <span className="truncate text-xs leading-[1.5] text-ink-faint">
                     {entry.description}
                   </span>
                 ) : null}
@@ -172,7 +174,7 @@ export const SettingsNav = ({
           )}
         </div>
       ) : (
-        <div className="flex flex-col gap-1.5 px-1">
+        <div className="flex flex-col gap-0.5 px-1">
           {SETTINGS_NAV_ITEMS.map((item) => {
             const Icon = NAV_ICONS[item.id]
             const isActive = item.id === active
@@ -183,7 +185,8 @@ export const SettingsNav = ({
                 onClick={() => onSelect(item.id)}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "h-auto w-full justify-start gap-1.5 rounded-sm px-1.5 py-1 text-sm leading-4",
+                  // Cursor sidebar-cell: pad 6×8, r6; whisper selected/hover.
+                  "h-auto w-full justify-start gap-1.5 rounded-sm px-2 py-1.5 text-sm leading-[1.5]",
                   "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                   isActive
                     ? "bg-fill-2 text-ink hover:bg-fill-2"

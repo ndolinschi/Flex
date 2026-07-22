@@ -16,7 +16,7 @@ registerBuiltinUiPlugins()
 createRoot(document.getElementById("root") as HTMLElement).render(
   <StrictMode>
     <ErrorBoundary>
-      <TooltipProvider delay={500}>
+      <TooltipProvider delay={300}>
         <App />
       </TooltipProvider>
     </ErrorBoundary>

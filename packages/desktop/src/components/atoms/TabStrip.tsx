@@ -7,8 +7,9 @@ type TabStripProps = HTMLAttributes<HTMLDivElement> & {
 
 /** Horizontal open-tabs strip — content pane chrome (and any embedded
  * open-buffer strips). Height = `--header-height` (30px); default `px-2.5` +
- * `gap-1.5` + bottom hairline. Callers may override padding/border/flex for
- * embedding, but keep gap/height unless a surface documents an exception.
+ * `gap-1.5` + bottom hairline (`stroke-3`). Callers may override
+ * padding/border/flex for embedding, but keep gap/height unless a surface
+ * documents an exception. Tab pills use whisper fills (fill-2 / fill-4).
  * Use a `min-w-0 flex-1 overflow-x-auto` child for the tab pills so trailing
  * actions (+ / close pane) stay pinned. */
 export const TabStrip = ({ children, className, ...props }: TabStripProps) => {

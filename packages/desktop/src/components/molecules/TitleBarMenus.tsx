@@ -154,10 +154,10 @@ export const TitleBarMenus = ({
             <MenubarTrigger
               className={cn(
                 "h-[22px] rounded-sm px-1.5 py-0 text-xs font-normal leading-none",
-                "text-muted-foreground",
+                "text-ink-muted",
                 "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-                "hover:bg-fill-4 hover:text-foreground",
-                "aria-expanded:bg-fill-4 aria-expanded:text-foreground",
+                "hover:bg-fill-4 hover:text-ink",
+                "aria-expanded:bg-fill-4 aria-expanded:text-ink",
               )}
             >
               {menu.label}
@@ -196,7 +196,7 @@ export const TitleBarMenus = ({
 export const AppMark = ({ className }: { className?: string }) => (
   <div
     className={cn(
-      "flex h-full items-center justify-center px-1.5 text-muted-foreground",
+      "flex h-full items-center justify-center px-1.5 text-ink-muted",
       className,
     )}
     aria-hidden

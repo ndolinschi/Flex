@@ -32,7 +32,7 @@ const TrafficButton = ({
     onClick={onClick}
     className={cn(
       "group relative flex h-3 w-3 items-center justify-center rounded-full",
-      "outline-none transition-opacity",
+      "outline-none transition-opacity duration-[var(--duration-fast)] ease-[var(--easing-default)]",
       tone === "close" && "bg-[#ff5f57] hover:brightness-95",
       tone === "minimize" && "bg-[#febc2e] hover:brightness-95",
       tone === "zoom" && "bg-[#28c840] hover:brightness-95",

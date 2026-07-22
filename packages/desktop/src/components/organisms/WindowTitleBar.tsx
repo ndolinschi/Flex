@@ -82,9 +82,10 @@ const WindowTitleBarImpl = ({
     <>
       <header
         className={cn(
+          // Compact density: 30px chrome (`--titlebar-height`); h-6 controls only.
           "flex h-[var(--titlebar-height)] shrink-0 items-center select-none",
-          // Background comes from `.app-shell` / macOS vibrancy CSS — keep this
-          // bar paint-free so HudWindow can read through as soft glass.
+          // Continuous surface: paint-free over `.app-shell` / macOS HudWindow
+          // vibrancy so glass reads through; hairline stroke-3 only.
           "border-b border-stroke-3 bg-transparent",
           className,
         )}
@@ -116,7 +117,7 @@ const WindowTitleBarImpl = ({
               title={`${collapsed ? "Show" : "Hide"} sidebar (${mod}B)`}
               onClick={handlers.toggleSidebar}
               className={cn(
-                "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+                "text-ink-muted hover:bg-fill-4 hover:text-ink",
                 "opacity-50 hover:opacity-80",
                 "h-6 w-6 shrink-0",
               )}
@@ -150,7 +151,7 @@ const WindowTitleBarImpl = ({
                 title={`${split ? "Close split" : "Split view"} (${mod}J)`}
                 onClick={toggleSplit}
                 className={cn(
-                  "text-muted-foreground hover:bg-fill-4 hover:text-foreground",
+                  "text-ink-muted hover:bg-fill-4 hover:text-ink",
                   "opacity-50 hover:opacity-80",
                   "h-6 w-6",
                   !split && "opacity-60",
