@@ -27,15 +27,28 @@ const Toaster = ({ theme = "system", ...props }: ToasterProps) => {
       }}
       style={
         {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
+          "--normal-bg": "var(--color-panel)",
+          "--normal-text": "var(--color-ink)",
+          "--normal-border": "var(--color-stroke-3)",
+          "--border-radius": "var(--radius-md)",
+          "--success-bg": "var(--color-panel)",
+          "--success-text": "var(--color-ink)",
+          "--success-border": "var(--color-stroke-3)",
+          "--error-bg": "var(--color-panel)",
+          "--error-text": "var(--color-ink)",
+          "--error-border": "var(--color-stroke-3)",
+          "--warning-bg": "var(--color-panel)",
+          "--warning-text": "var(--color-ink)",
+          "--warning-border": "var(--color-stroke-3)",
+          "--info-bg": "var(--color-panel)",
+          "--info-text": "var(--color-ink)",
+          "--info-border": "var(--color-stroke-3)",
         } as React.CSSProperties
       }
       toastOptions={{
         classNames: {
-          toast: "cn-toast",
+          // Quiet panel toast — no glass blur, no rainbow success/error fills.
+          toast: "cn-toast border-stroke-3 bg-panel text-ink shadow-popover",
         },
       }}
       {...props}

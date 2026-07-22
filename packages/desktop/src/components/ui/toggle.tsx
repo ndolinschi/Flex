@@ -7,7 +7,7 @@ const toggleVariants = cva(
   [
     "group/toggle inline-flex items-center justify-center gap-1 rounded-md text-sm font-medium whitespace-nowrap transition-colors outline-none",
     "hover:bg-fill-4 hover:text-ink",
-    "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
+    "focus-visible:border-stroke-2 focus-visible:ring-1 focus-visible:ring-stroke-2",
     "disabled:pointer-events-none disabled:opacity-50",
     "aria-invalid:border-destructive aria-invalid:ring-destructive/20",
     // Pressed = fill-4 (same as menu/select highlight — never brand accent).

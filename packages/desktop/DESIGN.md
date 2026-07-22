@@ -21,12 +21,69 @@ audit and fix UI against this file. For shadcn adds/rewrites, also load the
 |---|---|
 | Compact density | 30px chrome rows; prefer `h-6` controls in headers |
 | Quiet chrome | Hairline `stroke-3` borders; sash hover is white-alpha, never accent |
-| Whisper fills | Selected `fill-2`, hover `fill-4` (list rows, tabs, chrome buttons) |
-| Opacity hover | Quiet `IconButton`: idle `.5` → hover `.8` |
+| Whisper fills | Selected `fill-2` (~8%), hover `fill-4` (~6%) (list rows, tabs, chrome buttons) |
+| Opacity hover | Quiet icon controls: idle `.5` → hover `.8`; mode/model pills idle `.8` → hover `1` |
+| Mode tint | Composer mode pill uses semantic fill (agent green / plan yellow / ask cyan / flex purple) |
+| Cool dark | Dark surfaces are cool charcoal (`#0f1114` / `#14171c` / `#1a1d24`), not pure gray |
 | 4px grid | Spacing tokens `--space-1`…`--space-12` (4–48px) |
 | Radius by role | Controls `rounded-md` (8); composer/bubbles 14; settings cards 12; pills full; sidebar rows 6 |
 | Keyboard focus | Neutral `stroke-2` ring; no accent glow |
 | Semibold = 590 | Plus micro tracking on captions |
+
+
+## Reference extraction (Cursor glass → Flex)
+
+Source: local Cursor install `workbench.glass.main.css` (design tokens + agent/
+composer surfaces). **Do not clone brand assets or copy Cursor chrome 1:1** —
+adapt rhythm, hierarchy, and density into Flex tokens and domain components.
+
+### Surface ladder (dark)
+
+| Role | Cursor glass | Flex token |
+|---|---|---|
+| Primary / chat | `#0c0e11` | `--color-chrome` `#0f1114` |
+| Secondary / sidebar | `#14171d` | `--color-panel` `#14171c` |
+| Elevated / bubble | `#1b1f27` | `--color-elevated` / `--color-user-bubble` `#1a1d24` |
+| Hover fill | `hsla(0,0%,100%,.07)` / quaternary ~6% | `--color-fill-4` ~6% |
+| Selected fill | tertiary ~8% fg | `--color-fill-2` ~8% |
+
+Ink/icons use cool white (`236 241 250` / `226 233 244` alpha steps), matching
+Cursor's icon primary/secondary stack — not pure `#fafafa`.
+
+### Stroke & elevation
+
+| Cursor | Flex |
+|---|---|
+| stroke tertiary ~9%, secondary ~16% | `stroke-3` 9%, `stroke-2` 12%, `stroke-1` 16% |
+| Human message border = stroke-secondary | User `Bubble` + composer ring use stronger stroke |
+| Composer max-width 840px | `--content-rail` 52.5rem (840px) |
+| Bubble radius `radius-xl` 14px | `--radius-bubble` / `--radius-composer` 14px |
+| Box shadows = 1px stroke ring + layered ambient | `--shadow-composer` / `--shadow-popover` |
+
+### Mode semantics (composer)
+
+Cursor tints mode chrome by role. Flex maps:
+
+| Mode | Fill / text tokens |
+|---|---|
+| Agent | `--color-mode-agent-{bg,fg}` (green) |
+| Plan | `--color-mode-plan-{bg,fg}` (yellow) |
+| Ask | `--color-mode-ask-{bg,fg}` (cyan) |
+| Flex (flag) | `--color-mode-flex-{bg,fg}` (purple) |
+
+Trigger pill is always tinted for the active mode (not neutral gray with a
+colored icon only).
+
+### Intentional Flex deltas (do not “fix”)
+
+- Product monochrome accent default (Settings can override) — not Cursor blue CTA.
+- Green switch ON track (`--color-switch-on`) for settings.
+- ContextBar above composer; sidebar footer = theme + settings.
+- Domain chrome stays custom: `Tab`/`TabStrip`, `WindowTitleBar`, Monaco/xterm,
+  timeline WorkGroup/tool cards, HITL docks.
+- Light theme: white chrome / cool panel / elevated — three surface steps so
+  sidebar and chat don't flatten. Mode tints stronger on light so pills stay
+  readable.
 
 ### shadcn token bridge
 

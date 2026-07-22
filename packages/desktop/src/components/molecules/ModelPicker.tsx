@@ -104,24 +104,24 @@ export const ModelPicker = ({
               // balance (same recipe as SelectTrigger size=xs).
               "h-6 max-w-[14rem] gap-1 rounded-full border-input bg-transparent py-0 pl-2 pr-1.5 font-normal shadow-none",
               // Quiet idle opacity matching ModePicker; full opacity on hover/open.
-              "opacity-70 hover:opacity-100 aria-expanded:opacity-100",
+              "opacity-80 hover:opacity-100 aria-expanded:opacity-100",
             )}
           />
         }
       >
         {isAutoSelected ? (
-          <Shuffle className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <Shuffle className="size-3.5 shrink-0 text-ink-muted" aria-hidden />
         ) : (
-          <Box className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <Box className="size-3.5 shrink-0 text-ink-muted" aria-hidden />
         )}
         <span className="min-w-0 truncate">{label}</span>
         {selectedEffort ? (
-          <span className="shrink-0 text-muted-foreground">
+          <span className="shrink-0 text-ink-muted">
             · {effortLabel(selectedEffort)}
           </span>
         ) : null}
         <ChevronDown
-          className="pointer-events-none size-3 shrink-0 text-muted-foreground"
+          className="pointer-events-none size-3 shrink-0 text-ink-muted"
           aria-hidden
         />
       </DropdownMenuTrigger>
@@ -152,9 +152,9 @@ export const ModelPicker = ({
                     className="gap-1.5"
                     onClick={() => applyModel("auto")}
                   >
-                    <Shuffle className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    <Shuffle className="size-3.5 shrink-0 text-ink-muted" aria-hidden />
                     <span className="flex-1">Auto</span>
-                    <span className="text-xs text-muted-foreground">delegates per rules</span>
+                    <span className="text-xs text-ink-muted">delegates per rules</span>
                     {isAutoSelected ? (
                       <Check className="ml-auto size-3 shrink-0 text-primary" aria-hidden />
                     ) : null}
@@ -164,7 +164,7 @@ export const ModelPicker = ({
             ) : null}
             {groups.length === 0 ? (
               query || !autoModeEnabled ? (
-                <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">
+                <p className="px-2.5 py-3 text-center text-xs text-ink-muted">
                   No models found
                 </p>
               ) : null
@@ -187,7 +187,7 @@ export const ModelPicker = ({
                         >
                           <span className="min-w-0 truncate">{name}</span>
                           {modelEffort ? (
-                            <span className="ml-auto max-w-[4.5rem] shrink-0 truncate text-xs text-muted-foreground">
+                            <span className="ml-auto max-w-[4.5rem] shrink-0 truncate text-xs text-ink-muted">
                               {effortLabel(modelEffort)}
                             </span>
                           ) : null}
@@ -242,7 +242,7 @@ export const ModelPicker = ({
               ))
             )}
             {truncated ? (
-              <p className="px-2.5 py-2 text-xs text-muted-foreground">
+              <p className="px-2.5 py-2 text-xs text-ink-muted">
                 Showing {MODEL_MENU_VISIBLE_CAP} of {totalMatched}. Type to
                 narrow.
               </p>
