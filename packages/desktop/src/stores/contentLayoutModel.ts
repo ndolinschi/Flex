@@ -23,6 +23,11 @@ export type PaneState = {
   groups?: Record<string, TabGroup>
 }
 
+/** Reference-like chat/work split: a compact conversation rail beside a
+ * larger implementation surface. Near the 760px eligibility floor, panel
+ * min-size constraints still rebalance both panes to fit. */
+export const DEFAULT_SPLIT_RATIO = 0.38
+
 export type ContentLayout = {
   mode: "single" | "split"
   /** Left pane fraction when split (0.2–0.8). */
@@ -74,7 +79,7 @@ export const defaultContentLayout = (
   if (!sessionId) {
     return {
       mode: "single",
-      splitRatio: 0.5,
+      splitRatio: DEFAULT_SPLIT_RATIO,
       focusedPane: 0,
       panes: [emptyPane()],
     }
@@ -82,7 +87,7 @@ export const defaultContentLayout = (
   const tab = makeChatTab(sessionId)
   return {
     mode: "single",
-    splitRatio: 0.5,
+    splitRatio: DEFAULT_SPLIT_RATIO,
     focusedPane: 0,
     panes: [{ tabs: [tab], activeTabId: tab.id }],
   }
@@ -338,7 +343,7 @@ export const migrateToContentLayout = (opts: {
     }
     return {
       mode: "split",
-      splitRatio: 0.5,
+      splitRatio: DEFAULT_SPLIT_RATIO,
       focusedPane: 1,
       panes: [left, right],
     }
@@ -346,7 +351,7 @@ export const migrateToContentLayout = (opts: {
 
   return {
     mode: "single",
-    splitRatio: 0.5,
+    splitRatio: DEFAULT_SPLIT_RATIO,
     focusedPane: 0,
     panes: [
       {
@@ -358,7 +363,7 @@ export const migrateToContentLayout = (opts: {
 }
 
 export const normalizeLayout = (layout: ContentLayout): ContentLayout => {
-  const ratio = clampSplitRatio(layout.splitRatio ?? 0.5)
+  const ratio = clampSplitRatio(layout.splitRatio ?? DEFAULT_SPLIT_RATIO)
   if (layout.mode === "split") {
     const p0 = layout.panes[0] ?? emptyPane()
     const p1 = layout.panes[1] ?? emptyPane()

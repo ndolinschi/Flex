@@ -19,6 +19,7 @@ export type TreeBranchProps = {
   depth: number
   expanded: Set<string>
   gitIndex: GitStatusIndex
+  activePath?: string
   onToggle: (dirPath: string) => void
   onOpenFile: (path: string) => void
   onContextMenu: (e: MouseEvent, hit: FileHit) => void
@@ -32,6 +33,7 @@ export const TreeBranch = ({
   depth,
   expanded,
   gitIndex,
+  activePath,
   onToggle,
   onOpenFile,
   onContextMenu,
@@ -93,6 +95,7 @@ export const TreeBranch = ({
       {sorted.map((hit) => {
         const isDir = !!hit.isDir
         const isOpen = isDir && expanded.has(hit.path)
+        const isActive = !isDir && activePath === hit.path
         const Glyph = isDir
           ? isOpen
             ? FolderOpen
@@ -110,14 +113,16 @@ export const TreeBranch = ({
               onContextMenu={(e) => onContextMenu(e, hit)}
               title={hit.path}
               aria-expanded={isDir ? isOpen : undefined}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
                 // File-tree cell: h-7, r6, whisper fills — open dirs read selected (fill-2).
                 "h-7 w-full justify-start gap-1.5 rounded-sm pr-2 text-sm font-normal leading-[1.5]",
                 "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-                isOpen
+                isOpen || isActive
                   ? "bg-fill-2 text-ink hover:bg-fill-2"
                   : "hover:bg-fill-4",
-                statusClass ?? (!isOpen && "text-ink-secondary hover:text-ink"),
+                statusClass ??
+                  (!(isOpen || isActive) && "text-ink-secondary hover:text-ink"),
               )}
               style={{ paddingLeft: 8 + depth * INDENT_PX }}
             >
@@ -154,6 +159,7 @@ export const TreeBranch = ({
                 depth={depth + 1}
                 expanded={expanded}
                 gitIndex={gitIndex}
+                activePath={activePath}
                 onToggle={onToggle}
                 onOpenFile={onOpenFile}
                 onContextMenu={onContextMenu}

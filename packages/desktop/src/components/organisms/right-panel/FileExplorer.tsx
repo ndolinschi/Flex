@@ -44,6 +44,8 @@ type FileExplorerProps = {
   cwd: string
   /** Prefer when `cwd` is a missing isolated worktree (`session.base_cwd`). */
   fallbackCwd?: string
+  /** Currently open editor buffer, highlighted with the persistent fill. */
+  activePath?: string
   /** Called with a repo-relative file path (never a directory). */
   onOpenFile: (path: string) => void
 }
@@ -57,6 +59,7 @@ export const FileExplorer = ({
   sessionKey,
   cwd,
   fallbackCwd,
+  activePath,
   onOpenFile,
 }: FileExplorerProps) => {
   const queryClient = useQueryClient()
@@ -330,6 +333,7 @@ export const FileExplorer = ({
             depth={0}
             expanded={expanded}
             gitIndex={gitIndex}
+            activePath={activePath}
             onToggle={toggleDir}
             onOpenFile={onOpenFile}
             onContextMenu={handleContextMenu}

@@ -479,7 +479,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                 variant="ghost"
                 size="icon-xs"
                 aria-label="Open tab"
-                title="Open tab"
+                title={openTabModal ? undefined : "Open tab"}
                 className={cn(
                   "h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink",
                   "opacity-50 hover:opacity-80",

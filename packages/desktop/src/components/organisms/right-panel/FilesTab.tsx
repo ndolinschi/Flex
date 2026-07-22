@@ -452,6 +452,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
             sessionKey={sessionKey}
             cwd={cwd}
             fallbackCwd={fallbackCwd}
+            activePath={path ?? undefined}
             onOpenFile={(p) => {
               // Preserve the tree beside the editor after opening the first
               // file so navigation remains visible and spatially stable.
@@ -589,6 +590,10 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
                     tabSize: 2,
                     renderWhitespace: "selection",
                     padding: { top: 8, bottom: 8 },
+                    scrollbar: {
+                      verticalScrollbarSize: 8,
+                      horizontalScrollbarSize: 8,
+                    },
                     bracketPairColorization: { enabled: true },
                     inlineSuggest: { enabled: true },
                   }}
@@ -639,6 +644,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
               sessionKey={sessionKey}
               cwd={cwd}
               fallbackCwd={fallbackCwd}
+              activePath={path ?? undefined}
               onOpenFile={(nextPath) =>
                 openWorkspaceFile(sessionKey, nextPath)
               }
