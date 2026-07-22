@@ -11,9 +11,6 @@ pub(crate) const MANUAL_COMPACT_STRATEGY: &str = "summarize_oldest";
 /// Auto-compaction (near context limit) uses a distinct strategy for UI/telemetry.
 pub(crate) const AUTO_COMPACT_STRATEGY: &str = "auto_summarize_oldest";
 
-/// Fraction of the resolved context limit that triggers proactive compaction.
-const AUTO_COMPACT_THRESHOLD_PERCENT: u64 = 85;
-
 /// Fallback when neither provider caps nor a provider default apply.
 const DEFAULT_CONTEXT_LIMIT: u64 = 128_000;
 
@@ -92,9 +89,17 @@ fn provider_default_limit(provider_id: &ProviderId) -> u64 {
     }
 }
 
-/// Whether estimated prompt tokens are close enough to the limit to compact proactively.
-pub(crate) fn should_auto_compact(estimated_tokens: u64, context_limit: u64) -> bool {
-    let threshold = context_limit.saturating_mul(AUTO_COMPACT_THRESHOLD_PERCENT) / 100;
+/// Whether estimated prompt tokens are close enough to the limit to compact
+/// proactively. `threshold_percent` is clamped to 1–100: 0 is treated as 1
+/// (fire at 1% to avoid silent disabling), values above 100 are clamped to
+/// 100 (fire only when fully used).
+pub(crate) fn should_auto_compact(
+    estimated_tokens: u64,
+    context_limit: u64,
+    threshold_percent: u64,
+) -> bool {
+    let pct = threshold_percent.clamp(1, 100);
+    let threshold = context_limit.saturating_mul(pct) / 100;
     estimated_tokens >= threshold
 }
 
@@ -141,9 +146,28 @@ mod tests {
     #[test]
     fn should_auto_compact_at_eighty_five_percent() {
         let limit = 1_000;
-        assert!(!should_auto_compact(849, limit));
-        assert!(should_auto_compact(850, limit));
-        assert!(should_auto_compact(900, limit));
+        assert!(!should_auto_compact(849, limit, 85));
+        assert!(should_auto_compact(850, limit, 85));
+        assert!(should_auto_compact(900, limit, 85));
+    }
+
+    #[test]
+    fn should_auto_compact_respects_custom_threshold() {
+        let limit = 1_000;
+        // 50% threshold: fires at 500.
+        assert!(!should_auto_compact(499, limit, 50));
+        assert!(should_auto_compact(500, limit, 50));
+    }
+
+    #[test]
+    fn should_auto_compact_clamps_threshold_to_valid_range() {
+        let limit = 1_000;
+        // 0 is clamped to 1% → threshold = 10.
+        assert!(!should_auto_compact(9, limit, 0));
+        assert!(should_auto_compact(10, limit, 0));
+        // 200 is clamped to 100% → threshold = 1000.
+        assert!(!should_auto_compact(999, limit, 200));
+        assert!(should_auto_compact(1_000, limit, 200));
     }
 
     #[test]

@@ -9,7 +9,9 @@ use agentloop_core::{PluginRegistry, ProviderRegistry, SessionStore};
 use agentloop_loop::roles::RoleRegistry;
 use agentloop_loop::{LoopLimits, NativeAgentBuilder};
 use agentloop_session::MemoryStore;
-use agentloop_tools::BaseTools;
+use agentloop_tools::{
+    BaseTools, GetActiveAgentsTool, GetMessagesTool, PeerMailbox, SendMessageTool, SwitchModeTool,
+};
 
 use crate::paths::resolve_max_iterations;
 use crate::service::EngineService;
@@ -42,6 +44,7 @@ impl EngineService {
         let BaseTools {
             registry: mut tools,
             pending_questions,
+            pending_mode_switches,
             background_processes,
             demote_processes,
             ..
@@ -72,15 +75,37 @@ impl EngineService {
             .session_store
             .take()
             .unwrap_or_else(|| Arc::new(MemoryStore::new()));
+
+        // Peer-messaging tools: share one mailbox across all three tools.
+        if config.enable_peer_messaging {
+            let mailbox = Arc::new(PeerMailbox::new());
+            tools.register(Arc::new(GetActiveAgentsTool::new(store.clone())));
+            tools.register(Arc::new(SendMessageTool::new(mailbox.clone())));
+            tools.register(Arc::new(GetMessagesTool::new(mailbox)));
+        }
+
+        // SwitchMode: wire the same pending map the builder will expose via
+        // `respond_mode_switch`, so the tool and the reply path share state.
+        let active_mode_switches = if config.enable_switch_mode {
+            tools.register(Arc::new(SwitchModeTool::new(pending_mode_switches.clone())));
+            Some(pending_mode_switches.clone())
+        } else {
+            None
+        };
+
         let limits = LoopLimits {
             max_iterations: resolve_max_iterations(config.max_iterations),
             retry: config.retry_policy.clone().unwrap_or_default(),
+            auto_compact: config.auto_compact,
+            auto_compact_threshold_percent: config.auto_compact_threshold_percent as u64,
+            compaction_mode: config.compaction_mode,
             ..LoopLimits::default()
         };
         let mut builder = NativeAgentBuilder::new(store.clone())
             .providers(providers.clone())
             .tools(tools)
             .questions(pending_questions)
+            .mode_switches(pending_mode_switches)
             .system_prompt(system_prompt)
             .commands(commands.infos())
             .roles(roles)
@@ -120,6 +145,7 @@ impl EngineService {
         service.verbosity = config.verbosity;
         service.background_processes = background_processes;
         service.demote_processes = demote_processes;
+        service.pending_mode_switches = active_mode_switches;
         Ok(service)
     }
 }

@@ -11,9 +11,9 @@ use tokio_util::sync::CancellationToken;
 
 use agentloop_contracts::{
     AgentCaps, AgentEvent, AgentInfo, Answer, AttachmentCaps, CancelSupport, CommandInfo,
-    CompactionSummary, EngineError, ErrorCode, McpPassthrough, ModelDiscovery, NewSessionParams,
-    PermissionCaps, PermissionDecision, PermissionMode, PermissionRequestId, PromptInput,
-    QuestionId, ResumeSupport, SessionEvent, SessionId, SessionMeta, SessionMetaPatch,
+    CompactionSummary, EngineError, ErrorCode, McpPassthrough, ModeSwitchId, ModelDiscovery,
+    NewSessionParams, PermissionCaps, PermissionDecision, PermissionMode, PermissionRequestId,
+    PromptInput, QuestionId, ResumeSupport, SessionEvent, SessionId, SessionMeta, SessionMetaPatch,
     StreamingGranularity, TurnOptions, TurnSummary, now_ms,
 };
 use agentloop_core::{Agent, AgentError, EventStream};
@@ -413,6 +413,22 @@ impl Agent for NativeAgent {
         } else {
             Err(AgentError::Other(format!(
                 "no pending question with id {id}"
+            )))
+        }
+    }
+
+    async fn respond_mode_switch(
+        &self,
+        session: &SessionId,
+        id: ModeSwitchId,
+        allow: bool,
+    ) -> Result<(), AgentError> {
+        let _ = self.handle(session)?;
+        if self.deps.pending_mode_switches.resolve(&id, allow) {
+            Ok(())
+        } else {
+            Err(AgentError::Other(format!(
+                "no pending mode-switch proposal with id {id}"
             )))
         }
     }

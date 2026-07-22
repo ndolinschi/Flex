@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 
-use agentloop_contracts::IsolationPolicy;
+use agentloop_contracts::{IsolationPolicy, ModeSwitchId};
 use agentloop_core::{
-    Agent, BackgroundProcessRegistry, DemoteRegistry, ProviderRegistry, SessionStore,
+    Agent, BackgroundProcessRegistry, DemoteRegistry, PendingMap, ProviderRegistry, SessionStore,
 };
 use agentloop_prompts::CommandRegistry;
 
@@ -41,6 +41,10 @@ pub struct EngineService {
     /// duration of one in-flight call and self-cleans either way, so there
     /// is nothing to kill on session delete or service shutdown.
     pub(crate) demote_processes: Option<Arc<DemoteRegistry>>,
+    /// Pending mode-switch proposals; `None` when `enable_switch_mode` is
+    /// false (the `SwitchMode` tool is not registered). Present so that
+    /// `respond_mode_switch` can drive the `SwitchMode` tool's wait loop.
+    pub(crate) pending_mode_switches: Option<Arc<PendingMap<ModeSwitchId, bool>>>,
 }
 
 impl EngineService {
@@ -56,6 +60,7 @@ impl EngineService {
             verbosity: OutputVerbosity::default(),
             background_processes: None,
             demote_processes: None,
+            pending_mode_switches: None,
         }
     }
 
@@ -75,6 +80,7 @@ impl EngineService {
             verbosity: OutputVerbosity::default(),
             background_processes: None,
             demote_processes: None,
+            pending_mode_switches: None,
         }
     }
 

@@ -4,7 +4,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use agentloop_contracts::{Answer, CommandInfo, ModelRef, PermissionMode, QuestionId};
+use agentloop_contracts::{
+    Answer, CommandInfo, CompactionMode, ModeSwitchId, ModelRef, PermissionMode, QuestionId,
+};
 use agentloop_core::{Hook, PendingMap, ProviderRegistry, SessionStore, ToolRegistry, Workspaces};
 use agentloop_mcp::McpManager;
 
@@ -28,6 +30,16 @@ pub struct LoopLimits {
     /// survive a dropped connection instead of failing the turn or burning a
     /// fallback model. See [`RetryPolicy`].
     pub retry: RetryPolicy,
+    /// Enable proactive auto-compaction when estimated context usage nears
+    /// `auto_compact_threshold_percent`. Default `true`. When `false`,
+    /// compaction is still triggered reactively on a hard context-overflow
+    /// error from the provider.
+    pub auto_compact: bool,
+    /// Percentage (1–100) of the resolved context window that triggers
+    /// proactive auto-compaction. Default 85.
+    pub auto_compact_threshold_percent: u64,
+    /// How the conversation is condensed during compaction.
+    pub compaction_mode: CompactionMode,
 }
 
 impl Default for LoopLimits {
@@ -38,6 +50,9 @@ impl Default for LoopLimits {
             tool_timeout: Duration::from_secs(600),
             tool_pool_size: None,
             retry: RetryPolicy::default(),
+            auto_compact: true,
+            auto_compact_threshold_percent: 85,
+            compaction_mode: CompactionMode::Standard,
         }
     }
 }
@@ -117,6 +132,7 @@ pub struct NativeAgentBuilder {
     command_infos: Vec<CommandInfo>,
     roles: Vec<crate::roles::RoleSpec>,
     pending_questions: Arc<PendingMap<QuestionId, Vec<Answer>>>,
+    pending_mode_switches: Arc<PendingMap<ModeSwitchId, bool>>,
     mcp: Option<std::sync::Arc<McpManager>>,
     workspace: Option<Arc<dyn Workspaces>>,
     executor_id: Option<String>,
@@ -137,6 +153,7 @@ impl NativeAgentBuilder {
             command_infos: Vec::new(),
             roles: Vec::new(),
             pending_questions: Arc::new(PendingMap::new()),
+            pending_mode_switches: Arc::new(PendingMap::new()),
             mcp: None,
             workspace: None,
             executor_id: None,
@@ -197,6 +214,13 @@ impl NativeAgentBuilder {
         self
     }
 
+    /// Share the pending mode-switch map with the `SwitchMode` tool: build
+    /// the map first, hand a clone to the tool, and a clone here.
+    pub fn mode_switches(mut self, pending: Arc<PendingMap<ModeSwitchId, bool>>) -> Self {
+        self.pending_mode_switches = pending;
+        self
+    }
+
     /// Role definitions for multi-agent orchestration (built-ins are always
     /// present; these override or extend them).
     pub fn roles(mut self, roles: Vec<crate::roles::RoleSpec>) -> Self {
@@ -253,10 +277,44 @@ impl NativeAgentBuilder {
                 executor_id: self.executor_id,
                 pending_permissions: Arc::new(PendingMap::new()),
                 pending_questions: self.pending_questions,
+                pending_mode_switches: self.pending_mode_switches,
             }),
             command_infos: self.command_infos,
             sessions: Mutex::new(HashMap::new()),
         })
+    }
+}
+
+#[cfg(test)]
+mod loop_limits_tests {
+    use super::*;
+
+    #[test]
+    fn default_has_auto_compact_enabled_at_85_percent_standard_mode() {
+        let limits = LoopLimits::default();
+        assert!(limits.auto_compact);
+        assert_eq!(limits.auto_compact_threshold_percent, 85);
+        assert_eq!(limits.compaction_mode, CompactionMode::Standard);
+    }
+
+    #[test]
+    fn auto_compact_false_is_a_valid_config() {
+        let limits = LoopLimits {
+            auto_compact: false,
+            ..LoopLimits::default()
+        };
+        assert!(!limits.auto_compact);
+        // Threshold and mode fields remain accessible even when compaction is off.
+        assert_eq!(limits.auto_compact_threshold_percent, 85);
+    }
+
+    #[test]
+    fn turn_pair_mode_can_be_set() {
+        let limits = LoopLimits {
+            compaction_mode: CompactionMode::TurnPair,
+            ..LoopLimits::default()
+        };
+        assert_eq!(limits.compaction_mode, CompactionMode::TurnPair);
     }
 }
 
