@@ -4,6 +4,7 @@ import {
   Check,
   Globe,
   Monitor,
+  Package,
   ShieldCheck,
   Search,
   AppWindow,
@@ -75,6 +76,14 @@ const PLUGIN_CATALOG: PluginCardSpec[] = [
     name: "Verifier",
     description: "Independent grading of results: Verify / SubmitVerdict tools.",
     icon: ShieldCheck,
+    category: "Engine plugins",
+  },
+  {
+    key: "artifacts",
+    name: "Artifacts",
+    description:
+      "Office deliverables: CreateDocument / CreateSpreadsheet / CreatePresentation, plus the Artifacts tool tab.",
+    icon: Package,
     category: "Engine plugins",
   },
   {
@@ -159,6 +168,7 @@ export const PluginCatalog = () => {
             plugins.learningRequireHumanApproval ?? false,
           learningRequireVerifiedMemory:
             plugins.learningRequireVerifiedMemory ?? false,
+          artifacts: plugins.artifacts ?? true,
           browser: plugins.browser ?? false,
           computer: plugins.computer ?? false,
           messaging: plugins.messaging ?? false,

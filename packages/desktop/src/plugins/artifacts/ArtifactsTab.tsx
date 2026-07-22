@@ -6,6 +6,7 @@ import {
   FileText,
   Image,
   LayoutTemplate,
+  Package,
   RefreshCw,
   Share2,
   Table2,
@@ -143,12 +144,14 @@ export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
       {!projectKey ? (
         <EmptyState
           className="min-h-0 flex-1"
+          icon={<Package className="h-6 w-6" aria-hidden />}
           title="No project folder"
           description="Pick a working directory for this session to see its artifacts."
         />
       ) : artifacts.length === 0 ? (
         <EmptyState
           className="min-h-0 flex-1"
+          icon={<Package className="h-6 w-6" aria-hidden />}
           title="No artifacts yet"
           description="Agent-created deliverables (reports, spreadsheets, presentations, diagrams, images) appear here automatically."
         />

@@ -66,6 +66,25 @@ describe("DATABASE_TAB_ENABLED", () => {
   })
 })
 
+describe("ARTIFACTS_TAB_ENABLED", () => {
+  it("defaults on with a Package icon via the UI plugin registry", async () => {
+    resetUiPluginsForTests()
+    // Mimic main.tsx: ContentPane imports (and used to snapshot the catalog)
+    // happen before registerBuiltinUiPlugins — the live lookup must still work.
+    const before = visibleRightPanelTabs().map((t) => t.id)
+    expect(before).not.toContain("artifacts")
+
+    registerBuiltinUiPlugins()
+    const { ARTIFACTS_TAB_ENABLED } = await import("./featureFlags")
+    expect(ARTIFACTS_TAB_ENABLED).toBe(true)
+    expect(isRightPanelTabEnabled("artifacts")).toBe(true)
+    const artifacts = visibleRightPanelTabs().find((t) => t.id === "artifacts")
+    expect(artifacts).toBeDefined()
+    expect(artifacts?.icon).toBeDefined()
+    expect(artifacts?.label).toBe("Artifacts")
+  })
+})
+
 describe("COMPONENTS_TAB_ENABLED", () => {
   it("defaults off so Components is hidden from the tab strip", () => {
     resetUiPluginsForTests()

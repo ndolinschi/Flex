@@ -42,8 +42,16 @@ type ContentPaneProps = {
   keepAliveTools: Set<string>
 }
 
-/** Labels/icons for the strip — always include PR so open tabs keep a label. */
-const STRIP_CATALOG = visibleRightPanelTabs({ hasBranchPr: true })
+/**
+ * Labels/icons for open strip tabs — always include PR so an open PR tab keeps
+ * its chrome after the branch PR goes away.
+ *
+ * Call at render time (not module load): `ContentPane` is imported via `App`
+ * before `registerBuiltinUiPlugins()` runs in `main.tsx`, so a module-level
+ * snapshot would omit plugin tabs (Artifacts, Database, …) and their icons
+ * would never appear in the TabStrip.
+ */
+const fullStripCatalog = () => visibleRightPanelTabs({ hasBranchPr: true })
 
 /** Stable fallback when a pane index is missing (must keep object identity). */
 const EMPTY_PANE = emptyPane()
@@ -78,12 +86,13 @@ const GroupSwatchBar = ({ onPickColor }: GroupSwatchBarProps) => (
 const tabLabel = (
   tab: ContentTab,
   sessionsById: Map<string, SessionMeta>,
+  catalog: ReturnType<typeof fullStripCatalog>,
 ): string => {
   if (tab.kind === "chat") {
     const s = sessionsById.get(tab.sessionId)
     return s ? sessionLabel(s) : "Chat"
   }
-  return STRIP_CATALOG.find((c) => c.id === tab.tool)?.label ?? tab.tool
+  return catalog.find((c) => c.id === tab.tool)?.label ?? tab.tool
 }
 
 /**
@@ -216,6 +225,9 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     () => visibleRightPanelTabs({ hasBranchPr }),
     [hasBranchPr],
   )
+  // Full catalog (PR always included) for strip labels/icons of already-open tabs.
+  // Empty deps: plugin registry is fixed after boot in main.tsx.
+  const stripLabels = useMemo(() => fullStripCatalog(), [])
   const paneFocused = focusedPane === paneIndex
 
   const handleUngroup = useCallback(
@@ -328,7 +340,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
           {displayTabs.map((t, index) => {
             const def =
               t.kind === "tool"
-                ? STRIP_CATALOG.find((c) => c.id === t.tool)
+                ? stripLabels.find((c) => c.id === t.tool)
                 : undefined
             const isDragged = dragTabId === t.id
             const dropEdge =
@@ -340,7 +352,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                     ? "after"
                     : null
                 : null
-            const label = tabLabel(t, sessionsById)
+            const label = tabLabel(t, sessionsById, stripLabels)
 
             // Session ownership cue: when multiple sessions share a pane,
             // suffix tool-tab titles with the owning session label.
