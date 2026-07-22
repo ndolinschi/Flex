@@ -13,6 +13,7 @@ mod grep;
 pub mod peer;
 mod plan;
 mod registry;
+pub mod set_routing;
 mod skill;
 mod switch_mode;
 mod web_fetch;
@@ -31,6 +32,7 @@ pub use registry::{
     BaseTools, base_tools, base_tools_read_only, registry_with_questions,
     registry_with_questions_and_background,
 };
+pub use set_routing::{AllowedRouting, SetRoutingTool};
 pub use skill::{SkillLoader, skill_tool};
 pub use switch_mode::SwitchModeTool;
 pub use web_fetch::WebFetchTool;
