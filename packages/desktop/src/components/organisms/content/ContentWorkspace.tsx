@@ -143,16 +143,13 @@ export const ContentWorkspace = () => {
         elementRef={containerRef}
         groupRef={groupImperativeRef}
         defaultLayout={defaultLayout}
-        onLayoutChange={(layout) => {
-          if (!split) return
-          const leftPct = layout[LEFT_PANEL_ID]
-          if (leftPct === undefined) return
-          setSplitRatio(leftPct / 100, false)
-        }}
         onLayoutChanged={(
           layout: Record<string, number>,
           meta: LayoutChangedMeta,
         ) => {
+          // Persist only on drag end — live panel sizes are owned by
+          // react-resizable-panels; writing the store every frame re-renders
+          // the whole chat/editor shell for no visual gain.
           if (!split || !meta.isUserInteraction) return
           const leftPct = layout[LEFT_PANEL_ID]
           if (leftPct === undefined) return

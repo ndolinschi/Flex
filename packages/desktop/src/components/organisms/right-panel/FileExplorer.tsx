@@ -297,7 +297,7 @@ export const FileExplorer = ({
       </div>
 
       <ScrollArea className="min-h-0 flex-1">
-        <div className="px-2 py-1">
+        <div className="py-1">
         {searching ? (
           <FileExplorerSearchResults
             loading={searchLoading}

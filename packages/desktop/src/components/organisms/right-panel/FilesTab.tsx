@@ -505,7 +505,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
               onClick={toggleMarkdownPreview}
               className={cn(
                 "text-ink-muted hover:bg-fill-4 hover:text-ink",
-                previewMode && "bg-fill-2 text-ink",
+                previewMode && "bg-fill-2 text-ink hover:bg-fill-2",
               )}
             >
               {previewMode ? (
@@ -634,10 +634,15 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
           ) : null}
         </div>
 
-        {explorerOpen && cwd ? (
+        {cwd ? (
           <aside
-            className="w-[clamp(180px,32%,240px)] shrink-0 border-l border-stroke-3 bg-panel"
+            className={cn(
+              "w-[clamp(180px,32%,240px)] shrink-0 border-l border-stroke-3 bg-panel",
+              !explorerOpen && "hidden",
+            )}
             aria-label="File explorer"
+            aria-hidden={!explorerOpen}
+            inert={!explorerOpen ? true : undefined}
           >
             <FileExplorer
               sessionId={activeSessionId}

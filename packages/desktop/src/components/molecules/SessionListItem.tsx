@@ -235,14 +235,40 @@ export const SessionListItem = memo(function SessionListItem({
   return (
     <div
       role="button"
-      tabIndex={0}
+      tabIndex={isActive ? 0 : -1}
+      data-session-row=""
       aria-label={`Session ${label}`}
       aria-current={isActive ? "true" : undefined}
       onClick={() => {
         if (!isEditing) onSelect(session.id)
       }}
       onKeyDown={(e) => {
-        if (e.key === "Enter" && !isEditing) onSelect(session.id)
+        if (isEditing) return
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          onSelect(session.id)
+          return
+        }
+        const rows = Array.from(
+          document.querySelectorAll<HTMLElement>("[data-session-row]"),
+        )
+        const index = rows.indexOf(e.currentTarget)
+        if (index < 0) return
+        const focusAt = (next: number) => {
+          const row = rows[next]
+          if (!row) return
+          e.preventDefault()
+          row.focus()
+        }
+        if (e.key === "ArrowDown") {
+          focusAt(Math.min(index + 1, rows.length - 1))
+        } else if (e.key === "ArrowUp") {
+          focusAt(Math.max(index - 1, 0))
+        } else if (e.key === "Home") {
+          focusAt(0)
+        } else if (e.key === "End") {
+          focusAt(rows.length - 1)
+        }
       }}
       onDoubleClick={() => {
         if (!isEditing) startRename()

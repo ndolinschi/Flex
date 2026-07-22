@@ -35,13 +35,13 @@ export const PlusMenu = ({
             variant="ghost"
             size="icon-xs"
             aria-label="Add context"
-            title="Add context"
+            title={open ? undefined : "Add context"}
             className={cn(
               // Quiet + circle — matches Bypass/Send hit target, not a filled chip.
               "size-6 rounded-full text-ink-muted opacity-60",
               "transition-[opacity,background-color,color,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
               "hover:bg-fill-4 hover:text-ink hover:opacity-100",
-              "active:translate-y-px active:opacity-100",
+              "active:translate-y-px active:opacity-100 motion-reduce:active:translate-y-0",
               "aria-expanded:bg-fill-4 aria-expanded:text-ink aria-expanded:opacity-100",
             )}
           />

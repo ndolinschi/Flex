@@ -144,7 +144,7 @@ const CodeBlock = (props: HTMLAttributes<HTMLPreElement>) => {
           aria-label="Copy code"
           title="Copy code"
           onClick={handleCopy}
-          className="rounded text-ink-muted hover:bg-surface-muted hover:text-ink"
+          className="rounded text-ink-muted hover:bg-fill-4 hover:text-ink"
         >
           {copied ? (
             <Check className="h-3 w-3" aria-hidden />

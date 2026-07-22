@@ -1,7 +1,8 @@
 import type { ComponentType } from "react"
-import { Loader2 } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
+import { Kbd } from "@/components/ui/kbd"
+import { Spinner } from "../atoms"
 
 type SidebarActionRowProps = {
   icon: ComponentType<{
@@ -48,10 +49,9 @@ export const SidebarActionRow = ({
       )}
     >
       {loading ? (
-        <Loader2
-          data-icon="inline-start"
-          className="animate-spin text-ink-secondary"
-          aria-hidden
+        <Spinner
+          size="sm"
+          label={`${label} in progress`}
         />
       ) : (
         <Icon data-icon="inline-start" className="text-ink-secondary" aria-hidden />
@@ -63,9 +63,7 @@ export const SidebarActionRow = ({
           aria-hidden
         />
       ) : kbd ? (
-        <kbd className="ml-auto shrink-0 font-sans text-xs tracking-[var(--tracking-caption)] text-ink-secondary">
-          {kbd}
-        </kbd>
+        <Kbd className="ml-auto shrink-0">{kbd}</Kbd>
       ) : null}
     </Button>
   )

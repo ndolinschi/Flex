@@ -1,4 +1,8 @@
-import { useMemo, type MouseEvent } from "react"
+import {
+  useMemo,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent,
+} from "react"
 import { useQuery } from "@tanstack/react-query"
 import { ChevronDown, Folder, FolderOpen } from "lucide-react"
 import { listDirChildren } from "../../../lib/tauri"
@@ -90,9 +94,65 @@ export const TreeBranch = ({
     )
   }
 
+  const handleTreeKeyDown = (e: ReactKeyboardEvent<HTMLUListElement>) => {
+    if (!isRoot) return
+    const target = (e.target as HTMLElement).closest<HTMLElement>(
+      '[role="treeitem"]',
+    )
+    if (!target) return
+    const items = Array.from(
+      e.currentTarget.querySelectorAll<HTMLElement>('[role="treeitem"]'),
+    )
+    const index = items.indexOf(target)
+    if (index < 0) return
+
+    const focusAt = (next: number) => {
+      const item = items[next]
+      if (!item) return
+      e.preventDefault()
+      item.focus()
+    }
+
+    if (e.key === "ArrowDown") focusAt(Math.min(index + 1, items.length - 1))
+    else if (e.key === "ArrowUp") focusAt(Math.max(index - 1, 0))
+    else if (e.key === "Home") focusAt(0)
+    else if (e.key === "End") focusAt(items.length - 1)
+    else if (e.key === "ArrowRight") {
+      const expandedState = target.getAttribute("aria-expanded")
+      if (expandedState === "false") {
+        e.preventDefault()
+        target.click()
+      } else if (expandedState === "true") {
+        const level = Number(target.getAttribute("aria-level") ?? 1)
+        const next = items[index + 1]
+        if (Number(next?.getAttribute("aria-level") ?? 0) > level) {
+          focusAt(index + 1)
+        }
+      }
+    } else if (e.key === "ArrowLeft") {
+      if (target.getAttribute("aria-expanded") === "true") {
+        e.preventDefault()
+        target.click()
+        return
+      }
+      const level = Number(target.getAttribute("aria-level") ?? 1)
+      for (let i = index - 1; i >= 0; i -= 1) {
+        if (Number(items[i]?.getAttribute("aria-level") ?? 0) === level - 1) {
+          focusAt(i)
+          break
+        }
+      }
+    }
+  }
+
   return (
-    <ul className="flex flex-col" role="list">
-      {sorted.map((hit) => {
+    <ul
+      className="flex flex-col"
+      role={isRoot ? "tree" : "group"}
+      aria-label={isRoot ? "Workspace files" : undefined}
+      onKeyDown={isRoot ? handleTreeKeyDown : undefined}
+    >
+      {sorted.map((hit, index) => {
         const isDir = !!hit.isDir
         const isOpen = isDir && expanded.has(hit.path)
         const isActive = !isDir && activePath === hit.path
@@ -106,6 +166,10 @@ export const TreeBranch = ({
           <li key={hit.path}>
             <Button
               variant="ghost"
+              role="treeitem"
+              tabIndex={
+                isActive || (isRoot && index === 0 && !activePath) ? 0 : -1
+              }
               onClick={() => {
                 if (isDir) onToggle(hit.path)
                 else onOpenFile(hit.path)
@@ -113,13 +177,17 @@ export const TreeBranch = ({
               onContextMenu={(e) => onContextMenu(e, hit)}
               title={hit.path}
               aria-expanded={isDir ? isOpen : undefined}
+              aria-level={depth + 1}
+              aria-selected={!isDir ? isActive : undefined}
               aria-current={isActive ? "page" : undefined}
               className={cn(
                 // File-tree cell: h-7, r6, whisper fills — open dirs read selected (fill-2).
                 "h-7 w-full justify-start gap-1.5 rounded-sm pr-2 text-sm font-normal leading-[1.5]",
                 "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-                isOpen || isActive
+                isActive
                   ? "bg-fill-2 text-ink hover:bg-fill-2"
+                  : isOpen
+                    ? "bg-fill-4 text-ink hover:bg-fill-4"
                   : "hover:bg-fill-4",
                 statusClass ??
                   (!(isOpen || isActive) && "text-ink-secondary hover:text-ink"),

@@ -36,11 +36,11 @@ export const TabClose = ({
         e.stopPropagation()
       }}
       className={cn(
-        "ml-0 max-w-0 shrink-0 overflow-hidden rounded-sm p-0 opacity-0",
-        "transition-[max-width,margin,padding,opacity] duration-[var(--duration-normal)] ease-[var(--easing-default)]",
-        "hover:bg-fill-4 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stroke-2 group-hover:ml-0.5 group-hover:max-w-[1rem] group-hover:p-0.5 group-hover:opacity-100",
+        "pointer-events-none ml-0.5 w-4 shrink-0 overflow-hidden rounded-sm p-0.5 opacity-0",
+        "transition-opacity duration-[var(--duration-fast)] ease-[var(--easing-default)] motion-reduce:transition-none",
+        "hover:bg-fill-4 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stroke-2 group-hover:pointer-events-auto group-hover:opacity-100",
         revealOnFocusWithin &&
-          "group-focus-within:ml-0.5 group-focus-within:max-w-[1rem] group-focus-within:p-0.5 group-focus-within:opacity-100",
+          "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
         className,
       )}
       data-tab-no-drag

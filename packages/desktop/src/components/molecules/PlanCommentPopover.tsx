@@ -60,7 +60,7 @@ export const PlanCommentPopover = ({
     <Popover open={open} onOpenChange={onOpenChange}>
       <div
         data-suppress-native-webview=""
-        className="fixed z-50"
+        className="fixed z-[var(--z-overlay)]"
         style={{ left, top }}
       >
         <PopoverTrigger

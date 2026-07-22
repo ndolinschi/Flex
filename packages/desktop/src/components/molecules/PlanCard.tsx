@@ -19,7 +19,7 @@ export const PlanStatusIcon = ({ status }: { status: PlanEntry["status"] }) => {
   if (status === "in_progress") {
     return (
       <LoaderCircle
-        className="h-3 w-3 animate-spin text-accent"
+        className="h-3 w-3 animate-spin text-ink-muted"
         aria-hidden
       />
     )
@@ -38,7 +38,7 @@ export const PlanCard = ({ entries }: PlanCardProps) => {
       size="sm"
       role="list"
       aria-label={`Plan ${done} of ${entries.length} complete`}
-      className="rounded-lg bg-fill-5"
+      className="bg-fill-5"
     >
       <CardHeader className="border-b border-stroke-3 px-3 py-2">
         <CardTitle className="flex items-center gap-2 text-sm font-medium text-ink-secondary">

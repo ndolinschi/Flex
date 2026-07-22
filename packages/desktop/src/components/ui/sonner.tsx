@@ -40,6 +40,7 @@ const Toaster = ({ theme = "system", ...props }: ToasterProps) => {
           "--info-bg": "var(--color-panel)",
           "--info-text": "var(--color-ink)",
           "--info-border": "var(--color-stroke-3)",
+          zIndex: "var(--z-toast)",
         } as React.CSSProperties
       }
       toastOptions={{

@@ -64,7 +64,7 @@ export const SessionRowActions = memo(function SessionRowActions({
       <span
         className={cn(
           "absolute right-2 top-1/2 z-[2] flex max-w-0 -translate-y-1/2 items-center overflow-hidden opacity-0",
-          "pointer-events-none transition-[max-width,opacity] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+          "pointer-events-none transition-[max-width,opacity] duration-[var(--duration-fast)] ease-[var(--easing-default)] motion-reduce:transition-none",
           "group-hover:pointer-events-auto group-hover:max-w-[90px] group-hover:opacity-100",
           "group-focus-within:pointer-events-auto group-focus-within:max-w-[90px] group-focus-within:opacity-100",
         )}

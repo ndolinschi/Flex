@@ -513,7 +513,7 @@ export const TurnTimeline = ({
           className={cn(
             "absolute bottom-3 left-1/2 z-20 -translate-x-1/2",
             // Floating chrome: panel + shadow-popover (ring lives in the shadow).
-            "rounded-full bg-panel text-ink-secondary shadow-popover hover:text-ink",
+            "rounded-full bg-panel text-ink-secondary shadow-popover hover:bg-fill-4 hover:text-ink",
             "animate-tray-in",
           )}
         >

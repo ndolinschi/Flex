@@ -154,7 +154,6 @@ export const OpenTabModal = ({
         side="bottom"
         align="start"
         sideOffset={4}
-        positionerClassName="z-[300]"
         className="w-[280px] gap-0 overflow-hidden p-0"
       >
         <PopoverTitle className="sr-only">Open tab</PopoverTitle>

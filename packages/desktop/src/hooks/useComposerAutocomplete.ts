@@ -39,6 +39,7 @@ export const useComposerAutocomplete = ({
   slashAtCaret = false,
 }: UseComposerAutocompleteArgs) => {
   const [slashHighlight, setSlashHighlight] = useState(0)
+  const [slashDismissed, setSlashDismissed] = useState(false)
   const [atHighlight, setAtHighlight] = useState(0)
   const [atDismissed, setAtDismissed] = useState(false)
   const [caret, setCaret] = useState(0)
@@ -81,10 +82,12 @@ export const useComposerAutocomplete = ({
     )
   }, [commands, slashQuery])
 
-  const slashOpen = slashQuery !== null && slashMatches.length > 0
+  const slashOpen =
+    slashQuery !== null && slashMatches.length > 0 && !slashDismissed
 
   useEffect(() => {
     setSlashHighlight(0)
+    setSlashDismissed(false)
   }, [slashQuery])
 
   const atToken = useMemo(() => {
@@ -217,6 +220,7 @@ export const useComposerAutocomplete = ({
     slashMatches,
     slashHighlight,
     setSlashHighlight,
+    setSlashDismissed,
     atOpen,
     atToken,
     /** @deprecated alias — prefer `atHits`. */

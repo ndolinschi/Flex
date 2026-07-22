@@ -58,7 +58,7 @@ export const PlanModelPill = ({
               "max-w-[12rem] rounded-full border border-stroke-3 px-2 text-ink-muted",
               "transition-colors duration-[var(--duration-fast)]",
               "hover:border-stroke-3 hover:bg-fill-4 hover:text-ink",
-              "aria-expanded:border-stroke-3 aria-expanded:text-ink",
+              "aria-expanded:border-stroke-3 aria-expanded:bg-fill-4 aria-expanded:text-ink",
             )}
           />
         }

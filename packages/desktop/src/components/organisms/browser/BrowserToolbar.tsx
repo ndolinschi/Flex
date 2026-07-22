@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Bug,
-  Loader2,
   Maximize,
   Monitor,
   MousePointer2,
@@ -20,7 +19,7 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group"
-import { Tooltip } from "../../atoms"
+import { Spinner, Tooltip } from "../../atoms"
 import { VIEWPORT_PRESETS as VIEWPORT_PRESETS_BASE } from "../../../hooks/useBrowserSession"
 import type { BrowserViewportPreset } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
@@ -131,13 +130,13 @@ export const BrowserToolbar = ({
         <Button
       type="button"
       variant="ghost"
-      size="icon-sm"
-      aria-label="Back" title="Back"
+      size="icon-xs"
+      aria-label="Back"
       disabled={!showLiveContent}
       onClick={browserBack}
       className={cn(
         "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "h-6 w-6",
+        "shrink-0",
       )}
     >
       <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
@@ -145,34 +144,31 @@ export const BrowserToolbar = ({
         <Button
       type="button"
       variant="ghost"
-      size="icon-sm"
-      aria-label="Forward" title="Forward"
+      size="icon-xs"
+      aria-label="Forward"
       disabled={!showLiveContent}
       onClick={browserForward}
       className={cn(
         "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "h-6 w-6",
+        "shrink-0",
       )}
     >
       <ArrowRight className="h-3.5 w-3.5" aria-hidden />
     </Button>
         <div className="relative flex h-6 w-6 items-center justify-center">
           {browserLoading ? (
-            <Loader2
-              className="h-3.5 w-3.5 animate-spin text-ink-muted"
-              aria-hidden
-            />
+            <Spinner size="sm" label="Loading page" />
           ) : (
             <Button
       type="button"
       variant="ghost"
-      size="icon-sm"
-      aria-label="Reload" title="Reload"
+      size="icon-xs"
+      aria-label="Reload"
       disabled={!showLiveContent}
       onClick={handleReload}
       className={cn(
         "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "h-6 w-6",
+        "shrink-0",
       )}
     >
       <RotateCw className="h-3.5 w-3.5" aria-hidden />
@@ -222,11 +218,10 @@ export const BrowserToolbar = ({
               value={id}
               size="icon-xs"
               aria-label={label}
-              title={label}
               className={cn(
                 "text-ink-muted hover:bg-fill-4 hover:text-ink",
-                "h-6 w-6 rounded-md p-0",
-                "data-pressed:bg-surface-muted data-pressed:text-ink",
+                "rounded-md p-0",
+                "data-pressed:bg-fill-2 data-pressed:text-ink data-pressed:hover:bg-fill-2",
               )}
             >
               <Icon className="h-3.5 w-3.5" aria-hidden />
@@ -239,14 +234,13 @@ export const BrowserToolbar = ({
         <Button
       type="button"
       variant="ghost"
-      size="icon-sm"
-      aria-label={browserDesignMode ? "Exit Design Mode" : "Design Mode"} title={browserDesignMode ? "Exit Design Mode" : "Design Mode"}
+      size="icon-xs"
+      aria-label={browserDesignMode ? "Exit Design Mode" : "Design Mode"}
       disabled={!showLiveContent}
       onClick={() => void toggleDesignMode()}
       className={cn(
         "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "h-6 w-6",
-            browserDesignMode && "bg-surface-muted text-ink",
+        browserDesignMode && "bg-fill-2 text-ink hover:bg-fill-2",
       )}
     >
       <MousePointer2 className="h-3.5 w-3.5" aria-hidden />
@@ -257,13 +251,13 @@ export const BrowserToolbar = ({
         <Button
       type="button"
       variant="ghost"
-      size="icon-sm"
-      aria-label="Open DevTools" title="Open DevTools"
+      size="icon-xs"
+      aria-label="Open DevTools"
       disabled={!showLiveContent}
       onClick={handleOpenDevtools}
       className={cn(
         "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "h-6 w-6",
+        "shrink-0",
       )}
     >
       <Bug className="h-3.5 w-3.5" aria-hidden />

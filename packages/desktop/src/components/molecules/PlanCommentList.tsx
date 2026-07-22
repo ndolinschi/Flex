@@ -52,18 +52,20 @@ export const PlanCommentList = ({
                 </p>
               </Button>
               <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label="Remove comment" title="Remove comment"
-      onClick={() => onRemove(comment.id)}
-      className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "h-6 w-6 opacity-0 transition-opacity duration-[var(--duration-fast)] ease-[var(--easing-default)] group-hover:opacity-100",
-      )}
-    >
-      <X className="h-3 w-3" aria-hidden />
-    </Button>
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Remove comment"
+                title="Remove comment"
+                onClick={() => onRemove(comment.id)}
+                className={cn(
+                  "text-ink-muted hover:bg-fill-4 hover:text-ink",
+                  "h-6 w-6 opacity-0 transition-opacity duration-[var(--duration-fast)] ease-[var(--easing-default)] motion-reduce:transition-none",
+                  "group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100",
+                )}
+              >
+                <X className="h-3 w-3" aria-hidden />
+              </Button>
             </li>
           )
         })}

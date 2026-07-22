@@ -1,13 +1,12 @@
 import {
   ChevronDown,
   Eye,
-  Loader2,
   Maximize2,
   Pencil,
   Send,
   ShieldCheck,
 } from "lucide-react"
-import { Tooltip } from "../../atoms"
+import { Spinner, Tooltip } from "../../atoms"
 import { Button } from "@/components/ui/button"
 import {
   Popover,
@@ -67,13 +66,13 @@ export const PromptTabHeader = ({
           <Button
             type="button"
             variant="ghost"
-            size="icon-sm"
+            size="icon-xs"
             aria-label="Insert section"
-            title="Insert section"
+            title={insertOpen ? undefined : "Insert section"}
             className={cn(
               "text-ink-muted hover:bg-fill-4 hover:text-ink",
               "opacity-50 hover:opacity-80",
-              "h-6 w-6",
+              "shrink-0",
             )}
           />
         }
@@ -108,14 +107,12 @@ export const PromptTabHeader = ({
         <Button
           type="button"
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs"
           aria-label={showMarks ? "Edit prompt" : "Show marks"}
-          title={showMarks ? "Edit prompt" : "Show marks"}
           onClick={() => setShowMarks((v) => !v)}
           className={cn(
             "text-ink-muted hover:bg-fill-4 hover:text-ink",
-            "h-6 w-6",
-            showMarks && "bg-fill-2 text-ink",
+            showMarks && "bg-fill-2 text-ink hover:bg-fill-2",
           )}
         >
           {showMarks ? (
@@ -130,18 +127,17 @@ export const PromptTabHeader = ({
       <Button
         type="button"
         variant="ghost"
-        size="icon-sm"
+        size="icon-xs"
         aria-label="Verify prompt"
-        title="Verify prompt"
         disabled={!draft.trim() || busy}
         onClick={onVerify}
         className={cn(
           "text-ink-muted hover:bg-fill-4 hover:text-ink",
-          "h-6 w-6",
+          "shrink-0",
         )}
       >
         {busy ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+          <Spinner size="sm" label="Verifying prompt" />
         ) : (
           <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
         )}
@@ -151,14 +147,13 @@ export const PromptTabHeader = ({
       <Button
         type="button"
         variant="ghost"
-        size="icon-sm"
+        size="icon-xs"
         aria-label="Send prompt"
-        title="Send prompt"
         disabled={!draft.trim() || busy}
         onClick={onSend}
         className={cn(
           "text-ink-muted hover:bg-fill-4 hover:text-ink",
-          "h-6 w-6",
+          "shrink-0",
         )}
       >
         <Send className="h-3.5 w-3.5" aria-hidden />

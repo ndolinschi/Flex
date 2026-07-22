@@ -17,8 +17,8 @@
   /* Cool white ink (Cursor glass icon stack: ~236 241 250). */
   --color-text-1: rgb(236 241 250 / 0.92);
   --color-text-2: rgb(226 233 244 / 0.58);
-  --color-text-3: rgb(226 233 244 / 0.4);
-  --color-text-4: rgb(226 233 244 / 0.26);
+  --color-text-3: rgb(226 233 244 / 0.48);
+  --color-text-4: rgb(226 233 244 / 0.32);
 
   --color-icon-1: rgb(236 241 250 / 0.88);
   --color-icon-2: rgb(226 233 244 / 0.62);
@@ -289,4 +289,11 @@
   --form-rail: 32rem;
   --welcome-rail: 28rem;
   --end-of-turn-reserved-height: 1.25rem;
+
+  /* Overlay ladder — non-blocking hints stay below menus; blocking surfaces
+   * and transient feedback never compete for the same z-index tier. */
+  --z-tooltip: 250;
+  --z-overlay: 300;
+  --z-toast: 400;
+  --z-modal: 500;
 }

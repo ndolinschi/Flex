@@ -28,8 +28,8 @@ function AlertDialogOverlay({
     <AlertDialogPrimitive.Backdrop
       data-slot="alert-dialog-overlay"
       className={cn(
-        // z-[300] matches prior ConfirmDialog — above chrome, trays, and toasts.
-        "fixed inset-0 isolate z-[300] bg-black/30 duration-[var(--duration-normal)] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        // Modal tier stays above menus, tooltips, and transient toasts.
+        "fixed inset-0 isolate z-[var(--z-modal)] bg-black/30 duration-[var(--duration-normal)] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}
       {...props}
@@ -52,7 +52,7 @@ function AlertDialogContent({
         data-size={size}
         data-suppress-native-webview=""
         className={cn(
-          "group/alert-dialog-content fixed top-1/2 left-1/2 z-[300] grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg bg-panel p-4 text-ink shadow-popover duration-[var(--duration-normal)] outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "group/alert-dialog-content fixed top-1/2 left-1/2 z-[var(--z-modal)] grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg bg-panel p-4 text-ink shadow-popover duration-[var(--duration-normal)] outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}

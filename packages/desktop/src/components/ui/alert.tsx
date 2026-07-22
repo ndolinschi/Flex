@@ -17,7 +17,7 @@ const alertVariants = cva(
           // Whisper danger — product tokens, not a solid red slab (ErrorBanner canon).
           "border-danger/15 bg-danger-subtle/70 text-danger *:data-[slot=alert-description]:text-danger/90 *:[svg]:text-danger",
         warning:
-          "border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-50 *:data-[slot=alert-description]:text-current *:[svg]:text-current",
+          "border-warning/15 bg-warning-subtle/70 text-warning *:data-[slot=alert-description]:text-warning/90 *:[svg]:text-warning",
       },
     },
     defaultVariants: {

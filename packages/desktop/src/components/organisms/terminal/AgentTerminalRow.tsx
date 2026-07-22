@@ -21,7 +21,7 @@ export const AgentTerminalRow = ({
       }}
       className={cn(
         "group flex w-full cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-xs",
-        selected ? "bg-fill-2 text-ink" : "hover:bg-fill-4",
+        selected ? "bg-fill-2 text-ink hover:bg-fill-2" : "hover:bg-fill-4",
       )}
     >
       <InfinityIcon className="h-3.5 w-3.5 shrink-0 text-yellow" aria-hidden />

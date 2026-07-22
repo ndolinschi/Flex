@@ -22,6 +22,13 @@ describe("contentWorkspaceDefaultLayout", () => {
     expect(Object.values(layout).reduce((a, b) => a + b, 0)).toBe(100)
   })
 
+  it("uses the reference 38/62 default split proportions", () => {
+    expect(contentWorkspaceDefaultLayout(true, 0.38)).toEqual({
+      "content-left": 38,
+      "content-right": 62,
+    })
+  })
+
   it("respects a non-default split ratio", () => {
     expect(contentWorkspaceDefaultLayout(true, 0.6)).toEqual({
       "content-left": 60,

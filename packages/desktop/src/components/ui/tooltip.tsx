@@ -43,13 +43,12 @@ function TooltipContent({
         alignOffset={alignOffset}
         side={side}
         sideOffset={sideOffset}
-        className="isolate z-[1100]"
+        className="isolate z-[var(--z-tooltip)]"
       >
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"
-          data-suppress-native-webview=""
           className={cn(
-            "z-[1100] inline-flex w-fit max-w-xs origin-(--transform-origin) items-center gap-1 rounded-md bg-foreground px-1.5 py-0.5 text-xs text-background shadow-sm has-data-[slot=kbd]:pr-1 data-[side=bottom]:slide-in-from-top-1 data-[side=inline-end]:slide-in-from-left-1 data-[side=inline-start]:slide-in-from-right-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-50 **:data-[slot=kbd]:rounded-sm data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-[var(--duration-fast)]",
+            "z-[var(--z-tooltip)] inline-flex w-fit max-w-xs origin-(--transform-origin) items-center gap-1 rounded-md bg-foreground px-1.5 py-0.5 text-xs text-background shadow-sm has-data-[slot=kbd]:pr-1 data-[side=bottom]:slide-in-from-top-1 data-[side=inline-end]:slide-in-from-left-1 data-[side=inline-start]:slide-in-from-right-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-50 **:data-[slot=kbd]:rounded-sm data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 duration-[var(--duration-fast)]",
             className
           )}
           {...props}

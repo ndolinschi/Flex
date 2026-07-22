@@ -481,23 +481,31 @@ tabs are hidden to the right). Dual-edge composited as two separate gradients.
 
 ## Overlay z-index
 
+Tokens in `tokens.css` (`--z-tooltip` / `--z-overlay` / `--z-toast` /
+`--z-modal`). Use the token ladder — do not invent one-off `z-[n]` for
+portaled chrome.
+
 | Surface | Positioning | z |
 |---|---|---|
-| CommandPalette / SearchModal | `fixed inset-0`; panel `mt-[10vh] w-[560px]` | `z-[300]` |
+| CommandPalette / SearchModal | `fixed inset-0`; panel `mt-[10vh] w-[560px]` | `--z-overlay` (300) |
 | Sidebar overlay + backdrop | `absolute` on app body | `z-30` / `z-20` |
 | Composer stack / HITL | In-flow above bubble; ChatShell slot `z-50` | — |
 | SubagentViewer | Bottom sheet over timeline `main` | `z-10`–`z-20` |
 | Scroll-to-bottom | Absolute in timeline | `z-20` |
-| Tooltips / context menus | Portaled | ≥ `z-[1100]` tooltips |
+| Tooltips / hover tips | Portaled | `--z-tooltip` (250) |
+| Menus / popovers / select / context | Portaled | `--z-overlay` (300) |
+| Toasts (Sonner) | Portaled | `--z-toast` (400) |
+| Dialog / AlertDialog / Sheet | Portaled | `--z-modal` (500) |
 
 Native Browser webview stacks above DOM — use
 `data-suppress-native-webview` / `aria-modal` intersection (see
 `nativeWebviewGate.ts`) when a modal must cover it.
 Shared portaled popups (`Dialog`, `AlertDialog`, `DropdownMenu`, `Popover`,
-`Select`, `Combobox`, and `Tooltip`) put the suppress marker on the actual
-popup node, and `ToastHost` puts it on the Sonner root; never mark a full-screen
-backdrop because its bounds would hide the Browser when the visible panel does
-not intersect it.
+`Select`, `Combobox`) put the suppress marker on the actual popup node.
+Tooltips and `ToastHost` deliberately omit it — a corner toast or brief tip
+must never blank the open Browser page. Never mark a full-screen backdrop
+because its bounds would hide the Browser when the visible panel does not
+intersect it.
 
 ---
 

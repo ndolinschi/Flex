@@ -258,6 +258,18 @@ button[data-slot="button"] {
   outline-offset: 2px;
 }
 
+/* Shared primitives and tabs paint their own neutral ring; suppress the global
+ * fallback so keyboard focus is one crisp stroke rather than ring + outline. */
+:where(
+  [data-slot="button"],
+  [data-slot="toggle"],
+  [data-slot="select-trigger"],
+  [data-slot="input-group-button"],
+  [role="tab"]
+):focus-visible {
+  outline: none;
+}
+
 /* Composer textarea owns its own chrome — suppress the global ring. */
 [data-composer]:focus-visible,
 textarea[data-composer]:focus-visible {
@@ -361,12 +373,12 @@ mark[data-plan-comment-id].plan-comment-mark-active {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-fill-2);
+  background: var(--color-fill-4);
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-fill-1);
+  background: var(--color-fill-2);
 }
 
 /* Running indicator */

@@ -83,6 +83,7 @@ export const ComposerInput = ({
     slashMatches,
     slashHighlight,
     setSlashHighlight,
+    setSlashDismissed,
     atOpen,
     fileHits,
     atHighlight,
@@ -180,7 +181,7 @@ export const ComposerInput = ({
       }
       if (e.key === "Escape") {
         e.preventDefault()
-        setComposerDraft("")
+        setSlashDismissed(true)
         return
       }
     }

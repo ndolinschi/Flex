@@ -323,7 +323,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             description={branch ? `on ${branch}` : undefined}
           />
         ) : (
-          <ul className="flex flex-col gap-0.5 px-2 py-1.5">
+          <ul className="flex flex-col gap-0.5 py-1.5">
             {files.map((file) => (
               <FileRow
                 key={file.path}

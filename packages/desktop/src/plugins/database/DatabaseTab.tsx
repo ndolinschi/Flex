@@ -680,7 +680,7 @@ const ConnectionRow = ({
       }}
       className={cn(
         "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "absolute right-1 top-1 h-5 w-5 opacity-0 group-hover:opacity-100",
+        "absolute right-1 top-1 h-5 w-5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
       )}
     >
       <Trash2 className="h-3 w-3" />
