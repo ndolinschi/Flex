@@ -121,6 +121,30 @@ const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
   },
   {
     section: "behavior",
+    rowId: "behavior-cost-mode",
+    title: "Cost mode",
+    description: "Which tier SetRouting may escalate to in Auto mode: low, medium, high, or auto",
+  },
+  {
+    section: "behavior",
+    rowId: "behavior-cost-models-low",
+    title: "Low-cost models",
+    description: "Models at the low cost tier (fast, cheap). Auto starts here.",
+  },
+  {
+    section: "behavior",
+    rowId: "behavior-cost-models-medium",
+    title: "Medium-cost models",
+    description: "Models at the medium cost tier (balanced).",
+  },
+  {
+    section: "behavior",
+    rowId: "behavior-cost-models-high",
+    title: "High-cost models",
+    description: "Models at the high cost tier (powerful, expensive).",
+  },
+  {
+    section: "behavior",
     rowId: "behavior-auto-compact",
     title: "Auto compact",
     description: "Proactively compact context when usage nears the threshold",

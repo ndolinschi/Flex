@@ -182,6 +182,10 @@ const useSavePlugins = () => {
         compactionMode: plugins.compactionMode ?? "standard",
         modeSwitchVetoMs: plugins.modeSwitchVetoMs ?? 2000,
         delegationRules: plugins.delegationRules ?? "",
+        costMode: plugins.costMode ?? "auto",
+        costModelsLow: plugins.costModelsLow ?? [],
+        costModelsMedium: plugins.costModelsMedium ?? [],
+        costModelsHigh: plugins.costModelsHigh ?? [],
         ...patch,
       },
     })
@@ -337,6 +341,90 @@ const BehaviorContent = () => {
             disabled={isLoading || !plugins}
             className="w-28"
             aria-label="Mode switch veto window in milliseconds"
+          />
+        </SettingRow>
+        <SettingRow
+          rowId="behavior-cost-mode"
+          title="Cost mode"
+          description="Auto always starts low-cost with low reasoning, then may escalate via SetRouting. Fixed modes restrict which models and effort levels the SetRouting tool may pick."
+        >
+          <select
+            value={plugins?.costMode ?? "auto"}
+            onChange={(e) => void savePlugins({ costMode: e.target.value })}
+            disabled={isLoading || !plugins}
+            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Cost mode"
+          >
+            <option value="auto">Auto (escalate freely)</option>
+            <option value="low">Low only</option>
+            <option value="medium">Low + Medium</option>
+            <option value="high">High only</option>
+          </select>
+        </SettingRow>
+        <SettingRow
+          rowId="behavior-cost-models-low"
+          title="Low-cost models"
+          description="Comma-separated provider/model ids for the low cost tier (fast, cheap). Auto starts here."
+          stacked
+        >
+          <Input
+            value={(plugins?.costModelsLow ?? []).join(", ")}
+            onChange={(e) =>
+              void savePlugins({
+                costModelsLow: e.target.value
+                  .split(",")
+                  .map((m) => m.trim())
+                  .filter(Boolean),
+              })
+            }
+            placeholder="anthropic/claude-haiku-4-5, openai/gpt-4.1-mini"
+            disabled={isLoading || !plugins}
+            className="font-mono text-xs w-full"
+            aria-label="Low cost tier models"
+          />
+        </SettingRow>
+        <SettingRow
+          rowId="behavior-cost-models-medium"
+          title="Medium-cost models"
+          description="Comma-separated provider/model ids for the medium cost tier (balanced)."
+          stacked
+        >
+          <Input
+            value={(plugins?.costModelsMedium ?? []).join(", ")}
+            onChange={(e) =>
+              void savePlugins({
+                costModelsMedium: e.target.value
+                  .split(",")
+                  .map((m) => m.trim())
+                  .filter(Boolean),
+              })
+            }
+            placeholder="anthropic/claude-sonnet-4-5, openai/gpt-4.1"
+            disabled={isLoading || !plugins}
+            className="font-mono text-xs w-full"
+            aria-label="Medium cost tier models"
+          />
+        </SettingRow>
+        <SettingRow
+          rowId="behavior-cost-models-high"
+          title="High-cost models"
+          description="Comma-separated provider/model ids for the high cost tier (powerful, expensive)."
+          stacked
+        >
+          <Input
+            value={(plugins?.costModelsHigh ?? []).join(", ")}
+            onChange={(e) =>
+              void savePlugins({
+                costModelsHigh: e.target.value
+                  .split(",")
+                  .map((m) => m.trim())
+                  .filter(Boolean),
+              })
+            }
+            placeholder="anthropic/claude-opus-4-5, openai/o3"
+            disabled={isLoading || !plugins}
+            className="font-mono text-xs w-full"
+            aria-label="High cost tier models"
           />
         </SettingRow>
       </SettingsCard>

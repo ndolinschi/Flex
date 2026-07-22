@@ -33,6 +33,10 @@ type PluginKey = Exclude<
   | "compactionMode"
   | "modeSwitchVetoMs"
   | "delegationRules"
+  | "costMode"
+  | "costModelsLow"
+  | "costModelsMedium"
+  | "costModelsHigh"
 >
 
 type PluginCardSpec = {
@@ -165,6 +169,10 @@ export const PluginCatalog = () => {
           compactionMode: plugins.compactionMode ?? "standard",
           modeSwitchVetoMs: plugins.modeSwitchVetoMs ?? 2000,
           delegationRules: plugins.delegationRules ?? "",
+          costMode: plugins.costMode ?? "auto",
+          costModelsLow: plugins.costModelsLow ?? [],
+          costModelsMedium: plugins.costModelsMedium ?? [],
+          costModelsHigh: plugins.costModelsHigh ?? [],
           ...patch,
         },
       })
