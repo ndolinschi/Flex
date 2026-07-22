@@ -171,7 +171,7 @@ export const ContentWorkspace = () => {
               className={cn(
                 "sash-line-transition z-10 w-1.5 shrink-0 cursor-col-resize bg-transparent",
                 "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-stroke-3",
-                "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_15%,transparent)]",
+                "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_12%,transparent)]",
                 !showSash && "invisible pointer-events-none",
               )}
               onPointerDown={() => setRightPanelDragging(true)}

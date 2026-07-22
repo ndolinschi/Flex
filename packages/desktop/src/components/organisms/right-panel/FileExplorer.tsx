@@ -285,7 +285,7 @@ export const FileExplorer = ({
               aria-label="New file"
               title="New file"
               onClick={() => openCreate()}
-              className="text-muted-foreground hover:bg-fill-4 hover:text-foreground"
+              className="text-ink-muted hover:bg-fill-4 hover:text-foreground"
             >
               <FilePlus aria-hidden />
             </InputGroupButton>
