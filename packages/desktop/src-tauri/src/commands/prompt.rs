@@ -329,6 +329,12 @@ pub(crate) fn build_prompt_input(input: &PromptCommandInput) -> PromptInput {
 /// rather than `0` (which would mean "use the 8k default").
 const PROJECT_MEMORY_PROMPT_BUDGET_CHARS: usize = 4_000;
 
+/// Character budget for project instructions loaded from the working
+/// directory each turn. Set well below the default (12k) so the combined
+/// per-turn system-prompt overhead stays bounded even in projects with many
+/// instruction files. Silent if empty — no UI spinner is shown.
+const PROJECT_INSTRUCTIONS_BUDGET_CHARS: usize = 12_000;
+
 /// System prompt appended for the Flex composer mode, instructing the model
 /// to act as an orchestrator over the `planner` / `plan-reviewer` /
 /// `flex-worker` roles registered in `compose.rs::flex_composer_roles`. The
@@ -559,12 +565,22 @@ pub(crate) async fn prompt_inner(
             budget_chars: PROJECT_MEMORY_PROMPT_BUDGET_CHARS,
         })
     });
+    let project_instructions = meta.as_ref().and_then(|meta| {
+        let loaded = agentloop_prompts::load_project_instructions(
+            &meta.cwd,
+            PROJECT_INSTRUCTIONS_BUDGET_CHARS,
+        );
+        agentloop_prompts::format_project_instructions_section(&loaded)
+    });
     let mut system_append = match (cwd_notice, project_memory) {
         (Some(a), Some(b)) => Some(format!("{a}\n\n{b}")),
         (Some(a), None) => Some(a),
         (None, Some(b)) => Some(b),
         (None, None) => None,
     };
+    if let Some(instr) = project_instructions {
+        system_append = append_system(system_append, &instr);
+    }
     if input.composer_mode.as_deref() == Some("flex") {
         system_append = append_system(system_append, FLEX_ORCHESTRATOR_PROMPT);
     }
