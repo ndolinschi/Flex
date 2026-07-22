@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import {
   ExternalLink,
   FileSpreadsheet,
@@ -70,7 +70,6 @@ const affinityLabel = (artifact: Artifact, activeSessionId: string | undefined):
 }
 
 export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
-  const queryClient = useQueryClient()
   const projectKey = session?.cwd?.trim() ?? ""
   const activeSessionId = session?.id
 

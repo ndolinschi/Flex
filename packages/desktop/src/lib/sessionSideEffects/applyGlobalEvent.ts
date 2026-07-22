@@ -359,7 +359,10 @@ export const applyGlobalSessionEvent = (
 
   // Auto-register artifacts when a Write/Edit completes for an artifact path.
   if (!opts?.ignoreStreaming && payload.kind === "tool_call_updated") {
-    maybeRegisterArtifact(event, store.activeSessionId)
+    maybeRegisterArtifact(event, {
+      activeSessionId: store.activeSessionId,
+      queryClient: opts?.queryClient,
+    })
   }
 
   // Background-completion notification + unread dot: only for live events

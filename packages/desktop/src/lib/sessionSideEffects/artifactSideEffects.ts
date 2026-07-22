@@ -1,7 +1,8 @@
 /** Side-effects that auto-register AI-created artifacts when Write/Edit
  *  tool calls complete for artifact-extension file paths. */
 
-import type { SessionEvent } from "../types"
+import type { QueryClient } from "@tanstack/react-query"
+import type { SessionEvent, SessionMeta } from "../types"
 import { useAppStore } from "../../stores/appStore"
 import { inferArtifactKind } from "../artifacts/types"
 import { pathFromInput } from "../toolPresentation"
@@ -11,9 +12,17 @@ import { artifactsRegister } from "../tauri"
 /** Tool names that write files and may produce artifacts. */
 const WRITE_TOOLS = new Set(["write", "edit", "multiedit"])
 
-/** Per-session set of turn ids for which we already opened the Artifacts tab —
+/** Per-session turn marker for which we already opened the Artifacts tab —
  *  prevents spamming the tab open on every Write in a single turn. */
 const artifactTabOpenedForTurn = new Map<string, string>()
+
+const sessionMetaFromCache = (
+  queryClient: QueryClient | undefined,
+  sessionId: string,
+): SessionMeta | undefined => {
+  const sessions = queryClient?.getQueryData<SessionMeta[]>(["sessions"])
+  return sessions?.find((s) => s.id === sessionId)
+}
 
 /** Call inside `applyGlobalSessionEvent` for live events only (not JSONL replay).
  *
@@ -22,7 +31,10 @@ const artifactTabOpenedForTurn = new Map<string, string>()
  * (once per turn per session). */
 export const maybeRegisterArtifact = (
   event: SessionEvent,
-  activeSessionId: string | undefined,
+  opts?: {
+    activeSessionId?: string | null
+    queryClient?: QueryClient
+  },
 ): void => {
   const { payload } = event
 
@@ -38,10 +50,8 @@ export const maybeRegisterArtifact = (
   const rawPath = pathFromInput(call.input)
   if (!rawPath) return
 
-  // Find the session's cwd to derive a relative path.
   const store = useAppStore.getState()
-  const sessions = store.sessions ?? []
-  const session = sessions.find((s) => s.id === event.session_id)
+  const session = sessionMetaFromCache(opts?.queryClient, event.session_id)
   const cwd = session?.cwd
 
   const relativePath = toSessionRelativePath(rawPath, cwd)
@@ -56,14 +66,13 @@ export const maybeRegisterArtifact = (
 
   // Register asynchronously — fire-and-forget; errors are non-fatal.
   void artifactsRegister(projectKey, event.session_id, relativePath).then(() => {
-    // Open the Artifacts tab beside chat — once per turn per session.
     const sessionId = event.session_id
     const turnKey = `${sessionId}:${call.id}`
     if (artifactTabOpenedForTurn.get(sessionId) === turnKey) return
     artifactTabOpenedForTurn.set(sessionId, turnKey)
 
-    // Only auto-open for the active session.
-    if (sessionId !== (activeSessionId ?? store.activeSessionId)) return
+    const activeId = opts?.activeSessionId ?? store.activeSessionId
+    if (sessionId !== activeId) return
 
     store.openToolBesideChat(sessionId, "artifacts")
   })
