@@ -7,8 +7,8 @@ use futures::StreamExt;
 use tokio_util::sync::CancellationToken;
 
 use agentloop_contracts::{
-    AgentEvent, CompactionSummary, Message, Role, Transcript, TranscriptItem, TurnOptions,
-    markdown, reduce,
+    AgentEvent, CompactionMode, CompactionSummary, Message, Role, Transcript, TranscriptItem,
+    TurnOptions, markdown, reduce,
 };
 use agentloop_core::provider::ChatRequest;
 use agentloop_core::{AgentError, ProviderError};
@@ -22,6 +22,15 @@ const SUMMARIZE_SYSTEM: &str = "You are a conversation summarizer. Summarize the
     conversation history into a concise but complete markdown summary. Preserve: key decisions, \
     file paths, code changes, errors, and open tasks. Omit filler and redundant tool output. \
     Output only the summary — no preamble or closing remarks.";
+
+/// System prompt for `TurnPair` mode: produce a bulleted list of nicknamed
+/// user→assistant turn pairs so the model can skim the session arc quickly.
+const TURN_PAIR_SUMMARIZE_SYSTEM: &str = "You are a conversation summarizer. Condense the \
+    following conversation history into a numbered list of turn-pair summaries. Each entry \
+    covers one user message and the assistant's response. Format each entry as:\n\
+    N. **<short nickname>**: <one-sentence summary of what the user asked and what the assistant did>.\n\
+    Preserve file paths, tool results, and key decisions in the summaries. Omit filler. \
+    Output only the numbered list — no preamble or closing remarks.";
 
 /// Summarize the session's current context view and record a compaction boundary.
 pub(crate) async fn compact_session(
@@ -69,6 +78,11 @@ pub(crate) async fn compact_session(
         ));
     }
 
+    let compaction_mode = deps.limits.compaction_mode;
+    let system_prompt = match compaction_mode {
+        CompactionMode::TurnPair => TURN_PAIR_SUMMARIZE_SYSTEM,
+        _ => SUMMARIZE_SYSTEM,
+    };
     let mut request = ChatRequest::new(
         model.clone(),
         vec![Message {
@@ -79,7 +93,7 @@ pub(crate) async fn compact_session(
             cache_hint: false,
         }],
     );
-    request.system = Some(SUMMARIZE_SYSTEM.to_owned());
+    request.system = Some(system_prompt.to_owned());
 
     let tokens_before = estimate_tokens(&source);
 
@@ -129,7 +143,7 @@ pub(crate) async fn compact_session(
         strategy: strategy.to_owned(),
         tokens_before: Some(tokens_before),
         tokens_after: Some(tokens_after),
-        mode: None,
+        mode: Some(compaction_mode),
     };
 
     handle

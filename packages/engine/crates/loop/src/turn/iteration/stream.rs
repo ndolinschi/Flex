@@ -129,7 +129,14 @@ pub(super) async fn stream_model_response(
 
         let tokens_est = estimate_request_tokens(request.system.as_deref().unwrap_or(""), &request);
         let context_limit = resolve_context_limit(&provider);
-        if !auto_compacted && should_auto_compact(tokens_est, context_limit) {
+        if !auto_compacted
+            && deps.limits.auto_compact
+            && should_auto_compact(
+                tokens_est,
+                context_limit,
+                deps.limits.auto_compact_threshold_percent,
+            )
+        {
             tracing::info!(
                 target: "loop",
                 session_id = %handle.id,
