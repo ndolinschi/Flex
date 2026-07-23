@@ -58,7 +58,7 @@ import {
 } from "../../lib/tauri"
 import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import { isSessionNotFoundError } from "../../lib/sessions"
-import type { SessionMeta } from "../../lib/types"
+import { isDefaultSessionTitle, type SessionMeta } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { persistUiState, useAppStore } from "../../stores/appStore"
 import { log } from "../../lib/debug/log"
@@ -226,10 +226,24 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
 
   const handleSelect = useCallback(
     async (id: string) => {
+      // Empty New Agent drafts should open as a single-tab composition
+      // (Cursor empty agent) — prune sibling Changes/Files tabs + collapse split.
+      const sessions =
+        queryClient.getQueryData<SessionMeta[]>(SESSIONS_KEY) ?? []
+      const meta = sessions.find((s) => s.id === id)
+      const pristineDraft =
+        !!meta &&
+        isDefaultSessionTitle(meta.title) &&
+        !meta.base_cwd &&
+        !meta.workspace_id
+      const activateOpts = pristineDraft
+        ? ({ panel: "closed" } as const)
+        : undefined
+
       if (id === activeSessionId) {
         // Re-open the chat tab if the user closed every tab but stayed
         // "active" on this session (empty "+ " placeholder).
-        setActiveSessionId(id)
+        setActiveSessionId(id, activateOpts)
         setRoute("chat")
         if (narrow) setSidebarCollapsed(true)
         return
@@ -245,7 +259,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
       })
 
       // Paint the target chat immediately — resume is warm-up, not a gate.
-      setActiveSessionId(id)
+      setActiveSessionId(id, activateOpts)
       setRoute("chat")
       if (narrow) setSidebarCollapsed(true)
 
@@ -280,6 +294,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
       activeSessionId,
       healNotFoundSession,
       narrow,
+      queryClient,
       setActiveSessionId,
       setRoute,
       setSidebarCollapsed,

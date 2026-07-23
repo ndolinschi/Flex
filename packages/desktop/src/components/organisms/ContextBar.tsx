@@ -50,8 +50,13 @@ export const ContextBar = ({
   const { data: isRepo = true } = useIsGitRepo(cwd)
 
   if (compact) {
+    // Content-sized strip (not a full-width status bar) — matches Cursor's
+    // folder|Direct row glued above the empty-agent input.
     return (
-      <div className="flex items-center gap-0.5 px-0">
+      <div
+        className="inline-flex max-w-full items-center gap-0.5 rounded-md border border-stroke-3 bg-user-bubble/80 px-0.5 py-0.5 shadow-[var(--shadow-composer)]"
+        data-context-bar="compact"
+      >
         <ProjectPicker
           sessionId={sessionId ?? null}
           cwd={projectCwd || cwd}

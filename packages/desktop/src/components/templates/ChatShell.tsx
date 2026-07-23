@@ -70,20 +70,20 @@ export const ChatShell = ({
       <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {composerHero ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-8">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-10">
               <div className="mx-auto w-full max-w-[var(--content-rail)]">
-                <h2 className="truncate text-base font-medium tracking-[-0.02em] text-ink-secondary">
+                <h2 className="truncate text-[15px] font-medium tracking-[-0.02em] text-ink-secondary">
                   {heroTitle}
                 </h2>
-                <p className="mt-1.5 text-xs text-ink-muted">{heroHint}</p>
-                <div className="mt-4 flex flex-wrap gap-1.5">
+                <p className="mt-1 text-xs text-ink-muted">{heroHint}</p>
+                <div className="mt-3.5 flex flex-wrap gap-1.5">
                   {QUICKSTART_SUGGESTIONS.map((suggestion) => (
                     <Button
                       key={suggestion}
                       variant="ghost"
                       size="xs"
                       onClick={() => handleQuickstart(suggestion)}
-                      className="h-7 rounded-md border border-stroke-3 bg-fill-5 px-2.5 text-xs font-normal text-ink-muted hover:border-stroke-2 hover:bg-fill-4 hover:text-ink-secondary"
+                      className="h-7 rounded-md border border-stroke-3/80 bg-transparent px-2.5 text-xs font-normal text-ink-muted hover:border-stroke-2 hover:bg-fill-5 hover:text-ink-secondary"
                     >
                       {suggestion}
                     </Button>

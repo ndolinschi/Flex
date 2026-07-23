@@ -270,7 +270,14 @@ export const Composer = ({
         </div>
       ) : null}
 
-      <div className="mx-auto mb-1 w-full max-w-[var(--content-rail)]">
+      <div
+        className={cn(
+          "mx-auto w-full max-w-[var(--content-rail)]",
+          // Empty agent: sit the folder|Direct strip flush above the bubble
+          // (Cursor glue). Full ContextBar keeps a breathing `mb-1`.
+          isHero ? "mb-0.5" : "mb-1",
+        )}
+      >
         {interactive ? (
           <ContextBar
             cwd={active?.cwd}
