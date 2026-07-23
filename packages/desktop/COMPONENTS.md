@@ -15,7 +15,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `Checkbox` | Round selection control (filled accent circle + check) | `checked`, `indeterminate?`, `onChange`, `label` | ChangesTab select-all, FileRow |
 | `DiffStat` | Git +/- visualization | summary shape | SessionRowSubtitle, FilesChangedCard, Changes |
 | `HighlightedLabel` | Fuzzy-match accent spans in a label | `label`, `query` | SearchModal |
-| `ProviderIcon` | Brand mark from `public/providers/{id}.*` | `providerId`, `size?` | ProviderPicker, Welcome, Connections |
+| `ProviderIcon` | Brand mark from `public/providers/{id}.{png,svg,webp}` (PNG preferred when shipped; monochrome PNGs `dark:invert`) | `providerId`, `size?`, `chip?` | ProviderPicker, ProviderProfileList, ModelPicker, ModelSelect, Welcome |
 | `RunningDot` | Live status glyph | — | WorkGroup, timeline |
 | `Spinner` | Indeterminate loading (size map over ui/spinner) | `size`, `label?` | SessionSidebar, forms |
 | `Tab` | Pill tab / open-buffer chip; pointer DnD | `selected`, `size?`, `onSelect`, `onClick?`, `onClose?`, `groupColor?`, `activityDot?`, `sessionColor?`, `rangeSelected?`, … | ContentPane, FilesTab |
@@ -49,7 +49,7 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `ArchivedSectionHeader` | Collapsible Archived group header | `count`, `collapsed`, `onToggle` | SessionSidebar |
 | `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays + optional ghost-text inline completion (isolates keystrokes from ModelPicker/ContextBar); large auto-grow surface | `composerMode`, `isHero?`, `anchorRef`, `attachments`, `onSend` | Composer |
 | `ModelSelect` | Simple model `<select>` | `models`, `value`, `onChange` | ProviderSettingsForm |
-| `ModelPicker` | Searchable model dropdown (shadcn DropdownMenu + effort submenu) | `models`, `value`, `onChange`, `effortFor`, `onEffortChange` | Composer |
+| `ModelPicker` | Searchable model dropdown (shadcn DropdownMenu + effort submenu); provider icon beside model name on trigger + rows | `models`, `value`, `onChange`, `effortFor`, `onEffortChange` | Composer |
 | `ModePicker` | Agent / Plan / Ask / Debug (/ Flex when flagged) mode dropdown | `value`, `onChange` | Composer |
 | `PlanBuildBar` | Cursor-style Build CTA after ExitPlanMode | `onBuild`, `onKeepPlanning?`, `variant` | Plan tab, ChatSessionBody |
 | `PlanCard` | Checklist from `plan_updated` (Plan tool tab; not inlined in timeline) | `entries` | PlanTab |
@@ -401,7 +401,7 @@ spacing changes, update [DESIGN.md](./DESIGN.md).
 - **Session-event demux:** `lib/sessionEventBus` attaches one Tauri `session-event` listener; `useGlobalSessionEvents` and each `useSessionEvents` subscribe to the bus (SubagentViewer no longer triples wire delivery).
 - **Browser / terminal selectors:** `useBrowserSession` selects per-session primitives; `TerminalTab` mounts xterm only for the active session's terminals (+ that session's agent terminal). `useIsGitRepo` shares the 5s `git-is-repo` poll across ContextBar / FilesChangedCard / ChangesTab.
 - **MarkdownBody:** module-scoped `components` map so settled `react-markdown` trees keep stable element constructors across parent re-renders.
-- **Spacing balance (careful):** see [DESIGN.md](./DESIGN.md) for the full gutter/height canon. Short form: chat chrome `px-3`; content pane `TabStrip` + tab chrome `px-2.5` / `--header-height` with `Tab` at `h-6`; Terminal/Database side lists `px-2.5 py-1.5 text-xs`; Settings `px-3.5` rows / `gap-3` cards; Welcome `h-9` inputs; session sidebar list `px-2`.
+- **Spacing balance (careful):** see [DESIGN.md](./DESIGN.md) for the full gutter/height canon. Short form: chat chrome `px-3`; content pane `TabStrip` + tab chrome `px-2.5` / `--header-height` with `Tab` at `h-6`; Terminal/Database side lists `px-2.5 py-1.5 text-xs`; Settings `px-3.5` rows / `gap-3` cards; Welcome `h-9` inputs; session sidebar list `px-2.5`.
 
 ## Perf notes (Wave 5 — cache / prefetch / background)
 

@@ -113,6 +113,17 @@ export const isDefaultSessionTitle = (title?: string | null): boolean => {
   return !t || t === DEFAULT_SESSION_TITLE
 }
 
+/**
+ * Unused draft: placeholder title and no isolated worktree.
+ * DiffStat must not show for these — `git_status_since_baseline` falls back to
+ * full-repo dirty status when no per-session baseline exists yet, which would
+ * incorrectly paint project-wide `+N −M` on an empty "New Agent" row.
+ */
+export const isPristineSession = (
+  meta: Pick<SessionMeta, "title" | "base_cwd" | "workspace_id">,
+): boolean =>
+  isDefaultSessionTitle(meta.title) && !meta.base_cwd && !meta.workspace_id
+
 /** Title derived from the first user prompt . */
 export const titleFromPrompt = (text: string, maxLen = 48): string => {
   const cleaned = text.replace(/\s+/g, " ").trim()

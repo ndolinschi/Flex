@@ -102,17 +102,6 @@ export const useBootstrap = (
           }
         }
 
-        if (ui.activeSessionId) {
-          try {
-            await resumeSession(ui.activeSessionId)
-            useAppStore
-              .getState()
-              .setActiveSessionId(ui.activeSessionId, { panel: "closed" })
-          } catch {
-            useAppStore.getState().setActiveSessionId(null)
-          }
-        }
-
         if (ui.selectedModelId) {
           useAppStore.getState().setSelectedModelId(ui.selectedModelId)
         }
@@ -191,9 +180,8 @@ export const useBootstrap = (
           useAppStore.getState().setSidebarCollapsed(true)
         }
 
-        // Right panel stays closed on app start (`setActiveSessionId(…,
-        // { panel: "closed" })` above). Still hydrate width/tabs so ⌘J and
-        // later session switches restore the strip the user left behind.
+        // Right panel stays closed on app start. Still hydrate width/tabs so
+        // ⌘J and later session switches restore the strip the user left behind.
         if (ui.planAnnotationsBySession) {
           useAppStore
             .getState()
@@ -208,14 +196,31 @@ export const useBootstrap = (
           useAppStore.getState().setSidebarWidth(width)
         }
 
+        // Show the chat shell before resume_session so the Loading spinner
+        // does not wait on engine resume (and any incidental index work).
         setRoute("chat")
+        useAppStore.getState().setBootstrapped(true)
+
+        const activeId = ui.activeSessionId
+        if (activeId) {
+          try {
+            await resumeSession(activeId)
+            useAppStore
+              .getState()
+              .setActiveSessionId(activeId, { panel: "closed" })
+          } catch {
+            useAppStore.getState().setActiveSessionId(null)
+          }
+        }
       } catch (err) {
         log.error("boot", "bootstrap: failed, routing to welcome", err)
         setRoute("welcome")
+        useAppStore.getState().setBootstrapped(true)
       } finally {
         log.info("boot", "bootstrap: finished", {
           durationMs: Math.round(performance.now() - bootStartedAt),
         })
+        // Idempotent if already set after chat hydration above.
         useAppStore.getState().setBootstrapped(true)
       }
     }

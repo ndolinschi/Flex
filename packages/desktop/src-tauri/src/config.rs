@@ -107,7 +107,6 @@ pub struct PluginPrefs {
     pub artifacts: bool,
 
     // --- Agent coordination / auto mode ---
-
     /// Peer agent messaging: `GetActiveAgents`, `SendMessage`, `GetMessages`,
     /// and `SwitchMode` tools. Default off.
     #[serde(default)]
@@ -149,7 +148,6 @@ pub struct PluginPrefs {
     pub delegation_rules: String,
 
     // --- Cost-tier routing ---
-
     /// Which cost tier `SetRouting` may escalate to in Auto mode.
     /// `"low"` | `"medium"` | `"high"` | `"auto"` (default: `"auto"`).
     #[serde(default = "default_cost_mode")]

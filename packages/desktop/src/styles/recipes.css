@@ -76,7 +76,7 @@
   align-items: center;
   gap: 0.5rem; /* gap-2 */
   border-radius: var(--radius-sm); /* 6 — matches nav rounded-sm */
-  padding-inline: 0.5rem; /* px-2 — same gutter as SidebarActionRow */
+  padding-inline: 0.625rem; /* px-2.5 — same gutter as SidebarActionRow */
   font-size: var(--text-base);
   transition-property: color, background-color;
   transition-duration: var(--duration-fast);
@@ -107,7 +107,7 @@
   justify-content: flex-start;
   gap: 0.5rem;
   border-radius: var(--radius-sm);
-  padding-inline: 0.5rem;
+  padding-inline: 0.625rem; /* px-2.5 — same gutter as agent-row */
   font-size: var(--text-base);
   font-weight: 500;
   color: var(--color-text-1);
@@ -126,7 +126,7 @@
   height: 1.5rem; /* h-6 */
   align-items: center;
   gap: 0.125rem;
-  padding-inline: 0.375rem; /* px-1.5 */
+  padding-inline: 0.625rem; /* px-2.5 — align with agent-row gutter */
   font-size: var(--text-sm);
   color: var(--color-text-3);
   white-space: nowrap;

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react"
 import { ChevronDown } from "lucide-react"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
+import { providerIdForModel } from "../../lib/providerIcons"
+import { ProviderIcon } from "../atoms/ProviderIcon"
 import { Button } from "@/components/ui/button"
 import {
   Command,
@@ -57,6 +59,7 @@ export const ModelSelect = ({
   const [query, setQuery] = useState("")
 
   const selected = models.find((m) => m.id === value)
+  const selectedProviderId = providerIdForModel(selected, value)
   const triggerLabel = selected?.displayName ?? selected?.id ?? placeholder
 
   const { groups, truncated, totalMatched } = useGroupedModels(
@@ -86,6 +89,14 @@ export const ModelSelect = ({
             />
           }
         >
+          {selectedProviderId ? (
+            <ProviderIcon
+              providerId={selectedProviderId}
+              size={14}
+              chip={false}
+              className="size-3.5 opacity-90"
+            />
+          ) : null}
           <span
             className={cn(
               "min-w-0 flex-1 truncate text-left",
@@ -129,6 +140,11 @@ export const ModelSelect = ({
                             setOpen(false)
                           }}
                         >
+                          <ProviderIcon
+                            providerId={m.providerId}
+                            size={14}
+                            chip={false}
+                          />
                           <span className="min-w-0 truncate">
                             {m.displayName ?? m.id}
                           </span>

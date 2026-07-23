@@ -32,8 +32,8 @@ export const RepoSectionHeader = ({
         if (e.key === "Enter") onToggle()
       }}
       className={cn(
-        // Production date/section labels: px-1 py-2 text-sm text-tertiary.
-        "group flex w-full cursor-default items-center gap-0.5 rounded-sm px-1 py-2",
+        // Section labels: px-1.5 py-2 text-sm text-tertiary (row gutter px-2.5 via wrapper).
+        "group flex w-full cursor-default items-center gap-0.5 rounded-sm px-1.5 py-2",
         "text-sm tracking-[var(--tracking-caption)] text-ink-muted",
         "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)] hover:text-ink",
       )}

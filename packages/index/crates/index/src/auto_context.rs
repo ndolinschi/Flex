@@ -193,7 +193,16 @@ pub struct IndexStatus {
     pub ready: bool,
 }
 
-/// Open (without rebuilding) and report status for `cwd`'s index.
+/// Report status for `cwd`'s index from on-disk metadata only.
+///
+/// Does **not** open tantivy / mmap segment files — those are reserved for
+/// SearchCode / FindSymbol / RepoMap / rebuild. Desktop polls this on sidebar
+/// mount for "indexed" badges; opening the full store here was the boot-time
+/// mmap flood (`tantivy::directory::mmap_directory` DEBUG `Open Read`).
+///
+/// `embedded_chunk_count` stays `0` here: [`IndexStore::open`] (no embedder)
+/// never loaded vectors for status either, and Settings UI only shows file /
+/// symbol counts.
 pub fn status_for(cwd: &std::path::Path) -> Result<IndexStatus, IndexStoreError> {
     let index_dir = index_dir_for(cwd, &index_root_base());
     let repo_root = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
@@ -207,14 +216,13 @@ pub fn status_for(cwd: &std::path::Path) -> Result<IndexStatus, IndexStoreError>
             ready: false,
         });
     }
-    let store = IndexStore::open(&repo_root, &index_dir)?;
-    let file_count = store.indexed_file_count();
+    let (file_count, symbol_count) = IndexStore::status_counts(&index_dir)?;
     Ok(IndexStatus {
         repo_root,
-        index_dir: store.index_dir().to_path_buf(),
+        index_dir,
         file_count,
-        symbol_count: store.symbols().len(),
-        embedded_chunk_count: store.embedded_chunk_count(),
+        symbol_count,
+        embedded_chunk_count: 0,
         ready: file_count > 0,
     })
 }

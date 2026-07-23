@@ -689,11 +689,7 @@ pub(crate) async fn prompt_inner(
                 join_models(&cfg.prefs.plugins.cost_models_high),
                 cfg.prefs.plugins.cost_mode,
             );
-            (
-                delegation,
-                cfg.prefs.plugins.messaging,
-                lists,
-            )
+            (delegation, cfg.prefs.plugins.messaging, lists)
         };
         system_append = append_system(system_append, &delegation_fragment);
         system_append = append_system(system_append, AUTO_MODE_ROUTING_PROMPT);

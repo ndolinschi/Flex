@@ -34,4 +34,22 @@ describe("chrome primitives", () => {
     expect(html).toContain('aria-label="Close"')
     expect(html).toContain('tabindex="0"')
   })
+
+  it("keeps tab close as a sibling button, not nested under role=tab", () => {
+    const html = renderToStaticMarkup(
+      <Tab
+        selected
+        onSelect={() => undefined}
+        onClose={() => undefined}
+        closeLabel="Close Chat"
+      >
+        Chat
+      </Tab>,
+    )
+    expect(html).toContain('role="tab"')
+    expect(html).toContain('aria-label="Close Chat"')
+    // Select control closes before the close button opens (sibling, not nested).
+    expect(html).toMatch(/role="tab"[^>]*>[\s\S]*?<\/button>\s*<button[^>]*aria-label="Close Chat"/)
+    expect(html.match(/<button/g)?.length).toBe(2)
+  })
 })

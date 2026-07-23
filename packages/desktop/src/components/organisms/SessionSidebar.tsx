@@ -57,7 +57,7 @@ import {
 import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import { isSessionNotFoundError } from "../../lib/sessions"
 import { nestSessionsByParent } from "../../lib/sessionGrouping"
-import { isDefaultSessionTitle, type SessionMeta } from "../../lib/types"
+import { isPristineSession, type SessionMeta } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { persistUiState, useAppStore } from "../../stores/appStore"
 import { log } from "../../lib/debug/log"
@@ -236,11 +236,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
       const sessions =
         queryClient.getQueryData<SessionMeta[]>(SESSIONS_KEY) ?? []
       const meta = sessions.find((s) => s.id === id)
-      const pristineDraft =
-        !!meta &&
-        isDefaultSessionTitle(meta.title) &&
-        !meta.base_cwd &&
-        !meta.workspace_id
+      const pristineDraft = !!meta && isPristineSession(meta)
       const activateOpts = pristineDraft
         ? ({ panel: "closed" } as const)
         : undefined
@@ -376,7 +372,9 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   const sessionCwdsForPoll = useMemo(
     () =>
       allSessions
-        .filter((s) => statusPollIds.has(s.id))
+        // Skip pristine drafts — no baseline yet, so git_status_since_baseline
+        // would return full-repo dirty and paint a lying DiffStat on "New Agent".
+        .filter((s) => statusPollIds.has(s.id) && !isPristineSession(s))
         .map((s) => ({ id: s.id, cwd: s.cwd })),
     [allSessions, statusPollIds],
   )
@@ -638,7 +636,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
                 </SidebarMenu>
               </nav>
 
-              <div className="flex items-center gap-0.5 px-2 pb-0.5">
+              <div className="flex items-center gap-0.5 px-2.5 pb-0.5">
                 <span className="min-w-0 flex-1 truncate text-xs tracking-[var(--tracking-caption)] text-ink-muted">
                   Repositories
                 </span>
@@ -665,12 +663,12 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
           </SidebarHeader>
 
           {error ? (
-            <div className="px-2 pb-2">
+            <div className="px-2.5 pb-2">
               <ErrorBanner message={error} />
             </div>
           ) : null}
 
-          {/* Gutters live on rows (DESIGN: no px-2 on SidebarContent — avoids double indent). */}
+          {/* Gutters live on rows (DESIGN: no px-2.5 on SidebarContent — avoids double indent). */}
           <SidebarContent className="pb-2">
             {isLoading ? (
               <SidebarSkeleton />
@@ -686,7 +684,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
               <div className="flex flex-col gap-px">
                 {pinnedSessions.length > 0 ? (
                   <SidebarGroup className="gap-0 p-0">
-                    <SidebarGroupLabel className="flex h-6 items-center px-2 pl-8 text-sm font-normal text-ink-muted">
+                    <SidebarGroupLabel className="flex h-6 items-center px-2.5 pl-8 text-sm font-normal text-ink-muted">
                       Pinned
                     </SidebarGroupLabel>
                     <SidebarMenu className="gap-px">
@@ -699,7 +697,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
 
                 {repoGroups.map((group) => (
                   <SidebarGroup key={group.cwd} className="gap-0 p-0">
-                    <div className="px-1">
+                    <div className="px-1.5">
                       <RepoSectionHeader
                         label={group.label}
                         collapsed={!!collapsedRepos[group.cwd]}

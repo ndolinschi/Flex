@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react"
-import { Box, Check, ChevronDown, Gauge, Shuffle } from "lucide-react"
+import { Check, ChevronDown, Gauge, Shuffle } from "lucide-react"
 import { EFFORT_LEVELS, effortLabel } from "../../lib/types"
 import type { BuiltinProvider, ModelInfoDto } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { useProviderConfig } from "../../hooks/useProviderConfig"
+import { providerIdForModel } from "../../lib/providerIcons"
+import { ProviderIcon } from "../atoms/ProviderIcon"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -58,6 +60,7 @@ export const ModelPicker = ({
   const autoModeEnabled = config?.plugins?.autoMode ?? false
 
   const selected = models.find((m) => m.id === value)
+  const selectedProviderId = providerIdForModel(selected, value)
   const selectedEffort = value && effortFor ? effortFor(value) : null
   const isAutoSelected = value === "auto"
   const label = isAutoSelected
@@ -111,8 +114,15 @@ export const ModelPicker = ({
       >
         {isAutoSelected ? (
           <Shuffle className="size-3.5 shrink-0 text-ink-muted" aria-hidden />
+        ) : selectedProviderId ? (
+          <ProviderIcon
+            providerId={selectedProviderId}
+            size={14}
+            chip={false}
+            className="size-3.5 opacity-90"
+          />
         ) : (
-          <Box className="size-3.5 shrink-0 text-ink-muted" aria-hidden />
+          <span className="size-3.5 shrink-0" aria-hidden />
         )}
         <span className="min-w-0 truncate">{label}</span>
         {selectedEffort ? (
@@ -171,7 +181,15 @@ export const ModelPicker = ({
             ) : (
               groups.map((group) => (
                 <DropdownMenuGroup key={group.providerId}>
-                  <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                  <DropdownMenuLabel className="flex items-center gap-1.5">
+                    <ProviderIcon
+                      providerId={group.providerId}
+                      label={group.label}
+                      size={14}
+                      chip={false}
+                    />
+                    {group.label}
+                  </DropdownMenuLabel>
                   {group.items.map((m) => {
                     const active = m.id === value
                     const modelEffort = effortFor ? effortFor(m.id) : null
@@ -185,6 +203,14 @@ export const ModelPicker = ({
                           className="min-w-0 flex-1 gap-1.5"
                           onClick={() => applyModel(m.id)}
                         >
+                          <ProviderIcon
+                            providerId={
+                              providerIdForModel(m) ?? group.providerId
+                            }
+                            size={14}
+                            chip={false}
+                            className="size-3.5"
+                          />
                           <span className="min-w-0 truncate">{name}</span>
                           {modelEffort ? (
                             <span className="ml-auto max-w-[4.5rem] shrink-0 truncate text-xs text-ink-muted">

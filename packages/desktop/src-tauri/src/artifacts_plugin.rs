@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{DesktopError, DesktopResult};
 use crate::db_plugin::normalize_project_key;
+use crate::error::{DesktopError, DesktopResult};
 
 // ── Wire types ───────────────────────────────────────────────────────────────
 
@@ -69,9 +69,7 @@ pub fn infer_artifact_kind(path: &str) -> Option<ArtifactKind> {
         "svg" | "mmd" | "dot" => Some(ArtifactKind::Diagram),
         "pdf" | "docx" => Some(ArtifactKind::Document),
         // Generic text/markdown/html in artifact dirs → document.
-        "md" | "txt" | "html" | "htm" | "json" | "yaml" | "yml" | "xml"
-            if in_artifact_dir =>
-        {
+        "md" | "txt" | "html" | "htm" | "json" | "yaml" | "yml" | "xml" if in_artifact_dir => {
             Some(ArtifactKind::Document)
         }
         _ => None,
@@ -160,7 +158,10 @@ fn safe_relative_path(project_key: &str, relative_path: &str) -> Option<PathBuf>
         return None;
     }
     if rel.components().any(|c| {
-        matches!(c, std::path::Component::ParentDir | std::path::Component::Prefix(_))
+        matches!(
+            c,
+            std::path::Component::ParentDir | std::path::Component::Prefix(_)
+        )
     }) {
         return None;
     }
@@ -306,8 +307,7 @@ pub async fn artifacts_preview_csv(
             truncated = true;
             break;
         }
-        let record =
-            result.map_err(|e| DesktopError::Message(format!("csv record: {e}")))?;
+        let record = result.map_err(|e| DesktopError::Message(format!("csv record: {e}")))?;
         rows.push(record.iter().map(str::to_string).collect());
     }
 
@@ -348,13 +348,17 @@ fn mime_for_kind(kind: &ArtifactKind, path: &str) -> Option<String> {
     match kind {
         ArtifactKind::Csv => Some("text/csv".into()),
         ArtifactKind::Spreadsheet => match ext.as_str() {
-            "xlsx" => Some("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".into()),
+            "xlsx" => {
+                Some("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".into())
+            }
             "xls" => Some("application/vnd.ms-excel".into()),
             "ods" => Some("application/vnd.oasis.opendocument.spreadsheet".into()),
             _ => None,
         },
         ArtifactKind::Presentation => match ext.as_str() {
-            "pptx" => Some("application/vnd.openxmlformats-officedocument.presentationml.presentation".into()),
+            "pptx" => Some(
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation".into(),
+            ),
             "ppt" => Some("application/vnd.ms-powerpoint".into()),
             _ => None,
         },
@@ -372,7 +376,9 @@ fn mime_for_kind(kind: &ArtifactKind, path: &str) -> Option<String> {
         },
         ArtifactKind::Document => match ext.as_str() {
             "pdf" => Some("application/pdf".into()),
-            "docx" => Some("application/vnd.openxmlformats-officedocument.wordprocessingml.document".into()),
+            "docx" => Some(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document".into(),
+            ),
             "html" | "htm" => Some("text/html".into()),
             "md" => Some("text/markdown".into()),
             _ => None,
@@ -395,14 +401,26 @@ mod tests {
 
     #[test]
     fn spreadsheet_detected() {
-        assert_eq!(infer_artifact_kind("report.xlsx"), Some(ArtifactKind::Spreadsheet));
-        assert_eq!(infer_artifact_kind("REPORT.XLS"), Some(ArtifactKind::Spreadsheet));
+        assert_eq!(
+            infer_artifact_kind("report.xlsx"),
+            Some(ArtifactKind::Spreadsheet)
+        );
+        assert_eq!(
+            infer_artifact_kind("REPORT.XLS"),
+            Some(ArtifactKind::Spreadsheet)
+        );
     }
 
     #[test]
     fn presentation_detected() {
-        assert_eq!(infer_artifact_kind("deck.pptx"), Some(ArtifactKind::Presentation));
-        assert_eq!(infer_artifact_kind("keynote.key"), Some(ArtifactKind::Presentation));
+        assert_eq!(
+            infer_artifact_kind("deck.pptx"),
+            Some(ArtifactKind::Presentation)
+        );
+        assert_eq!(
+            infer_artifact_kind("keynote.key"),
+            Some(ArtifactKind::Presentation)
+        );
     }
 
     #[test]
@@ -415,14 +433,23 @@ mod tests {
     #[test]
     fn diagram_detected() {
         assert_eq!(infer_artifact_kind("flow.mmd"), Some(ArtifactKind::Diagram));
-        assert_eq!(infer_artifact_kind("graph.dot"), Some(ArtifactKind::Diagram));
+        assert_eq!(
+            infer_artifact_kind("graph.dot"),
+            Some(ArtifactKind::Diagram)
+        );
         assert_eq!(infer_artifact_kind("logo.svg"), Some(ArtifactKind::Diagram));
     }
 
     #[test]
     fn document_detected() {
-        assert_eq!(infer_artifact_kind("spec.pdf"), Some(ArtifactKind::Document));
-        assert_eq!(infer_artifact_kind("notes.docx"), Some(ArtifactKind::Document));
+        assert_eq!(
+            infer_artifact_kind("spec.pdf"),
+            Some(ArtifactKind::Document)
+        );
+        assert_eq!(
+            infer_artifact_kind("notes.docx"),
+            Some(ArtifactKind::Document)
+        );
     }
 
     #[test]

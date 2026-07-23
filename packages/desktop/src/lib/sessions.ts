@@ -1,5 +1,5 @@
 import type { CreateSessionInput, IsolationPolicy, SessionMeta } from "./types"
-import { DEFAULT_SESSION_TITLE, isDefaultSessionTitle } from "./types"
+import { DEFAULT_SESSION_TITLE, isPristineSession } from "./types"
 
 /** True when an engine error means the session id no longer exists (engine's
  * `StoreError::SessionNotFound` → "session {id} not found", surfaced via
@@ -19,9 +19,7 @@ export const findDraftSession = (
 ): SessionMeta | undefined => {
   const key = cwd?.trim() || ""
   return sessions.find((s) => {
-    if (!isDefaultSessionTitle(s.title)) return false
-    // Already provisioned (create-time leftover or first-prompt worktree).
-    if (s.base_cwd || s.workspace_id) return false
+    if (!isPristineSession(s)) return false
     const sessionCwd = s.cwd?.trim() || ""
     return sessionCwd === key
   })

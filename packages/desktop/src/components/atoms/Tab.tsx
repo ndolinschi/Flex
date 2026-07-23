@@ -11,7 +11,7 @@ type TabProps = {
    * Both stay under `--header-height` (30px) so selected pills clear the strip
    * edges — h-7 in a 30px bar left ~1px and read as flush against the border. */
   size?: TabSize
-  /** "tab" = ARIA tab button; "chip" = editor-buffer shell with inner select button. */
+  /** "tab" = ARIA tablist pill (shell + role=tab select); "chip" = editor-buffer shell. */
   variant?: TabVariant
   icon?: ReactNode
   badge?: ReactNode
@@ -180,20 +180,23 @@ export const Tab = ({
       />
     ) : null
 
+  // Both variants use an outer shell + inner select button + sibling close so
+  // TabClose never nests a <button> inside the select control (DOM nesting).
+  const shellClassName = cn(
+    shell,
+    "focus-within:ring-1 focus-within:ring-stroke-2",
+  )
+  const selectClassName =
+    "min-w-0 flex-1 truncate py-0.5 text-left outline-none"
+
   if (variant === "chip") {
     return (
-      <div
-        className={cn(
-          shell,
-          "focus-within:ring-1 focus-within:ring-stroke-2",
-        )}
-        data-tab-id={tabId}
-      >
+      <div className={shellClassName} data-tab-id={tabId}>
         {dropMarker}
         {groupBar}
         <button
           type="button"
-          className="min-w-0 flex-1 truncate py-0.5 text-left outline-none"
+          className={selectClassName}
           title={title}
           onClick={onSelect}
         >
@@ -205,22 +208,26 @@ export const Tab = ({
   }
 
   return (
-    <button
-      type="button"
-      onClick={onClick ?? onSelect}
+    <div
+      className={shellClassName}
+      data-tab-id={tabId}
       onPointerDown={onPointerDown}
       onContextMenu={onContextMenu}
-      aria-selected={selected}
-      role="tab"
-      title={title}
-      data-tab-id={tabId}
-      tabIndex={tabIndex ?? 0}
-      className={shell}
     >
       {dropMarker}
       {groupBar}
-      {label}
+      <button
+        type="button"
+        onClick={onClick ?? onSelect}
+        aria-selected={selected}
+        role="tab"
+        title={title}
+        tabIndex={tabIndex ?? 0}
+        className={cn(selectClassName, "flex items-center")}
+      >
+        {label}
+      </button>
       {close}
-    </button>
+    </div>
   )
 }

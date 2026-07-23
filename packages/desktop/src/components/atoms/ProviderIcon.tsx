@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
+  isMonochromeProviderPng,
   providerIconCandidates,
   providerIconLetter,
 } from "../../lib/providerIcons"
@@ -41,7 +42,8 @@ const LetterMark = ({
   </span>
 )
 
-/** Brand mark for a provider id from `public/providers/{id}.{svg,png,webp}`.
+/** Brand mark for a provider id from `public/providers/{id}.{png,svg,webp}`.
+ * Monochrome PNGs are black-on-transparent and get `dark:invert`.
  * Falls back to a letter chip when no asset loads (custom providers, missing file). */
 export const ProviderIcon = ({
   providerId,
@@ -52,6 +54,9 @@ export const ProviderIcon = ({
 }: ProviderIconProps) => {
   const candidates = providerIconCandidates(providerId)
   const [index, setIndex] = useState(0)
+  useEffect(() => {
+    setIndex(0)
+  }, [providerId])
   const src = candidates[index]
   const title = label ?? providerId
   // Inner glyph is slightly inset when chipped so brand fills don't touch the edge.
@@ -76,7 +81,12 @@ export const ProviderIcon = ({
       width={glyph}
       height={glyph}
       draggable={false}
-      className={cn("shrink-0 object-contain", !chip && className)}
+      className={cn(
+        "shrink-0 object-contain",
+        // User PNGs are black glyphs on transparent; invert in dark UI.
+        isMonochromeProviderPng(src) && "dark:invert",
+        !chip && className,
+      )}
       style={{ width: glyph, height: glyph }}
       onError={() => {
         setIndex((i) => i + 1)

@@ -69,13 +69,18 @@ fn init_tracing(app: &tauri::App) {
         // `tauri_plugin_updater` logs ERROR on a missing latest.json channel
         // (expected until the first signed release). Silence that crate so
         // debug-mode consoles aren't flooded; JS still soft-fails the check.
+        //
+        // `tantivy=warn`: mmap Directory logs DEBUG `Open Read` once per
+        // segment file on every index open — a warm repo index has dozens of
+        // segments, which drowned the tauri-dev console. Real tantivy errors
+        // still surface at warn+.
         if debug_mode {
-            tracing_subscriber::EnvFilter::new("debug,tauri_plugin_updater=off")
+            tracing_subscriber::EnvFilter::new("debug,tauri_plugin_updater=off,tantivy=warn")
         } else {
             tracing_subscriber::EnvFilter::new(
                 "info,agentloop_loop=debug,agentloop_engine=debug,\
                  agentloop_providers=debug,agentloop_provider_bedrock=debug,\
-                 tauri_plugin_updater=off",
+                 tauri_plugin_updater=off,tantivy=warn",
             )
         }
     });

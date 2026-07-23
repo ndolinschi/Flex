@@ -177,6 +177,9 @@ impl IndexOpenMode {
 /// progress notes / `IndexingCompleted` so the chat UI can show "Indexing
 /// repository…" instead of a silent hang. Progress notes use `ToolProgress`
 /// when `call_id` is set.
+///
+/// Prefer [`crate::status_for`] / [`IndexStore::status_counts`] for readiness
+/// checks — those never open tantivy.
 fn open_and_build_at(
     cwd: &Path,
     index_dir: &Path,

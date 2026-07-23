@@ -42,7 +42,7 @@ bolted layers. Adapt these rules into Flex — do not clone Cursor brand chrome.
 | Closed project/branch are quiet pills, not form fields | `ComboboxTrigger` + search inside popup |
 | Nested boxes avoided | Never wrap pill rows in a second bordered card |
 | One loud accent job at a time | Mode pill is the tinted control; CTAs stay neutral/soft; semantic `blue`/`cyan` muted |
-| Even density | Sidebar cells share one recipe (`h-8` / `px-2` / r6); content rails keep gutters |
+| Even density | Sidebar cells share one recipe (`h-8` / `px-2.5` / r6); content rails keep gutters |
 
 **Anti-patterns that read messy:** form InputGroups in the context strip;
 ContextBar as a second full toolbar *above* an active composer; blue-cast
@@ -167,7 +167,7 @@ Production Cursor Agents Web (2026-07-23) maps to Flex desktop as:
 | Page | `.agents-page` flex h-dvh overflow-hidden | `.app-shell` + body flex row |
 | Top chrome | one 35px row (sidebar mark \| tabs) | Sidebar header + `ContentPane` `TabStrip` (`--titlebar-height`) |
 | Left rail | `bg-sidebar` `border-r border-tertiary` flex-none | `SessionSidebar` `bg-sidebar` `border-sidebar-border` |
-| Nav | `gap-px` · rows `h-8 rounded-md px-2 gap-2` | `SidebarActionRow` |
+| Nav | `gap-px` · rows `h-8 rounded-md px-2.5 gap-2` | `SidebarActionRow` |
 | Agent rows | `h-8 rounded-md` hover `fill-4` / selected `fill-2` (stay fill-2 on hover) | `SessionListItem` |
 | Main | chat column flex-1 min-h-0 | `ContentWorkspace` / `ChatShell` |
 | Thread header | `h-[40px] pl-3 pr-2` title + optional trailing | `ChatThreadHeader` (`--chat-header-height`); omit when TabStrip already names the session and ContextBar owns the project chip |
@@ -309,7 +309,7 @@ Use these gutters unless a surface documents an exception.
 |---|---|---|
 | **Chat chrome** (timeline, composer outer) | `px-2.5` (10px) | Timeline `py-3`; composer `pt-1 pb-1.5`; ContextBar air `mb-1` (hero) / `mt-1` (active) |
 | **Content pane chrome** (TabStrip, tool tab headers, banners, CommitCenter) | `px-2.5` (10px) | Rows = `--header-height` (30px) |
-| **Session sidebar** (header, nav, list) | header `px-2`; cells own `px-2`; list **no** horizontal pad | header `pb-3` (no top pad); section titles `h-6 px-1.5`; nav `gap-px` |
+| **Session sidebar** (header, nav, list) | header `px-2`; cells own `px-2.5`; list **no** horizontal pad | header `pb-3` (no top pad); section titles `h-6 px-2.5`; nav `gap-px` |
 | **Sidebar footer** | `px-2` | icons `min-h-8 py-1`; creating-strip `py-1.5` |
 | **Composer toolbar / textarea** | `px-2.5` | Bubble `gap-1.5`; toolbar `pb-1.5` (no top pad — gap owns it); textarea `pt-2` |
 | **Settings shell** | `px-4` | Nav↔content `gap-6`; cards `gap-3` |
@@ -373,11 +373,11 @@ Use **padding** (`pt-*`), not margin — virtualizer `measureElement` must inclu
 | `Tab` md (panel) | **`h-6`** `px-2 rounded-md text-sm` | Must clear strip edges |
 | `Tab` sm (file chips) | **`h-6`** tighter pad, `text-xs` | Same strip |
 | `TextInput` | `h-8` | Settings search `h-7`; Welcome `h-9` |
-| Sidebar session row | **`h-8`** `px-2` `gap-2` `rounded-sm` (6) | Status slot `h-5 w-5`; hover `fill-4` / selected `fill-2` (selected stays fill-2) |
-| Sidebar nav action | **`h-8`** `px-2` `gap-2` `rounded-sm` font-medium | Production New Agent row |
+| Sidebar session row | **`h-8`** `px-2.5` `gap-2` `rounded-sm` (6) | Status slot `h-5 w-5`; hover `fill-4` / selected `fill-2` (selected stays fill-2) |
+| Sidebar nav action | **`h-8`** `px-2.5` `gap-2` `rounded-sm` font-medium | Production New Agent row |
 | File tree / Changes file row | `h-7` `px-2.5` `rounded-sm` | Same whisper fills as sidebar cells |
 | Tool-call line | `gap-1` `text-base` `leading-[1.5]` icon slot `16×18` | Idle `text-ink-muted` → hover secondary; title secondary |
-| Section headers (sidebar) | `px-1 py-2` `text-sm` tertiary | Production date labels (Today / Yesterday) |
+| Section headers (sidebar) | `px-1.5 py-2` `text-sm` tertiary | Repo / date labels; wrapper adds matching inset |
 | Human message card | `rounded-[14px]` `px-2.5 py-2` `border-stroke-3` | hover `border-stroke-2` + whisper `fill-5` |
 | Composer card | `rounded-[14px]` inset stroke ladder + `backdrop-blur(10px)` | idle stroke-3 → hover stroke-2 → focus `--shadow-composer-focus` |
 | Chat thread header | **`h-[40px]`** `pl-3 pr-2` title `text-base font-medium` | `ChatThreadHeader` |
@@ -400,7 +400,7 @@ modal. HITL docks as a composer-adjacent blocking surface, not a dialog.
 | Empty | `EmptyState` | Top-weighted utility void: `py-10 gap-3` (not full-viewport `justify-center`); title `text-sm text-ink-secondary`; description `text-xs text-ink-muted`; CTA `Button secondary sm`; icon chip `bg-fill-3 text-ink-faint` |
 | Hero empty | `ChatShell` empty rail | Utility void: muted `text-ink-secondary` title (`text-[15px]`) + outline whisper chips; bare compact ContextBar (folder + Direct pills, no card) glued `mb-1` above composer; selecting a pristine draft from the sidebar prunes sibling tabs |
 | Onboarding | `WelcomePage` | Primary controls **`h-9`** (`Button size="lg"`, inputs `h-9`); errors via `ErrorBanner` |
-| Loading list | `SidebarSkeleton` | Rows **`h-8`**; section labels; `rounded-sm` whisper fills; parent `px-2` gutter |
+| Loading list | `SidebarSkeleton` | Rows **`h-8`**; section labels; `rounded-sm` whisper fills; parent no horizontal pad (cells own `px-2.5`) |
 | Loading block | `Skeleton` | `bg-surface-muted` (fill-3) + soft pulse; **`opacity-70`** dampen |
 | Timeline load | `TurnTimeline` | Short bubble placeholders (`h-8`–`h-14`), dampened skeleton base |
 | Indeterminate | `Spinner` | `text-ink-muted`; sizes sm/md/lg; contextual `label` for screen readers (inline HITL spinners also muted) |
@@ -449,7 +449,7 @@ empty CTAs; bright skeleton shimmer; loud red alert slabs; accent-filled quiz op
 
 Tab pills still use `fill-2` selected / `fill-4` hover elsewhere in the app.
 
-**Row-level gutter rule:** the `px-2` gutter is carried by each interactive row/button/label, NOT by a wrapper container. Do not add `px-2` to `SidebarContent` or the action-rows div — that doubles the effective indent to 16px and narrows the hover fills away from the sidebar edge.
+**Row-level gutter rule:** the `px-2.5` gutter is carried by each interactive row/button/label, NOT by a wrapper container. Do not add `px-2.5` to `SidebarContent` or the action-rows div — that doubles the effective indent to 20px and narrows the hover fills away from the sidebar edge.
 
 **Note:** Default list is **Repositories** (project-grouped), matching Cursor Agents. Time-bucket helpers stay in `lib/sessionGrouping` for Search/other surfaces.
 
@@ -686,7 +686,7 @@ Tailwind `p-*` / `gap-*` map through `@theme` in `src/index.css`.
 
 ## Checklist for UI changes
 
-1. Pick the surface gutter from **Spacing canon** (chat `px-2.5`, content pane `px-2.5`, sidebar `px-2`).
+1. Pick the surface gutter from **Spacing canon** (chat `px-2.5`, content pane `px-2.5`, sidebar cells `px-2.5`).
 2. Keep header rows at `--header-height`; controls inside them at **`h-6`**.
 3. Align nested chrome with the parent strip (don’t mix `px-2` under a `px-2.5` TabStrip).
 4. Prefer tokens / shared atoms (`Tab`, `TabStrip`, `IconButton`) over one-off heights.

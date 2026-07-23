@@ -63,6 +63,7 @@ export { SessionRowActions } from "./SessionRowActions"
 export {
   SessionRowSubtitle,
   sessionRowHasSubtitle,
+  sessionTrailingDiff,
   parseDiffStat,
 } from "./SessionRowSubtitle"
 export { SettingsSection, FieldRow, SettingsCard, SettingRow } from "./SettingsSection"

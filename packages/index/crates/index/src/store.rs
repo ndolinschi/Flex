@@ -449,6 +449,19 @@ impl IndexStore {
     pub fn embedded_chunk_count(&self) -> usize {
         self.embeddings.as_ref().map(|e| e.store.len()).unwrap_or(0)
     }
+
+    /// File + symbol counts from on-disk metadata only.
+    ///
+    /// Does **not** open the tantivy mmap directory (which eagerly maps every
+    /// segment file and floods DEBUG logs). Used by desktop `index_status`
+    /// / sidebar badges so app launch never pays an index-open cost.
+    pub fn status_counts(
+        index_dir: &Path,
+    ) -> Result<(usize /* files */, usize /* symbols */), StoreError> {
+        let manifest = load_manifest(index_dir)?;
+        let symbol_count = count_symbols_len(index_dir)?;
+        Ok((manifest.files.len(), symbol_count))
+    }
 }
 
 fn load_manifest(index_dir: &Path) -> Result<Manifest, StoreError> {
@@ -484,6 +497,22 @@ fn load_symbols(index_dir: &Path) -> Result<Vec<Symbol>, StoreError> {
         source,
     })?;
     Ok(serde_json::from_slice(&bytes).unwrap_or_default())
+}
+
+/// Length of `symbols.json` without fully deserializing into [`Symbol`].
+fn count_symbols_len(index_dir: &Path) -> Result<usize, StoreError> {
+    let path = index_dir.join(SYMBOLS_FILE);
+    if !path.exists() {
+        return Ok(0);
+    }
+    let bytes = fs::read(&path).map_err(|source| StoreError::Io {
+        path: path.display().to_string(),
+        source,
+    })?;
+    match serde_json::from_slice::<serde_json::Value>(&bytes) {
+        Ok(serde_json::Value::Array(items)) => Ok(items.len()),
+        Ok(_) | Err(_) => Ok(0),
+    }
 }
 
 #[cfg(test)]
@@ -741,5 +770,38 @@ mod tests {
         reopened.build().unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(embedder.embedded_texts().len(), 1);
         assert_eq!(reopened.embedded_chunk_count(), 1);
+    }
+
+    #[test]
+    fn status_counts_reads_metadata_without_tantivy_dir() {
+        // Simulate a warm index that only has manifest/symbols on disk —
+        // status must not require creating/opening the tantivy mmap dir.
+        let index_dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
+        let manifest = Manifest {
+            version: MANIFEST_VERSION,
+            files: HashMap::from([
+                ("a.rs".to_owned(), "hash-a".to_owned()),
+                ("b.rs".to_owned(), "hash-b".to_owned()),
+            ]),
+        };
+        fs::write(
+            index_dir.path().join(MANIFEST_FILE),
+            serde_json::to_vec_pretty(&manifest).unwrap_or_else(|e| panic!("{e}")),
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+        fs::write(
+            index_dir.path().join(SYMBOLS_FILE),
+            br#"[{"name":"a"},{"name":"b"},{"name":"c"}]"#,
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+
+        let (files, symbols) =
+            IndexStore::status_counts(index_dir.path()).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(files, 2);
+        assert_eq!(symbols, 3);
+        assert!(
+            !index_dir.path().join(TANTIVY_DIR).exists(),
+            "status_counts must not create the tantivy directory"
+        );
     }
 }

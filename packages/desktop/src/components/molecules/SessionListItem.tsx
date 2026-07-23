@@ -20,7 +20,7 @@ import { DiffStat, RunningDot, Tooltip } from "../atoms"
 import { ConfirmDialog } from "./ConfirmDialog"
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu"
 import { SessionRowActions } from "./SessionRowActions"
-import { parseDiffStat } from "./SessionRowSubtitle"
+import { sessionTrailingDiff } from "./SessionRowSubtitle"
 import { Input } from "@/components/ui/input"
 
 type SessionListItemProps = {
@@ -221,16 +221,13 @@ export const SessionListItem = memo(function SessionListItem({
 
   // Production Agents Web row is single-line h-8 with trailing +N −M that
   // fades on hover (actions take its place) — not a two-line subtitle stack.
-  const workspaceDiff = workspaceStatus
-    ? parseDiffStat(workspaceStatus.summary)
-    : null
-  const gitDiff =
-    !workspaceStatus && gitStatus && gitStatus.totalCount > 0
-      ? { added: gitStatus.totalAdded, removed: gitStatus.totalRemoved }
-      : null
-  const trailingDiff = workspaceDiff ?? gitDiff
+  // Pristine drafts never show DiffStat (full-repo fallback would lie).
+  const trailingDiff = sessionTrailingDiff(session, workspaceStatus, gitStatus)
   const hasTrailingDiff =
-    !!trailingDiff && (trailingDiff.added > 0 || trailingDiff.removed > 0)
+    !!trailingDiff &&
+    ((trailingDiff.added ?? 0) > 0 ||
+      (trailingDiff.removed ?? 0) > 0 ||
+      (trailingDiff.filesChanged ?? 0) > 0)
 
   // Numeric unread > 0 gets the "(N) " title prefix (reference design).
   const unreadCount = typeof unread === "number" && unread > 0 ? unread : null
