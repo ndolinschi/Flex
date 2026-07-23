@@ -1,10 +1,3 @@
-//! `VerifiedMemoryGateHook`: require a passing `Verify` verdict before
-//! `SkillSave`/`MemoryWrite` commit — the bridge between the independent
-//! verifier (`agentloop_core::tool::VERIFIER_TOOL_NAME`) and self-learning
-//! memory, so learned skills/notes can't compound on unverified self-report.
-//! Opt-in; off unless a `LearningPlugin` is built with
-//! [`LearningPlugin::require_verified_memory`].
-
 use async_trait::async_trait;
 
 use agentloop_contracts::HookPoint;
@@ -15,11 +8,6 @@ use agentloop_core::{Hook, HookError};
 
 const GATED_TOOLS: [&str; 2] = ["SkillSave", "MemoryWrite"];
 
-/// `PreToolUse`: blocks `SkillSave`/`MemoryWrite` unless the most recent
-/// completed `Verify` call in this session's own log reported
-/// [`VerdictOutcome::Pass`]. Reads the session's log through
-/// `HookContext.store`; if the caller gave no store, it cannot confirm a
-/// verdict and blocks (fails closed).
 #[derive(Debug, Default)]
 pub struct VerifiedMemoryGateHook;
 

@@ -1,5 +1,3 @@
-//! Ollama environment configuration.
-
 pub const OLLAMA_PROVIDER_ID: &str = "ollama";
 pub const DEFAULT_OLLAMA_HOST: &str = "http://localhost:11434";
 pub const DEFAULT_OLLAMA_MODEL: &str = "llama3.2";

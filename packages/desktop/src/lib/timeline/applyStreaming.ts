@@ -46,7 +46,6 @@ export const applyEventToStreaming = (
     }
     case "tool_call_updated": {
       next.toolCalls[payload.call.id] = payload.call
-      // Once a call settles, drop its transient progress/args buffers.
       const state = payload.call.status.state
       if (
         state === "completed" ||

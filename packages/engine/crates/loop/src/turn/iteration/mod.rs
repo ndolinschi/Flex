@@ -1,5 +1,3 @@
-//! One model iteration: build request, stream response, materialize assistant.
-
 mod finish;
 mod retry;
 mod run;

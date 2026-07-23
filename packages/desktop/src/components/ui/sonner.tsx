@@ -23,7 +23,6 @@ const Toaster = ({ theme = "system", ...props }: ToasterProps) => {
       }}
       style={
         {
-          // Quiet solid panel for every kind — no rainbow fills, no glass blur.
           "--normal-bg": "var(--color-panel)",
           "--normal-text": "var(--color-ink)",
           "--normal-border": "var(--color-stroke-3)",
@@ -45,7 +44,6 @@ const Toaster = ({ theme = "system", ...props }: ToasterProps) => {
       }
       toastOptions={{
         classNames: {
-          // shadow-popover already includes the 1px stroke ring — no border.
           toast: "cn-toast bg-panel text-ink shadow-popover",
           description: "text-ink-muted",
           actionButton: "bg-fill-2 text-ink",

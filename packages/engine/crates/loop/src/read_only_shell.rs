@@ -1,17 +1,3 @@
-//! Conservative read-only classification for shell commands, used to let safe
-//! inspection commands (`git log`, `ls`, `rg`, …) run while in plan mode.
-//!
-//! Safety-first: [`command_is_read_only`] returns `true` only when it can prove
-//! a command has no side effects. Anything it cannot prove — an unknown
-//! executable, output redirection, command/process substitution, or a mutating
-//! subcommand — is treated as read-write and left for the plan-mode gate to
-//! deny. Over-rejecting a harmless command is acceptable; letting a mutating one
-//! through is not.
-
-/// Executables that only read state. Deliberately excludes tools that can write
-/// (`tee`, `sed`/`awk` with in-place or redirection, `dd`, `cp`, `mv`, `rm`, …)
-/// and interpreters that can run arbitrary code (`bash`, `sh`, `python`, `node`,
-/// `eval`, `env`, `xargs`, `sudo`).
 const READONLY_BINS: &[&str] = &[
     "ls", "cat", "head", "tail", "wc", "echo", "printf", "pwd", "stat", "file", "du", "df", "date",
     "whoami", "id", "uname", "hostname", "which", "type", "basename", "dirname", "realpath",
@@ -19,8 +5,6 @@ const READONLY_BINS: &[&str] = &[
     "yq", "grep", "rg", "ag", "fd", "ps", "true", "false", "test",
 ];
 
-/// Read-only `git` subcommands. Excludes anything that writes to the repo,
-/// index, worktree, or remotes (`add`, `commit`, `push`, `checkout`, `reset`, …).
 const READONLY_GIT_SUBCOMMANDS: &[&str] = &[
     "status",
     "log",
@@ -47,10 +31,6 @@ const READONLY_GIT_SUBCOMMANDS: &[&str] = &[
     "tag",
 ];
 
-/// Shell metacharacters that can cause writes or run hidden commands. `>`/`>>`
-/// redirect to files; `$(`/backtick/`<(`/`>(` substitute command output; `&`
-/// backgrounds. Their mere presence forces a deny (we don't try to prove the
-/// nuance safe).
 fn has_side_effect_syntax(command: &str) -> bool {
     if command.contains("$(")
         || command.contains('`')
@@ -72,7 +52,6 @@ fn has_side_effect_syntax(command: &str) -> bool {
     scrubbed.contains('>')
 }
 
-/// Whether a shell command is confidently read-only (safe to run in plan mode).
 pub(crate) fn command_is_read_only(command: &str) -> bool {
     let trimmed = command.trim();
     if trimmed.is_empty() {
@@ -115,7 +94,6 @@ fn segment_is_read_only(segment: &str) -> bool {
     READONLY_BINS.contains(&bin)
 }
 
-/// `FOO=bar` style leading environment assignment (skipped to reach the binary).
 fn is_env_assignment(token: &str) -> bool {
     match token.split_once('=') {
         Some((name, _)) => {
@@ -127,7 +105,6 @@ fn is_env_assignment(token: &str) -> bool {
     }
 }
 
-/// Reduce `/usr/bin/ls` to `ls`; leaves a bare name unchanged.
 fn strip_path(bin: &str) -> &str {
     bin.rsplit('/').next().unwrap_or(bin)
 }

@@ -1,11 +1,7 @@
-//! Static OAuth-eligible model catalog for the ChatGPT Codex backend.
-
 use agentloop_contracts::ModelInfo;
 
 use crate::config::DEFAULT_CHATGPT_MODEL;
 
-/// Models the ChatGPT subscription / Codex backend accepts under OAuth.
-/// GPT-5.6 Sol/Terra/Luna need the Responses Lite wire (see `wire.rs`).
 pub fn static_models() -> Vec<ModelInfo> {
     [
         ("gpt-5.6-sol", "GPT-5.6 Sol", Some(272_000), true),
@@ -43,28 +39,24 @@ pub fn static_models() -> Vec<ModelInfo> {
     .collect()
 }
 
-/// Whether this model id speaks the Codex Responses Lite contract
-/// (tools/instructions move into `input`; lite header required).
 pub(crate) fn uses_responses_lite(model: &str) -> bool {
     let bare = model.rsplit('/').next().unwrap_or(model);
     bare == "gpt-5.6" || bare.starts_with("gpt-5.6-")
 }
 
-/// Resolve a requested model id to a catalog entry, falling back to the default.
 pub(crate) fn resolve_model(requested: &str) -> String {
     let trimmed = requested.trim();
     if trimmed.is_empty() {
         return DEFAULT_CHATGPT_MODEL.to_owned();
     }
     let bare = trimmed.rsplit('/').next().unwrap_or(trimmed);
-    // Alias: unsuffixed gpt-5.6 routes to Sol (OpenAI's documented default).
+
     if bare == "gpt-5.6" {
         return "gpt-5.6-sol".to_owned();
     }
     if static_models().iter().any(|m| m.id == bare) {
         bare.to_owned()
     } else {
-        // Pass through unknown ids — the backend will reject if unsupported.
         bare.to_owned()
     }
 }

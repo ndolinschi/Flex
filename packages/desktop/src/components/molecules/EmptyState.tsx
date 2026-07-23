@@ -13,7 +13,6 @@ type EmptyStateProps = {
   title: string
   description?: string
   icon?: ReactNode
-  /** Custom action node (wins over `actionLabel` / `onAction`). */
   action?: ReactNode
   actionLabel?: string
   onAction?: () => void

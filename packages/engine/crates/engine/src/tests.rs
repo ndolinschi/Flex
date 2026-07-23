@@ -80,9 +80,6 @@ mod run_goal {
 
     #[tokio::test]
     async fn stops_at_max_iterations_when_the_model_keeps_working() {
-        // Each run_goal iteration is one full turn: a tool call, then a
-        // text reply that ends it — scripted so the loop never sees the
-        // weak "no tool calls" achieved signal.
         let mut turns = Vec::new();
         for _ in 0..2 {
             let (tool_turn, _ids) =
@@ -108,10 +105,6 @@ mod run_goal {
 
     #[tokio::test]
     async fn stops_at_identical_failure_ceiling() {
-        // A turn-level max_iterations of 1 means any turn whose first
-        // model call produces a tool call (needing a second round to
-        // close out) is truncated as `TurnStopReason::MaxIterations` —
-        // a controllable, repeatable "failure" for this test.
         let (turn_a, _) = MockProvider::tool_turn(&[("echo", serde_json::json!({"text": "x"}))]);
         let (turn_b, _) = MockProvider::tool_turn(&[("echo", serde_json::json!({"text": "y"}))]);
         let provider = Arc::new(MockProvider::with_turns([turn_a, turn_b]));
@@ -143,10 +136,6 @@ mod run_goal {
     }
 }
 
-/// An `EngineService` wired to a mock isolation backend that provisions
-/// successfully, over a real (empty) native agent and an in-memory store.
-/// Returns the typed `NativeAgent` alongside the service so tests can drive
-/// deferred first-turn provisioning without a mock provider.
 fn isolated_service(
     store: std::sync::Arc<MemoryStore>,
 ) -> (
@@ -172,9 +161,6 @@ async fn open_isolated(service: &EngineService, agent: &agentloop_loop::NativeAg
         })
         .await
         .expect("isolated session opens");
-    // Deferred isolation: create doesn't provision. Drive the same first-turn
-    // ensure step run_turn would, so the rest of these tests see the
-    // provisioned workspace they expect.
     agent
         .ensure_workspace_for_test(&id)
         .await
@@ -324,9 +310,6 @@ async fn revert_restores_workspace_and_records_marker() {
 
 #[tokio::test]
 async fn replay_preserves_stored_ts_across_reopen_not_now() {
-    // replay must echo the ts captured at emit, never now_ms(). Assert it
-    // for a fresh append and after a "reopen" (a second store over the same
-    // log — MemoryStore keeps the same records within the process).
     let store = std::sync::Arc::new(MemoryStore::new());
     let agent = NativeAgentBuilder::new(store.clone()).build();
     let service = EngineService::new(agent, store.clone());
@@ -347,8 +330,6 @@ async fn replay_preserves_stored_ts_across_reopen_not_now() {
         )
         .await
         .expect("append");
-    // Pin the stored ts of the TurnStarted event by its seq — create_session
-    // may have appended earlier events, so match the exact one replay echoes.
     let stored = store.read(&id, 0).await.expect("read");
     let turn = stored
         .iter()
@@ -367,7 +348,6 @@ async fn replay_preserves_stored_ts_across_reopen_not_now() {
         "replayed ts_ms equals the stored ts, not now_ms()"
     );
 
-    // Replaying again yields the identical ts — reopening never rewrites it.
     let again = service.replay(&id, 0).await.expect("replay again");
     let again_event = again
         .iter()

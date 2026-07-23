@@ -1,5 +1,3 @@
-//! `CreateDocument` — writes a `.docx` file at an absolute path.
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -15,20 +13,12 @@ use crate::path::{ensure_parent, relative_from, require_absolute};
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct CreateDocumentInput {
-    /// Absolute path for the output `.docx` file, e.g. `/project/reports/summary.docx`.
-    /// Must be absolute; if you want a file under the session working directory,
-    /// pass the full path (the session cwd is shown in context).
     file_path: String,
 
-    /// Document title — used as the first paragraph (bold heading).
     title: String,
 
-    /// Body text. Blank lines separate paragraphs. Markdown-style formatting is
-    /// preserved as plain text — the model should write clean prose, not raw
-    /// markdown syntax, as the output is a binary Word file.
     body: String,
 
-    /// Create missing parent directories. Defaults to `true`.
     #[serde(default = "default_true")]
     create_dirs: bool,
 }
@@ -37,7 +27,6 @@ fn default_true() -> bool {
     true
 }
 
-/// The `CreateDocument` tool.
 pub struct CreateDocumentTool {
     backend: Arc<dyn OfficeArtifact>,
 }

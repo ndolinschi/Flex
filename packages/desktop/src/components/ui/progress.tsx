@@ -45,7 +45,6 @@ function ProgressIndicator({
   return (
     <ProgressPrimitive.Indicator
       data-slot="progress-indicator"
-      // Quiet meter — ink-faint, never a bright primary bar (DESIGN.md States).
       className={cn(
         "h-full bg-ink-faint/50 transition-[width] duration-[var(--duration-fast)] ease-[var(--easing-default)] motion-reduce:transition-none",
         className,

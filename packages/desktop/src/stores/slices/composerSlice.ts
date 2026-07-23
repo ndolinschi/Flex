@@ -63,9 +63,6 @@ export const createComposerSlice: StateCreator<
     void persistUiState({ selectedIsolation: isolation })
   },
   setSelectedReuseWorkspaceId: (id) => {
-    // Never persisted to disk: a workspace id is only meaningful for the
-    // very next `create_session` this draft becomes. Persisting it across
-    // restarts would carry a stale reference into the next launch.
     set({ selectedReuseWorkspaceId: id })
   },
   setSelectedEffort: (effort) => {

@@ -1,6 +1,3 @@
-/** Best-effort Monaco language id from a repo-relative path.
- * Kept free of `monaco-editor` imports so FilesTab can resolve languages
- * without pulling the editor into the initial module graph. */
 export const languageForPath = (path: string): string => {
   const name = path.split("/").pop()?.toLowerCase() ?? ""
   const ext = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : name

@@ -9,24 +9,12 @@ import { useAppStore } from "../../stores/appStore"
 import { cn } from "../../lib/utils"
 
 type SettingsShellProps = {
-  /** Section content keyed by id — the shell renders whichever one is
-   * active, so the header title/description below are per-section, not a
-   * single title for the whole surface (DESIGN.md Settings). */
   sections: Partial<Record<SettingsSectionId, ReactNode>>
-  /** Page title shown above the active section's content. */
   titleFor: (section: SettingsSectionId) => string
   descriptionFor?: (section: SettingsSectionId) => string | undefined
-  /** When true, omit the outer full-window chrome (used inside AppShell). */
   embedded?: boolean
 }
 
-/** Settings shell — persistent left nav + content pane (see DESIGN.md
- * Settings shell / nav). Replaces the old single-page "Back to chat" header
- * shell: this is now the one surface that houses General / Appearance /
- * Models & Connections / Behavior / Memory / Tools & MCP / Automations, with
- * a Search Settings box at the top of the nav that navigates to (and
- * pulse-highlights) a row in another section rather than filtering in
- * place. */
 export const SettingsShell = ({
   sections,
   titleFor,
@@ -58,7 +46,6 @@ export const SettingsShell = ({
   const navigateToResult = (entry: SettingsSearchEntry) => {
     setActiveSection(entry.section)
     setQuery("")
-    // Wait a tick for the section to mount/switch before scrolling+highlighting.
     window.requestAnimationFrame(() => {
       const row = contentRef.current?.querySelector<HTMLElement>(
         `[data-settings-row="${entry.rowId}"]`,
@@ -91,7 +78,6 @@ export const SettingsShell = ({
       aria-label="Back to chat" title="Back to chat"
       onClick={() => setRoute("chat")}
       className={cn(
-        // Quiet chrome: same recipe as WindowTitleBar / SessionSidebar h-6 icons.
         "text-ink-muted hover:bg-fill-4 hover:text-ink",
         "opacity-50 hover:opacity-80",
         "h-6 w-6",
@@ -148,10 +134,6 @@ export const SettingsShell = ({
   return <div className="flex h-full flex-col bg-bg">{body}</div>
 }
 
-/** Applies `.animate-settings-row-highlight` to whichever DOM node currently
- * carries `data-settings-row={rowId}` — done as a small effect rather than
- * threading highlight state through every section, so sections stay plain
- * `SettingRow` trees with no highlight-awareness of their own. */
 const HighlightScope = ({
   rowId,
   children,

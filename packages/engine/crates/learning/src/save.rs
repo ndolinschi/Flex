@@ -1,5 +1,3 @@
-//! `SkillSave`: persist a distilled procedure as a learned `SKILL.md`.
-
 use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -8,33 +6,20 @@ use std::path::PathBuf;
 use agentloop_contracts::ToolOutput;
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
-/// Skill names stay filesystem- and prompt-friendly.
 const NAME_MAX: usize = 48;
-/// Description cap: it sits in every request's context via the Skill tool.
 const DESCRIPTION_MAX: usize = 300;
-/// Body cap: a skill is a focused playbook, not a transcript dump.
 const BODY_MAX: usize = 16_000;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct SkillSaveInput {
-    /// Kebab-case skill name, e.g. `migrate-sqlx-schema`. Lowercase letters,
-    /// digits, and hyphens; max 48 chars.
     name: String,
-    /// One sentence stating when this skill applies (max 300 chars). This is
-    /// what future sessions see when deciding relevance.
     description: String,
-    /// The skill body in markdown: the verified procedure as numbered steps,
-    /// including pitfalls encountered and how they were resolved (max 16000
-    /// chars). Write for a future agent with no memory of this session.
     body: String,
-    /// Set true to replace an existing learned skill of the same name.
     #[serde(default)]
     overwrite: bool,
 }
 
-/// Writes learned skills under a dedicated directory, one
-/// `<name>/SKILL.md` per skill, with `provenance: learned` frontmatter.
 pub struct SkillSaveTool {
     learned_dir: PathBuf,
 }

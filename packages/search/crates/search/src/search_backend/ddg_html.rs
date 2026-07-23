@@ -1,16 +1,9 @@
-//! DuckDuckGo HTML scrape — last-ditch; often blocked from datacenters.
-
 use async_trait::async_trait;
 use reqwest::Client;
 
 use super::html_parse::{looks_like_ddg_block_page, parse_duckduckgo_html};
 use super::{SearchBackend, SearchError, SearchResult, http_client, map_status_error, urlencoding};
 
-/// Searches DuckDuckGo's HTML endpoint and parses result blocks.
-///
-/// Uses `https://html.duckduckgo.com/html/` — no API key is required, but
-/// datacenter IPs are frequently blocked (400/captcha). Prefer
-/// [`super::DuckDuckGoInstantBackend`] in the default chain.
 pub struct DuckDuckGoBackend {
     client: Client,
 }

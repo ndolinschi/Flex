@@ -29,7 +29,6 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        // Solid scrim (no blur) — quieter paint + matches sidebar overlay.
         "fixed inset-0 isolate z-[var(--z-modal)] bg-black/30 duration-[var(--duration-normal)] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}
@@ -53,7 +52,6 @@ function DialogContent({
         data-slot="dialog-content"
         data-suppress-native-webview=""
         className={cn(
-          // Phase 7: scale+opacity entrance; radius-xl 12; elevated panel + popover shadow.
           "fixed top-1/2 left-1/2 z-[var(--z-modal)] grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[var(--radius-xl)] bg-elevated p-4 text-sm text-ink shadow-popover duration-[var(--duration-slow)] outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}

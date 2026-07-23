@@ -1,5 +1,3 @@
-//! One-turn headless run path.
-
 use anyhow::bail;
 
 use agentloop_transport_stdio::{OneTurnRequest, serve_one_turn};

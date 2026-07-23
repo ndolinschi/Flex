@@ -37,9 +37,7 @@ type ProviderConnectionFormProps = {
   defaultIsolation: string
   hasStoredKey: boolean
   isBedrock: boolean
-  /** GitHub Copilot: device-flow / editor sign-in is present. */
   copilotSignedIn?: boolean
-  /** ChatGPT Plus/Pro: OAuth tokens are discoverable. */
   chatgptSignedIn?: boolean
   models: ModelInfoDto[]
   defaultModelOptions: ModelInfoDto[]
@@ -59,13 +57,11 @@ type ProviderConnectionFormProps = {
   onDefaultIsolationChange: (value: string) => void
   onValidate: () => void
   onSave: () => void
-  /** Return to the connections list without saving. */
   onCancel?: () => void
   onCopilotSignIn?: () => void
   onChatgptSignIn?: () => void
 }
 
-/** Connection create/edit form (fields + models + isolation + save footer). */
 export const ProviderConnectionForm = ({
   editingId,
   editingLabel,
@@ -136,8 +132,6 @@ export const ProviderConnectionForm = ({
         <FieldRow
           label="Provider"
           htmlFor="provider"
-          // Full-width tile grid — two-column FieldRow leaves uneven side
-          // padding around DeepSeek / Copilot / … chips.
           className="@[640px]/settings:grid-cols-1 @[640px]/settings:gap-2"
         >
           <ProviderPicker
@@ -344,9 +338,6 @@ export const ProviderConnectionForm = ({
           />
         </FieldRow>
       </SettingsSection>
-
-      {/* Plugins moved to the Customize page; `plugins` state is kept hydrated
-          from config so buildInput() round-trips the current values on save. */}
 
       <SettingsSection title="Behavior" rowId="behavior-isolation" className="mb-0">
         <FieldRow

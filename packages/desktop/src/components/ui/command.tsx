@@ -154,7 +154,6 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        // Dense rows (py-1) + selected fill-2. Never bg-accent (brand near-white).
         "group/command-item relative mx-1 flex cursor-default items-center gap-2 rounded-md px-2.5 py-1 text-sm text-ink outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-fill-2 data-selected:text-ink aria-selected:bg-fill-2 aria-selected:text-ink [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5 data-selected:[&_svg:not([class*='text-'])]:text-ink aria-selected:[&_svg:not([class*='text-'])]:text-ink",
         className
       )}

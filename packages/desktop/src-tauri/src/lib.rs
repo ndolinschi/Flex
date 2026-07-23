@@ -25,39 +25,9 @@ use crate::compose::{build_service, open_session_store};
 use crate::config::load_config;
 use crate::state::AppState;
 
-/// Must match `app.windows[0].minWidth`/`minHeight` in `tauri.conf.json`.
-///
-/// tauri-plugin-window-state's `on_window_ready` restore hook calls
-/// `set_size` directly from whatever was last persisted to
-/// `.window-state.json` — it does not consult the window's configured
-/// min-size, and a programmatic `set_size` is not clamped by the OS/Tauri
-/// the way an interactive user drag-resize is. So a size saved *before*
-/// this minimum existed (or saved on a platform where the min wasn't
-/// enforced) gets replayed verbatim on every future launch, silently
-/// bypassing the constraint below. Re-assert and clamp here, in `setup`,
-/// which runs after the plugin's window-ready restore.
 const MAIN_WINDOW_MIN_WIDTH: f64 = 900.0;
 const MAIN_WINDOW_MIN_HEIGHT: f64 = 600.0;
 
-/// Trace/log to stdout (visible in the `tauri dev` console) AND to a rolling
-/// daily file under the app's log dir (visible in packaged builds, where
-/// stdout is discarded — see the module doc on why this matters). `RUST_LOG`
-/// wins if set (standard `EnvFilter` syntax, e.g. `RUST_LOG=debug`);
-/// otherwise the default filter is picked by whether "Debug logging" is
-/// currently on in the frontend's Settings (read directly from its
-/// persisted UI store — see `debug::is_debug_mode_enabled`): debug mode ON
-/// raises the whole app to `debug`; OFF uses the previous useful default
-/// (`info` + explicit `debug` for the engine/provider crates, which surface
-/// request/stream failures without drowning in framework noise).
-///
-/// Runs inside `.setup()` (not before `tauri::Builder`) because it needs an
-/// `AppHandle` to resolve the app's log dir via Tauri's path API — it still
-/// runs before `build_service`, so failures there are captured same as
-/// before. The file writer's `WorkerGuard` (must stay alive for the process
-/// lifetime, or the background flush task stops — see
-/// `tracing_appender::non_blocking`'s docs) is deliberately leaked rather
-/// than threaded through `AppState`: this runs exactly once per process and
-/// needs to outlive every other subsystem, including teardown-time logging.
 fn init_tracing(app: &tauri::App) {
     let app_data_dir = app
         .path()
@@ -66,14 +36,6 @@ fn init_tracing(app: &tauri::App) {
     let debug_mode = debug::is_debug_mode_enabled(&app_data_dir);
 
     let filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        // `tauri_plugin_updater` logs ERROR on a missing latest.json channel
-        // (expected until the first signed release). Silence that crate so
-        // debug-mode consoles aren't flooded; JS still soft-fails the check.
-        //
-        // `tantivy=warn`: mmap Directory logs DEBUG `Open Read` once per
-        // segment file on every index open — a warm repo index has dozens of
-        // segments, which drowned the tauri-dev console. Real tantivy errors
-        // still surface at warn+.
         if debug_mode {
             tracing_subscriber::EnvFilter::new("debug,tauri_plugin_updater=off,tantivy=warn")
         } else {
@@ -94,8 +56,6 @@ fn init_tracing(app: &tauri::App) {
     let _ = std::fs::create_dir_all(&log_dir);
     let file_appender = tracing_appender::rolling::daily(&log_dir, "flex-desktop.log");
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
-    // Leaked deliberately: this must outlive every other subsystem (so late
-    // shutdown logging still flushes) and there is exactly one per process.
     Box::leak(Box::new(guard));
     let file_layer = tracing_subscriber::fmt::layer()
         .with_writer(non_blocking)
@@ -112,19 +72,12 @@ fn init_tracing(app: &tauri::App) {
     tracing::info!(debug_mode, log_dir = %log_dir.display(), "tracing initialized");
 }
 
-/// `tracing_appender::rolling::daily` names files `<prefix>.<YYYY-MM-DD>`
-/// but doesn't expose the exact path it's writing to — reconstruct today's
-/// suffix (local date) purely for the Settings "copy log path" affordance;
-/// this is cosmetic (worst case: the displayed path is a day stale right at
-/// midnight), not load-bearing for logging itself.
 fn chrono_today_suffix() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let days = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() / 86_400)
         .unwrap_or(0) as i64;
-    // Civil-from-days (Howard Hinnant's algorithm) — avoids a chrono
-    // dependency for this one cosmetic label.
     let z = days + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let doe = (z - era * 146_097) as u64;
@@ -140,9 +93,6 @@ fn chrono_today_suffix() -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Before any ConPTY / portable-pty spawn: give this GUI-subsystem process
-    // a hidden console so Windows does not pop a visible PowerShell window
-    // per terminal tab. See `win_console::ensure_hidden_parent_console`.
     win_console::ensure_hidden_parent_console();
 
     tauri::Builder::default()
@@ -150,10 +100,6 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
-        // Persist size/position/maximized — but never decorations. Restoring a
-        // pre-custom-chrome `decorations: true` from `.window-state.json`
-        // would stack the native Windows title bar on top of WindowTitleBar
-        // (double header). Config + setup both force undecorated.
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(
@@ -163,34 +109,16 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_os::init())
-        // Auto-update + relaunch. Signing key / Apple notarization still
-        // gated on secrets (see release.yml TODOs) — the plugin is safe to
-        // init unsigned; checks soft-fail until a signed latest.json exists.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
-            // Needs `app`'s path resolver (Tauri's path API, not the raw
-            // `dirs` crate) for the log dir, so this can't run before
-            // `tauri::Builder` exists — see `init_tracing`'s doc comment.
-            // Still runs first thing in `setup`, so failures during
-            // `build_service` below are captured same as before.
             init_tracing(app);
 
-            // Belt-and-suspenders against tauri-plugin-window-state replaying a
-            // stale sub-minimum size from `.window-state.json` (see constants
-            // above). Re-apply the min constraint and, if the size restored by
-            // the plugin already violates it, snap back up to the minimum.
-            // Also re-assert undecorated chrome: older window-state files (and
-            // any future plugin flag slip) must not bring the native title bar
-            // back over WindowTitleBar.
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_decorations(false);
                 let min_size = LogicalSize::new(MAIN_WINDOW_MIN_WIDTH, MAIN_WINDOW_MIN_HEIGHT);
                 let _ = window.set_min_size(Some(min_size));
 
-                // Undecorated macOS windows are square by default — apply
-                // NSVisualEffectView vibrancy (with corner radius) and clip the
-                // content view so the shell matches native utility apps.
                 #[cfg(target_os = "macos")]
                 macos_window::apply_macos_chrome(&window);
 
@@ -231,7 +159,6 @@ pub fn run() {
                 commands::respawn_cron_loop(&state).await;
             });
 
-            // Auto-start Remote Access if the user left it enabled.
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let state = handle.state::<AppState>();
@@ -246,12 +173,9 @@ pub fn run() {
                 }
             });
 
-            // Dev-only layout probe: open Browser to google after launch so we
-            // can validate child-webview bounds without UI automation.
             if std::env::var("FLEX_BROWSER_QA").is_ok() {
                 let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
-                    // Wait for bootstrap + React mount before opening Browser.
                     tokio::time::sleep(std::time::Duration::from_secs(4)).await;
                     let _ = handle.emit("qa-open-browser", "https://www.google.com");
                 });
@@ -316,7 +240,6 @@ pub fn run() {
             commands::git_diff,
             commands::git_commit,
             commands::git_push,
-            // Commit center: selective staging + commit/push/branch/PR flow.
             commands::git_commit_paths,
             commands::git_commit_and_push,
             commands::git_create_branch_and_commit,
@@ -326,7 +249,6 @@ pub fn run() {
             commands::git_create_pr_for_branch,
             commands::git_pr_draft,
             commands::suggest_commit_message,
-            // Review flow: per-file keep/undo + hunk-patch apply.
             commands::review_undo_file,
             commands::review_keep_file,
             commands::review_apply_patch,
@@ -427,10 +349,6 @@ pub fn run() {
                     }
                 });
             }
-            // Child-webview resize is handled by wry's rate-based autoresize
-            // (updated on every `set_bounds`). Do NOT re-apply stored absolute
-            // pixels here — that freezes the browser at the pre-resize height
-            // and leaves a black gap under the page on macOS.
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

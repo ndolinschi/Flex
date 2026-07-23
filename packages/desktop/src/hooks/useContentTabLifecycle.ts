@@ -5,7 +5,6 @@ import { useSessions } from "./useSessions"
 import { sessionScopeKey, useAppStore } from "../stores/appStore"
 import { toolTabId } from "../stores/contentLayoutModel"
 
-/** Plan approval + PR appear/disappear → content pane tabs. */
 export const useContentTabLifecycle = () => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const pendingPlanApproval = useAppStore((s) => s.pendingPlanApproval)
@@ -47,9 +46,6 @@ export const useContentTabLifecycle = () => {
     openToolBesideChat,
   ])
 
-  // Poll PR status while streaming (may appear mid-turn after a push). Idle
-  // sessions reuse cache from BranchPicker / window focus — avoid kicking
-  // `gh pr view` on every chat switch (especially empty drafts).
   const prStatusQuery = useQuery({
     queryKey: ["git-pr-status", active?.cwd ?? ""],
     queryFn: () => gitPrStatus(active!.cwd),

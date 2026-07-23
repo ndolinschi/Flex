@@ -2,24 +2,13 @@ import type { ReactNode } from "react"
 import { cn } from "../../lib/utils"
 import { Field, FieldLabel, FieldDescription } from "@/components/ui/field"
 
-/* ── Settings shell primitives (see DESIGN.md Settings) ──────────
- * `SettingsCard` + `SettingRow` implement the reference's group-card/row
- * anatomy for the new SettingsShell nav+content layout. The legacy
- * `SettingsSection`/`FieldRow` pair below (bordered card, label+hint layout)
- * stays as-is — it's still used by list-style sections (MCP servers,
- * automations, provider connections) that don't fit the toggle-row shape. */
-
 type SettingsCardProps = {
-  /** Group label rendered OUTSIDE the card, above it (12px secondary per
-   * the reference — not a card header). */
   label?: string
   description?: string
   children: ReactNode
   className?: string
 }
 
-/** Group card — flat panel-tier background, no border, rows separated by
- * inset dividers (see `SettingRow`). */
 export const SettingsCard = ({
   label,
   description,
@@ -42,22 +31,15 @@ export const SettingsCard = ({
 }
 
 type SettingRowProps = {
-  /** Stable id for search-index navigation + highlight targeting — see
-   * `settingsSearchIndex.ts` and `SettingsShell`'s highlight effect. */
   rowId?: string
   title: string
   description?: string
   children?: ReactNode
-  /** Suppress the top inset divider — pass for the first row in a card. */
   first?: boolean
-  /** Stack title above a full-width control (tall pickers, grids). */
   stacked?: boolean
   className?: string
 }
 
-/** Toggle-row anatomy: title+description (both 13px, differ only by color)
- * on the left, a right-aligned control slot, and an absolute inset divider
- * between rows (see DESIGN.md Settings rows). */
 export const SettingRow = ({
   rowId,
   title,
@@ -105,10 +87,6 @@ type SettingsSectionProps = {
   actions?: ReactNode
   children: ReactNode
   className?: string
-  /** Stable id for search-index navigation + highlight targeting — see
-   * `settingsSearchIndex.ts` and `SettingsShell`'s highlight effect. Mirrors
-   * `SettingRow`'s `rowId` for sections that use this older list-card shape
-   * (MCP servers, automations, provider connections) instead of `SettingRow`. */
   rowId?: string
 }
 
@@ -136,8 +114,6 @@ export const SettingsSection = ({
       <div
         className={cn(
           "@container/settings rounded-[var(--radius-card)] bg-settings-card",
-          // Inset dividers between rows (12px inset, absolute — not
-          // full-width borders), per DESIGN.md Settings.
           "[&>*+*]:relative [&>*+*]:before:absolute [&>*+*]:before:inset-x-3.5 [&>*+*]:before:top-0 [&>*+*]:before:h-px [&>*+*]:before:bg-stroke-4 [&>*+*]:before:content-['']",
         )}
       >

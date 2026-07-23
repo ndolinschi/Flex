@@ -29,9 +29,6 @@ type BranchPickerProps = {
   onError?: (message: string) => void
 }
 
-/** Defer `gh pr view` until the session chrome is interactive — running it on
- * every ContextBar mount (new session / switch) stacked with git_status and
- * blocked the UI for 1–3s. */
 const schedulePrPrefetch = (fn: () => void): (() => void) => {
   if (typeof requestIdleCallback === "function") {
     const id = requestIdleCallback(() => fn(), { timeout: 2_000 })
@@ -83,8 +80,6 @@ export const BranchPicker = ({
   const { data: prStatus } = useQuery({
     queryKey: ["git-pr-status", cwd],
     queryFn: () => gitPrStatus(cwd!),
-    // Idle-gated: Open-tab already keeps this disabled; ContextBar used to
-    // fire `gh auth status` + `gh pr view` on every new-session mount.
     enabled: !!cwd && hasRemote && prPrefetchReady,
     staleTime: 60_000,
     refetchOnWindowFocus: true,

@@ -1,5 +1,3 @@
-//! `Glob`: find files by glob pattern under a directory.
-
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
@@ -19,15 +17,11 @@ const MAX_OUTPUT_CHARS: usize = 80_000;
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct GlobInput {
-    /// Glob pattern relative to `path`/cwd. Plain filenames are matched recursively.
     pattern: String,
-    /// Directory to search. Relative paths resolve against the session cwd.
     path: Option<String>,
-    /// Maximum results to return. Defaults to 100, capped at 1000.
     max_results: Option<usize>,
 }
 
-/// Ignore-aware glob search.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct GlobTool;
 

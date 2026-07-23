@@ -1,7 +1,5 @@
 import { cn } from "@/lib/utils"
 
-/** Whisper fill placeholder — soft pulse on surface-muted, opacity dampened
- * so loading never reads as a bright shimmer slab (DESIGN.md States). */
 function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div

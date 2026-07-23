@@ -9,8 +9,6 @@ type BranchPrStatusChipProps = {
   className?: string
 }
 
-/** Compact current-branch PR chip for the Changes header — number, title,
- * and CI summary. Opens the PR in the system browser on click. */
 export const BranchPrStatusChip = ({ pr, className }: BranchPrStatusChipProps) => {
   const failing = pr.checksSummary.includes("failing")
   const pending = pr.checksSummary.includes("pending")

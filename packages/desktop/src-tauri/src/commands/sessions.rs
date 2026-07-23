@@ -1,4 +1,3 @@
-//! Session CRUD, subscribe, and title suggestion.
 
 use super::common::{parse_isolation, require_service};
 use super::git::capture_session_baseline;
@@ -10,11 +9,7 @@ pub struct CreateSessionInput {
     pub title: Option<String>,
     pub model: Option<String>,
     pub cwd: Option<String>,
-    /// `never` | `optional` | `required` — falls back to prefs.default_isolation.
     pub isolation: Option<String>,
-    /// Attach an existing worktree (see `list_workspaces`) on the first
-    /// prompt instead of provisioning a new one. Ignored when the resolved
-    /// isolation policy doesn't want a workspace.
     pub reuse_workspace_id: Option<String>,
 }
 
@@ -24,9 +19,6 @@ struct SessionBaselineReady {
     session_id: String,
 }
 
-/// Capture + persist a session baseline off the create/resume hot path.
-/// Changes falls back to full-repo status until this finishes; the UI
-/// refetches git-status when `session-baseline-ready` fires.
 pub(crate) fn schedule_session_baseline(app: tauri::AppHandle, session_id: String, cwd: PathBuf) {
     tauri::async_runtime::spawn(async move {
         let Some(state) = app.try_state::<AppState>() else {
@@ -42,13 +34,10 @@ pub(crate) fn schedule_session_baseline(app: tauri::AppHandle, session_id: Strin
         {
             let mut inflight = state.baseline_inflight.lock().await;
             if !inflight.insert(session_id.clone()) {
-                // Another create/subscribe path already scheduled this id.
                 return;
             }
         }
 
-        // Missing / deleted project folders are common (stale recents). Don't
-        // shell out to git — one clear warn, then stop.
         if !cwd.is_dir() {
             tracing::warn!(
                 session_id = %session_id,
@@ -80,7 +69,6 @@ pub(crate) fn schedule_session_baseline(app: tauri::AppHandle, session_id: Strin
             Some(baseline) => {
                 let inserted = {
                     let mut baselines = state.session_baselines.lock().await;
-                    // Never overwrite an existing baseline (resume race / double schedule).
                     match baselines.entry(session_id.clone()) {
                         std::collections::hash_map::Entry::Vacant(slot) => {
                             slot.insert(baseline);
@@ -151,13 +139,6 @@ pub async fn create_session(
         .await?;
     let meta = service.session_meta(&id).await?;
 
-    // Only non-isolated sessions need a baseline: isolated sessions get a
-    // clean private worktree, so their `git_status` is already scoped to
-    // this session's own changes. Non-fatal on any git failure — the
-    // Changes panel just falls back to the full-repo view for this session.
-    // Capture runs in the background so create_session returns immediately;
-    // the baseline is still persisted once ready (survives restart before
-    // resume — same guarantee as the previous synchronous path).
     if meta.base_cwd.is_none() {
         schedule_session_baseline(app, id.to_string(), meta.cwd.clone());
     }
@@ -183,14 +164,6 @@ pub async fn session_meta(
     Ok(service.session_meta(&id).await?)
 }
 
-/// One-shot, tool-free title suggestion for a session's first turn (reference-
-/// style semantic auto-title). Reuses the session's own model via the
-/// `Provider::stream_chat` primitive directly — bypassing the full
-/// session/tool/event-stream loop entirely, since this is a single
-/// throwaway completion with no persistence, no tools, and no transcript.
-/// Fire-and-forget from the caller's perspective: any failure (no model set,
-/// provider error, empty output) surfaces as an `Err` and the caller should
-/// just keep the existing title.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn suggest_session_title(
@@ -242,8 +215,6 @@ pub async fn suggest_session_title(
         .trim()
         .to_string();
     if title.is_empty() {
-        // Model returned nothing usable — fall back to a prompt prefix so the
-        // session still gets a meaningful name instead of staying "New Agent".
         let fallback: String = prompt_text
             .split_whitespace()
             .take(6)
@@ -261,8 +232,6 @@ pub async fn suggest_session_title(
     Ok(title)
 }
 
-/// Stable error prefix the UI maps to the completion setup modal.
-
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn resume_session(
@@ -275,11 +244,6 @@ pub async fn resume_session(
     let result = match service.resume_session(&id).await {
         Ok(()) => Ok(()),
         Err(err) => {
-            // The engine can't always distinguish "workspace/cwd is gone" from
-            // other launch failures (e.g. a delegated agent's process spawn
-            // just returns an OS error string). Check the persisted cwd
-            // ourselves so the sidebar can show something actionable instead
-            // of a raw "No such file or directory (os error 2)".
             if let Ok(meta) = service.session_meta(&id).await {
                 if !meta.cwd.exists() {
                     return Err(DesktopError::Message(format!(
@@ -292,24 +256,6 @@ pub async fn resume_session(
         }
     };
 
-    // Backfill a session baseline on resume ONLY for a genuinely
-    // baseline-less legacy session — one created before this feature
-    // existed (or before persistence was added), which therefore has no
-    // entry in the persisted map at all. With persistence in place, a
-    // session created via `create_session` always already has a persisted
-    // baseline by the time it's resumed, so this branch should not fire for
-    // it. Critically, this must NEVER re-capture over an *existing*
-    // baseline: doing so on every resume was the original bug — the
-    // in-memory-only map was lost on every app restart, so this branch
-    // always looked baseline-less and re-captured from the tree as it stood
-    // at resume time, silently swallowing the session's own prior edits.
-    // Now that baselines are persisted (see `create_session` and
-    // `crate::state::{load,save}_session_baselines`), that map survives
-    // restart, so this only ever fires once per legacy session — after
-    // which its baseline is persisted and stable forever after (that
-    // session will show nothing until further edits, which is acceptable:
-    // strictly better than swallowing edits on every single resume).
-    // Capture is deferred so resume returns without blocking on git.
     if result.is_ok() {
         let has_baseline = {
             let baselines = state.session_baselines.lock().await;
@@ -394,10 +340,6 @@ pub async fn subscribe_session(
     }
 
     let service = require_service(&state).await?;
-    // UI paints the chat immediately and resumes in the background
-    // (SessionSidebar / draft New Agent). Subscribe often races ahead of
-    // resume and would otherwise ERROR with "no live handle". Auto-resume
-    // here so the event relay attaches without forcing callers to serialize.
     let stream = match service.subscribe(&id) {
         Ok(stream) => stream,
         Err(err) => {
@@ -410,7 +352,6 @@ pub async fn subscribe_session(
                 "subscribe before resume; auto-resuming session"
             );
             if let Err(resume_err) = service.resume_session(&id).await {
-                // Match resume_session's actionable "workspace missing" mapping.
                 if let Ok(meta) = service.session_meta(&id).await {
                     if !meta.cwd.exists() {
                         return Err(DesktopError::Message(format!(
@@ -421,8 +362,6 @@ pub async fn subscribe_session(
                 }
                 return Err(DesktopError::from(resume_err));
             }
-            // Backfill baseline for legacy sessions the same way resume_session
-            // does when subscribe was the first attach path.
             let has_baseline = {
                 let baselines = state.session_baselines.lock().await;
                 baselines.contains_key(id.as_str())

@@ -1,5 +1,3 @@
-//! rmcp-backed MCP client with per-server connection pooling.
-
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::process::Stdio;
@@ -30,7 +28,6 @@ struct ServerSession {
     service: Mutex<Option<ClientSession>>,
 }
 
-/// Live MCP client backed by [`rmcp`].
 pub struct RmcpToolClient {
     servers: BTreeMap<String, McpServerConfig>,
     sessions: RwLock<BTreeMap<String, Arc<ServerSession>>>,

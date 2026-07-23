@@ -1,7 +1,3 @@
-//! Tauri commands — thin wrappers over `EngineService` + keychain config.
-//!
-//! Split by feature so each surface stays reviewable; `lib.rs` still registers
-//! handlers as `commands::foo` via the re-exports below.
 
 mod prelude;
 

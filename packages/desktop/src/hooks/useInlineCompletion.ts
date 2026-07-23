@@ -17,20 +17,13 @@ import { useInlineCompletionPrefs } from "./useInlineCompletionPrefs"
 type UseInlineCompletionArgs = {
   draft: string
   caret: number
-  /** When true (@ / trays open), never fetch or accept. */
   traysOpen: boolean
-  /** Surface-level enable (e.g. composer enabled). */
   surfaceEnabled?: boolean
   setDraft: (value: string) => void
   setCaret: (caret: number) => void
-  /** Focus + setSelectionRange after accept. */
   focusCaret?: (caret: number) => void
 }
 
-/**
- * Debounced ghost-text completion for prompt surfaces. Client ignores stale
- * responses via a generation counter (Tauri invokes are not cancelable).
- */
 export const useInlineCompletion = ({
   draft,
   caret,
@@ -51,12 +44,10 @@ export const useInlineCompletion = ({
   const completionEnabled =
     pluginOn && surfaceEnabled && !!prefs?.enabled && configured
 
-  // Clear on every draft/caret/tray change; refetch after debounce.
   useEffect(() => {
     setSuggestion("")
     setLastError(null)
     if (!completionEnabled || traysOpen) return
-    // v1: only complete at end of draft so ghost can append after the backdrop.
     if (caret !== draft.length) return
     if (!isCaretAtEndOfLine(draft, caret)) return
     const prefix = draft.slice(0, caret)
@@ -96,7 +87,6 @@ export const useInlineCompletion = ({
     prefs?.setupDismissed,
   ])
 
-  // Soft nudge: typing with plugin on but unconfigured (and not dismissed).
   useEffect(() => {
     if (!pluginOn || !surfaceEnabled || traysOpen) return
     if (configured || prefs?.setupDismissed) return
@@ -133,7 +123,6 @@ export const useInlineCompletion = ({
     try {
       await save({ ...prefs, setupDismissed: true })
     } catch {
-      // non-fatal
     }
   }
 

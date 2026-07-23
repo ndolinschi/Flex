@@ -7,7 +7,6 @@ type PushToast = (
   action?: { label: string; onAction: () => void },
 ) => void
 
-/** Shared success/degraded toast after create-PR commands. */
 export const toastPrOutcome = (
   pushToast: PushToast,
   outcome: CreatePrOutcome,

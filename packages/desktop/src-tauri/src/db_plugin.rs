@@ -1,7 +1,3 @@
-//! Desktop Database UI plugin — connection + schema/table browse + query.
-//!
-//! Not part of the agent engine: Tauri IPC only, consumed by the right-panel
-//! Database tab registered through the frontend UI plugin registry.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -27,10 +23,7 @@ pub struct DbConnectionSpec {
     pub id: String,
     pub name: String,
     pub engine: DbEngine,
-    /// SQLite file path, or postgres/mysql URL (`postgres://…`, `mysql://…`).
     pub target: String,
-    /// Normalized project cwd this connection belongs to. Empty string = legacy
-    /// unscoped entry (hidden from project-scoped lists until re-saved).
     #[serde(default)]
     pub project_key: String,
 }
@@ -75,8 +68,6 @@ enum LiveConn {
 #[derive(Default)]
 pub struct DbPluginState {
     specs: HashMap<String, DbConnectionSpec>,
-    /// Active connection id per `project_key` so switching projects never
-    /// leaves another project's selection selected.
     active_by_project: HashMap<String, String>,
     live: HashMap<String, LiveConn>,
 }
@@ -120,10 +111,6 @@ fn db_state(state: &AppState) -> &Mutex<DbPluginState> {
     &state.db_plugin
 }
 
-/// Normalize a session cwd into a stable project key for connection scoping.
-/// Empty input → empty key (legacy / no project). Separators → `/`, trailing
-/// slashes stripped; on Windows the key is lowercased so drive-letter case
-/// does not split the same folder.
 pub fn normalize_project_key(cwd: &str) -> String {
     let trimmed = cwd.trim();
     if trimmed.is_empty() {
@@ -401,7 +388,6 @@ pub async fn db_query(
     }
 }
 
-/// Table names from live connections for this project — for composer `@` suggestions.
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip_all, err)]
 pub async fn db_mention_tables(
@@ -502,8 +488,6 @@ fn new_id() -> String {
     format!("db-{nanos:x}")
 }
 
-/// Validate + normalize connection targets so a leftover SQLite path can't be
-/// saved under MySQL/Postgres. `mysql2://` is rewritten to `mysql://`.
 fn normalize_db_target(engine: DbEngine, target: &str) -> DesktopResult<String> {
     let t = target.trim();
     match engine {

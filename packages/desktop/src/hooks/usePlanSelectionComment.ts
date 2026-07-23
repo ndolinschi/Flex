@@ -7,7 +7,6 @@ export type PlanSelectionAnchor = {
   anchor: { x: number; y: number }
 }
 
-/** Compute the character offset of `node`/`offset` within `root`'s text. */
 const offsetWithin = (
   root: HTMLElement,
   targetNode: Node,
@@ -24,11 +23,6 @@ const offsetWithin = (
   return null
 }
 
-/**
- * Capture a non-empty text selection inside the plan body and expose a
- * floating Comment affordance. Opening the composer is a separate step
- * (`openComposer`) so accidental selections don't jump straight into a form.
- */
 export const usePlanSelectionComment = (
   containerRef: RefObject<HTMLElement | null>,
   enabled: boolean,
@@ -53,7 +47,6 @@ export const usePlanSelectionComment = (
     }
 
     const onMouseUp = () => {
-      // Don't clobber an open composer.
       if (composerOpen) return
 
       const root = containerRef.current
@@ -108,7 +101,6 @@ export const usePlanSelectionComment = (
     composerOpen,
     openComposer,
     clearSelection,
-    /** Draft for the popover — only when the composer is open. */
     draft: composerOpen && selection ? selection : null,
   }
 }

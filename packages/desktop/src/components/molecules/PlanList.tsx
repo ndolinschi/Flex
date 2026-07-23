@@ -16,8 +16,6 @@ type PlanListProps = {
   className?: string
 }
 
-/** Multi-plan "Review plans" list — shown when a session has more than one
- * ExitPlanMode document. Newest plans are listed first. */
 export const PlanList = ({ plans, onSelect, className }: PlanListProps) => {
   const ordered = [...plans].sort((a, b) => b.createdAtMs - a.createdAtMs)
 

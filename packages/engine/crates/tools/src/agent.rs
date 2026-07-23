@@ -1,11 +1,3 @@
-//! `Agent`: delegate a scoped job to a subagent.
-//!
-//! This crate ships only the descriptor — execution is intercepted and run by
-//! the engine loop (it needs to spawn a child session, which a pure tool
-//! cannot). The description is written for the orchestrator model: it teaches
-//! when to fan out searchers vs workers and how to write a self-contained
-//! brief.
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -22,25 +14,15 @@ use crate::fs::schema_of;
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct AgentInput {
-    /// Which role runs the task (see the tool description for the list).
     role: String,
-    /// A 3-7 word label shown to the user, e.g. "map session event flow".
     description: String,
-    /// The self-contained brief: everything the subagent needs, since it
-    /// sees none of this conversation.
     prompt: String,
-    /// Precisely what the subagent should return.
     #[serde(default)]
     expected_output: Option<String>,
-    /// Optional model override for this subagent (e.g.
-    /// "anthropic/claude-opus-4-8" or a bare model id resolvable by the
-    /// registry). Defaults to the role's models or the parent's model.
     #[serde(default)]
     model: Option<String>,
 }
 
-/// The `Agent` descriptor. `run` is never reached in a correct build — the
-/// loop intercepts calls by name and runs a subagent instead.
 struct AgentTool {
     description: String,
 }
@@ -71,8 +53,6 @@ impl Tool for AgentTool {
     }
 }
 
-/// Build an `Agent` tool whose description advertises the spawnable `roles`
-/// as `(name, one-line summary)` pairs.
 pub fn subagent_tool(roles: &[(String, String)]) -> Arc<dyn Tool> {
     let role_lines = if roles.is_empty() {
         "  (no roles configured)".to_owned()

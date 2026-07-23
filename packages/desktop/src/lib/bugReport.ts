@@ -1,4 +1,3 @@
-/** GitHub issues destination for in-app Submit Bug reports. */
 export const BUG_REPORT_ISSUES_URL =
   "https://github.com/ndolinschi/Flex/issues/new"
 
@@ -11,11 +10,9 @@ export type BugReportContext = {
   appVersion: string
   os: string
   sessionId: string | null
-  /** Recent session / turn identifiers from this app session. */
   taskIds: string[]
 }
 
-/** Build a GitHub new-issue URL with the user note + disclosed diagnostics. */
 export const buildBugReportUrl = (
   description: string,
   ctx: BugReportContext,

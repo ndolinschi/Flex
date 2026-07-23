@@ -1,7 +1,3 @@
-//! The real process host now lives in `agentloop-delegator-common`;
-//! re-exported here for backwards compatibility. The live probe test
-//! stays with the crate that knows the CLI.
-
 pub use agentloop_delegator_common::TokioCommandHost;
 
 #[cfg(test)]

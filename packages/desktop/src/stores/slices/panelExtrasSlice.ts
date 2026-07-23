@@ -3,6 +3,70 @@ import type { AppState, PanelExtrasSliceState } from "../types"
 import { emptyBrowserSessionState, sessionScopeKey } from "../types"
 import { persistUiState } from "../persist"
 import { isRightPanelTabEnabled } from "../../lib/featureFlags"
+import {
+  fileTabId,
+  makeFileTab,
+  type ContentLayout,
+} from "../contentLayoutModel"
+
+const removeFileTabsFromLayout = (
+  layout: ContentLayout,
+  tabId: string,
+): ContentLayout => {
+  let changed = false
+  const panes = layout.panes.map((p) => {
+    if (!p.tabs.some((t) => t.id === tabId)) return p
+    changed = true
+    const closedIndex = p.tabs.findIndex((t) => t.id === tabId)
+    const tabs = p.tabs.filter((t) => t.id !== tabId)
+    return {
+      ...p,
+      tabs,
+      activeTabId:
+        p.activeTabId === tabId
+          ? (tabs[closedIndex]?.id ?? tabs[closedIndex - 1]?.id ?? null)
+          : p.activeTabId,
+    }
+  }) as ContentLayout["panes"]
+  if (!changed) return layout
+
+  let next: ContentLayout = { ...layout, panes }
+  if (next.mode === "split" && (next.panes[1]?.tabs.length ?? 0) === 0) {
+    next = {
+      mode: "single",
+      splitRatio: next.splitRatio,
+      focusedPane: 0,
+      panes: [next.panes[0]!],
+    }
+  }
+  return next
+}
+
+const renameFileTabsInLayout = (
+  layout: ContentLayout,
+  sessionId: string,
+  from: string,
+  to: string,
+): ContentLayout => {
+  const fromId = fileTabId(sessionId, from)
+  const nextTab = makeFileTab(sessionId, to)
+  let changed = false
+  const panes = layout.panes.map((p) => {
+    const idx = p.tabs.findIndex((t) => t.id === fromId)
+    if (idx < 0) return p
+    changed = true
+    const tabs = [...p.tabs]
+    const prev = tabs[idx]!
+    tabs[idx] = { ...nextTab, groupId: prev.groupId }
+    return {
+      ...p,
+      tabs,
+      activeTabId: p.activeTabId === fromId ? nextTab.id : p.activeTabId,
+    }
+  }) as ContentLayout["panes"]
+  if (!changed) return layout
+  return { ...layout, panes }
+}
 
 export const createPanelExtrasSlice: StateCreator<
   AppState,
@@ -25,6 +89,7 @@ export const createPanelExtrasSlice: StateCreator<
   openFilesBySession: {},
   activeFileBySession: {},
   fileDraftsBySession: {},
+  artifactFocusPathBySession: {},
   openTab: (sessionKey, tab) => {
     if (!isRightPanelTabEnabled(tab)) return
     const prev = get().openTabsBySession[sessionKey] ?? []
@@ -45,7 +110,7 @@ export const createPanelExtrasSlice: StateCreator<
   },
   setOpenTabsBySession: (value) => set({ openTabsBySession: value }),
   openWorkspaceFile: (sessionKey, path) => {
-    const trimmed = path.trim()
+    const trimmed = path.trim().replace(/\\/g, "/")
     if (!trimmed || trimmed.endsWith("/")) return
     const prev = get().openFilesBySession[sessionKey] ?? []
     const openFilesBySession = prev.includes(trimmed)
@@ -61,20 +126,31 @@ export const createPanelExtrasSlice: StateCreator<
         [sessionKey]: trimmed,
       },
     })
-    get().openTab(sessionKey, "files")
-    // sessionKey is the session id (or "none").
     if (sessionKey !== "none") {
-      get().openToolBesideChat(sessionKey, "files")
+      get().openFileBesideChat(sessionKey, trimmed)
     }
   },
   closeWorkspaceFile: (sessionKey, path) => {
+    const normalized = path.replace(/\\/g, "/")
     const prev = get().openFilesBySession[sessionKey] ?? []
-    if (!prev.includes(path)) return
-    const remaining = prev.filter((p) => p !== path)
+    if (!prev.includes(normalized) && !prev.includes(path)) {
+      // Still strip any stray content tab for this path.
+      if (sessionKey !== "none") {
+        const tabId = fileTabId(sessionKey, normalized)
+        const layout = removeFileTabsFromLayout(get().contentLayout, tabId)
+        if (layout !== get().contentLayout) {
+          set({ contentLayout: layout })
+          void persistUiState({ contentLayout: layout })
+        }
+      }
+      return
+    }
+    const remaining = prev.filter((p) => p !== normalized && p !== path)
     const drafts = { ...(get().fileDraftsBySession[sessionKey] ?? {}) }
+    delete drafts[normalized]
     delete drafts[path]
     const active = get().activeFileBySession[sessionKey]
-    set({
+    const patch: Partial<AppState> = {
       openFilesBySession: {
         ...get().openFilesBySession,
         [sessionKey]: remaining,
@@ -82,17 +158,28 @@ export const createPanelExtrasSlice: StateCreator<
       activeFileBySession: {
         ...get().activeFileBySession,
         [sessionKey]:
-          active === path ? (remaining[remaining.length - 1] ?? null) : active,
+          active === normalized || active === path
+            ? (remaining[remaining.length - 1] ?? null)
+            : active,
       },
       fileDraftsBySession: {
         ...get().fileDraftsBySession,
         [sessionKey]: drafts,
       },
-    })
+    }
+    if (sessionKey !== "none") {
+      const tabId = fileTabId(sessionKey, normalized)
+      const layout = removeFileTabsFromLayout(get().contentLayout, tabId)
+      if (layout !== get().contentLayout) {
+        patch.contentLayout = layout
+        void persistUiState({ contentLayout: layout })
+      }
+    }
+    set(patch)
   },
   renameWorkspaceFile: (sessionKey, from, to) => {
-    const trimmedFrom = from.trim()
-    const trimmedTo = to.trim()
+    const trimmedFrom = from.trim().replace(/\\/g, "/")
+    const trimmedTo = to.trim().replace(/\\/g, "/")
     if (!trimmedFrom || !trimmedTo || trimmedFrom === trimmedTo) return
     if (trimmedTo.endsWith("/")) return
 
@@ -103,12 +190,12 @@ export const createPanelExtrasSlice: StateCreator<
 
     const drafts = { ...(get().fileDraftsBySession[sessionKey] ?? {}) }
     if (trimmedFrom in drafts) {
-      drafts[trimmedTo] = drafts[trimmedFrom]
+      drafts[trimmedTo] = drafts[trimmedFrom]!
       delete drafts[trimmedFrom]
     }
 
     const active = get().activeFileBySession[sessionKey]
-    set({
+    const patch: Partial<AppState> = {
       openFilesBySession: {
         ...get().openFilesBySession,
         [sessionKey]: openFiles,
@@ -121,12 +208,32 @@ export const createPanelExtrasSlice: StateCreator<
         ...get().fileDraftsBySession,
         [sessionKey]: drafts,
       },
-    })
+    }
+    if (sessionKey !== "none") {
+      const layout = renameFileTabsInLayout(
+        get().contentLayout,
+        sessionKey,
+        trimmedFrom,
+        trimmedTo,
+      )
+      if (layout !== get().contentLayout) {
+        patch.contentLayout = layout
+        void persistUiState({ contentLayout: layout })
+      }
+    }
+    set(patch)
   },
   setActiveWorkspaceFile: (sessionKey, path) =>
     set((state) => ({
       activeFileBySession: {
         ...state.activeFileBySession,
+        [sessionKey]: path,
+      },
+    })),
+  setArtifactFocusPath: (sessionKey, path) =>
+    set((state) => ({
+      artifactFocusPathBySession: {
+        ...state.artifactFocusPathBySession,
         [sessionKey]: path,
       },
     })),
@@ -157,6 +264,7 @@ export const createPanelExtrasSlice: StateCreator<
       openFilesBySession: omit(get().openFilesBySession),
       activeFileBySession: omit(get().activeFileBySession),
       fileDraftsBySession: omit(get().fileDraftsBySession),
+      artifactFocusPathBySession: omit(get().artifactFocusPathBySession),
       terminalsBySession: omit(get().terminalsBySession),
       activeTerminalIdBySession: omit(get().activeTerminalIdBySession),
       agentStreamSessions: omit(get().agentStreamSessions),

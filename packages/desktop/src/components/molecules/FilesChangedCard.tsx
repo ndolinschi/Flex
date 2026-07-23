@@ -25,18 +25,10 @@ const STATUS_COLOR: Record<string, string> = {
   R: "text-blue",
 }
 
-/**
- * Compact "N files changed" summary in the chat feed after a turn. Click the
- * headline to expand an inline file list; click a file to open it in the
- * Files (Monaco) tab. "Review" still opens Changes for undo/diff/commit.
- */
 export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
   const [expanded, setExpanded] = useState(false)
   const openToolBesideChat = useAppStore((s) => s.openToolBesideChat)
   const openWorkspaceFile = useAppStore((s) => s.openWorkspaceFile)
-  // Empty drafts must not surface pre-existing repo dirt (or a freshly
-  // provisioned worktree's noise) as "N files changed" before the agent
-  // has done any work.
   const hasActivity = useAppStore((s) =>
     sessionId ? sessionHasActivity(s, sessionId) : false,
   )
@@ -75,12 +67,8 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
     openWorkspaceFile(sessionScopeKey(sessionId), path)
   }
 
-  const hiddenCount = Math.max(0, totalCount - files.length)
-
   return (
-    <div className="overflow-hidden rounded-[var(--radius-lg)] border border-stroke-3 bg-transparent">
-      {/* Shared horizontal recipe with file rows: px-2 shell + px-1.5 row
-          gutters so chevron/icon and Review/status share one vertical axis. */}
+    <div className="overflow-hidden rounded-[var(--radius-lg)] border border-stroke-3 bg-fill-5/50">
       <div className="flex min-h-[var(--end-of-turn-reserved-height)] items-center gap-2 px-2">
         <Button
           variant="ghost"
@@ -94,9 +82,9 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
           className="h-auto min-w-0 flex-1 justify-start gap-1.5 rounded-md px-1.5 py-1 font-normal hover:bg-fill-4"
         >
           {expanded ? (
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-icon-3" aria-hidden />
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
           ) : (
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-icon-3" aria-hidden />
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
           )}
           <span className="truncate text-base text-ink">
             {totalCount} file{totalCount === 1 ? "" : "s"} changed
@@ -106,7 +94,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
         <Button
           variant="ghost"
           onClick={handleReview}
-          className="h-auto shrink-0 gap-1 rounded-md px-1.5 py-1 text-xs text-accent font-normal hover:bg-transparent hover:opacity-80"
+          className="h-auto shrink-0 gap-0.5 rounded-md px-1.5 py-1 text-xs font-normal text-ink-muted hover:bg-transparent hover:text-ink"
         >
           Review
           <ArrowRight className="h-3 w-3" aria-hidden />
@@ -115,7 +103,7 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
 
       {expanded ? (
         <ul className="border-t border-stroke-3 px-2 py-1" role="list">
-          {files.map((file) => {
+          {files.slice(0, 20).map((file) => {
             const isDir = file.path.endsWith("/")
             const name = isDir ? file.path : basename(file.path)
             const dir =
@@ -162,28 +150,28 @@ export const FilesChangedCard = ({ cwd, sessionId }: FilesChangedCardProps) => {
                       size="xs"
                       className="shrink-0"
                     />
-                  ) : (
-                    <span
-                      className={cn(
-                        "w-3.5 shrink-0 text-center font-mono text-xs",
-                        statusClass,
-                      )}
-                    >
-                      {file.status === "?" ? "U" : file.status}
-                    </span>
-                  )}
+                  ) : null}
+                  <span
+                    className={cn(
+                      "w-3.5 shrink-0 text-center font-mono text-xs",
+                      statusClass,
+                    )}
+                  >
+                    {file.status === "?" ? "U" : file.status}
+                  </span>
                 </Button>
               </li>
             )
           })}
-          {truncated || hiddenCount > 0 ? (
+          {totalCount > 20 || truncated ? (
             <li className="px-1.5 py-1 text-xs text-ink-muted">
               <Button
                 variant="link"
                 onClick={handleReview}
                 className="h-auto px-0 py-0 text-xs text-accent font-normal"
               >
-                +{hiddenCount > 0 ? hiddenCount : "more"} in Changes
+                +{Math.max(0, totalCount - Math.min(20, files.length))} in
+                Changes
               </Button>
             </li>
           ) : null}

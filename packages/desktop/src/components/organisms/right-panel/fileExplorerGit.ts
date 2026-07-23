@@ -26,7 +26,6 @@ export const isValidBasename = (name: string): boolean => {
   return true
 }
 
-/** Map git porcelain paths → status letter; also index dirty dir prefixes. */
 export const buildGitStatusIndex = (
   files: ReadonlyArray<{ path: string; status: string }> | undefined,
 ): GitStatusIndex => {
@@ -36,7 +35,6 @@ export const buildGitStatusIndex = (
   for (const f of files) {
     const path = f.path.replace(/\\/g, "/")
     byPath.set(path, f.status)
-    // Untracked dirs arrive with a trailing slash.
     if (path.endsWith("/")) {
       dirtyDirs.add(path.replace(/\/+$/, ""))
     }

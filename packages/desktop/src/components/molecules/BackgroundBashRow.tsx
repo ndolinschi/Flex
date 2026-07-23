@@ -21,13 +21,6 @@ const useBackgroundExitState = (
   return parseExitMarker(tail)
 }
 
-/** Distinct feed row for a `Bash` call started with `run_in_background:
- * true` (see `isBackgroundBashCall`). Renders a subtle pulsing dot + Stop
- * button while running; once the engine's `[process exited...]` marker
- * appears in the tail (authoritative — see `parseExitMarker`), swaps to an
- * exited state showing the code when parseable. The persisted tail keeps
- * rendering underneath via the same `ExecTail` used for foreground shell
- * rows. */
 export const BackgroundBashRow = ({ detail }: { detail: ToolStepDetail }) => {
   const sessionId = useAppStore((s) => s.activeSessionId)
   const exitState = useBackgroundExitState(detail.id)
@@ -35,9 +28,6 @@ export const BackgroundBashRow = ({ detail }: { detail: ToolStepDetail }) => {
   const [stopError, setStopError] = useState<string | null>(null)
 
   const exited = exitState.exited
-  // Structured `running` from the start call's result is the fallback before
-  // any tail has streamed in (e.g. preview mock with no exec_chunk yet);
-  // the exit marker always wins once seen.
   const running = !exited && (detail.background?.initiallyRunning ?? detail.running)
 
   const handleStop = () => {
@@ -108,12 +98,3 @@ export const BackgroundBashRow = ({ detail }: { detail: ToolStepDetail }) => {
   )
 }
 
-/** "Move to background" affordance for a running foreground shell row (see
- * `MOVE-TO-BACKGROUND`, `detail.canDemote`): sits next to the running
- * spinner, mirroring the reference design's inline row action. On click,
- * calls `backgroundDemote`; a `false` result (nothing to demote — the call
- * already finished, or the backend doesn't support it) is treated as a
- * silent no-op, not an error, since it's a benign race rather than a
- * failure. On success the row flips to the background presentation on its
- * own once the engine's demoted result lands (see `isDemotedBashCall`) — no
- * local "demoted" state to track here. */

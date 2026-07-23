@@ -1,5 +1,3 @@
-//! Gemini provider implementation.
-
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::sync::Arc;

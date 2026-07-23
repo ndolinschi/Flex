@@ -1,22 +1,3 @@
-//! First-prompt workspace provisioning for isolated root sessions.
-//!
-//! When a session is created with an isolation policy that wants isolation,
-//! `NativeAgent::create_session` deliberately does not spawn a worktree — it
-//! records the policy (and any `reuse_workspace_id` hint) on `SessionMeta`
-//! but leaves `cwd` pointed at the project directory. The actual provision
-//! (or attach) happens here, on the first turn, so:
-//!
-//! - The UI has time between create and first prompt to let the user pick
-//!   an existing workspace to reuse (or fall through to a fresh one).
-//! - `create_session` stays off the `git` hot path.
-//! - A session that never sees a prompt never leaves a worktree behind.
-//!
-//! Once provisioned we patch the session meta with `cwd` (the worktree
-//! root), `workspace_id`, `base_cwd` (the original project directory), and
-//! clear `reuse_workspace_id`; then emit a persistent
-//! [`AgentEvent::WorkspaceProvisioned`] so the transcript records the same
-//! event shape as an eager-provisioned session.
-
 use std::sync::Arc;
 
 use agentloop_contracts::{AgentEvent, SessionMeta, SessionMetaPatch};
@@ -25,13 +6,6 @@ use agentloop_core::AgentError;
 use crate::deps::TurnDeps;
 use crate::session_handle::SessionHandle;
 
-/// If `meta` is a depth-0 session whose isolation policy wants a workspace
-/// but hasn't been provisioned yet, provision (or attach a reuse hint) and
-/// return the updated `SessionMeta` — otherwise return `meta` unchanged.
-/// Emits a persistent `WorkspaceProvisioned` on success.
-///
-/// Failure semantics mirror `create_session`: `Required` propagates the
-/// error; `Optional` logs and continues in place.
 pub(crate) async fn ensure_root_workspace(
     deps: &Arc<TurnDeps>,
     handle: &Arc<SessionHandle>,
@@ -62,7 +36,6 @@ pub(crate) async fn ensure_root_workspace(
         return Ok(meta);
     };
 
-    // Reuse an existing worktree if a hint was provided, else provision fresh.
     let outcome = match reuse.as_deref() {
         Some(id) => backend.attach(&base_cwd, id, &meta.id, policy).await,
         None => backend.provision(&base_cwd, &meta.id, policy).await,
@@ -95,8 +68,6 @@ pub(crate) async fn ensure_root_workspace(
     let workspace_id = workspace.id.clone();
     let base_ref = workspace.base_ref.clone();
 
-    // Persist the new coordinates. Empty string / empty path clears the
-    // pending reuse hint — see `SessionMetaPatch` docs.
     deps.store
         .update_meta(
             &meta.id,
@@ -130,9 +101,6 @@ pub(crate) async fn ensure_root_workspace(
         "isolated workspace ready on first turn"
     );
 
-    // Return the updated meta so the caller doesn't need to re-read the
-    // store; callers that already read `meta.cwd` before this call must
-    // switch to the returned value.
     Ok(SessionMeta {
         cwd: workspace_root,
         workspace_id: Some(workspace_id),

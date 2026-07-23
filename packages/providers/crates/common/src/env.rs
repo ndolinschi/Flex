@@ -1,9 +1,6 @@
-//! Environment variable helpers for provider configuration.
-
 use agentloop_contracts::ProviderId;
 use agentloop_core::ProviderError;
 
-/// Read an optional env var, treating empty and whitespace-only values as unset.
 pub fn optional_env(name: &str) -> Option<String> {
     std::env::var(name)
         .ok()
@@ -11,7 +8,6 @@ pub fn optional_env(name: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-/// Read a required provider credential from the environment.
 pub fn required_env(
     provider: &ProviderId,
     name: &str,

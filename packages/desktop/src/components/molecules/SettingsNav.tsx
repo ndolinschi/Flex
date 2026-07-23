@@ -28,7 +28,6 @@ export type SettingsNavItem = {
   label: string
 }
 
-/** Nav order + labels for our section set (see DESIGN.md Settings nav). */
 const ALL_SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { id: "general", label: "General" },
   { id: "appearance", label: "Appearance" },
@@ -42,13 +41,10 @@ const ALL_SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { id: "diagnostics", label: "Diagnostics" },
 ]
 
-/** Visible settings nav — Automations gated by `AUTOMATIONS_UI_ENABLED`. */
 export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = ALL_SETTINGS_NAV_ITEMS.filter(
   (item) => item.id !== "automations" || AUTOMATIONS_UI_ENABLED,
 )
 
-/** Icon per section — mapped from the reference `Bii` icon dictionary
- * (§7) onto lucide-react equivalents already used elsewhere in this app. */
 const NAV_ICONS: Record<SettingsSectionId, typeof Cog> = {
   general: Cog,
   appearance: Palette,
@@ -73,10 +69,6 @@ type SettingsNavProps = {
   onResultSelect: (entry: SettingsSearchEntry) => void
 }
 
-/** Persistent left nav (see DESIGN.md Settings shell / nav): width
- * clamp(100px,25%,200px), search-at-top that swaps the whole nav list for a
- * flat result list once the query is non-empty (navigate-to-result, not
- * inline filtering). */
 export const SettingsNav = ({
   active,
   onSelect,
@@ -157,7 +149,6 @@ export const SettingsNav = ({
                 onClick={() => onResultSelect(entry)}
                 onMouseEnter={() => onResultIndexChange(i)}
                 className={cn(
-                  // Sidebar-cell pad 6×8 r6; selected fill-2 / hover fill-4.
                   "h-auto w-full flex-col items-start gap-0 rounded-sm px-2 py-1.5 text-left leading-[1.5]",
                   "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                   i === resultIndex
@@ -187,7 +178,6 @@ export const SettingsNav = ({
                 onClick={() => onSelect(item.id)}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  // Cursor sidebar-cell: pad 6×8, r6; whisper selected/hover.
                   "h-auto w-full justify-start gap-1.5 rounded-sm px-2 py-1.5 text-sm leading-[1.5]",
                   "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                   isActive

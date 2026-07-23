@@ -1,5 +1,3 @@
-//! Helpers that assemble prompts, skills, and hooks for native composition.
-
 use std::sync::Arc;
 
 use agentloop_core::{Hook, PluginRegistry, PluginRole, PluginRoleTools, ToolRegistry};
@@ -14,7 +12,6 @@ use agentloop_prompts::{
 use crate::paths::{default_user_command_dir, default_user_memory_dir, default_user_skill_dir};
 use crate::{EngineConfig, EngineResult};
 
-/// Map a loop-independent [`PluginRole`] onto the loop's [`RoleSpec`].
 pub(super) fn plugin_role_to_spec(role: PluginRole) -> RoleSpec {
     let tools = match role.tools {
         PluginRoleTools::ReadOnly => RoleToolProfile::ReadOnly,

@@ -8,11 +8,9 @@ import type { PendingPermission } from "../lib/types"
 import { useAppStore } from "../stores/appStore"
 import { log } from "../lib/debug/log"
 
-/** Backend error when the engine no longer has this request in memory. */
 const isStalePermissionError = (message: string): boolean =>
   message.toLowerCase().includes("no pending permission request")
 
-/** Shared respond / allow-always bypass / stale-dismiss for permission HITL. */
 export const usePermissionRespond = (permission: PendingPermission) => {
   const setPendingPermission = useAppStore((s) => s.setPendingPermission)
   const setSessionBypass = useAppStore((s) => s.setSessionBypass)
@@ -24,8 +22,6 @@ export const usePermissionRespond = (permission: PendingPermission) => {
     setError(null)
     setIsSubmitting(true)
     try {
-      // Always allow → also arm session + live-turn bypass so subsequent
-      // tools in this run (and later turns) stop asking.
       if (decision === "allow_always") {
         setSessionBypass(permission.sessionId, true)
         try {

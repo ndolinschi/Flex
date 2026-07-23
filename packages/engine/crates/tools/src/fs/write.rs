@@ -1,5 +1,3 @@
-//! `Write`: create or replace a whole file.
-
 use std::path::Path;
 use std::sync::Arc;
 
@@ -15,15 +13,11 @@ use super::{FsState, check_freshness, modified_time, require_absolute, schema_of
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct WriteInput {
-    /// Absolute path to write.
     file_path: String,
-    /// Complete new file content.
     content: String,
-    /// Create missing parent directories. Defaults to false.
     create_dirs: Option<bool>,
 }
 
-/// Create a new file or overwrite a file that has been read freshly.
 pub struct WriteTool {
     state: Arc<FsState>,
 }

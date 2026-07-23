@@ -1,23 +1,16 @@
-//! Launch configuration for the Copilot CLI.
-
 use std::path::PathBuf;
 
 use agentloop_delegator_common::{DelegatorProcessSpec, DelegatorRunRequest};
 
-/// How `copilot` is invoked. Defaults follow the CLI's public preview
-/// surface: `copilot -p "<prompt>"` for one-shot programmatic runs,
-/// `copilot --version` for probing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CopilotConfig {
     pub program: String,
     pub cwd: Option<PathBuf>,
-    /// Let Copilot use its own tools without interactive approval
-    /// (`--allow-all-tools`). Off by default: a delegated run has no approval
-    /// channel, so enabling this hands Copilot unattended tool access.
+
     pub allow_all_tools: bool,
-    /// Model override passed as `--model <value>` when set.
+
     pub model: Option<String>,
-    /// Extra arguments appended verbatim (escape hatch for CLI drift).
+
     pub extra_args: Vec<String>,
     pub probe_args: Vec<String>,
 }
@@ -42,8 +35,6 @@ impl CopilotConfig {
         )
     }
 
-    /// One-shot prompt invocation: `copilot [--allow-all-tools] [--model m]
-    /// [extra args] -p <prompt>`.
     pub fn prompt_request(&self, prompt: impl Into<String>) -> DelegatorRunRequest {
         let mut spec = DelegatorProcessSpec::new(self.program.clone());
         if self.allow_all_tools {

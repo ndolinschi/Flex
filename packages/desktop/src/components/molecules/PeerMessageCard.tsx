@@ -9,8 +9,6 @@ type Props = {
   tsMs: number
 }
 
-/** Timeline card for a `peer_message` event — a note sent between two
- * active agents (e.g. "I'm editing auth.ts — please avoid that file"). */
 export const PeerMessageCard = ({ from, to, content, aboutPath }: Props) => (
   <div className="flex items-start gap-2 rounded-md border border-stroke-3 bg-fill-3 px-3 py-2 text-sm">
     <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-icon-2" aria-hidden />

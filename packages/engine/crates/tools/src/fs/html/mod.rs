@@ -1,5 +1,3 @@
-//! HTML cleaning utilities for model-facing page content.
-
 mod content;
 mod links;
 mod nav;

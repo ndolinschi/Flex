@@ -12,10 +12,6 @@ type McpCatalogCardProps = {
   onConfigure?: (entry: McpCatalogEntry) => void
 }
 
-/** Compact catalog row for the "Browse catalog" list — name + one-line
- * truncated description on the left, right-aligned Install / Configure /
- * Installed controls, matching `SettingsSection`'s inset-divider row anatomy
- * so the catalog reads as one family with the "MCP servers" list below it. */
 export const McpCatalogCard = ({
   entry,
   installed,

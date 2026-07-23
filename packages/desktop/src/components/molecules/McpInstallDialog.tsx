@@ -19,11 +19,8 @@ import { Input } from "@/components/ui/input"
 
 type McpInstallDialogProps = {
   entry: McpCatalogEntry | null
-  /** When set, dialog is in configure mode (keep-blank-to-keep for secrets). */
   mode?: "install" | "configure"
-  /** Prefill for non-secret fields when configuring an existing server. */
   initialValues?: CatalogInstallValues | null
-  /** Secret env keys already stored (configure mode). */
   configuredSecretEnv?: string[]
   hasSecretArgs?: boolean
   isLoading: boolean
@@ -32,10 +29,6 @@ type McpInstallDialogProps = {
   onInstall: (values: CatalogInstallValues) => void
 }
 
-/** Small inline-form dialog collecting the args/env values a catalog entry
- * needs before install (e.g. filesystem's path, Slack's bot token). Also
- * reused as "Configure" for already-installed catalog servers — secret
- * fields accept empty to keep the existing encrypted value. */
 export const McpInstallDialog = ({
   entry,
   mode = "install",

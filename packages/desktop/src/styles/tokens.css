@@ -1,24 +1,11 @@
-/* ── Design tokens — Cursor glass + Agents Web (neutral, no blue cast) ─────
- *
- * Structure / recipes: Cursor.app `workbench.glass.main.css` (desktop glass).
- * Surfaces / ink: Agents Web pure gray (HTML 7：42 / 7：56 / IDE 8：22) so the
- * UI does not pick up the glass cool-blue cast (ecf1fa / 0c0e11 blues).
- *
- * Dark surfaces (Agents Web):
- *   chrome  #141414 · sidebar #181818 · elevated #1d1e20 · base #f0f0f0
- * Glass structure kept: white-alpha strokes, hover 7%, soft ambient, vibrancy.
- *
- * Flex names stay stable; product monochrome accent remains factory default.
- */
 
 :root,
 [data-theme="dark"] {
-  /* ── Neutral pure gray (Agents Web) — glass depth without cool blue ───── */
-  --color-chrome: #141414; /* chat / shell */
-  --color-panel: #181818; /* sidebar */
-  --color-editor: #181818; /* file reader / editor work surface */
-  --color-elevated: #1d1e20; /* bubbles / popovers / raised */
-  --color-base: #f0f0f0; /* neutral ink for mixes (NOT cool #ecf1fa) */
+  --color-chrome: #141414;
+  --color-panel: #181818;
+  --color-editor: #181818;
+  --color-elevated: #1d1e20;
+  --color-base: #f0f0f0;
 
   --color-accent-raw: #599ce7;
   --color-action-label: #1a1a1a;
@@ -48,7 +35,6 @@
   --shadow-color: var(--shadow-primary);
   --shadow-ambient: var(--shadow-secondary);
 
-  /* Syntax on elevated editor */
   --syntax-foreground: #d6d6dd;
   --syntax-background: #1d1e20;
   --syntax-keyword: #82d2ce;
@@ -62,7 +48,6 @@
   --syntax-link: #87c3ff;
   --syntax-string-expression: #e394dc;
 
-  /* Product monochrome accent (factory) — neutral white on dark. */
   --color-accent: #f0f0f0;
   --color-accent-hover: #ffffff;
   --color-accent-subtle: color-mix(in srgb, #f0f0f0 14%, transparent);
@@ -82,7 +67,6 @@
 }
 
 [data-theme="light"] {
-  /* ── Primitives (`:root` light) ────────────────────────────────────────── */
   --color-chrome: #f8f8f8;
   --color-panel: #f3f3f3;
   --color-editor: #fcfcfc;
@@ -117,7 +101,6 @@
   --shadow-color: var(--shadow-primary);
   --shadow-ambient: var(--shadow-secondary);
 
-  /* Syntax (light) */
   --syntax-foreground: #141414eb;
   --syntax-background: #fcfcfc;
   --syntax-keyword: #b3003f;
@@ -149,18 +132,13 @@
   --color-diff-removed: color-mix(in oklab, var(--color-removed) 18%, transparent);
 }
 
-/* ── Semantic ladder (theme-independent; re-derives from primitives) ───────
- * Exact percentages from production `color-mix(in oklab, …)`. */
 :root {
-  /* Surfaces */
   --color-bg-chrome: var(--color-chrome);
   --color-bg-sidebar: var(--color-panel);
   --color-bg-editor: var(--color-editor);
   --color-bg-elevated: var(--color-elevated);
   --color-bg-scrim: #0006;
 
-  /* Whisper fills — glass recipe on neutral base (no cool blue).
-   * tertiary 8% selected · quaternary 6% hover · hover ~7% */
   --color-bg-primary: color-mix(in oklab, var(--color-base) 20%, transparent);
   --color-bg-secondary: color-mix(in oklab, var(--color-base) 14%, transparent);
   --color-bg-tertiary: color-mix(in oklab, var(--color-base) 8%, transparent);
@@ -184,14 +162,12 @@
   );
   --color-bg-quinary-opaque: color-mix(in oklab, var(--color-base) 4%, var(--color-bg-chrome));
 
-  /* agent-sidebar-cell: selected = tertiary, hover = quaternary */
   --color-fill-1: var(--color-bg-primary);
-  --color-fill-2: var(--color-bg-tertiary); /* selected */
+  --color-fill-2: var(--color-bg-tertiary);
   --color-fill-3: var(--color-bg-quinary);
-  --color-fill-4: var(--color-bg-quaternary); /* hover */
+  --color-fill-4: var(--color-bg-quaternary);
   --color-fill-5: color-mix(in oklab, var(--color-base) 2.5%, transparent);
 
-  /* Neutral ink ladder (Agents Web oklab on --base — works light + dark). */
   --color-text-1: var(--color-base);
   --color-text-2: color-mix(in oklab, var(--color-base) 74%, transparent);
   --color-text-3: color-mix(in oklab, var(--color-base) 60%, transparent);
@@ -201,13 +177,11 @@
   --color-text-inverted-tertiary: color-mix(in oklab, var(--color-chrome) 48%, transparent);
   --color-text-inverted-quaternary: color-mix(in oklab, var(--color-chrome) 32%, transparent);
 
-  /* Icon ladder tracks ink (glass alphas mapped onto neutral base). */
   --color-icon-1: color-mix(in oklab, var(--color-base) 88%, transparent);
   --color-icon-2: color-mix(in oklab, var(--color-base) 62%, transparent);
   --color-icon-3: color-mix(in oklab, var(--color-base) 42%, transparent);
   --color-icon-4: color-mix(in oklab, var(--color-base) 30%, transparent);
 
-  /* Glass strokes via base (theme-safe; dark ≈ white 16%/9%). */
   --color-border-primary: color-mix(in oklab, var(--color-base) 20%, transparent);
   --color-border-secondary: color-mix(in oklab, var(--color-base) 16%, transparent);
   --color-border-tertiary: color-mix(in oklab, var(--color-base) 9%, transparent);
@@ -220,7 +194,6 @@
   --color-stroke-3: var(--color-border-tertiary);
   --color-stroke-4: var(--color-border-quaternary);
 
-  /* Semantic text */
   --color-text-success: var(--color-success-raw);
   --color-text-success-secondary: color-mix(in oklab, var(--color-success-raw) 78%, transparent);
   --color-text-success-tertiary: color-mix(in oklab, var(--color-success-raw) 64%, transparent);
@@ -236,7 +209,6 @@
   --color-text-brand: var(--color-brand);
   --color-text-accent-cursor: var(--color-accent-raw);
 
-  /* Semantic backgrounds (solid + hover + whisper ladder) */
   --color-bg-success: var(--color-success-raw);
   --color-bg-success-hover: color-mix(in oklab, var(--color-base) 10%, var(--color-success-raw));
   --color-bg-success-secondary: color-mix(in oklab, var(--color-success-raw) 24%, transparent);
@@ -267,7 +239,6 @@
   --color-bg-accent-cursor-tertiary: color-mix(in oklab, var(--color-accent-raw) 12%, transparent);
   --color-bg-accent-cursor-quaternary: color-mix(in oklab, var(--color-accent-raw) 8%, transparent);
 
-  /* Semantic borders */
   --color-border-brand: color-mix(in oklab, var(--color-brand) 92%, transparent);
   --color-border-brand-secondary: color-mix(in oklab, var(--color-brand) 56%, transparent);
   --color-border-brand-tertiary: color-mix(in oklab, var(--color-brand) 32%, transparent);
@@ -276,7 +247,6 @@
   --color-border-accent-cursor-secondary: color-mix(in oklab, var(--color-accent-raw) 56%, transparent);
   --color-border-accent-cursor-tertiary: color-mix(in oklab, var(--color-accent-raw) 32%, transparent);
 
-  /* Semantic aliases used across the app */
   --color-bg: var(--color-chrome);
   --color-surface: var(--color-panel);
   --color-surface-raised: var(--color-fill-4);
@@ -299,8 +269,6 @@
   --color-thinking: var(--color-text-3);
   --color-code-bg: var(--color-panel);
 
-  /* Composer mode semantics (Flex domain — tinted whisper fills) */
-  /* Mode tints quieter (~10%) so pills read tinted, not neon (main neatness). */
   --color-mode-agent-bg: color-mix(in oklab, var(--color-green) 10%, transparent);
   --color-mode-agent-fg: var(--color-green);
   --color-mode-plan-bg: color-mix(in oklab, var(--color-yellow) 10%, transparent);
@@ -310,9 +278,6 @@
   --color-mode-flex-bg: color-mix(in oklab, var(--color-purple) 10%, transparent);
   --color-mode-flex-fg: var(--color-purple);
 
-  /* Typography — production size ladder (7：56 HTML).
-   * UI: Inter first (prompt + web fallbacks). Code: JetBrains Mono / Cascadia. */
-  /* Glass desktop: system sans; code Menlo/Monaco first (editor 12px). */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Inter",
     sans-serif;
   --font-mono: Menlo, Monaco, "Cascadia Code", "SF Mono", "JetBrains Mono",
@@ -320,17 +285,16 @@
   --editor-font-size: 12px;
   --editor-line-height: 18px;
 
-  /* Cursor glass: normal ~418, medium 500, semibold/bold 600. */
   --font-weight-normal: 418;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 600;
 
-  --text-xs: 0.6875rem; /* 11px — font-size-xs */
-  --text-sm: 0.75rem; /* 12px — font-size-sm */
-  --text-base: 0.8125rem; /* 13px — font-size-base */
-  --text-lg: 1rem; /* 16px — production font-size-lg */
-  --text-xl: 1.25rem; /* 20px — production font-size-xl */
+  --text-xs: 0.6875rem;
+  --text-sm: 0.75rem;
+  --text-base: 0.8125rem;
+  --text-lg: 1rem;
+  --text-xl: 1.25rem;
   --text-2xl: 1.5rem;
 
   --leading-tight: 1.25;
@@ -338,19 +302,17 @@
   --leading-relaxed: 1.5;
   --line-height-xs: 0.875rem;
   --line-height-sm: 1rem;
-  --line-height-base: 1.125rem; /* pairs with text-base */
+  --line-height-base: 1.125rem;
   --line-height-lg: 1.5rem;
   --line-height-xl: 1.75rem;
 
   --tracking-caption: 0.07px;
   --tracking-body: -0.078px;
 
-  /* Icons — thin stroke, 14–16px (production cursor-icon / lucide). */
   --icon-size-sm: 14px;
   --icon-size-md: 16px;
   --icon-stroke: 1.5;
 
-  /* Spacing — Cursor dense 4px grid with half-steps (px values). */
   --space-0-25: 1px;
   --space-0-5: 2px;
   --space-0-75: 3px;
@@ -378,22 +340,20 @@
   --space-14: 56px;
   --space-16: 64px;
 
-  /* Radius — glass workbench (base 8, lg 10, xl 14) */
   --radius-none: 0px;
   --radius-2xs: 2px;
   --radius-xs: 4px;
-  --radius-sm: 6px; /* agent-sidebar-cell border-radius */
-  --radius-md: 8px; /* cursor-radius-base — controls */
-  --radius-lg: 10px; /* cursor-radius-lg */
-  --radius-xl: 14px; /* cursor-radius-xl — bubbles */
-  --radius-2xl: 16px; /* cursor-radius-2xl */
-  --radius-3xl: 18px; /* cursor-radius-3xl */
-  --radius-bubble: 14px; /* cursor-radius-xl — human-message */
-  --radius-composer: 14px; /* cursor-radius-xl — chat-composer-card */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
+  --radius-3xl: 18px;
+  --radius-bubble: 14px;
+  --radius-composer: 14px;
   --radius-card: 12px;
   --radius-full: 9999px;
 
-  /* Shadows — Cursor box-shadow recipes (soft, layered) */
   --shadow-sm: 0 2px 8px 0 var(--shadow-secondary);
   --shadow-md:
     0 0 0 1px var(--color-border-tertiary),
@@ -409,7 +369,6 @@
     0 24px 16px 6px var(--shadow-tertiary);
   --shadow-soft: 0 0 8px 2px var(--shadow-tertiary);
   --shadow-base: 0 0 8px 2px var(--shadow-primary);
-  /* Glass composer: idle inset stroke-3 + soft ambient (hover/focus in recipes). */
   --shadow-composer:
     inset 0 0 0 1px var(--color-border-tertiary),
     0 1px 4px 0 color-mix(in srgb, var(--shadow-tertiary) 40%, transparent);
@@ -422,7 +381,6 @@
     0 0 4px 0 var(--shadow-secondary),
     0 8px 24px -2px var(--shadow-secondary);
 
-  /* Motion — Cursor production */
   --duration-instant: 50ms;
   --duration-fast: 100ms;
   --duration-normal: 150ms;
@@ -440,50 +398,40 @@
   --easing-in-strong: cubic-bezier(0.895, 0.03, 0.685, 0.22);
   --easing-end-turn: cubic-bezier(0.23, 1, 0.32, 1);
 
-  /* Layout — Cursor glass desktop body (titlebar 35px, sidebar 210–400). */
-  --sidebar-width: 16.25rem; /* 260px Agents / Cursor density default */
-  --titlebar-height: 35px; /* glass-titlebar height */
-  --traffic-lights-spacer: 80px; /* glass macOS traffic-lights spacer */
+  --sidebar-width: 17.5rem;
+  --titlebar-height: 35px;
+  --traffic-lights-spacer: 80px;
   --window-radius: 10px;
-  /* Tab strips / dense chrome rows (not the window title bar). */
   --header-height: 30px;
-  /* Chat thread header + right-panel toolbars (Agents web + glass panels). */
   --chat-header-height: 40px;
   --panel-toolbar-height: 40px;
-  /* File tree toggle width (production Hide file tree control). */
   --file-tree-toggle-width: 26px;
   --composer-min-height: 1.5rem;
   --composer-max-height: 10rem;
   --timeline-row-min-height: 1.25rem;
-  --status-bar-height: 1.75rem;
-  /* Clamp chat column density when the right split is closed (Cursor middle-column feel). */
+  --status-bar-height: 1.25rem;
   --content-rail: min(100%, 45rem);
   --form-rail: 32rem;
   --welcome-rail: 28rem;
   --end-of-turn-reserved-height: 1.25rem;
 
-  /* Scrollbar (Cursor: 8px, thin, border-tertiary thumb) */
   --scrollbar-size: 8px;
   --scrollbar-thumb: var(--color-border-tertiary);
   --scrollbar-thumb-hover: var(--color-border-secondary);
   --scrollbar-thumb-active: var(--color-text-3);
 
-  /* Focus ring — neutral stroke, never accent glow (production + DESIGN.md). */
   --focus-ring-color: var(--color-border-secondary);
   --focus-ring-width: 1px;
   --focus-ring-offset: 2px;
   --focus-ring: var(--focus-ring-width) solid var(--focus-ring-color);
-  /* denser in-panel focus (lists, selects) */
   --focus-ring-inset: 0 0 0 1px var(--color-border-secondary);
 
-  /* Overlay ladder */
   --z-tooltip: 250;
   --z-overlay: 300;
   --z-toast: 400;
   --z-modal: 500;
 }
 
-/* ── Phase 0 foundation defaults (vars only; rules live in index.css) ───── */
 :root {
   --icon-size: var(--icon-size-sm);
 }

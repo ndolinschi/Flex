@@ -1,5 +1,3 @@
-//! Permission policy evaluation and HITL ask for one tool call.
-
 use std::sync::{Arc, Mutex};
 
 use tokio_util::sync::CancellationToken;

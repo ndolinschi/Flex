@@ -12,14 +12,9 @@ type ErrorBannerProps = {
   message: string
   onDismiss?: () => void
   className?: string
-  /** Optional short title above the message. */
   title?: string
 }
 
-/**
- * Quiet inline error callout — dismissible, no loud red slabs. Prefer this
- * over modals for recoverable failures (composer, settings, timeline).
- */
 export const ErrorBanner = ({
   message,
   onDismiss,
@@ -32,7 +27,6 @@ export const ErrorBanner = ({
     <Alert
       variant="destructive"
       className={cn(
-        // Whisper danger: thin tint border + subtle fill, not a solid red block.
         "border-danger/15 bg-danger-subtle/70 py-1.5 text-danger",
         className,
       )}

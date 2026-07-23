@@ -1,7 +1,3 @@
-//! Desktop Artifacts UI plugin — index of AI-created non-code deliverables.
-//!
-//! Persists an artifact index at `{cwd}/.flex/artifacts/index.json`
-//! (one per project). Commands are consumed by the right-panel Artifacts tab.
 
 use std::path::{Path, PathBuf};
 
@@ -9,8 +5,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::db_plugin::normalize_project_key;
 use crate::error::{DesktopError, DesktopResult};
-
-// ── Wire types ───────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -47,37 +41,28 @@ pub struct CsvPreview {
     pub row_count: usize,
 }
 
-// ── Kind inference ────────────────────────────────────────────────────────────
-
-/// Infer artifact kind from a file path.  Returns `None` for code / source
-/// files that should not be auto-registered.
 pub fn infer_artifact_kind(path: &str) -> Option<ArtifactKind> {
     let lower = path.to_ascii_lowercase();
     let ext = lower.rsplit('.').next().unwrap_or("");
 
-    // Artifact-bearing parent directories add strong signal.
     let in_artifact_dir = lower.contains("/artifacts/")
         || lower.contains("/reports/")
         || lower.contains("/exports/")
         || lower.contains("/plans/");
 
-    let kind = match ext {
+    match ext {
         "csv" | "tsv" => Some(ArtifactKind::Csv),
         "xlsx" | "xls" | "ods" => Some(ArtifactKind::Spreadsheet),
         "pptx" | "ppt" | "key" => Some(ArtifactKind::Presentation),
         "png" | "jpg" | "jpeg" | "webp" | "gif" => Some(ArtifactKind::Image),
         "svg" | "mmd" | "dot" => Some(ArtifactKind::Diagram),
         "pdf" | "docx" => Some(ArtifactKind::Document),
-        // Generic text/markdown/html in artifact dirs → document.
         "md" | "txt" | "html" | "htm" | "json" | "yaml" | "yml" | "xml" if in_artifact_dir => {
             Some(ArtifactKind::Document)
         }
         _ => None,
-    };
-    kind
+    }
 }
-
-// ── Index I/O ─────────────────────────────────────────────────────────────────
 
 fn index_path(project_key: &str) -> DesktopResult<PathBuf> {
     if project_key.is_empty() {
@@ -85,8 +70,6 @@ fn index_path(project_key: &str) -> DesktopResult<PathBuf> {
             "project folder is required to manage artifacts".into(),
         ));
     }
-    // project_key IS the normalized cwd (absolute path, forward-slashes).
-    // Reconstruct the OS-native path.
     let root = PathBuf::from(project_key.replace('/', std::path::MAIN_SEPARATOR_STR));
     let dir = root.join(".flex").join("artifacts");
     std::fs::create_dir_all(&dir)
@@ -113,8 +96,6 @@ fn save_index(project_key: &str, index: &[Artifact]) -> DesktopResult<()> {
         .map_err(|e| DesktopError::Message(format!("write artifacts index: {e}")))
 }
 
-// ── Path helpers ──────────────────────────────────────────────────────────────
-
 fn new_id() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let nanos = SystemTime::now()
@@ -130,13 +111,11 @@ fn now_iso() -> String {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
-    // Simple RFC 3339 UTC timestamp without pulling in chrono.
     let d = secs / 86_400;
     let t = secs % 86_400;
     let h = t / 3600;
     let m = (t % 3600) / 60;
     let s = t % 60;
-    // Civil date from days (Howard Hinnant's algorithm).
     let z = d as i64 + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let doe = (z - era * 146_097) as u64;
@@ -150,10 +129,8 @@ fn now_iso() -> String {
     format!("{yr:04}-{mo:02}-{dy:02}T{h:02}:{m:02}:{s:02}Z")
 }
 
-/// Reject relative paths and any `..` traversal; return `None` on rejection.
 fn safe_relative_path(project_key: &str, relative_path: &str) -> Option<PathBuf> {
     let rel = Path::new(relative_path);
-    // Must be relative and contain no `..` component.
     if rel.is_absolute() {
         return None;
     }
@@ -165,12 +142,9 @@ fn safe_relative_path(project_key: &str, relative_path: &str) -> Option<PathBuf>
     }) {
         return None;
     }
-    // Reconstruct absolute path.
     let root = PathBuf::from(project_key.replace('/', std::path::MAIN_SEPARATOR_STR));
     Some(root.join(rel))
 }
-
-// ── Commands ──────────────────────────────────────────────────────────────────
 
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip_all, err)]
@@ -200,7 +174,6 @@ pub async fn artifacts_register(
     if rel.is_empty() {
         return Err(DesktopError::Message("relative_path is required".into()));
     }
-    // Validate the path.
     if safe_relative_path(&key, &rel).is_none() {
         return Err(DesktopError::Message(
             "relative_path must not be absolute or contain '..'".into(),
@@ -225,7 +198,6 @@ pub async fn artifacts_register(
 
     let mut index = load_index(&key).unwrap_or_default();
 
-    // Upsert by (project_key, relative_path).
     if let Some(existing) = index.iter_mut().find(|a| a.relative_path == rel) {
         existing.session_id = session_id.trim().to_string();
         existing.kind = kind;
@@ -283,7 +255,6 @@ pub async fn artifacts_preview_csv(
 
     let limit = max_rows.unwrap_or(200).clamp(1, 2000) as usize;
 
-    // Read + parse synchronously — CSV files are expected to be small.
     let content = std::fs::read_to_string(&abs)
         .map_err(|e| DesktopError::Message(format!("read csv: {e}")))?;
 
@@ -323,7 +294,7 @@ pub async fn artifacts_preview_csv(
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip_all, err)]
 pub async fn artifacts_open_external(
-    app: tauri::AppHandle,
+    _app: tauri::AppHandle,
     project_key: String,
     id: String,
 ) -> DesktopResult<()> {
@@ -340,8 +311,6 @@ pub async fn artifacts_open_external(
     tauri_plugin_opener::open_path(abs, None::<&str>)
         .map_err(|e| DesktopError::Message(format!("open external: {e}")))
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn mime_for_kind(kind: &ArtifactKind, path: &str) -> Option<String> {
     let ext = path.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
@@ -386,8 +355,6 @@ fn mime_for_kind(kind: &ArtifactKind, path: &str) -> Option<String> {
         ArtifactKind::Other => None,
     }
 }
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -472,7 +439,6 @@ mod tests {
             infer_artifact_kind("exports/data.json"),
             Some(ArtifactKind::Document)
         );
-        // Code files in artifact dirs are still not promoted.
         assert_eq!(infer_artifact_kind("artifacts/helper.ts"), None);
     }
 

@@ -1,48 +1,23 @@
-//! Git-aware repo walker: enumerates indexable files with stable content
-//! hashes so the rest of the pipeline can detect "unchanged" files cheaply.
-//!
-//! Respects `.gitignore`/`.git/info/exclude` via the `ignore` crate, skips
-//! binary files (content sniff) and anything over [`MAX_FILE_BYTES`].
-
 use std::path::{Path, PathBuf};
 
 use ignore::overrides::OverrideBuilder;
 
-/// Files larger than this are skipped entirely (never indexed).
 pub const MAX_FILE_BYTES: u64 = 1_024 * 1_024;
 
-/// Directory name the index store persists itself under (see
-/// `tools::shared::index_dir_for`). Always excluded from scans so the store
-/// never indexes its own tantivy segments/manifest as source content.
 pub const INDEX_STORE_DIR_NAME: &str = ".agentloop";
 
-/// Number of leading bytes sniffed to decide if a file looks binary.
 const SNIFF_BYTES: usize = 8_192;
 
-/// One file discovered by the scanner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScannedFile {
-    /// Absolute path on disk.
     pub path: PathBuf,
-    /// Path relative to the scan root, used as the stable index key.
     pub rel_path: String,
-    /// blake3 hex digest of the file's raw bytes at scan time.
     pub content_hash: String,
-    /// File size in bytes.
     pub size: u64,
 }
 
-/// Walk `root`, returning every text file that should be indexed.
-///
-/// Ignore rules (`.gitignore`, `.git/info/exclude`, global gitignore) are
-/// honored; hidden files are included unless ignored (mirrors `Glob`/`Grep`).
-/// Binary files (detected by a null-byte sniff of the first
-/// [`SNIFF_BYTES`]) and files over [`MAX_FILE_BYTES`] are skipped silently —
-/// this is a best-effort scan, not a strict manifest.
 pub fn scan_repo(root: &Path) -> Vec<ScannedFile> {
     let mut overrides = OverrideBuilder::new(root);
-    // Best-effort: an invalid pattern here would be a programmer error, not
-    // a user-facing one, so fall back to no overrides rather than panic.
     let _ = overrides.add(&format!("!{INDEX_STORE_DIR_NAME}/"));
     let overrides = overrides.build().unwrap_or_else(|_| {
         OverrideBuilder::new(root)
@@ -56,10 +31,6 @@ pub fn scan_repo(root: &Path) -> Vec<ScannedFile> {
         .git_ignore(true)
         .git_exclude(true)
         .parents(true)
-        // Honor `.gitignore` even when `root` isn't itself inside a `.git`
-        // repo (e.g. a test fixture, or a subdirectory handed to us
-        // directly) — the default `require_git(true)` would silently skip
-        // `.gitignore` rules in that case.
         .require_git(false)
         .overrides(overrides)
         .build()
@@ -97,10 +68,6 @@ pub fn scan_repo(root: &Path) -> Vec<ScannedFile> {
     out
 }
 
-/// Cheap binary sniff: a NUL byte in the first [`SNIFF_BYTES`] almost always
-/// means non-text content. Good enough for a first pass; false negatives
-/// (e.g. binary files with no NUL in the prefix) just get lexically indexed
-/// as garbage text, which is harmless.
 fn looks_binary(bytes: &[u8]) -> bool {
     let take = bytes.len().min(SNIFF_BYTES);
     bytes[..take].contains(&0)

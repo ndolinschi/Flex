@@ -14,7 +14,6 @@ type AttachmentChipProps = {
   onRemove: (id: string) => void
 }
 
-/** Pending attachment chip in the Composer input strip. */
 export const AttachmentChip = ({ attachment, onRemove }: AttachmentChipProps) => {
   const Icon =
     attachment.kind === "image"

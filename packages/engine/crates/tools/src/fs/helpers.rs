@@ -1,5 +1,3 @@
-//! Shared filesystem-tool helpers.
-
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -7,13 +5,11 @@ use agentloop_core::ToolError;
 
 use super::FsState;
 
-/// Derive an input schema for a tool.
 pub(crate) fn schema_of<I: schemars::JsonSchema>() -> serde_json::Value {
     serde_json::to_value(schemars::schema_for!(I))
         .unwrap_or_else(|_| serde_json::json!({"type": "object"}))
 }
 
-/// Parse a `file_path` argument, teaching the model to pass absolute paths.
 pub(crate) fn require_absolute(raw: &str, cwd: &Path) -> Result<PathBuf, ToolError> {
     let path = PathBuf::from(raw);
     if path.is_absolute() {
@@ -28,10 +24,6 @@ pub(crate) fn require_absolute(raw: &str, cwd: &Path) -> Result<PathBuf, ToolErr
     }
 }
 
-/// Enforce the read-before-modify discipline for an existing file.
-///
-/// `current_mtime` is the file's mtime right now; `tool_name` names the
-/// caller (`Write` / `Edit`) so errors read naturally.
 pub(crate) fn check_freshness(
     state: &FsState,
     path: &Path,
@@ -57,8 +49,6 @@ pub(crate) fn modified_time(metadata: &std::fs::Metadata) -> SystemTime {
     metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH)
 }
 
-/// Resolve an optional search-root argument against the session cwd and
-/// verify it is an existing directory.
 pub(crate) async fn resolve_search_root(
     path: Option<&str>,
     cwd: &Path,

@@ -15,7 +15,6 @@ type ProviderProfileListProps = {
   onDelete: (id: string) => void
 }
 
-/** Named provider connections list (Connections settings section). */
 export const ProviderProfileList = ({
   profiles,
   editingId,
@@ -52,10 +51,8 @@ export const ProviderProfileList = ({
               if (e.key === "Enter" || e.key === " ") onSelect(p)
             }}
             className={cn(
-              // Denser than generic settings rows: closer to sidebar-cell rhythm.
               "flex cursor-pointer items-center justify-between gap-3 px-3.5 py-2 text-left",
               "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-              // Selected wins over hover (whisper fills: fill-2 > fill-4).
               editingId === p.id ? "bg-fill-2" : "hover:bg-fill-4",
             )}
           >

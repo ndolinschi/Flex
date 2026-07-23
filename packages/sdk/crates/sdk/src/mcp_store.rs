@@ -1,17 +1,7 @@
-//! On-disk storage for user-configured MCP servers: one `<id>.toml` per
-//! server under `~/.config/agentloop/mcp`, mirroring `routines.rs`'s
-//! `FileRoutineStore` (same directory-of-TOML-files shape, same reasoning —
-//! small, dependency-free, human-editable). The wire type
-//! (`agentloop_mcp::McpServerConfig`) already carries serde + schemars, so no
-//! new contract is needed here; this module is purely composition-time
-//! persistence glue, which is why it lives in `sdk` next to `routines`
-//! rather than in the engine-agnostic `gateway` workspace.
-
 use std::path::PathBuf;
 
 use agentloop_mcp::{McpBridgeConfig, McpServerConfig};
 
-/// The default user-level MCP server directory: `~/.config/agentloop/mcp`.
 pub fn default_mcp_dir() -> Option<PathBuf> {
     std::env::var_os("HOME").map(|home| {
         PathBuf::from(home)
@@ -30,7 +20,6 @@ pub enum McpStoreError {
     Storage(String),
 }
 
-/// File-backed store for [`McpServerConfig`]s: one `<id>.toml` per server.
 pub struct FileMcpStore {
     dir: PathBuf,
 }
@@ -40,8 +29,6 @@ impl FileMcpStore {
         Self { dir: dir.into() }
     }
 
-    /// Use the default user-level MCP directory. `None` when the home
-    /// directory cannot be resolved.
     pub fn with_default_dir() -> Option<Self> {
         default_mcp_dir().map(Self::new)
     }
@@ -73,11 +60,6 @@ impl FileMcpStore {
         .map_err(io_err)?
     }
 
-    /// Every server config whose `enabled` flag is set — what
-    /// `compose::build_service` folds into `EngineConfig.mcp` at
-    /// composition. Returns an empty [`McpBridgeConfig`] on read failure so a
-    /// broken/missing directory never blocks service composition (mirrors
-    /// the "dead MCP server is a warning, not a build failure" contract).
     pub async fn enabled_bridge_config(&self) -> McpBridgeConfig {
         let servers = self.list().await.unwrap_or_default();
         McpBridgeConfig {

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { remeasureMountedVirtualItems } from "./remeasureMountedVirtualItems"
 
-/** Plain measurable stub — vitest runs under `environment: "node"` (no jsdom). */
 const measurable = (offsetHeight: number) => ({ offsetHeight })
 
 describe("remeasureMountedVirtualItems", () => {

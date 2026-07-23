@@ -1,15 +1,4 @@
-//! Shared lazy-index-open/build logic for the `SearchCode` and `FindSymbol`
-//! tools: both tools need "the index for this session's cwd".
-//!
-//! `IndexStore::build` is itself incremental (it diffs against the persisted
-//! manifest and only re-processes changed files). Every tool call opens the
-//! store (cheap — a manifest/symbol JSON read plus an mmap handle). Whether
-//! it then calls `build()` depends on [`IndexOpenMode`]:
-//! - [`IndexOpenMode::AutoUpdate`] — always scan/update (previous default).
-//! - [`IndexOpenMode::ReuseWarm`] — if the on-disk index already has files,
-//!   reuse it as-is (no scan, no `IndexingStarted` UI). First use / empty
-//!   index still builds. Desktop Settings → Rebuild forces a refresh.
-
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -19,29 +8,14 @@ use agentloop_core::{EventSink, ToolError};
 use crate::embed::resolve_embedder;
 use crate::store::{IndexStore, UpdateStats};
 
-/// Repos above this file count get an info-level log line after indexing,
-/// since a from-scratch build can take a while and a silent tool call looks
-/// hung.
 const LARGE_REPO_FILE_THRESHOLD: usize = 20_000;
 
-/// Overrides the app-data *base* used by [`index_root_base`] (the directory
-/// under which `agentloop/index/<repo-hash>` is created), so tests and the
-/// desktop composition root never touch a real user data dir. Mirrors the
-/// env-override pattern used by `providers/{copilot,openai}`; not meant to
-/// be set in normal CLI operation.
 pub(crate) const INDEX_DIR_OVERRIDE_ENV: &str = "AGENTLOOP_INDEX_DIR";
 
-/// Process-wide override for [`index_root_base`], consulted *before* the
-/// env var. Lets tests redirect the tool path to a tempdir without
-/// `unsafe` env mutation (`unsafe_code` is forbidden in this workspace).
 static INDEX_ROOT_OVERRIDE: Mutex<Option<PathBuf>> = Mutex::new(None);
 
-/// Env var that enables index auto-update on tool use when set to a truthy
-/// value (`1`/`true`/`on`/`yes`, case-insensitive). Used by
-/// [`crate::IndexPlugin::default`]. Default is **off** (reuse warm index).
 pub const AUTO_UPDATE_ENV: &str = "AGENTLOOP_INDEX_AUTO_UPDATE";
 
-/// Parse a truthy env value for [`AUTO_UPDATE_ENV`].
 pub fn env_auto_update_enabled() -> bool {
     match std::env::var(AUTO_UPDATE_ENV) {
         Ok(raw) => {
@@ -52,15 +26,9 @@ pub fn env_auto_update_enabled() -> bool {
     }
 }
 
-/// Serializes tests that install [`set_index_root_override`]: `Tool::run`
-/// dispatches work onto a `spawn_blocking` thread pool, so a thread-local
-/// override would be invisible there, and parallel tests would race on the
-/// process-wide cell.
 #[cfg(test)]
 static INDEX_ROOT_OVERRIDE_GATE: Mutex<()> = Mutex::new(());
 
-/// Install (or clear) the process-wide index-root override used by
-/// [`index_root_base`]. Test-only: production never calls this.
 #[cfg(test)]
 pub(crate) fn set_index_root_override(path: Option<PathBuf>) {
     let mut guard = INDEX_ROOT_OVERRIDE
@@ -69,9 +37,6 @@ pub(crate) fn set_index_root_override(path: Option<PathBuf>) {
     *guard = path;
 }
 
-/// Acquire the gate that serializes live-accept tests using the index-root
-/// override. Caller must hold the returned guard for the duration of the
-/// override (including across `await` points that drive `Tool::run`).
 #[cfg(test)]
 pub(crate) fn lock_index_root_override() -> std::sync::MutexGuard<'static, ()> {
     INDEX_ROOT_OVERRIDE_GATE
@@ -79,13 +44,6 @@ pub(crate) fn lock_index_root_override() -> std::sync::MutexGuard<'static, ()> {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
-/// Resolve the app-data base directory that owns `agentloop/index/…`:
-/// process override (tests) → `$AGENTLOOP_INDEX_DIR` → `$XDG_DATA_HOME` →
-/// the platform data dir (`~/Library/Application Support` on macOS,
-/// `%LOCALAPPDATA%` on Windows, `~/.local/share` elsewhere) → temp dir.
-///
-/// Kept separate from [`index_dir_for`] so tests can exercise the latter as
-/// a pure function of an explicit `base`.
 pub fn index_root_base() -> PathBuf {
     if let Ok(guard) = INDEX_ROOT_OVERRIDE.lock() {
         if let Some(path) = guard.as_ref() {
@@ -123,19 +81,8 @@ pub fn index_root_base() -> PathBuf {
     std::env::temp_dir()
 }
 
-/// Where a repo's index lives under `base`: `<base>/agentloop/index/<repo-hash>`
-/// — in normal operation `base` is the platform app-data dir
-/// ([`index_root_base`]), so this resolves to e.g.
-/// `~/Library/Application Support/agentloop/index/<repo-hash>` on macOS —
-/// **never** inside the repo being indexed. Keying by a blake3 hash of the
-/// canonicalized repo root means every worktree/session for the same repo
-/// shares one on-disk index (per the scanner's design: incrementality keys
-/// on blob hash, not path), while distinct repos never collide. The crate
-/// itself stays agnostic about location: `IndexStore::open` takes an
-/// explicit `index_dir`; this function is the one policy decision, made
-/// once here for every tool that needs "the index for this cwd".
 pub fn index_dir_for(cwd: &Path, base: &Path) -> PathBuf {
-    let repo_root = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
+    let repo_root = index_identity_root(cwd);
     let hash = blake3::hash(repo_root.to_string_lossy().as_bytes());
     let repo_hash = hash.to_hex();
 
@@ -144,14 +91,49 @@ pub fn index_dir_for(cwd: &Path, base: &Path) -> PathBuf {
         .join(repo_hash.as_str())
 }
 
-/// Whether a tool/hook should refresh the on-disk index before searching.
+pub(crate) fn index_identity_root(cwd: &Path) -> PathBuf {
+    let canon = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
+    if let Some(main) = git_main_worktree_root(&canon) {
+        return main;
+    }
+    canon
+}
+
+fn git_main_worktree_root(cwd: &Path) -> Option<PathBuf> {
+    for dir in cwd.ancestors() {
+        let git = dir.join(".git");
+        if git.is_dir() {
+            return Some(dir.to_path_buf());
+        }
+        if !git.is_file() {
+            continue;
+        }
+        let contents = fs::read_to_string(&git).ok()?;
+        let gitdir = contents
+            .lines()
+            .find_map(|line| {
+                line.strip_prefix("gitdir:")
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+            })?
+            .to_owned();
+        let mut gitdir_path = PathBuf::from(&gitdir);
+        if gitdir_path.is_relative() {
+            gitdir_path = dir.join(gitdir_path);
+        }
+        let gitdir_path = gitdir_path.canonicalize().unwrap_or(gitdir_path);
+        for ancestor in gitdir_path.ancestors() {
+            if ancestor.file_name().is_some_and(|n| n == ".git") {
+                return ancestor.parent().map(Path::to_path_buf);
+            }
+        }
+    }
+    None
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IndexOpenMode {
-    /// Always scan the repo and incrementally update changed files.
     AutoUpdate,
-    /// Reuse a non-empty on-disk index without scanning. Builds only when
-    /// the index is missing or empty (first use). Default for desktop so a
-    /// warm index is not re-scanned on every new chat's `RepoMap` call.
     #[default]
     ReuseWarm,
 }
@@ -166,20 +148,6 @@ impl IndexOpenMode {
     }
 }
 
-/// Open (or create) the index rooted at `cwd` and optionally bring it up to
-/// date, at the given `index_dir`. The actual worker behind [`open_and_build`];
-/// split out so tests can pass an explicit scratch `index_dir` instead of
-/// depending on [`index_root_base`]'s env/`$HOME` resolution (this workspace
-/// forbids `unsafe_code`, so tests can't scope an env-var override the way
-/// `packages/desktop`'s composition root does elsewhere in this repo).
-///
-/// When `events` is provided and a build runs, emits `IndexingStarted` /
-/// progress notes / `IndexingCompleted` so the chat UI can show "Indexing
-/// repository…" instead of a silent hang. Progress notes use `ToolProgress`
-/// when `call_id` is set.
-///
-/// Prefer [`crate::status_for`] / [`IndexStore::status_counts`] for readiness
-/// checks — those never open tantivy.
 fn open_and_build_at(
     cwd: &Path,
     index_dir: &Path,
@@ -213,9 +181,11 @@ fn open_and_build_at(
         return Ok(store);
     }
 
+    let mut announced = false;
     if was_empty {
         tracing::info!(cwd = %cwd.display(), "SearchCode/FindSymbol: building code index for the first time");
         if let Some(sink) = events {
+            announced = true;
             sink.emit(AgentEvent::IndexingStarted {
                 reason: "first_build".to_owned(),
             });
@@ -229,31 +199,47 @@ fn open_and_build_at(
     }
 
     let mut announced_update = false;
-    let stats: UpdateStats = store
-        .build_with_progress(|done, total| {
-            if let Some(sink) = events {
-                if !was_empty && !announced_update && total > 0 {
-                    announced_update = true;
-                    sink.emit(AgentEvent::IndexingStarted {
-                        reason: "update".to_owned(),
+    let stats: UpdateStats = match store.build_with_progress(|done, total| {
+        if let Some(sink) = events {
+            if !was_empty && !announced_update && total > 0 {
+                announced_update = true;
+                announced = true;
+                sink.emit(AgentEvent::IndexingStarted {
+                    reason: "update".to_owned(),
+                });
+            }
+            if total > 0 {
+                let note = if was_empty {
+                    format!("Indexing repository… {done}/{total} files")
+                } else {
+                    format!("Updating code index… {done}/{total} files")
+                };
+                if let Some(id) = call_id {
+                    sink.emit(AgentEvent::ToolProgress {
+                        call_id: id.clone(),
+                        note,
                     });
                 }
-                if total > 0 {
-                    let note = if was_empty {
-                        format!("Indexing repository… {done}/{total} files")
-                    } else {
-                        format!("Updating code index… {done}/{total} files")
-                    };
-                    if let Some(id) = call_id {
-                        sink.emit(AgentEvent::ToolProgress {
-                            call_id: id.clone(),
-                            note,
-                        });
-                    }
+            }
+        }
+    }) {
+        Ok(stats) => stats,
+        Err(err) => {
+            if announced {
+                if let Some(sink) = events {
+                    sink.emit(AgentEvent::IndexingCompleted {
+                        added: 0,
+                        changed: 0,
+                        removed: 0,
+                        unchanged: 0,
+                    });
                 }
             }
-        })
-        .map_err(|err| ToolError::Execution(format!("Failed to build the code index: {err}.")))?;
+            return Err(ToolError::Execution(format!(
+                "Failed to build the code index: {err}."
+            )));
+        }
+    };
 
     let total = stats.added + stats.changed + stats.unchanged;
     let did_work = was_empty || stats.added + stats.changed > 0 || announced_update;
@@ -288,19 +274,15 @@ fn open_and_build_at(
     Ok(store)
 }
 
-/// Open (or create) the index rooted at `cwd` and bring it up to date.
 pub fn open_and_build(cwd: &Path) -> Result<IndexStore, ToolError> {
     open_and_build_with_mode(cwd, IndexOpenMode::AutoUpdate)
 }
 
-/// Open the index for `cwd` under [`IndexOpenMode`].
 pub fn open_and_build_with_mode(cwd: &Path, mode: IndexOpenMode) -> Result<IndexStore, ToolError> {
     let index_dir = index_dir_for(cwd, &index_root_base());
     open_and_build_at(cwd, &index_dir, None, None, mode)
 }
 
-/// Like [`open_and_build`], but streams indexing status into `events` so the
-/// chat UI can show live "Indexing repository…" feedback.
 pub fn open_and_build_with_events(
     cwd: &Path,
     events: &EventSink,
@@ -309,7 +291,6 @@ pub fn open_and_build_with_events(
     open_and_build_with_events_mode(cwd, events, call_id, IndexOpenMode::AutoUpdate)
 }
 
-/// Like [`open_and_build_with_events`], with an explicit [`IndexOpenMode`].
 pub fn open_and_build_with_events_mode(
     cwd: &Path,
     events: &EventSink,
@@ -320,15 +301,11 @@ pub fn open_and_build_with_events_mode(
     open_and_build_at(cwd, &index_dir, Some(events), call_id, mode)
 }
 
-/// Test-only equivalent of [`open_and_build`] that indexes under an explicit
-/// scratch directory (a `tempfile::TempDir`) instead of the real app-data
-/// index root, so test runs never write outside their own tempdirs.
 #[cfg(test)]
 pub(crate) fn open_and_build_in(cwd: &Path, index_root: &Path) -> Result<IndexStore, ToolError> {
     open_and_build_in_mode(cwd, index_root, IndexOpenMode::AutoUpdate)
 }
 
-/// Test-only open under an explicit index root and [`IndexOpenMode`].
 #[cfg(test)]
 pub(crate) fn open_and_build_in_mode(
     cwd: &Path,
@@ -385,6 +362,27 @@ mod tests {
     }
 
     #[test]
+    fn index_dir_for_shares_identity_across_linked_worktree() {
+        let index_root = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
+        let main = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
+        let worktree = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
+        let git_dir = main.path().join(".git");
+        fs::create_dir_all(git_dir.join("worktrees").join("wt")).unwrap_or_else(|e| panic!("{e}"));
+        let gitdir_line = format!(
+            "gitdir: {}\n",
+            git_dir.join("worktrees").join("wt").display()
+        );
+        fs::write(worktree.path().join(".git"), gitdir_line).unwrap_or_else(|e| panic!("{e}"));
+
+        let main_dir = index_dir_for(main.path(), index_root.path());
+        let wt_dir = index_dir_for(worktree.path(), index_root.path());
+        assert_eq!(
+            main_dir, wt_dir,
+            "linked worktree must share the main repo's index dir"
+        );
+    }
+
+    #[test]
     fn index_dir_for_never_uses_repo_root() {
         let index_root = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
         let repo = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
@@ -407,8 +405,6 @@ mod tests {
     #[test]
     fn index_root_base_is_outside_typical_repo_paths() {
         let base = index_root_base();
-        // Never the process cwd (a repo checkout in normal use) and never a
-        // bare `$HOME` — it must be an app-data / override / temp location.
         assert_ne!(base, PathBuf::from("."));
         if let Some(home) = std::env::var_os("HOME") {
             assert_ne!(base, PathBuf::from(home));

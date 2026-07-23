@@ -20,7 +20,6 @@ export const AgentTerminalRow = ({
         }
       }}
       className={cn(
-        // Match TerminalRow production pill (h-6 rounded-md quaternary selected).
         "group mx-1.5 flex h-6 w-[calc(100%-12px)] cursor-pointer items-center gap-1.5 rounded-md px-2 text-sm",
         "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
         selected

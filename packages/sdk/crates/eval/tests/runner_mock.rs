@@ -1,7 +1,3 @@
-//! End-to-end harness self-test: a scripted `MockProvider` deterministically
-//! solves the shipped `create-file` task, proving runner → check → report
-//! with no network and no API keys. The testkit is a dev-dependency only.
-
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -14,8 +10,6 @@ fn create_file_task_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../evals/tasks/create-file.toml")
 }
 
-/// A factory whose service is backed by a mock provider that writes the file
-/// the `create-file` check expects (when `solve` is true) or just talks.
 fn mock_factory(solve: bool) -> ServiceFactory {
     Arc::new(move |_target: EvalTarget, cwd: PathBuf| {
         Box::pin(async move {
@@ -68,12 +62,10 @@ async fn scripted_provider_solves_create_file_end_to_end() {
     assert!(run.metrics.num_tool_calls >= 1, "the Write tool was called");
     assert!(run.metrics.usage.input > 0);
 
-    // The raw JSONL transcript was dumped and contains a TurnCompleted event.
     let transcript = run.transcript_path.as_ref().expect("transcript dumped");
     let jsonl = std::fs::read_to_string(transcript).expect("transcript readable");
     assert!(jsonl.lines().any(|line| line.contains("turn_completed")));
 
-    // report.json is the CI artifact and round-trips through the gate.
     let json_path = out.path().join("report.json");
     let loaded = agentloop_eval::SuiteReport::load_json(&json_path).expect("report.json loads");
     assert!(loaded.regressions_against(&report).is_empty());

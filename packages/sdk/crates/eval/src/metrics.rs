@@ -1,33 +1,24 @@
-//! Per-run metrics, folded from the canonical event stream.
-//!
-//! Everything comes straight from `TurnCompleted.summary` — the engine already
-//! accounts usage, cost, model/tool call counts, and turn duration; no new
-//! instrumentation is needed.
-
 use serde::{Deserialize, Serialize};
 
 use agentloop_contracts::{AgentEvent, TokenUsage, TurnSummary};
 
-/// Aggregated metrics for one task run (possibly multiple turns).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct RunMetrics {
-    /// Completed turns folded in.
     pub turns: u32,
-    /// Token usage summed across turns.
+
     pub usage: TokenUsage,
-    /// Cost summed across turns; `None` when no turn reported cost.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost_usd: Option<f64>,
     pub num_model_calls: u32,
     pub num_tool_calls: u32,
-    /// Agent-reported turn duration, summed.
+
     pub agent_duration_ms: u64,
-    /// End-to-end wall time of the run (workspace prep + turn + check).
+
     pub wall_ms: u64,
 }
 
 impl RunMetrics {
-    /// Fold one completed turn's summary into the totals.
     pub fn fold_turn(&mut self, summary: &TurnSummary) {
         self.turns += 1;
         self.usage.add(&summary.usage);
@@ -39,7 +30,6 @@ impl RunMetrics {
         self.agent_duration_ms += summary.duration_ms;
     }
 
-    /// Fold one canonical event; only `TurnCompleted` carries metrics.
     pub fn fold_event(&mut self, event: &AgentEvent) {
         if let AgentEvent::TurnCompleted { summary, .. } = event {
             self.fold_turn(summary);

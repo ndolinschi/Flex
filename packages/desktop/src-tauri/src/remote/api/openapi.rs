@@ -1,6 +1,3 @@
-//! Static OpenAPI document for the desktop Remote Access `/v1` surface.
-//!
-//! Chat-only: list sessions, read filtered message events, send text prompts.
 
 pub fn openapi_json() -> serde_json::Value {
     serde_json::json!({

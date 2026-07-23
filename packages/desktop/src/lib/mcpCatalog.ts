@@ -1,64 +1,33 @@
-/** Curated MCP server catalog for the Tools & MCP "Browse catalog" list
- * (see `CustomizePage.tsx`'s `McpCatalogSection`). Static metadata only —
- * installing a card assembles an `McpServerDto` (stdio transport, the only
- * shape `mcp_upsert` writes for desktop-managed servers — see
- * `commands.rs::mcp_dto_to_config`) and calls the existing `mcpUpsert`
- * wrapper.
- *
- * Secret env/args collected in the install dialog are written to the
- * desktop encrypted secrets store (`secrets.enc` / keychain master key) —
- * never into the MCP TOML file. Non-secret env (e.g. `SLACK_TEAM_ID`) stays
- * in the TOML.
- *
- * Every `command`/`args` pair below was verified against the server's own
- * README (via WebFetch) rather than assumed — see the `verifiedFrom` field
- * on each entry for the exact source. Entries whose install shape couldn't
- * be confirmed from a primary source were dropped rather than guessed. */
 
 export type McpCatalogEnvKey = {
-  /** Environment variable name, written into `env` or `secretEnv`. */
   name: string
-  /** Human label shown above the input in the install dialog. */
   label: string
-  /** Masks the input (password-style) and is stored in the encrypted secrets store. */
   secret: boolean
   required: boolean
   placeholder?: string
-  /** Short help under the field (e.g. where to find a Slack team ID). */
   hint?: string
 }
 
 export type McpCatalogArgKey = {
-  /** Stable key for the install-dialog form state (not sent over the wire —
-   * folded into `args` / `secretArgs` at install time). */
   key: string
   label: string
   required: boolean
-  /** When true, value is stored encrypted and appended at resolve time. */
   secret?: boolean
   placeholder?: string
   hint?: string
 }
 
 export type McpCatalogEntry = {
-  /** Matches the `id` an installed `McpServerDto` would use — also how the
-   * "Installed" badge is matched against `mcp_list` results. */
   id: string
   name: string
   description: string
   transport: "stdio"
   command: string
-  /** Literal leading args (before any `argKeys` substitutions are appended). */
   args: string[]
-  /** User-supplied positional args appended after `args`, in order — e.g.
-   * filesystem's allowed path, postgres/sqlite's connection string. Empty
-   * when the server takes no extra positional args. */
   argKeys: McpCatalogArgKey[]
   envKeys: McpCatalogEnvKey[]
   docsUrl: string
-  /** Exact source URL the command/args/env shape was verified against. */
   verifiedFrom: string
-  /** Optional setup blurb shown at the top of the install/configure dialog. */
   setupHint?: string
 }
 
@@ -257,6 +226,5 @@ export const MCP_CATALOG: McpCatalogEntry[] = [
 export const findCatalogEntry = (id: string): McpCatalogEntry | undefined =>
   MCP_CATALOG.find((entry) => entry.id === id)
 
-/** True when the entry needs install/configure fields (args or env). */
 export const catalogEntryNeedsConfig = (entry: McpCatalogEntry): boolean =>
   entry.argKeys.length > 0 || entry.envKeys.length > 0

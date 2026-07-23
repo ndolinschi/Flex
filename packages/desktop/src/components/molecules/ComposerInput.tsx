@@ -15,14 +15,11 @@ import { AttachmentChip } from "./AttachmentChip"
 import { modePlaceholder } from "./ModePicker"
 
 type ComposerInputProps = {
-  /** Bind drafts to this session (defaults to store activeSessionId). */
   sessionId?: string | null
   composerMode: ComposerMode
-  /** Empty-agent placeholders vs follow-up copy; layout is always large. */
   isHero?: boolean
   cwd: string | undefined
   enabled: boolean
-  /** Bubble root used by slash/@ trays for positioning (same as before the split). */
   anchorRef: RefObject<HTMLDivElement | null>
   attachments: ComposerAttachment[]
   removeAttachment: (id: string) => void
@@ -30,15 +27,9 @@ type ComposerInputProps = {
   handlePaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void
   handleDrop: (e: React.DragEvent<HTMLTextAreaElement>) => void
   onSend: () => void
-  /** Optional out-ref so the parent can focus the textarea (flex:focus-composer). */
   textareaRefOut?: RefObject<HTMLTextAreaElement | null>
 }
 
-/**
- * Draft-subscribed composer surface: mention trays, attachment chips,
- * highlight backdrop, and textarea. Isolates `draftsBySession` so
- * ContextBar / ModelPicker in the parent do not re-render on keystrokes.
- */
 export const ComposerInput = ({
   sessionId: sessionIdProp = null,
   composerMode,
@@ -71,8 +62,6 @@ export const ComposerInput = ({
     minHeight: 36,
   })
 
-  // Keep the caller's out-ref in sync with the auto-grow ref (once the
-  // textarea mounts / when the out-ref identity changes).
   useEffect(() => {
     if (!textareaRefOut) return
     textareaRefOut.current = textareaRef.current
@@ -200,8 +189,6 @@ export const ComposerInput = ({
         return
       }
     }
-    // Atomic mention delete: Backspace right after an `@name` pill removes the
-    // whole token (and its attachment), so a mention behaves like one unit.
     if (e.key === "Backspace" && !atOpen && !slashOpen) {
       const el = e.currentTarget
       const pos = el.selectionStart ?? 0
@@ -233,8 +220,6 @@ export const ComposerInput = ({
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      // Stop bubbling: the window ⌘Enter shortcut re-dispatches a synthetic
-      // keydown at the composer, so letting this propagate loops the send.
       e.stopPropagation()
       onSend()
       return

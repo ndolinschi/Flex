@@ -1,12 +1,3 @@
-//! Subagent spawning: the engine-owned execution behind the `Task` tool.
-//!
-//! The Task tool ships only a descriptor; the loop intercepts calls to it and
-//! runs them here. A subagent is a plain child session of the same
-//! [`NativeAgent`] (its own log, own turn), given its role's model chain,
-//! filtered tools, and a self-contained brief. Its final message is returned
-//! to the parent as the tool's output; its events relay live into the parent
-//! stream so a client can render the tree.
-
 use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
@@ -20,36 +11,21 @@ use agentloop_core::tool::{SUBMIT_VERDICT_TOOL_NAME, ToolError};
 use crate::agent::NativeAgent;
 use crate::roles::VERIFIER_ROLE;
 
-/// Cap on a child result folded back into the parent's context.
 const RESULT_MAX_CHARS: usize = 24_000;
 
-/// One subagent to spawn, assembled by the Task tool intercept.
 pub(crate) struct SubagentRequest {
-    /// The parent Task tool call id (for `SubagentStarted.call_id`).
     pub call_id: ToolCallId,
-    /// Role name; must be spawnable (not `main`).
     pub role: String,
-    /// Short UI label.
     pub description: String,
-    /// The self-contained task brief (first user message).
     pub prompt: String,
-    /// What the child should return, if the model specified it.
     pub expected_output: Option<String>,
-    /// Model chosen by split round-robin; `None` = the role chain's first
-    /// resolvable model, else the parent's inherited model.
     pub assigned_model: Option<ModelRef>,
-    /// Permission mode inherited from the parent turn.
     pub permission_mode: Option<PermissionMode>,
-    /// Effort inherited from the parent turn; the child's own role then scales
-    /// the derived thinking budget in `run_iteration`.
     pub effort: Option<Effort>,
-    /// The parent call's cancel token — cancellation cascades to the child.
     pub cancel: CancellationToken,
 }
 
 impl NativeAgent {
-    /// Run one subagent to completion, returning its final message as the
-    /// Task tool's output. Relays the child's events into `parent`.
     pub(crate) async fn run_subagent(
         self: &Arc<Self>,
         parent: &SessionId,
@@ -90,10 +66,6 @@ impl NativeAgent {
 
         let child = SessionId::generate();
 
-        // Per-subagent isolation: a role that asks for isolation gets its own
-        // worktree branched from the parent's cwd, merged back (or discarded)
-        // when the child finishes. Failures degrade per policy, mirroring
-        // root-session provisioning in `create_session`.
         let policy = role.isolation;
         let mut child_cwd = parent_meta.cwd.clone();
         let mut isolation = None;
@@ -210,10 +182,6 @@ impl NativeAgent {
             effort: req.effort,
             ..TurnOptions::default()
         };
-        // The subagent drives the child turn directly (no turn_gate handoff to
-        // race), so it doesn't need the "turn logically done" signal — feed a
-        // throwaway sender; `run_turn`'s `let _ = done.send(())` no-ops when the
-        // receiver is dropped.
         let (done_tx, _done_rx) = tokio::sync::oneshot::channel();
         let summary = tokio::select! {
             biased;
@@ -229,10 +197,6 @@ impl NativeAgent {
         relay_stop.cancel();
         let _ = relay.await;
 
-        // Tear the child's workspace down: merge completed work back into the
-        // parent's tree, discard on error/cancellation. Integration problems
-        // never fail the tool call — they're folded into the result text so
-        // the parent can react.
         let mut integration_note = None;
         if let Some((workspace_id, root, base)) = child_workspace {
             if let Some(backend) = &self.deps.workspace {
@@ -336,11 +300,6 @@ impl NativeAgent {
         Ok(output)
     }
 
-    /// Read the child log for its last completed `SubmitVerdict` call and
-    /// return the structured verdict it reported, so a `Verify` call's
-    /// `ToolOutput` carries a machine-readable outcome — not just prose —
-    /// even though the verifier itself only ever produces free text plus
-    /// one tool call.
     async fn extract_last_verdict(&self, child: &SessionId) -> Option<serde_json::Value> {
         let events = self.deps.store.read(child, 0).await.ok()?;
         events.iter().rev().find_map(|stored| match &stored.event {
@@ -356,7 +315,6 @@ impl NativeAgent {
         })
     }
 
-    /// Read the child log and join its last assistant message, capped.
     async fn collect_final_text(&self, child: &SessionId) -> String {
         let Ok(events) = self.deps.store.read(child, 0).await else {
             return String::new();
@@ -394,7 +352,6 @@ impl NativeAgent {
     }
 }
 
-/// Assemble the child's first user message from the brief and expected output.
 fn build_brief(req: &SubagentRequest, _role_prompt: &Option<String>) -> String {
     let expected = req
         .expected_output

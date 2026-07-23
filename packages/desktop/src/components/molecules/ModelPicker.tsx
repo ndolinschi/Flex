@@ -32,14 +32,8 @@ type ModelPickerProps = {
   onChange: (id: string) => void
   isLoading?: boolean
   disabled?: boolean
-  /** Effort for a given model id (contracts Effort wire value, or `null` for
-   * "Default"). Reference design: effort is picked FOR a specific model,
-   * inside its dropdown row — not a global setting. */
   effortFor?: (modelId: string) => string | null
   onEffortChange?: (modelId: string, effort: string | null) => void
-  /** Provider id -> friendly label (from `list_builtin_providers`), used for
-   * the dropdown's section headers. Falls back to a capitalized providerId
-   * when a model's provider isn't in this list (e.g. a custom profile). */
   builtinProviders?: BuiltinProvider[]
 }
 
@@ -67,7 +61,6 @@ export const ModelPicker = ({
     ? "Auto"
     : (selected?.displayName ?? selected?.id ?? "Select model")
 
-  // Group/filter only while open — closed composer re-renders stay cheap.
   const { groups, truncated, totalMatched } = useGroupedModels(
     models,
     query,
@@ -102,8 +95,6 @@ export const ModelPicker = ({
             disabled={isLoading || disabled}
             aria-label="Select model"
             className={cn(
-              // Quiet model pill (Cursor density): h-6 · text-xs · no hard outline.
-              // pl/pr asymmetric so leading icon and trailing chevron balance.
               "h-6 max-w-[14rem] gap-1 rounded-full border border-transparent bg-transparent py-0 pl-2 pr-1.5 font-normal text-ink-secondary shadow-none",
               "hover:border-stroke-3 hover:bg-fill-4 hover:text-ink",
               "opacity-80 hover:opacity-100 aria-expanded:opacity-100",

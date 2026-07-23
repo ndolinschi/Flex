@@ -1,9 +1,3 @@
-//! Anthropic provider client.
-//!
-//! The public surface is provider configuration plus the [`AnthropicProvider`].
-//! Messages API wire types are private and normalized into
-//! `ProviderStreamEvent` before leaving this crate.
-
 mod config;
 mod provider;
 mod wire;

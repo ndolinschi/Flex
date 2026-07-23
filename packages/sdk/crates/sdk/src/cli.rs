@@ -1,5 +1,3 @@
-//! CLI argument parsing for the headless runner.
-
 use std::net::SocketAddr;
 use std::path::PathBuf;
 

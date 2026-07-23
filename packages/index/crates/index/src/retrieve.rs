@@ -1,30 +1,12 @@
-//! Query-time retrieval: BM25 search merged with a symbol-name exact/prefix
-//! boost, so a query naming a symbol ranks its definition first even when
-//! the surrounding prose wouldn't otherwise win on term frequency alone.
-//!
-//! [`search_hybrid`] additionally fuses in a cosine-similarity vector rank
-//! (Reciprocal Rank Fusion, k=60) when the store has an embedder configured;
-//! with no vectors present it degrades silently to exactly [`search`]'s
-//! BM25 + symbol-boost behavior, so callers (the tools) can call
-//! `search_hybrid` unconditionally.
-
 use std::collections::HashMap;
 
 use crate::chunker::chunk_id_of;
 use crate::store::IndexStore;
 
-/// Additive score boost when the query matches a chunk's symbol name
-/// exactly (case-insensitive).
 const EXACT_SYMBOL_BOOST: f32 = 10.0;
-/// Additive score boost when the query is a prefix of the symbol name, or
-/// vice versa.
 const PREFIX_SYMBOL_BOOST: f32 = 4.0;
-/// RRF's smoothing constant: `1 / (k + rank)`. 60 is the standard value from
-/// the original Cormack/Clarke/Buettcher RRF paper, chosen so no single
-/// ranker's #1 slot can completely dominate the fused score.
 const RRF_K: f32 = 60.0;
 
-/// One ranked retrieval result.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Hit {
     pub path: String,
@@ -35,12 +17,6 @@ pub struct Hit {
     pub symbol: Option<String>,
 }
 
-/// Search `store` for `query`, returning up to `k` hits ranked by BM25 score
-/// with a symbol-name boost merged in.
-///
-/// Pulls a larger candidate pool from tantivy (`k * 4`, capped) than the
-/// final result count so re-ranking by the boost can actually change the
-/// top-k order rather than just re-sorting whatever BM25 happened to return.
 pub fn search(
     store: &IndexStore,
     query: &str,
@@ -70,8 +46,6 @@ pub fn search(
     Ok(hits)
 }
 
-/// Errors from [`search_hybrid`]: either half of the fusion (lexical search,
-/// or embedding the query for the vector half) can fail independently.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum HybridSearchError {
@@ -81,14 +55,6 @@ pub enum HybridSearchError {
     Store(#[from] crate::store::StoreError),
 }
 
-/// Hybrid search: Reciprocal Rank Fusion (`k=60`) of the BM25+symbol-boost
-/// ranking (from [`search`]) with a cosine-similarity vector ranking, when
-/// `store` has an embedder configured.
-///
-/// If the store has no vector store populated (embeddings disabled, or
-/// simply not built yet), this degrades silently to exactly [`search`]'s
-/// result — the tools call this unconditionally and never need to branch on
-/// whether embeddings are enabled.
 pub fn search_hybrid(
     store: &IndexStore,
     query: &str,
@@ -115,7 +81,6 @@ pub fn search_hybrid(
 
     let vector_hits = vector_store.search(&query_vector, pool_size);
 
-    // chunk_id -> (best-known Hit fields, rrf score accumulator).
     let mut fused: HashMap<String, (Hit, f32)> = HashMap::new();
 
     for (rank, hit) in lexical_hits.into_iter().enumerate() {
@@ -127,9 +92,6 @@ pub fn search_hybrid(
             .or_insert((hit, rrf));
     }
 
-    // Paths already resolved via a `chunks_for_path` lookup this call, so a
-    // query with several vector-only hits in the same file doesn't re-fetch
-    // it once per chunk.
     let mut resolved_paths: HashMap<String, Vec<crate::lexical::RawHit>> = HashMap::new();
 
     for (rank, vhit) in vector_hits.into_iter().enumerate() {
@@ -138,12 +100,6 @@ pub fn search_hybrid(
             *score += rrf;
             continue;
         }
-        // A vector-only hit: this chunk's embedding is close to the query
-        // but it shared too few (or no) literal terms to be in the BM25
-        // pool at all — exactly the case hybrid retrieval exists to catch.
-        // Resolve its full chunk data (line range, snippet, symbol) from
-        // the lexical index by chunk id, since the vector store only kept
-        // `(chunk_id, path, vector)`.
         let candidates = match resolved_paths.get(&vhit.path) {
             Some(cached) => cached,
             None => {
@@ -155,7 +111,7 @@ pub fn search_hybrid(
             .iter()
             .find(|raw| chunk_id_of(&raw.path, raw.start_line, raw.end_line) == vhit.chunk_id)
         else {
-            continue; // Stale vector (file changed since last embed); skip.
+            continue;
         };
         let hit = Hit {
             path: raw.path.clone(),
@@ -175,9 +131,6 @@ pub fn search_hybrid(
             hit
         })
         .collect();
-    // Tie-break deterministically on (path, start_line): `fused` is a
-    // `HashMap`, so its iteration order (and thus the order of exact score
-    // ties) isn't stable across runs otherwise.
     results.sort_by(|a, b| {
         b.score
             .total_cmp(&a.score)
@@ -202,7 +155,6 @@ fn symbol_boost(query_lower: &str, symbol: Option<&str>) -> f32 {
     0.0
 }
 
-/// First couple of lines of a chunk, for a compact preview.
 fn snippet_of(chunk: &str) -> String {
     let mut lines = chunk.lines();
     let first = lines.next().unwrap_or("").trim();
@@ -227,8 +179,6 @@ mod tests {
         fs::write(path, content).unwrap_or_else(|e| panic!("{e}"));
     }
 
-    /// A synthetic mini-repo with a handful of files, one of which is
-    /// unambiguously "where the session title is generated".
     fn build_mini_repo() -> (tempfile::TempDir, tempfile::TempDir, IndexStore) {
         let repo = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
         let index_dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
@@ -315,15 +265,6 @@ pub fn gcd(mut a: u64, mut b: u64) -> u64 {
         assert_eq!(hits[0].path, "src/network.rs");
     }
 
-    /// Fixture for the hybrid-vs-BM25 tests below: a query whose literal
-    /// words appear (out of context) in a lexically-loud but semantically
-    /// irrelevant chunk, while the *actually* relevant chunk
-    /// (`verify_credentials`) shares only one incidental word with the query
-    /// (enough to land somewhere in BM25's candidate pool, never at the
-    /// top) — exactly the case where BM25 alone still picks the lexical
-    /// decoy, but RRF-fusing in a strong vector-rank signal flips the order.
-    /// A couple of unrelated filler files widen the candidate pool so the
-    /// fusion isn't just a two-item tiebreak.
     const QUERY: &str = "user login check";
     const AUTH_CHUNK: &str = "\
 /// Confirm a supplied secret matches what's on file for this account.
@@ -368,18 +309,6 @@ pub fn connect_with_timeout(addr: &str, timeout_ms: u64) -> Result<(), String> {
         (repo, index_dir)
     }
 
-    /// An embedder engineered so the query vector is close to the auth
-    /// chunk's vector and far from the distractor's — simulating what a
-    /// real semantic embedding model would give "for free", deterministically.
-    ///
-    /// Needles target each chunk's *code* (function signature), not the doc
-    /// comment above it — [`crate::symbols::extract_symbols`] anchors a
-    /// symbol's chunk at the `pub fn` line itself, so the doc comment isn't
-    /// part of the text actually handed to `embed`. `QUERY`'s exact words
-    /// also appear inside `DISTRACTOR_CHUNK`'s `println!` call, so the query
-    /// override must be checked as a *whole-string* match, and the
-    /// distractor's needle must be specific enough (its unique function
-    /// signature) not to also match the query text.
     fn semantic_embedder() -> crate::embed::MockEmbedder {
         crate::embed::MockEmbedder::new(4)
             .with_override("pub fn verify_credentials", vec![0.9, 0.1, 0.0, 0.0])
@@ -439,9 +368,6 @@ pub fn connect_with_timeout(addr: &str, timeout_ms: u64) -> Result<(), String> {
 
     #[test]
     fn search_hybrid_degrades_to_bm25_when_vector_store_empty() {
-        // An embedder is configured, but `build()` is never called, so the
-        // vector store stays empty — the "not built yet" half of the
-        // degrade-silently contract, distinct from "no embedder at all".
         let (repo, index_dir) = build_semantic_fixture();
         let embedder = std::sync::Arc::new(semantic_embedder());
         let store = IndexStore::open_with_embeddings(repo.path(), index_dir.path(), embedder)
@@ -454,9 +380,6 @@ pub fn connect_with_timeout(addr: &str, timeout_ms: u64) -> Result<(), String> {
         );
     }
 
-    /// Golden recall@10 gate lives in [`crate::eval`] (M4). Kept here as a
-    /// thin unit-level pointer so retrieve-module changes still trip the gate
-    /// without needing the integration-test binary.
     #[test]
     fn hybrid_golden_recall_at_10_meets_threshold() {
         let repo = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));

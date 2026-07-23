@@ -6,15 +6,12 @@ import type { ContentTab, TabGroup } from "../stores/appStore"
 type UseContentPaneContextMenuParams = {
   paneIndex: 0 | 1
   paneTabs: ContentTab[]
-  /** Group map for this pane — used to determine group membership. */
   paneGroups: Record<string, TabGroup>
-  /** Whether the viewport + window width allow a split to be opened. */
   splitEligible: boolean
   openTabToSide: (pane: 0 | 1, tabId: string) => void
   closeTabInPane: (pane: 0 | 1, tabId: string) => void
   closeOtherTabsInPane: (pane: 0 | 1, tabId: string) => void
   closeTabsToRightInPane: (pane: 0 | 1, tabId: string) => void
-  /** Remove a single tab from its current group. */
   onRemoveFromGroup?: (tabId: string) => void
 }
 
@@ -44,7 +41,6 @@ export function useContentPaneContextMenu({
     if (!menuTabId) return []
     const idx = paneTabs.findIndex((t) => t.id === menuTabId)
     const menuTab = idx >= 0 ? paneTabs[idx] : undefined
-    // Browser holds a singleton native webview — duplicating across panes races.
     const openToSideDisabled =
       !splitEligible || (menuTab?.kind === "tool" && menuTab.tool === "browser")
 
@@ -58,7 +54,6 @@ export function useContentPaneContextMenu({
       { type: "separator" },
     ]
 
-    // Group membership actions.
     const tabGroupId = menuTab?.groupId
     if (tabGroupId != null && paneGroups[tabGroupId] != null && onRemoveFromGroup) {
       items.push({

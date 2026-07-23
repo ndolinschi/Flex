@@ -1,5 +1,3 @@
-//! OpenAI provider implementation.
-
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -20,29 +18,19 @@ use agentloop_provider_common::{
 use crate::config::{OPENAI_PROVIDER_ID, OpenAiConfig};
 use crate::wire::{ModelList, OpenAiStreamMapper, build_request, models_from_response};
 
-/// Bounded attempts for transient failures (429s, timeouts, connection
-/// resets) before `stream_chat` gives up and surfaces a terminal error.
-/// Includes the initial attempt, so this allows up to 2 retries.
 const MAX_ATTEMPTS: u32 = 3;
 
-/// Backoff used when a 429 response carries no `Retry-After` header.
-/// Doubles each attempt: 500ms, 1s, 2s, ...
 const BASE_BACKOFF_MS: u64 = 500;
 
-/// Upper bound on any single computed backoff delay, whether it comes from
-/// `Retry-After` or from the exponential fallback.
 const MAX_BACKOFF_MS: u64 = 30_000;
 
 #[derive(Debug, Clone)]
 pub struct OpenAiProvider {
-    /// Instance identity: `openai` for [`OpenAiProvider::new`], the caller's
-    /// id for [`OpenAiProvider::with_identity`]. Errors and stream events are
-    /// attributed to this id.
     id: ProviderId,
     config: Arc<OpenAiConfig>,
-    /// Static catalog served when non-empty (endpoints without `/models`).
+
     static_models: Vec<ModelInfo>,
-    /// Advertise + forward extended-thinking config (DeepSeek-style endpoints).
+
     thinking: bool,
     client: Client,
 }
@@ -52,13 +40,6 @@ impl OpenAiProvider {
         Self::with_identity(OPENAI_PROVIDER_ID, config, Vec::new(), false)
     }
 
-    /// An OpenAI-compatible provider registering under a custom id
-    /// (e.g. `deepseek`, `glm`) with its own base URL and key.
-    ///
-    /// When `static_models` is non-empty, [`Provider::list_models`] serves it
-    /// without a network call; when `thinking` is true the provider advertises
-    /// the extended-thinking capability and forwards
-    /// [`ChatRequest::thinking`](agentloop_core::ChatRequest) on the wire.
     pub fn with_identity(
         id: impl Into<ProviderId>,
         config: OpenAiConfig,
@@ -82,8 +63,6 @@ impl OpenAiProvider {
         &self.config.default_model
     }
 
-    /// Query the live `/models` endpoint. Errors when the endpoint is
-    /// unreachable, unauthorized, or has no listing route.
     async fn fetch_models_live(&self) -> Result<Vec<ModelInfo>, ProviderError> {
         let provider = self.id();
         let token = self.resolve_auth_token().await?;
@@ -221,27 +200,16 @@ impl Provider for OpenAiProvider {
     }
 }
 
-/// The result of one failed `send_chat_request` attempt, distinguishing
-/// terminal failures from genuinely transient ones without repurposing
-/// [`ProviderError::RateLimited`] to mean "connection reset" or similar.
 enum AttemptError {
-    /// A 429 response, or a transient transport failure (timeout, connection
-    /// reset). Worth retrying within the attempt budget. Carries the
-    /// server-provided `Retry-After` delay when the failure was a 429 that
-    /// included one.
     Retryable {
         error: ProviderError,
         retry_after_ms: Option<u64>,
     },
-    /// Auth failures, invalid requests, context overflow, model-not-found,
-    /// malformed stream, etc. — retrying would just reproduce the same
-    /// failure.
+
     Terminal(ProviderError),
 }
 
 impl AttemptError {
-    /// `Some(delay)` when retryable (`delay` is the server-provided
-    /// `Retry-After`, if any); `None` when terminal.
     fn retry_after_ms(&self) -> Option<Option<u64>> {
         match self {
             Self::Retryable { retry_after_ms, .. } => Some(*retry_after_ms),
@@ -257,8 +225,6 @@ impl AttemptError {
 }
 
 impl OpenAiProvider {
-    /// Send one chat-completions attempt and map it to a `Response` on
-    /// success, or a classified [`AttemptError`] on failure.
     async fn send_chat_request(
         &self,
         provider: &ProviderId,
@@ -314,9 +280,6 @@ impl OpenAiProvider {
     }
 }
 
-/// Exponential backoff used when a retryable failure carries no
-/// server-provided `Retry-After`: `BASE_BACKOFF_MS` doubled per attempt,
-/// capped at `MAX_BACKOFF_MS`.
 fn backoff_delay_ms(attempt: u32) -> u64 {
     let exponent = attempt.saturating_sub(1).min(6);
     BASE_BACKOFF_MS

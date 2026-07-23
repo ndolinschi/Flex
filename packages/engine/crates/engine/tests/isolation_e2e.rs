@@ -1,8 +1,3 @@
-//! End-to-end isolation over a real git repo and the real `GitWorktrees`
-//! backend: `EngineService` provisions a worktree on the first prompt of an
-//! isolated session (deferred from `create_session`), an edit there stays out
-//! of the base tree, and `integrate_session` merges it back.
-
 use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
@@ -63,7 +58,6 @@ async fn engine_provisions_a_real_worktree_and_merges_it_back() {
         .await
         .expect("isolated session opens");
 
-    // Deferred: create does not provision yet.
     assert!(
         !service.is_isolated(&session).await.expect("meta"),
         "workspace not provisioned until the first prompt"
@@ -73,8 +67,6 @@ async fn engine_provisions_a_real_worktree_and_merges_it_back() {
         "no worktree directory yet"
     );
 
-    // Drive one prompt: the MockProvider's default turn is a no-tool end-turn,
-    // so this executes just far enough to run the first-turn workspace ensure.
     service
         .prompt(&session, PromptInput::text("hello"), TurnOptions::default())
         .await

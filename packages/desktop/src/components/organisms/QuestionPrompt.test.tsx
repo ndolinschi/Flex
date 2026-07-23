@@ -3,12 +3,6 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { QuestionPrompt } from "./QuestionPrompt"
 import type { PendingQuestion } from "../../lib/types"
 
-/**
- * Layout regressions for the AskUserQuestion wizard: mid-step single-select
- * used to always paint an empty footer (invisible Back + border + padding),
- * which hollowed out the bottom of the card on a wide content rail.
- */
-
 const baseQuestion = (
   overrides: Partial<PendingQuestion> = {},
 ): PendingQuestion => ({
@@ -46,7 +40,6 @@ describe("QuestionPrompt layout", () => {
     expect(html).toContain("1 of 2")
     expect(html).toContain("Project name")
     expect(html).toContain("Keep temp-app")
-    // No Back / Next chrome when options auto-advance.
     expect(html).not.toContain(">Back<")
     expect(html).not.toContain(">Next<")
     expect(html).not.toContain(">Submit<")
@@ -79,7 +72,6 @@ describe("QuestionPrompt layout", () => {
     )
     expect(html).toContain("data-question-prompt")
     expect(html).toContain("px-3")
-    // Quiet denser HITL card (wave-2 states): pt-2.5 pb-2.5.
     expect(html).toContain("pt-2.5")
     expect(html).toContain("pb-2.5")
     expect(html).toContain("mt-2")

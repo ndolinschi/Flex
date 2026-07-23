@@ -22,7 +22,6 @@ export const TerminalInstance = ({
     <div
       className={cn("glass-terminal-wrapper h-full w-full", !active && "hidden")}
       onMouseDown={() => {
-        // Ensure keystrokes reach xterm after clicking the panel.
         const el = containerRef.current?.querySelector("textarea")
         el?.focus()
       }}

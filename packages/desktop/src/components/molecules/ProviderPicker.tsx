@@ -14,7 +14,6 @@ type ProviderPickerProps = {
   className?: string
 }
 
-/** Visual provider chooser — icon + label tiles instead of a bare `<select>`. */
 export const ProviderPicker = ({
   providers,
   value,
@@ -26,7 +25,6 @@ export const ProviderPicker = ({
     <ToggleGroup
       value={[value]}
       onValueChange={(vals) => {
-        // Exclusive select: pick the newly added value; ignore deselect clicks.
         const next = vals.find((v) => v !== value)
         if (next) onChange(next)
       }}

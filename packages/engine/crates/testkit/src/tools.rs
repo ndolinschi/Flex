@@ -1,6 +1,3 @@
-//! Simple [`Tool`] implementations for exercising the loop's tool pipeline:
-//! a happy-path echo, a deterministic failure, and a cancellable sleeper.
-
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -10,8 +7,6 @@ use serde::Deserialize;
 use agentloop_core::contracts::ToolOutput;
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
-/// Derive a JSON Schema for a tool input type (mirrors what `typed_tool`
-/// does; a schema derivation failure degrades to an open object).
 fn schema_of<I: JsonSchema>() -> serde_json::Value {
     serde_json::to_value(schemars::schema_for!(I))
         .unwrap_or_else(|_| serde_json::json!({"type": "object"}))
@@ -32,12 +27,9 @@ fn parse_input<I: serde::de::DeserializeOwned>(
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct EchoInput {
-    /// The text to echo back verbatim.
     text: String,
 }
 
-/// `echo` — returns the provided text unchanged. The happy-path round-trip
-/// tool: what the model sends is exactly what comes back.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct EchoTool;
 
@@ -66,8 +58,6 @@ impl Tool for EchoTool {
     }
 }
 
-/// `fail` — always returns a tool-level execution error. Use it to test how
-/// the loop feeds failed results back to the model.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct FailingTool;
 
@@ -101,12 +91,9 @@ impl Tool for FailingTool {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 struct SlowInput {
-    /// How long to sleep, in milliseconds.
     ms: u64,
 }
 
-/// `slow` — sleeps for the requested duration, honoring cancellation. Use it
-/// to test interrupts racing in-flight tool calls.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SlowTool;
 
@@ -140,7 +127,6 @@ impl Tool for SlowTool {
     }
 }
 
-/// A tool that always panics — exercises the loop's panic containment.
 pub struct PanickingTool;
 
 #[async_trait]

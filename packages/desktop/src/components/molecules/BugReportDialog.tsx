@@ -42,7 +42,6 @@ const collectTaskIds = (): string[] => {
   return [...ids].slice(0, 12)
 }
 
-/** Google-style Submit Bug modal: disclosure of what is sent + free-text note. */
 export const BugReportDialog = ({ open, onClose }: BugReportDialogProps) => {
   const [note, setNote] = useState("")
   const [version, setVersion] = useState("…")

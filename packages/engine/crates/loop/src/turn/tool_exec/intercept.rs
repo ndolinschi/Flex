@@ -1,5 +1,3 @@
-//! Loop-intercepted tool calls: Task (subagent) and Verify.
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -16,7 +14,6 @@ use crate::subagent::SubagentRequest;
 
 use super::batch::MAX_CHILDREN_PER_TURN;
 
-/// Parse a Task call, enforce the per-turn budget, and run the subagent.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn run_subagent_call(
     deps: &Arc<TurnDeps>,
@@ -107,10 +104,6 @@ pub(super) async fn run_subagent_call(
     agent.run_subagent(&handle.id, sub).await
 }
 
-/// Parse a Verify call and run it as a `verifier`-role subagent whose brief
-/// is built programmatically from `rubric` + `artifacts` — never from the
-/// caller's own reasoning, since the input schema has no field for that
-/// ("maker is never the grader").
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn run_verify_call(
     deps: &Arc<TurnDeps>,

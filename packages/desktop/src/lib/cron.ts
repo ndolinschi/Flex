@@ -1,6 +1,3 @@
-/** Human-readable summaries for common 5-field cron expressions. Falls back
- * to the raw expression for anything it doesn't recognize — this is a
- * display helper, not a validator. */
 
 const WEEKDAYS: Record<string, string> = {
   "0": "Sundays",

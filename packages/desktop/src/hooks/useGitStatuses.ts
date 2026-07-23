@@ -24,18 +24,6 @@ const fetchGitStatus = async (id: string): Promise<GitStatusSummary> => {
   }
 }
 
-/**
- * Sidebar change-indicator data: one `git_status_since_baseline` query per
- * session, keyed identically to the Changes tab's own query
- * (`["git-status", cwd, sessionId]`) so both surfaces read the same cache
- * entry and never disagree on counts. Unlike `useWorkspaceStatuses` (which
- * only ever resolves for isolated sessions), this covers every session with
- * a git repo cwd — isolated or not — since `git_status_since_baseline`
- * itself already branches on isolation server-side.
- *
- * Pass `pollingEnabled: false` (sidebar collapsed) or a `pollIds` set
- * (active + pinned + visible rows) to avoid N-session background IPC.
- */
 export const useGitStatuses = (
   sessions: Array<{ id: string; cwd: string }>,
   options?: StatusPollOptions,
@@ -44,15 +32,12 @@ export const useGitStatuses = (
     queries: sessions.map(({ id, cwd }) => ({
       queryKey: ["git-status", cwd, id] as const,
       queryFn: () => fetchGitStatus(id),
-      // Gate fetch (not only interval) for collapsed / filtered-out rows —
-      // Changes tab keeps its own observer on the shared query key.
       enabled:
         !!cwd &&
         !!id &&
         options?.pollingEnabled !== false &&
         (!options?.pollIds || options.pollIds.has(id)),
       staleTime: STALE_TIME_MS,
-      // Same as workspace status — missing sessions must not retry.
       retry: false,
       refetchInterval: statusRefetchInterval(id, STALE_TIME_MS, options),
     })),

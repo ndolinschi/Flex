@@ -1,5 +1,3 @@
-//! Tool implementations exposed by the index plugin.
-
 mod find_symbol;
 mod repo_map;
 mod search_code;

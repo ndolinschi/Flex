@@ -67,18 +67,12 @@ const AppRoutes = () => {
   const viewport = useAppStore((s) => s.viewport)
   const { newAgent } = useSessions()
   useGlobalSessionEvents()
-  // Gated on isBootstrapped so the first classification runs after
-  // restoreUiState applies the persisted sidebarCollapsed value — otherwise
-  // an early narrow classification could force-collapse before the user's
-  // saved preference is even loaded (BEHAVIOR SPEC #5).
   useViewportWidth(isBootstrapped)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [searchModalOpen, setSearchModalOpen] = useState(false)
   const contentBlocked =
     route !== "chat" || (viewport !== "wide" && !sidebarCollapsed)
 
-  // Dev QA: Rust emits `qa-open-browser` when FLEX_BROWSER_QA=1 so we can
-  // validate native webview bounds without flaky UI automation.
   useEffect(() => {
     if (!import.meta.env.DEV || isBrowserPreview()) return
     let cancelled = false
@@ -108,7 +102,6 @@ const AppRoutes = () => {
           url: event.payload,
           loadError: null,
         })
-        // Let ContentPane + BrowserTab commit refs before open/bounds.
         await new Promise((r) => window.setTimeout(r, 500))
         if (cancelled) return
         await browserOpen(event.payload)
@@ -123,10 +116,6 @@ const AppRoutes = () => {
     }
   }, [])
 
-  // A web link clicked anywhere in chat markdown (see MarkdownBody's `a`)
-  // opens in the embedded Browser panel — never the app's own webview (which
-  // would replace the whole UI with the page). Opens/focuses the Browser tab
-  // for the active session and navigates it.
   useEffect(() => {
     const onOpenInBrowser = (ev: Event) => {
       const url = (ev as CustomEvent<{ url?: string }>).detail?.url
@@ -146,17 +135,12 @@ const AppRoutes = () => {
           url,
           loadError: null,
         })
-        // First open: let ContentPane + BrowserTab mount/commit refs before the
-        // native webview is created and positioned (mirrors qa-open-browser).
         if (!alreadyStarted) {
           await new Promise((r) => window.setTimeout(r, 500))
         }
-        // `browserOpen` is idempotent — navigates the existing webview or
-        // creates it (see browser.rs::browser_open).
         try {
           await browserOpen(url)
         } catch {
-          /* surfaced as a toast via the browser session hook */
         }
       })()
     }
@@ -164,7 +148,6 @@ const AppRoutes = () => {
     return () => window.removeEventListener("flex:open-in-browser", onOpenInBrowser)
   }, [])
 
-  // Stable handlers — avoid rebinding the window listener every render.
   const handlersRef = useRef({
     onSend: () => {},
     onNewSession: () => {},
@@ -221,9 +204,6 @@ const AppRoutes = () => {
         setSearchModalOpen(false)
         return true
       }
-      // HITL overlays own Esc while visible — never cancel the in-flight turn
-      // underneath an Allow Bash / AskUserQuestion prompt (that looked like
-      // "generation closed all modals").
       const activeId = state.activeSessionId
       if (
         activeId &&
@@ -234,8 +214,6 @@ const AppRoutes = () => {
       ) {
         return true
       }
-      // Narrow/tight: an open sidebar overlay covers the chat area — Esc
-      // closes it before falling through to turn-cancel. Split is wide-only.
       if (state.viewport !== "wide") {
         if (!state.sidebarCollapsed) {
           state.setSidebarCollapsed(true)
@@ -247,14 +225,7 @@ const AppRoutes = () => {
       state.setIsStreaming(false)
       state.setSessionStreaming(sessionId, false)
       state.clearStreamingForSession(sessionId)
-      // Force-close any rows still marked running (spinner backstop) — the
-      // engine may never emit a matching turn_completed/session_error, e.g.
-      // if the process already died. See useSessionEvents' sweepRequests.
       state.requestSweep(sessionId)
-      // Keep this session's event subscription alive until the cancelled
-      // turn's terminal event is actually observed (see
-      // useGlobalSessionEvents.ts) — the engine cancel is async, and
-      // streamingSessions was just cleared above.
       state.setSessionDraining(sessionId, true)
       void cancel(sessionId)
       return true
@@ -266,8 +237,6 @@ const AppRoutes = () => {
   useBootstrap(setRoute, setTheme)
   useUpdaterCheck(isBootstrapped && route !== "welcome")
 
-  // Background-load heavy tab chunks + markdown highlight after the shell
-  // is interactive (Files / Terminal / Browser first-open hitch).
   useEffect(() => {
     if (isBootstrapped) startDesktopIdlePrefetch()
   }, [isBootstrapped])
@@ -286,8 +255,6 @@ const AppRoutes = () => {
     return (
       <div className="flex h-full flex-col">
         {titleBar}
-        {/* Drag anywhere during bootstrap — title bar alone is easy to miss
-            while the spinner fills the window (same idea as #boot-splash). */}
         <div
           className="flex min-h-0 flex-1 cursor-default items-center justify-center gap-2 text-sm text-ink-muted"
           data-tauri-drag-region
@@ -317,21 +284,13 @@ const AppRoutes = () => {
     )
   }
 
-  // Persistent sidebar + keep Chat mounted so timeline/subscriptions survive
-  // settings round-trips (reference glass: content swap, not full remount).
-  // Top chrome = sidebar header | ContentPane TabStrip (one row, no stacked
-  // WindowTitleBar). Welcome/bootstrap still use full-width WindowTitleBar.
   return (
     <div className="relative flex h-full min-h-0">
       <TitleBarChromeHost
         onOpenCommandPalette={openCommandPalette}
         onOpenSearch={openSearch}
       />
-      {/* Root is `relative` so SessionSidebar's mobile overlay (absolute,
-       * anchored to this container's left edge — see SessionSidebar.tsx's
-       * `narrow` handling) spans the full app width, not just the chat area. */}
       <SessionSidebar onOpenSearch={() => setSearchModalOpen(true)} />
-      {/* Content workspace fills remaining width (tabs + optional split). */}
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         <div
           className={cn(
@@ -406,9 +365,6 @@ const App = () => {
   if (isBrowserPreview()) return <NativeAppRequired />
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Rounded, clipped shell over a transparent Tauri window — see
-          `.app-shell` in index.css and macOS vibrancy in macos_window.rs. */}
-      {/* agents-page shell: title bar + flex body (sidebar | main). */}
       <div className="app-shell agents-page flex h-full min-h-0 flex-col overflow-hidden">
         <AppRoutes />
       </div>

@@ -1,5 +1,3 @@
-//! Single tool-call lifecycle: permission, hooks, pool dispatch.
-
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
 
@@ -21,7 +19,6 @@ use super::dispatch::dispatch_tool_call;
 use super::intercept::{run_subagent_call, run_verify_call};
 use super::permission::{PermissionGate, gate_permission};
 
-/// Execute a single tool call through its full lifecycle.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn execute_one_call(
     deps: &Arc<TurnDeps>,

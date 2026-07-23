@@ -1,20 +1,3 @@
-//! Browser panel commands — an embedded child webview navigated from Rust.
-//!
-//! Compromise: Tauri's `Webview` has no native back/forward-history
-//! introspection, so `canGoBack`/`canGoForward` on `BrowserStateEvent` are
-//! always emitted as `true`. The frontend's back/forward buttons stay
-//! enabled unconditionally; `eval("history.back()")`/`eval("history.forward()")`
-//! are harmless no-ops in the webview when there's nowhere left to go.
-//!
-//! Load failures: wry/`PageLoadEvent` only exposes Started/Finished (no Failed),
-//! so after Finished we probe the document via `eval_with_callback` for
-//! chrome-error / about:neterror schemes and connection-refused body text,
-//! then emit `BrowserStateEvent.error` for the frontend load-error UI.
-//!
-//! Design Mode: an injected page script highlights elements on hover and, on
-//! click, stashes a JSON payload then navigates to `agentloop-design://…`.
-//! `on_navigation` cancels that scheme, reads the payload via
-//! `eval_with_callback`, and emits `browser-design-event` for the Composer.
 
 use std::sync::{Arc, Mutex};
 
@@ -31,8 +14,6 @@ const BROWSER_LABEL: &str = "panel-browser";
 const DEFAULT_URL: &str = "https://www.google.com";
 const DESIGN_SCHEME: &str = "agentloop-design";
 
-/// Runs in the child webview after `PageLoadEvent::Finished`. Returns a JSON
-/// object `{ "error": bool, "message"?: string }` for `eval_with_callback`.
 const DETECT_LOAD_ERROR_JS: &str = r#"(function () {
   try {
     var href = String(location.href || "");
@@ -103,10 +84,6 @@ const DETECT_LOAD_ERROR_JS: &str = r#"(function () {
   }
 })()"#;
 
-/// Injected when Design Mode is enabled. Idempotent: tears down any prior
-/// install first. Click → stash payload on `window.__agentloopDesign` →
-/// navigate to `agentloop-design://select` (cancelled by `on_navigation`).
-/// Escape → `agentloop-design://exit`.
 const DESIGN_MODE_INJECT_JS: &str = r##"(function () {
   try {
     if (window.__agentloopDesignApi && typeof window.__agentloopDesignApi.teardown === "function") {
@@ -429,9 +406,6 @@ pub struct BrowserStateEvent {
     pub loading: bool,
     pub can_go_back: bool,
     pub can_go_forward: bool,
-    /// Navigation/load failure when detected after Finished (error-scheme URL
-    /// or connection-refused body via eval). `None` on loading pulses and
-    /// successful finishes.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<BrowserLoadError>,
 }
@@ -443,7 +417,6 @@ pub struct BrowserLoadError {
     pub message: String,
 }
 
-/// Frontend-facing Design Mode event (select / exit).
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum BrowserDesignEvent {
@@ -490,7 +463,6 @@ fn normalize_url(raw: &str) -> DesktopResult<Url> {
     Url::parse(&candidate).map_err(|e| DesktopError::Message(format!("invalid url: {e}")))
 }
 
-/// Public wrapper for agent BrowserNavigate tool.
 pub fn normalize_url_public(raw: &str) -> DesktopResult<Url> {
     normalize_url(raw)
 }
@@ -547,8 +519,6 @@ fn parse_eval_json<T: serde::de::DeserializeOwned>(raw: &str) -> Option<T> {
     })
 }
 
-/// Handle `agentloop-design://…` navigations: cancel them, read the stashed
-/// payload, emit `browser-design-event`. Called from `on_navigation`.
 fn handle_design_navigation(app: &AppHandle, url: &Url) {
     let kind = url.host_str().unwrap_or("select");
     tracing::debug!(target: "browser", kind, "design-mode navigation intercepted");
@@ -563,7 +533,6 @@ fn handle_design_navigation(app: &AppHandle, url: &Url) {
         return;
     }
 
-    // Default: select (and any unknown kind treated as select).
     let emit_app = app.clone();
     let _ = webview.eval_with_callback(DESIGN_MODE_READ_PAYLOAD_JS, move |raw| {
         let parsed: Option<DesignSelectPayload> = parse_eval_json(&raw);
@@ -657,8 +626,6 @@ fn probe_and_emit_finished(
     let last_error_ok = Arc::clone(&last_error);
     let url_for_cb = url.clone();
     let url_ok = url.clone();
-    // Only the first completion (callback or timeout) may emit — avoids a
-    // late probe result flipping success→error or double-emitting Finished.
     let settled = Arc::new(Mutex::new(false));
     let settled_cb = Arc::clone(&settled);
     let settled_timeout = Arc::clone(&settled);
@@ -674,7 +641,6 @@ fn probe_and_emit_finished(
             }
             let parsed: Option<DetectLoadErrorResult> =
                 serde_json::from_str(&raw).ok().or_else(|| {
-                    // Some platforms double-encode the return value as a JSON string.
                     serde_json::from_str::<String>(&raw)
                         .ok()
                         .and_then(|inner| serde_json::from_str(&inner).ok())
@@ -696,7 +662,6 @@ fn probe_and_emit_finished(
         })
         .is_err()
     {
-        // Eval unavailable — still clear the spinner rather than hang.
         if let Ok(mut g) = last_error.lock() {
             *g = None;
         }
@@ -704,8 +669,6 @@ fn probe_and_emit_finished(
         return;
     }
 
-    // If the probe callback never returns (CSP / hung eval), still emit a
-    // successful Finished so the frontend doesn't stay on loading forever.
     let app_timeout = app.clone();
     let url_timeout = url;
     let last_error_timeout = Arc::clone(&last_error);
@@ -738,9 +701,6 @@ pub async fn browser_open(
 
     let mut guard = state.browser_webview.lock().await;
     if let Some(webview) = guard.as_ref() {
-        // Do not show here — the frontend reveals the webview only after
-        // applying bounds for the content area below the toolbar. Showing
-        // early reuses stale bounds that can cover the browser chrome.
         let _ = webview.set_background_color(Some(Color(255, 255, 255, 255)));
         webview.navigate(target.clone())?;
         emit_state(&app, &target, None, true, None);
@@ -764,8 +724,6 @@ pub async fn browser_open(
     let title_last_error = Arc::clone(&last_error);
 
     let builder = WebviewBuilder::new(BROWSER_LABEL, WebviewUrl::External(target.clone()))
-        // Opaque page underlay — without this, short document bodies show the
-        // app's black panel through the WKWebView and look like a layout gap.
         .background_color(Color(255, 255, 255, 255))
         .on_navigation(move |url| {
             if is_design_scheme(url) {
@@ -796,8 +754,6 @@ pub async fn browser_open(
                     emit_state(&load_app, &url, None, true, None);
                 }
                 tauri::webview::PageLoadEvent::Finished => {
-                    // Re-inject Design Mode after every Finished so SPA /
-                    // full navigations keep the picker while the flag is on.
                     if design_mode_enabled(&load_app) {
                         inject_design_mode(&webview);
                     }
@@ -813,8 +769,6 @@ pub async fn browser_open(
         })
         .on_document_title_changed(move |webview, title| {
             if let Ok(u) = webview.url() {
-                // Preserve any in-flight loadError — title pulses must not
-                // clobber the Finished-path error for the frontend.
                 let err = title_last_error.lock().ok().and_then(|g| g.clone());
                 if looks_like_error_url(&u) || err.is_some() {
                     let shown = if looks_like_error_url(&u) {
@@ -835,8 +789,6 @@ pub async fn browser_open(
         .ok()
         .map(|s| s.to_logical::<f64>(scale))
         .unwrap_or_else(|| LogicalSize::new(1280.0, 800.0));
-    // Never create at 1×1 — that poisons wry's rate-based autoresize and the
-    // first visible frame. Prefer last frontend bounds; else right-half guess.
     let (x, y, w, h) = state
         .browser_bounds
         .lock()
@@ -857,8 +809,6 @@ pub async fn browser_open(
         LogicalPosition::new(x, y),
         LogicalSize::new(w.max(1.0), h.max(1.0)),
     )?;
-    // Mitigates focus-steal on creation; the frontend brings it to front via
-    // `browser_set_visible` once it has positioned the panel.
     webview.hide()?;
     let _ = apply_bounds(&webview, x, y, w, h);
 
@@ -924,8 +874,6 @@ fn apply_bounds(
     width: f64,
     height: f64,
 ) -> DesktopResult<()> {
-    // Trust the frontend-measured slot rect — stretching to the window bottom
-    // made the child webview bleed over the resize sash and adjacent panes.
     let y = y.max(0.0);
     let width = width.max(1.0);
     let height = height.max(1.0);
@@ -936,10 +884,6 @@ fn apply_bounds(
         .map(|s| s.to_logical::<f64>(scale).height)
         .unwrap_or(height + y);
 
-    // Atomic bounds — never set_position then set_size. On macOS the child
-    // NSView is bottom-anchored; splitting the calls lets an intermediate
-    // size change slide the top edge over the React toolbar. `set_bounds`
-    // also updates wry's rate-based autoresize.
     webview.set_bounds(Rect {
         position: LogicalPosition::new(x, y).into(),
         size: LogicalSize::new(width, height).into(),
@@ -962,8 +906,6 @@ fn apply_bounds(
             std::env::temp_dir().join("flex-browser-bounds.json"),
             applied.to_string(),
         );
-        // Also mirror to /tmp — macOS temp_dir is under /var/folders and
-        // is easy to miss when grepping for the probe file during layout QA.
         #[cfg(unix)]
         let _ = std::fs::write("/tmp/flex-browser-bounds.json", applied.to_string());
     }
@@ -996,8 +938,6 @@ pub async fn browser_set_visible(state: State<'_, AppState>, visible: bool) -> D
     let guard = state.browser_webview.lock().await;
     if let Some(webview) = guard.as_ref() {
         if visible {
-            // Re-assert bounds before reveal so the webview can never flash
-            // at a stale (e.g. bottom-anchored, post-resize) position.
             if let Some((x, y, w, h)) = bounds {
                 apply_bounds(webview, x, y, w, h)?;
             }
@@ -1020,8 +960,6 @@ pub async fn browser_close(app: AppHandle, state: State<'_, AppState>) -> Deskto
     Ok(())
 }
 
-/// Enable or disable Design Mode (element picker) in the embedded browser.
-/// Persists a flag so Finished-load handlers re-inject after navigations.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_set_design_mode(
@@ -1041,9 +979,6 @@ pub async fn browser_set_design_mode(
     Ok(())
 }
 
-/// Apply temporary CSS property overrides to an element matched by `selector`
-/// in the embedded browser. Used by the Components tab CSS panel for live
-/// preview — does not write source files.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_apply_style_overrides(
@@ -1081,13 +1016,6 @@ pub async fn browser_apply_style_overrides(
     Ok(())
 }
 
-/// Opens DevTools for the embedded browser's child webview only — never the
-/// app's main webview. Errors if the browser hasn't been opened yet so the
-/// frontend can toast instead of silently no-op'ing (Cursor parity).
-///
-/// On macOS, WebKit's inspector defaults to docking into the parent window
-/// (full-width, shoving the right panel). After `show` we call private
-/// `_WKInspector::detach` so it opens as a floating window instead.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_open_devtools(state: State<'_, AppState>) -> DesktopResult<()> {
@@ -1100,10 +1028,6 @@ pub async fn browser_open_devtools(state: State<'_, AppState>) -> DesktopResult<
     webview.open_devtools();
     #[cfg(target_os = "macos")]
     {
-        // WebKit creates and DOCKS the _WKInspector asynchronously after
-        // open_devtools(); a single deferred detach often no-ops (the inspector
-        // view doesn't exist yet), leaving it docked full-width over the panel.
-        // Retry with backoff so detach lands after the inspector is up.
         std::thread::spawn(move || {
             const DELAYS_MS: &[u64] = &[0, 200, 500, 1000];
             let mut last_nil = false;
@@ -1111,8 +1035,6 @@ pub async fn browser_open_devtools(state: State<'_, AppState>) -> DesktopResult<
                 if delay > 0 {
                     std::thread::sleep(std::time::Duration::from_millis(delay));
                 }
-                // with_webview requires a 'static Send closure, so share the
-                // flag via Arc rather than borrowing a stack AtomicBool.
                 let detached = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
                 let detached_flag = std::sync::Arc::clone(&detached);
                 let _ = webview.with_webview(move |platform| {
@@ -1137,8 +1059,6 @@ pub async fn browser_open_devtools(state: State<'_, AppState>) -> DesktopResult<
     Ok(())
 }
 
-/// Detach the WKWebView inspector into a floating window (private API).
-/// Returns `true` when `_inspector` was found and detach was invoked.
 #[cfg(target_os = "macos")]
 fn detach_macos_inspector(wk_webview: *mut std::ffi::c_void) -> bool {
     if wk_webview.is_null() {
@@ -1153,18 +1073,12 @@ fn detach_macos_inspector(wk_webview: *mut std::ffi::c_void) -> bool {
             return false;
         }
         let insp: &AnyObject = &*inspector;
-        // show is usually already called by open_devtools; detach undocks it.
         let _: () = msg_send![insp, show];
         let _: () = msg_send![insp, detach];
         true
     }
 }
 
-/// Hard reload — bypasses Tauri's `reload()` (a plain in-place reload) and
-/// instead re-navigates to the current URL, which forces the webview to
-/// re-fetch rather than potentially serve from its own cache. `reload()`
-/// remains available as the soft-reload path (`browser_reload`); this command
-/// is the "…" menu's cache-busting variant.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_hard_reload(app: AppHandle, state: State<'_, AppState>) -> DesktopResult<()> {
@@ -1178,11 +1092,6 @@ pub async fn browser_hard_reload(app: AppHandle, state: State<'_, AppState>) -> 
     Ok(())
 }
 
-/// Clears cookies, cache, and other browsing data for the embedded browser's
-/// child webview via wry/Tauri's `clear_all_browsing_data` — shipped as one
-/// "Clear Browsing Data" action rather than separate cookie/cache items since
-/// the underlying API doesn't expose that granularity. Errors when no child
-/// webview is open (frontend disables the menu item; this is the safety net).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_clear_data(state: State<'_, AppState>) -> DesktopResult<()> {
@@ -1194,15 +1103,6 @@ pub async fn browser_clear_data(state: State<'_, AppState>) -> DesktopResult<()>
     Ok(())
 }
 
-/// Captures a screenshot of the embedded browser's on-screen region.
-///
-/// Uses the shared [`crate::screen_capture`] backends:
-/// - macOS: `screencapture -R` (points)
-/// - Linux: `grim -g` / ImageMagick `import`
-/// - Windows: PowerShell `CopyFromScreen`
-///
-/// Caveat: if the app window isn't frontmost, region capture can include
-/// whatever occludes it — acceptable for agent tooling.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn browser_screenshot(state: State<'_, AppState>) -> DesktopResult<String> {
@@ -1217,7 +1117,6 @@ pub async fn browser_screenshot(state: State<'_, AppState>) -> DesktopResult<Str
     let view_pos = webview.position()?;
     let view_size = webview.size()?;
 
-    // Physical pixels — macOS backend converts to points via `scale`.
     let rect = crate::screen_capture::ScreenRect::from_physical(
         win_pos.x as f64 + view_pos.x as f64,
         win_pos.y as f64 + view_pos.y as f64,

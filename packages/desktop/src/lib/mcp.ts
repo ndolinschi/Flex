@@ -17,14 +17,12 @@ export const emptyMcpForm = (): McpFormState => ({
   enabled: true,
 })
 
-/** Splits on whitespace, dropping empties — good enough for `npx -y pkg` style commands. */
 export const parseArgs = (raw: string): string[] =>
   raw
     .split(/\s+/)
     .map((s) => s.trim())
     .filter(Boolean)
 
-/** One `KEY=value` pair per line; blank lines and lines without `=` are ignored. */
 export const parseEnv = (raw: string): Record<string, string> => {
   const env: Record<string, string> = {}
   for (const line of raw.split("\n")) {
@@ -37,11 +35,6 @@ export const parseEnv = (raw: string): Record<string, string> => {
   return env
 }
 
-/**
- * Heuristic matching `config::is_likely_secret_env_name` — splits a manual
- * form's env map into plaintext TOML env vs encrypted `secretEnv`.
- * Workspace IDs / channel allowlists stay plaintext.
- */
 export const isLikelySecretEnvName = (name: string): boolean => {
   const upper = name.toUpperCase()
   if (
@@ -64,7 +57,6 @@ export const isLikelySecretEnvName = (name: string): boolean => {
   )
 }
 
-/** Split a flat env map into non-secret `env` and credential `secretEnv`. */
 export const splitEnvSecrets = (
   env: Record<string, string>,
 ): { env: Record<string, string>; secretEnv: Record<string, string> } => {
@@ -87,10 +79,6 @@ export type CatalogInstallValues = {
   env: Record<string, string>
 }
 
-/** Assembles an `McpServerDto` for a catalog entry from the install
- * dialog's collected values — non-secret positional `argKeys` are appended
- * after the entry's literal `args`; secret arg values go in `secretArgs`
- * (encrypted store); secret `envKeys` go in `secretEnv`. */
 export const buildCatalogServerDto = (
   entry: McpCatalogEntry,
   values: CatalogInstallValues,
@@ -130,17 +118,11 @@ export const buildCatalogServerDto = (
   }
 }
 
-/**
- * Prefill install-dialog values from an already-installed server (configure
- * mode). Secret fields stay empty — the dialog shows "leave blank to keep".
- */
 export const prefillCatalogValues = (
   entry: McpCatalogEntry,
   server: McpServerDto,
 ): CatalogInstallValues => {
   const args: Record<string, string> = {}
-  // Non-secret positional args sit after the literal `entry.args` prefix in
-  // the saved TOML args list.
   const suffix = server.args.slice(entry.args.length)
   let plainIdx = 0
   for (const arg of entry.argKeys) {

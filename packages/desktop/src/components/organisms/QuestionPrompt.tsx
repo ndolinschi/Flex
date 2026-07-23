@@ -23,7 +23,6 @@ type DraftAnswer = {
 
 const emptyDraft = (): DraftAnswer => ({ selected: [], custom: "" })
 
-/** Shared vertical rhythm for the docked quiz card (compact 8px steps). */
 const CARD_PAD = "px-3 pt-2.5 pb-2.5"
 const SECTION_GAP = "mt-2"
 const STACK_GAP = "gap-1.5"
@@ -37,7 +36,6 @@ const StepBody = ({
   q: Question
   draft: DraftAnswer
   onChange: (next: DraftAnswer) => void
-  /** Fired only when a single-select option is chosen — drives auto-advance. */
   onOptionSelected: () => void
 }) => {
   const multi = !!q.multi_select
@@ -137,14 +135,6 @@ const StepBody = ({
   )
 }
 
-/** HITL modal for `AskUserQuestion` / `question_requested` events.
- *
- * Renders one question per step (reference-design wizard): a step
- * advances automatically on single-select choice, or via an explicit
- * Next button for multi-select / custom answers. Back preserves prior answers.
- * The last step's Next becomes Submit, which still builds the full
- * answers map client-side and sends it through the unchanged
- * `respondQuestion` wire call. */
 export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
   const setPendingQuestion = useAppStore((s) => s.setPendingQuestion)
   const [error, setError] = useState<string | null>(null)
@@ -166,8 +156,6 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
   }, [currentDraft])
 
   const showBack = stepIndex > 0
-  // Single-select mid-steps auto-advance on option click — no hollow footer.
-  // Custom text / multi-select / last step still need an explicit action.
   const showAdvance =
     !!currentQuestion.multi_select ||
     isLastStep ||
@@ -227,18 +215,11 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
     <div
       role="dialog"
       aria-labelledby="question-title"
-      // Same rail width as the composer pill below it (Composer docks this
-      // as a sibling above the bubble) and no bottom margin — the two read
-      // as one continuous stacked unit rather than a floating modal.
       className="w-full animate-modal-in"
       data-question-prompt
     >
       <div
         className={cn(
-          // Match the composer bubble's surface/radius/shadow language, but
-          // round only the top corners and drop the bottom shadow layer so
-          // the seam where this card meets the composer reads as one solid
-          // panel, not two stacked cards.
           "rounded-t-[var(--radius-composer)] border border-b-0 border-stroke-2",
           "bg-user-bubble shadow-[0_-4px_16px_-4px_var(--shadow-color)]",
           CARD_PAD,
@@ -291,9 +272,6 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => {
             className={cn(
               SECTION_GAP,
               "flex items-center gap-1.5",
-              // Full action row (Back + Next/Submit): hairline separator.
-              // Back-only mid-step: no border — avoids a hollow footer band
-              // between the options and a lone Back control.
               showAdvance
                 ? "justify-between border-t border-stroke-4 pt-2"
                 : "justify-start",

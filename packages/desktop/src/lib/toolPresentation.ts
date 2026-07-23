@@ -6,7 +6,6 @@ export type ToolKind = "explore" | "edit" | "shell" | "plan" | "generic"
 
 export const classifyTool = (name: string): ToolKind => {
   const n = name.toLowerCase()
-  // Exact `plan` only — don't match ExitPlanMode / plan-ish names via includes.
   if (n === "plan") return "plan"
   if (
     n === "read" ||
@@ -104,7 +103,6 @@ const countLines = (text: string): number => {
 
 export type DiffStats = { added: number; removed: number }
 
-/** Heuristic line diff from Edit/Write inputs (engine has no structured diffs). */
 export const diffFromCall = (call: ToolCall): DiffStats | null => {
   const input = asRecord(call.input)
   if (!input) return null
@@ -151,49 +149,23 @@ const readRangeLabel = (call: ToolCall): string | null => {
 const shellCommand = (call: ToolCall): string | null =>
   stringField(asRecord(call.input), ["command", "cmd"])
 
-/** Whether `call` is a `Bash` tool call started with `run_in_background:
- * true` (the engine's detached-process mode — see `BashTool::run_in_background`
- * in `packages/engine/crates/tools/src/bash.rs`, read-only from here). Such
- * calls get a distinct feed row (see `backgroundDetail`) instead of the plain
- * shell row. */
 export const isBackgroundBashCall = (call: ToolCall): boolean => {
   const input = asRecord(call.input)
   return input?.run_in_background === true
 }
 
-/** Whether `call` is a **foreground** `Bash` call that was demoted mid-run
- * (see `MOVE-TO-BACKGROUND`): its `input.run_in_background` is `false`/unset
- * (it started as a normal blocking call), but the engine's result carries the
- * same structured `{"process_id", "running"}` shape a `run_in_background`
- * start does (see `BashTool::run` in `packages/engine/crates/tools/src/bash.rs`
- * — the demote path deliberately mirrors that structured payload so this
- * detection doesn't need a third code path). Distinguishing this from
- * `isBackgroundBashCall` only matters for the label ("Background: <command>"
- * vs. leaving the original command text) — both route to the same
- * `BackgroundRow` presentation. */
 export const isDemotedBashCall = (call: ToolCall): boolean => {
   if (isBackgroundBashCall(call)) return false
   const structured = asRecord(call.result?.structured)
   return typeof structured?.process_id === "string"
 }
 
-/** Whether `call` should render as a background-process row at all —
- * started that way from the outset, or demoted into one mid-run. */
 export const isBackgroundPresentedBashCall = (call: ToolCall): boolean =>
   isBackgroundBashCall(call) || isDemotedBashCall(call)
 
-/** `process_id` the engine assigned this background process, from the
- * start call's `structured` result (`{"process_id", "pid", "running",
- * "truncated"}` — see `BashTool::run_in_background`, or the same shape from
- * a demote — see `isDemotedBashCall`). `None` until the initial result
- * lands. */
 const backgroundProcessId = (call: ToolCall): string | null =>
   stringField(asRecord(call.result?.structured), ["process_id"])
 
-/** Whether the engine has reported this background process as still
- * running, from the same `structured` payload. Defaults to `true` while the
- * call itself is still in flight (no structured result yet) — the row should
- * read as "running" until told otherwise. */
 const backgroundStructuredRunning = (call: ToolCall): boolean => {
   const structured = asRecord(call.result?.structured)
   if (!structured) return true
@@ -201,12 +173,6 @@ const backgroundStructuredRunning = (call: ToolCall): boolean => {
   return typeof running === "boolean" ? running : true
 }
 
-/** The engine's own exit marker: a plain-text `ExecChunk` line reading
- * `[process exited with code N]`, appended to the same `call_id`'s tail after
- * a background process terminates (see `packages/engine`'s background
- * executor, read-only from here). This is the authoritative "has it exited"
- * signal — `structured.running` only reflects the state at the moment the
- * *start* call returned, not the process's live status. */
 const EXIT_MARKER_RE = /\[process exited(?: with code (-?\d+))?]/
 
 export const parseExitMarker = (
@@ -226,34 +192,14 @@ export type ToolStepDetail = {
   removed?: number
   running: boolean
   failed: boolean
-  /** Repo-relative file path for edit/write rows — lets the row offer an
-   * inline diff (lazy-fetched via `reviewFileDiff` on first expand). */
   diffPath?: string
-  /** Repo-relative path for open-in-Files (Read/explore rows without a diff). */
   filePath?: string
-  /** Shell/bash calls get a live mini-log tail rendered under the row while
-   * running (see `execTailBus`). */
   isShell?: boolean
-  /** Raw shell command (undecorated — no "Background: " prefix), used by the
-   * "Ask Agent to fix" error action so the prefilled prompt quotes the actual
-   * command rather than the display label. */
   command?: string
-  /** Set for a `Bash` call started with `run_in_background: true` — renders
-   * as a distinct "Background: <command>" row with its own running/exited
-   * state and a Stop control, instead of the plain shell row. */
   background?: {
     processId: string | null
-    /** Best-effort "still running" guess from the start call's `structured`
-     * result — superseded by the exit marker once one appears in the tail
-     * (see `ExecTail`/`BackgroundRow`, which parse the live tail directly). */
     initiallyRunning: boolean
   }
-  /** Set for a still-running **foreground** shell row (not already a
-   * background row) — offers the "Move to background" affordance (see
-   * `MOVE-TO-BACKGROUND`). Calling `backgroundDemote` for this call id; on
-   * success the row flips to the `background` presentation once the
-   * engine's demoted result lands with its structured `process_id` (see
-   * `isDemotedBashCall`) — no separate client-side state needed. */
   canDemote?: boolean
 }
 
@@ -356,10 +302,6 @@ const shellDetail = (call: ToolCall): ToolStepDetail => {
         initiallyRunning: backgroundStructuredRunning(call),
       }
     : undefined
-  // A demoted call's label keeps the plain command text (it started as a
-  // normal foreground row, and the row it flips into already shows
-  // "running"/"exited" state) — only calls that started with
-  // `run_in_background: true` from the outset get the "Background: " prefix.
   const label = cmd
     ? background && !demoted
       ? `Background: ${cmd}`
@@ -387,7 +329,6 @@ const genericDetail = (call: ToolCall): ToolStepDetail => {
   }
 }
 
-/** Checklist items from a `Plan` tool call's `input.entries`. */
 const planEntriesFromInput = (
   call: ToolCall,
 ): Array<{ content: string; status?: string }> => {
@@ -405,8 +346,6 @@ const planEntriesFromInput = (
   return out
 }
 
-/** One detail row per plan step — never echo the tool name "Plan" as the
- * only body line under a "Plan" header (the live QA stray "Plan > Plan"). */
 const planDetails = (calls: ToolCall[]): ToolStepDetail[] => {
   const details: ToolStepDetail[] = []
   for (const call of calls) {
@@ -441,8 +380,6 @@ export const summarizeToolCalls = (calls: ToolCall[]): ToolStepSummary => {
             if (kind === "shell") return shellDetail(call)
             return genericDetail(call)
           })
-          // Bare "RepoMap" under a "RepoMap" header (no path/args) is noise —
-          // same poka-yoke as plan details never echoing the tool name.
           .filter((detail, i) => {
             if (kind !== "generic") return true
             const call = calls[i]
@@ -450,8 +387,6 @@ export const summarizeToolCalls = (calls: ToolCall[]): ToolStepSummary => {
             return detail.label !== call.tool_name
           })
 
-  // Prefer the call list over filtered details so a bare RepoMap (no detail
-  // rows) still shows as running while in flight.
   const running = calls.some(isRunning)
   const failed = calls.some(isFailed)
 
@@ -474,7 +409,6 @@ export const summarizeToolCalls = (calls: ToolCall[]): ToolStepSummary => {
       if (path) fileSet.add(path)
       for (const f of filesFromStructured(call)) fileSet.add(f)
     }
-    // Prefer structured file counts from glob/grep when no paths collected.
     let count = fileSet.size
     if (count === 0) {
       for (const call of calls) {
@@ -553,7 +487,21 @@ export const summarizeToolCalls = (calls: ToolCall[]): ToolStepSummary => {
       ? calls.length === 1
         ? "Starting agent…"
         : `Starting ${calls.length} agents…`
-      : `Running ${calls[0]?.tool_name ?? "tool"}…`
+      : calls[0]?.tool_name?.toLowerCase() === "repomap"
+        ? "Building repo map…"
+        : `Running ${calls[0]?.tool_name ?? "tool"}…`
+    : calls.length === 1 && calls[0]?.tool_name?.toLowerCase() === "repomap"
+      ? (() => {
+          const structured = asRecord(calls[0]?.result?.structured)
+          const n = numberField(structured, ["file_count", "fileCount"])
+          const cached = structured?.cache_hit === true || structured?.cacheHit === true
+          if (typeof n === "number" && n > 0) {
+            return cached
+              ? `Repo map · ${n.toLocaleString()} files (cached)`
+              : `Repo map · ${n.toLocaleString()} files`
+          }
+          return "Repo map"
+        })()
     : calls.length === 1
       ? (calls[0]?.tool_name ?? "Tool")
       : calls[0]?.tool_name === SUBAGENT_TOOL_NAME
@@ -563,11 +511,6 @@ export const summarizeToolCalls = (calls: ToolCall[]): ToolStepSummary => {
   return { kind, title, running, failed, details }
 }
 
-/**
- * Collapsed WorkGroup resume line — aggregate settled tool calls by kind
- * across the whole group (not just consecutive clusters):
- * "Edited 3 files · Explored 2 files · Ran 1 command".
- */
 export const buildWorkResumeLine = (calls: ToolCall[]): string | null => {
   if (calls.length === 0) return null
 
@@ -582,7 +525,6 @@ export const buildWorkResumeLine = (calls: ToolCall[]): string | null => {
     buckets[classifyTool(call.tool_name)].push(call)
   }
 
-  // Order matches the plan resume: edits → explores → commands → plan → other.
   const order: ToolKind[] = ["edit", "explore", "shell", "plan", "generic"]
   const parts: string[] = []
   for (const kind of order) {
@@ -594,38 +536,13 @@ export const buildWorkResumeLine = (calls: ToolCall[]): string | null => {
   return parts.length > 0 ? parts.join(" · ") : null
 }
 
-
-/** Minimal row shape needed to cluster consecutive same-kind tool rows. */
 export type TimelineToolRowLike = {
   type: string
   call?: ToolCall
   id?: string
-  /** Present on `thinking`/`assistant`/`user` rows — needed to tell an
-   * empty-text (invisible, `TimelineRowView` renders `null`) shell from a
-   * real visible row. */
   text?: string
 }
 
-/**
- * True when `row` must not act as a cluster boundary between two tool rows
- * of the same family — either because it renders as nothing in
- * `TimelineRowView` (a `turn` marker, always consumed before this list is
- * built but defensively included; a `plan` row, owned by the right-panel Plan
- * tab; or a `thinking`/`assistant` row whose text is empty/whitespace — a
- * thinking-only or tool-use-only assistant_message chunk with no markdown
- * yet, normal mid-turn model output, not rare), or because it's ordinary
- * mid-turn assistant NARRATION — a short "Good — the project uses plain
- * CommonJS…" aside the model emits between tool calls, before its final
- * answer. Real sessions are full of these; a completely ordinary "Read,
- * (narration), Read" or "Edit, (narration), Edit" sequence must still merge
- * into "Read 2 files"/"Edited 2 files", the same as it would with a silent
- * thinking-only chunk in between — otherwise every real turn with any
- * mid-turn commentary renders as a run of singleton tool rows instead of
- * clustering, which is the confirmed-live bug this exists to fix (see
- * HANDOFF-OPUS.md). The narration row itself still renders — it's returned as
- * `kind: "other"` in its original position, same as any invisible row —
- * only the cluster ADJACENCY tolerates it.
- */
 const isNonBreakingRow = (row: TimelineToolRowLike): boolean => {
   if (row.type === "turn" || row.type === "plan") return true
   if (row.type === "thinking" || row.type === "assistant") return true
@@ -643,13 +560,6 @@ export const clusterToolRows = (
     | { kind: "other"; row: TimelineToolRowLike }
   > = []
 
-  // Cluster consecutive same-family tool rows over the FINAL row order,
-  // tolerant of non-breaking rows interleaved between them (see
-  // `isNonBreakingRow`): a non-breaking row is emitted in its original
-  // position (via `kind: "other"` — `TimelineRowView` renders it normally, so
-  // visible narration still shows up as its own line) but does NOT reset
-  // `last`, so the next real tool row still sees the open cluster and can
-  // merge into it.
   let last: { kind: "tools"; calls: ToolCall[] } | undefined
   for (const row of rows) {
     if (row.type !== "tool" || !("call" in row) || !row.call) {

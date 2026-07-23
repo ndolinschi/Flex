@@ -20,7 +20,6 @@ const MentionIcon = ({ kind }: { kind: AtMentionHit["kind"] }) => {
   return <FileIcon className={className} aria-hidden />
 }
 
-/** Composer `@` suggestion tray — files, folders, tables, and MCP servers. */
 export const AtMentionTray = ({
   open,
   anchorRef,

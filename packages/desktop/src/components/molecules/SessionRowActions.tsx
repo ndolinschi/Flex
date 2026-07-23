@@ -22,15 +22,9 @@ type SessionRowActionsProps = {
   onOpenMenu: (e: MouseEvent<HTMLButtonElement>) => void
   canTogglePin: boolean
   canSetArchived: boolean
-  /**
-   * Mount icon action Buttons only after the row is hovered/focused.
-   * Sidebar lists are not virtualized — permanently mounting 3 buttons per
-   * row scales poorly (hooks × sessions). Sticky once true.
-   */
   actionsReady: boolean
 }
 
-/** Hover trailing actions (pin / archive / more) + optional compact time. */
 export const SessionRowActions = memo(function SessionRowActions({
   pinned,
   archived,
@@ -58,9 +52,6 @@ export const SessionRowActions = memo(function SessionRowActions({
           {formatTime(updatedAtMs)}
         </span>
       ) : null}
-      {/* Absolutely positioned (reference technique: .agent-sidebar-cell-trailing
-          uses position:absolute + top:50%/translateY(-50%)) so the hover-actions'
-          intrinsic button height can never inflate the row's own height. */}
       <span
         className={cn(
           "absolute right-2 top-1/2 z-[2] flex max-w-0 -translate-y-1/2 items-center overflow-hidden opacity-0",

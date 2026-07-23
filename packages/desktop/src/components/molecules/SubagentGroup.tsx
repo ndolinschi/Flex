@@ -23,19 +23,12 @@ type SubagentGroupProps = {
   phase: "started" | "completed"
   durationMs?: number
   summary?: TurnSummary
-  /** Opens the bottom subagent viewer with this child's live feed. */
   onOpenViewer?: () => void
-  /**
-   * Compact worker row (inside WorkersGroup): status + activity + meta,
-   * no nested tool dump by default. Expand still peeks recent tools.
-   */
   compact?: boolean
-  /** Raw nested timeline for activity / tool-count (preferred). */
   nestedRows?: TimelineRow[]
   children?: ReactNode
 }
 
-/** First line of a (possibly multi-line) task prompt. */
 const firstLine = (text: string): string => text.split("\n", 1)[0]
 
 const StatusGlyph = ({ status }: { status: WorkerStatus }) => {
@@ -53,7 +46,6 @@ const StatusGlyph = ({ status }: { status: WorkerStatus }) => {
   return <Check className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
 }
 
-/** Small expandable "Task prompt" row. */
 const TaskPromptDetail = ({ task }: { task: string }) => {
   const [expanded, setExpanded] = useState(false)
   const preview = firstLine(task)
@@ -89,8 +81,6 @@ const TaskPromptDetail = ({ task }: { task: string }) => {
   )
 }
 
-/** Collapsible nested subagent work block — enriched with live status,
- * latest activity, and tool-count meta. */
 export const SubagentGroup = memo(function SubagentGroup({
   task,
   role,
@@ -200,7 +190,6 @@ export const SubagentGroup = memo(function SubagentGroup({
           {activityLine ? (
             <span
               className={cn(
-                // Indent under icon slot (16px) + gap (4px).
                 "min-w-0 truncate pl-5 text-xs leading-[1.5] text-ink-faint",
                 status === "running" && "animate-shimmer-text",
               )}

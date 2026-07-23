@@ -1,5 +1,3 @@
-//! `Grep`: regex search over text files.
-
 use std::path::Path;
 
 use async_trait::async_trait;
@@ -21,21 +19,14 @@ const MAX_OUTPUT_CHARS: usize = 100_000;
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct GrepInput {
-    /// Rust regex pattern to search for.
     pattern: String,
-    /// Directory to search. Relative paths resolve against the session cwd.
     path: Option<String>,
-    /// Optional glob filter such as `**/*.rs`.
     glob: Option<String>,
-    /// Case-insensitive regex matching.
     case_insensitive: Option<bool>,
-    /// Context lines before and after each match, capped at 5.
     context: Option<usize>,
-    /// Maximum matching lines to return. Defaults to 100, capped at 1000.
     max_results: Option<usize>,
 }
 
-/// Search text files with a regex.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct GrepTool;
 

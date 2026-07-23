@@ -1,5 +1,3 @@
-//! Gemini environment configuration.
-
 use agentloop_contracts::ProviderId;
 use agentloop_core::ProviderError;
 use agentloop_provider_common::required_env;

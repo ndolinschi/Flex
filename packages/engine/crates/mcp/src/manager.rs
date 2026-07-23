@@ -1,5 +1,3 @@
-//! MCP manager: config reload, tool discovery, and registry registration.
-
 use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
@@ -13,7 +11,6 @@ use crate::client::RmcpToolClient;
 use crate::config::{McpBridgeConfig, McpServerConfig};
 use crate::tool::McpBridgedTool;
 
-/// Owns MCP configuration, live client connections, and bridged tool handles.
 pub struct McpManager {
     config: McpBridgeConfig,
     client: Arc<dyn McpToolClient>,
@@ -158,7 +155,6 @@ impl McpManager {
         self.client.shutdown().await;
     }
 
-    /// Look up a server config by name (enabled or disabled).
     pub fn server_config(&self, name: &str) -> Option<&McpServerConfig> {
         self.config
             .servers
@@ -166,7 +162,6 @@ impl McpManager {
             .find(|server| server.name == name)
     }
 
-    /// List tools from a single server (for the MCP explorer UI).
     pub async fn list_server_tools(
         &self,
         server_name: &str,
@@ -180,7 +175,6 @@ impl McpManager {
         self.client.list_tools(server, cancel).await
     }
 
-    /// Call a tool on a single server (for the MCP explorer UI).
     pub async fn call_server_tool(
         &self,
         server_name: &str,

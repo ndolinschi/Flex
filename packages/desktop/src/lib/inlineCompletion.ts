@@ -1,13 +1,10 @@
-/** Pure helpers for ghost-text prompt completion (composer + Prompt tab). */
 
-/** True when the caret sits at end-of-line or end-of-draft (v1 ghost target). */
 export const isCaretAtEndOfLine = (draft: string, caret: number): boolean => {
   if (caret < 0 || caret > draft.length) return false
   if (caret === draft.length) return true
   return draft[caret] === "\n"
 }
 
-/** Insert `suggestion` at `caret`, returning the next draft + caret. */
 export const acceptInlineSuggestion = (
   draft: string,
   caret: number,
@@ -18,18 +15,14 @@ export const acceptInlineSuggestion = (
   return { draft: next, caret: caret + suggestion.length }
 }
 
-/** Minimum prefix length before we ask the model. */
 export const INLINE_COMPLETION_MIN_PREFIX = 4
 
-/** Debounce before invoking `complete_prompt_inline`. */
 export const INLINE_COMPLETION_DEBOUNCE_MS = 300
 
-/** Recommended small Ollama model for the setup modal. */
 export const RECOMMENDED_OLLAMA_MODEL = "qwen2.5:0.5b"
 
 export const OLLAMA_PULL_COMMAND = `ollama pull ${RECOMMENDED_OLLAMA_MODEL}`
 
-/** Strip a redundant `provider/` prefix from a model id (dropdown values). */
 export const normalizeCompletionModelId = (
   providerId: string,
   modelId: string,
@@ -38,7 +31,6 @@ export const normalizeCompletionModelId = (
   return modelId.startsWith(prefix) ? modelId.slice(prefix.length) : modelId
 }
 
-/** ModelSelect values are qualified; prefs store bare model ids. */
 export const qualifiedCompletionModelId = (
   providerId: string,
   modelId: string,

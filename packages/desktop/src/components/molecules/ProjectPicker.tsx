@@ -55,18 +55,15 @@ export const ProjectPicker = ({
   const label = cwd ? basename(cwd) : "Project"
 
   const recents = useMemo(() => {
-    // Closed: skip session-cache scan — trigger only needs `label`.
     if (!open) return []
     const sessions =
       queryClient.getQueryData<
         { cwd: string; base_cwd?: string; parent_id?: string }[]
       >(["sessions"]) ?? []
-    // Skip subagent children — their worktree paths aren't user projects.
-    // Prefer base_cwd so isolated sessions don't pollute recents with UUID worktrees.
     const fromSessions = sessions
       .filter((s) => !s.parent_id)
       .map((s) => s.base_cwd || s.cwd)
-    const projectCwd = cwd // caller should pass base_cwd ?? cwd
+    const projectCwd = cwd
     const merged = [...recentCwds, ...fromSessions, projectCwd].filter(
       (p): p is string => !!p && p.trim().length > 0,
     )

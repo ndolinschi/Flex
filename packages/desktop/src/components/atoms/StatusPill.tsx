@@ -7,7 +7,6 @@ type StatusPillProps = {
   tone?: StatusPillTone
   children: ReactNode
   className?: string
-  /** Optional leading glyph / icon (keep ≤14px). */
   icon?: ReactNode
 }
 
@@ -18,10 +17,6 @@ const toneClass: Record<StatusPillTone, string> = {
   neutral: "status-pill-neutral bg-bg-quaternary text-ink-secondary",
 }
 
-/**
- * Production status pill (Phase 4) — full-radius whisper chip.
- * Uses semantic quaternary fills + semantic text (oklab ladders).
- */
 export const StatusPill = ({
   tone = "neutral",
   children,

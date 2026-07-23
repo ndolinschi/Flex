@@ -60,13 +60,10 @@ const KindIcon = ({
 type ToolStepGroupProps = {
   calls: ToolCall[]
   className?: string
-  /** Keep expanded while any call in the group is still running. */
   forceOpen?: boolean
-  /** Latest live progress note per call id (from `tool_progress`). */
   progress?: Record<string, string>
 }
 
-/** aggregated tool step: one summary line, expandable details. */
 export const ToolStepGroup = memo(function ToolStepGroup({
   calls,
   className,
@@ -85,10 +82,6 @@ export const ToolStepGroup = memo(function ToolStepGroup({
   const open = forceOpen || expanded
   const canExpand = summary.details.length > 0
 
-  // Auto-expand while `forceOpen` (cluster still running). When the run
-  // finishes, `forceOpen` drops — keep open for a single Edit/Write so the
-  // chat diff card stays visible; otherwise collapse. Only reacts to
-  // `forceOpen` / single-edit settling so a manual toggle isn't clobbered.
   const prevForceOpen = useRef(forceOpen)
   const prevSingleEdit = useRef(singleEditDiff)
   useEffect(() => {
@@ -137,13 +130,11 @@ export const ToolStepGroup = memo(function ToolStepGroup({
         onClick={handleToggle}
         onKeyDown={handleKeyDown}
         className={cn(
-          // Cursor ui-tool-call-line: gap 4, text-base, lh 1.5; idle muted → hover secondary.
           "h-auto w-full justify-start gap-1 rounded-sm px-0 py-px font-normal text-base leading-[1.5]",
           "text-ink-muted hover:bg-transparent hover:text-ink-secondary aria-expanded:bg-transparent",
           summary.failed && "text-destructive",
         )}
       >
-        {/* Fixed icon slot ~16×18 (Cursor primary-toolcall-icon). */}
         <span className="flex h-[18px] w-4 shrink-0 items-center justify-center">
           <KindIcon kind={summary.kind} running={summary.running} />
         </span>
@@ -172,8 +163,6 @@ export const ToolStepGroup = memo(function ToolStepGroup({
       </Button>
 
       <Collapsible open={open}>
-        {/* Single `pt-0.5` under the summary — avoid stacking mt + py which
-            left an uneven air gap above the first detail (RepoMap QA). */}
         <ul className="ml-1.5 flex flex-col gap-0.5 pt-0.5 pl-3">
           {summary.details.map((detail) => (
             <DetailRow
@@ -189,4 +178,3 @@ export const ToolStepGroup = memo(function ToolStepGroup({
   )
 })
 
-/** Cluster consecutive same-kind tool rows for summaries. */

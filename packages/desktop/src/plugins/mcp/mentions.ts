@@ -1,17 +1,12 @@
 import { mcpList } from "../../lib/tauri"
 import type { UiMentionHit } from "../types"
 
-/** Case-insensitive substring match on server id. */
 const matches = (id: string, query: string): boolean => {
   const q = query.trim().toLowerCase()
   if (!q) return true
   return id.toLowerCase().includes(q)
 }
 
-/**
- * @-mention provider for enabled MCP servers. Inserts `@{serverId}` so the
- * prompt can steer the agent toward that server's bridged tools (`id__tool`).
- */
 export const searchMcpMentions = async (
   query: string,
   _cwd: string | undefined,

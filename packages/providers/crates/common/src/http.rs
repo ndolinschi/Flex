@@ -1,12 +1,8 @@
-//! HTTP helpers shared by provider clients.
-
 use agentloop_contracts::ProviderId;
 use agentloop_core::ProviderError;
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Method, RequestBuilder, StatusCode};
 
-/// Build an authenticated request using bearer-token auth. An empty key
-/// sends no Authorization header (keyless local endpoints like LM Studio).
 pub fn authenticated_request(
     client: &Client,
     method: Method,
@@ -23,7 +19,6 @@ pub fn authenticated_request(
     }
 }
 
-/// Convert a non-success HTTP response into a canonical provider error.
 pub fn status_to_provider_error(
     provider: &ProviderId,
     status: StatusCode,
@@ -72,10 +67,6 @@ pub fn status_to_provider_error(
     }
 }
 
-/// True when a provider body reports the prompt exceeded its context window.
-///
-/// Copilot returns HTTP 400 with text like
-/// `prompt token count of 383156 exceeds the limit of 136000`.
 pub fn looks_like_context_overflow(message: &str) -> bool {
     let lower = message.to_ascii_lowercase();
     let tokenish = lower.contains("token")
@@ -94,24 +85,12 @@ pub fn looks_like_context_overflow(message: &str) -> bool {
         || lower.contains("max context")
 }
 
-/// Parse a `Retry-After` response header into milliseconds.
-///
-/// Only the delay-seconds form (`Retry-After: 20`), which is what every
-/// OpenAI-compatible endpoint we target actually sends, is supported. The
-/// HTTP-date form is rare enough on JSON APIs that pulling in a date-parsing
-/// dependency for it isn't worth it here; an unparsable header just means the
-/// caller falls back to its own backoff schedule.
 pub fn retry_after_ms_from_headers(headers: &HeaderMap) -> Option<u64> {
     let value = headers.get(reqwest::header::RETRY_AFTER)?.to_str().ok()?;
     let seconds: u64 = value.trim().parse().ok()?;
     Some(seconds.saturating_mul(1000))
 }
 
-/// Whether a transport-level (pre-HTTP-status) `reqwest` error is worth
-/// retrying: timeouts and connection failures (refused/reset connections,
-/// DNS blips) are transient. Everything else — malformed request/URL,
-/// redirect policy violations, body encoding errors — is a bug or a
-/// permanently broken configuration, not a blip, so it stays terminal.
 pub fn is_retryable_transport_error(err: &reqwest::Error) -> bool {
     err.is_timeout() || err.is_connect()
 }

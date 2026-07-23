@@ -1,5 +1,3 @@
-//! `CreateSpreadsheet` — writes an `.xlsx` file at an absolute path.
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -15,20 +13,14 @@ use crate::path::{ensure_parent, relative_from, require_absolute};
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct CreateSpreadsheetInput {
-    /// Absolute path for the output `.xlsx` file.
     file_path: String,
 
-    /// Sheet tab name (worksheet title). Max 31 characters (Excel limit).
     title: String,
 
-    /// Optional header row — written as the first row if provided.
     headers: Option<Vec<String>>,
 
-    /// Data rows. Each inner array is one row; cells are strings.
-    /// Rows may have different lengths; shorter rows leave trailing cells empty.
     rows: Vec<Vec<String>>,
 
-    /// Create missing parent directories. Defaults to `true`.
     #[serde(default = "default_true")]
     create_dirs: bool,
 }
@@ -37,7 +29,6 @@ fn default_true() -> bool {
     true
 }
 
-/// The `CreateSpreadsheet` tool.
 pub struct CreateSpreadsheetTool {
     backend: Arc<dyn OfficeArtifact>,
 }

@@ -13,9 +13,6 @@ type CheckboxProps = {
   onClick?: (e: MouseEvent) => void
 }
 
-/** Selection control — uses the Base UI Checkbox primitive (same as
- * `@/components/ui/checkbox`) with a custom indicator for indeterminate state.
- * Round shape preserved; shadcn accent tokens applied. */
 export const Checkbox = ({
   checked,
   indeterminate = false,

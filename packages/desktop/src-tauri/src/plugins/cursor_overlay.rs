@@ -1,7 +1,3 @@
-//! Animated always-on-top agent cursor overlay (ChatGPT computer-use style).
-//!
-//! A transparent, click-through window hosts a single glowing pointer that
-//! animates between screen coordinates while Computer tools drive the host.
 
 use std::time::Duration;
 
@@ -106,9 +102,6 @@ async fn ensure_overlay(app: &AppHandle) -> DesktopResult<()> {
         .map_err(|e| DesktopError::Message(format!("agent cursor overlay write: {e}")))?;
     let url = tauri::Url::from_file_path(&html_path)
         .map_err(|_| DesktopError::Message("agent cursor overlay: invalid file url".into()))?;
-    // `.transparent(true)` needs crate feature `macos-private-api` (+
-    // `app.macOSPrivateApi` in tauri.conf.json) on macOS; other platforms
-    // expose the method unconditionally.
     let win = WebviewWindowBuilder::new(app, WINDOW_LABEL, WebviewUrl::CustomProtocol(url))
         .title("Agent cursor")
         .decorations(false)
@@ -122,7 +115,6 @@ async fn ensure_overlay(app: &AppHandle) -> DesktopResult<()> {
         .build()
         .map_err(|e| DesktopError::Message(format!("agent cursor overlay: {e}")))?;
 
-    // Cover the primary monitor so screen coordinates map 1:1.
     if let Ok(Some(monitor)) = app.primary_monitor() {
         let size = monitor.size();
         let pos = monitor.position();
@@ -131,18 +123,15 @@ async fn ensure_overlay(app: &AppHandle) -> DesktopResult<()> {
         let _ = win.set_ignore_cursor_events(true);
     }
     let _ = win.show();
-    // Give the HTML a beat to boot before the first eval.
     tokio::time::sleep(Duration::from_millis(60)).await;
     Ok(())
 }
 
-/// Show the agent cursor and animate it to `(x, y)` in screen points.
 pub async fn show_agent_cursor(app: &AppHandle, x: f64, y: f64) -> DesktopResult<()> {
     ensure_overlay(app).await?;
     move_agent_cursor(app, x, y, false).await
 }
 
-/// Move (and optionally pulse-click) the agent cursor.
 pub async fn move_agent_cursor(app: &AppHandle, x: f64, y: f64, click: bool) -> DesktopResult<()> {
     ensure_overlay(app).await?;
     let Some(win) = app.get_webview_window(WINDOW_LABEL) else {
@@ -155,7 +144,6 @@ pub async fn move_agent_cursor(app: &AppHandle, x: f64, y: f64, click: bool) -> 
     );
     win.eval(&js)
         .map_err(|e| DesktopError::Message(format!("agent cursor eval: {e}")))?;
-    // Match the CSS transition so callers can sequence OS clicks after motion.
     tokio::time::sleep(Duration::from_millis(if click { 420 } else { 400 })).await;
     Ok(())
 }

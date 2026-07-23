@@ -10,9 +10,11 @@ import { persistUiState } from "../persist"
 import {
   chatTabId,
   clampSplitRatio,
+  DEFAULT_WORK_TAB,
   defaultContentLayout,
   emptyPane,
   ensureChatInPane,
+  fileTabId,
   makeChatTab,
   moveTabBetweenPanes as moveTabBetweenPanesModel,
   normalizeLayout,
@@ -20,21 +22,24 @@ import {
   placeTabAt,
   replacePane,
   toolTabId,
+  upsertFileInPane,
   upsertToolInPane,
   type ContentLayout,
   type ContentTab,
   type PaneState,
   type TabGroup,
+  type ToolTabId,
 } from "../contentLayoutModel"
 
-/**
- * Whether the current state supports opening a split view.
- * Requires a wide viewport AND enough content-column width for two minimum-
- * width chat panes. Uses `window.innerWidth - sidebarUsed` as an approximation
- * (the exact row width is only available in ContentWorkspace's ResizeObserver).
- * Falls back to the viewport check alone when `window` is unavailable (SSR /
- * node test environment).
- */
+const DEFAULT_WORK_CANDIDATES: readonly ToolTabId[] = [
+  "changes",
+  "files",
+  "plan",
+  "terminal",
+  "browser",
+  "artifacts",
+]
+
 export const isSplitEligible = (state: AppState): boolean => {
   if (state.viewport !== "wide") return false
   if (typeof window === "undefined" || window.innerWidth === 0) return true
@@ -46,7 +51,6 @@ const persistLayout = (layout: ContentLayout) => {
   void persistUiState({ contentLayout: layout })
 }
 
-/** Mirror legacy right-panel open flags from the focused pane's active tool. */
 const syncCompatFlags = (
   layout: ContentLayout,
 ): Pick<AppState, "rightPanelOpen" | "rightPanelTab"> => {
@@ -60,18 +64,16 @@ const syncCompatFlags = (
           | undefined)?.tool
   return {
     rightPanelOpen: layout.mode === "split",
-    rightPanelTab: tool ?? "plan",
+    rightPanelTab: tool ?? "changes",
   }
 }
 
-/** Sync global activeSessionId from the focused pane's active chat tab. */
 const sessionIdFromLayout = (layout: ContentLayout): SessionId | null => {
   const focused = layout.panes[layout.focusedPane] ?? layout.panes[0]
   const active = focused?.tabs.find((t) => t.id === focused.activeTabId)
-  if (active?.kind === "chat") return active.sessionId
-  // Fall back to any chat still present in the focused pane.
+  if (active) return active.sessionId
   const chat = focused?.tabs.find((t) => t.kind === "chat")
-  return chat?.kind === "chat" ? chat.sessionId : null
+  return chat?.sessionId ?? null
 }
 
 const withSessionSync = (
@@ -91,6 +93,75 @@ const clonePanes = (layout: ContentLayout): PaneState[] =>
     activeTabId: p.activeTabId,
     groups: p.groups ? { ...p.groups } : {},
   }))
+
+const findPaneWithTab = (
+  layout: ContentLayout,
+  tabId: string,
+): 0 | 1 | null => {
+  if (layout.panes[0]?.tabs.some((t) => t.id === tabId)) return 0
+  if (layout.panes[1]?.tabs.some((t) => t.id === tabId)) return 1
+  return null
+}
+
+/** Prefer the pane that hosts Files for this session, else focused work pane. */
+const resolveFileOpenPane = (
+  layout: ContentLayout,
+  sessionId: SessionId,
+  path: string,
+): 0 | 1 => {
+  const fileId = fileTabId(sessionId, path)
+  const existing = findPaneWithTab(layout, fileId)
+  if (existing !== null) return existing
+
+  const filesId = toolTabId(sessionId, "files")
+  const filesPane = findPaneWithTab(layout, filesId)
+  if (filesPane !== null) return filesPane
+
+  if (layout.mode !== "split") return 0
+
+  const focused = layout.focusedPane
+  const focusedPane = layout.panes[focused]
+  const chatId = chatTabId(sessionId)
+  const focusedIsChatOnly =
+    !!focusedPane &&
+    focusedPane.tabs.length > 0 &&
+    focusedPane.tabs.every((t) => t.kind === "chat") &&
+    focusedPane.tabs.some((t) => t.id === chatId)
+
+  if (focusedPane && !focusedIsChatOnly) return focused
+  return otherPaneIndex(focused)
+}
+
+/** Drop open-file / draft bookkeeping without touching contentLayout. */
+const clearFileOpenState = (
+  get: () => AppState,
+  set: (partial: Partial<AppState>) => void,
+  sessionId: SessionId,
+  path: string,
+) => {
+  const sessionKey = sessionId
+  const prev = get().openFilesBySession[sessionKey] ?? []
+  if (!prev.includes(path)) return
+  const remaining = prev.filter((p) => p !== path)
+  const drafts = { ...(get().fileDraftsBySession[sessionKey] ?? {}) }
+  delete drafts[path]
+  const active = get().activeFileBySession[sessionKey]
+  set({
+    openFilesBySession: {
+      ...get().openFilesBySession,
+      [sessionKey]: remaining,
+    },
+    activeFileBySession: {
+      ...get().activeFileBySession,
+      [sessionKey]:
+        active === path ? (remaining[remaining.length - 1] ?? null) : active,
+    },
+    fileDraftsBySession: {
+      ...get().fileDraftsBySession,
+      [sessionKey]: drafts,
+    },
+  })
+}
 
 export const createContentLayoutSlice: StateCreator<
   AppState,
@@ -114,7 +185,6 @@ export const createContentLayoutSlice: StateCreator<
     const focused = next.panes[pane]
     const active = focused?.tabs.find((t) => t.id === focused.activeTabId)
     if (active?.kind === "chat") {
-      // Sync sidebar highlight without rewriting pane tabs.
       if (get().activeSessionId !== active.sessionId) {
         set({ activeSessionId: active.sessionId })
         void persistUiState({ activeSessionId: active.sessionId })
@@ -179,6 +249,10 @@ export const createContentLayoutSlice: StateCreator<
       panes: [keep],
     }
     const active = keep.tabs.find((t) => t.id === keep.activeTabId)
+    // Closing the work (east) pane is an explicit hide — keep it closed until reopened.
+    if (pane === 1) {
+      get().setRightPanelCollapsed(true)
+    }
     set({
       contentLayout: next,
       ...(active?.kind === "chat" ? { activeSessionId: active.sessionId } : {}),
@@ -196,10 +270,40 @@ export const createContentLayoutSlice: StateCreator<
       return
     }
     if (get().contentLayout.mode === "split") {
+      get().setRightPanelCollapsed(true)
       get().collapseSplit()
+      return
+    }
+    get().setRightPanelCollapsed(false)
+    const sessionId = get().activeSessionId
+    if (sessionId) {
+      get().ensureDefaultWorkPane(sessionId)
     } else {
       get().ensureSplit()
     }
+  },
+
+  ensureDefaultWorkPane: (sessionId) => {
+    if (get().rightPanelCollapsed) return
+    if (!isSplitEligible(get())) return
+    if (!isRightPanelTabEnabled(DEFAULT_WORK_TAB)) return
+
+    const layout = get().contentLayout
+    if (layout.mode === "split") {
+      const right = layout.panes[1]
+      const hasSessionWork = right?.tabs.some(
+        (t) => t.kind === "tool" && t.sessionId === sessionId,
+      )
+      if (hasSessionWork) return
+    }
+
+    const openTabs = get().openTabsBySession[sessionId] ?? []
+    const fromSession = openTabs.find(
+      (t) =>
+        DEFAULT_WORK_CANDIDATES.includes(t) && isRightPanelTabEnabled(t),
+    )
+    const tool = fromSession ?? DEFAULT_WORK_TAB
+    get().openToolBesideChat(sessionId, tool)
   },
 
   openChatInPane: (pane, sessionId) => {
@@ -240,18 +344,19 @@ export const createContentLayoutSlice: StateCreator<
     const next = upsertToolInPane(layout, pane, sessionId, tool)
     set({ contentLayout: next, ...syncCompatFlags(next) })
     persistLayout(next)
-    // Mirror legacy openTabsBySession for FilesTab / bootstrap compat.
     get().openTab(sessionId, tool)
   },
 
   openToolBesideChat: (sessionId, tool) => {
     if (!isRightPanelTabEnabled(tool)) return
+    if (get().rightPanelCollapsed) {
+      get().setRightPanelCollapsed(false)
+    }
     let layout = get().contentLayout
     const existingId = toolTabId(sessionId, tool)
     const chatId = chatTabId(sessionId)
 
     if (!isSplitEligible(get())) {
-      // Not wide enough for a split: open tool in the single pane.
       layout = ensureChatInPane(layout, 0, sessionId)
       const next = upsertToolInPane(layout, 0, sessionId, tool)
       set({ contentLayout: next, ...syncCompatFlags(next) })
@@ -260,8 +365,6 @@ export const createContentLayoutSlice: StateCreator<
       return
     }
 
-    // Wide: keep chat as the left rail, tools on the right — even when the
-    // tool tab already coexists in the chat pane (activate must not bury chat).
     if (layout.mode !== "split") {
       layout = {
         ...layout,
@@ -271,7 +374,6 @@ export const createContentLayoutSlice: StateCreator<
       }
     }
 
-    // Prefer chat in pane 0.
     const chatWhere = layout.panes[0]?.tabs.some((t) => t.id === chatId)
       ? 0
       : layout.panes[1]?.tabs.some((t) => t.id === chatId)
@@ -289,7 +391,6 @@ export const createContentLayoutSlice: StateCreator<
       layout = ensureChatInPane(layout, 0, sessionId)
     }
 
-    // Pin chat as the active tab in its pane.
     {
       const panes = clonePanes(layout)
       const chatPane = panes[0]!
@@ -304,7 +405,6 @@ export const createContentLayoutSlice: StateCreator<
       }
     }
 
-    // Move existing tool out of the chat pane, or upsert on the tool side.
     const toolWhere = layout.panes[0]?.tabs.some((t) => t.id === existingId)
       ? 0
       : layout.panes[1]?.tabs.some((t) => t.id === existingId)
@@ -318,7 +418,6 @@ export const createContentLayoutSlice: StateCreator<
         existingId,
         layout.panes[1]?.tabs.length ?? 0,
       )
-      // Re-pin chat active after the move (move may have shifted activeTabId).
       const panes = clonePanes(layout)
       if (panes[0]) panes[0].activeTabId = chatId
       layout = {
@@ -342,6 +441,87 @@ export const createContentLayoutSlice: StateCreator<
     set({ contentLayout: layout, ...syncCompatFlags(layout) })
     persistLayout(layout)
     get().openTab(sessionId, tool)
+  },
+
+  openFileBesideChat: (sessionId, path) => {
+    const normalized = path.trim().replace(/\\/g, "/")
+    if (!normalized || normalized.endsWith("/")) return
+
+    if (get().rightPanelCollapsed) {
+      get().setRightPanelCollapsed(false)
+    }
+    let layout = get().contentLayout
+    const existingId = fileTabId(sessionId, normalized)
+
+    if (!isSplitEligible(get())) {
+      layout = ensureChatInPane(layout, 0, sessionId)
+      const next = upsertFileInPane(layout, 0, sessionId, normalized)
+      set({
+        contentLayout: next,
+        activeSessionId: sessionId,
+        ...syncCompatFlags(next),
+      })
+      persistLayout(next)
+      void persistUiState({ activeSessionId: sessionId })
+      return
+    }
+
+    // Reuse the pane that already has this file — never steal west↔east.
+    const existingPane = findPaneWithTab(layout, existingId)
+    if (existingPane !== null) {
+      const panes = clonePanes(layout)
+      const p = panes[existingPane]!
+      p.activeTabId = existingId
+      const next: ContentLayout = {
+        ...layout,
+        focusedPane: existingPane,
+        panes:
+          layout.mode === "split"
+            ? [panes[0]!, panes[1]!]
+            : [panes[0]!],
+      }
+      set({
+        contentLayout: next,
+        activeSessionId: sessionId,
+        ...syncCompatFlags(next),
+      })
+      persistLayout(next)
+      void persistUiState({ activeSessionId: sessionId })
+      return
+    }
+
+    let target = resolveFileOpenPane(layout, sessionId, normalized)
+
+    // First open from a chat-only single pane → open work split on east.
+    if (
+      layout.mode !== "split" &&
+      target === 0 &&
+      (layout.panes[0]?.tabs.every((t) => t.kind === "chat") ?? true)
+    ) {
+      layout = {
+        ...layout,
+        mode: "split",
+        focusedPane: 1,
+        panes: [layout.panes[0]!, emptyPane()],
+      }
+      target = 1
+    } else if (target === 1 && layout.mode !== "split") {
+      layout = {
+        ...layout,
+        mode: "split",
+        focusedPane: 1,
+        panes: [layout.panes[0]!, emptyPane()],
+      }
+    }
+
+    const next = upsertFileInPane(layout, target, sessionId, normalized)
+    set({
+      contentLayout: next,
+      activeSessionId: sessionId,
+      ...syncCompatFlags(next),
+    })
+    persistLayout(next)
+    void persistUiState({ activeSessionId: sessionId })
   },
 
   openTabToSide: (fromPane, tabId) => {
@@ -382,30 +562,17 @@ export const createContentLayoutSlice: StateCreator<
     if (!p?.tabs.some((t) => t.id === tabId)) return
     const tab = p.tabs.find((t) => t.id === tabId)
     if (p.activeTabId === tabId && layout.focusedPane === pane) {
-      // Already active — only sync sidebar highlight if needed.
       if (tab?.kind === "chat" && get().activeSessionId !== tab.sessionId) {
         set({ activeSessionId: tab.sessionId })
         void persistUiState({ activeSessionId: tab.sessionId })
       }
       return
     }
-    // Wide: leaving the chat tab for a tool must not bury the composer —
-    // promote that tool beside chat. Switching between co-located tools stays.
-    if (
-      tab?.kind === "tool" &&
-      isSplitEligible(get()) &&
-      p.tabs.some(
-        (t) => t.kind === "chat" && t.sessionId === tab.sessionId,
-      )
-    ) {
-      const active = p.tabs.find((t) => t.id === p.activeTabId)
-      if (active?.kind === "chat") {
-        get().openToolBesideChat(tab.sessionId, tab.tool)
-        return
-      }
+    // Activate in place — do not auto-steal tools/files to the opposite pane.
+    // Intentional "beside chat" opens still go through openToolBesideChat.
+    if (tab?.kind === "file") {
+      get().setActiveWorkspaceFile(tab.sessionId, tab.path)
     }
-    // Keep the same tabs array when only activeTabId changes so the sibling
-    // pane retains object identity and inactive ContentPane skips re-render.
     const nextPane: PaneState =
       p.activeTabId === tabId ? p : { ...p, activeTabId: tabId }
     const next: ContentLayout = {
@@ -479,14 +646,15 @@ export const createContentLayoutSlice: StateCreator<
       tabs,
       activeTabId:
         p.activeTabId === tabId
-          // Prefer right neighbor at the removed index, else left neighbor.
           ? (tabs[closedIndex]?.id ?? tabs[closedIndex - 1]?.id ?? null)
           : p.activeTabId,
     }
 
-    // Mirror legacy closeTab for tools.
     if (tab.kind === "tool") {
       get().closeTab(tab.sessionId, tab.tool)
+    }
+    if (tab.kind === "file") {
+      clearFileOpenState(get, set, tab.sessionId, tab.path)
     }
 
     let next: ContentLayout = {
@@ -494,7 +662,6 @@ export const createContentLayoutSlice: StateCreator<
       panes: replacePane(layout, pane, nextPane),
     }
 
-    // If side pane emptied, collapse split.
     if (
       next.mode === "split" &&
       (next.panes[1]?.tabs.length ?? 0) === 0
@@ -527,9 +694,9 @@ export const createContentLayoutSlice: StateCreator<
     const keptTab = p.tabs.find((t) => t.id === tabId)
     if (!keptTab) return
     for (const t of p.tabs) {
-      if (t.id !== tabId && t.kind === "tool") {
-        get().closeTab(t.sessionId, t.tool)
-      }
+      if (t.id === tabId) continue
+      if (t.kind === "tool") get().closeTab(t.sessionId, t.tool)
+      if (t.kind === "file") clearFileOpenState(get, set, t.sessionId, t.path)
     }
     const nextPane: PaneState = { tabs: [keptTab], activeTabId: keptTab.id }
     let next: ContentLayout = {
@@ -567,9 +734,8 @@ export const createContentLayoutSlice: StateCreator<
     if (toClose.length === 0) return
     const tabs = p.tabs.slice(0, index + 1)
     for (const t of toClose) {
-      if (t.kind === "tool") {
-        get().closeTab(t.sessionId, t.tool)
-      }
+      if (t.kind === "tool") get().closeTab(t.sessionId, t.tool)
+      if (t.kind === "file") clearFileOpenState(get, set, t.sessionId, t.path)
     }
     const keptActiveId = tabs.some((t) => t.id === p.activeTabId)
       ? p.activeTabId
@@ -631,7 +797,6 @@ export const createContentLayoutSlice: StateCreator<
     const tabs = p.tabs.map((t) =>
       tabIdSet.has(t.id) ? { ...t, groupId: undefined } : t,
     )
-    // Prune groups that have no remaining members.
     const liveGroupIds = new Set(
       tabs.map((t) => t.groupId).filter(Boolean) as string[],
     )
@@ -649,7 +814,6 @@ export const createContentLayoutSlice: StateCreator<
   },
 })
 
-/** Seed layout when focusing a session (sidebar / new agent). */
 export const syncContentLayoutForSession = (
   get: () => AppState,
   set: (
@@ -668,7 +832,6 @@ export const syncContentLayoutForSession = (
   }
 
   const layout = get().contentLayout
-  // If this chat already exists in some pane, just activate it.
   const id = chatTabId(sessionId)
   for (let i = 0; i < layout.panes.length; i++) {
     if (layout.panes[i]?.tabs.some((t) => t.id === id)) {
@@ -677,14 +840,11 @@ export const syncContentLayoutForSession = (
     }
   }
 
-  // Open chat in focused pane (or pane 0).
   const pane =
     layout.mode === "split" ? layout.focusedPane : (0 as 0 | 1)
   get().openChatInPane(pane, sessionId)
 
   if (opts?.preferClosed && get().contentLayout.mode === "split") {
-    // Boot: prefer single unless tools were migrated into split already.
-    // Caller controls this via migrate + preferClosed.
   }
 }
 

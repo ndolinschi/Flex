@@ -1,10 +1,3 @@
-//! ChatGPT Plus/Pro subscription provider.
-//!
-//! Speaks the Codex Responses backend used by ChatGPT subscription OAuth
-//! (`https://chatgpt.com/backend-api/codex/responses`), reusing the ChatGPT
-//! OAuth flow from [`agentloop_provider_openai`]. Distinct from the Platform
-//! API-key [`agentloop_provider_openai::OpenAiProvider`] Chat Completions path.
-
 mod config;
 mod models;
 mod provider;

@@ -1,5 +1,3 @@
-//! `CreatePresentation` — writes a `.pptx` file at an absolute path.
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -15,25 +13,19 @@ use crate::path::{ensure_parent, relative_from, require_absolute};
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct SlideInput {
-    /// Slide title text.
     title: String,
-    /// Bullet-point lines. Each string becomes one bullet.
     bullets: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct CreatePresentationInput {
-    /// Absolute path for the output `.pptx` file.
     file_path: String,
 
-    /// Presentation title (for metadata; not currently embedded in the deck).
     title: String,
 
-    /// Ordered slides. Each slide has a `title` and a `bullets` array.
     slides: Vec<SlideInput>,
 
-    /// Create missing parent directories. Defaults to `true`.
     #[serde(default = "default_true")]
     create_dirs: bool,
 }
@@ -42,7 +34,6 @@ fn default_true() -> bool {
     true
 }
 
-/// The `CreatePresentation` tool.
 pub struct CreatePresentationTool {
     backend: Arc<dyn OfficeArtifact>,
 }

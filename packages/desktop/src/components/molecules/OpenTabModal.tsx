@@ -37,14 +37,9 @@ type OpenTabEntry = {
 type OpenTabModalProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /**
-   * Real chrome control shell (e.g. ContentPane `+` Button without children).
-   * Becomes PopoverTrigger so aria-expanded / focus-return attach to it.
-   */
   trigger: ReactElement
   paneIndex: 0 | 1
   sessionId: SessionId | null
-  /** Visible tool tabs for this session/workspace. */
   tabs: OpenTabDef[]
   onOpenChat: (paneIndex: 0 | 1, sessionId: SessionId) => void
   onOpenTool: (
@@ -54,11 +49,11 @@ type OpenTabModalProps = {
   ) => void
 }
 
-/** Prefer everyday workspace tabs first; everything else follows catalog order. */
 const PRIMARY_TOOL_ORDER: readonly RightPanelTab[] = [
   "plan",
   "changes",
   "files",
+  "artifacts",
   "terminal",
   "browser",
 ] as const
@@ -98,8 +93,6 @@ const buildEntries = (
   return out
 }
 
-/** Searchable open-tab picker for ContentPane `+` (catalog-driven).
- * Anchored to the real trigger; ~5 primary tabs visible, remainder scrolls. */
 export const OpenTabModal = ({
   open,
   onOpenChange,
@@ -162,8 +155,6 @@ export const OpenTabModal = ({
           className="rounded-none bg-transparent p-0"
         >
           <div className="flex shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5 py-1.5">
-            {/* cmdk Input (not CommandInput) — CommandInput wraps an inset
-             * InputGroup that reads as a nested chip in this chrome strip. */}
             <CommandPrimitive.Input
               value={query}
               onValueChange={setQuery}

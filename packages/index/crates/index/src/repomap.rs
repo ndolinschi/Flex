@@ -1,34 +1,71 @@
-//! Compact repo map: PageRank over an import/dependency graph, rendered
-//! within a token budget for agent orientation.
-//!
-//! Built from the files already tracked by [`IndexStore`] (manifest +
-//! symbols). Import edges are extracted with language heuristics (line
-//! scans) — good enough for ranking "which files matter" without a full
-//! language server. Failures to read a file or resolve an import are
-//! skipped; the map always returns *something* as long as the store has
-//! files.
-
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
+
 use crate::store::IndexStore;
 use crate::symbols::{Language, Symbol};
 
-/// Damping factor for PageRank (standard web-graph value).
+const REPOMAP_CACHE_FILE: &str = "repomap.cache.json";
+
 const DAMPING: f64 = 0.85;
-/// Iteration count — converges quickly on small/medium graphs.
 const PAGERANK_ITERS: usize = 20;
-/// Approx chars per token when budgeting the rendered map.
 const CHARS_PER_TOKEN: usize = 4;
-/// Cap how many symbols we attach to one file line.
 const MAX_SYMBOLS_PER_FILE: usize = 6;
 
-/// Build a compact, token-budgeted map of the most central files in `store`.
-///
-/// `token_budget` is an approximate ceiling (chars ≈ budget × 4). Empty
-/// stores yield a short "no indexed files" note.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct RepoMapCache {
+    fingerprint: String,
+    budget: usize,
+    map: String,
+}
+
 pub fn build_repo_map(store: &IndexStore, token_budget: usize) -> String {
+    build_repo_map_uncached(store, token_budget)
+}
+
+pub fn build_repo_map_cached(store: &IndexStore, token_budget: usize) -> (String, usize, bool) {
+    let file_count = store.indexed_file_count();
+    if file_count == 0 {
+        return (
+            "Repo map: no indexed files yet. Call again after the index builds.".to_owned(),
+            0,
+            false,
+        );
+    }
+
+    let fingerprint = store.manifest_fingerprint();
+    let cache_path = store.index_dir().join(REPOMAP_CACHE_FILE);
+    if let Some(cached) = read_cache(&cache_path) {
+        if cached.fingerprint == fingerprint && cached.budget == token_budget {
+            return (cached.map, file_count, true);
+        }
+    }
+
+    let map = build_repo_map_uncached(store, token_budget);
+    let _ = write_cache(
+        &cache_path,
+        &RepoMapCache {
+            fingerprint,
+            budget: token_budget,
+            map: map.clone(),
+        },
+    );
+    (map, file_count, false)
+}
+
+fn read_cache(path: &Path) -> Option<RepoMapCache> {
+    let bytes = fs::read(path).ok()?;
+    serde_json::from_slice(&bytes).ok()
+}
+
+fn write_cache(path: &Path, cache: &RepoMapCache) -> std::io::Result<()> {
+    let bytes = serde_json::to_vec_pretty(cache).map_err(std::io::Error::other)?;
+    fs::write(path, bytes)
+}
+
+fn build_repo_map_uncached(store: &IndexStore, token_budget: usize) -> String {
     let budget_chars = token_budget.saturating_mul(CHARS_PER_TOKEN).max(200);
     let paths: Vec<String> = store.indexed_paths().map(str::to_owned).collect();
     if paths.is_empty() {
@@ -530,6 +567,32 @@ mod tests {
             map.len()
         );
         assert!(map.contains("truncated") || map.lines().count() < 45);
+    }
+
+    #[test]
+    fn repo_map_cache_hits_on_second_call() {
+        let repo = tempfile::tempdir().unwrap_or_else(|e| panic!("{e}"));
+        let index = tempfile::tempdir().unwrap_or_else(|e| panic!("{e}"));
+        write(repo.path(), "src/core.rs", "pub fn important() {}\n");
+        write(
+            repo.path(),
+            "src/a.rs",
+            "use crate::core::important;\npub fn a() { important(); }\n",
+        );
+
+        let mut store =
+            IndexStore::open(repo.path(), index.path()).unwrap_or_else(|e| panic!("{e}"));
+        store.build().unwrap_or_else(|e| panic!("{e}"));
+
+        let (first, count, hit1) = build_repo_map_cached(&store, 2000);
+        assert!(!hit1, "first call must miss cache");
+        assert!(count >= 2);
+        assert!(first.contains("src/core.rs"), "{first}");
+
+        let (second, count2, hit2) = build_repo_map_cached(&store, 2000);
+        assert!(hit2, "second call must hit cache");
+        assert_eq!(count2, count);
+        assert_eq!(second, first);
     }
 
     #[test]

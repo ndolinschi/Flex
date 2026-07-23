@@ -1,12 +1,7 @@
-//! Wire DTOs for the desktop Remote Access HTTP API (snake_case).
-//!
-//! Least-privilege chat surface only: list/read sessions + send a text prompt.
-//! No permission overrides, no MCP, no session mutation, no HITL.
 
 use agentloop_contracts::SessionMeta;
 use serde::{Deserialize, Serialize};
 
-/// Hard cap on a single remote prompt body (bytes of the UTF-8 string).
 pub const MAX_PROMPT_CHARS: usize = 32_768;
 
 #[derive(Debug, Serialize)]

@@ -1,12 +1,3 @@
-//! Engine service front door.
-//!
-//! This crate owns the ready runtime boundary above concrete agents: handshake,
-//! session operations, replay/materialized items, and native-loop composition
-//! over a *prebuilt* [`ProviderRegistry`]. It is provider-agnostic: it never
-//! constructs concrete providers or delegators — the `providers` facade
-//! resolves those and hands the registry (plus a default model) to
-//! [`EngineService::native`].
-
 mod background;
 mod error;
 mod goal;

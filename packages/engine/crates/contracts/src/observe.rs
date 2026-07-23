@@ -1,13 +1,3 @@
-//! Metric name constants — the observability vocabulary.
-//!
-//! The persisted event stream is the ground truth (timings, usage, cost, and
-//! statuses all live in events); metrics are a derived view recorded at the
-//! single choke point where events are appended and broadcast. Keeping the
-//! names here means native and delegated agents can't drift apart.
-//!
-//! The `metrics` facade itself is not a dependency of this crate — recording
-//! happens in the core crate.
-
 pub const METRIC_TURNS_TOTAL: &str = "engine_turns_total";
 pub const METRIC_TURN_DURATION_MS: &str = "engine_turn_duration_ms";
 pub const METRIC_LLM_REQUESTS_TOTAL: &str = "engine_llm_requests_total";
@@ -20,7 +10,6 @@ pub const METRIC_PERMISSION_WAIT_MS: &str = "engine_permission_wait_ms";
 pub const METRIC_ERRORS_TOTAL: &str = "engine_errors_total";
 pub const METRIC_COMPACTIONS_TOTAL: &str = "engine_compactions_total";
 
-/// Common metric label keys.
 pub const LABEL_AGENT: &str = "agent";
 pub const LABEL_PROVIDER: &str = "provider";
 pub const LABEL_MODEL: &str = "model";

@@ -1,12 +1,8 @@
-//! Accumulate a provider stream into a complete assistant message while
-//! surfacing live deltas.
-
 use agentloop_contracts::{
     AgentEvent, ContentBlock, MessageId, StopReason, TokenUsage, ToolCallId,
 };
 use agentloop_core::provider::ProviderStreamEvent;
 
-/// A parsed tool request from the finished message.
 #[derive(Debug, Clone)]
 pub(crate) struct DraftToolCall {
     pub(crate) id: ToolCallId,
@@ -14,7 +10,6 @@ pub(crate) struct DraftToolCall {
     pub(crate) input: serde_json::Value,
 }
 
-/// The in-progress assistant message.
 pub(crate) struct AssistantDraft {
     pub(crate) message_id: MessageId,
     pub(crate) model: Option<String>,
@@ -47,8 +42,6 @@ impl AssistantDraft {
         }
     }
 
-    /// Apply one provider event; returns the ephemeral delta event to
-    /// broadcast, if any.
     pub(crate) fn apply(&mut self, event: ProviderStreamEvent) -> Option<AgentEvent> {
         match event {
             ProviderStreamEvent::MessageStart { message_id, model } => {
@@ -132,7 +125,6 @@ impl AssistantDraft {
         }
     }
 
-    /// The finished content blocks and parsed tool requests.
     pub(crate) fn finish(self) -> (Vec<ContentBlock>, Vec<DraftToolCall>) {
         let mut content = Vec::with_capacity(self.blocks.len());
         let mut calls = Vec::new();
@@ -144,8 +136,6 @@ impl AssistantDraft {
                     }
                 }
                 DraftBlock::Thinking { text, signature } => {
-                    // Match Markdown: drop empty shells. Keep signature-only
-                    // blocks so provider thinking round-trip still works.
                     if !text.is_empty() || signature.is_some() {
                         content.push(ContentBlock::Thinking { text, signature });
                     }

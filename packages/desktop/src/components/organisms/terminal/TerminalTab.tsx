@@ -15,17 +15,8 @@ import { TerminalRow } from "./TerminalRow"
 import { useNowTicker } from "./time"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
-/** Stable empty list — inline `?? []` in a Zustand selector re-renders forever. */
 const EMPTY_TERMINALS: TerminalMeta[] = []
 
-/** Terminal right-panel tab: terminal list + xterm instances.
- * Scoped to the session that owns this content tab (prop `sessionId`).
- * Stays mounted when inactive (parent hides via display:none).
- * Only the *active* terminal mounts an xterm instance — others stay as
- * metadata + `terminalBus` scrollback until selected.
- *
- * Opening the tab with zero workspace terminals auto-creates one PTY so the
- * user lands in a shell instead of an empty state. */
 export const TerminalTab = ({
   active,
   sessionId,
@@ -47,9 +38,6 @@ export const TerminalTab = ({
   const setActiveTerminalId = useAppStore((s) => s.setActiveTerminalId)
   const toggleTerminalListVisible = useAppStore((s) => s.toggleTerminalListVisible)
 
-  // Agent terminal (read-only, mirrors `exec_chunk` session-events). Lives in
-  // the same `activeTerminalIdBySession` map as workspace terminals since its
-  // id is just a string (`agent:${sessionId}`) — no PTY/terminalCreate behind it.
   const agentId = sessionId ? agentTerminalId(sessionId) : null
   const hasAgentStream = useAppStore((s) =>
     agentId ? !!s.agentStreamSessions[agentId] : false,
@@ -61,14 +49,8 @@ export const TerminalTab = ({
   const [pendingClose, setPendingClose] = useState<string | null>(null)
   const [closing, setClosing] = useState(false)
   const now = useNowTicker(30_000, active)
-  /** Sessions for which we've already tried default spawn this tab visit —
-   * prevents StrictMode double-create and recreate-after-close while still
-   * on the Terminal tab. Cleared when the tab becomes inactive. */
   const autoSpawnAttemptedRef = useRef(new Set<string>())
 
-  // Register the output listener before any terminal can be created, so the
-  // shell's first output (the prompt) is buffered even if no xterm instance
-  // has mounted yet.
   useEffect(() => {
     void ensureTerminalBus()
   }, [])
@@ -103,7 +85,6 @@ export const TerminalTab = ({
     }
   }
 
-  // Default: opening Terminal with no workspace PTYs creates one shell.
   useEffect(() => {
     if (!active) {
       autoSpawnAttemptedRef.current.delete(sessionKey)
@@ -113,7 +94,6 @@ export const TerminalTab = ({
     if (autoSpawnAttemptedRef.current.has(sessionKey)) return
     autoSpawnAttemptedRef.current.add(sessionKey)
     void handleNewTerminal()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- spawn once per empty tab open
   }, [active, sessionKey, terminals.length, activeSession?.cwd])
 
   const handleConfirmClose = async () => {
@@ -136,12 +116,6 @@ export const TerminalTab = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Header — fixed chrome height so tab switches don't jump; agent
-          subtitle lives on a separate non-chrome row below. Keep `border-b`
-          like BrowserToolbar: this row separates chrome from the xterm
-          surface (a native-like body), not a second rule under TabStrip
-          with only hairline content between. */}
-      {/* Production terminal-session-toolbar: h-10 border-b tertiary px-2 bg-card. */}
       <div
         role="toolbar"
         aria-label="Terminal sessions"
@@ -207,10 +181,8 @@ export const TerminalTab = ({
         </p>
       ) : null}
 
-      {/* Body */}
       <div className="flex min-h-0 flex-1">
         {terminalListVisible && (terminals.length > 0 || hasAgentStream) ? (
-          // Production right rail: narrow session list (screenshot "1 Terminal" + zsh pills).
           <div className="flex w-[160px] shrink-0 flex-col border-r border-stroke-3 bg-panel">
             <div className="flex h-7 shrink-0 items-center px-2 text-xs text-ink-muted">
               <span className="tabular-nums">
@@ -231,9 +203,6 @@ export const TerminalTab = ({
                   />
                 </>
               ) : null}
-              {/* Only label the "Workspace" section when there's something to
-                  put under it — an empty heading with no rows is the exact
-                  scaffolding noise this panel should avoid. */}
               {terminals.length > 0 ? (
                 <>
                   <p

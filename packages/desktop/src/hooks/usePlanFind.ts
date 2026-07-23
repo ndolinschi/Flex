@@ -4,13 +4,8 @@ const MARK_ATTR = "data-plan-find-mark"
 const MARK_SELECTOR = `mark[${MARK_ATTR}]`
 const ACTIVE_CLASS = "plan-find-mark-active"
 
-/** Escapes a string for use inside a `RegExp` (no special-char injection
- * from arbitrary Find-in-Plan queries). */
 const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
-/** Removes any highlight `<mark>`s inserted by a previous pass, merging
- * their text back into the surrounding text node (so re-running the
- * search on updated content starts from clean DOM). */
 const clearMarks = (root: HTMLElement) => {
   const marks = root.querySelectorAll<HTMLElement>(MARK_SELECTOR)
   for (const mark of marks) {
@@ -22,16 +17,6 @@ const clearMarks = (root: HTMLElement) => {
   }
 }
 
-/**
- * Find-in-Plan: wraps every case-insensitive match of `query` in the
- * rendered plan markdown with a `<mark>`, without touching react-markdown's
- * own rendering — this walks the DOM text nodes AFTER MarkdownBody paints,
- * which is the simplest robust option since matches can straddle inline
- * markdown formatting in ways a source-text regex can't safely see.
- *
- * Returns the match count and active index, and exposes `scrollToActive` /
- * `next` / `prev` to drive the toolbar's counter + navigation.
- */
 export const usePlanFind = (
   containerRef: RefObject<HTMLElement | null>,
   query: string,
@@ -57,8 +42,6 @@ export const usePlanFind = (
     const re = new RegExp(escapeRegExp(query.trim()), "gi")
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: (node) => {
-        // Skip text inside <script>/<style> (none expected, defensive) and
-        // marks we just cleared but might still be mid-walk over.
         const parentTag = node.parentElement?.tagName
         if (parentTag === "SCRIPT" || parentTag === "STYLE") {
           return NodeFilter.FILTER_REJECT
@@ -106,8 +89,6 @@ export const usePlanFind = (
     setActiveIndex((prev) => (total === 0 ? 0 : Math.min(prev, total - 1)))
   }, [containerRef, query, active])
 
-  // Active-match styling + scroll-into-view, kept separate from the
-  // (re)highlight pass so moving next/prev doesn't re-walk the DOM.
   useEffect(() => {
     const root = containerRef.current
     if (!root) return
@@ -124,13 +105,11 @@ export const usePlanFind = (
     }
   }, [containerRef, activeIndex, matchCount])
 
-  // Cleanup marks on unmount / when Find closes.
   useEffect(() => {
     return () => {
       const root = containerRef.current
       if (root) clearMarks(root)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const next = () => {

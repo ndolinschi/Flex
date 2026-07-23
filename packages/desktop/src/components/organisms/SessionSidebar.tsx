@@ -89,7 +89,6 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   const [bugOpen, setBugOpen] = useState(false)
   const openBugReport = useCallback(() => setBugOpen(true), [])
   const closeBugReport = useCallback(() => setBugOpen(false), [])
-  // newAgent is declared below via useSessions — wire menus after that hook.
   const pinnedSessionIds = useAppStore((s) => s.pinnedSessionIds)
   const archivedSessionIds = useAppStore((s) => s.archivedSessionIds)
   const sidebarProjectSort = useAppStore((s) => s.sidebarProjectSort)
@@ -137,7 +136,6 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     onOpenBugReport: openBugReport,
   })
   const queryClient = useQueryClient()
-  // Roots fill time buckets / pins; children (`parent_id`) nest under roots.
   const sessions = useMemo(
     () => allSessions.filter((s) => !s.parent_id),
     [allSessions],
@@ -158,11 +156,6 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     [allSessions, sessions, activeSessionId],
   )
 
-  // Drop persisted active/pin ids that are no longer in the sessions list
-  // (engine restarted, deleted elsewhere) so status polls never target ghosts.
-  // Skip while the list is loading/refetching — a just-created session can be
-  // selected before invalidateQueries lands, and clearing would wipe the
-  // content pane to the empty "Open a chat or tool tab with +" state.
   useEffect(() => {
     if (isLoading || isFetching) return
     const known = new Set(allSessions.map((s) => s.id))
@@ -194,10 +187,6 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
 
   const handleCreate = useCallback(
     async (cwd?: string) => {
-      // Collapse overlay immediately so the click feels responsive even when
-      // create_session waits on isolation / engine work. Do not await —
-      // mutation onSuccess selects the new session; awaiting here left the
-      // sidebar button dead until create + post-select git/`gh` finished.
       if (narrow) setSidebarCollapsed(true)
       else setSidebarCollapsed(false)
       void newAgent(cwd).catch((err: unknown) => {
@@ -207,12 +196,6 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     [newAgent, narrow, setSidebarCollapsed, pushToast],
   )
 
-  /** Everywhere `resume_session` can fail with "not found" (the session's
-   * row/id no longer exists engine-side — e.g. a delete that raced with a
-   * resume, or a persisted id from a previous run): drop it from the
-   * react-query list cache, clear the persisted activeSessionId if it
-   * matches, toast, and — critically — do NOT surface a Retry banner, since
-   * retrying a resume for an id that will never exist again is meaningless. */
   const healNotFoundSession = useCallback(
     (id: string) => {
       queryClient.setQueryData<SessionMeta[]>(SESSIONS_KEY, (prev) =>
@@ -231,8 +214,6 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
 
   const handleSelect = useCallback(
     async (id: string) => {
-      // Empty New Agent drafts open as a single-tab composition —
-      // prune sibling Changes/Files tabs + collapse split.
       const sessions =
         queryClient.getQueryData<SessionMeta[]>(SESSIONS_KEY) ?? []
       const meta = sessions.find((s) => s.id === id)
@@ -242,15 +223,12 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         : undefined
 
       if (id === activeSessionId) {
-        // Re-open the chat tab if the user closed every tab but stayed
-        // "active" on this session (empty "+ " placeholder).
         setActiveSessionId(id, activateOpts)
         setRoute("chat")
         if (narrow) setSidebarCollapsed(true)
         return
       }
 
-      // Clear only this row's stale error banner/state — leave other rows alone.
       setSelectErrorId((prevId) => {
         if (prevId === id) {
           setSelectError(null)
@@ -259,7 +237,6 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
         return prevId
       })
 
-      // Paint the target chat immediately — resume is warm-up, not a gate.
       setActiveSessionId(id, activateOpts)
       setRoute("chat")
       if (narrow) setSidebarCollapsed(true)
@@ -325,10 +302,6 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     if (selectErrorId) void handleSelect(selectErrorId)
   }
 
-  // Poll only sessions that both exist in the list cache and are visible
-  // (plus active + pinned when present). Never poll a stale persisted
-  // activeSessionId / pin that is gone engine-side — that path used to
-  // hammer `workspace_status` with "session not found" for ~6s each.
   const knownSessionIds = useMemo(
     () => new Set(sessions.map((s) => s.id)),
     [sessions],
@@ -372,8 +345,6 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   const sessionCwdsForPoll = useMemo(
     () =>
       allSessions
-        // Skip pristine drafts — no baseline yet, so git_status_since_baseline
-        // would return full-repo dirty and paint a lying DiffStat on "New Agent".
         .filter((s) => statusPollIds.has(s.id) && !isPristineSession(s))
         .map((s) => ({ id: s.id, cwd: s.cwd })),
     [allSessions, statusPollIds],
@@ -404,11 +375,9 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     try {
       e.currentTarget.setPointerCapture(e.pointerId)
     } catch {
-      // Capture is best-effort — window listeners still drive the drag.
     }
 
     const onMove = (ev: globalThis.PointerEvent) => {
-      // Sidebar is on the left — dragging right grows it.
       setSidebarWidth(startWidth + (ev.clientX - startX), false)
     }
     const onUp = (ev: globalThis.PointerEvent) => {
@@ -446,7 +415,6 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
 
   const expanded = !collapsed
 
-  /** Root row + nested children (`parent_id`). */
   const renderSessionTree = (
     session: SessionMeta,
     opts: { pinned?: boolean; archived?: boolean } = {},
@@ -506,17 +474,12 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
       <aside
         style={!collapsed && !narrow ? { width: sidebarWidth } : undefined}
         className={cn(
-          // overflow-visible so the sash (positioned past the right edge) can
-          // receive pointer events; inner shell clips list/nav content.
           "relative flex h-full shrink-0 flex-col overflow-visible bg-sidebar",
           !dragging &&
             "transition-[width,opacity] duration-[var(--duration-normal)] ease-[var(--easing-default)] motion-reduce:transition-none",
           collapsed
             ? "w-0 border-r-0 opacity-0 pointer-events-none"
             : "border-r border-sidebar-border opacity-100",
-          // Mobile (narrow/tight): full-width overlay anchored to the app's
-          // left edge instead of a side-by-side column — same open/close
-          // state, now floating above the chat with a shadow.
           narrow && expanded
             ? "absolute inset-y-0 left-0 z-30 w-full overflow-hidden shadow-popover"
             : null,
@@ -537,10 +500,8 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
             onDoubleClick={handleSashDoubleClick}
             onKeyDown={handleSashKeyDown}
             className={cn(
-              // z-30 above content pane so the hit target isn't covered.
               "sash-line-transition absolute -right-[5px] inset-y-0 z-30 w-2.5 cursor-col-resize",
               "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent",
-              // Quiet sash: white-alpha hover only — never accent (Feel: Quiet chrome).
               "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_12%,transparent)]",
               dragging && "after:bg-stroke-1",
             )}
@@ -549,11 +510,11 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
 
         <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
           <SidebarHeader className="gap-0 p-0">
-            <div className="flex flex-col gap-1 pb-3">
-              {/* Top chrome aligns with ContentPane TabStrip (`--titlebar-height`).
-               * Dedicated TitleBarDragRegion so the undecorated window can move;
-               * traffic lights / collapse stay no-drag via button CSS. */}
-              <div className="flex h-[var(--titlebar-height)] items-center gap-1 border-b border-stroke-3 px-2">
+            <div className="flex flex-col gap-px pb-2">
+              <div
+                data-slot="glass-titleband"
+                className="glass-titleband flex h-[var(--titlebar-height)] items-center gap-1 border-b border-stroke-3 px-2"
+              >
                 <div className="flex shrink-0 items-center gap-0.5">
                   {isMacHost ? (
                     <div className="flex h-full items-center pl-1.5 pr-0.5">
@@ -588,7 +549,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
                 </div>
               </div>
 
-              <nav className="flex flex-col gap-px pb-1" aria-label="Agent navigation">
+              <nav className="flex flex-col gap-px pb-0.5" aria-label="Agent navigation">
                 <SidebarMenu className="gap-px">
                   <SidebarMenuItem>
                     <SidebarActionRow
@@ -668,7 +629,6 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
             </div>
           ) : null}
 
-          {/* Gutters live on rows (DESIGN: no px-2.5 on SidebarContent — avoids double indent). */}
           <SidebarContent className="pb-2">
             {isLoading ? (
               <SidebarSkeleton />

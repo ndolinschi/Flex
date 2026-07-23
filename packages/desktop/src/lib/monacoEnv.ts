@@ -1,8 +1,3 @@
-/** Monaco worker + language wiring for Vite / Tauri.
- *
- * Call once before mounting an editor. Uses Vite `?worker` imports so
- * workers load from the same origin as the app (CDN is unreliable offline).
- * Import this module dynamically — static imports pull ~3MB into the graph. */
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker"
 import cssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker"
 import htmlWorker from "monaco-editor/esm/vs/language/html/html.worker?worker"
@@ -20,18 +15,14 @@ export { languageForPath } from "./monacoLanguages"
 
 let ready = false
 
-/** Module-level flag updated by FilesTab via `setMonacoCompletionEnabled`. */
 const completionState = { enabled: false }
 
-/** Called by FilesTab when inline-completion prefs change. */
 export const setMonacoCompletionEnabled = (enabled: boolean): void => {
   completionState.enabled = enabled
 }
 
-/** Singleton disposable — provider registered at most once per page load. */
 let inlineProviderDisposable: monaco.IDisposable | null = null
 
-/** Register the inline-completions provider (idempotent). */
 const ensureInlineProvider = (): void => {
   if (inlineProviderDisposable) return
   inlineProviderDisposable = monaco.languages.registerInlineCompletionsProvider(
@@ -56,7 +47,6 @@ const ensureInlineProvider = (): void => {
           endColumn: model.getLineMaxColumn(model.getLineCount()),
         })
 
-        // Debounce — resolve early when Monaco cancels the token.
         await new Promise<void>((resolve) => {
           const timer = setTimeout(resolve, INLINE_COMPLETION_DEBOUNCE_MS)
           token.onCancellationRequested(() => {
@@ -99,7 +89,6 @@ export const ensureMonaco = (): void => {
   }
   loader.config({ monaco })
 
-  // TypeScript / JavaScript: ESNext target, React JSX, syntax + semantic diagnostics.
   const tsCompilerOptions: monaco.languages.typescript.CompilerOptions = {
     target: monaco.languages.typescript.ScriptTarget.ESNext,
     module: monaco.languages.typescript.ModuleKind.ESNext,

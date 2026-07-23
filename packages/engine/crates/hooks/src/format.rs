@@ -1,5 +1,3 @@
-//! `FormatOnEditHook` — run a code formatter after `Write`/`Edit`.
-
 use std::process::Stdio;
 use std::time::Duration;
 
@@ -10,23 +8,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::util;
 
-/// A formatter run is bounded: a wedged formatter must not stall a turn.
 const FORMAT_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// One formatter: the extensions it handles and the command to run.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FormatterSpec {
-    /// File extensions (without the dot) this formatter applies to, e.g.
-    /// `["rs"]` or `["ts", "tsx"]`.
     pub extensions: Vec<String>,
-    /// Command argv. The literal token `$FILE` is replaced with the edited
-    /// file's absolute path (e.g. `["rustfmt", "$FILE"]`,
-    /// `["prettier", "--write", "$FILE"]`).
     pub command: Vec<String>,
-    /// Extra environment variables for the formatter process.
     #[serde(default)]
     pub env: Vec<(String, String)>,
-    /// When true, this spec is ignored.
     #[serde(default)]
     pub disabled: bool,
 }
@@ -39,9 +28,6 @@ impl FormatterSpec {
     }
 }
 
-/// Formats files after `Write`/`Edit`. Never blocks or fails the loop: a
-/// formatter that is not on `$PATH`, times out, or exits non-zero is a silent
-/// no-op (a failed format must not derail a correct edit).
 pub struct FormatOnEditHook {
     specs: Vec<FormatterSpec>,
     interests: Vec<HookPoint>,
@@ -55,8 +41,6 @@ impl FormatOnEditHook {
         }
     }
 
-    /// Whether any enabled spec carries a command — if not, there is nothing to
-    /// register and the composition root can drop the hook.
     pub fn is_active(&self) -> bool {
         self.specs
             .iter()
@@ -111,9 +95,6 @@ impl Hook for FormatOnEditHook {
     }
 }
 
-/// Run the formatter, discarding its stdio (formatters mutate the file in
-/// place; their stdout must never leak into the engine's own stdout stream).
-/// Returns whether it exited successfully.
 async fn run_formatter(argv: &[String], env: &[(String, String)], file: &str) -> bool {
     let Some((program, args)) = argv.split_first() else {
         return false;

@@ -1,14 +1,7 @@
-//! Path resolution for artifact tools — mirrors the `Write` tool's contract.
-
 use std::path::{Path, PathBuf};
 
 use agentloop_core::ToolError;
 
-/// Require an absolute `file_path`.
-///
-/// Returns the path as a `PathBuf` on success. On failure, returns an
-/// `InvalidInput` error that teaches the model the absolute path it should
-/// have used.
 pub(crate) fn require_absolute(raw: &str, cwd: &Path) -> Result<PathBuf, ToolError> {
     let path = PathBuf::from(raw);
     if path.is_absolute() {
@@ -24,7 +17,6 @@ pub(crate) fn require_absolute(raw: &str, cwd: &Path) -> Result<PathBuf, ToolErr
     }
 }
 
-/// Ensure parent directories exist, creating them when `create_dirs` is true.
 pub(crate) async fn ensure_parent(path: &Path, create_dirs: bool) -> Result<(), ToolError> {
     let Some(parent) = path.parent() else {
         return Ok(());
@@ -48,8 +40,6 @@ pub(crate) async fn ensure_parent(path: &Path, create_dirs: bool) -> Result<(), 
     )))
 }
 
-/// Return a relative path from `cwd` to `abs_path`, or `abs_path` itself when
-/// it is not under `cwd`.
 pub(crate) fn relative_from(abs_path: &Path, cwd: &Path) -> String {
     abs_path
         .strip_prefix(cwd)

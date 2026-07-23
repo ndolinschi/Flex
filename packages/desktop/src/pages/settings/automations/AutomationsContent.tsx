@@ -9,10 +9,6 @@ import { CreateRoutineForm } from "./CreateRoutineForm"
 import { EMPTY_ROUTINES, ROUTINES_KEY } from "./constants"
 import { RoutineRow } from "./RoutineRow"
 
-/** Automations content — scheduled/webhook-triggered routines (cron/webhook
- * run_goal). Mounted inside the Settings shell's "Automations" section
- * (DESIGN.md Settings); no `SettingsShell` wrapper
- * here anymore since the shell owns nav+header+page title. */
 export const AutomationsContent = () => {
   const [creating, setCreating] = useState(false)
   const queryClient = useQueryClient()

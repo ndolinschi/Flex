@@ -1,4 +1,3 @@
-//! Git status, commit, push, PR, and session baselines.
 
 use super::common::{require_service, review_dirs, validate_repo_relative_path};
 use super::prelude::*;
@@ -14,10 +13,6 @@ pub fn git_is_repo(cwd: String) -> bool {
         .unwrap_or(false)
 }
 
-/// Whether `cwd`'s repo has at least one configured remote (`git remote`
-/// prints a non-empty name). Gates Commit vs Commit & Push in the UI — no
-/// remote means push would fail with "No configured push destination", so
-/// the chrome must not offer push.
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
 pub fn git_has_remote(cwd: String) -> bool {
@@ -29,7 +24,6 @@ pub fn git_has_remote(cwd: String) -> bool {
         .unwrap_or(false)
 }
 
-/// Read-only current-branch lookup for the composer context bar.
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
 pub fn git_branch(cwd: String) -> Option<String> {
@@ -45,7 +39,6 @@ pub fn git_branch(cwd: String) -> Option<String> {
     (!branch.is_empty()).then_some(branch)
 }
 
-/// Local branch names for the branch picker (`git branch --format`).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub fn git_list_branches(cwd: String) -> DesktopResult<Vec<String>> {
@@ -73,7 +66,6 @@ pub fn git_list_branches(cwd: String) -> DesktopResult<Vec<String>> {
     Ok(branches)
 }
 
-/// Check out a local branch in the session cwd.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub fn git_checkout(cwd: String, branch: String) -> DesktopResult<()> {
@@ -100,41 +92,21 @@ pub fn git_checkout(cwd: String, branch: String) -> DesktopResult<()> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitFileStatus {
-    /// Path relative to `cwd` (rename keeps the new path).
     pub path: String,
-    /// Porcelain letter: "M" | "A" | "D" | "R" | "?" (untracked) | other.
     pub status: String,
-    /// Lines added per `git diff --numstat HEAD`; None for binary/untracked.
     pub added: Option<u32>,
-    /// Lines removed; None for binary/untracked.
     pub removed: Option<u32>,
 }
 
-/// Max rows returned to the UI by [`git_status`] / [`git_status_since_baseline`].
-/// A session that scaffolds a large project (e.g. `create-next-app`) can dirty
-/// hundreds of untracked files; rendering all of them as list rows is what
-/// makes the Changes panel jank. The UI shows a "+N more" indicator instead of
-/// mounting every row, and [`GitStatusSummary`]'s totals are always computed
-/// over the *full* set so the aggregate +/- badge stays correct regardless of
-/// the cap.
 const MAX_STATUS_FILES: usize = 300;
 
-/// Wraps a (possibly truncated) file list with totals computed over the full,
-/// untruncated set — the aggregate +/- badge and file count must reflect
-/// every changed file even when only the first [`MAX_STATUS_FILES`] rows are
-/// sent to the UI for rendering.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitStatusSummary {
-    /// First `MAX_STATUS_FILES` entries only — render these as rows.
     pub files: Vec<GitFileStatus>,
-    /// Total number of changed files (tracked + untracked), untruncated.
     pub total_count: usize,
-    /// Sum of `added` across every changed file, untruncated.
     pub total_added: u32,
-    /// Sum of `removed` across every changed file, untruncated.
     pub total_removed: u32,
-    /// `true` when `files` was truncated (`total_count > files.len()`).
     pub truncated: bool,
 }
 
@@ -157,10 +129,6 @@ pub(crate) fn summarize(mut files: Vec<GitFileStatus>) -> GitStatusSummary {
     }
 }
 
-/// Read-only working-tree status for the Changes panel. Non-git dirs yield
-/// an empty summary (mirrors `git_branch`'s tolerance). Capped at
-/// [`MAX_STATUS_FILES`] rows; see [`GitStatusSummary`] for how totals stay
-/// accurate past the cap.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn git_status(cwd: String) -> DesktopResult<GitStatusSummary> {
@@ -169,9 +137,6 @@ pub async fn git_status(cwd: String) -> DesktopResult<GitStatusSummary> {
         .map_err(|e| DesktopError::Message(format!("git status join: {e}")))?
 }
 
-/// Shared implementation behind [`git_status`] and
-/// [`git_status_since_baseline`]. Returns the full, untruncated list —
-/// callers cap/summarize via [`summarize`].
 pub(crate) fn git_status_full(cwd: &str) -> DesktopResult<Vec<GitFileStatus>> {
     let porcelain = match crate::win_console::command("git")
         .args(["status", "--porcelain"])
@@ -182,7 +147,6 @@ pub(crate) fn git_status_full(cwd: &str) -> DesktopResult<Vec<GitFileStatus>> {
         _ => return Ok(Vec::new()),
     };
 
-    // Line counts per changed file; binary files report "-" and are skipped.
     let mut counts: std::collections::HashMap<String, (u32, u32)> =
         std::collections::HashMap::new();
     if let Ok(out) = crate::win_console::command("git")
@@ -198,7 +162,6 @@ pub(crate) fn git_status_full(cwd: &str) -> DesktopResult<Vec<GitFileStatus>> {
                     continue;
                 };
                 if let (Ok(a), Ok(r)) = (a.parse::<u32>(), r.parse::<u32>()) {
-                    // Renames appear as "old => new" or "{old => new}/tail".
                     let path = path
                         .rsplit(" => ")
                         .next()
@@ -218,11 +181,9 @@ pub(crate) fn git_status_full(cwd: &str) -> DesktopResult<Vec<GitFileStatus>> {
         }
         let code = &line[..2];
         let mut path = line[3..].trim().to_string();
-        // Rename lines: "R  old -> new" — keep the new path.
         if let Some((_, new)) = path.split_once(" -> ") {
             path = new.trim().to_string();
         }
-        // Strip porcelain quoting for paths with special characters.
         if path.starts_with('"') && path.ends_with('"') && path.len() >= 2 {
             path = path[1..path.len() - 1].to_string();
         }
@@ -249,20 +210,6 @@ pub(crate) fn git_status_full(cwd: &str) -> DesktopResult<Vec<GitFileStatus>> {
     Ok(files)
 }
 
-/// Working-tree status scoped to what this session has actually touched,
-/// for the Changes panel. Falls back to the full-repo [`git_status`] result
-/// (unchanged shape) whenever session-scoping isn't possible or safe:
-///
-/// - Isolated sessions (`base_cwd.is_some()`) already run in a private
-///   worktree, so the plain status is already session-scoped.
-/// - No baseline was captured for this session (e.g. it predates this
-///   feature, or the app restarted between creation and baseline capture
-///   and `resume_session` hasn't run yet).
-/// - The repo's HEAD has moved since the baseline was captured (a commit,
-///   checkout, etc. invalidates the recorded content hashes' meaning).
-///
-/// Otherwise, a dirty path from the current `git status` is kept only if it
-/// wasn't dirty at baseline time, or its content hash has changed since.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn git_status_since_baseline(
@@ -314,12 +261,6 @@ pub async fn git_status_since_baseline(
             .into_iter()
             .filter(|f| match baseline_files.get(&f.path) {
                 None => true,
-                // Untracked dir already recorded at baseline time (see the "dir"
-                // sentinel in `capture_session_baseline`) — there's no blob to
-                // hash for a directory, and an already-untracked dir isn't a
-                // session change, so it's always filtered out regardless of what
-                // may have changed inside it (mirrors git's own porcelain
-                // granularity, which also collapses to the single dir entry).
                 Some(baseline_hash) if baseline_hash == "dir" => false,
                 Some(baseline_hash) => {
                     let current_hash = hashes
@@ -336,10 +277,6 @@ pub async fn git_status_since_baseline(
     .map_err(|e| DesktopError::Message(format!("git status join: {e}")))?
 }
 
-/// `git hash-object <path>` relative to `cwd`; used to detect whether a
-/// dirty path's content has changed since baseline capture. Returns `None`
-/// on any git failure (missing file, not a git repo, etc.) so callers can
-/// treat the path as "unknown" rather than failing outright.
 pub(crate) fn hash_object(cwd: &std::path::Path, path: &str) -> Option<String> {
     let out = crate::win_console::command("git")
         .args(["hash-object", path])
@@ -352,10 +289,6 @@ pub(crate) fn hash_object(cwd: &std::path::Path, path: &str) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-/// Batch `git hash-object --stdin-paths` for many relative paths in one
-/// subprocess. Falls back to per-path [`hash_object`] if the batch fails
-/// (e.g. a path vanished mid-flight). Missing paths are simply omitted from
-/// the map so callers can treat them as deleted.
 pub(crate) fn hash_objects_batch(
     cwd: &std::path::Path,
     paths: &[String],
@@ -365,10 +298,6 @@ pub(crate) fn hash_objects_batch(
         return out;
     }
 
-    // Only feed paths git can hash — `--stdin-paths` aborts the whole batch
-    // if any path is missing. Include symlinks (even to dirs): `is_file()`
-    // follows links and would skip them, wrongly baselining as "deleted".
-    // Real directories are excluded; porcelain already records those as "dir".
     let existing: Vec<&str> = paths
         .iter()
         .map(String::as_str)
@@ -438,9 +367,6 @@ pub(crate) fn try_hash_objects_stdin(
     )
 }
 
-/// `git rev-parse HEAD` in `cwd`; empty string if there is no HEAD yet
-/// (e.g. a freshly initialized repo with no commits) rather than an error,
-/// since that's a legitimate baseline state.
 pub(crate) fn current_head_sha(cwd: &std::path::Path) -> String {
     crate::win_console::command("git")
         .args(["rev-parse", "HEAD"])
@@ -452,14 +378,6 @@ pub(crate) fn current_head_sha(cwd: &std::path::Path) -> String {
         .unwrap_or_default()
 }
 
-/// Capture a [`crate::state::SessionBaseline`] snapshot of `cwd`'s dirty
-/// state, for scoping the Changes panel to this session's own edits. Only
-/// meaningful for non-isolated sessions (isolated sessions already get a
-/// clean worktree, so their `git_status` is inherently session-scoped).
-///
-/// Non-fatal by design: any git failure (not a repo, git missing, etc.)
-/// simply yields no baseline, and `git_status_since_baseline` gracefully
-/// degrades to the full-repo `git_status` in that case.
 pub(crate) fn capture_session_baseline(
     cwd: &std::path::Path,
 ) -> Option<crate::state::SessionBaseline> {
@@ -490,19 +408,6 @@ pub(crate) fn capture_session_baseline(
         if path.starts_with('"') && path.ends_with('"') && path.len() >= 2 {
             path = path[1..path.len() - 1].to_string();
         }
-        // Untracked dirs are reported by porcelain as a single "dir/" entry
-        // with no single blob to hash. Record them with the "dir" sentinel
-        // instead of skipping them outright: skipping meant an
-        // already-untracked dir at baseline time was absent from
-        // `baseline.files`, so `git_status_since_baseline`'s filter (`None`
-        // => "not in baseline" => keep) treated it as a brand-new session
-        // change — the "phantom session changes" bug. With the sentinel
-        // recorded, that same dir entry is now `Some("dir")` in the filter
-        // and gets correctly dropped as pre-existing. A dir newly created
-        // during the session still has no baseline entry at all, so it's
-        // still kept. Note: files added inside an already-untracked dir stay
-        // collapsed under the single dir entry by porcelain itself (git's
-        // own display has the same granularity) — acceptable.
         if path.ends_with('/') {
             files.insert(path, "dir".to_string());
             continue;
@@ -529,8 +434,6 @@ pub(crate) fn capture_session_baseline(
 
 const MAX_DIFF_BYTES: usize = 200 * 1024;
 
-/// Truncate `text` to `MAX_DIFF_BYTES` at a char boundary, appending a marker
-/// so callers can tell the diff was cut short. Shared by all diff commands.
 pub(crate) fn truncate_diff(mut text: String) -> String {
     if text.len() > MAX_DIFF_BYTES {
         let mut cut = MAX_DIFF_BYTES;
@@ -543,9 +446,6 @@ pub(crate) fn truncate_diff(mut text: String) -> String {
     text
 }
 
-/// `git diff <rev> -- <path>` in `dir`, falling back to a `--no-index` diff
-/// against `/dev/null` when the file has no history against `rev` (i.e. it's
-/// untracked there). Shared by `git_diff` and `review_file_diff`.
 pub(crate) fn diff_against_rev(
     dir: &std::path::Path,
     rev: &str,
@@ -564,8 +464,6 @@ pub(crate) fn diff_against_rev(
     };
 
     if text.trim().is_empty() {
-        // Untracked file: diff against /dev/null (exit code 1 means "differs",
-        // which is success for --no-index; >1 is a real error).
         let untracked = crate::win_console::command("git")
             .args(["diff", "--no-index", "--", "/dev/null", path])
             .current_dir(dir)
@@ -591,7 +489,6 @@ pub(crate) fn diff_against_rev(
     Ok(truncate_diff(text))
 }
 
-/// Unified diff for one file (read-only, capped) for the Changes panel.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub fn git_diff(cwd: String, path: String) -> DesktopResult<String> {
@@ -602,13 +499,6 @@ pub fn git_diff(cwd: String, path: String) -> DesktopResult<String> {
     diff_against_rev(std::path::Path::new(&cwd), "HEAD", path)
 }
 
-/// Stage everything and commit in the session's working directory, for the
-/// "Commit & Push" bar above the composer. Isolated sessions
-/// integrate their worktree back into the base repo instead (`integrate_session`)
-/// — committing directly here would strand the commit in a throwaway worktree —
-/// so this is rejected up front for those sessions.
-///
-/// Returns the resulting commit's short SHA.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn git_commit(
@@ -672,8 +562,6 @@ pub async fn git_commit(
     Ok(String::from_utf8_lossy(&sha.stdout).trim().to_string())
 }
 
-/// Push the current branch in the session's working directory. Same
-/// isolated-session restriction as `git_commit` (see its doc comment).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn git_push(state: State<'_, AppState>, session_id: String) -> DesktopResult<()> {
@@ -700,16 +588,6 @@ pub async fn git_push(state: State<'_, AppState>, session_id: String) -> Desktop
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// Commit center: selective staging + commit/push/branch/PR flow for the
-// Changes tab (spec #48). Same isolated-session restriction as
-// `git_commit`/`git_push` above — isolated sessions integrate their worktree
-// back into the base repo instead of committing directly here.
-// ---------------------------------------------------------------------------
-
-/// Push the current branch, creating the upstream on first push (`git push
-/// -u origin <branch>`) instead of failing with "no upstream branch". Shared
-/// by `git_commit_and_push` and `git_create_pr`.
 pub(crate) fn push_current_branch(cwd: &std::path::Path) -> DesktopResult<()> {
     let push = crate::win_console::command("git")
         .args(["push"])
@@ -720,10 +598,6 @@ pub(crate) fn push_current_branch(cwd: &std::path::Path) -> DesktopResult<()> {
         return Ok(());
     }
     let stderr = String::from_utf8_lossy(&push.stderr).trim().to_string();
-    // "no upstream" is reported on stderr by git; retry with `-u origin
-    // <branch>` rather than string-matching the exact wording, which varies
-    // by git version/locale — instead just always retry once with `-u` on
-    // any push failure that looks like a missing-upstream case.
     if stderr.contains("has no upstream branch") || stderr.contains("--set-upstream") {
         let branch = git_branch(cwd.to_string_lossy().to_string())
             .ok_or_else(|| DesktopError::Message("could not determine current branch".into()))?;
@@ -749,9 +623,6 @@ pub(crate) fn push_current_branch(cwd: &std::path::Path) -> DesktopResult<()> {
     }))
 }
 
-/// Stage only `paths` (`git add -- <paths>`) then commit. Shared staging +
-/// commit body for every commit-center entry point below. Rejects isolated
-/// sessions and empty message/paths up front — same contract as `git_commit`.
 pub(crate) async fn commit_selected_paths(
     state: &State<'_, AppState>,
     session_id: &str,
@@ -825,8 +696,6 @@ pub(crate) async fn commit_selected_paths(
     Ok((cwd, String::from_utf8_lossy(&sha.stdout).trim().to_string()))
 }
 
-/// Stage exactly the selected files and commit — the Changes tab's per-file
-/// checkbox selection, unlike `git_commit`'s `git add -A`.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn git_commit_paths(
@@ -839,8 +708,6 @@ pub async fn git_commit_paths(
     Ok(sha)
 }
 
-/// Commit the selected files, then push (creating the upstream if this is
-/// the branch's first push).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn git_commit_and_push(
@@ -854,8 +721,6 @@ pub async fn git_commit_and_push(
     Ok(sha)
 }
 
-/// Create and check out a new local branch, then commit the selected files
-/// to it. The branch is created off the current HEAD (`git checkout -b`).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn git_create_branch_and_commit(
@@ -895,12 +760,6 @@ pub async fn git_create_branch_and_commit(
     Ok(sha)
 }
 
-/// Commit the selected files, push the branch, then open a PR via `gh pr
-/// create --fill` (or with an explicit title/body when given). Gracefully
-/// degrades when the GitHub CLI isn't installed or isn't authenticated: the
-/// branch is still pushed (so the commit is never stranded locally-only) and
-/// the returned message tells the UI to show "GitHub CLI not available —
-/// pushed the branch instead" rather than silently losing the PR step.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn git_create_pr(
@@ -926,10 +785,6 @@ pub async fn git_create_pr(
     let pr = run_gh_pr_create(&cwd, title.as_deref(), body.as_deref())?;
     if !pr.status.success() {
         let stderr = String::from_utf8_lossy(&pr.stderr).trim().to_string();
-        // The push already succeeded above, so degrade rather than error —
-        // the commit/push is not lost even though the PR step failed (e.g.
-        // a PR already exists for this branch, or `gh` isn't authenticated
-        // for this repo's host).
         return Ok(CreatePrOutcome {
             commit_sha: sha,
             pr_url: None,
@@ -948,7 +803,6 @@ pub async fn git_create_pr(
     })
 }
 
-/// Build `gh pr create` with either an explicit title/body or `--fill`.
 pub(crate) fn run_gh_pr_create(
     cwd: &std::path::Path,
     title: Option<&str>,
@@ -978,28 +832,15 @@ pub(crate) fn run_gh_pr_create(
 pub struct CreatePrOutcome {
     pub commit_sha: String,
     pub pr_url: Option<String>,
-    /// Set when the PR step itself was skipped/failed but the commit+push
-    /// still succeeded (e.g. `gh` missing/unauthenticated) — the UI shows
-    /// this as a non-fatal toast rather than treating the call as an error.
     pub degraded_reason: Option<String>,
 }
 
-/// Whether `gh` is installed and authenticated for this cwd.
-/// Cheap, process-wide cache for "is `gh` on PATH?". Avoids re-spawning
-/// `gh` on every BranchPicker / PR-tab poll. Auth failures are still handled
-/// by callers treating a failed `gh pr view` as "no PR".
-/// Process-wide cache for "is `gh` on PATH?". Shared by availability probes
-/// and spawn-failure invalidation so a missing binary does not keep retrying
-/// `gh pr view` for the full TTL after a stale `true`.
 fn gh_bin_cache() -> &'static std::sync::Mutex<Option<(std::time::Instant, bool)>> {
     use std::sync::{Mutex, OnceLock};
     static CACHE: OnceLock<Mutex<Option<(std::time::Instant, bool)>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(None))
 }
 
-/// Cheap, process-wide cache for "is `gh` on PATH?". Avoids re-spawning
-/// `gh` on every BranchPicker / PR-tab poll. Auth failures are still handled
-/// by callers treating a failed `gh pr view` as "no PR".
 fn gh_bin_available() -> bool {
     use std::time::{Duration, Instant};
 
@@ -1013,8 +854,6 @@ fn gh_bin_available() -> bool {
         }
     }
 
-    // `gh --version` is local and fast; do **not** use `gh auth status` here —
-    // that was a multi-hundred-ms (sometimes network) tax on every new session.
     let ok = crate::win_console::command("gh")
         .arg("--version")
         .output()
@@ -1027,7 +866,6 @@ fn gh_bin_available() -> bool {
     ok
 }
 
-/// Forget a cached availability result after a spawn failure.
 fn invalidate_gh_bin_cache() {
     if let Ok(mut guard) = gh_bin_cache().lock() {
         *guard = None;
@@ -1044,9 +882,7 @@ pub struct BranchPrInfo {
     pub number: u64,
     pub title: String,
     pub url: String,
-    /// OPEN / MERGED / CLOSED (from `gh pr view --json state`).
     pub state: String,
-    /// Human summary derived from `statusCheckRollup`, e.g. "3/3 passing".
     pub checks_summary: String,
 }
 
@@ -1057,7 +893,6 @@ pub struct BranchPrStatus {
     pub pr: Option<BranchPrInfo>,
 }
 
-/// Summarize `gh pr view --json statusCheckRollup` into a short chip label.
 pub(crate) fn summarize_status_checks(rollup: &[serde_json::Value]) -> String {
     if rollup.is_empty() {
         return "No checks".into();
@@ -1076,7 +911,6 @@ pub(crate) fn summarize_status_checks(rollup: &[serde_json::Value]) -> String {
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_ascii_uppercase();
-        // StatusContext nodes use `state` instead of conclusion/status.
         let state = item
             .get("state")
             .and_then(|v| v.as_str())
@@ -1107,9 +941,6 @@ pub(crate) fn summarize_status_checks(rollup: &[serde_json::Value]) -> String {
     }
 }
 
-/// Look up the open PR for the current branch via `gh pr view`. Returns
-/// `pr: None` when there is no PR (or `gh` is unavailable) — never an error
-/// for the common "no PR yet" case, so the Changes UI can poll safely.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn git_pr_status(cwd: String) -> DesktopResult<BranchPrStatus> {
@@ -1138,9 +969,6 @@ fn git_pr_status_sync(cwd: String) -> DesktopResult<BranchPrStatus> {
         .output()
     {
         Ok(out) => out,
-        // Missing binary / PATH race (common in GUI apps): never surface as
-        // a hard IPC error — BranchPicker polls this and instrument(err)
-        // would log ERROR on every session switch.
         Err(err) => {
             tracing::debug!(error = %err, "gh pr view spawn failed; treating as unavailable");
             invalidate_gh_bin_cache();
@@ -1152,7 +980,6 @@ fn git_pr_status_sync(cwd: String) -> DesktopResult<BranchPrStatus> {
     };
 
     if !out.status.success() {
-        // No PR for this branch (or other non-fatal gh exits) — treat as empty.
         return Ok(BranchPrStatus {
             gh_available: true,
             pr: None,
@@ -1210,9 +1037,6 @@ fn git_pr_status_sync(cwd: String) -> DesktopResult<BranchPrStatus> {
     })
 }
 
-/// Unified diff for the current branch's PR via `gh pr diff`. Empty string
-/// when there is no PR / `gh` unavailable — callers poll alongside
-/// `git_pr_status` and should treat empty as "nothing to review".
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub fn git_pr_diff(cwd: String) -> DesktopResult<String> {
@@ -1239,7 +1063,6 @@ pub fn git_pr_diff(cwd: String) -> DesktopResult<String> {
     }
 
     let mut diff = String::from_utf8_lossy(&out.stdout).into_owned();
-    // Cap so a huge monorepo PR cannot freeze the DiffView.
     const MAX_CHARS: usize = 512_000;
     if diff.len() > MAX_CHARS {
         diff.truncate(MAX_CHARS);
@@ -1255,10 +1078,6 @@ pub struct PrDraft {
     pub body: String,
 }
 
-/// Prefill title/body for the Create PR dialog — latest commit subject as
-/// title, and bullet subjects for any additional commits ahead of the
-/// upstream (or the repo's default branch when no upstream is set). Empty
-/// strings when git can't resolve a suggestion; the UI still opens.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub fn git_pr_draft(cwd: String) -> DesktopResult<PrDraft> {
@@ -1272,9 +1091,6 @@ pub fn git_pr_draft(cwd: String) -> DesktopResult<PrDraft> {
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
         .unwrap_or_default();
 
-    // Prefer commits not yet on the upstream tracking branch; fall back to
-    // the remote HEAD / origin/main so a freshly pushed feature branch still
-    // gets a useful multi-commit body.
     let range_candidates = [
         "@{upstream}..HEAD",
         "origin/HEAD..HEAD",
@@ -1295,8 +1111,6 @@ pub fn git_pr_draft(cwd: String) -> DesktopResult<PrDraft> {
         if text.is_empty() {
             continue;
         }
-        // Skip a single-bullet body that just repeats the title — leave the
-        // description empty so the dialog doesn't look redundant.
         let lines: Vec<&str> = text.lines().collect();
         if lines.len() == 1 {
             let subject = lines[0].trim_start_matches("- ").trim();
@@ -1314,11 +1128,6 @@ pub fn git_pr_draft(cwd: String) -> DesktopResult<PrDraft> {
     Ok(PrDraft { title, body })
 }
 
-/// Create a PR for the current branch without a fresh commit (branch must
-/// already have commits to open against the base). Optional `title`/`body`
-/// override `gh`'s `--fill`; omit both (or pass empty title) to fill from
-/// commits. Pushes first when a remote is configured so the head ref exists
-/// on the host. Same degradation as `git_create_pr` when `gh` is unavailable.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub fn git_create_pr_for_branch(
@@ -1327,7 +1136,6 @@ pub fn git_create_pr_for_branch(
     body: Option<String>,
 ) -> DesktopResult<CreatePrOutcome> {
     let path = std::path::PathBuf::from(&cwd);
-    // Best-effort push so a local-only branch can still become a PR head.
     let _ = push_current_branch(&path);
 
     if !gh_available(&path) {
@@ -1343,7 +1151,6 @@ pub fn git_create_pr_for_branch(
     let pr = run_gh_pr_create(&path, title.as_deref(), body.as_deref())?;
     if !pr.status.success() {
         let stderr = String::from_utf8_lossy(&pr.stderr).trim().to_string();
-        // If a PR already exists, surface its URL instead of failing.
         if let Ok(view) = crate::win_console::command("gh")
             .args(["pr", "view", "--json", "url"])
             .current_dir(&path)
@@ -1381,11 +1188,6 @@ pub fn git_create_pr_for_branch(
     })
 }
 
-/// One-shot, tool-free commit-message suggestion from a diff summary —
-/// same throwaway-completion pattern as `suggest_session_title` (no tools,
-/// no persistence, no transcript). Any failure (no model set, provider
-/// error, empty output) surfaces as an `Err`; callers should just leave the
-/// message box empty rather than block the commit flow on this.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn suggest_commit_message(
@@ -1444,11 +1246,6 @@ pub async fn suggest_commit_message(
 mod git_status_tests {
     use super::*;
 
-    /// `summarize` must cap rendered rows at `MAX_STATUS_FILES` while keeping
-    /// totals (count/added/removed) computed over the *full*, untruncated
-    /// set — otherwise the aggregate +/- badge would silently undercount once
-    /// a session's changes exceed the row cap (e.g. after scaffolding a
-    /// project with hundreds of new files).
     #[test]
     fn summarize_caps_rows_but_keeps_full_totals() {
         let n = MAX_STATUS_FILES + 50;
@@ -1469,7 +1266,6 @@ mod git_status_tests {
         assert!(summary.truncated);
     }
 
-    /// Below the cap, nothing is truncated and totals match the row count.
     #[test]
     fn summarize_untruncated_when_under_cap() {
         let files: Vec<GitFileStatus> = (0..5)
@@ -1548,9 +1344,6 @@ mod git_status_tests {
 mod session_baseline_tests {
     use super::*;
 
-    /// Minimal git repo fixture under a fresh temp dir (not the shared
-    /// scratchpad — each test gets its own throwaway repo so runs don't
-    /// interfere). Returns the repo root.
     fn init_repo() -> std::path::PathBuf {
         use std::sync::atomic::{AtomicU64, Ordering};
         static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1605,29 +1398,20 @@ mod session_baseline_tests {
             .unwrap();
     }
 
-    /// Baseline capture + filtering should hide a file that was already
-    /// dirty before the session started (pre-existing repo mess), while
-    /// surfacing a file the "session" newly touched.
     #[test]
     fn baseline_filters_pre_existing_dirty_file_but_keeps_new_edit() {
         let dir = init_repo();
 
-        // Committed baseline: two tracked files.
         write(&dir, "pre_dirty.txt", "original\n");
         write(&dir, "untouched.txt", "original\n");
         commit_all(&dir, "initial commit");
 
-        // Simulate a pre-existing dirty file the user had before opening a
-        // session in this repo.
         write(&dir, "pre_dirty.txt", "user's uncommitted edit\n");
 
-        // Capture the session baseline now (mirrors create_session).
         let baseline = capture_session_baseline(&dir).expect("baseline capture should succeed");
         assert!(!baseline.head_sha.is_empty());
         assert!(baseline.files.contains_key("pre_dirty.txt"));
 
-        // Now the "session" makes its own edit to a different file, plus a
-        // brand-new untracked file.
         write(&dir, "untouched.txt", "session edit\n");
         write(&dir, "session_new.txt", "brand new\n");
 
@@ -1638,8 +1422,6 @@ mod session_baseline_tests {
         assert!(all_paths.contains(&"untouched.txt"));
         assert!(all_paths.contains(&"session_new.txt"));
 
-        // Reproduce git_status_since_baseline's filtering logic directly
-        // (it otherwise requires a Tauri State<AppState>).
         let filtered: Vec<_> = all
             .into_iter()
             .filter(|f| match baseline.files.get(&f.path) {
@@ -1669,8 +1451,6 @@ mod session_baseline_tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// A path already dirty at baseline time, but further modified since,
-    /// must still show up (content hash differs from the recorded one).
     #[test]
     fn baseline_keeps_file_when_further_modified_after_capture() {
         let dir = init_repo();
@@ -1680,7 +1460,6 @@ mod session_baseline_tests {
         write(&dir, "a.txt", "v2 (dirty before session)\n");
         let baseline = capture_session_baseline(&dir).expect("baseline capture should succeed");
 
-        // Session further edits the same file.
         write(&dir, "a.txt", "v3 (session edit)\n");
 
         let current_hash = hash_object(&dir, "a.txt").unwrap();
@@ -1693,9 +1472,6 @@ mod session_baseline_tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// Deleted-at-baseline paths are recorded with the sentinel so a later
-    /// re-creation of the same path is treated as new content, not as
-    /// "unchanged since baseline".
     #[test]
     fn baseline_records_deleted_sentinel() {
         let dir = init_repo();
@@ -1713,18 +1489,12 @@ mod session_baseline_tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// Reproduces the "phantom session changes" bug: an untracked directory
-    /// that already existed before the session started must not show up as
-    /// a session change, while a directory newly created during the session
-    /// still must.
     #[test]
     fn baseline_filters_pre_existing_untracked_dir_but_keeps_new_dir() {
         let dir = init_repo();
         write(&dir, "README.md", "hello\n");
         commit_all(&dir, "initial commit");
 
-        // Pre-existing untracked directory (e.g. a build output dir the user
-        // already had before opening a session in this repo).
         write(&dir, "public/index.html", "<html></html>\n");
 
         let baseline = capture_session_baseline(&dir).expect("baseline capture should succeed");
@@ -1735,7 +1505,6 @@ mod session_baseline_tests {
             baseline.files
         );
 
-        // Session creates a brand-new untracked directory of its own.
         write(&dir, "src/new_module.rs", "// new\n");
 
         let cwd_str = dir.to_string_lossy().to_string();
@@ -1766,10 +1535,6 @@ mod session_baseline_tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// Persistence round-trip: saving a baseline map to disk and loading it
-    /// back must yield an equivalent map. This is the core of the app-restart
-    /// fix — `AppState::new` calls `load_session_baselines()` on startup, so
-    /// whatever `save_session_baselines` last wrote must come back intact.
     #[test]
     fn baseline_persistence_round_trips() {
         let mut files = std::collections::HashMap::new();
@@ -1785,9 +1550,6 @@ mod session_baseline_tests {
             },
         );
 
-        // Round-trip through the same JSON (de)serialization
-        // save/load_session_baselines use, without touching the real
-        // per-user data dir (keeps this test hermetic).
         let raw = serde_json::to_string_pretty(&baselines).unwrap();
         let loaded: std::collections::HashMap<String, crate::state::SessionBaseline> =
             serde_json::from_str(&raw).unwrap();
@@ -1810,13 +1572,6 @@ mod session_baseline_tests {
     }
 }
 
-/// Commit-center git-mutation commands (`git_commit_paths`,
-/// `git_commit_and_push`, `git_create_branch_and_commit`, `git_create_pr`)
-/// plus `write_temp_blob`. These are `#[tauri::command]`s that take
-/// `State<'_, AppState>`, so the harness below builds a real (mocked-runtime)
-/// `tauri::App`, `.manage()`s an `AppState` wired to an in-memory
-/// `EngineService`, and reads the `State` back off it — the standard way to
-/// unit test a Tauri command per `tauri::test::mock_app`.
 #[cfg(test)]
 mod commit_center_tests {
     use std::path::Path;
@@ -1829,8 +1584,6 @@ mod commit_center_tests {
     use super::*;
     use crate::commands::write_temp_blob;
 
-    /// Minimal git repo fixture under a fresh temp dir, scoped to this
-    /// module's own tests so it has no cross-module test dependency.
     fn init_repo() -> std::path::PathBuf {
         use std::sync::atomic::{AtomicU64, Ordering};
         static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -1885,8 +1638,6 @@ mod commit_center_tests {
             .unwrap();
     }
 
-    /// `git status --porcelain` lines for a repo dir, for asserting which
-    /// paths are (not) still dirty after a commit.
     fn status_lines(dir: &Path) -> Vec<String> {
         let out = crate::win_console::command("git")
             .args(["status", "--porcelain"])
@@ -1908,12 +1659,6 @@ mod commit_center_tests {
         String::from_utf8_lossy(&out.stdout).trim().to_string()
     }
 
-    /// Test-only `Agent` stub. None of the commit-center commands under test
-    /// call anything on `Agent` (they only read `SessionMeta` via
-    /// `EngineService::session_meta`, which goes straight to the
-    /// `SessionStore`), so every method just panics if ever invoked — that
-    /// would indicate the test started exercising a code path these tests
-    /// don't intend to cover, not a real production concern.
     struct StubAgent;
 
     #[async_trait]
@@ -1965,10 +1710,6 @@ mod commit_center_tests {
         }
     }
 
-    /// Builds an `AppState` whose `EngineService` has exactly one session
-    /// (id `"s1"`), pointed at `cwd`, non-isolated (`base_cwd: None`) — the
-    /// shape every commit-center command expects for a plain (non-isolated)
-    /// repo session.
     fn state_with_session(cwd: &Path) -> AppState {
         let session_store: Arc<dyn agentloop_core::SessionStore> = Arc::new(MemoryStore::new());
         let now = agentloop_contracts::now_ms();
@@ -1992,11 +1733,6 @@ mod commit_center_tests {
             created_at_ms: now,
             updated_at_ms: now,
         };
-        // Seed synchronously. `MemoryStore::create` never actually awaits
-        // (it just locks a std Mutex), so a bare `futures::executor::block_on`
-        // resolves it immediately without needing (or conflicting with) a
-        // tokio runtime — this helper is called from inside `#[tokio::test]`
-        // bodies, where spinning up a second tokio runtime would panic.
         futures::executor::block_on(session_store.create(meta)).expect("seed session meta");
 
         let engine = EngineService::new(Arc::new(StubAgent), session_store);
@@ -2012,9 +1748,6 @@ mod commit_center_tests {
         AppState::new(jsonl_store, ProviderConfig::default(), Some(engine))
     }
 
-    /// Wraps `state_with_session` in a mocked-runtime Tauri app and hands
-    /// back a real `State<AppState>`, the only way `#[tauri::command]`
-    /// functions taking `State` can be called directly from a unit test.
     fn mock_state_with_session(cwd: &Path) -> tauri::App<tauri::test::MockRuntime> {
         let app_state = state_with_session(cwd);
         tauri::test::mock_builder()
@@ -2030,7 +1763,6 @@ mod commit_center_tests {
         write(&dir, "b.txt", "v1\n");
         commit_all(&dir, "initial commit");
 
-        // Two files get dirtied; only one is selected for commit.
         write(&dir, "a.txt", "v2 (to be committed)\n");
         write(&dir, "b.txt", "v2 (left dirty)\n");
 
@@ -2111,8 +1843,6 @@ mod commit_center_tests {
         let app = mock_state_with_session(&dir);
         let state: State<'_, AppState> = app.state();
 
-        // No remote configured: the commit step must still land even though
-        // the push step is guaranteed to fail.
         let err = git_commit_and_push(
             state,
             "s1".to_string(),
@@ -2143,12 +1873,7 @@ mod commit_center_tests {
 
     #[tokio::test]
     async fn git_commit_and_push_pushes_new_branch_to_bare_remote_with_no_upstream() {
-        // A local bare repo stands in for `origin` so the real push +
-        // no-upstream `-u` retry path in `push_current_branch` gets
-        // exercised end to end, not just the local-commit half.
         let remote_dir = init_repo();
-        // `git init` alone can't produce a bare repo via our helper, so
-        // reinitialize as bare directly.
         std::fs::remove_dir_all(&remote_dir).ok();
         std::fs::create_dir_all(&remote_dir).unwrap();
         let out = crate::win_console::command("git")
@@ -2167,9 +1892,6 @@ mod commit_center_tests {
             .current_dir(&dir)
             .output()
             .unwrap();
-        // Push the initial commit once first so the bare remote has the
-        // branch's history; still no upstream tracking ref is set, so the
-        // *next* push exercises the "no upstream" -u retry path.
         crate::win_console::command("git")
             .args(["push", "origin", "HEAD"])
             .current_dir(&dir)
@@ -2203,7 +1925,6 @@ mod commit_center_tests {
             "bare remote must have received the pushed commit: {remote_log_text}"
         );
 
-        // Upstream tracking must now be set (the `-u` retry path ran).
         let upstream = crate::win_console::command("git")
             .args(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
             .current_dir(&dir)
@@ -2277,7 +1998,6 @@ mod commit_center_tests {
         .expect_err("empty branch name must be rejected");
         assert!(matches!(err, DesktopError::Message(_)));
 
-        // Must not have switched branches on the rejected attempt.
         assert_eq!(current_branch(&dir), branch_before);
 
         std::fs::remove_dir_all(&dir).ok();
@@ -2290,10 +2010,6 @@ mod commit_center_tests {
         commit_all(&dir, "initial commit");
         write(&dir, "a.txt", "v2 (to push)\n");
 
-        // A bare repo stands in for `origin` so the push half of
-        // `git_create_pr` has somewhere to succeed against — `gh` itself is
-        // hidden via PATH below, which is what should trigger the degraded
-        // (non-error) outcome.
         let remote_dir = init_repo();
         std::fs::remove_dir_all(&remote_dir).ok();
         std::fs::create_dir_all(&remote_dir).unwrap();
@@ -2318,21 +2034,6 @@ mod commit_center_tests {
         let app = mock_state_with_session(&dir);
         let state: State<'_, AppState> = app.state();
 
-        // Simulate "gh absent" by restricting PATH for this process to just
-        // wherever `git` itself resolves from (so `git add`/`commit`/`push`
-        // still work), excluding every other PATH entry — in particular
-        // wherever `gh` lives (e.g. Homebrew's bin). `git_create_pr` shells
-        // out to `gh auth status`/`gh pr create` via `std::process::Command`,
-        // which resolves through PATH, so this reliably makes gh
-        // "not available" without depending on whether the host actually has
-        // gh installed.
-        //
-        // This mutates the process-wide `PATH` env var, which is safe here
-        // only because no other test in this suite invokes `gh`, and `git`
-        // remains resolvable throughout the narrowed window (serialized by
-        // `PATH_MUTATION_GUARD` against any future PATH-mutating test). A
-        // `tokio::sync::Mutex` (not `std::sync::Mutex`) is required here
-        // since the guard is held across the `git_create_pr(..).await` below.
         static PATH_MUTATION_GUARD: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
         let _path_guard = PATH_MUTATION_GUARD.lock().await;
 
@@ -2372,8 +2073,6 @@ mod commit_center_tests {
             "missing gh must surface a degraded_reason rather than silently succeeding"
         );
 
-        // The commit + push must have gone through even though the PR step
-        // was skipped.
         let remote_log = crate::win_console::command("git")
             .args(["log", "--oneline", "-1"])
             .current_dir(&remote_dir)
@@ -2423,8 +2122,6 @@ mod commit_center_tests {
 
     #[tokio::test]
     async fn write_temp_blob_rejects_oversized_blob() {
-        // Just over the 20MB cap — one byte over is enough to prove the
-        // boundary check, no need to allocate something wastefully larger.
         let bytes = vec![0u8; 20 * 1024 * 1024 + 1];
         let err = write_temp_blob(bytes, "png".to_string())
             .await

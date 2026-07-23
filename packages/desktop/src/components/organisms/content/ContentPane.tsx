@@ -39,35 +39,23 @@ import { ContextBar } from "../ContextBar"
 import { visibleRightPanelTabs } from "../right-panel/tabs"
 import { ChatSessionBody } from "./ChatSessionBody"
 import { ToolTabBody } from "./ToolTabBody"
-import { cn } from "../../../lib/utils"
+import { FileDocumentTab } from "../right-panel/FileDocumentTab"
+import { cn, basename, fileIconForPath } from "../../../lib/utils"
 import { sessionColor, GROUP_PALETTE } from "../../../lib/sessionColor"
 import { toggleZoomWindow } from "../../../lib/windowChrome"
+import { sessionScopeKey } from "../../../stores/appStore"
 
 type ContentPaneProps = {
   paneIndex: 0 | 1
-  /** Tool tabs that must stay mounted (browser/terminal/files) across panes. */
   keepAliveTools: Set<string>
-  /** True when this pane is the eastmost — owns window trailing chrome. */
   isEastmost?: boolean
   onOpenCommandPalette?: () => void
   onOpenSearch?: () => void
 }
 
-/**
- * Labels/icons for open strip tabs — always include PR so an open PR tab keeps
- * its chrome after the branch PR goes away.
- *
- * Call at render time (not module load): `ContentPane` is imported via `App`
- * before `registerBuiltinUiPlugins()` runs in `main.tsx`, so a module-level
- * snapshot would omit plugin tabs (Artifacts, Database, …) and their icons
- * would never appear in the TabStrip.
- */
 const fullStripCatalog = () => visibleRightPanelTabs({ hasBranchPr: true })
 
-/** Stable fallback when a pane index is missing (must keep object identity). */
 const EMPTY_PANE = emptyPane()
-
-// ─── Group color swatch bar ───────────────────────────────────────────────────
 
 type GroupSwatchBarProps = {
   onPickColor: (color: string) => void
@@ -103,13 +91,12 @@ const tabLabel = (
     const s = sessionsById.get(tab.sessionId)
     return s ? sessionLabel(s) : "Chat"
   }
+  if (tab.kind === "file") {
+    return basename(tab.path)
+  }
   return catalog.find((c) => c.id === tab.tool)?.label ?? tab.tool
 }
 
-/**
- * Track which chat tab ids have been shown so we can keep their bodies mounted
- * after the first visit (scroll/draft locality) without mounting every open chat.
- */
 const useVisitedChatTabs = (
   tabs: ContentTab[],
   activeTabId: string | null,
@@ -148,8 +135,6 @@ export const ContentPane = ({
   onOpenCommandPalette,
   onOpenSearch,
 }: ContentPaneProps) => {
-  // Narrow selectors — avoid re-rendering this pane when only the sibling
-  // pane's tabs change (structural sharing in activate/reorder/close).
   const pane = useAppStore(
     (s) => s.contentLayout.panes[paneIndex] ?? EMPTY_PANE,
   )
@@ -162,7 +147,7 @@ export const ContentPane = ({
   const closeTabsToRightInPane = useAppStore((s) => s.closeTabsToRightInPane)
   const closePane = useAppStore((s) => s.closePane)
   const openChatInPane = useAppStore((s) => s.openChatInPane)
-  const openToolBesideChat = useAppStore((s) => s.openToolBesideChat)
+  const openToolInPane = useAppStore((s) => s.openToolInPane)
   const openTabToSide = useAppStore((s) => s.openTabToSide)
   const setFocusedPane = useAppStore((s) => s.setFocusedPane)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
@@ -174,12 +159,8 @@ export const ContentPane = ({
   const { sessions } = useSessions()
   const dragUi = useTabDragUi()
   const [openTabModal, setOpenTabModal] = useState(false)
-  // Tool tabs hide ChatSessionBody (and thus Composer’s ContextBar). Local
-  // error state for the pane-level ContextBar strip below.
   const [toolContextError, setToolContextError] = useState<string | null>(null)
 
-  // ─── SHIFT range-select state ──────────────────────────────────────────────
-  // Ephemeral — not persisted; clears when the pane unmounts or on plain click.
   const [selectedTabIds, setSelectedTabIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   )
@@ -190,7 +171,6 @@ export const ContentPane = ({
     anchorTabIdRef.current = null
   }, [])
 
-  // ─── Group picker ──────────────────────────────────────────────────────────
   const groupIdCounter = useRef(0)
 
   const handlePickGroupColor = useCallback(
@@ -216,7 +196,6 @@ export const ContentPane = ({
     [sessions],
   )
 
-  // True when tabs from more than one session are open in this pane.
   const hasMultipleSessions = useMemo(() => {
     const ids = new Set(pane.tabs.map((t) => t.sessionId))
     return ids.size > 1
@@ -232,11 +211,8 @@ export const ContentPane = ({
     return activeSessionId
   }, [activeTab, activeSessionId])
 
-  // ContextBar lives under Composer — when the active body is a tool tab the
-  // chat (and its footer) are hidden. Surface the same strip on the pane so
-  // project / branch / isolation stay reachable on Files / Terminal / etc.
   const toolContextSession = useMemo(() => {
-    if (activeTab?.kind !== "tool") return null
+    if (activeTab?.kind !== "tool" && activeTab?.kind !== "file") return null
     return sessionsById.get(activeTab.sessionId) ?? null
   }, [activeTab, sessionsById])
 
@@ -249,8 +225,6 @@ export const ContentPane = ({
     [sessionsById, contextSession],
   )
 
-  // Never fetch PR status when opening the + menu — `gh pr view` can stall
-  // the first click. Reuse cache populated by BranchPicker / tab lifecycle.
   const prQuery = useQuery({
     queryKey: ["git-pr-status", cwd ?? ""],
     queryFn: () => gitPrStatus(cwd!),
@@ -262,8 +236,6 @@ export const ContentPane = ({
     () => visibleRightPanelTabs({ hasBranchPr }),
     [hasBranchPr],
   )
-  // Full catalog (PR always included) for strip labels/icons of already-open tabs.
-  // Empty deps: plugin registry is fixed after boot in main.tsx.
   const stripLabels = useMemo(() => fullStripCatalog(), [])
   const paneFocused = focusedPane === paneIndex
 
@@ -287,7 +259,6 @@ export const ContentPane = ({
       onRemoveFromGroup: handleUngroup,
     })
 
-  // Keep the active tab visible when it changes or tabs are added.
   useEffect(() => {
     const id = pane.activeTabId
     if (!id) return
@@ -297,7 +268,6 @@ export const ContentPane = ({
     el?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }, [pane.activeTabId, pane.tabs.length, tabsScrollRef])
 
-  // Arrow-key focus navigation within the tab strip (roving tabIndex).
   const handleTabsKeyDown = useCallback(
     (e: ReactKeyboardEvent<HTMLDivElement>) => {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
@@ -316,7 +286,8 @@ export const ContentPane = ({
     [tabsScrollRef],
   )
 
-  // Reactive sibling pane tabs for drag preview (avoids getState() inside useMemo).
+  const fileDraftsBySession = useAppStore((s) => s.fileDraftsBySession)
+
   const siblingFromPane =
     dragUi?.dragging && dragUi.fromPane !== paneIndex ? dragUi.fromPane : null
   const siblingPaneTabs = useAppStore((s) =>
@@ -348,11 +319,7 @@ export const ContentPane = ({
   return (
     <div
       className={cn(
-        // Continuous chrome surface (`--color-chrome` via bg-bg); tool work
-        // surfaces can layer `bg-editor` inside their own hosts.
-        "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-bg",
-        // Keep panes below the split sash (z-20) so focused z-index never
-        // covers the resize hit target.
+        "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-chrome",
         paneFocused ? "z-[1]" : "z-0",
       )}
       data-content-pane={paneIndex}
@@ -360,11 +327,8 @@ export const ContentPane = ({
     >
       <TabStrip
         aria-label={paneIndex === 0 ? "Left pane tabs" : "Right pane tabs"}
-        // One 35px band with sidebar header: quiet h-6 pills, all vertically
-        // centered (Agents). Mixing items-end tabs + centered actions reads crooked.
-        // Drag lives on TitleBarDragRegion (not the whole strip) so tab clicks,
-        // sash hits, and Mac trackpad gestures stay reliable.
-        className="h-[var(--titlebar-height)] min-w-0 items-center gap-1 px-2"
+        data-slot="glass-titleband"
+        className="glass-titleband h-[var(--titlebar-height)] min-w-0 items-center gap-1.5 px-2.5"
         onDoubleClick={() => void toggleZoomWindow()}
         onKeyDown={handleTabsKeyDown}
       >
@@ -383,8 +347,7 @@ export const ContentPane = ({
           data-content-tab-strip={paneIndex}
           onWheel={handleTabsWheel}
           className={cn(
-            // Size to tabs; leave flex-1 for TitleBarDragRegion (window move).
-            "flex min-w-0 shrink items-center gap-1 overflow-x-auto",
+            "flex min-w-0 shrink items-center gap-1.5 overflow-x-auto",
             "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           )}
           style={
@@ -409,45 +372,46 @@ export const ContentPane = ({
                     : null
                 : null
             const label = tabLabel(t, sessionsById, stripLabels)
+            const FileGlyph =
+              t.kind === "file" ? fileIconForPath(t.path) : null
 
-            // Session ownership cue: when multiple sessions share a pane,
-            // suffix tool-tab titles with the owning session label.
+            const dirty =
+              t.kind === "file"
+                ? !!fileDraftsBySession[sessionScopeKey(t.sessionId)]?.[t.path]
+                : false
+
             const titleText =
-              hasMultipleSessions && t.kind === "tool"
-                ? `${label} — ${sessionLabel(sessionsById.get(t.sessionId) ?? { title: t.sessionId.slice(0, 8) } as SessionMeta)}`
-                : label
+              t.kind === "file"
+                ? t.path
+                : hasMultipleSessions && t.kind === "tool"
+                  ? `${label} — ${sessionLabel(sessionsById.get(t.sessionId) ?? { title: t.sessionId.slice(0, 8) } as SessionMeta)}`
+                  : label
 
-            // Hairline between workspace/session clusters, tab groups, and
-            // the chat→tool seam so adjacent agents/projects stay separable.
             const prev = displayTabs[index - 1]
             const showDivider =
               !!prev &&
               (prev.sessionId !== t.sessionId ||
                 prev.groupId !== t.groupId ||
-                (prev.kind === "chat" && t.kind === "tool"))
+                (prev.kind === "chat" && t.kind !== "chat") ||
+                (prev.kind !== "chat" && t.kind === "chat"))
 
-            // Session affinity dot: shown when multiple sessions share the pane.
             const dotColor = hasMultipleSessions
               ? sessionColor(t.sessionId)
               : undefined
 
-            // Activity indicators: streaming chat tabs + browser-owner tool tabs.
             const isBrowser = t.kind === "tool" && t.tool === "browser"
             const isStreaming = streamingSessions[t.sessionId] ?? false
             const isBrowserOwner =
               isBrowser && browserOwnerSessionId === t.sessionId
             const showActivity = isStreaming || isBrowserOwner
 
-            // Group underbar: read color from the pane's groups map.
             const groupColor =
               t.groupId != null && pane.groups?.[t.groupId] != null
                 ? pane.groups[t.groupId]!.color
                 : undefined
 
-            // SHIFT range-selection highlight.
             const isRangeSelected = selectedTabIds.has(t.id)
 
-            // SHIFT+click opens range selection; plain click activates + clears.
             const handleTabClick = (e: ReactMouseEvent<HTMLElement>) => {
               if (e.shiftKey) {
                 e.preventDefault()
@@ -491,15 +455,19 @@ export const ContentPane = ({
                   icon={
                     t.kind === "chat" ? (
                       <MessageSquare aria-hidden />
+                    ) : t.kind === "file" && FileGlyph ? (
+                      <FileGlyph aria-hidden />
                     ) : def?.icon ? (
                       <def.icon aria-hidden />
                     ) : undefined
                   }
                   className={cn(
-                    // Quiet Agents pills — same optical center as sidebar F / actions.
                     "max-w-[180px] shrink-0",
-                    "transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+                    "transition-[opacity,transform,colors] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                     isDragged && "opacity-40",
+                    t.id === pane.activeTabId &&
+                      !paneFocused &&
+                      "bg-fill-3 text-ink-secondary",
                   )}
                   title={titleText}
                   tabId={t.id}
@@ -512,7 +480,6 @@ export const ContentPane = ({
                   draggable
                   dropEdge={dropEdge}
                   onPointerDown={(e) => {
-                    // Skip DnD initiation when SHIFT is held (range-select gesture).
                     if (e.shiftKey) return
                     startContentTabPointerDrag(e, paneIndex, t.id)
                   }}
@@ -521,6 +488,7 @@ export const ContentPane = ({
                   sessionColor={dotColor}
                   rangeSelected={isRangeSelected}
                 >
+                  {dirty ? "● " : ""}
                   {label}
                 </Tab>
               </Fragment>
@@ -552,8 +520,8 @@ export const ContentPane = ({
             sessionId={contextSession}
             tabs={catalog}
             onOpenChat={openChatInPane}
-            onOpenTool={(_p, sid, tool) =>
-              openToolBesideChat(sid, tool as RightPanelTab)
+            onOpenTool={(p, sid, tool) =>
+              openToolInPane(p, sid, tool as RightPanelTab)
             }
           />
           {split ? (
@@ -599,6 +567,23 @@ export const ContentPane = ({
               </div>
             )
           }
+          if (t.kind === "file") {
+            return (
+              <div
+                key={t.id}
+                className={cn(
+                  "absolute inset-0 flex flex-col",
+                  isActive ? "flex" : "hidden",
+                )}
+              >
+                <FileDocumentTab
+                  path={t.path}
+                  session={sessionsById.get(t.sessionId)}
+                  active={isActive}
+                />
+              </div>
+            )
+          }
           const keepKey = `${t.sessionId}:${t.tool}`
           return (
             <ToolTabBody
@@ -619,11 +604,11 @@ export const ContentPane = ({
 
       {toolContextSession ? (
         <div
-          className="shrink-0 border-t border-stroke-3 px-2.5 py-1"
+          className="shrink-0 border-t border-stroke-3 px-2.5 py-0.5"
           data-pane-context-bar
         >
           {toolContextError ? (
-            <div className="mb-1">
+            <div className="mb-0.5">
               <ErrorBanner
                 message={toolContextError}
                 onDismiss={() => setToolContextError(null)}
@@ -638,6 +623,7 @@ export const ContentPane = ({
             sessionId={toolContextSession.id}
             disabled={!paneFocused}
             onError={setToolContextError}
+            quiet
           />
         </div>
       ) : null}

@@ -1,6 +1,3 @@
-//! Root-session workspace isolation: policy resolution, deferred provisioning
-//! on first prompt, reuse of an existing worktree, and resume repointing.
-
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -59,8 +56,6 @@ async fn required_isolation_defers_provisioning_until_first_prompt() {
         .await
         .expect("required isolation succeeds at create time when a backend is configured");
 
-    // At create time nothing is provisioned yet: cwd still points at the
-    // project, workspace_id is empty, no WorkspaceProvisioned event yet.
     let meta = get_meta(&store, &id).await;
     assert_eq!(meta.cwd, PathBuf::from("/repo"));
     assert_eq!(meta.workspace_id, None);
@@ -69,7 +64,6 @@ async fn required_isolation_defers_provisioning_until_first_prompt() {
     assert_eq!(mock.provision_calls(), 0, "provisioning is deferred");
     assert_eq!(provisioned_events(&store, &id).await, 0);
 
-    // Simulate the first prompt's ensure step.
     agent
         .ensure_workspace_for_test(&id)
         .await
@@ -137,7 +131,6 @@ async fn required_isolation_fails_at_first_turn_when_backend_cannot_provision() 
     let mock = Arc::new(MockWorkspaces::unavailable());
     let agent = build_agent(store.clone(), Some(mock), Vec::new());
 
-    // Create still succeeds — we only find out on the first turn.
     let id = agent
         .create_session(params("/repo", Some(IsolationPolicy::Required)))
         .await
@@ -234,7 +227,6 @@ async fn reuse_workspace_id_attaches_existing_worktree() {
         .await
         .expect("session");
 
-    // Reuse hint is recorded on meta and no worktree is created yet.
     assert_eq!(
         get_meta(&store, &id).await.reuse_workspace_id.as_deref(),
         Some("ws-existing")

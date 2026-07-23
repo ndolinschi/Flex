@@ -1,130 +1,131 @@
 import { useEffect, useState } from "react"
-import { Bot, ChevronDown, Network } from "lucide-react"
+import { Bot, Network, X } from "lucide-react"
 import type { SubagentTimelineRow } from "../../lib/workerPresentation"
 import {
   summarizeWorkerActivity,
   workerTitle,
 } from "../../lib/workerPresentation"
 import { useAppStore } from "../../stores/appStore"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { cn } from "../../lib/utils"
 
 type WorkingAgentsPillProps = {
   workers: SubagentTimelineRow[]
-  /** Scroll the timeline to the active workers group. */
   onScrollToWorkers?: () => void
+  /** Cancel the parent turn (and thus running workers) — Cursor “Stop All”. */
+  onStopAll?: () => void
 }
 
-/** Composer-adjacent glance: "N Working" opens a short menu of running
- * worker titles (open viewer / scroll to group). Hidden when none running.
- * Menu body (per-worker summarize) only mounts while open. */
 export const WorkingAgentsPill = ({
   workers,
   onScrollToWorkers,
+  onStopAll,
 }: WorkingAgentsPillProps) => {
   const openSubagentViewer = useAppStore((s) => s.openSubagentViewer)
-  const [open, setOpen] = useState(false)
+  const [stopping, setStopping] = useState(false)
 
   useEffect(() => {
-    if (workers.length === 0) setOpen(false)
+    if (workers.length === 0) setStopping(false)
   }, [workers.length])
 
   if (workers.length === 0) return null
 
   const n = workers.length
+  const preview = workers.slice(0, 4)
+  const overflow = n - preview.length
+
+  const handleStopAll = () => {
+    if (!onStopAll || stopping) return
+    setStopping(true)
+    onStopAll()
+  }
 
   return (
-    <div className="relative mb-1.5 flex justify-start">
-      <DropdownMenu open={open} onOpenChange={setOpen}>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-label="Running workers"
-              className="h-6 gap-1.5 px-2 text-ink-muted hover:text-ink"
-            />
-          }
+    <div
+      className={cn(
+        "relative mb-1.5 overflow-hidden rounded-[var(--radius-composer)]",
+        "border border-stroke-3 bg-elevated/90",
+      )}
+    >
+      <div className="flex h-7 items-center gap-2 px-2.5">
+        <Network className="size-3.5 shrink-0 text-ink-muted" aria-hidden />
+        <button
+          type="button"
+          className={cn(
+            "min-w-0 flex-1 truncate text-left text-sm text-ink",
+            "animate-shimmer-text",
+            onScrollToWorkers &&
+              "hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stroke-2",
+          )}
+          onClick={onScrollToWorkers}
+          disabled={!onScrollToWorkers}
         >
-          <Network className="size-3 shrink-0" aria-hidden />
-          <span className="animate-shimmer-text text-xs">Working</span>
-          <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[10px]">
-            {n}
-          </Badge>
-          <ChevronDown
-            className={cn(
-              "size-2.5 transition-transform duration-[var(--duration-fast)]",
-              open && "rotate-180",
-            )}
-            aria-hidden
-          />
-        </DropdownMenuTrigger>
-        {open ? (
-          <DropdownMenuContent
-            align="start"
-            side="top"
-            sideOffset={6}
-            className="min-w-[220px] max-w-[320px]"
+          {n} Working
+        </button>
+        {onStopAll ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="Stop all workers"
+            disabled={stopping}
+            onClick={handleStopAll}
+            className="h-6 gap-1 px-1.5 text-xs text-ink-muted hover:bg-fill-4 hover:text-ink"
           >
-            <DropdownMenuGroup>
-              {onScrollToWorkers ? (
-                <>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setOpen(false)
-                      onScrollToWorkers()
-                    }}
-                  >
-                    <Network />
-                    Jump to workers
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              ) : null}
-              {workers.map((w) => {
-                const activity = summarizeWorkerActivity(
-                  w.children,
-                  w.phase,
-                  w.summary,
-                )
-                const title = workerTitle(w.role, w.task)
-                return (
-                  <DropdownMenuItem
-                    key={w.childSession}
-                    className="h-auto items-start py-1.5"
-                    onClick={() => {
-                      setOpen(false)
-                      openSubagentViewer(w.childSession, title)
-                    }}
-                  >
-                    <Bot className="mt-0.5" />
-                    <span className="min-w-0 flex-1 text-left">
-                      <span className="block truncate text-sm text-foreground">
-                        {title}
-                      </span>
-                      {activity.latestLabel ? (
-                        <span className="block truncate text-xs text-ink-muted">
-                          {activity.latestLabel}
-                        </span>
-                      ) : null}
-                    </span>
-                  </DropdownMenuItem>
-                )
-              })}
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
+            <X className="size-3" aria-hidden />
+            Stop All
+          </Button>
         ) : null}
-      </DropdownMenu>
+      </div>
+      <ul className="flex flex-col gap-0.5 border-t border-stroke-3 px-2.5 py-1.5">
+        {preview.map((w) => {
+          const activity = summarizeWorkerActivity(
+            w.children,
+            w.phase,
+            w.summary,
+          )
+          const title = workerTitle(w.role, w.task)
+          return (
+            <li key={w.childSession}>
+              <button
+                type="button"
+                className={cn(
+                  "flex w-full min-w-0 items-start gap-2 rounded-md px-1 py-1 text-left",
+                  "transition-colors duration-[var(--duration-fast)]",
+                  "hover:bg-fill-4 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stroke-2",
+                )}
+                onClick={() => openSubagentViewer(w.childSession, title)}
+              >
+                <Bot
+                  className="mt-0.5 size-3 shrink-0 text-ink-faint"
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs text-ink">
+                    {title}
+                  </span>
+                  {activity.latestLabel ? (
+                    <span className="block truncate text-xs text-ink-faint">
+                      {activity.latestLabel}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            </li>
+          )
+        })}
+        {overflow > 0 && onScrollToWorkers ? (
+          <li>
+            <button
+              type="button"
+              className="w-full px-1 py-0.5 text-left text-xs text-ink-faint hover:text-ink-muted"
+              onClick={onScrollToWorkers}
+            >
+              +{overflow} more — jump to workers
+            </button>
+          </li>
+        ) : null}
+      </ul>
     </div>
   )
 }

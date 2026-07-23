@@ -7,12 +7,10 @@ type PlanBuildBarProps = {
   onBuild: () => void
   onKeepPlanning?: () => void
   isBuilding?: boolean
-  /** Compact chip above the composer vs full Plan-tab footer. */
   variant?: "footer" | "chip"
   className?: string
 }
 
-/** Build CTA to leave plan mode and implement. */
 export const PlanBuildBar = ({
   onBuild,
   onKeepPlanning,

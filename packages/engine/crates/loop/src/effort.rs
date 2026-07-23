@@ -1,25 +1,8 @@
-//! Resolving an [`Effort`] level into concrete per-turn reasoning controls.
-//!
-//! Effort is the single user-facing knob (`/effort`, `--effort`). Here it
-//! fans out into the levers the loop actually applies, each aware of both the
-//! effort level and the subagent role so reasoning is tuned to *each type* of
-//! work:
-//!
-//! * [`thinking_budget`] — extended-thinking token budget (the caller gates it
-//!   on `provider.capabilities().thinking`).
-//! * [`guidance`] — reasoning-discipline text appended to the system prompt.
-//! * [`reasoning_effort_str`] — the OpenAI o-series `reasoning_effort` string,
-//!   ready for the deferred wire path (see the plan's Deferred section).
-
 use agentloop_contracts::Effort;
 
-/// Role names that get special budget treatment. Kept as local constants to
-/// match `roles.rs` without coupling the two modules.
 const ROLE_SEARCHER: &str = "searcher";
 const ROLE_REVIEWER: &str = "reviewer";
 
-/// Base extended-thinking budget for `effort`, before per-role scaling.
-/// `None` means "no extended thinking" — the cheap path.
 fn base_budget(effort: Effort) -> Option<u32> {
     match effort {
         Effort::Low => None,
@@ -30,15 +13,6 @@ fn base_budget(effort: Effort) -> Option<u32> {
     }
 }
 
-/// The extended-thinking budget for a turn at `effort` serving `role`
-/// (`None` = the interactive main session). Scaled per role so reasoning is
-/// tuned to each kind of work:
-///
-/// * `searcher` — fast, broad recon → half budget (floored so it stays useful).
-/// * `reviewer` — careful checking benefits most → never below the High budget.
-/// * `worker` / main — track the chosen level exactly.
-///
-/// Returns `None` when no extended thinking should be requested.
 pub fn thinking_budget(effort: Effort, role: Option<&str>) -> Option<u32> {
     match role {
         Some(ROLE_SEARCHER) => base_budget(effort).map(|b| (b / 2).max(4_096)),
@@ -50,10 +24,6 @@ pub fn thinking_budget(effort: Effort, role: Option<&str>) -> Option<u32> {
     }
 }
 
-/// The reasoning-discipline block appended to the system prompt for `effort`.
-/// Provider-agnostic; composes *after* any role prompt (role says what the job
-/// is, this says how hard to work at it). The xhigh/max blocks carry the
-/// orchestration posture (parallel fan-out + a mandatory reviewer pass).
 pub fn guidance(effort: Effort) -> &'static str {
     match effort {
         Effort::Low => {
@@ -85,10 +55,6 @@ pub fn guidance(effort: Effort) -> &'static str {
     }
 }
 
-/// The OpenAI o-series `reasoning_effort` string. OpenAI supports only
-/// low/medium/high, so the top tiers saturate at "high". Not wired into any
-/// request body in v1 (the DeepSeek-dialect OpenAI provider uses token
-/// budgets); kept ready for the deferred wire path.
 pub fn reasoning_effort_str(effort: Effort) -> &'static str {
     match effort {
         Effort::Low => "low",

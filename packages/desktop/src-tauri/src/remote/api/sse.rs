@@ -1,9 +1,3 @@
-//! SSE replay-then-tail for remote session events.
-//!
-//! **Strict chat filter:** only message-facing events leave the host, and
-//! message payloads are scrubbed to markdown text (plus safe image blobs).
-//! Tool use/results, local file paths, thinking, permissions, and other
-//! control-plane events never cross the wire.
 
 use axum::response::sse::{Event, KeepAlive, Sse};
 use futures::stream::{Stream, StreamExt};
@@ -11,7 +5,6 @@ use futures::stream::{Stream, StreamExt};
 use agentloop_contracts::{AgentEvent, BlobSource, ContentBlock, SessionEvent};
 use agentloop_engine::EngineService;
 
-/// Events a remote chat client is allowed to see (before payload scrubbing).
 pub(crate) fn event_visible(event: &AgentEvent) -> bool {
     matches!(
         event,
@@ -25,8 +18,6 @@ pub(crate) fn event_visible(event: &AgentEvent) -> bool {
     )
 }
 
-/// Keep only chat-safe content blocks. Drops ToolUse/ToolResult/Thinking/File
-/// and any `BlobSource::Path` (local filesystem disclosure).
 fn scrub_blocks(blocks: Vec<ContentBlock>) -> Vec<ContentBlock> {
     blocks
         .into_iter()
@@ -69,7 +60,6 @@ fn scrub_payload(payload: AgentEvent) -> AgentEvent {
         } => AgentEvent::AssistantMessage {
             message_id,
             content: scrub_blocks(content),
-            // Model id is fine; usage is accounting only.
             model,
             usage,
         },

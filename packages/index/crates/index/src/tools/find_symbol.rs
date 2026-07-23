@@ -1,6 +1,3 @@
-//! `FindSymbol` tool: exact/prefix lookup of a definition by name (and
-//! optional kind) over the repo's extracted symbol table.
-
 use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -17,17 +14,10 @@ const MAX_MATCHES: usize = 50;
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct FindSymbolInput {
-    /// Symbol name to find. Exact matches (case-sensitive) rank first,
-    /// followed by prefix matches.
     name: String,
-    /// Optional kind filter: `function`, `method`, `struct`, `class`,
-    /// `const`, `interface`, `enum`, or `heading` (markdown). Omit to match
-    /// any kind.
     kind: Option<String>,
 }
 
-/// Find where a symbol (function, struct, class, const, method, interface,
-/// enum, or markdown heading) is defined.
 #[derive(Debug, Clone, Copy)]
 pub struct FindSymbolTool {
     open_mode: IndexOpenMode,
@@ -154,11 +144,6 @@ fn find_matches(
     Ok(query_matches(&store, name, kind_filter))
 }
 
-/// Pure query over an already-open store: exact matches first, then prefix
-/// matches, each group path/line sorted, capped at [`MAX_MATCHES`]. Split out
-/// from [`find_matches`] so tests can build a store against a scratch index
-/// directory (via `shared::open_and_build_in`) instead of depending on
-/// `open_and_build`'s real app-data index resolution.
 fn query_matches(
     store: &crate::store::IndexStore,
     name: &str,
@@ -272,10 +257,8 @@ mod tests {
         assert!(rendered.contains("No symbol named"));
     }
 
-    /// M1 live-acceptance: `FindSymbol` `Tool::run` with the index-root
-    /// override so tests never write to real Application Support.
     #[tokio::test]
-    #[allow(clippy::await_holding_lock)] // gate must cover Tool::run's spawn_blocking
+    #[allow(clippy::await_holding_lock)]
     async fn live_accept_find_symbol_tool_run() {
         use agentloop_contracts::{SessionId, ToolCallId, TurnId};
         use agentloop_core::{EventSink, Tool};

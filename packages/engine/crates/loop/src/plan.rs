@@ -1,12 +1,3 @@
-//! Plan-mode system-prompt guidance.
-//!
-//! Appended to the system prompt for any turn whose permission mode is
-//! [`agentloop_contracts::PermissionMode::Plan`]. The permission policy blocks
-//! mutation regardless, but telling the model up front — rather than letting it
-//! discover the constraint by getting an edit denied — keeps it on the intended
-//! research-then-plan path and points it at the `ExitPlanMode` handoff.
-
-/// The guidance block appended to the system prompt while in plan mode.
 pub(crate) fn guidance() -> &'static str {
     "Plan mode is ON — you are in a read-only research phase.\n\
      - Investigate freely with read-only tools: Read, Grep, Glob, and read-only \

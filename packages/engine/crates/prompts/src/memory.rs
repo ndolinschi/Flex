@@ -1,32 +1,14 @@
-//! Local memory discovery: small markdown notes loaded into every session's
-//! system prompt.
-//!
-//! A memory is one `<name>.md` file under the memory directory
-//! (`~/.config/agentloop/memory` by default) holding durable facts and
-//! preferences the user (or the agent, via a memory-writing tool) chose to
-//! persist. Unlike skills — procedures loaded on demand — memories are always
-//! resident, so the total budget is hard-capped and files are loaded in name
-//! order until the budget is exhausted (a truncation note names what was
-//! skipped, never silently).
-
 use std::fs;
 use std::path::PathBuf;
 
-/// Default budget for the assembled memory section.
 pub const DEFAULT_MEMORY_BUDGET_CHARS: usize = 8_000;
 
-/// Where and how much memory to load.
 #[derive(Debug, Clone, Default)]
 pub struct MemoryConfig {
-    /// The memory directory; `None` or missing = no memory section.
     pub dir: Option<PathBuf>,
-    /// Total character budget; `0` means [`DEFAULT_MEMORY_BUDGET_CHARS`].
     pub budget_chars: usize,
 }
 
-/// Assemble the memory prompt section, or `None` when there is nothing to
-/// load. Unreadable files are skipped with a trace, never an error — memory
-/// must not be able to break session startup.
 pub fn load_memory_section(config: &MemoryConfig) -> Option<String> {
     let dir = config.dir.as_ref()?;
     let entries = fs::read_dir(dir).ok()?;

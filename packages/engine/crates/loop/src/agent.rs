@@ -1,6 +1,3 @@
-//! `NativeAgent`: the engine's own agent-loop implementation of the
-//! [`Agent`] trait, over any [`Provider`] + tool registry + session store.
-
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -23,7 +20,6 @@ use crate::deps::TurnDeps;
 use crate::session_handle::SessionHandle;
 use crate::turn;
 
-/// The native agent loop. Construct with [`crate::NativeAgentBuilder`].
 pub struct NativeAgent {
     pub(crate) deps: Arc<TurnDeps>,
     pub(crate) command_infos: Vec<CommandInfo>,
@@ -40,7 +36,6 @@ impl NativeAgent {
             .ok_or_else(|| AgentError::SessionNotFound(id.clone()))
     }
 
-    /// A live handle for `id`, if the session is attached.
     pub(crate) fn live_handle(&self, id: &SessionId) -> Option<Arc<SessionHandle>> {
         self.sessions
             .lock()
@@ -49,19 +44,10 @@ impl NativeAgent {
             .cloned()
     }
 
-    /// Install a fresh handle for a subagent child session (seq starts at 0).
     pub(crate) fn install_child_handle(&self, id: &SessionId) -> Arc<SessionHandle> {
         self.install_handle(id, 0)
     }
 
-    /// Drive first-prompt workspace provisioning for a session without
-    /// running a full turn. Intended for tests that want to exercise the
-    /// deferred-isolation path without going through a mock provider.
-    ///
-    /// Semantics match what [`crate::turn::run_turn`] does on the first
-    /// prompt of an isolated root session: no-op for non-isolated sessions
-    /// or ones already provisioned; provisions (or attaches a reuse hint)
-    /// otherwise, updates `SessionMeta`, and emits `WorkspaceProvisioned`.
     #[doc(hidden)]
     pub async fn ensure_workspace_for_test(&self, id: &SessionId) -> Result<(), AgentError> {
         let handle = self.handle(id)?;
@@ -70,9 +56,6 @@ impl NativeAgent {
         Ok(())
     }
 
-    /// Relay a child's persisted/control events into the parent stream as
-    /// [`AgentEvent::SubagentEvent`], until `stop` is tripped. Token deltas
-    /// are dropped — the tree renders from materialized child events.
     pub(crate) fn spawn_relay(
         &self,
         child: &Arc<SessionHandle>,
@@ -183,13 +166,6 @@ impl Agent for NativeAgent {
             .isolation
             .unwrap_or_else(|| self.deps.roles.isolation(role.as_deref()));
 
-        // Deferred isolation: when a session asks to be isolated we record
-        // the policy (and any reuse hint) but keep `cwd` on the project
-        // directory with `workspace_id`/`base_cwd` empty. The actual worktree
-        // is created (or attached) on the first prompt — see
-        // `ensure_root_workspace`. This lets a user pick between "new" and
-        // an existing workspace after create_session returns, and avoids
-        // spawning `git` on the create hot path.
         let isolation = policy.wants_isolation().then_some(policy);
         let reuse_workspace_id = if policy.wants_isolation() {
             params.reuse_workspace_id
@@ -197,9 +173,6 @@ impl Agent for NativeAgent {
             None
         };
         if policy.is_required() && self.deps.workspace.is_none() {
-            // Fail fast: required isolation without a backend can never be
-            // satisfied — better to reject at create than to reject the
-            // first prompt after the user has already typed one.
             return Err(AgentError::Other(
                 "isolation required but no workspace backend is configured".to_owned(),
             ));
@@ -314,11 +287,6 @@ impl Agent for NativeAgent {
             .turn_gate
             .try_lock()
             .map_err(|_| AgentError::TurnInProgress(session.clone()))?;
-        // Run the turn on its own task: a panic anywhere in the turn body
-        // (hooks, message assembly, compaction — outside the tool worker
-        // pool's own panic isolation) unwinds that task alone. `JoinError`
-        // turns into a recorded `SessionError` instead of propagating the
-        // unwind into whatever called `prompt` (an HTTP handler, the CLI).
         let deps = self.deps.clone();
         let turn_handle = handle.clone();
         let (done_tx, done_rx) = tokio::sync::oneshot::channel();
@@ -326,15 +294,6 @@ impl Agent for NativeAgent {
             tokio::spawn(
                 async move { turn::run_turn(&deps, turn_handle, input, opts, done_tx).await },
             );
-        // Release the turn gate the moment the turn is LOGICALLY complete (its
-        // terminal event has been emitted) rather than after the post-turn
-        // event-flush cleanup — otherwise a queued follow-up prompt, draining
-        // the instant the frontend sees TurnCompleted, races the still-held
-        // gate during the flush window and is rejected (see `flush_turn_events`).
-        // `Err` = run_turn returned/panicked before signalling (early error
-        // path) — release anyway. Reset `current_cancel` BEFORE dropping the
-        // guard so a new turn that acquires the gate right after can't have its
-        // freshly-installed cancel token clobbered by this reset.
         let _ = done_rx.await;
         *handle
             .current_cancel

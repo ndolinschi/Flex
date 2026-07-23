@@ -14,21 +14,17 @@ import { PlanStatusIcon } from "./PlanCard"
 import { SubagentGroup } from "./SubagentGroup"
 import { Button } from "@/components/ui/button"
 
-/** Inferred progress state of one workflow step. Mirrors `PlanEntry.status`
- * plus a `failed` outcome (a workflow step can error; a plan entry cannot). */
 type StepState = "pending" | "in_progress" | "completed" | "failed"
 
 type ResolvedStep = {
   label: string
   role: string
   state: StepState
-  /** Subagent slots this step consumed, for the expandable detail. */
   slots: WorkflowSubagentSlot[]
 }
 
 const taskLabel = (task: WorkflowStepTaskInput): string => task.label ?? task.role
 
-/** A stop reason that should read as "failed" rather than "done". */
 const isFailedStopReason = (reason?: string): boolean =>
   reason === "error" || reason === "max_iterations"
 
@@ -45,17 +41,6 @@ const combineStates = (states: StepState[]): StepState => {
   return "pending"
 }
 
-/**
- * Resolve each declared step's status by consuming subagent arrivals in
- * order. The engine emits no step index/total on the wire (`RunWorkflow`
- * shares one `ToolCallId` across every step — see `run_workflow_call` in
- * `packages/engine/crates/loop/src/workflow.rs`), so this walks the parsed
- * `steps` (from the tool call's input JSON) and, for each one, claims the
- * next N subagent slots that have arrived so far (N=1 for `task`, N=tasks.length
- * for `parallel`). A step with fewer arrived slots than it needs is still
- * `pending`; once all its slots exist it's `in_progress` until every slot
- * completes, then `completed`/`failed`.
- */
 const resolveSteps = (
   steps: WorkflowStepInput[],
   subagents: WorkflowSubagentSlot[],
@@ -92,8 +77,6 @@ const resolveSteps = (
 const StepRow = ({ step }: { step: ResolvedStep }) => {
   const [expanded, setExpanded] = useState(false)
   const canExpand = step.slots.length > 0
-  // PlanStatusIcon only knows pending/in_progress/completed; a failed step
-  // renders its own dot below instead of forcing a fourth icon state onto it.
   const iconStatus: PlanStatus = step.state === "failed" ? "pending" : step.state
 
   return (
@@ -171,9 +154,6 @@ const StepRow = ({ step }: { step: ResolvedStep }) => {
   )
 }
 
-/** Minimal re-render of a nested subagent's own timeline rows, avoiding a
- * circular import on `TurnTimeline`'s `TimelineRowView` (this only needs to
- * cover what a subagent step can actually emit: tool calls and text). */
 const WorkflowChildRow = ({ row }: { row: WorkflowSubagentSlot["children"][number] }): ReactNode => {
   if (row.type === "assistant") {
     if (!row.text.trim()) return null
@@ -191,9 +171,6 @@ const WorkflowChildRow = ({ row }: { row: WorkflowSubagentSlot["children"][numbe
 
 const overallState = (steps: ResolvedStep[], status: ToolCallStatus): StepState => {
   if (status.state === "failed" || status.state === "denied") return "failed"
-  // "completed" normally, "cancelled" when the turn-end sweep force-closed a
-  // dangling RunWorkflow call (Stop/error mid-run) — both are settled, not
-  // still in flight, so resolve from the steps the same way.
   if (status.state === "completed" || status.state === "cancelled") {
     return steps.some((s) => s.state === "failed") ? "failed" : "completed"
   }
@@ -206,10 +183,6 @@ type WorkflowGroupProps = {
   status: ToolCallStatus
 }
 
-/** collapsible block for a `RunWorkflow` tool call: a header
- * ("Workflow — step i/N") plus one row per declared step, each expandable to
- * the subagent activity it spawned. Progress is inferred (see
- * `resolveSteps`) since the engine emits no per-step event. */
 export const WorkflowGroup = ({
   steps,
   subagents,
@@ -234,8 +207,6 @@ export const WorkflowGroup = ({
   const open = state === "in_progress" || expanded
   const prevState = useRef(state)
   useEffect(() => {
-    // Auto-open while running; collapse when the workflow settles so the
-    // header can be expanded again manually (same contract as ToolStepGroup).
     if (prevState.current !== state) {
       if (state === "in_progress") setExpanded(true)
       else if (prevState.current === "in_progress") setExpanded(false)

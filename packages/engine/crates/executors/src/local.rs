@@ -1,8 +1,3 @@
-//! Local backend: runs the session's shell directly in the session cwd — the
-//! historical default. Unix uses `/bin/sh -lc`; Windows uses PowerShell
-//! (`powershell.exe -NoProfile -NonInteractive -Command`, see
-//! [`shell_command`] for why).
-
 use async_trait::async_trait;
 use tokio::process::Command;
 use tokio_util::sync::CancellationToken;
@@ -14,17 +9,6 @@ use agentloop_core::{
 
 use crate::run::{run_command_demotable, run_command_with_sink, spawn_background};
 
-/// Build a [`Command`] that runs `script` as a single-line shell command.
-///
-/// Unix: `/bin/sh -lc <script>` (login shell, matching the historical
-/// behavior so `PATH`/profile-sourced env stays intact).
-///
-/// Windows: `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass
-/// -Command <script>`. Models on Windows emit PowerShell (`Get-ChildItem`,
-/// `> $null`, …); running those under `cmd /C` fails the cmdlets and can
-/// create a literal `$null` file from the redirect. The script is passed as
-/// one argv element so PowerShell parses it as code (not re-tokenized by an
-/// outer shell).
 fn shell_command(script: &str) -> Command {
     #[cfg(windows)]
     {
@@ -36,7 +20,6 @@ fn shell_command(script: &str) -> Command {
             .arg("Bypass")
             .arg("-Command")
             .arg(script);
-        // GUI parents (desktop) must not flash a conhost for every Bash call.
         crate::win_console::hide_console(&mut command);
         command
     }
@@ -44,22 +27,11 @@ fn shell_command(script: &str) -> Command {
     {
         let mut command = Command::new("/bin/sh");
         command.arg("-lc").arg(script);
-        // Make the shell the leader of a new process group (pgid = its own
-        // pid) instead of inheriting ours. Killing just the `/bin/sh` pid on
-        // cancel/timeout/kill leaves any children it spawned (a pipeline
-        // stage, a backgrounded `node`/`python` server via `&`, a `make`
-        // sub-process) running as orphans reparented to init — this crate's
-        // kill paths (`run_command*`'s cancel/timeout branches,
-        // `LocalBackgroundProcess::kill`) all signal the *group* via
-        // `crate::process_group::kill_group` instead, which requires every
-        // spawn to actually be its own group leader.
         crate::process_group::configure(&mut command);
         command
     }
 }
 
-/// Runs commands directly on the host with no isolation. Cannot honor
-/// [`NetworkPolicy::Denied`].
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LocalExecutor;
 
@@ -163,8 +135,6 @@ mod tests {
         }
     }
 
-    /// Platform-native one-liners so the same assertions hold under `/bin/sh`
-    /// and Windows PowerShell 5.1 (`Write-Output -NoNewline` is pwsh-only).
     #[cfg(windows)]
     fn echo_hello() -> &'static str {
         "[Console]::Out.Write('hello')"
@@ -284,12 +254,10 @@ mod tests {
             .await
             .expect("exec ok");
 
-        // Final result still carries the complete, unstreamed-view output.
         assert_eq!(outcome.exit_code, Some(0));
         assert_eq!(outcome.stdout, b"a\nb\n");
         assert_eq!(outcome.stderr, b"oops\n");
 
-        // The sink actually received chunks for both streams.
         let seen = chunks.lock().expect("lock");
         assert!(
             seen.iter()
@@ -305,10 +273,6 @@ mod tests {
 
     #[tokio::test]
     async fn background_returns_early_while_process_still_runs() {
-        // The process sleeps well past the initial-output window; the call
-        // must still return (proving it doesn't wait for exit) with the
-        // banner it printed before sleeping, and `status()` must report it
-        // as still running.
         let s = spec(echo_ready_then_sleep());
         let spawn = LocalExecutor
             .exec_background(s)
@@ -319,7 +283,6 @@ mod tests {
         assert!(status.running, "process should still be running");
         assert!(status.pid.is_some());
 
-        // Clean up so the test doesn't leave a sleeping child around.
         spawn.handle.kill().await.expect("kill ok");
     }
 
@@ -334,8 +297,6 @@ mod tests {
 
         spawn.handle.kill().await.expect("kill ok");
 
-        // Give the wait task a moment to observe the cancellation and flip
-        // the shared state; poll briefly rather than sleeping a fixed guess.
         for _ in 0..50 {
             if !spawn.handle.status().running {
                 break;
@@ -369,8 +330,6 @@ mod tests {
 
     #[tokio::test]
     async fn foreground_exec_is_unaffected_by_background_support() {
-        // Non-background behavior stays byte-identical: same call, same
-        // path, regardless of `exec_background` existing on the trait.
         let outcome = LocalExecutor
             .exec(spec(echo_hello()), CancellationToken::new())
             .await
@@ -412,8 +371,6 @@ mod tests {
                 .await
         });
 
-        // Give the process a moment to print its banner, then demote.
-        // PowerShell cold-start on Windows is slower than `/bin/sh`.
         #[cfg(windows)]
         tokio::time::sleep(Duration::from_millis(1_500)).await;
         #[cfg(not(windows))]

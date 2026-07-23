@@ -26,30 +26,16 @@ import { Input } from "@/components/ui/input"
 type SessionListItemProps = {
   session: SessionMeta
   isActive: boolean
-  /** Set when the last resume attempt for this session failed; shows a warning icon. */
   errorMessage?: string | null
-  /** Workspace diff status for the subtitle line; undefined = loading, null = no isolated workspace. */
   workspaceStatus?: WorkspaceStatusDto | null
-  /** Same `["git-status", cwd, sessionId]` summary the Changes tab reads —
-   * used as the subtitle's change indicator for non-isolated sessions
-   * (`workspaceStatus` above only ever resolves for isolated ones), so the
-   * numbers always agree with the Changes tab. */
   gitStatus?: GitStatusSummary
-  /** Whether this session is pinned (reference-design "Pinned" group). */
   pinned?: boolean
-  /** Whether this session is archived (dimmed row, restore action instead of archive/delete). */
   archived?: boolean
-  /**
-   * Nest depth for child sessions (`parent_id`). 0 = root, 1 = nested under
-   * parent (Cursor Agents nested thread indent).
-   */
   nestDepth?: 0 | 1
-  /** Role badge for nested subagents (e.g. `worker`, `searcher`). */
   roleLabel?: string | null
   onSelect: (id: string) => void
   onRename: (id: string, title: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
-  /** "New agent" in this session's repo — used by the context menu only. */
   onNewAgentInRepo?: (cwd: string) => void
   onTogglePin?: (id: string) => void
   onSetArchived?: (id: string, archived: boolean) => void
@@ -72,8 +58,6 @@ export const SessionListItem = memo(function SessionListItem({
   onTogglePin,
   onSetArchived,
 }: SessionListItemProps) {
-  // Single selector returning a tuple — one subscription instead of four,
-  // with a field-level equality check so unrelated sessions' updates are skipped.
   const { isRunning, unread, needsInput, turnFailed } = useStoreWithEqualityFn(
     useAppStore,
     (s) => {
@@ -100,7 +84,6 @@ export const SessionListItem = memo(function SessionListItem({
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(
     null,
   )
-  /** Defer icon action Buttons until first hover/focus — sticky thereafter. */
   const [actionsReady, setActionsReady] = useState(false)
 
   const label = sessionLabel(session)
@@ -219,9 +202,6 @@ export const SessionListItem = memo(function SessionListItem({
     },
   ]
 
-  // Production Agents Web row is single-line h-8 with trailing +N −M that
-  // fades on hover (actions take its place) — not a two-line subtitle stack.
-  // Pristine drafts never show DiffStat (full-repo fallback would lie).
   const trailingDiff = sessionTrailingDiff(session, workspaceStatus, gitStatus)
   const hasTrailingDiff =
     !!trailingDiff &&
@@ -229,9 +209,7 @@ export const SessionListItem = memo(function SessionListItem({
       (trailingDiff.removed ?? 0) > 0 ||
       (trailingDiff.filesChanged ?? 0) > 0)
 
-  // Numeric unread > 0 gets the "(N) " title prefix (reference design).
   const unreadCount = typeof unread === "number" && unread > 0 ? unread : null
-  // Status-first triage: needs-input > working > failed > unread.
   const statusKind = needsInput
     ? "needs-input"
     : isRunning
@@ -287,7 +265,6 @@ export const SessionListItem = memo(function SessionListItem({
       onPointerEnter={armActions}
       onFocusCapture={armActions}
       className={cn(
-        // Production agent-sidebar-cell: h-8 px-1.5 rounded-md, quaternary hover/selected.
         "agent-row group relative",
         isActive ? "agent-row-selected" : "agent-row-hover text-ink",
         "cv-auto-meta",
@@ -296,7 +273,6 @@ export const SessionListItem = memo(function SessionListItem({
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        {/* Production status slot ~13px wide */}
         <span className="flex w-[13px] shrink-0 items-center justify-center text-icon-2">
           {statusKind === "needs-input" ? (
             <Tooltip label="Needs your input">
@@ -342,7 +318,6 @@ export const SessionListItem = memo(function SessionListItem({
             <p
               className={cn(
                 "min-w-0 flex-1 truncate text-left text-base",
-                // Room for absolute trailing actions on hover.
                 "group-hover:pr-[5.5rem] group-focus-within:pr-[5.5rem]",
                 isActive ? "text-ink" : "text-ink-secondary",
               )}
@@ -367,8 +342,6 @@ export const SessionListItem = memo(function SessionListItem({
         ) : null}
       </div>
 
-      {/* In-flow trailing slot — same cross-axis as the title (not absolute
-       * top-1/2 which floated +N−M above the baseline). Actions overlay. */}
       {!isEditing && hasTrailingDiff && trailingDiff ? (
         <DiffStat
           summary={trailingDiff}

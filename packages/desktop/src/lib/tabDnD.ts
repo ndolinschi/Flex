@@ -1,9 +1,3 @@
-/** Pointer-driven tab DnD for content panes (same pane + cross-pane).
- *
- * HTML5 Drag and Drop is unreliable in Tauri webviews (WKWebView on macOS
- * silently ignores `draggable` / dragstart; WebView2 can also intercept it).
- * Tabs use pointer events + `elementFromPoint` instead.
- */
 
 export const FLEX_TAB_DND_MIME = "application/x-flex-tab-id"
 
@@ -14,26 +8,13 @@ export type TabDragSession = {
   fromPane: 0 | 1
 }
 
-/** Live drop target while a pointer drag is past the threshold (shared across panes).
- * `null` means idle / below threshold — never publish a non-dragging stub. */
 export type TabDragUi = {
   tabId: string
   fromPane: 0 | 1
-  /** Target pane while over a valid drop zone; mirrors fromPane until then. */
   toPane: 0 | 1
-  /**
-   * Insert index in the *target* tab list after the dragged tab is removed
-   * from its source (0…length). Ignored when `overTarget` is false.
-   */
   insertAt: number
-  /** False until the pointer moves past the drag threshold. */
   dragging: boolean
-  /**
-   * True only while the pointer is over a valid drop zone (tab strip or
-   * pane body). Drop commits only when this is true — outside = no-op.
-   */
   overTarget: boolean
-  /** Pointer position for the floating drag ghost. */
   pointerX: number
   pointerY: number
 }
@@ -75,7 +56,6 @@ export const setTabDragUi = (next: TabDragUi | null): void => {
   emitUi()
 }
 
-/** True when this drag is a Flex content tab (legacy HTML5 path / types check). */
 export const isFlexTabDrag = (dt: DataTransfer): boolean => {
   if (active != null) return true
   const types = Array.from(dt.types)
@@ -101,17 +81,12 @@ export const tabDragThresholdExceeded = (
   return dx * dx + dy * dy >= DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX
 }
 
-/** True when the event target is a tab control that must not start a drag (e.g. close). */
 export const isTabNoDragTarget = (target: EventTarget | null): boolean => {
   if (typeof Element === "undefined") return false
   if (!(target instanceof Element)) return false
   return target.closest("[data-tab-no-drag]") != null
 }
 
-/**
- * Chrome-style insert index from tab geometry. Pure — used by `hitTestTabDrop`
- * and unit-tested without a DOM.
- */
 export const insertIndexAtX = (
   tabs: ReadonlyArray<{ left: number; width: number }>,
   clientX: number,
@@ -132,22 +107,9 @@ export const insertIndexAtX = (
 
 export type TabDropHit = {
   toPane: 0 | 1
-  /** Index after removing the dragged tab from the target list. */
   insertAt: number
 }
 
-/**
- * Resolve drop target under the pointer.
- * - Tab strip (`data-content-tab-strip`): precise before/after insert
- * - Pane body (`data-content-pane`): append to that pane
- * - Elsewhere: `null` (commit must no-op)
- *
- * `excludeTabId` skips the dragged tab so live preview reordering does not
- * jitter the insert index under the cursor.
- *
- * Strip geometry is cached for ~one frame so pointermove does not
- * querySelectorAll + getBoundingClientRect every event.
- */
 type StripGeometryCache = {
   strip: HTMLElement
   excludeTabId: string | undefined
@@ -201,7 +163,6 @@ const getStripGeometry = (
   return stripGeometryCache
 }
 
-/** Clear geometry cache when a drag ends (tabs may reorder). */
 export const clearTabDropGeometryCache = (): void => {
   stripGeometryCache = null
 }
@@ -219,8 +180,6 @@ export const hitTestTabDrop = (
     return hitTestStrip(strip, el, clientX, excludeTabId)
   }
 
-  // Whole workspace pane is a drop zone (append) — so dragging into the
-  // other pane's content still lands the tab there and activates it.
   const pane = el.closest("[data-content-pane]")
   if (pane instanceof HTMLElement) {
     const paneRaw = pane.getAttribute("data-content-pane")
@@ -270,11 +229,6 @@ const hitTestStrip = (
   return { toPane, insertAt: insertIndexAtX(geometry, clientX, null) }
 }
 
-/**
- * Preview order for a pane while a drag is active: the dragged tab is
- * removed from its source and inserted at `insertAt` on the target so
- * neighbors shift live on the axis (and across panes).
- */
 export const previewTabsForPane = <T extends { id: string }>(
   paneIndex: 0 | 1,
   paneTabs: T[],

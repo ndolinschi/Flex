@@ -14,7 +14,6 @@ import type { PlanEntry, SessionId } from "../../lib/types"
 import { addUsageToModelMap } from "../../lib/modelUsage"
 import { defaultContentLayout, chatTabId } from "../contentLayoutModel"
 
-/** Snapshot annotations from in-memory plans for ui.json persistence. */
 const annotationsFromPlans = (
   sessionPlansBySession: Record<SessionId, SessionPlan[]>,
   activePlanIdBySession: Record<SessionId, string | null>,
@@ -111,7 +110,6 @@ export const createSessionSlice: StateCreator<
   setActiveSessionId: (id, opts) => {
     set({ activeSessionId: id, subagentViewer: null })
     void persistUiState({ activeSessionId: id })
-    // Focusing a session clears its unread flag (design: dot disappears on view).
     if (id) {
       get().openChatTab(id)
       set((state) => {
@@ -121,9 +119,6 @@ export const createSessionSlice: StateCreator<
         return { unreadBySession: next }
       })
     }
-    // Sync content panes: open/activate this session's chat in the focused pane.
-    // `opts.panel: "closed"` collapses split on boot / New Agent and prunes
-    // sibling tool tabs so the empty agent reads as a single-tab composition.
     if (id) {
       get().openChatInPane(
         get().contentLayout.mode === "split"
@@ -136,6 +131,10 @@ export const createSessionSlice: StateCreator<
           get().collapseSplit()
         }
         get().closeOtherTabsInPane(0, chatTabId(id))
+      } else {
+        // Active (non-pristine) sessions default to Cursor Agents 3-col:
+        // sidebar | chat | work. Respect an explicit user hide.
+        get().ensureDefaultWorkPane(id)
       }
     } else {
       get().setContentLayout(defaultContentLayout(null))
@@ -149,14 +148,6 @@ export const createSessionSlice: StateCreator<
     }))
   },
   markTurnCompleted: (sessionId, turnId) => {
-    // Record completion even when the terminal event carries no turn_id
-    // (e.g. `session_error`, or an envelope whose optional `turn_id` is
-    // falsy) — a stable sentinel still marks "this session's last observed
-    // turn has ended" so `isStragglerForCompletedTurn()` can trip for any
-    // trailing delta, regardless of whether that delta happens to carry an
-    // id. Previously this bailed out on a falsy turnId, which meant
-    // completion was silently NEVER recorded for that (common) case — the
-    // root cause of the phantom "Working" row / stuck Stop button.
     const recorded = turnId || "__ended__"
     log.debug("store", "markTurnCompleted", { sessionId, turnId: recorded })
     set((state) => ({
@@ -378,9 +369,6 @@ export const createSessionSlice: StateCreator<
   setPendingPlanApproval: (approval) => {
     if (approval) {
       set({ pendingPlanApproval: approval })
-      // Only steal the right panel for the session the user is looking at —
-      // background ExitPlanMode still records pending approval; switching
-      // to that session (RightPanel rising-edge) opens Plan then.
       if (get().activeSessionId === approval.sessionId) {
         get().revealPlanPanel()
       }
@@ -391,9 +379,6 @@ export const createSessionSlice: StateCreator<
   revealPlanPanel: () => {
     const sessionId = get().activeSessionId
     if (!sessionId) return
-    // Opening the Plan surface must un-collapse the legacy right-panel
-    // chrome flag (still persisted / asserted) even though layout now
-    // lives in content panes.
     if (get().rightPanelCollapsed) {
       get().setRightPanelCollapsed(false)
     }
@@ -401,9 +386,6 @@ export const createSessionSlice: StateCreator<
   },
   setPlanEntries: (sessionId, entries) =>
     set((state) => {
-      // Never let an empty Plan tool call wipe a non-empty checklist —
-      // models sometimes emit `entries: []` at handoff and the Plan tab
-      // would lose every to-do after ExitPlanMode.
       const prev = state.plansBySession[sessionId] ?? []
       if (entries.length === 0 && prev.length > 0) return state
       return {
@@ -418,9 +400,6 @@ export const createSessionSlice: StateCreator<
       const restoredComments = restored?.commentsByPlanId[planId]
       const restoredEntries = restored?.entriesByPlanId?.[planId]
       const title = firstPlanHeading(markdown) ?? "Untitled plan"
-      // Prefer an explicit handoff snapshot, else live session checklist,
-      // else anything restored from ui.json — never clobber a prior snapshot
-      // with an empty list.
       const liveEntries = state.plansBySession[sessionId] ?? []
       const snapshotEntries =
         entries && entries.length > 0
@@ -437,7 +416,6 @@ export const createSessionSlice: StateCreator<
           ...prev,
           markdown,
           title,
-          // A rewritten plan body invalidates prior Build status.
           built: markdownChanged ? false : prev.built,
           comments:
             prev.comments.length > 0 ? prev.comments : (restoredComments ?? []),
@@ -542,8 +520,6 @@ export const createSessionSlice: StateCreator<
       }
     }),
   setPlanDoc: (sessionId, plan) => {
-    // Legacy path: if there's an active plan, update it; otherwise create a
-    // synthetic id so older callers still populate the history list.
     const state = get()
     const activeId = state.activePlanIdBySession[sessionId]
     const planId = activeId ?? `legacy-${sessionId}`
@@ -615,7 +591,6 @@ export const createSessionSlice: StateCreator<
     }),
   setRestoredPlanAnnotations: (annotations) => {
     set({ restoredPlanAnnotations: annotations })
-    // Also restore remembered active plan ids (plans themselves arrive via replay).
     set((state) => {
       const nextActive = { ...state.activePlanIdBySession }
       for (const [sessionId, ann] of Object.entries(annotations)) {

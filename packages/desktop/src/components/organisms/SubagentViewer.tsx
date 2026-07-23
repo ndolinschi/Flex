@@ -4,11 +4,6 @@ import { Button } from "@/components/ui/button"
 import { TurnTimeline } from "./TurnTimeline"
 import { useAppStore } from "../../stores/appStore"
 
-/** Bottom-anchored overlay showing a subagent's inner session feed, readable
- * while it runs (reference design: tray slides up over the dimmed
- * conversation; outside click / Esc / × closes). Subagent children are real
- * sessions, so the body is the same timeline component as the main chat —
- * replay + live subscribe come for free, just without a composer. */
 export const SubagentViewer = () => {
   const viewer = useAppStore((s) => s.subagentViewer)
   const closeSubagentViewer = useAppStore((s) => s.closeSubagentViewer)
@@ -29,7 +24,6 @@ export const SubagentViewer = () => {
 
   return (
     <>
-      {/* Dim + click-capture over the conversation behind the tray. */}
       <Button
         variant="ghost"
         aria-label="Close subagent view"

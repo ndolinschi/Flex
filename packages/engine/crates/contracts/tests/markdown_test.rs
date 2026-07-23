@@ -1,5 +1,3 @@
-//! Snapshot of the markdown projection — the one-document view of a session.
-
 mod common;
 
 use agentloop_contracts::*;

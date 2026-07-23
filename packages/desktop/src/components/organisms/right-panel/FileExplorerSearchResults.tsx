@@ -61,7 +61,6 @@ export const FileExplorerSearchResults = ({
               onContextMenu={(e) => onContextMenu(e, hit)}
               title={hit.path}
               className={cn(
-                // Same cell recipe as TreeBranch / FileRow (h-7, r6, pad 8).
                 "h-7 w-full justify-start gap-1.5 rounded-sm px-2 text-sm font-normal leading-[1.5]",
                 "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                 "hover:bg-fill-4",

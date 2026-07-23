@@ -2,8 +2,6 @@ import { Switch as SwitchPrimitive } from "@base-ui/react/switch"
 
 import { cn } from "@/lib/utils"
 
-/** Settings binary control — ON track is green (`--color-switch-on`), not
- * primary/accent. Sizes match the former Toggle atom (30×18 / 24×14). */
 function Switch({
   className,
   size = "default",

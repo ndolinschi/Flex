@@ -1,5 +1,3 @@
-//! Bridged MCP tools exposed through the native [`Tool`] trait.
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -10,7 +8,6 @@ use agentloop_core::{Tool, ToolContext, ToolDescriptor, ToolError};
 use crate::bridge::{McpBridgeError, McpToolCall, McpToolClient, McpToolRef};
 use crate::config::McpServerConfig;
 
-/// One MCP remote tool registered in the native tool registry.
 pub struct McpBridgedTool {
     descriptor: ToolDescriptor,
     client: Arc<dyn McpToolClient>,
@@ -90,7 +87,6 @@ fn map_bridge_error(err: McpBridgeError) -> ToolError {
     }
 }
 
-/// Parse a bridged tool name back into server + remote tool identifiers.
 pub fn parse_bridge_tool_name(
     servers: &[McpServerConfig],
     bridged_name: &str,

@@ -1,5 +1,3 @@
-//! The ToolCall status machine, pinned as a full transition matrix.
-
 mod common;
 
 use agentloop_contracts::{PermissionRequestId, ToolCallStatus};

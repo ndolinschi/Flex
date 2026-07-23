@@ -1,5 +1,3 @@
-//! One model iteration orchestrator.
-
 use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
@@ -15,7 +13,6 @@ use super::super::IterationOutcome;
 use super::finish::finish_iteration;
 use super::stream::{StreamResult, stream_model_response};
 
-/// One model call plus its tool executions.
 #[allow(clippy::too_many_arguments)]
 pub(in crate::turn) async fn run_iteration(
     deps: &Arc<TurnDeps>,
@@ -31,7 +28,6 @@ pub(in crate::turn) async fn run_iteration(
     num_tool_calls: &mut u32,
     last_model: &mut Option<String>,
 ) -> Result<IterationOutcome, AgentError> {
-    // Check for a routing override written by `SetRouting` earlier this turn.
     let routing_ov = deps.routing.get(&handle.id);
 
     let primary = routing_ov
@@ -59,7 +55,6 @@ pub(in crate::turn) async fn run_iteration(
         }
     }
 
-    // Build effective opts: apply routing override for effort if present.
     let effective_opts_storage;
     let opts = match routing_ov.as_ref().and_then(|ov| ov.effort) {
         Some(override_effort) => {

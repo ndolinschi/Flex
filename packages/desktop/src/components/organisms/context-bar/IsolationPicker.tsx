@@ -40,33 +40,12 @@ const policyLabel = (policy: IsolationPolicy | null | undefined): string => {
   return ISOLATION_OPTIONS.find((o) => o.value === value)!.label
 }
 
-/**
- * Draft-only picker: chooses the isolation for the NEXT session this draft
- * turns into. Isolation is fixed at `create_session` time — there's no
- * `update_session` patch for it (see `commands.rs::UpdateSessionInput`) — so
- * this can't reconfigure the current draft in place. Instead the picker
- * writes a store preference (`selectedIsolation`) that `newAgentCreateInput`
- * / `ProjectPicker`'s create-session path read when they next call
- * `create_session`.
- *
- * The isolated worktree itself is *provisioned on the first prompt*, not at
- * create time — see engine `workspace_ensure`. That deferral is what makes
- * the sibling reuse dropdown meaningful: when isolation is chosen but no
- * turn has run yet, the user can still point the next session at an
- * existing worktree (`selectedReuseWorkspaceId`) instead of spawning a new
- * one. Once the draft has taken its first turn the choice is locked in —
- * the picker turns into a plain read-only indicator here, and once the
- * session IS isolated `IsolationBadge` above takes over as the one true
- * indicator (this component doesn't render for isolated sessions).
- */
 export const IsolationPicker = ({
   sessionId,
   projectCwd,
   disabled,
 }: {
   sessionId: string
-  /** Base project directory to list reusable workspaces from. Omit to hide
-   * the reuse picker. */
   projectCwd?: string
   disabled?: boolean
 }) => {
@@ -78,19 +57,12 @@ export const IsolationPicker = ({
   const setSelectedReuseWorkspaceId = useAppStore(
     (s) => s.setSelectedReuseWorkspaceId,
   )
-  // Both selectors must run unconditionally on every render — `||` short-
-  // circuits, so inlining a second `useAppStore` call on its right-hand side
-  // would skip that hook call whenever the first is truthy, changing the
-  // number of hooks called between renders ("Rendered fewer hooks than
-  // expected"). Read both values first, then combine.
   const hasTurnUsage = !!useAppStore((s) => s.lastTurnUsage[sessionId])
   const logRowCount = useAppStore(
     (s) => s.sessionLogRows[sessionId]?.length ?? 0,
   )
   const hasTurns = hasTurnUsage || logRowCount > 0
 
-  // Prefer this session's recorded policy so switching tabs does not show
-  // the global draft preference (selectedIsolation) belonging to another agent.
   const { data: sessions } = useQuery({
     queryKey: SESSIONS_KEY,
     queryFn: listSessions,
@@ -100,8 +72,6 @@ export const IsolationPicker = ({
 
   const draftPolicy: IsolationPolicy =
     selectedIsolation === "required" ? "required" : "never"
-  // Locked sessions: show what *this* session was created with. Drafts still
-  // edit the global preference used on the next create_session.
   const current: IsolationPolicy = hasTurns
     ? sessionPolicy === "required"
       ? "required"
@@ -109,8 +79,6 @@ export const IsolationPicker = ({
     : draftPolicy
   const currentLabel = policyLabel(current)
 
-  // Only enumerate worktrees when the picker is actually going to show a
-  // reuse dropdown — no wasted `git worktree list` on non-isolated drafts.
   const shouldListWorkspaces =
     !hasTurns && current === "required" && !!projectCwd
   const { data: workspaces = [] } = useQuery<WorkspaceInfo[]>({
@@ -120,13 +88,10 @@ export const IsolationPicker = ({
     staleTime: 10_000,
   })
 
-  // Once the draft has had a turn, the choice that produced this session is
-  // final — show a static label instead of an editable picker so it's clear
-  // selecting no longer does anything.
   if (hasTurns) {
     return (
       <span
-        className="ml-1 flex h-6 items-center gap-1 rounded-md px-1.5 text-sm text-ink-muted opacity-60"
+        className="ml-1 flex h-5 items-center gap-1 rounded-md px-1.5 text-sm text-ink-muted opacity-60"
         title="Isolation is fixed for this session"
       >
         <GitFork className="size-3 shrink-0" aria-hidden />
@@ -146,8 +111,6 @@ export const IsolationPicker = ({
         onValueChange={(v) => {
           if (v == null) return
           setSelectedIsolation(v as IsolationPolicy)
-          // Switching away from isolation clears the reuse hint so it
-          // doesn't linger and reappear if isolation is toggled back on.
           if (v === "never") setSelectedReuseWorkspaceId(null)
         }}
       >

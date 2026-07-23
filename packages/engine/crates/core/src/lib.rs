@@ -1,13 +1,3 @@
-//! Core traits and registries — the contracts every implementation crate
-//! programs against.
-//!
-//! Depends only on `agentloop-contracts` plus async plumbing (tokio sync
-//! primitives, futures, async-trait). No I/O lives here: providers own HTTP,
-//! delegators own processes, stores own files. This crate defines *what* an
-//! [`Agent`], [`Provider`], [`Tool`], [`SessionStore`], and [`Hook`] are, and
-//! the shared machinery (event sinks, pending request maps, metric recording)
-//! their implementations compose.
-
 pub mod agent;
 pub mod event_sink;
 pub mod executor;
@@ -44,5 +34,4 @@ pub use tool::{
 };
 pub use workspace::{Workspace, WorkspaceError, WorkspaceStatus, Workspaces};
 
-/// Re-export of the contracts crate for convenience.
 pub use agentloop_contracts as contracts;

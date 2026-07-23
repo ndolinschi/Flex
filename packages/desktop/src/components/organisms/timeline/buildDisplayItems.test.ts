@@ -11,13 +11,6 @@ import {
 } from "./buildDisplayItems"
 import type { TimelineRow, ToolCall, TurnSummary } from "../../../lib/types"
 
-/**
- * Regression coverage for `buildDisplayItems` — the second twice-regressed
- * timeline bug. Fixtures mirror historical preview-session event sequences:
- * a turn with mid-turn tool calls and interleaved narration, both completed
- * and still-streaming.
- */
-
 let callSeq = 0
 let rowSeq = 0
 
@@ -81,7 +74,6 @@ const turnCompleted = (turnId: string, tsMs: number, summary?: TurnSummary): Tim
   tsMs,
 })
 
-/** Manual WorkGroupItem fixtures for helpers that take `DisplayItem[]`. */
 const groupItem = (
   partial: Pick<DisplayItem & { kind: "group" }, "id" | "isOpen" | "rows"> &
     Partial<Extract<DisplayItem, { kind: "group" }>>,
@@ -128,7 +120,6 @@ describe("buildDisplayItems", () => {
 
     const items = buildDisplayItems(rows, false)
 
-    // user row, one work group, one final answer row.
     expect(items).toHaveLength(3)
     expect(items[0]).toMatchObject({ kind: "row", row: { type: "user" } })
 
@@ -136,9 +127,6 @@ describe("buildDisplayItems", () => {
     expect(group.kind).toBe("group")
     if (group.kind !== "group") throw new Error("expected group")
     expect(group.isOpen).toBe(false)
-    // Group contains everything except the trailing final answer, in
-    // original arrival order — narration stays IN POSITION between the
-    // read cluster and the edit cluster.
     expect(group.rows.map((r) => (r.type === "tool" ? r.call.tool_name : r.type))).toEqual([
       "Bash",
       "Read",
@@ -149,9 +137,7 @@ describe("buildDisplayItems", () => {
       "Bash",
     ])
     expect(group.rows[3]).toBe(narration)
-    // No footer on the group since the final answer row carries it.
     expect(group.footer).toBeUndefined()
-    // Precomputed collapsed props (Wave 4) — avoid rescanning in the virtualizer.
     expect(group.resumeLine).toBe("Edited 2 files · Explored 2 files · Ran 2 commands")
     expect(group.hasLiveThinking).toBe(false)
     expect(group.verdict).toBeUndefined()
@@ -163,7 +149,6 @@ describe("buildDisplayItems", () => {
     expect(answerItem.footer).toBeDefined()
     expect(answerItem.footer?.durationMs).toBe(1000)
 
-    // Resume line aggregates by kind across the whole group.
     const resume = resumeLineForRows(group.rows)
     expect(resume).toBe("Edited 2 files · Explored 2 files · Ran 2 commands")
   })
@@ -181,8 +166,6 @@ describe("buildDisplayItems", () => {
       toolRow(read2),
       narration,
       toolRow(edit1),
-      // Turn has NOT completed yet — still streaming, no trailing assistant
-      // answer after the last tool call.
     ]
 
     const items = buildDisplayItems(rows, true)
@@ -193,10 +176,7 @@ describe("buildDisplayItems", () => {
     const group = items[1]
     expect(group.kind).toBe("group")
     if (group.kind !== "group") throw new Error("expected group")
-    // Stays open while streaming.
     expect(group.isOpen).toBe(true)
-    // Narration is NOT floated out below the group — it's inside, in
-    // position, even though the group hasn't settled.
     expect(group.rows).toHaveLength(4)
     expect(group.rows.map((r) => (r.type === "tool" ? r.call.tool_name : r.type))).toEqual([
       "Read",
@@ -205,9 +185,7 @@ describe("buildDisplayItems", () => {
       "Edit",
     ])
     expect(group.rows[2]).toBe(narration)
-    // No separate row item for the narration anywhere in `items`.
     expect(items.some((i) => i.kind === "row" && i.row === narration)).toBe(false)
-    // An open group never carries a footer.
     expect(group.footer).toBeUndefined()
     expect(group.resumeLine).toBeNull()
     expect(group.hasLiveThinking).toBe(false)
@@ -224,7 +202,6 @@ describe("buildDisplayItems", () => {
 
     const items = buildDisplayItems(rows, false)
 
-    // Only the user row and the final answer row — no group item at all.
     expect(items).toHaveLength(2)
     expect(items.some((i) => i.kind === "group")).toBe(false)
     expect(items[1]).toMatchObject({ kind: "row", row: { type: "assistant" } })
@@ -245,22 +222,6 @@ describe("buildDisplayItems", () => {
     expect(items[0]).toMatchObject({ kind: "row", row: { type: "user" } })
   })
 
-  /**
-   * Regression coverage for the "two stacked Working rows" bug (see
-   * HANDOFF-OPUS.md / live QA BUG 2). `WorkGroup` itself always rendered its
-   * OWN duplicate — a static "Working" in the header plus a shimmering
-   * "Working" as the last row of the body, simultaneously, any time a group
-   * was open (fixed in WorkGroup.tsx, not covered here). The other half of
-   * the bug lived in `lastItemIsOpenWorkGroup`: TurnTimeline's bottom-of-feed
-   * backstop is supposed to suppress itself whenever the trailing item is an
-   * open WorkGroup (which already shows its own cue) — but a still-open
-   * group's trailing LIVE narration gets pulled OUT of the group as its own
-   * `tail` row (see `flush`), so the group is no longer literally the LAST
-   * display item. The old `lastItemIsOpenWorkGroup(lastItem)` signature only
-   * ever checked that one trailing item, missed this case entirely, and let
-   * the backstop reappear — a THIRD "Working" indicator alongside the open
-   * group's own two. These lock the corrected array-aware signature.
-   */
   describe("lastItemIsOpenWorkGroup", () => {
     it("is true when the trailing item is the open group itself (no trailing narration yet)", () => {
       const rows: TimelineRow[] = [
@@ -278,20 +239,14 @@ describe("buildDisplayItems", () => {
         userRow("Run the test suite."),
         turnStarted("turn-1"),
         toolRow(readCall("test.js")),
-        // Live trailing assistant narration, nothing after it yet — `flush`
-        // floats this out as its own `tail` row even though the group above
-        // it is still open (isStreaming = true).
         assistantRow("Good — the project uses plain CommonJS, so I can fix both files."),
       ]
       const items = buildDisplayItems(rows, true)
 
-      // Sanity: the narration DID get split into its own trailing row item,
-      // sitting right after the (still open) group — this is the exact
-      // shape that used to fool the old single-item check.
       const last = items[items.length - 1]
       expect(last).toMatchObject({ kind: "row", row: { type: "assistant" } })
       if (last.kind !== "row") throw new Error("expected row")
-      expect(last.footer).toBeUndefined() // live row — never gets a footer
+      expect(last.footer).toBeUndefined()
       const prev = items[items.length - 2]
       expect(prev).toMatchObject({ kind: "group", isOpen: true })
 
@@ -311,10 +266,8 @@ describe("buildDisplayItems", () => {
       const last = items[items.length - 1]
       expect(last).toMatchObject({ kind: "row", row: { type: "assistant" } })
       if (last.kind !== "row") throw new Error("expected row")
-      expect(last.footer).toBeDefined() // settled — footer IS attached
+      expect(last.footer).toBeDefined()
 
-      // A settled trailing answer must NOT suppress the backstop check as an
-      // "open group" case — there's no live turn to show a cue for.
       expect(lastItemIsOpenWorkGroup(items)).toBe(false)
     })
 
@@ -334,8 +287,6 @@ describe("buildDisplayItems", () => {
         isOpen: true,
         rows: [],
       })
-      // Settled answer from another turn with a footer — lastItemIsOpenWorkGroup
-      // treats footer as "not live narration", so trailing-only check is false.
       const settledAnswer: DisplayItem = {
         kind: "row",
         row: {
@@ -398,8 +349,6 @@ describe("shouldSkipCv", () => {
   })
 
   it("always skips content-visibility on virtualized timeline rows", () => {
-    // Virtualization already unmounts off-screen rows; cv on the mounted
-    // overscan window races with WebView2 measurement during scroll.
     expect(shouldSkipCv(settledUser, false)).toBe(true)
     expect(shouldSkipCv(settledUser, true)).toBe(true)
     expect(shouldSkipCv(closedGroup, false)).toBe(true)
@@ -452,7 +401,6 @@ describe("estimateSizeForItem", () => {
         tsMs: 0,
       },
     }
-    // ThinkingBlock mounts collapsed — must not reserve hundreds of px.
     expect(estimateSizeForItem(longThinking, true)).toBeLessThanOrEqual(32)
   })
 
@@ -504,7 +452,6 @@ describe("estimateSizeForItem", () => {
     expect(estimateSizeForItem(closed, true)).toBe(32)
     const openPx = estimateSizeForItem(open, true)
     expect(openPx).toBeGreaterThan(estimateSizeForItem(closed, true))
-    // Long thinking must not dominate — collapsed ~24px, not full text.
     expect(openPx).toBeLessThan(900)
   })
 })

@@ -9,11 +9,6 @@ import { CreateMcpServerForm } from "./CreateMcpServerForm"
 import { McpServerRow } from "./McpServerRow"
 import { EMPTY_MCP_SERVERS, MCP_SERVERS_KEY } from "./mcpServersKey"
 
-/** MCP (Model Context Protocol) server management — stdio servers whose
- * tools get bridged into the tool registry on the next service rebuild.
- * Structured like AutomationsPage (list + inline add-form + per-row
- * delete-confirm) rather than the fixed plugin-toggle catalog above, since
- * servers are user-added CRUD entries with distinct identities. */
 export const McpServersSection = () => {
   const [creating, setCreating] = useState(false)
   const queryClient = useQueryClient()

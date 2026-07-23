@@ -26,10 +26,7 @@ import { Label } from "@/components/ui/label"
 type ModelMultiSelectProps = {
   id: string
   label?: string
-  /** All models eligible to be added (already excludes anything provider-
-   * inappropriate the caller wants to filter out). */
   models: ModelInfoDto[]
-  /** Ordered `provider/model` ids — order is the failover chain. */
   value: string[]
   onChange: (value: string[]) => void
   isLoading?: boolean
@@ -38,9 +35,6 @@ type ModelMultiSelectProps = {
   builtinProviders?: BuiltinProvider[]
 }
 
-/** Ordered multi-select for the fallback model chain: removable, reorderable
- * chips + an "Add fallback" button that opens the same grouped/searchable
- * picker surface as `ModelSelect`. */
 export const ModelMultiSelect = ({
   id,
   label = "Fallback models",

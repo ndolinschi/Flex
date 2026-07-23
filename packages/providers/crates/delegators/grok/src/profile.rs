@@ -1,5 +1,3 @@
-//! Grok as a [`DelegatorProfile`] over the shared line-oriented runtime.
-
 use std::sync::Arc;
 
 use agentloop_contracts::{
@@ -17,7 +15,6 @@ use crate::GROK_AGENT_ID;
 use crate::config::GrokConfig;
 use crate::mapper::GrokLineMapper;
 
-/// Grok Build's identity, capabilities, and launch shape.
 pub struct GrokRuntimeProfile {
     pub config: GrokConfig,
 }
@@ -43,8 +40,7 @@ impl DelegatorProfile for GrokRuntimeProfile {
                 tool_scoping: false,
             },
             reasoning_visible: false,
-            // streaming-json is structured, but the one-shot host maps it
-            // post-hoc, so clients see a snapshot replay, not live deltas.
+
             streaming: StreamingGranularity::SnapshotOnly,
             resume: ResumeSupport::Replay,
             attachments: AttachmentCaps {
@@ -77,10 +73,8 @@ impl DelegatorProfile for GrokRuntimeProfile {
     }
 }
 
-/// The Grok delegator agent.
 pub type GrokAgent<H = TokioCommandHost> = LineDelegatorAgent<GrokRuntimeProfile, H>;
 
-/// Build a Grok agent with the real process host.
 pub fn grok_agent(config: GrokConfig, store: Arc<dyn SessionStore>) -> GrokAgent {
     LineDelegatorAgent::new(
         GrokRuntimeProfile { config },
@@ -89,12 +83,10 @@ pub fn grok_agent(config: GrokConfig, store: Arc<dyn SessionStore>) -> GrokAgent
     )
 }
 
-/// Build a Grok agent with an ephemeral in-memory store (probing, doctor).
 pub fn ephemeral_grok_agent(config: GrokConfig) -> GrokAgent {
     grok_agent(config, Arc::new(MemoryStore::new()))
 }
 
-/// Build a Grok agent over a custom [`ProcessHost`] (tests).
 pub fn grok_agent_with_host<H: ProcessHost + 'static>(
     config: GrokConfig,
     store: Arc<dyn SessionStore>,
@@ -157,7 +149,6 @@ mod tests {
 
     #[tokio::test]
     async fn streaming_json_output_becomes_assistant_message() {
-        // UNVERIFIED doc-shaped frames (see mapper.rs).
         let host = Arc::new(ScriptedHost {
             stdout_lines: vec![
                 r#"{"type":"status","message":"Thinking..."}"#.to_owned(),

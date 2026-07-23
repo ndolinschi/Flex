@@ -4,9 +4,8 @@ use agentloop_delegator_common::{DelegatorProcessSpec, DelegatorRunRequest};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromptTransport {
-    /// Pass the prompt as the final process argument.
     Argument,
-    /// Write the prompt to stdin.
+
     Stdin,
 }
 

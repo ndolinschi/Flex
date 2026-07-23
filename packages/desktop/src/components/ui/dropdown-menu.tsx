@@ -4,27 +4,12 @@ import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 import { cn } from "@/lib/utils"
 import { ChevronRightIcon, CheckIcon } from "lucide-react"
 
-/**
- * Flex maps Tailwind `accent` to the product brand color (near-white on dark).
- * shadcn menu hover expects a whisper fill — use `fill-4` / `ink` instead of
- * `bg-accent` / `text-accent-foreground` or hover is white-on-white.
- *
- * Base UI highlights via `data-highlighted` (mouse + keyboard); also keep
- * `focus:` for when the item receives DOM focus.
- */
 const itemHighlight =
   "data-highlighted:bg-fill-4 data-highlighted:text-ink focus:bg-fill-4 focus:text-ink"
 
 const itemHighlightDescendants =
   "data-highlighted:[&_svg:not([class*='text-'])]:text-ink focus:[&_svg:not([class*='text-'])]:text-ink"
 
-/**
- * Default `modal={false}`: Base UI's modal menus scroll-lock the document
- * (hide the scrollbar), which shifts layout width and races the composer
- * textarea + timeline ResizeObservers — surfacing as
- * "ResizeObserver loop completed with undelivered notifications" on open
- * (e.g. the composer + button). Pass `modal` to opt back in.
- */
 function DropdownMenu({
   modal = false,
   ...props

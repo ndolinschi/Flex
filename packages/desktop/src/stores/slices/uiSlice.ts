@@ -33,7 +33,6 @@ const syncAccentToDom = (state: {
   applyAccentToDom(state.accentId, state.accentCustomHex, state.theme)
 }
 
-/** Apply the custom theme tokens for the current mode, or clear if factory. */
 const syncCustomThemeToDom = (
   activeThemeId: string,
   customThemes: ThemeSpec[],
@@ -81,8 +80,6 @@ export const createUiSlice: StateCreator<
   customThemes: [],
   setRoute: (route) =>
     set((state) => {
-      // Automations UI is feature-flagged off by default — treat the legacy
-      // route as Settings so stale shortcuts / deep-links don't blank out.
       const effectiveRoute =
         route === "automations" && !AUTOMATIONS_UI_ENABLED ? "settings" : route
 
@@ -100,13 +97,7 @@ export const createUiSlice: StateCreator<
 
       return {
         route: effectiveRoute,
-        // Navigating away from chat leaves the panel with nothing sensible to
-        // anchor to — close it rather than let it linger off-screen.
         subagentViewer: effectiveRoute === "chat" ? state.subagentViewer : null,
-        // Legacy dedicated routes (settings/customize/automations/memory) now
-        // all mount the same SettingsShell — preselect the nav section that
-        // corresponds to whichever shortcut was clicked, so e.g. the sidebar's
-        // "Memory" button still lands the user on the Memory section.
         settingsSection,
       }
     }),
@@ -187,7 +178,6 @@ export const createUiSlice: StateCreator<
       const pinnedSessionIds = isPinned
         ? state.pinnedSessionIds.filter((sid) => sid !== id)
         : [...state.pinnedSessionIds, id]
-      // Pinning unarchives (mutually exclusive with archive).
       const archivedSessionIds = isPinned
         ? state.archivedSessionIds
         : state.archivedSessionIds.filter((sid) => sid !== id)
@@ -201,7 +191,6 @@ export const createUiSlice: StateCreator<
           ? state.archivedSessionIds
           : [...state.archivedSessionIds, id]
         : state.archivedSessionIds.filter((sid) => sid !== id)
-      // Archiving unpins (mutually exclusive with pin).
       const pinnedSessionIds = archived
         ? state.pinnedSessionIds.filter((sid) => sid !== id)
         : state.pinnedSessionIds
@@ -221,7 +210,6 @@ export const createUiSlice: StateCreator<
   openChatTab: (id) =>
     set((state) => {
       if (state.openChatSessionIds.includes(id)) return state
-      // Cap so a long day of switching does not grow an endless strip.
       const openChatSessionIds = [...state.openChatSessionIds, id].slice(-20)
       void persistUiState({ openChatSessionIds })
       return { openChatSessionIds }
@@ -237,7 +225,6 @@ export const createUiSlice: StateCreator<
     void persistUiState({ openChatSessionIds })
     set({ openChatSessionIds })
     if (state.activeSessionId !== id) return state.activeSessionId
-    // Prefer the tab to the right, else the one to the left.
     return openChatSessionIds[idx] ?? openChatSessionIds[idx - 1] ?? null
   },
   setOpenChatSessionIds: (ids) => {
@@ -281,7 +268,6 @@ export const createUiSlice: StateCreator<
       void persistUiState({ customThemes: next })
       return { customThemes: next }
     })
-    // Re-apply if this theme is currently active.
     const { activeThemeId, theme } = get()
     if (activeThemeId === spec.id) {
       syncCustomThemeToDom(spec.id, get().customThemes, theme)

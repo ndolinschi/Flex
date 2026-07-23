@@ -47,15 +47,12 @@ const VISIBILITY_OPTIONS: Array<{
   },
 ]
 
-/** Shared quiet chrome for Repositories header icons (filter + folder-plus). */
 export const reposHeaderIconClass = cn(
   "size-6 shrink-0 rounded-md text-icon-2 opacity-50",
   "hover:bg-fill-4 hover:text-icon-1 hover:opacity-80",
   "transition-[opacity,background-color,color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
 )
 
-/** Quiet filter control for the Repositories label row — sort + visibility.
- * Stays open after a pick so both dimensions can be set in one pass. */
 export const SidebarProjectFilter = ({
   sort,
   visibility,
@@ -82,7 +79,6 @@ export const SidebarProjectFilter = ({
             title="Filter projects"
             className={cn(
               reposHeaderIconClass,
-              // Always-visible ghost (Cursor Agents) — stronger when open/filtered.
               (isFiltered || open) && "opacity-100",
               open && "bg-fill-2 text-icon-1",
               isFiltered && !open && "text-ink",

@@ -3,9 +3,6 @@ import { defineConfig, devices } from "@playwright/test"
 const port = Number(process.env.E2E_PORT ?? 1420)
 const baseURL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${port}`
 
-/**
- * PR-gate E2E: Vite preview asserts the native-app-required gate (no mock IPC).
- */
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,

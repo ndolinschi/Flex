@@ -83,7 +83,6 @@ export type BrowserToolbarProps = {
   toggleDesignMode: () => void | Promise<void>
 }
 
-/** Browser chrome: nav buttons, omnibar, viewport presets, overflow menu. */
 export const BrowserToolbar = ({
   toolbarRef,
   browserUrl,

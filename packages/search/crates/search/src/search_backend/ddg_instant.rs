@@ -1,16 +1,9 @@
-//! DuckDuckGo Instant Answer JSON API — no scrape, no API key.
-
 use async_trait::async_trait;
 use reqwest::Client;
 
 use super::ddg_instant_parse::{DdgIaResponse, ddg_ia_results};
 use super::{SearchBackend, SearchError, SearchResult, http_client, map_status_error};
 
-/// DuckDuckGo Instant Answer JSON API — no scrape, no API key.
-///
-/// `https://api.duckduckgo.com/?q=…&format=json` returns abstracts, related
-/// topics, and official-site links. It is far more reliable from datacenter
-/// IPs than the HTML endpoint (which is usually blocked / 400 / captcha).
 pub struct DuckDuckGoInstantBackend {
     client: Client,
 }

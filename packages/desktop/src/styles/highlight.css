@@ -1,23 +1,19 @@
-/* Theme-aware highlight.js tokens — we never ship a hardcoded dark
-   code-block background baked into the syntax theme; the surface color
-   comes from our own code-block chrome (see MarkdownBody's `pre`/`code`
-   tokens). This file only supplies token *foreground* colors per theme. */
 
 :root,
 [data-theme="dark"] {
-  --hljs-keyword: #ff9b6a; /* orange */
-  --hljs-string: #7fd97a; /* green */
-  --hljs-comment: rgb(250 250 250 / 0.4); /* ink-muted */
-  --hljs-number: #7dcfff; /* cyan */
-  --hljs-title: #6b9eff; /* blue */
+  --hljs-keyword: #ff9b6a;
+  --hljs-string: #7fd97a;
+  --hljs-comment: rgb(250 250 250 / 0.4);
+  --hljs-number: #7dcfff;
+  --hljs-title: #6b9eff;
   --hljs-function: #6b9eff;
-  --hljs-attr: #e6b450; /* yellow */
+  --hljs-attr: #e6b450;
   --hljs-built_in: #7dcfff;
-  --hljs-literal: #c3a6e0; /* magenta */
+  --hljs-literal: #c3a6e0;
   --hljs-type: #c3a6e0;
-  --hljs-params: rgb(250 250 250 / 0.92); /* ink */
+  --hljs-params: rgb(250 250 250 / 0.92);
   --hljs-meta: rgb(250 250 250 / 0.4);
-  --hljs-tag: #f07178; /* red */
+  --hljs-tag: #f07178;
   --hljs-symbol: #e6b450;
   --hljs-addition-bg: #7fd97a33;
   --hljs-addition-fg: #7fd97a;
@@ -26,19 +22,19 @@
 }
 
 [data-theme="light"] {
-  --hljs-keyword: #b86f55; /* orange */
-  --hljs-string: #1a7f4b; /* green */
-  --hljs-comment: rgb(20 20 20 / 0.48); /* ink-muted */
-  --hljs-number: #3d7a96; /* cyan */
-  --hljs-title: #2f6fed; /* blue */
+  --hljs-keyword: #b86f55;
+  --hljs-string: #1a7f4b;
+  --hljs-comment: rgb(20 20 20 / 0.48);
+  --hljs-number: #3d7a96;
+  --hljs-title: #2f6fed;
   --hljs-function: #2f6fed;
-  --hljs-attr: #9a6700; /* yellow */
+  --hljs-attr: #9a6700;
   --hljs-built_in: #3d7a96;
-  --hljs-literal: #8f6b8a; /* magenta */
+  --hljs-literal: #8f6b8a;
   --hljs-type: #8f6b8a;
-  --hljs-params: rgb(20 20 20 / 0.94); /* ink */
+  --hljs-params: rgb(20 20 20 / 0.94);
   --hljs-meta: rgb(20 20 20 / 0.48);
-  --hljs-tag: #d94a5b; /* red */
+  --hljs-tag: #d94a5b;
   --hljs-symbol: #9a6700;
   --hljs-addition-bg: #1a7f4b33;
   --hljs-addition-fg: #1a7f4b;
@@ -46,8 +42,6 @@
   --hljs-deletion-fg: #d94a5b;
 }
 
-/* No background here — the code-block surface comes from MarkdownBody's
-   `pre`/`code` tokens (bg-panel / bg-code-inline). */
 .hljs {
   color: inherit;
   background: transparent;

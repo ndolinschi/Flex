@@ -1,7 +1,3 @@
-//! Every event variant must survive a JSON round-trip unchanged, and the
-//! wire shape of the full log is pinned by a snapshot — a churn in that
-//! snapshot is a visible, reviewable protocol change.
-
 mod common;
 
 use agentloop_contracts::*;

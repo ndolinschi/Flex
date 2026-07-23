@@ -33,7 +33,6 @@ pub struct McpRemoteTool {
     pub name: String,
     pub description: String,
     pub input_schema: serde_json::Value,
-    /// Conservative until a server declares a stronger capability.
     #[serde(default)]
     pub read_only: bool,
 }
@@ -113,7 +112,6 @@ pub trait McpToolClient: Send + Sync {
         cancel: CancellationToken,
     ) -> Result<ToolOutput, McpBridgeError>;
 
-    /// Close live server connections. Default is a no-op for mock clients.
     async fn shutdown(&self) {}
 }
 

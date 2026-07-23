@@ -1,11 +1,3 @@
-//! Agent-implementation resolution — the composition-root half of "which
-//! agent serves this run".
-//!
-//! Precedence: explicit `--agent` > explicit `--provider` > auto-detect
-//! (provider API keys in the environment → native loop; otherwise a probed,
-//! installed external CLI → delegator). Every decision is recorded in a
-//! human-readable trace so `doctor` and logs can explain the outcome.
-
 use std::path::Path;
 use std::sync::Arc;
 
@@ -31,7 +23,6 @@ use agentloop_session::MemoryStore;
 
 use agentloop_sdk::AgentBuilder;
 
-/// A resolved service plus the trace of how it was chosen.
 pub(crate) struct Resolution {
     pub(crate) service: EngineService,
     pub(crate) trace: Vec<String>,
@@ -159,9 +150,6 @@ fn native_service(
         builder = builder.model(model);
     }
     if !fallback_models.is_empty() {
-        // A fallback entry naming a provider other than --provider needs
-        // that provider registered too, or resolution just fails with "no
-        // provider registered" the first time the chain advances to it.
         if fallback_models
             .iter()
             .any(|candidate| crosses_provider(provider, candidate))
@@ -176,10 +164,6 @@ fn native_service(
     builder.build()
 }
 
-/// Whether a `provider/model`-qualified fallback entry names a different
-/// provider than the one explicitly selected (or the auto-detected default
-/// when none was). An unqualified entry inherits whatever provider resolves
-/// the primary model, so it never crosses.
 fn crosses_provider(selected_provider: Option<&str>, candidate: &str) -> bool {
     let Some((candidate_provider, _)) = candidate.split_once('/') else {
         return false;
@@ -257,8 +241,7 @@ async fn acp_service(
 ) -> anyhow::Result<EngineService> {
     let (program, args) = split_agent_cmd(program);
     let mut env = std::collections::BTreeMap::new();
-    // Forward common API-key auth into the ACP child (inherits parent env too;
-    // explicit map makes doctor/trace intent clear for headless CI).
+
     for key in [
         "XAI_API_KEY",
         "CURSOR_API_KEY",
@@ -290,16 +273,12 @@ async fn acp_service(
     Ok(EngineService::new(agent, store))
 }
 
-/// Split `--agent-cmd` into program + args on whitespace.
-/// Example: `"grok agent stdio"` → (`grok`, [`agent`, `stdio`]).
 fn split_agent_cmd(raw: &str) -> (String, Vec<String>) {
     let mut parts = raw.split_whitespace().map(str::to_owned);
     let program = parts.next().unwrap_or_default();
     (program, parts.collect())
 }
 
-/// Grok Build via headless streaming-json (`grok -p --output-format streaming-json`).
-/// ACP remains available as `--agent acp --agent-cmd "grok agent stdio"`.
 async fn grok_service(
     workdir: Option<&Path>,
     trace: &mut Vec<String>,
@@ -378,9 +357,7 @@ async fn cursor_service(
         cwd: workdir.map(|p| p.to_path_buf()),
         ..CursorCliConfig::default()
     };
-    // Cursor headless auth: Dashboard API key via CURSOR_API_KEY (or --api-key).
-    // Inherit already works; we also inject into the process spec env map and
-    // surface it in the resolution trace so doctor/logs explain the path.
+
     if let Ok(api_key) = std::env::var("CURSOR_API_KEY") {
         let trimmed = api_key.trim();
         if !trimmed.is_empty() {
@@ -459,7 +436,6 @@ fn today() -> String {
     format!("{year:04}-{month:02}-{:02}", remaining + 1)
 }
 
-/// The `doctor` subcommand: explain what the resolver would do and why.
 pub(crate) async fn doctor(workdir: &Path) -> anyhow::Result<()> {
     let workdir = Some(workdir);
     println!("environment:");
@@ -625,8 +601,6 @@ mod tests {
 
     #[test]
     fn qualified_fallback_with_no_explicit_provider_crosses() {
-        // We don't know what auto-detect will pick, so err on the side of
-        // registering every available provider.
         assert!(crosses_provider(None, "openai/gpt-5"));
     }
 

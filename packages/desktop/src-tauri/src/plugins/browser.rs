@@ -1,4 +1,3 @@
-//! `BrowserPlugin` — drive the embedded Browser panel as agent tools.
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};

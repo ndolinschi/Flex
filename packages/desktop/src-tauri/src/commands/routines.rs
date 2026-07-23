@@ -1,14 +1,6 @@
-//! Routines (automations) CRUD, run, history, and cron loop.
 
 use super::common::require_service;
 use super::prelude::*;
-
-// ---------------------------------------------------------------------------
-// Routines (automations): saved goal configurations run by a cron schedule or
-// webhook trigger instead of a human sending a prompt. See
-// `agentloop_channel::routine` for the underlying contracts and
-// `agentloop_sdk::routines` for the file store + runner.
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -237,9 +229,6 @@ pub async fn routines_history(id: String) -> DesktopResult<Vec<RoutineRunRecordD
     Ok(records)
 }
 
-/// (Re)spawn the routines cron-poll loop against the current engine service.
-/// Cancels any previously running loop first — called after the engine is
-/// (re)built (`save_provider_config`, and once at startup if configured).
 pub async fn respawn_cron_loop(state: &AppState) {
     if let Some(token) = state.routine_cancel.lock().await.take() {
         token.cancel();

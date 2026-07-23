@@ -57,7 +57,6 @@ type CommandPaletteProps = {
   onClose: () => void
 }
 
-/** Centered top overlay (VS Code-style) — fuzzy command + session switcher. */
 export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
   const [query, setQuery] = useState("")
 
@@ -234,7 +233,6 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
         }),
       ),
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [sessions, tabCatalog],
   )
 

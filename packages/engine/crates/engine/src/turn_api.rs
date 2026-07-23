@@ -1,6 +1,3 @@
-//! Turn-facing API: hello, prompt, compact, cancel, permissions, questions,
-//! and mode-switch replies.
-
 use agentloop_contracts::{
     Answer, CompactionSummary, Hello, ModeSwitchId, PermissionDecision, PermissionMode,
     PermissionRequestId, PromptInput, QuestionId, SessionId, TurnOptions, TurnSummary,
@@ -32,7 +29,6 @@ impl EngineService {
         Ok(self.agent.prompt(session, input, opts).await?)
     }
 
-    /// Summarize conversation history and record a compaction boundary.
     pub async fn compact(
         &self,
         session: &SessionId,
@@ -44,7 +40,6 @@ impl EngineService {
     pub async fn cancel(&self, session: &SessionId) -> EngineResult<()> {
         Ok(self.agent.cancel(session).await?)
     }
-    /// Push a permission-mode change into an in-flight native turn.
     pub fn set_turn_permission_mode(
         &self,
         session: &SessionId,
@@ -71,11 +66,6 @@ impl EngineService {
         Ok(self.agent.respond_question(session, id, answers).await?)
     }
 
-    /// Resolve a pending `ModeSwitchProposed` event.
-    ///
-    /// `allow = true` applies the switch; `allow = false` vetoes it.
-    /// Returns an error when `enable_switch_mode` is false (the `SwitchMode`
-    /// tool is not registered) or no proposal with `id` is pending.
     pub async fn respond_mode_switch(
         &self,
         session: &SessionId,

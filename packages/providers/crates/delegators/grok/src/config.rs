@@ -11,7 +11,6 @@ use agentloop_delegator_common::{DelegatorProcessSpec, DelegatorRunRequest};
 
 use crate::GROK_AGENT_ID;
 
-/// Launch config for the official Grok Build CLI headless mode.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct GrokConfig {
     pub program: String,
@@ -21,7 +20,7 @@ pub struct GrokConfig {
     pub base_args: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub probe_args: Vec<String>,
-    /// Optional xAI API key (also read from `XAI_API_KEY`).
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,
 }
@@ -31,10 +30,7 @@ impl Default for GrokConfig {
         Self {
             program: "grok".to_owned(),
             cwd: None,
-            // `-p <prompt>` is appended by [`Self::prompt_request`].
-            // `--always-approve` keeps headless runs non-interactive;
-            // `--no-auto-update` skips background update checks in CI/scripts
-            // (see https://docs.x.ai/build/cli/headless-scripting).
+
             base_args: vec![
                 "--output-format".to_owned(),
                 "streaming-json".to_owned(),
@@ -61,12 +57,10 @@ impl GrokConfig {
         ))
     }
 
-    /// The prompt is the value of `-p` / `--single` (last base arg).
     pub fn prompt_request(&self, prompt: impl Into<String>) -> DelegatorRunRequest {
         DelegatorRunRequest::new(self.process_spec().arg(prompt.into()))
     }
 
-    /// Attach an xAI API key for headless auth (`XAI_API_KEY`).
     pub fn with_api_key(mut self, api_key: impl Into<String>) -> Self {
         self.api_key = Some(api_key.into());
         self

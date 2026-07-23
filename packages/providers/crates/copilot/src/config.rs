@@ -1,6 +1,3 @@
-//! Copilot configuration: GitHub token discovery, persistence, and endpoint
-//! defaults.
-
 use std::path::{Path, PathBuf};
 
 use agentloop_contracts::ProviderId;
@@ -9,19 +6,16 @@ use agentloop_core::ProviderError;
 use crate::device_flow::COPILOT_DEVICE_CLIENT_ID;
 
 pub const COPILOT_PROVIDER_ID: &str = "copilot";
-/// Multiplier-free default available on every Copilot plan.
+
 pub const DEFAULT_COPILOT_MODEL: &str = "gpt-4.1";
 pub const DEFAULT_COPILOT_TOKEN_URL: &str = "https://api.github.com/copilot_internal/v2/token";
-/// Used when the token exchange doesn't name an API endpoint.
+
 pub const FALLBACK_COPILOT_API_BASE: &str = "https://api.githubcopilot.com";
 
-/// Environment variables holding a GitHub OAuth token with Copilot access,
-/// checked in order.
 const TOKEN_ENV_VARS: [&str; 2] = ["COPILOT_GITHUB_TOKEN", "GH_COPILOT_TOKEN"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CopilotConfig {
-    /// Long-lived GitHub OAuth token (`gho_…`/`ghu_…`) with Copilot access.
     pub github_token: String,
     pub default_model: String,
     pub token_url: String,
@@ -29,8 +23,6 @@ pub struct CopilotConfig {
 }
 
 impl CopilotConfig {
-    /// Resolve from the environment: explicit token env vars first, then an
-    /// existing editor/CLI sign-in on disk.
     pub fn from_env() -> Result<Self, ProviderError> {
         let token = TOKEN_ENV_VARS
             .iter()
@@ -63,8 +55,6 @@ impl CopilotConfig {
         }
     }
 
-    /// Whether credentials are discoverable without constructing a provider —
-    /// used by resolvers to decide if Copilot participates in auto-detection.
     pub fn discoverable() -> bool {
         TOKEN_ENV_VARS
             .iter()
@@ -75,8 +65,6 @@ impl CopilotConfig {
     }
 }
 
-/// `~/.config/github-copilot` (honoring `XDG_CONFIG_HOME`) — where VS Code,
-/// JetBrains, and the Copilot CLI store their sign-in.
 pub(crate) fn default_config_dir() -> Option<PathBuf> {
     if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
         if !xdg.trim().is_empty() {
@@ -89,9 +77,6 @@ pub(crate) fn default_config_dir() -> Option<PathBuf> {
         .map(|home| PathBuf::from(home).join(".config").join("github-copilot"))
 }
 
-/// Find an `oauth_token` in `apps.json` (current format: one entry per GitHub
-/// app, keyed like `"github.com:Iv1.…"`) or `hosts.json` (older format,
-/// keyed by host).
 pub(crate) fn discover_github_token(dir: &Path) -> Option<String> {
     for file in ["apps.json", "hosts.json"] {
         let Ok(raw) = std::fs::read_to_string(dir.join(file)) else {
@@ -120,10 +105,6 @@ pub(crate) fn discover_github_token(dir: &Path) -> Option<String> {
     None
 }
 
-/// Persist a GitHub OAuth token where every Copilot client looks for it:
-/// `apps.json` under `~/.config/github-copilot` (honoring `XDG_CONFIG_HOME`),
-/// keyed by the GitHub app id. Entries written by other clients are
-/// preserved. Returns the path of the file written.
 pub fn store_github_token(token: &str) -> Result<PathBuf, ProviderError> {
     let Some(dir) = default_config_dir() else {
         return Err(ProviderError::AuthMissing {

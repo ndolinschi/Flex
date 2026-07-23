@@ -1,26 +1,15 @@
-//! SearXNG — opt-in via `SEARXNG_BASE_URL`.
-
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::Deserialize;
 
 use super::{SearchBackend, SearchError, SearchResult, http_client, map_status_error, urlencoding};
 
-/// A SearXNG backend that queries a public or self-hosted instance.
-///
-/// Queries the instance at the configured base URL using the JSON API
-/// (`/search?format=json&q=...`). Public instances are frequently rate-limited;
-/// set `SEARXNG_BASE_URL` to your own instance when you need this hop.
 pub struct SearxNGBackend {
     client: Client,
     base_url: String,
 }
 
 impl SearxNGBackend {
-    /// Create a backend that queries the given SearXNG instance.
-    ///
-    /// The `base_url` should be the root of the instance (e.g.
-    /// `https://searx.example.com`).
     pub fn new(base_url: String) -> Self {
         Self {
             client: http_client(),
@@ -29,7 +18,6 @@ impl SearxNGBackend {
     }
 }
 
-/// Minimal SearXNG JSON response for parsing.
 #[derive(Debug, Deserialize)]
 struct SearxNGResponse {
     results: Vec<SearxNGResult>,

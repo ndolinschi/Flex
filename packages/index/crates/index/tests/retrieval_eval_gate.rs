@@ -1,8 +1,3 @@
-//! CI gate: hybrid retrieval recall@10 ≥ 0.8 on the offline golden set.
-//!
-//! Uses [`agentloop_index::eval`] with [`MockEmbedder`] overrides — no
-//! network, no API keys, no live LLM.
-
 use agentloop_index::eval::{
     RECALL_THRESHOLD, materialize_golden_fixture, open_golden_store, run_hybrid_retrieval_eval,
 };

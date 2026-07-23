@@ -1,10 +1,3 @@
-//! Parsing of the Bedrock control-plane model catalog responses.
-//!
-//! `ListFoundationModels` gives directly-invokable on-demand models;
-//! `ListInferenceProfiles` gives the cross-region profile ids (`us.…`, `eu.…`)
-//! that newer models require. Both are filtered to usable, text-capable,
-//! streaming entries and mapped onto [`ModelInfo`].
-
 use agentloop_contracts::ModelInfo;
 use serde::Deserialize;
 
@@ -34,12 +27,11 @@ struct FoundationModelSummary {
 struct InferenceProfilesResponse {
     #[serde(default, rename = "inferenceProfileSummaries")]
     summaries: Vec<InferenceProfileSummary>,
-    /// Continuation token when the account has more profiles than one page.
+
     #[serde(default, rename = "nextToken")]
     next_token: Option<String>,
 }
 
-/// One page of parsed inference profiles plus the continuation token, if any.
 pub(crate) struct InferenceProfilePage {
     pub models: Vec<ModelInfo>,
     pub next_token: Option<String>,
@@ -55,8 +47,6 @@ struct InferenceProfileSummary {
     status: Option<String>,
 }
 
-/// Parse `ListFoundationModels`, keeping text-output, streaming, on-demand
-/// models (the ones a bare `modelId` can invoke via Converse-stream).
 pub(crate) fn parse_foundation_models(body: &str) -> Result<Vec<ModelInfo>, serde_json::Error> {
     let parsed: FoundationModelsResponse = serde_json::from_str(body)?;
     let models = parsed
@@ -78,9 +68,6 @@ pub(crate) fn parse_foundation_models(body: &str) -> Result<Vec<ModelInfo>, serd
     Ok(models)
 }
 
-/// Parse one page of `ListInferenceProfiles`, keeping the ACTIVE profiles
-/// (directly invokable cross-region ids) and returning the continuation token
-/// so the caller can fetch the rest.
 pub(crate) fn parse_inference_profiles_page(
     body: &str,
 ) -> Result<InferenceProfilePage, serde_json::Error> {
@@ -108,15 +95,11 @@ pub(crate) fn parse_inference_profiles_page(
     })
 }
 
-/// Parse `ListInferenceProfiles`, keeping the ACTIVE profiles from a single
-/// page (ignoring any continuation token).
 #[cfg(test)]
 pub(crate) fn parse_inference_profiles(body: &str) -> Result<Vec<ModelInfo>, serde_json::Error> {
     Ok(parse_inference_profiles_page(body)?.models)
 }
 
-/// Merge model lists, de-duplicating by id (first occurrence wins), preserving
-/// order. Used to combine foundation models with inference profiles.
 pub(crate) fn merge_dedup(lists: impl IntoIterator<Item = Vec<ModelInfo>>) -> Vec<ModelInfo> {
     let mut seen = std::collections::BTreeSet::new();
     let mut out = Vec::new();
@@ -136,9 +119,6 @@ fn contains_ci(haystack: &[String], needle: &str) -> bool {
         .any(|item| item.eq_ignore_ascii_case(needle))
 }
 
-/// Known context-window sizes by model-id family. Bedrock's list endpoints
-/// don't report this, so we infer it from the id; unknown families fall back
-/// to `None` (the frontend then assumes a conservative default).
 fn context_window_for(id: &str) -> Option<u32> {
     let id = id.to_ascii_lowercase();
     if id.contains("anthropic.claude") {

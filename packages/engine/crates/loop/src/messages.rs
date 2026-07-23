@@ -1,18 +1,8 @@
-//! Rebuild provider messages from a materialized transcript.
-//!
-//! The transcript folds tool results into `ToolCall` records; providers need
-//! the classic shape back — `ToolUse` blocks in assistant messages and
-//! `ToolResult` blocks in a following user message. This is the inverse of the
-//! reducer's folding, applied to the compaction-aware context view.
-
 use agentloop_contracts::{BlobSource, ContentBlock, Message, Role, Transcript, TranscriptBlock};
 use base64::Engine as _;
 
 use crate::tool_results::output_or_synthetic;
 
-/// Media types whose payloads should be inlined as markdown for the model
-/// rather than left as opaque `File` placeholders (providers only render a
-/// `[file: …, base64 data]` stub for those).
 fn is_text_media_type(media_type: &str) -> bool {
     let mt = media_type.trim().to_ascii_lowercase();
     let base = mt.split(';').next().unwrap_or(mt.as_str()).trim();
@@ -32,7 +22,6 @@ fn is_text_media_type(media_type: &str) -> bool {
         )
 }
 
-/// Fence language hint from a filename extension (best-effort).
 fn fence_lang(name: &str) -> &'static str {
     let ext = std::path::Path::new(name)
         .extension()
@@ -63,8 +52,6 @@ fn fence_lang(name: &str) -> &'static str {
     }
 }
 
-/// Expand a text-ish `File` blob into fenced markdown the model can read.
-/// Returns `None` for binary / undecodable payloads (caller keeps `File`).
 fn expand_text_file(name: &str, media_type: &str, data: &BlobSource) -> Option<ContentBlock> {
     if !is_text_media_type(media_type) {
         return None;
@@ -80,7 +67,6 @@ fn expand_text_file(name: &str, media_type: &str, data: &BlobSource) -> Option<C
     )))
 }
 
-/// Build the provider-facing message list for the next model call.
 pub fn transcript_to_messages(transcript: &Transcript) -> Vec<Message> {
     let (compaction, items) = transcript.context_view();
     let mut messages = Vec::with_capacity(items.len() + 1);

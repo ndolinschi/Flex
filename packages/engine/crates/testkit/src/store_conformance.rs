@@ -1,16 +1,3 @@
-//! Reusable conformance checks every [`SessionStore`] implementation must
-//! satisfy. Each `MemoryStore`/`JsonlStore`-style crate calls
-//! [`assert_store_conformance`] against its own type in its own tests, so a
-//! new implementation gets these invariants for free.
-//!
-//! Replay-after-reopen (durable stores only) is not covered here — it has no
-//! generic shape across in-memory and file-backed stores — and stays a
-//! dedicated test in the store's own crate.
-//!
-//! Returns `Result` rather than panicking directly (no `unwrap`/`expect`
-//! outside test code, per the workspace's library-crate rule); the calling
-//! `#[cfg(test)]` site unwraps.
-
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -48,8 +35,6 @@ fn turn_event(turn: &str) -> AgentEvent {
     }
 }
 
-/// Runs the full conformance suite against a fresh store. Each check opens
-/// its own session (unique id) so checks never interfere with each other.
 pub async fn assert_store_conformance<S>(store: S) -> Result<(), StoreError>
 where
     S: SessionStore + 'static,
@@ -85,17 +70,12 @@ async fn assert_gapless_seq_on_append(store: &Arc<dyn SessionStore>) -> Result<(
     Ok(())
 }
 
-/// Every appended event round-trips a real (non-zero) `ts_ms`, and events
-/// appended at distinct times keep distinct, non-decreasing timestamps. This
-/// is the store-level guarantee replay relies on to never collapse historical
-/// times to "now".
 async fn assert_append_roundtrips_monotonic_ts(
     store: &Arc<dyn SessionStore>,
 ) -> Result<(), StoreError> {
     let id = SessionId::from("conformance-ts");
     store.create(meta(id.as_str())).await?;
     store.append(&id, &[turn_event("t0")]).await?;
-    // A real wall-clock gap so the second append cannot share the first's ms.
     std::thread::sleep(std::time::Duration::from_millis(2));
     store.append(&id, &[turn_event("t1")]).await?;
 

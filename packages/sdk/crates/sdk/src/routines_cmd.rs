@@ -1,8 +1,3 @@
-//! `routines` subcommand and the `flex serve --enable-routines` webhook
-//! route. Kept separate from `routines.rs` (the runner/store logic, which
-//! doesn't know about the CLI or HTTP) — this module is the composition of
-//! that logic into `flex`'s actual entry points.
-
 use std::sync::Arc;
 
 use anyhow::{Context, bail};
@@ -19,7 +14,6 @@ pub(crate) fn usage() -> &'static str {
      webhook-triggered ones."
 }
 
-/// `flex routines <list|run|remove> [id]`.
 pub(crate) async fn routines_cmd(args: &[String]) -> anyhow::Result<()> {
     let Some(store) = FileRoutineStore::with_default_dir() else {
         bail!("could not resolve a home directory for the routines store");

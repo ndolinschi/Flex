@@ -1,14 +1,3 @@
-// Auto-update helpers (tauri-plugin-updater).
-//
-// Wired for the GitHub Releases channel (`latest.json` at the repo's latest
-// release). Signing requires `TAURI_SIGNING_PRIVATE_KEY` in CI (see
-// `.github/workflows/release.yml`); Apple notarization is still blocked on
-// Developer certs (phase 2.2). Until a signed release exists the endpoint
-// 404s and `checkForAppUpdate` returns `{ status: "unavailable" }` — that is
-// expected, not an error.
-//
-// Browser preview / Vite-only runs never load the native plugin — every
-// helper short-circuits to a safe stub.
 import { isBrowserPreview } from "./browserPreview"
 import { log } from "./debug/log"
 
@@ -27,8 +16,6 @@ const isTauriRuntime = (): boolean => {
   }
 }
 
-/** Poll the configured updater endpoint. Never throws — callers surface
- * `status`/`reason` in Settings or a toast. */
 export const checkForAppUpdate = async (): Promise<UpdateCheckResult> => {
   if (!isTauriRuntime()) {
     return {
@@ -53,9 +40,6 @@ export const checkForAppUpdate = async (): Promise<UpdateCheckResult> => {
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    // Missing latest.json / network / unsigned channel — common until the
-    // first signed release lands. Treat as "unavailable" so Settings stays
-    // calm rather than red.
     const soft =
       /404|not found|failed to fetch|error sending request|signature|pubkey|endpoint|valid release json|release json/i.test(
         message,
@@ -72,8 +56,6 @@ export const checkForAppUpdate = async (): Promise<UpdateCheckResult> => {
   }
 }
 
-/** Download + install an available update, then relaunch. Returns false when
- * nothing was installed (already current / plugin unavailable). */
 export const installAppUpdateAndRelaunch = async (): Promise<boolean> => {
   if (!isTauriRuntime()) return false
 

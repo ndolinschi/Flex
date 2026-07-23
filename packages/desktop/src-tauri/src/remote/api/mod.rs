@@ -1,4 +1,3 @@
-//! Desktop Remote Access HTTP `/v1` API (axum).
 
 mod dto;
 mod openapi;

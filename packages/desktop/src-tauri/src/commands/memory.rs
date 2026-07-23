@@ -1,33 +1,13 @@
-//! Global and project memory notes + user identity.
 
 use super::prelude::*;
-
-// ---------------------------------------------------------------------------
-// Memory: durable notes the `learning` plugin's `MemoryWrite` tool persists as
-// `<name>.md` files under `~/.config/agentloop/memory` (loaded into every
-// future session's system prompt — see `agentloop_prompts::load_memory_section`).
-// The SDK/engine expose no list/read/delete API (`MemoryWrite` is write-only —
-// see `agentloop_learning::MemoryWriteTool`), so these commands operate
-// directly on the flat `<name>.md` file layout, which is stable and owned by
-// this crate alone (`default_memory_dir` just joins path segments; no format
-// to get out of sync with).
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoryEntryDto {
-    /// The note's name (file stem), e.g. `user-preferences`.
     pub id: String,
-    /// First non-empty line of the note, used as a title in the list view.
     pub title: String,
-    /// Full markdown body. `None` in `memory_list` (call `memory_get` to fetch it).
     pub content: Option<String>,
-    /// Milliseconds since epoch, from the file's last-modified time.
     pub updated_at_ms: Option<u64>,
-    /// Milliseconds since epoch when this entry expires and is purged.
-    /// `None` = long-term / never expires. Sourced from the sidecar
-    /// `expiry.json` file in the same directory (see the "Memory expiry"
-    /// section below) — never from the `.md` file itself.
     pub expires_at_ms: Option<u64>,
 }
 
@@ -77,17 +57,6 @@ pub(crate) fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-// ---------------------------------------------------------------------------
-// Memory expiry: short-term memories carry a TTL; long-term ones never
-// expire. The engine's prompt loader (`agentloop_prompts::load_memory_section`)
-// reads the raw `.md` file body verbatim into the system prompt, so any
-// frontmatter/marker written into the file itself would leak straight into
-// the model's context. To keep the `.md` files byte-for-byte "just the note"
-// (untouched by this feature), expiry lives in a sidecar `expiry.json` file
-// in the same directory, mapping `<entry id>` -> `<unix ms expiry>`. Entries
-// absent from the map never expire.
-// ---------------------------------------------------------------------------
-
 const EXPIRY_SIDECAR_FILE: &str = "expiry.json";
 
 type ExpiryMap = std::collections::BTreeMap<String, u64>;
@@ -96,10 +65,6 @@ pub(crate) fn expiry_sidecar_path(dir: &std::path::Path) -> PathBuf {
     dir.join(EXPIRY_SIDECAR_FILE)
 }
 
-/// Read a directory's `expiry.json`. Missing file or unparseable content is
-/// treated as "no entries have an expiry" rather than an error — expiry is a
-/// best-effort convenience layer, never something that should break listing
-/// or deleting memories.
 pub(crate) fn read_expiry_map(dir: &std::path::Path) -> ExpiryMap {
     let path = expiry_sidecar_path(dir);
     let Ok(raw) = std::fs::read_to_string(&path) else {
@@ -111,8 +76,6 @@ pub(crate) fn read_expiry_map(dir: &std::path::Path) -> ExpiryMap {
 pub(crate) fn write_expiry_map(dir: &std::path::Path, map: &ExpiryMap) -> DesktopResult<()> {
     let path = expiry_sidecar_path(dir);
     if map.is_empty() {
-        // Nothing left to track — remove the sidecar rather than leave an
-        // empty `{}` file around.
         match std::fs::remove_file(&path) {
             Ok(()) => return Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
@@ -130,9 +93,6 @@ pub(crate) fn write_expiry_map(dir: &std::path::Path, map: &ExpiryMap) -> Deskto
         .map_err(|e| DesktopError::Message(format!("cannot write `{}`: {e}", path.display())))
 }
 
-/// Set (or clear, when `expires_at_ms` is `None`) one entry's expiry in
-/// `dir`'s `expiry.json`. Shared by both the global and per-project
-/// `*_set_expiry` commands below.
 pub(crate) fn set_expiry_in_dir(
     dir: &std::path::Path,
     id: &str,
@@ -150,12 +110,6 @@ pub(crate) fn set_expiry_in_dir(
     write_expiry_map(dir, &map)
 }
 
-/// Delete every `.md` file in `dir` whose `expiry.json` entry is in the past,
-/// dropping its expiry entry too. Called at the top of every `*_list` command
-/// (self-cleaning listing) and from `prompt()` before assembling the
-/// per-turn system prompt, so expired memories never reach the model even if
-/// the Memory page was never opened. Best-effort: I/O errors are swallowed —
-/// a purge failure must not block listing or prompting.
 pub(crate) fn purge_expired_memories(dir: &std::path::Path) {
     let mut map = read_expiry_map(dir);
     if map.is_empty() {
@@ -178,8 +132,6 @@ pub(crate) fn purge_expired_memories(dir: &std::path::Path) {
     let _ = write_expiry_map(dir, &map);
 }
 
-/// List memory notes (title + metadata, no content — call `memory_get` for
-/// the body). Sorted by most-recently-modified first.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn memory_list() -> DesktopResult<Vec<MemoryEntryDto>> {
@@ -220,7 +172,6 @@ pub async fn memory_list() -> DesktopResult<Vec<MemoryEntryDto>> {
     Ok(out)
 }
 
-/// Read one memory note's full content.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn memory_get(id: String) -> DesktopResult<MemoryEntryDto> {
@@ -248,10 +199,6 @@ pub async fn memory_get(id: String) -> DesktopResult<MemoryEntryDto> {
     })
 }
 
-/// Delete a memory note. There is no engine/SDK API for this — `MemoryWrite`
-/// is write-only — so this removes the `<name>.md` file directly; safe
-/// because the on-disk layout is exactly one file per note with no index to
-/// keep in sync. Also drops any `expiry.json` entry for the id.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn memory_remove(id: String) -> DesktopResult<()> {
@@ -270,8 +217,6 @@ pub async fn memory_remove(id: String) -> DesktopResult<()> {
     set_expiry_in_dir(&dir, id, None)
 }
 
-/// Set (or clear) a global memory entry's expiry. `expires_at_ms: None`
-/// removes it from `expiry.json`, i.e. the entry never expires (long-term).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn memory_set_expiry(id: String, expires_at_ms: Option<u64>) -> DesktopResult<()> {
@@ -279,21 +224,6 @@ pub async fn memory_set_expiry(id: String, expires_at_ms: Option<u64>) -> Deskto
     let dir = memory_dir()?;
     set_expiry_in_dir(&dir, id, expires_at_ms)
 }
-
-// ---------------------------------------------------------------------------
-// Project memory: the same durable-notes mechanism as the global memory
-// section above, scoped to one project instead of the user's home directory.
-// Backing dir is `<cwd>/.agent/memory` (flat `<name>.md` layout, same shape
-// as `default_memory_dir`). `cwd` is caller-supplied (the frontend has no
-// other way to name "this project"), so it is canonicalized and required to
-// be an existing directory before use, closing off path traversal.
-//
-// Reads only: writes still go to the global memory dir only (`MemoryWrite`
-// has no per-project mode), so a note captured mid-session lands in
-// `~/.config/agentloop/memory` even when working in a project — promoting a
-// note to project scope is a manual file move for now. See `prompt()` below
-// for how this is loaded into the system prompt alongside `cwd_notice`.
-// ---------------------------------------------------------------------------
 
 pub(crate) fn project_memory_dir(cwd: &str) -> DesktopResult<PathBuf> {
     let trimmed = cwd.trim();
@@ -312,9 +242,6 @@ pub(crate) fn project_memory_dir(cwd: &str) -> DesktopResult<PathBuf> {
     Ok(canonical.join(".agent").join("memory"))
 }
 
-/// List a project's memory notes (title + metadata, no content — call
-/// `project_memory_get` for the body). Sorted by most-recently-modified
-/// first. Mirrors `memory_list` exactly but reads from `<cwd>/.agent/memory`.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn project_memory_list(cwd: String) -> DesktopResult<Vec<MemoryEntryDto>> {
@@ -355,7 +282,6 @@ pub async fn project_memory_list(cwd: String) -> DesktopResult<Vec<MemoryEntryDt
     Ok(out)
 }
 
-/// Read one project memory note's full content.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn project_memory_get(cwd: String, id: String) -> DesktopResult<MemoryEntryDto> {
@@ -383,9 +309,6 @@ pub async fn project_memory_get(cwd: String, id: String) -> DesktopResult<Memory
     })
 }
 
-/// Delete a project memory note. Same rationale as `memory_remove`: no
-/// engine/SDK API for this, so it removes the `<name>.md` file directly.
-/// Also drops any `expiry.json` entry for the id.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn project_memory_remove(cwd: String, id: String) -> DesktopResult<()> {
@@ -404,8 +327,6 @@ pub async fn project_memory_remove(cwd: String, id: String) -> DesktopResult<()>
     set_expiry_in_dir(&dir, id, None)
 }
 
-/// Set (or clear) a project memory entry's expiry — same semantics as
-/// `memory_set_expiry` but scoped to `<cwd>/.agent/memory`.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn project_memory_set_expiry(
@@ -418,19 +339,12 @@ pub async fn project_memory_set_expiry(
     set_expiry_in_dir(&dir, id, expires_at_ms)
 }
 
-// ---------------------------------------------------------------------------
-// User identity: best-effort local display name for the sidebar footer.
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserIdentityDto {
     pub name: String,
 }
 
-/// Best-effort local display name for the sidebar footer: `git config
-/// user.name` (run without a `cwd` so it reads the global config), falling
-/// back to the `USER` env var, then a static "User" placeholder. Never fails.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn user_identity(_state: State<'_, AppState>) -> DesktopResult<UserIdentityDto> {

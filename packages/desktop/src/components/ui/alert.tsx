@@ -3,10 +3,6 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
-/**
- * shadcn Alert — Flex density (`rounded-md`) and destructive tinted with
- * product danger tokens via `--destructive` bridge.
- */
 const alertVariants = cva(
   "group/alert relative grid w-full gap-0.5 rounded-md border px-2.5 py-2 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-10 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
   {
@@ -14,7 +10,6 @@ const alertVariants = cva(
       variant: {
         default: "border-border bg-card text-card-foreground",
         destructive:
-          // Whisper danger — product tokens, not a solid red slab (ErrorBanner canon).
           "border-danger/15 bg-danger-subtle/70 text-danger *:data-[slot=alert-description]:text-danger/90 *:[svg]:text-danger",
         warning:
           "border-warning/15 bg-warning-subtle/70 text-warning *:data-[slot=alert-description]:text-warning/90 *:[svg]:text-warning",

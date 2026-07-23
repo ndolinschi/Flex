@@ -1,5 +1,3 @@
-//! DuckDuckGo HTML result-page parsing helpers.
-
 use super::SearchResult;
 
 pub(crate) fn looks_like_ddg_block_page(html: &str) -> bool {
@@ -10,12 +8,6 @@ pub(crate) fn looks_like_ddg_block_page(html: &str) -> bool {
         || (!lower.contains("result__body") && lower.contains("challenge"))
 }
 
-/// Parse DuckDuckGo HTML results page into `SearchResult` items.
-///
-/// Result blocks are delimited by `class="result__body"`. Within each block:
-/// - Title and URL come from `<a class="result__a" href="URL">TITLE</a>`
-/// - Snippet comes from `<a class="result__snippet">...</a>` or
-///   `<td class="result-snippet">...</td>`
 pub(crate) fn parse_duckduckgo_html(html: &str) -> Vec<SearchResult> {
     let mut results = Vec::new();
     let marker = "result__body";
@@ -50,7 +42,6 @@ pub(crate) fn parse_duckduckgo_html(html: &str) -> Vec<SearchResult> {
     results
 }
 
-/// Extract title and URL from a `<a class="result__a" href="URL">TITLE</a>` tag.
 fn extract_result_link(html: &str) -> Option<(String, String)> {
     let link_marker = "class=\"result__a\"";
     let pos = html.find(link_marker)?;
@@ -75,7 +66,6 @@ fn extract_result_link(html: &str) -> Option<(String, String)> {
     Some((title, url))
 }
 
-/// Extract the snippet text from a result block.
 fn extract_snippet(html: &str) -> Option<String> {
     if let Some(snippet) = extract_tag_content(html, "class=\"result__snippet\"") {
         return Some(snippet);
@@ -86,7 +76,6 @@ fn extract_snippet(html: &str) -> Option<String> {
     None
 }
 
-/// Extract the text content after a marker attribute until the next `<`.
 fn extract_tag_content(html: &str, marker: &str) -> Option<String> {
     let pos = html.find(marker)?;
     let after_marker = &html[pos + marker.len()..];
@@ -104,7 +93,6 @@ fn extract_tag_content(html: &str, marker: &str) -> Option<String> {
     Some(cleaned)
 }
 
-/// Decode common HTML entities in a string.
 fn html_entity_decode(s: &str) -> String {
     s.replace("&amp;", "&")
         .replace("&lt;", "<")
@@ -115,7 +103,6 @@ fn html_entity_decode(s: &str) -> String {
         .replace("&apos;", "'")
 }
 
-/// Strip HTML tags from a string (naive: removes anything between `<` and `>`).
 fn strip_html_tags(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut in_tag = false;
@@ -130,7 +117,6 @@ fn strip_html_tags(s: &str) -> String {
     html_entity_decode(&out)
 }
 
-/// DuckDuckGo ad results have URLs that start with the ad-redirect domain.
 fn is_ad_result(url: &str) -> bool {
     url.contains("duckduckgo.com/y.js") || url.contains("duckduckgo.com/ac.js")
 }

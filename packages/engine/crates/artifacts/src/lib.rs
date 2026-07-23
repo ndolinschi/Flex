@@ -1,16 +1,3 @@
-//! Office document artifacts plugin.
-//!
-//! Provides three tools:
-//! - **`CreateDocument`** — writes a Word document (`.docx`) via `docx-rs`.
-//! - **`CreateSpreadsheet`** — writes an Excel spreadsheet (`.xlsx`) via
-//!   `rust_xlsxwriter`.
-//! - **`CreatePresentation`** — writes a PowerPoint presentation (`.pptx`) as
-//!   a minimal OOXML ZIP archive (no external PPTX library).
-//!
-//! Enable at the composition root with
-//! `AgentBuilder::enable_plugin("artifacts")` (SDK feature `artifacts`).
-//! Zero footprint when disabled.
-
 pub mod error;
 pub mod kind;
 pub mod mcp;
@@ -37,13 +24,6 @@ use tools::document::CreateDocumentTool;
 use tools::presentation::CreatePresentationTool;
 use tools::spreadsheet::CreateSpreadsheetTool;
 
-/// Plugin that registers `CreateDocument`, `CreateSpreadsheet`, and
-/// `CreatePresentation` tools plus a system-prompt fragment teaching the model
-/// when and how to use them.
-///
-/// Construct with [`ArtifactsPlugin::default`] for the standard backends, or
-/// with [`ArtifactsPlugin::with_backends`] to inject custom or mock
-/// implementations (useful in tests and MCP bridges).
 pub struct ArtifactsPlugin {
     word: Arc<dyn OfficeArtifact>,
     sheet: Arc<dyn OfficeArtifact>,
@@ -51,12 +31,6 @@ pub struct ArtifactsPlugin {
 }
 
 impl ArtifactsPlugin {
-    /// Create the plugin with explicitly supplied backends.
-    ///
-    /// The three `Arc<dyn OfficeArtifact>` arguments must correspond to
-    /// `ArtifactKind::Document`, `ArtifactKind::Spreadsheet`, and
-    /// `ArtifactKind::Presentation` respectively; the plugin does not enforce
-    /// this but the registered tool descriptors will be misleading otherwise.
     pub fn with_backends(
         word: Arc<dyn OfficeArtifact>,
         sheet: Arc<dyn OfficeArtifact>,

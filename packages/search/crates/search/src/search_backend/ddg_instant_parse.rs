@@ -1,5 +1,3 @@
-//! DuckDuckGo Instant Answer JSON response parsing.
-
 use serde::Deserialize;
 
 use super::SearchResult;
@@ -93,8 +91,7 @@ fn push_ddg_link(out: &mut Vec<SearchResult>, url: &str, text: &str) {
     if url.is_empty() || text.is_empty() {
         return;
     }
-    // Instant Answer related topics often point at DDG category pages that
-    // are useless to scrape — keep external / wikipedia-style destinations.
+
     if url.contains("duckduckgo.com/c/") || url.contains("duckduckgo.com/?") {
         return;
     }

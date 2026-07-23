@@ -1,5 +1,3 @@
-//! `Plan`: update the agent-visible working plan.
-
 use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -12,11 +10,9 @@ use crate::fs::schema_of;
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct PlanInput {
-    /// The full current plan; callers should include every visible item.
     entries: Vec<PlanEntry>,
 }
 
-/// Emits a canonical `PlanUpdated` event.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PlanTool;
 

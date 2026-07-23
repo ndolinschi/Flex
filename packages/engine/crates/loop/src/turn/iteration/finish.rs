@@ -1,5 +1,3 @@
-//! Materialize the assistant message and run tools / stop hooks.
-
 use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
@@ -53,11 +51,6 @@ pub(super) async fn finish_iteration(
 
     let message_id = draft.message_id.clone();
     let model_name = draft.model.clone();
-    // Attribution note: a turn's `usage_total` is a single running sum across
-    // every model call in the turn, not split per-model (see `TurnDeps` /
-    // `usage_total` above). When a turn fails over between models, cost is
-    // approximated by pricing the *whole* accumulated usage at the last
-    // (most current) model's rate rather than splitting per call.
     if let Some(name) = &model_name {
         *last_model = Some(name.clone());
     }
@@ -145,15 +138,6 @@ pub(super) async fn finish_iteration(
         return Ok(IterationOutcome::Stop(TurnStopReason::Cancelled));
     }
 
-    // In Plan permission mode, a *successful* `ExitPlanMode` call is a hard
-    // turn-ending interrupt: the plan is already ready for the user's
-    // approval (surfaced via the `ToolCallUpdated` event emitted above), so
-    // there is nothing left for the model to do this turn. Without this, a
-    // model that doesn't voluntarily emit `end_turn` keeps iterating/
-    // re-planning, and the turn never reaches `TurnCompleted` — which is
-    // what the client's plan-approval gate waits on. Guarded strictly to
-    // Plan mode: in any other mode `ExitPlanMode` shouldn't be called, and if
-    // it somehow is, this must not change behavior.
     if matches!(
         opts.permission_mode,
         Some(agentloop_contracts::PermissionMode::Plan)

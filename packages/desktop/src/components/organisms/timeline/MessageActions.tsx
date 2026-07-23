@@ -12,13 +12,7 @@ export const MessageActions = ({
 }: {
   text: string
   tsMs: number
-  /** Suppress the relative-time label when the row's turn footer already
-   * renders its own timestamp. */
   hideTimestamp?: boolean
-  /**
-   * `hover` (default): opacity-0 until group-hover/focus-within on `group/row`.
-   * `always`: visible (parent already gates reveal, e.g. absolute chip).
-   */
   reveal?: "hover" | "always"
   className?: string
 }) => {
@@ -30,7 +24,6 @@ export const MessageActions = ({
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1500)
     } catch {
-      // ignore
     }
   }
 

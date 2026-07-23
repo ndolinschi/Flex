@@ -1,7 +1,3 @@
-//! Cloudflare Tunnel adapter — thin supervisor stub for v1.
-//!
-//! When `cloudflared` is on PATH and the method is enabled, attempts a quick
-//! tunnel to the local listener. Named tunnels / full account wiring is later.
 
 use std::process::Stdio;
 
@@ -61,7 +57,6 @@ impl ConnectionMethod for CloudflareMethod {
             return Ok(());
         };
 
-        // Named hostname preference is Phase C; v1 uses quick tunnels only.
         let _ = &self.hostname_pref;
 
         let mut child = Command::new(&bin)
@@ -79,7 +74,6 @@ impl ConnectionMethod for CloudflareMethod {
                 crate::error::DesktopError::Message(format!("cloudflare: spawn failed: {e}"))
             })?;
 
-        // Best-effort: scrape stderr for the trycloudflare.com URL.
         if let Some(stderr) = child.stderr.take() {
             let note_slot = std::sync::Arc::new(tokio::sync::Mutex::new(None::<String>));
             let note_clone = note_slot.clone();
@@ -92,7 +86,6 @@ impl ConnectionMethod for CloudflareMethod {
                     }
                 }
             });
-            // Give the tunnel a moment to print the URL.
             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
             self.tunnel_hostname = note_slot.lock().await.clone();
         }
@@ -179,8 +172,6 @@ fn which_cloudflared() -> Option<std::path::PathBuf> {
 }
 
 fn extract_trycloudflare_url(line: &str) -> Option<String> {
-    // cloudflared prints something like:
-    //   https://random-words.trycloudflare.com
     for part in line.split_whitespace() {
         if part.starts_with("https://") && part.contains("trycloudflare.com") {
             return Some(part.trim_matches(|c| c == '"' || c == '\'').to_owned());

@@ -1,7 +1,3 @@
-//! Cursor delegator: drives `cursor-agent --print --output-format stream-json`
-//! and normalizes its output. The workspace-bridge integration remains a
-//! profile placeholder that returns actionable errors.
-
 mod config;
 mod mapper;
 mod profile;

@@ -1,9 +1,3 @@
-//! `RunWorkflow`: the engine-owned execution behind the tool of the same
-//! name. A declarative pipeline of subagent steps, each run through
-//! [`crate::subagent`] — the exact same isolation, event-relay, and
-//! permission-inheritance machinery `Agent`/`Verify` already use. No new
-//! wire types, no executable plan: just data, sequenced.
-
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -22,15 +16,8 @@ use crate::session_handle::SessionHandle;
 use crate::subagent::SubagentRequest;
 use crate::turn::tool_exec::MAX_CHILDREN_PER_TURN;
 
-/// Hard cap on tasks in one `parallel` step — the same clamp
-/// [`crate::roles::RoleSpec::max_parallel`] applies to a single role's
-/// split, applied here to a step that can mix roles.
 const MAX_PARALLEL_WORKFLOW_TASKS: usize = 8;
 
-/// Mirrors `agentloop_tools::RunWorkflowInput`'s wire shape — kept as a
-/// private, deserialize-only copy here rather than a dependency on `tools`
-/// (which composes *over* `loop`, not the other way around; `Verify`/`Agent`
-/// dispatch the same way, parsing raw JSON rather than sharing a type).
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RunWorkflowInput {
@@ -52,11 +39,6 @@ enum WorkflowStepKind {
     Parallel { tasks: Vec<WorkflowStepInput> },
 }
 
-/// Run a `RunWorkflow` call: parse its steps, run each through
-/// [`NativeAgent::run_subagent`] in order (a `parallel` step fans out
-/// concurrently as a barrier), and return a combined summary. Every spawn
-/// still counts against `children_spawned`'s per-turn budget, same as a
-/// plain `Agent` call.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_workflow_call(
     deps: &Arc<TurnDeps>,
@@ -175,8 +157,6 @@ pub(crate) async fn run_workflow_call(
     Ok(ToolOutput::text(rendered_steps.join("\n\n")))
 }
 
-/// Spawn one subagent task, prefixing its brief with every earlier step's
-/// combined results so it can build on them.
 #[allow(clippy::too_many_arguments)]
 async fn spawn_one(
     agent: &Arc<NativeAgent>,

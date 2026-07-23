@@ -4,16 +4,6 @@ import { TimelineRowView } from "./TimelineRowView"
 import type { TimelineRow } from "../../../lib/types"
 import type { TurnFooterInfo } from "./buildDisplayItems"
 
-/**
- * Regression coverage for the "duplicate 'just now' stacked" bug (see
- * HANDOFF-OPUS.md / live QA BUG 2): the trailing answer row of a completed
- * turn rendered `MessageActions` AND `TurnFooter` — two identical relative
- * timestamps. `TimelineRowView` now owns rendering the footer itself (right
- * after `MessageActions`) and passes `hideTimestamp` down whenever a `footer`
- * prop is present, so exactly ONE relative-time label renders while BOTH
- * copy affordances stay (they copy different payloads — see
- * `MessageActions`' and `TurnFooter`'s docs).
- */
 describe("TimelineRowView", () => {
   const answerRow: TimelineRow = {
     type: "assistant",
@@ -34,15 +24,9 @@ describe("TimelineRowView", () => {
       <TimelineRowView row={answerRow} showActions footer={footer} />,
     )
 
-    // "just now" appears from formatRelativeTime — once for the footer, and
-    // (if the bug regressed) a second time for MessageActions.
     expect(html.match(/just now/g)?.length ?? 0).toBe(1)
-    // On the footer row only the footer's "Copy response" shows — the
-    // per-message MessageActions (with its own "Copy message") is suppressed so
-    // there aren't two adjacent copy icons on the same message.
     expect(html).toContain("Copy response")
     expect(html).not.toContain("Copy message")
-    // The footer's own duration text renders too.
     expect(html).toContain("Worked for")
   })
 
@@ -66,12 +50,10 @@ describe("TimelineRowView", () => {
     }
     const html = renderToStaticMarkup(<TimelineRowView row={liveRow} />)
 
-    // Plain text — no GFM strong/code highlighting from react-markdown.
     expect(html).toContain("Hello **world**")
     expect(html).not.toContain("<strong>")
     expect(html).not.toContain("<pre")
     expect(html).toContain("whitespace-pre-wrap")
-    // Inline caret + reserved actions-row height (no MessageActions yet).
     expect(html).toContain("animate-pulse")
     expect(html).toContain("h-5")
     expect(html).not.toContain("Copy message")
@@ -112,7 +94,6 @@ describe("TimelineRowView", () => {
     expect(html).toContain("human-turn-sticky")
     expect(html).toContain("data-agent-turn-human")
     expect(html).toContain("Copy message")
-    // No chat-bubble alignment chrome.
     expect(html).not.toContain("data-align=\"end\"")
     expect(html).not.toContain("min-w-[150px]")
   })

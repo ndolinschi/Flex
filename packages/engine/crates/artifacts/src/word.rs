@@ -1,12 +1,9 @@
-//! `WordDocument` — builds `.docx` via `docx-rs`.
-
 use std::io::Cursor;
 
 use docx_rs::{Docx, Paragraph, Run};
 
 use crate::{ArtifactBuildSpec, ArtifactError, ArtifactKind, OfficeArtifact};
 
-/// Builds Word documents (.docx) using the `docx-rs` library.
 #[derive(Debug, Default)]
 pub struct WordDocument;
 
@@ -30,10 +27,8 @@ impl OfficeArtifact for WordDocument {
 
         let mut docx = Docx::new();
 
-        // Title as the first paragraph.
         docx = docx.add_paragraph(Paragraph::new().add_run(Run::new().add_text(title.as_str())));
 
-        // Body: split on blank lines; each non-empty chunk becomes a paragraph.
         for chunk in body.split("\n\n") {
             let text = chunk.trim();
             if !text.is_empty() {
@@ -63,7 +58,6 @@ mod tests {
         };
         let bytes = doc.build(&spec).expect("build");
         assert!(!bytes.is_empty(), "docx bytes must not be empty");
-        // .docx is a ZIP — starts with PK signature
         assert_eq!(&bytes[..2], b"PK", "docx must start with ZIP magic");
     }
 

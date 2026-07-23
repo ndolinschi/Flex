@@ -1,47 +1,21 @@
-//! Project-instruction preflight: scan a working directory for agent/AI
-//! coding-tool configuration files and format them into a system-prompt
-//! section.
-//!
-//! This is a pure Rust, synchronous I/O scan — no LLM calls, no async.
-//! Files are read in priority order; the total character budget is enforced
-//! globally across all loaded files, with an explicit truncation marker
-//! when exceeded. Missing files and unreadable files are silently skipped so
-//! a broken or absent project config never breaks session startup.
-//!
-//! Skills directories (`.agent/skills/`, `.claude/skills/`,
-//! `.github/skills/`) are noted by *path only* — their full bodies are not
-//! loaded here; that is the job of [`crate::SkillRegistry`].
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Default total character budget for all project instructions combined.
-///
-/// Deliberately capped: this section rides every turn, so keeping it
-/// concise matters more than completeness.
 pub const DEFAULT_PROJECT_INSTRUCTIONS_BUDGET_CHARS: usize = 12_000;
 
-/// A single instruction file that was successfully loaded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LoadedFile {
-    /// Path relative to `cwd` (e.g. `"AGENTS.md"`, `".cursor/rules/style.md"`).
     pub relative_path: String,
-    /// UTF-8 content, possibly truncated if the budget was exhausted.
     pub content: String,
-    /// Original byte count (before any truncation).
     pub bytes: usize,
 }
 
-/// All project-instruction content discovered under a working directory.
 #[derive(Debug, Clone, Default)]
 pub struct ProjectInstructions {
-    /// Loaded files in priority order.
     pub files: Vec<LoadedFile>,
-    /// Skill directories that exist (bodies are NOT loaded here).
     pub skill_dirs: Vec<PathBuf>,
 }
 
-/// Priority-ordered single-file candidates (relative to `cwd`).
 static CANDIDATE_FILES: &[&str] = &[
     "AGENTS.md",
     "agents.md",
@@ -55,16 +29,10 @@ static CANDIDATE_FILES: &[&str] = &[
     ".agent/delegation.md",
 ];
 
-/// Skill directories whose existence is noted (bodies not loaded here).
 static SKILL_DIR_CANDIDATES: &[&str] = &[".agent/skills", ".claude/skills", ".github/skills"];
 
-/// Maximum number of `.cursor/rules/` files loaded per session.
 const MAX_CURSOR_RULES_FILES: usize = 20;
 
-/// Load project instructions from `cwd` up to `budget_chars` total characters.
-///
-/// Pass `0` for `budget_chars` to use [`DEFAULT_PROJECT_INSTRUCTIONS_BUDGET_CHARS`].
-/// The function never panics and never propagates I/O errors.
 pub fn load_project_instructions(cwd: &Path, budget_chars: usize) -> ProjectInstructions {
     let budget = if budget_chars == 0 {
         DEFAULT_PROJECT_INSTRUCTIONS_BUDGET_CHARS
@@ -82,7 +50,6 @@ pub fn load_project_instructions(cwd: &Path, budget_chars: usize) -> ProjectInst
         try_load_file(cwd, rel, &mut result.files, &mut used, budget);
     }
 
-    // .cursor/rules/*.{md,mdc} — sorted, each prefixed with a filename header.
     if used < budget {
         load_cursor_rules(
             &cwd.join(".cursor").join("rules"),
@@ -103,8 +70,6 @@ pub fn load_project_instructions(cwd: &Path, budget_chars: usize) -> ProjectInst
     result
 }
 
-/// Attempt to load a single file at `cwd/rel_path`, charge the budget, and
-/// append a [`LoadedFile`] when the file is readable and non-empty.
 fn try_load_file(
     cwd: &Path,
     rel_path: &str,
@@ -140,8 +105,6 @@ fn try_load_file(
     });
 }
 
-/// Load `.cursor/rules/*.{md,mdc}` files in name-sorted order, each prefixed
-/// with a `### <filename>` header.
 fn load_cursor_rules(
     rules_dir: &Path,
     cwd: &Path,
@@ -211,8 +174,6 @@ fn load_cursor_rules(
     }
 }
 
-/// Best-effort check: does `link` resolve to a target outside `cwd`?
-/// Returns `false` (= don't skip) when either path cannot be resolved.
 fn is_escaping_symlink(cwd: &Path, link: &Path) -> bool {
     let Ok(canonical_cwd) = cwd.canonicalize() else {
         return false;
@@ -223,11 +184,6 @@ fn is_escaping_symlink(cwd: &Path, link: &Path) -> bool {
     !canonical_target.starts_with(&canonical_cwd)
 }
 
-/// Format loaded project instructions into a single markdown section, or
-/// return `None` when nothing was found.
-///
-/// Each file appears in a fenced code block with its filename as the fence
-/// language tag. Skill directories are listed at the end as a bullet note.
 pub fn format_project_instructions_section(loaded: &ProjectInstructions) -> Option<String> {
     if loaded.files.is_empty() {
         return None;
@@ -325,7 +281,6 @@ mod tests {
 
         let loaded = load_project_instructions(dir.path(), 0);
         assert_eq!(loaded.files.len(), 2);
-        // naming.mdc < style.md alphabetically.
         assert!(loaded.files[0].relative_path.contains("naming.mdc"));
         assert!(loaded.files[1].relative_path.contains("style.md"));
         assert!(loaded.files[0].content.contains("### naming.mdc"));

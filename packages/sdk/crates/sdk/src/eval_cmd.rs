@@ -1,6 +1,3 @@
-//! The `eval` subcommand: benchmark TOML tasks against a resolved agent
-//! service and print/report/gate the results.
-
 use std::path::PathBuf;
 use std::sync::Arc;
 

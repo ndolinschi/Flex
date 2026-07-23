@@ -98,7 +98,6 @@ function MenubarItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        // Whisper fill — never bg-accent (brand near-white on dark).
         "group/menubar-item gap-1.5 rounded-md px-1.5 py-1 text-sm data-highlighted:bg-fill-4 data-highlighted:text-ink focus:bg-fill-4 focus:text-ink data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive data-disabled:opacity-50 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive!",
         className
       )}

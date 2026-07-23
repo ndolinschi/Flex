@@ -1,19 +1,12 @@
-//! Turn prompting, cancellation, permissions, and background processes.
 
 use super::common::require_service;
 use super::memory::{memory_dir, purge_expired_memories};
 use super::prelude::*;
 
-/// One-shot prompt critique for the Prompt editor tab — tool-free
-/// `stream_chat` like `suggest_session_title`. Returns structured findings
-/// (quote + severity + message) so the UI can highlight spans and show hover
-/// notes. Not persisted; not a session turn.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptReviewFindingDto {
-    /// Exact substring copied from the user's prompt (preferred over offsets).
     pub quote: String,
-    /// `error` | `warn` | `info`
     pub severity: String,
     pub message: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -198,23 +191,12 @@ pub struct PromptCommandInput {
     pub session_id: String,
     pub text: String,
     pub model: Option<String>,
-    /// Maps composer mode → engine `PermissionMode` (`plan` / `default` / …).
-    /// `#[serde(default)]` so a missing / omitted field becomes `None` (engine
-    /// Default) rather than failing the whole invoke — matches `effort` /
-    /// `composer_mode` below.
     #[serde(default)]
     pub permission_mode: Option<String>,
     #[serde(default)]
     pub attachments: Vec<PromptAttachment>,
-    /// `Effort` enum's serde wire value ("low" | "medium" | "high" | "xhigh" |
-    /// "max"). Invalid/unrecognized values parse to `None` (engine default)
-    /// rather than erroring — see `parse_effort`.
     #[serde(default)]
     pub effort: Option<String>,
-    /// The composer mode picked in the UI ("agent" | "plan" | "ask" | "flex" |
-    /// "debug"), distinct from `permission_mode` (its derived wire value — see
-    /// `ModePicker.tsx::modeToPermission`). `"flex"` / `"plan"` / `"debug"`
-    /// append mode-specific system prompts below.
     #[serde(default)]
     pub composer_mode: Option<String>,
 }
@@ -322,21 +304,10 @@ pub(crate) fn build_prompt_input(input: &PromptCommandInput) -> PromptInput {
     }
 }
 
-/// Character budget for the per-project memory section injected into every
-/// turn's system prompt (see `prompt` below). Deliberately modest — unlike
-/// the one-shot global memory load, this rides every turn, so it uses an
-/// explicit cap well under `agentloop_prompts::DEFAULT_MEMORY_BUDGET_CHARS`
-/// rather than `0` (which would mean "use the 8k default").
 const PROJECT_MEMORY_PROMPT_BUDGET_CHARS: usize = 4_000;
 
-/// Character budget for project instructions loaded from the working
-/// directory each turn. Set well below the default (12k) so the combined
-/// per-turn system-prompt overhead stays bounded even in projects with many
-/// instruction files. Silent if empty — no UI spinner is shown.
 const PROJECT_INSTRUCTIONS_BUDGET_CHARS: usize = 12_000;
 
-/// Built-in delegation rules (no assumption that peer-messaging tools exist).
-/// Project-level `delegation.md` (via project-instructions preflight) overrides.
 const DEFAULT_DELEGATION_RULES_CORE: &str = "\
 # Delegation rules (system defaults — project delegation.md overrides)
 
@@ -353,8 +324,6 @@ Use `SwitchMode` when available and the user's intent clearly matches a differen
 
 When in doubt, self-execute rather than delegate.";
 
-/// Core Auto fragment: cost-tier routing via `SetRouting`. Always appended when
-/// Auto is active (ModelPicker `"auto"` or composer mode `"auto"`).
 const AUTO_MODE_ROUTING_PROMPT: &str = "\
 # Auto mode
 
@@ -384,7 +353,6 @@ The user sees a brief veto countdown.
 Apply the delegation rules above. Prefer self-execution for small tasks; \
 delegate large or parallel work via `Agent`.";
 
-/// Appended only when peer messaging is enabled (those tools are registered).
 const AUTO_MODE_MESSAGING_PROMPT: &str = "\
 ## Peer coordination
 
@@ -394,13 +362,6 @@ You also have:
 
 Use `GetActiveAgents` before editing a path another agent may be modifying.";
 
-/// System prompt appended for the Flex composer mode, instructing the model
-/// to act as an orchestrator over the `planner` / `plan-reviewer` /
-/// `flex-worker` roles registered in `compose.rs::flex_composer_roles`. The
-/// model runs with `PermissionMode::DontAsk` in this mode (see
-/// `ModePicker.tsx::modeToPermission`), so it — and every subagent it
-/// spawns, which inherit the parent's permission mode — must never leave a
-/// permission ask pending.
 const FLEX_ORCHESTRATOR_PROMPT: &str = "\
 You are an orchestrator. First classify the task:
 - SIMPLE (single-file change, question, quick fix): do it yourself directly, no subagents.
@@ -434,9 +395,6 @@ list when overriding a subagent's model.
 You run with DontAsk permissions, and every subagent you spawn inherits \
 that: never leave a permission ask pending, and never block waiting on one.";
 
-/// Appended in Plan mode (`composer_mode == "plan"`). Forces investigate-first:
-/// the plan must be grounded in the real codebase, not a generic checklist of
-/// "go look at the code" steps.
 const FLEX_PLAN_PROMPT: &str = "\
 Plan mode: INVESTIGATE before you plan. First use your read-only tools \
 (SearchCode/FindSymbol, Read, and RepoMap when available) to find the actual \
@@ -447,9 +405,6 @@ checklist of investigative steps (e.g. \"locate the code\", \"identify the \
 logic\") — that investigation is your job to do now, before answering. Present \
 a concrete, grounded plan only after you have actually explored the code.";
 
-/// Appended in Debug mode (`composer_mode == "debug"`). Same agent, full tools:
-/// reproduce → localize → temporary probes → rerun → remove probes → deliver.
-/// Vision-aware appendices are composed separately in `prompt_inner`.
 const DEBUG_MODE_PROMPT: &str = "\
 # Debug mode
 
@@ -499,7 +454,6 @@ repros (open the app, drive UI, capture state). Respect permission prompts.
 - IDE-native debuggers (e.g. attaching IntelliJ to a running process) are out \
 of scope for this mode — stick to in-repo probes + tools above.";
 
-/// Text-evidence appendix when the active model advertises vision.
 const DEBUG_VISION_YES: &str = "\
 ## Vision: ENABLED for this model
 
@@ -507,7 +461,6 @@ Screenshots from Browser/Computer tools (and user image attachments) are \
 first-class evidence — use them when a visual or layout bug is suspected. \
 Still pair images with console/DOM/text so the fix is grounded in code.";
 
-/// Text-evidence appendix when the active model does NOT support images.
 const DEBUG_VISION_NO: &str = "\
 ## Vision: DISABLED for this model
 
@@ -520,7 +473,6 @@ Prefer text channels instead:
 If a screenshot tool returns a path, treat it as opaque unless the user can \
 interpret it; extract facts via eval/logs instead.";
 
-/// When we could not resolve ModelInfo.vision for the selected model.
 const DEBUG_VISION_UNKNOWN: &str = "\
 ## Vision: UNKNOWN for this model
 
@@ -537,9 +489,6 @@ pub async fn prompt(
     if let Err(err) = &result {
         let msg = err.to_string();
         if msg.contains("already in progress") {
-            // Expected control-flow, not a fault: the frontend recognizes this
-            // marker and requeues the message (see useComposerSend's
-            // TURN_IN_PROGRESS_MARKER) — keep it out of the ERROR log.
             tracing::debug!(error = %msg, "prompt rejected: turn in progress");
         } else {
             tracing::error!(error = %msg, "prompt failed");
@@ -548,22 +497,6 @@ pub async fn prompt(
     result
 }
 
-/// Builds the per-turn system-prompt notice that pins the model to *this*
-/// session's own working directory.
-///
-/// Bug #50: `EngineService` bakes a single `Working directory: {{cwd}}` line
-/// into its system prompt once, at `build_service` time
-/// (`packages/desktop/src-tauri/src/compose.rs`), from the global
-/// `cfg.prefs.cwd` preference — not from any particular session. Since one
-/// `EngineService` backs every session in the desktop app, that baked line
-/// can name a different repo than the session actually being prompted (e.g.
-/// the last-selected project at startup, while this turn's session was
-/// created against a different repo). This notice is appended per-turn from
-/// the *target* session's own `meta.cwd` (see `prompt_inner` below, which
-/// always resolves `meta` from `input.session_id`, never from any global or
-/// "active" session) and is worded to unambiguously override that stale
-/// baked-in line — see `packages/engine/prompts/system/00-identity.md`,
-/// which now explicitly defers to this notice.
 pub(crate) fn session_cwd_notice(cwd: &std::path::Path) -> String {
     format!(
         "Session working directory: {}. This is the ONLY working directory for \
@@ -576,8 +509,6 @@ pub(crate) fn session_cwd_notice(cwd: &std::path::Path) -> String {
     )
 }
 
-/// Look up `ModelInfo.vision` for a model id (`provider/model` or bare).
-/// Returns `None` when the model cannot be resolved or `list_models` fails.
 pub(crate) async fn resolve_model_vision(service: &EngineService, model: &str) -> Option<bool> {
     let model_ref = ModelRef(model.to_owned());
     let (provider, model_id) = service.provider_registry().resolve(&model_ref)?;
@@ -617,14 +548,6 @@ pub(crate) async fn prompt_inner(
     let id = SessionId::from(input.session_id.clone());
     let meta = service.session_meta(&id).await.ok();
     let cwd_notice = meta.as_ref().map(|meta| session_cwd_notice(&meta.cwd));
-    // Purge expired memories (global + this session's project dir) before
-    // assembling the system prompt, so a memory that expired since the
-    // engine's one-shot global load at startup — or one that was never
-    // surfaced via the Memory page's self-cleaning `*_list` calls — never
-    // rides into the model's context on this turn. The global load itself
-    // happened once at engine construction and can't be re-run per turn
-    // (that path is engine-side, read-only from here), but deleting the file
-    // now stops it from persisting into any future turn/session.
     if let Ok(dir) = memory_dir() {
         purge_expired_memories(&dir);
     }
@@ -644,14 +567,6 @@ pub(crate) async fn prompt_inner(
         );
         agentloop_prompts::format_project_instructions_section(&loaded)
     });
-    // Per-turn system_append stack (order matters — later sections override
-    // earlier guidance when they conflict):
-    //   1. session cwd notice
-    //   2. project memory (`.agent/memory`)
-    //   3. project instructions preflight (AGENTS.md / CLAUDE.md / …)
-    //   4. composer-mode overlays (flex / plan / auto / debug)
-    // Auto is selected via ModelPicker `"auto"` (composer mode usually stays
-    // `agent`). Also accept composer_mode `"auto"` for symmetry.
     let is_auto_model = input.model.as_deref() == Some("auto");
     let is_auto_mode = input.composer_mode.as_deref() == Some("auto") || is_auto_model;
     let mut system_append = match (cwd_notice, project_memory) {
@@ -715,13 +630,8 @@ pub(crate) async fn prompt_inner(
         };
         system_append = append_system(system_append, vision_frag);
     }
-    // "auto" is a UI sentinel for the Auto routing mode; resolve it to the
-    // cheapest configured low-cost model (so SetRouting can escalate from
-    // there), falling back to the configured router model, then the session
-    // default.
     let resolved_model = if is_auto_model {
         let cfg = state.config.lock().await;
-        // Start at the cheapest available model in auto mode.
         cfg.prefs
             .plugins
             .cost_models_low
@@ -738,8 +648,6 @@ pub(crate) async fn prompt_inner(
     } else {
         input.model.as_deref().map(str::to_owned)
     };
-    // Force low effort at the start of every Auto-mode turn so SetRouting
-    // can escalate exactly as much as the task warrants.
     let effort = if is_auto_mode && input.effort.is_none() {
         Some(Effort::Low)
     } else {
@@ -786,10 +694,6 @@ impl From<BackgroundEntrySummary> for BackgroundProcessDto {
     }
 }
 
-/// List background processes (started via `Bash`'s `run_in_background`) for
-/// a session, for a "background processes" panel. Thin pass-through to
-/// `EngineService::background_list`, which itself proxies to
-/// `BackgroundProcessRegistry::list` (`packages/engine/crates/core/src/executor.rs`).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn background_list(
@@ -805,11 +709,6 @@ pub async fn background_list(
         .collect())
 }
 
-/// Kill one background process by id, for the Stop button on a running
-/// background-process row. Thin pass-through to
-/// `EngineService::background_kill`; a `false` result (unknown id — already
-/// reaped or never existed) is not an error, so it's swallowed here rather
-/// than surfaced as one.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn background_kill(
@@ -823,16 +722,6 @@ pub async fn background_kill(
     Ok(())
 }
 
-/// Ask a still-running **foreground** shell call to move to the background
-/// (see `MOVE-TO-BACKGROUND`): the "Move to background" affordance on a
-/// running shell row in `ToolStepGroup`. Thin pass-through to
-/// `EngineService::background_demote`. Returns `false` — not an error — when
-/// there's nothing to do: the call already finished, the id is unknown, or
-/// the session's execution backend doesn't support demote (only the local
-/// backend does; docker/ssh sessions get no visible effect). The caller
-/// should treat `false` the same as `true` from the user's perspective —
-/// silently do nothing rather than show an error, since "the command already
-/// finished" is not exceptional.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn background_demote(
@@ -922,11 +811,6 @@ pub struct RespondModeSwitchInput {
     pub allow: bool,
 }
 
-/// Respond to a pending `ModeSwitchProposed` event — mirror of
-/// `respond_permission` / `respond_question` for the SwitchMode HITL loop.
-/// `allow: true` applies the switch; `allow: false` rejects it.
-/// Calling this after the engine has already auto-applied or auto-rejected
-/// (timeout) is a no-op (the engine's pending map is one-shot).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn respond_mode_switch(
@@ -965,10 +849,6 @@ pub async fn respond_question(
 mod prompt_cwd_tests {
     use super::*;
 
-    /// Regression for bug #50: a session's per-turn cwd notice must always
-    /// name *that session's own* `meta.cwd`, never another session's (or the
-    /// engine-wide startup default's). Two sessions created against different
-    /// repos must each get a notice mentioning only their own path.
     #[test]
     fn session_cwd_notice_reflects_only_its_own_session() {
         let test_flex = std::path::Path::new("/Users/example/Documents/Projects/TestFlex");
@@ -986,11 +866,6 @@ mod prompt_cwd_tests {
         assert_ne!(flex_notice, next_notice);
     }
 
-    /// The notice must explicitly call out and override the engine-wide
-    /// startup line from `00-identity.md` (`Working directory at engine
-    /// startup: {{cwd}}`) — otherwise the model has two same-weight, possibly
-    /// conflicting cwd claims in one prompt and may pick the wrong one, which
-    /// is exactly what happened in bug #50's live repro.
     #[test]
     fn session_cwd_notice_overrides_the_engine_startup_line() {
         let notice = session_cwd_notice(std::path::Path::new("/repo"));

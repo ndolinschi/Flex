@@ -1,7 +1,3 @@
-//! TCP-facing connection methods: manual, lan, public_port.
-//!
-//! These do not own the listener — [`crate::remote::server`] binds once.
-//! Each variant only contributes pairing endpoints / bind hints.
 
 use async_trait::async_trait;
 

@@ -27,18 +27,12 @@ export type TitleBarActionHandlers = {
 }
 
 type UseTitleBarActionsOpts = {
-  /** From `useSessions().newAgent` — single source of draft-reuse logic. */
   newAgent: (cwd?: string) => Promise<unknown>
   onOpenCommandPalette?: () => void
   onOpenSearch?: () => void
   onOpenBugReport: () => void
 }
 
-/**
- * Shared File/Edit/View/Help actions for in-window menus and the native macOS
- * menu bar. Handler object is built once (refs) so chat/tab switches do not
- * thrash menu children.
- */
 export const useTitleBarActions = ({
   newAgent,
   onOpenCommandPalette,

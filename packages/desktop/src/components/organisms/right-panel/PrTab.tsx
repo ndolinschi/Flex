@@ -13,9 +13,6 @@ type PrTabProps = {
   active: SessionMeta | undefined
 }
 
-/** Right-panel PR review — only meaningful when `gitPrStatus` finds a PR for
- * the session cwd's current branch. Header metadata + full `gh pr diff`.
- * Chrome matches Browser/Changes: 30px `--header-height` row + `px-2.5`. */
 export const PrTab = ({ active }: PrTabProps) => {
   const cwd = active?.cwd
 
@@ -75,7 +72,6 @@ export const PrTab = ({ active }: PrTabProps) => {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Primary chrome — fixed 30px row (Browser recipe). */}
       <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
         <GitPullRequest
           className="h-3.5 w-3.5 shrink-0 text-ink-faint"

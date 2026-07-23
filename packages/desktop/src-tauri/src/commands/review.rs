@@ -1,20 +1,8 @@
-//! Per-file keep/undo and hunk-patch review commands.
 
 use super::common::{base_head_sha, porcelain_code, resolve_review_path, review_dirs};
 use super::git::diff_against_rev;
 use super::prelude::*;
 
-/// Revert one file's agent changes in the session's working directory
-/// (worktree root if isolated, else the repo itself) back to the pre-agent
-/// base state.
-///
-/// - Untracked in the working dir (`??`) → delete it.
-/// - Isolated session → restore the path from the *base* repo's HEAD commit
-///   (not the worktree's own HEAD, which `integrate_session` may have
-///   advanced by committing agent changes) via
-///   `git checkout <base_head_sha> -- <path>`. Falls back to the worktree's
-///   own HEAD if the base sha somehow isn't reachable there.
-/// - Non-isolated session → `git checkout HEAD -- <path>`.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn review_undo_file(
@@ -57,8 +45,6 @@ pub async fn review_undo_file(
         if out.status.success() {
             return Ok(());
         }
-        // Base sha unreachable in the worktree (shouldn't happen — the
-        // worktree branches from it) — fall back to the worktree's own HEAD.
         let fallback = checkout_from("HEAD")?;
         if fallback.status.success() {
             return Ok(());
@@ -91,16 +77,6 @@ pub async fn review_undo_file(
     )))
 }
 
-/// Make the base repo's copy of one file match the worktree's current copy
-/// (isolated sessions only). This is a plain working-tree write — it never
-/// runs `git add` in the base repo, so the base repo's index stays exactly
-/// as the user left it; `integrate_session` is the sanctioned path for a
-/// real merge.
-///
-/// - File exists in the worktree → create parent dirs in the base repo and
-///   copy the file's bytes over.
-/// - File was deleted in the worktree (porcelain ` D` / `D `) → remove it
-///   from the base repo's working tree (missing file is not an error).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn review_keep_file(
@@ -146,8 +122,6 @@ pub async fn review_keep_file(
     }
 }
 
-/// Apply (or reverse-apply) a unified-diff patch — produced client-side from
-/// filtered hunks — against either the session's worktree or its base repo.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn review_apply_patch(
@@ -223,12 +197,6 @@ pub async fn review_apply_patch(
     }
 }
 
-/// Unified diff for one file, always computed against the pre-agent base
-/// state: for isolated sessions this is the base repo's HEAD (so committed
-/// *and* uncommitted agent changes both show up, since `integrate_session`
-/// may have already committed some into the worktree); for non-isolated
-/// sessions this is identical to `git_diff` (HEAD, with an untracked-file
-/// fallback).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn review_file_diff(

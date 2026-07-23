@@ -1,5 +1,3 @@
-//! Execute a `search_web` tool call against a backend.
-
 use std::sync::Arc;
 
 use agentloop_contracts::{ToolOutput, ToolResultBlock};
@@ -10,7 +8,6 @@ use crate::search_backend::{SearchBackend, SearchError};
 
 use super::format::{format_search_results, truncate_chars};
 
-/// Run the search, apply optional re-ranking, and format markdown output.
 pub(crate) async fn execute(
     backend: &Arc<dyn SearchBackend>,
     reranker: &Option<Arc<dyn SearchReranker>>,

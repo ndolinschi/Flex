@@ -1,27 +1,3 @@
-//! JSON scenario files: a data-driven way to script a [`MockProvider`].
-//!
-//! Format (one file = one whole conversation script; each element of
-//! `turns` is one model call):
-//!
-//! ```json
-//! {
-//!   "turns": [
-//!     {
-//!       "events": [
-//!         { "text": "markdown..." },
-//!         { "thinking": "reasoning..." },
-//!         { "tool": { "name": "echo", "input": { "text": "ping" } } }
-//!       ]
-//!     }
-//!   ]
-//! }
-//! ```
-//!
-//! Each turn plays as `MessageStart`, the listed deltas (every `tool` entry
-//! expands to `ToolCallStart`/`ToolCallArgsDelta`/`ToolCallEnd` with a fresh
-//! [`ToolCallId`]), a `Usage` report, and a `MessageEnd` whose stop reason is
-//! `ToolUse` when the turn contains tool calls, `EndTurn` otherwise.
-
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -31,11 +7,9 @@ use agentloop_core::contracts::{MessageId, StopReason, ToolCallId};
 
 use crate::mock_provider::{MOCK_MODEL, MockProvider, ScriptedTurn};
 
-/// A scenario file failed to load.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum ScenarioError {
-    /// The file could not be read.
     #[error(
         "cannot read scenario file {}: {source}. Check the path — committed scenarios live in \
          the testkit crate's `scenarios/` directory; build paths from CARGO_MANIFEST_DIR in tests.",
@@ -46,7 +20,6 @@ pub enum ScenarioError {
         #[source]
         source: std::io::Error,
     },
-    /// The file is not valid scenario JSON.
     #[error(
         "scenario file {} is not valid scenario JSON: {source}. Expected \
          {{\"turns\": [{{\"events\": [{{\"text\": \"...\"}} | {{\"thinking\": \"...\"}} | \
@@ -73,11 +46,8 @@ struct ScenarioTurn {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum ScenarioEvent {
-    /// `{"text": "..."}` — a markdown delta.
     Text(String),
-    /// `{"thinking": "..."}` — a thinking delta.
     Thinking(String),
-    /// `{"tool": {"name": "...", "input": {...}}}` — one tool call.
     Tool(ScenarioToolCall),
 }
 
@@ -92,9 +62,6 @@ fn empty_object() -> serde_json::Value {
     serde_json::Value::Object(serde_json::Map::new())
 }
 
-/// Load a scenario file and map it into [`MockProvider`] turns, one
-/// [`ScriptedTurn`] per scenario turn. Tool entries get fresh
-/// [`ToolCallId`]s on every load.
 pub fn scenario_turns(path: &Path) -> Result<Vec<ScriptedTurn>, ScenarioError> {
     let raw = std::fs::read_to_string(path).map_err(|source| ScenarioError::Io {
         path: path.to_path_buf(),
@@ -148,8 +115,6 @@ fn scripted_turn(turn: ScenarioTurn) -> ScriptedTurn {
 }
 
 impl MockProvider {
-    /// A provider scripted from a scenario file (see the module docs for the
-    /// format).
     pub fn from_scenario_file(path: &Path) -> Result<Self, ScenarioError> {
         Ok(Self::with_turns(scenario_turns(path)?))
     }

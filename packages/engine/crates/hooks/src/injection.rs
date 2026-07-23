@@ -1,31 +1,14 @@
-//! Prompt-injection scanning: a heuristic scanner over untrusted text plus a
-//! `PostToolUse` hook that fences flagged tool results before the model reads
-//! them.
-//!
-//! Tool results (web pages, file contents, command output) are the classic
-//! injection vector: text the *environment* produced gets read by the model
-//! with the same authority as user instructions. The scanner is heuristic and
-//! deliberately conservative — it wraps suspicious content in an explicit
-//! warning fence (`Mutated`) rather than dropping it, so the model keeps the
-//! data but is told not to obey it. Gateway channels reuse [`scan_text`] on
-//! inbound platform messages.
-
 use async_trait::async_trait;
 
 use agentloop_contracts::{HookPoint, ToolResultBlock};
 use agentloop_core::{Hook, HookContext, HookData, HookError, HookOutcome};
 
-/// One matched suspicion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InjectionFinding {
-    /// Stable pattern id (`override-instructions`, `invisible-unicode`, …).
     pub pattern: &'static str,
-    /// The matched excerpt, truncated for logs.
     pub excerpt: String,
 }
 
-/// Phrases that read as attempts to override the agent's instructions.
-/// Lowercased substring match — cheap, no regex dependency.
 const OVERRIDE_PHRASES: [&str; 10] = [
     "ignore previous instructions",
     "ignore all previous instructions",
@@ -39,7 +22,6 @@ const OVERRIDE_PHRASES: [&str; 10] = [
     "without telling the user",
 ];
 
-/// Phrases that read as data-exfiltration instructions aimed at the agent.
 const EXFIL_PHRASES: [&str; 6] = [
     "send your api key",
     "send the contents of",
@@ -63,8 +45,6 @@ fn excerpt_around(haystack: &str, needle_pos: usize) -> String {
         .collect::<String>()
 }
 
-/// Scan untrusted text for injection heuristics. Returns every finding, empty
-/// when the text looks clean.
 pub fn scan_text(text: &str) -> Vec<InjectionFinding> {
     let mut findings = Vec::new();
     let lowered = text.to_lowercase();
@@ -86,8 +66,6 @@ pub fn scan_text(text: &str) -> Vec<InjectionFinding> {
             break;
         }
     }
-    // Zero-width and bidi-control characters hide instructions from human
-    // reviewers while staying model-readable.
     if text.chars().any(|c| {
         matches!(
             c,
@@ -104,7 +82,6 @@ pub fn scan_text(text: &str) -> Vec<InjectionFinding> {
     findings
 }
 
-/// The fence wrapped around flagged content.
 fn fence(findings: &[InjectionFinding], original: &str) -> String {
     let patterns = findings
         .iter()
@@ -119,8 +96,6 @@ fn fence(findings: &[InjectionFinding], original: &str) -> String {
     )
 }
 
-/// Fences flagged tool results at `PostToolUse`. Purely additive: content is
-/// wrapped, never dropped, and clean results pass through untouched.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct InjectionScanHook;
 

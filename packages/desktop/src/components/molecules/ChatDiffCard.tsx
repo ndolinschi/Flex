@@ -10,18 +10,12 @@ import { DiffStat } from "../atoms/DiffStat"
 import { Button } from "@/components/ui/button"
 
 type ChatDiffCardProps = {
-  /** Raw unified / +/- dump. Parsed when `lines` is omitted. */
   diff?: string
-  /** Pre-parsed display lines (skips re-parse). */
   lines?: ChatDiffLine[]
-  /** File path for header chip; overrides path derived from the diff. */
   path?: string | null
-  /** Line stats override (e.g. heuristic from Edit tool input). */
   added?: number
   removed?: number
-  /** Open file in the Files tab when the header is clicked. */
   onOpenFile?: () => void
-  /** Scroll cap for long diffs (tool rows). */
   maxHeight?: number | string
   className?: string
 }
@@ -39,7 +33,6 @@ const gutterClass = (kind: ChatDiffLineKind): string => {
   return "bg-transparent"
 }
 
-/** Cursor-style file diff card for chat (markdown fences + Edit/Write expand). */
 export const ChatDiffCard = ({
   diff,
   lines: linesProp,
@@ -80,7 +73,6 @@ export const ChatDiffCard = ({
   return (
     <div
       className={cn(
-        // Cursor tool card: radius-lg 10, hairline border, panel surface.
         "my-1.5 overflow-hidden rounded-[var(--radius-lg)] border border-stroke-3 bg-panel first:mt-0 last:mb-0",
         className,
       )}

@@ -4,15 +4,11 @@ type ShortcutHandlers = {
   onSend?: () => void
   onNewSession?: () => void
   onFocusComposer?: () => void
-  /** Return true if the shortcut was handled (caller may preventDefault). */
   onCancel?: () => boolean
-  /** ⌘K — opens the SearchModal ( agent search). */
   onSearch?: () => void
   onToggleSidebar?: () => void
   onToggleRightPanel?: () => void
-  /** ⌘⇧P — command palette (distinct from ⌘K agent search). */
   onToggleCommandPalette?: () => void
-  /** ⌘W / Ctrl+W — close the focused pane's active tab. */
   onCloseActiveTab?: () => void
 }
 
@@ -76,8 +72,6 @@ export const useKeyboardShortcuts = (
       }
 
       if (e.key === "w" && handlers.onCloseActiveTab) {
-        // Preserve Ctrl+W "delete previous word" in editable fields on
-        // Windows/Linux. Meta+W (macOS) still closes the tab — IDE pattern.
         if (e.ctrlKey && !e.metaKey && isEditableTarget(e.target)) return
         e.preventDefault()
         handlers.onCloseActiveTab()

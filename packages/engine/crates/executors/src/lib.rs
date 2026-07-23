@@ -1,13 +1,3 @@
-//! Command-execution backends implementing [`agentloop_core::Executor`].
-//!
-//! Each backend shells out to its CLI (`docker`, `ssh`, `apptainer`, …) via
-//! `tokio::process`, mirroring how the workspace crate shells out to `git`:
-//! implementation crates are the sanctioned I/O edges, and owning the process
-//! invocation keeps heavyweight client libraries out of the tree.
-//!
-//! [`LocalExecutor`] is the default and is byte-compatible with the historical
-//! in-tool spawn path: `/bin/sh -lc` on Unix, PowerShell `-Command` on Windows.
-
 mod container_image;
 mod docker;
 mod local;

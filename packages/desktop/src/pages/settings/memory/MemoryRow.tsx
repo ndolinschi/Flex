@@ -32,7 +32,6 @@ export const MemoryRow = ({
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(
     null,
   )
-  /** Defer hover icon actions until first pointer/focus — sticky thereafter. */
   const [actionsReady, setActionsReady] = useState(false)
 
   const detailQuery = useQuery({
@@ -107,8 +106,6 @@ export const MemoryRow = ({
             ) : null}
           </span>
 
-          {/* Absolutely positioned trailing actions (SessionListItem pattern) so
-              hover controls never inflate this row's ~30px height. */}
           <span
             className={cn(
               "absolute right-2 top-1/2 flex max-w-0 -translate-y-1/2 items-center gap-0.5 overflow-hidden opacity-0",

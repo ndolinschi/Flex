@@ -1,9 +1,3 @@
-//! Append-only JSONL [`SessionStore`] implementation.
-//!
-//! Each session owns one `.jsonl` file. Lines are either metadata snapshots,
-//! events, or delete tombstones; reopening the store replays those records into
-//! the same in-memory shape as [`MemoryStore`](crate::MemoryStore).
-
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
@@ -25,17 +19,11 @@ enum LineRecord {
         meta: SessionMeta,
     },
     Event {
-        /// Wall-clock time the event was appended. Stamped once at emit and
-        /// persisted so replay never rewrites it to "now". `#[serde(default)]`
-        /// so pre-existing logs written before this field deserialize to 0;
-        /// such legacy lines get a reconstructed, monotonic ts at load time.
         #[serde(default)]
         ts_ms: u64,
         event: AgentEvent,
     },
     Delete,
-    /// Internal to this file format — not a wire type. A named pointer at a
-    /// `seq` the log already contains.
     Checkpoint {
         checkpoint: CheckpointRef,
     },
@@ -44,13 +32,10 @@ enum LineRecord {
 #[derive(Debug, Clone)]
 struct Record {
     meta: SessionMeta,
-    /// Appended events paired with the wall-clock `ts_ms` captured at emit.
-    /// Index is the per-session sequence number (gapless, starts at 0).
     events: Vec<(u64, AgentEvent)>,
     checkpoints: Vec<CheckpointRef>,
 }
 
-/// JSONL-backed append-only session store.
 #[derive(Debug)]
 pub struct JsonlStore {
     root: PathBuf,
@@ -58,7 +43,6 @@ pub struct JsonlStore {
 }
 
 impl JsonlStore {
-    /// Open or create a JSONL store rooted at `root`.
     pub fn open(root: impl Into<PathBuf>) -> Result<Self, StoreError> {
         let root = root.into();
         fs::create_dir_all(&root).map_err(io_error)?;
@@ -110,9 +94,6 @@ impl SessionStore for JsonlStore {
             .get_mut(id)
             .ok_or_else(|| StoreError::SessionNotFound(id.clone()))?;
         let first_seq = record.events.len() as u64;
-        // Stamp emit time once per appended event. append runs synchronously at
-        // emit, so this is the true emit time; it is persisted and reused on
-        // replay so historical timestamps never collapse to "now".
         let ts_ms = now_ms();
         for event in events {
             self.append_record(
@@ -205,8 +186,6 @@ impl SessionStore for JsonlStore {
         if let Some(mode) = mode {
             next.mode = Some(mode);
         }
-        // Empty string / empty path clears; a non-empty value sets. Matches
-        // the convention in `MemoryStore::update_meta` — see there.
         if let Some(workspace_id) = workspace_id {
             next.workspace_id = if workspace_id.is_empty() {
                 None
@@ -361,17 +340,9 @@ fn load_file(path: &Path) -> Result<Option<(SessionId, Record)>, StoreError> {
     Ok(current.map(|record| (record.meta.id.clone(), record)))
 }
 
-/// Backfill a stable, monotonic `ts_ms` onto legacy event lines that predate
-/// the persisted timestamp (`ts_ms == 0`). Old sessions must render stable,
-/// non-collapsing, roughly-ordered times that DON'T jump to "now" on reload,
-/// so we reconstruct deterministically: carry forward the max of the previous
-/// event's effective ts, any checkpoint ts at/before this seq, and
-/// `meta.created_at_ms` as the floor. Events that already carry a real ts are
-/// left untouched (but still raise the running floor for later legacy lines).
 fn reconstruct_legacy_ts(record: &mut Record) {
     let mut floor = record.meta.created_at_ms;
     for (seq, (ts_ms, _)) in record.events.iter_mut().enumerate() {
-        // Any checkpoint recorded at or before this seq is a known real time.
         for checkpoint in &record.checkpoints {
             if checkpoint.seq <= seq as u64 {
                 floor = floor.max(checkpoint.ts_ms);
@@ -485,8 +456,6 @@ mod tests {
             .map(|stored| (stored.seq, stored.event.clone()))
             .collect();
         assert_eq!(seqs, vec![(1, event("t1")), (2, event("t2"))]);
-        // The persisted ts round-trips as a real (non-zero) wall-clock time,
-        // stable across the reopen above.
         assert!(events.iter().all(|stored| stored.ts_ms > 0));
         assert_eq!(reopened.append(&id, &[]).await.unwrap(), 3);
     }
@@ -500,7 +469,6 @@ mod tests {
             let store = JsonlStore::open(dir.path()).unwrap();
             store.create(meta("s1")).await.unwrap();
             store.append(&id, &[event("t0")]).await.unwrap();
-            // Force a distinct wall-clock reading for the second append.
             std::thread::sleep(std::time::Duration::from_millis(2));
             store.append(&id, &[event("t1")]).await.unwrap();
             let live = store.read(&id, 0).await.unwrap();
@@ -511,7 +479,6 @@ mod tests {
             assert!(t1_ts > t0_ts, "distinct appends keep distinct ts");
         }
 
-        // Reopening must not rewrite the stored timestamps to "now".
         let reopened = JsonlStore::open(dir.path()).unwrap();
         let events = reopened.read(&id, 0).await.unwrap();
         assert_eq!(events[0].ts_ms, t0_ts);
@@ -520,8 +487,6 @@ mod tests {
 
     #[tokio::test]
     async fn legacy_event_lines_without_ts_reconstruct_stable_time() {
-        // Simulate an on-disk log written before ts_ms existed: Event lines
-        // carry no ts field, so they deserialize to 0 and must be backfilled.
         let dir = tempdir().unwrap();
         let id = SessionId::from("legacy");
         let path = dir.path().join("legacy.jsonl");
@@ -529,7 +494,6 @@ mod tests {
             let mut m = meta("legacy");
             m.created_at_ms = 5_000;
             append_record(&path, &LineRecord::Meta { meta: m }).unwrap();
-            // Hand-write legacy event lines with NO ts_ms key.
             let mut file = OpenOptions::new()
                 .create(true)
                 .append(true)
@@ -558,8 +522,6 @@ mod tests {
         let store = JsonlStore::open(dir.path()).unwrap();
         let events = store.read(&id, 0).await.unwrap();
         assert_eq!(events.len(), 2);
-        // Reconstructed times are non-zero, floored at created_at_ms, stable,
-        // and non-decreasing — never "now".
         assert_eq!(events[0].ts_ms, 5_000);
         assert_eq!(events[1].ts_ms, 5_000);
         assert!(events[1].ts_ms >= events[0].ts_ms);

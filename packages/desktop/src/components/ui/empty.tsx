@@ -7,8 +7,6 @@ function Empty({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="empty"
       className={cn(
-        // Compact empty: top-weighted utility void (IDE), not a full-viewport
-        // marketing hero. Production: no loud dashed slab — quiet void only.
         "flex w-full min-w-0 flex-col items-center gap-3 rounded-[var(--radius-card)] px-4 py-10 text-center text-balance",
         className
       )}
@@ -33,7 +31,6 @@ const emptyMediaVariants = cva(
     variants: {
       variant: {
         default: "bg-transparent",
-        // Whisper chip — fill-3 + ink-faint, never muted/foreground loud slabs.
         icon: "flex size-8 shrink-0 items-center justify-center rounded-lg bg-fill-3 text-ink-faint [&_svg:not([class*='size-'])]:size-4",
       },
     },

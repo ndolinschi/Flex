@@ -1,18 +1,3 @@
-//! Canonical data model for the agent-loop engine.
-//!
-//! This crate is the hub every other crate depends on. It contains only pure
-//! data and pure functions: the unified event stream (content blocks, events,
-//! tool calls), capability declarations, errors, the transcript reducer, and
-//! the markdown projection. No I/O, no async runtime — it must stay
-//! wasm-compilable so future clients can run the reducer themselves.
-//!
-//! Wire-format rules (enforced across the workspace):
-//! - Every public type here derives `Serialize`, `Deserialize`, `JsonSchema`.
-//! - Changes within a protocol version are additive only: new enum variants,
-//!   new optional fields. Consumers route unknown event kinds to
-//!   [`AgentEvent::Unknown`] via [`AgentEvent::from_json_lenient`].
-//! - Public enums are `#[non_exhaustive]`; downstream matches need a wildcard.
-
 pub mod branding;
 pub mod capability;
 pub mod checkpoint;

@@ -4,7 +4,6 @@ type StreamingCaretProps = {
   className?: string
 }
 
-/** Thin streaming caret — subtle pulse on ink-muted, never a block accent cursor. */
 export const StreamingCaret = ({ className }: StreamingCaretProps) => {
   return (
     <span

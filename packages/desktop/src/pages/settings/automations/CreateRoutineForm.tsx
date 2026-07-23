@@ -56,7 +56,6 @@ const emptyForm = (): FormState => ({
   requireVerification: false,
 })
 
-/** Inline create form for a new routine — mirrors ProviderSettingsForm's select styling. */
 export const CreateRoutineForm = ({
   onCancel,
   onSaved,

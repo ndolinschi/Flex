@@ -9,10 +9,6 @@ import { invalidateGitQueries } from "../lib/invalidateGitQueries"
 import { useAppStore } from "../stores/appStore"
 import { log } from "../lib/debug/log"
 
-/**
- * Shared integrate/discard actions for isolated-workspace sessions
- * (ContextBar isolation popover + right-panel Changes tab).
- */
 export const useWorkspaceActions = (
   sessionId: string | null | undefined,
   onError?: (message: string) => void,
@@ -56,17 +52,6 @@ export const useWorkspaceActions = (
   }
 }
 
-/**
- * Shared invalidation for the finer-grained per-file / per-hunk review
- * actions (`reviewUndoFile`/`reviewKeepFile`/`reviewApplyPatch`) — mirrors
- * `useWorkspaceActions`' invalidation set (minus `sessions`/`is-isolated`,
- * which those actions never change) plus the per-file diff query so a
- * re-expanded row refetches instead of showing a stale diff.
- *
- * Not folded into `useWorkspaceActions` itself since these actions take a
- * `path` in addition to `sessionId` and are called far more often (per row,
- * per hunk) than the coarse integrate/discard pair.
- */
 export const invalidateReviewQueries = (
   queryClient: ReturnType<typeof useQueryClient>,
   path?: string,

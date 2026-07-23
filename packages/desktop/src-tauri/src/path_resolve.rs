@@ -1,17 +1,6 @@
-//! Shared filesystem path normalization for workspace `cwd` strings.
-//!
-//! Session paths round-trip through JSON and OS dialogs; on Windows they can
-//! pick up doubled backslashes, and isolated sessions can leave a dead
-//! worktree path in `cwd` while `base_cwd` still points at the real repo.
 
 use std::path::{Path, PathBuf};
 
-/// Collapse doubled `\` separators that appear when a Windows path was
-/// JSON/shell double-escaped (`C:\\Users\\foo` as the filesystem string).
-/// Preserves UNC (`\\server\share`) and extended (`\\?\…`) prefixes.
-///
-/// Double-escaped UNC arrives as four leading backslashes (`\\\\server\\…`);
-/// the leading run is normalized to exactly `\\` before collapsing the rest.
 pub fn collapse_extra_backslashes(path: &str) -> String {
     if path.starts_with(r"\\?\") {
         return path.to_owned();
@@ -22,7 +11,6 @@ pub fn collapse_extra_backslashes(path: &str) -> String {
     if unc {
         out.push('\\');
         out.push('\\');
-        // Skip the whole leading `\` run (2 from real UNC, 4+ from double-escape).
         while chars.peek() == Some(&'\\') {
             let _ = chars.next();
         }
@@ -40,18 +28,15 @@ pub fn collapse_extra_backslashes(path: &str) -> String {
     out
 }
 
-/// Trim quotes / `file://` prefixes from a dialog or wire-path string.
 pub fn normalize_cwd_input(raw: &str) -> String {
     let trimmed = raw.trim().trim_matches('"').trim_matches('\'');
     if trimmed.is_empty() {
         return String::new();
     }
-    // `file:///Users/…` or `file:///C:/Users/…` (and `file://localhost/…`).
     let without_scheme = trimmed
         .strip_prefix("file://localhost")
         .or_else(|| trimmed.strip_prefix("file://"))
         .unwrap_or(trimmed);
-    // On Windows, `file:///C:/…` → `/C:/…`; drop the leading slash before the drive.
     #[cfg(windows)]
     {
         let bytes = without_scheme.as_bytes();
@@ -88,8 +73,6 @@ fn try_dir(raw: &str) -> Option<PathBuf> {
     None
 }
 
-/// Resolve an existing directory from `primary`, then optional `fallback`
-/// (typically `SessionMeta.base_cwd` when an isolated worktree is gone).
 pub fn resolve_existing_dir(primary: &str, fallback: Option<&str>) -> Option<PathBuf> {
     if let Some(path) = try_dir(primary) {
         return Some(path);

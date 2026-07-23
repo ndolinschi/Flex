@@ -5,9 +5,6 @@ import {
 } from "../lib/updater"
 import { useAppStore } from "../stores/appStore"
 
-/** Fire-and-forget update check after bootstrap. Surfaces a toast with an
- * Install action when a newer signed release is on the channel; soft-fails
- * (no toast) when the channel isn't published yet. */
 export const useUpdaterCheck = (enabled: boolean) => {
   const pushToast = useAppStore((s) => s.pushToast)
   const ranRef = useRef(false)

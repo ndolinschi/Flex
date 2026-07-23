@@ -33,8 +33,6 @@ type TitleBarMenusProps = {
 const isMac = () => detectWindowHost() === "macos"
 const mod = () => (isMac() ? "⌘" : "Ctrl+")
 
-/** Cursor-style File / Edit / View / Help menus in the custom title bar (Windows/Linux).
- * Uses shadcn Menubar so hover-open coordination between menus is automatic. */
 export const TitleBarMenus = ({
   handlers,
   isBootstrapped,

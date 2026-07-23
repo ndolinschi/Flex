@@ -1,17 +1,8 @@
-//! Cross-platform screen / region capture for Browser + Computer tools.
-//!
-//! No heavy native capture crates (xcap's PipeWire/Wayland stack breaks
-//! Linux CI). Backends:
-//! - macOS: `screencapture`
-//! - Linux: `grim` (Wayland) → ImageMagick `import` (X11)
-//! - Windows: PowerShell + `System.Drawing` `CopyFromScreen`
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Absolute screen rectangle in **physical pixels** (same space as Tauri
-/// `outer_position` / webview `position`).
 #[derive(Debug, Clone, Copy)]
 pub struct ScreenRect {
     pub x: i32,
@@ -31,7 +22,6 @@ impl ScreenRect {
     }
 }
 
-/// Temp PNG path under the system temp dir.
 pub fn temp_png(prefix: &str) -> PathBuf {
     let ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -46,7 +36,6 @@ fn path_str(out: &Path) -> Result<&str, String> {
         .ok_or_else(|| "screenshot path is not valid UTF-8".to_owned())
 }
 
-/// Capture the primary display into `out` (PNG).
 pub fn capture_primary_to_png(out: &Path) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -90,11 +79,6 @@ pub fn capture_primary_to_png(out: &Path) -> Result<(), String> {
     }
 }
 
-/// Capture a screen region into `out` (PNG).
-///
-/// `scale` is the window scale factor (logical→physical). macOS
-/// `screencapture -R` wants **points**, so physical coords are divided by
-/// scale there. Linux/Windows tools use physical pixels.
 pub fn capture_region_to_png(rect: ScreenRect, scale: f64, out: &Path) -> Result<(), String> {
     if rect.width == 0 || rect.height == 0 {
         return Err("capture region has zero size".into());
@@ -239,7 +223,6 @@ fn run_powershell(script: &str) -> Result<(), String> {
     }
 }
 
-/// Windows mouse / keyboard helpers used by Computer Use.
 #[cfg(windows)]
 pub mod windows_input {
     use super::{run_powershell, windows_escape_ps_string};
@@ -267,7 +250,6 @@ public class AgentInput {
 
     pub fn click(x: f64, y: f64, button: &str) -> Result<(), String> {
         move_mouse(x, y)?;
-        // MOUSEEVENTF_LEFTDOWN=0x0002 LEFTUP=0x0004 RIGHTDOWN=0x0008 RIGHTUP=0x0010
         let (down, up) = if button == "right" {
             (0x0008u32, 0x0010u32)
         } else {
@@ -280,7 +262,6 @@ public class AgentInput {
     }
 
     pub fn type_text(text: &str) -> Result<(), String> {
-        // SendKeys special chars: + ^ % ~ ( ) { } [ ]
         let mut escaped = String::with_capacity(text.len());
         for ch in text.chars() {
             match ch {

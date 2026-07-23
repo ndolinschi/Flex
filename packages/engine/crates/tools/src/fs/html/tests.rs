@@ -11,9 +11,6 @@ fn list_item_detection() {
     assert!(is_list_item_line("  * indented item"));
     assert!(!is_list_item_line(""));
     assert!(!is_list_item_line("This is just regular text."));
-    // Bold text should not be flagged as a list item even though it starts
-    // with '*'; the 3-consecutive threshold protects against false
-    // positives.
     assert!(is_list_item_line("*bold* text"));
 }
 
@@ -28,11 +25,9 @@ fn markdown_link_counting() {
 
 #[test]
 fn nav_line_detection_short_link_heavy() {
-    // Short line composed almost entirely of links → nav.
     assert!(is_nav_line_by_links(
         "[Home](/) [Docs](/docs) [API](/api) [Blog](/blog)"
     ));
-    // Single link with substantial surrounding text → not nav.
     assert!(!is_nav_line_by_links(
         "Read the [installation guide](/install) before proceeding."
     ));
@@ -40,7 +35,6 @@ fn nav_line_detection_short_link_heavy() {
 
 #[test]
 fn nav_line_detection_many_links() {
-    // Line with 3+ links regardless of length → nav.
     assert!(is_nav_line_by_links(
         "Check [A](/a) [B](/b) and [C](/c) for a very long description of something interesting here"
     ));
@@ -48,7 +42,6 @@ fn nav_line_detection_many_links() {
 
 #[test]
 fn nav_line_detection_body_text_with_link() {
-    // A single mid-sentence link in genuine body text → not nav.
     assert!(!is_nav_line_by_links(
         "For more details please refer to the [official documentation](https://example.com)."
     ));
@@ -125,7 +118,6 @@ for proper content extraction to work correctly during web scraping.";
 
 #[test]
 fn strip_nav_preserves_short_content() {
-    // Content under 200 chars after stripping should return original.
     let md = "[Home](/) [About](/a)";
     let cleaned = strip_navigation_blocks(md);
     assert_eq!(
@@ -151,7 +143,6 @@ so it should pass through the cleaning pipeline without any modification.";
 
 #[test]
 fn clean_html_for_model_integration() {
-    // Simulate an ITER-like page: nav-heavy header + real article body.
     let html = r#"<html><body>
     <nav>
       <a href="/">Home</a>
@@ -171,7 +162,6 @@ fn clean_html_for_model_integration() {
     </article>
     </body></html>"#;
     let result = clean_html_for_model(html);
-    // The nav links should not dominate the output; body text must survive.
     assert!(
         result.contains("plasma") || result.contains("ITER"),
         "article body should appear in cleaned output: {result}"

@@ -6,15 +6,6 @@ import { useAppStore } from "../stores/appStore"
 
 const BUILD_PROMPT = "Implement the plan as specified."
 
-/**
- * "Build" — leave plan mode and start implementing.
- * Calls `prompt` directly (no synthetic keyboard events).
- *
- * `modelId` (optional) overrides `store.selectedModelId` for this one turn —
- * the Plan tab toolbar's model pill (`planBuildModelBySession`) picks the
- * build model independently of the composer's current model. Its per-model
- * effort (`effortByModel`) rides along automatically.
- */
 export const usePlanBuild = () => {
   const [isBuilding, setIsBuilding] = useState(false)
 

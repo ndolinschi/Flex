@@ -1,14 +1,8 @@
-/** One span of composer/timeline text — plain or an @-mention pill. */
 export type MentionSegment = { pill: boolean; value: string }
 
 const escapeRegExp = (s: string): string =>
   s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
-/** Split `text` into plain + pill segments for @-mentions.
- *
- * - `knownNames` omitted/`undefined` (timeline): heuristically pill `@token`s.
- * - `knownNames` provided (composer, even if empty): only those `@name`
- *   tokens become pills — matches the live attachment-backed backdrop. */
 export const segmentAtMentions = (
   text: string,
   knownNames?: readonly string[],
@@ -27,9 +21,7 @@ export const segmentAtMentions = (
 
   const re = useKnownList
     ? new RegExp(`@(?:${names.map(escapeRegExp).join("|")})`, "g")
-    : // Heuristic: @ + non-whitespace (files, dirs, paths). Stop before
-      // trailing sentence punctuation so "see @App.tsx." keeps the period
-      // outside the pill.
+    :
       /@[^\s@]+/g
 
   const segments: MentionSegment[] = []

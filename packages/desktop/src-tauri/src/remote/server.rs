@@ -1,4 +1,3 @@
-//! Remote Access HTTP server lifecycle (shared listener + connection methods).
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
@@ -93,8 +92,6 @@ impl RemoteServer {
             return Ok(());
         }
 
-        // Non-loopback expose always requires an explicit (persisted) token —
-        // we never auto-generate for LAN/public/cloudflare without storing it.
         let token_str = ensure_remote_token()?;
         self.set_token(AuthToken::new(token_str.clone())).await;
 
@@ -142,7 +139,6 @@ impl RemoteServer {
         });
         *self.http_task.lock().await = Some(task);
 
-        // Start connection-method adapters against the bound port.
         let mut methods = build_methods(&cfg);
         let ctx = MethodContext {
             config: &cfg,
@@ -180,8 +176,6 @@ impl RemoteServer {
         for method in methods.iter() {
             endpoints.extend(method.pairing_endpoints(&cfg));
         }
-        // When enabled but not yet started, still advertise configured methods
-        // as stopped so the Settings UI can show intent.
         if endpoints.is_empty() && cfg.enabled {
             for method in build_methods(&cfg) {
                 endpoints.extend(method.pairing_endpoints(&cfg));
@@ -214,7 +208,6 @@ impl RemoteServer {
 
 use axum::http::StatusCode;
 
-/// Process-wide remote server held in [`crate::state::AppState`].
 pub type RemoteServerHandle = Arc<RemoteServer>;
 
 pub fn init_remote_server() -> DesktopResult<RemoteServerHandle> {

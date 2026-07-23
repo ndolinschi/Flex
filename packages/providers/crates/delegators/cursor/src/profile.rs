@@ -1,5 +1,3 @@
-//! Cursor as a [`DelegatorProfile`] over the shared line-oriented runtime.
-
 use std::sync::Arc;
 
 use agentloop_contracts::{
@@ -17,7 +15,6 @@ use crate::CURSOR_AGENT_ID;
 use crate::config::CursorCliConfig;
 use crate::mapper::CursorLineMapper;
 
-/// Cursor's identity, capabilities, and launch shape (via `cursor-agent`).
 pub struct CursorRuntimeProfile {
     pub config: CursorCliConfig,
 }
@@ -43,8 +40,7 @@ impl DelegatorProfile for CursorRuntimeProfile {
                 tool_scoping: false,
             },
             reasoning_visible: false,
-            // Output is structured stream-json, but the one-shot host maps it
-            // post-hoc, so clients see a snapshot replay, not live deltas.
+
             streaming: StreamingGranularity::SnapshotOnly,
             resume: ResumeSupport::Replay,
             attachments: AttachmentCaps {
@@ -80,10 +76,8 @@ impl DelegatorProfile for CursorRuntimeProfile {
     }
 }
 
-/// The Cursor delegator agent.
 pub type CursorAgent<H = TokioCommandHost> = LineDelegatorAgent<CursorRuntimeProfile, H>;
 
-/// Build a Cursor agent with the real process host.
 pub fn cursor_agent(config: CursorCliConfig, store: Arc<dyn SessionStore>) -> CursorAgent {
     LineDelegatorAgent::new(
         CursorRuntimeProfile { config },
@@ -92,12 +86,10 @@ pub fn cursor_agent(config: CursorCliConfig, store: Arc<dyn SessionStore>) -> Cu
     )
 }
 
-/// Build a Cursor agent with an ephemeral in-memory store (probing, doctor).
 pub fn ephemeral_cursor_agent(config: CursorCliConfig) -> CursorAgent {
     cursor_agent(config, Arc::new(MemoryStore::new()))
 }
 
-/// Build a Cursor agent over a custom [`ProcessHost`] (tests).
 pub fn cursor_agent_with_host<H: ProcessHost + 'static>(
     config: CursorCliConfig,
     store: Arc<dyn SessionStore>,

@@ -1,6 +1,5 @@
 import type { TokenUsage } from "./types"
 
-/** Per-model usage bucket for the Status tab. */
 export type ModelUsageBucket = {
   input: number
   output: number
@@ -19,7 +18,6 @@ export const emptyModelUsageBucket = (): ModelUsageBucket => ({
   calls: 0,
 })
 
-/** Add a TokenUsage into a model's bucket (immutable). */
 export const addUsageToModelMap = (
   map: ModelUsageMap,
   model: string,
@@ -41,7 +39,6 @@ export const addUsageToModelMap = (
   }
 }
 
-/** Session-level cache R/W totals derived from a model-usage map. */
 export const cacheTotalsFromModelUsage = (
   map: ModelUsageMap | undefined,
 ): { cacheRead: number; cacheWrite: number } => {

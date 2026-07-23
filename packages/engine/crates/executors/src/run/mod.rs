@@ -1,7 +1,3 @@
-//! Shared process plumbing: spawn a prepared command, enforce timeout and
-//! cancellation, collect output. Every backend funnels through here so the
-//! cancel/timeout semantics are identical across backends.
-
 mod background;
 mod demote;
 mod foreground;

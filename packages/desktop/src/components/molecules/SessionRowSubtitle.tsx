@@ -7,7 +7,6 @@ import { isPristineSession } from "../../lib/types"
 import { formatCompactTime } from "../../lib/utils"
 import { DiffStat } from "../atoms"
 
-/** Parsed `+N -M` diff counters, if the workspace summary is in that shape. */
 export const parseDiffStat = (
   summary: string,
 ): { added: number; removed: number } | null => {
@@ -16,13 +15,6 @@ export const parseDiffStat = (
   return { added: Number(match[1]), removed: Number(match[2]) }
 }
 
-/**
- * Trailing DiffStat for a session row, or null when nothing session-scoped
- * should be shown. Pristine drafts are always null — full-repo dirty stats
- * from a missing baseline must not leak onto empty "New Agent" rows.
- * Isolated sessions prefer `workspaceStatus`; otherwise the Changes-tab
- * `gitStatus` summary.
- */
 export const sessionTrailingDiff = (
   session: Pick<SessionMeta, "title" | "base_cwd" | "workspace_id">,
   workspaceStatus?: WorkspaceStatusDto | null,
@@ -62,11 +54,9 @@ type SessionRowSubtitleProps = {
   updatedAtMs: number
   workspaceStatus?: WorkspaceStatusDto | null
   gitStatus?: GitStatusSummary
-  /** Repo basename — shown for pinned rows that left their project group. */
   repoLabel?: string
 }
 
-/** Diff + relative-time line under a session row title. */
 export const SessionRowSubtitle = ({
   session,
   updatedAtMs,
@@ -93,7 +83,6 @@ export const SessionRowSubtitle = ({
   )
 }
 
-/** Whether a session row should show the subtitle line (vs trailing time). */
 export const sessionRowHasSubtitle = (
   session: Pick<SessionMeta, "title" | "base_cwd" | "workspace_id">,
   workspaceStatus?: WorkspaceStatusDto | null,

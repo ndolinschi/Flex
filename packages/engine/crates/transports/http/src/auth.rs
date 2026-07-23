@@ -1,9 +1,3 @@
-//! Bearer-token auth: constant-time comparison, and a hard refusal to bind
-//! non-loopback without an explicit token. Three competing agent runtimes
-//! shipped unauthenticated-by-default HTTP servers and paid for it (an
-//! unauthenticated RCE, ~1000 exposed instances found via Shodan, an
-//! unauthenticated API) — this transport does not repeat that mistake.
-
 use std::net::{IpAddr, SocketAddr};
 
 use axum::extract::State;
@@ -12,7 +6,6 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use subtle::ConstantTimeEq;
 
-/// The bearer token guarding every route except `/health`.
 #[derive(Clone)]
 pub struct AuthToken(String);
 
@@ -21,7 +14,6 @@ impl AuthToken {
         Self(token.into())
     }
 
-    /// A fresh, randomly generated token (32 bytes, hex-encoded).
     pub fn generate() -> Self {
         Self(format!(
             "{}{}",
@@ -35,26 +27,14 @@ impl AuthToken {
     }
 
     fn matches(&self, presented: &str) -> bool {
-        // Constant-time so response latency can't leak how many leading
-        // bytes matched. Length must match first (ct_eq requires equal-
-        // length inputs); a length mismatch is already a safe, non-secret
-        // signal (any real token has a fixed known length).
         self.0.as_bytes().ct_eq(presented.as_bytes()).into()
     }
 }
 
-/// Where the server will listen. Refuses to construct a non-loopback bind
-/// unless a token was explicitly provided (not auto-generated) — an
-/// auto-generated token is meant for local-only use and printed once to
-/// stderr, never for a bind reachable off the host.
 pub struct BindTarget {
     pub addr: SocketAddr,
 }
 
-/// Validate a requested bind address against the token's provenance.
-/// `token_was_explicit` is `true` when the caller passed an explicit token
-/// (a CLI flag or an environment variable); `false` when it was
-/// auto-generated.
 pub fn validate_bind(addr: SocketAddr, token_was_explicit: bool) -> Result<BindTarget, String> {
     if !is_loopback(addr.ip()) && !token_was_explicit {
         return Err(format!(
@@ -70,11 +50,6 @@ fn is_loopback(ip: IpAddr) -> bool {
     ip.is_loopback()
 }
 
-/// Axum middleware: every request must carry `Authorization: Bearer <token>`
-/// matching the configured token, or gets `401`. Applied to every route
-/// except `/health` (mounted outside this layer). Exported so a caller
-/// mounting extra routes via `build_router_with_extra` can protect them with
-/// the same check (e.g. the SDK's routine webhook) instead of duplicating it.
 pub async fn require_bearer_token(
     State(token): State<AuthToken>,
     request: Request<axum::body::Body>,

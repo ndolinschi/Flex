@@ -1,14 +1,3 @@
-//! Git-worktree implementation of [`agentloop_core::Workspaces`].
-//!
-//! A provisioned workspace is a `git worktree` checked out on a fresh branch,
-//! branched from the base repository's current `HEAD`. The session's tools run
-//! there (via `SessionMeta.cwd`), so every edit is contained. Integration
-//! commits the work, optionally runs a verify command, and fast-forwards the
-//! base branch onto it; discard removes the worktree and its branch.
-//!
-//! This is the sanctioned I/O edge for isolation: it is the only place that
-//! spawns `git`.
-
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
@@ -18,12 +7,9 @@ use agentloop_contracts::branding::PRODUCT_SLUG;
 use agentloop_contracts::{IntegrationOutcome, IsolationPolicy, SessionId};
 use agentloop_core::workspace::{Workspace, WorkspaceError, WorkspaceStatus, Workspaces};
 
-/// Win32 `CREATE_NO_WINDOW` — do not allocate a new console for the child.
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-/// Apply creation flags so a console child does not flash a window when
-/// spawned from a GUI parent (desktop). No-op on non-Windows.
 fn hide_console(command: &mut Command) {
     #[cfg(windows)]
     command.creation_flags(CREATE_NO_WINDOW);
@@ -31,21 +17,14 @@ fn hide_console(command: &mut Command) {
     let _ = command;
 }
 
-/// Default cap on live worktrees per base project — see
-/// [`GitWorktrees::with_max_per_base`].
 const DEFAULT_MAX_PER_BASE: usize = 5;
 
-/// Provisions git-worktree-backed isolated workspaces under `root`.
 pub struct GitWorktrees {
-    /// Directory under which per-session worktrees are created.
     root: PathBuf,
-    /// Cap on the number of live worktrees per base project.
     max_per_base: usize,
 }
 
 impl GitWorktrees {
-    /// Create a provisioner that places worktrees under `root` (e.g.
-    /// `~/.local/state/<slug>/worktrees`).
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
             root: root.into(),
@@ -53,22 +32,16 @@ impl GitWorktrees {
         }
     }
 
-    /// Override the cap on live worktrees per base project (default 5).
-    /// Zero is clamped to 1 (a base can always host at least one workspace).
     pub fn with_max_per_base(mut self, cap: usize) -> Self {
         self.max_per_base = cap.max(1);
         self
     }
 
-    /// The commit message for the single squash-style commit that captures a
-    /// session's work. Brand-free by design.
     fn commit_message() -> &'static str {
         "agent session changes"
     }
 }
 
-/// Run `git` in `dir`, returning trimmed stdout. Spawn failure → `GitUnavailable`;
-/// a non-zero exit → `GitFailed` (with stderr).
 async fn git(dir: &Path, args: &[&str]) -> Result<String, WorkspaceError> {
     let mut command = Command::new("git");
     hide_console(&mut command);
@@ -88,8 +61,6 @@ async fn git(dir: &Path, args: &[&str]) -> Result<String, WorkspaceError> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }
 
-/// Map a "cannot isolate" condition to the policy-appropriate result: an error
-/// when isolation is required, a graceful `None` when it is optional.
 fn cannot_isolate(
     policy: IsolationPolicy,
     base: &Path,
@@ -106,7 +77,6 @@ fn path_str(path: &Path) -> Result<&str, WorkspaceError> {
         .ok_or_else(|| WorkspaceError::Io(format!("non-UTF-8 path: {}", path.display())))
 }
 
-/// Count of changed entries reported by `git status --porcelain`.
 fn changed_count(porcelain: &str) -> u32 {
     porcelain
         .lines()
@@ -131,11 +101,6 @@ impl Workspaces for GitWorktrees {
             Err(_) => return cannot_isolate(policy, base),
         };
 
-        // Cap: refuse to spawn a new worktree once the base project already
-        // has `max_per_base` live ones. `list` is best-effort — if git
-        // enumeration fails we fall through and let `git worktree add` run
-        // (its own errors surface); the cap is a soft guardrail, not a
-        // security boundary.
         if let Ok(existing) = self.list(base).await {
             if existing.len() >= self.max_per_base {
                 return Err(WorkspaceError::GitFailed(format!(
@@ -302,7 +267,6 @@ impl Workspaces for GitWorktrees {
     }
 
     async fn list(&self, base: &Path) -> Result<Vec<Workspace>, WorkspaceError> {
-        // Not a git repo? No workspaces belong to it.
         let toplevel = match git(base, &["rev-parse", "--show-toplevel"]).await {
             Ok(top) => PathBuf::from(top),
             Err(_) => return Ok(Vec::new()),
@@ -324,9 +288,6 @@ impl Workspaces for GitWorktrees {
         let existing = self.list(base).await.unwrap_or_default();
         match existing.into_iter().find(|w| w.id == workspace_id) {
             Some(mut workspace) => {
-                // Refresh `base_ref` to the workspace's actual HEAD so callers
-                // don't rely on the porcelain-reported value (it's already
-                // real; this is a no-op belt-and-braces read).
                 if let Ok(sha) = git(&workspace.root, &["rev-parse", "HEAD"]).await {
                     workspace.base_ref = sha;
                 }
@@ -350,11 +311,6 @@ impl Workspaces for GitWorktrees {
     }
 }
 
-/// Parse `git worktree list --porcelain` output and keep only worktrees that
-/// live under `root_prefix` (this backend's own worktree root). Each stanza
-/// is separated by a blank line and lists `worktree`, `HEAD`, and `branch`
-/// on their own lines; the branch line is the workspace id (with the
-/// `refs/heads/` prefix stripped).
 fn parse_worktrees(porcelain: &str, root_prefix: &Path) -> Vec<Workspace> {
     let mut out = Vec::new();
     let mut cur_path: Option<PathBuf> = None;
@@ -398,8 +354,6 @@ fn parse_worktrees(porcelain: &str, root_prefix: &Path) -> Vec<Workspace> {
     out
 }
 
-/// Run a verify command via `sh -c` in `root`. Returns `Ok(None)` on success,
-/// `Ok(Some(tail))` with a truncated output tail on failure.
 async fn run_verify(root: &Path, cmd: &str) -> Result<Option<String>, WorkspaceError> {
     let mut command = Command::new("sh");
     hide_console(&mut command);
@@ -418,7 +372,6 @@ async fn run_verify(root: &Path, cmd: &str) -> Result<Option<String>, WorkspaceE
     Ok(Some(tail(&combined, 800)))
 }
 
-/// The last `max` chars of `text`, prefixed with an elision marker when cut.
 fn tail(text: &str, max: usize) -> String {
     let trimmed = text.trim();
     if trimmed.chars().count() <= max {

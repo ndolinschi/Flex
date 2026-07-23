@@ -1,5 +1,3 @@
-//! Stdio chunk readers shared by foreground and background runners.
-
 use std::sync::{Arc, Mutex};
 
 use tokio::io::AsyncReadExt;
@@ -8,14 +6,8 @@ use agentloop_core::{ChunkSink, ExecStream};
 
 use super::background::BackgroundState;
 
-/// Size of each incremental read. Chunk-based (not line-based): a command
-/// that never emits a newline (a progress spinner, a long single-line log)
-/// still streams instead of stalling until EOF.
 pub(super) const CHUNK_BUF_SIZE: usize = 8 * 1024;
 
-/// Cap on the accumulated tail buffer, in bytes. Older bytes are dropped as
-/// new ones arrive (ring-buffer-by-truncation) so a chatty long-running
-/// process can't grow the registry entry unbounded.
 pub(super) const TAIL_BUFFER_CAP_BYTES: usize = 16 * 1024;
 
 pub(super) async fn read_and_forward_dual<R>(
@@ -52,8 +44,6 @@ where
     acc
 }
 
-/// Read one pipe to EOF in 8KB chunks, forwarding each chunk to `sink` (lossy
-/// UTF-8) while accumulating the raw bytes for the final result.
 pub(super) async fn read_and_forward<R>(
     mut reader: R,
     stream: ExecStream,
@@ -78,10 +68,6 @@ where
     acc
 }
 
-/// Like [`read_and_forward`], but for a detached background process: mirrors
-/// each chunk into the shared, capped tail buffer (instead of an unbounded
-/// accumulator returned to a waiting caller) and optionally forwards the raw
-/// bytes to `initial_tx` for the caller collecting the initial-output window.
 pub(super) async fn read_and_forward_background<R>(
     mut reader: R,
     stream: ExecStream,

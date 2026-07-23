@@ -1,5 +1,3 @@
-//! `Edit`: byte-exact string replacement in a freshly-read file.
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -14,17 +12,12 @@ use super::{FsState, check_freshness, modified_time, require_absolute, schema_of
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct EditInput {
-    /// Absolute path to edit.
     file_path: String,
-    /// Exact text to replace. Must occur once unless `replace_all` is true.
     old_string: String,
-    /// Replacement text.
     new_string: String,
-    /// Replace every occurrence instead of requiring a unique match.
     replace_all: Option<bool>,
 }
 
-/// Replace exact text in a file the model has already read.
 pub struct EditTool {
     state: Arc<FsState>,
 }

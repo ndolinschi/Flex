@@ -19,26 +19,11 @@ const RUNNING_TOOL_STATES: ReadonlySet<string> = new Set([
   "awaiting_permission",
 ])
 
-/** Force a still-in-flight `ToolCallStatus` to a terminal one. `cancelled` —
- * not `failed` — is the honest state here: the turn ended (normally,
- * cancelled, or errored) while this call was in flight, so we don't actually
- * know whether it would have succeeded; we just know it's no longer running. */
 const closeStatus = (status: ToolCallStatus): ToolCallStatus =>
   RUNNING_TOOL_STATES.has(status.state) ? { state: "cancelled" } : status
 
-/** Engine-side tool name for the HITL question tool (mirrors
- * `AskUserQuestion` in `agentloop_core::tool`). Used only to recognize a
- * dangling ask-type call after replay — see `findDanglingAskRow`. */
 const ASK_USER_QUESTION_TOOL_NAME = "AskUserQuestion"
 
-/**
- * True if `rows` still contains a not-yet-terminal `AskUserQuestion` tool
- * call — i.e. the replayed JSONL ends mid-question with no resolution ever
- * coming (the engine's pending-question map was in-memory only and died
- * with the process that asked). Recurses into subagent/workflow children
- * the same way `closeRunningRows` does, since a subagent can itself have
- * asked a question when the app restarted.
- */
 export const findDanglingAskRow = (rows: TimelineRow[]): boolean =>
   rows.some((row) => {
     switch (row.type) {
@@ -58,16 +43,6 @@ export const findDanglingAskRow = (rows: TimelineRow[]): boolean =>
     }
   })
 
-/**
- * Turn-end/error sweep: force-close anything in `rows` still marked running.
- * A cancelled Stop (or any non-`end_turn` stop reason, or a hard
- * `session_error`) can leave the timeline with dangling "running" state —
- * subagent rows stuck in `phase: "started"` ("Running Agent…" forever), tool
- * rows stuck `running`, `Verify` calls stuck pending — because the engine
- * simply stops emitting events for them rather than sending a final "done"
- * update. Recurses into subagent/workflow children since those can nest their
- * own tool/subagent/verdict rows arbitrarily deep.
- */
 export const closeRunningRows = (rows: TimelineRow[]): TimelineRow[] =>
   rows.map((row) => {
     switch (row.type) {
@@ -114,7 +89,6 @@ export const applyEventToTimeline = (
 
   switch (payload.kind) {
     case "user_message": {
-      // Tool-result-only user messages are model feedback, not chat bubbles.
       if (!hasVisibleUserContent(payload.content)) break
       const text = extractMarkdownText(payload.content)
       next.push({
@@ -138,7 +112,6 @@ export const applyEventToTimeline = (
         })
       }
       const text = extractMarkdownText(payload.content)
-      // Skip empty assistant shells (thinking/tool_use only — no markdown yet).
       if (!text.trim()) break
       next.push({
         type: "assistant",
@@ -183,8 +156,6 @@ export const applyEventToTimeline = (
           if (existing.type === "workflow") {
             next[existingIdx] = {
               ...existing,
-              // Args stream in incrementally; keep the richer parse once the
-              // model has emitted the full `steps` array.
               steps: steps.length > 0 ? steps : existing.steps,
               status: payload.call.status,
             }
@@ -230,13 +201,6 @@ export const applyEventToTimeline = (
       break
     }
     case "turn_completed": {
-      // Defensive: a turn can end cleanly (no error, no cancellation) yet
-      // produce literally nothing — an empty provider stream (zero deltas,
-      // zero tool calls). Nothing else in the reducer would ever push a row
-      // for that case, so the feed would render blank with no explanation
-      // once isStreaming clears. Detect it by scanning back to the matching
-      // `turn_started` for any assistant/tool/error content in between.
-      // Cancelled (Stop) turns get the same treatment with a "Stopped" cue.
       if (
         payload.summary.stop_reason === "end_turn" ||
         payload.summary.stop_reason === "cancelled"
@@ -287,10 +251,6 @@ export const applyEventToTimeline = (
         summary: payload.summary,
         tsMs,
       })
-      // Whatever stop reason (including "cancelled"/"error"), the turn is
-      // over — any row still claiming to be "running" at this point is
-      // dangling (the engine simply stopped emitting for it) and would
-      // otherwise spin forever in the feed. See `closeRunningRows`.
       next.splice(0, next.length, ...closeRunningRows(next))
       break
     }
@@ -301,8 +261,6 @@ export const applyEventToTimeline = (
         error: payload.error,
         tsMs,
       })
-      // Same reasoning as turn_completed above — a hard session error also
-      // ends whatever was in flight.
       next.splice(0, next.length, ...closeRunningRows(next))
       break
     }
@@ -343,10 +301,6 @@ export const applyEventToTimeline = (
       break
     }
     case "workspace_provisioned": {
-      // Deliberately not a timeline row. Old sessions provisioned at
-      // create_session left this as a chat banner on empty drafts; isolation
-      // is already shown by IsolationBadge once the worktree is active, and
-      // deferred provision means new empties never need this chrome.
       break
     }
     case "workspace_integrated": {
@@ -377,11 +331,6 @@ export const applyEventToTimeline = (
       break
     }
     case "subagent_started": {
-      // A `RunWorkflow` step spawns its subagent through the same tool call
-      // id as every other step (the engine has no per-step call/event) — so
-      // a matching `call_id` means "this is a workflow step", and the
-      // subagent slot is tracked inside that workflow row (arrival order)
-      // instead of as a standalone top-level subagent block.
       const workflowIdx = payload.call_id
         ? next.findIndex(
             (r) => r.type === "workflow" && r.callId === payload.call_id,

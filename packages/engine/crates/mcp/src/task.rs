@@ -13,10 +13,8 @@ pub struct TaskProfile {
     pub id: String,
     pub display_name: String,
     pub description: String,
-    /// Agent implementation key, for example `native` or a future delegator id.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_id: Option<String>,
-    /// MCP server names that should be visible to this spawned task.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub mcp_servers: Vec<String>,
 }

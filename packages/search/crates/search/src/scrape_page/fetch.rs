@@ -1,5 +1,3 @@
-//! Fetch-and-convert body for the `scrape_page` tool.
-
 use agentloop_contracts::{ToolOutput, ToolResultBlock};
 use agentloop_core::{ToolContext, ToolError};
 use reqwest::Client;
@@ -8,27 +6,21 @@ use serde::Deserialize;
 
 use super::body::{convert_page_body, render_scrape_output};
 
-/// Default max output bytes/chars.
 const DEFAULT_MAX_BYTES: usize = 200_000;
 
-/// Hard cap on max_bytes input parameter.
 const HARD_MAX_BYTES: usize = 1_000_000;
 
-/// Raw HTML fetch limit — applies before conversion, large enough that we don't
-/// cut HTML mid-tag.
 const RAW_FETCH_LIMIT: usize = 4 * 1024 * 1024;
 
-/// Maximum characters in the output fed back to the model.
 const MAX_OUTPUT_CHARS: usize = 120_000;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ScrapePageInput {
-    /// HTTP or HTTPS URL of the page to scrape.
     pub(crate) url: String,
-    /// Maximum response bytes to keep. Defaults to 200000, capped at 1000000.
+
     pub(crate) max_bytes: Option<usize>,
-    /// Whether to include links found on the page in the output. Defaults to true.
+
     pub(crate) include_links: Option<bool>,
 }
 

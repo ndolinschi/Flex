@@ -1,5 +1,3 @@
-//! Model streaming loop with compaction, retry, and failover.
-
 use std::sync::Arc;
 use std::time::Duration;
 

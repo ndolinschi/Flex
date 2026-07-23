@@ -1,6 +1,3 @@
-//! Instance-based registries (no globals — composition happens in the
-//! runner, and tests build their own).
-
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -9,10 +6,8 @@ use agentloop_contracts::{ModelRef, ProviderId};
 use crate::provider::{Provider, ToolSpec};
 use crate::tool::Tool;
 
-/// Which tools a session/turn may see. Deny wins over allow.
 #[derive(Debug, Clone, Default)]
 pub struct ToolFilter {
-    /// If non-empty, only these tool names are visible.
     pub allow: Vec<String>,
     pub deny: Vec<String>,
 }
@@ -26,8 +21,6 @@ impl ToolFilter {
     }
 }
 
-/// Registry of executable tools. Ordered (BTreeMap) so tool listings are
-/// deterministic across runs — stable prompts cache better.
 #[derive(Default, Clone)]
 pub struct ToolRegistry {
     tools: BTreeMap<String, Arc<dyn Tool>>,
@@ -38,7 +31,6 @@ impl ToolRegistry {
         Self::default()
     }
 
-    /// Register a tool. Re-registering a name replaces the previous tool.
     pub fn register(&mut self, tool: Arc<dyn Tool>) {
         self.tools.insert(tool.descriptor().name, tool);
     }
@@ -47,7 +39,6 @@ impl ToolRegistry {
         self.tools.get(name).cloned()
     }
 
-    /// Agent-facing specs for all tools passing the filter.
     pub fn specs(&self, filter: &ToolFilter) -> Vec<ToolSpec> {
         self.tools
             .values()
@@ -60,7 +51,6 @@ impl ToolRegistry {
         self.tools.keys().cloned().collect()
     }
 
-    /// Names of tools whose descriptor declares them read-only.
     pub fn read_only_names(&self) -> Vec<String> {
         self.tools
             .values()
@@ -74,11 +64,9 @@ impl ToolRegistry {
     }
 }
 
-/// Registry of provider clients, with model-reference resolution.
 #[derive(Default, Clone)]
 pub struct ProviderRegistry {
     providers: BTreeMap<ProviderId, Arc<dyn Provider>>,
-    /// Order in which providers are preferred for unqualified model refs.
     priority: Vec<ProviderId>,
 }
 
@@ -95,8 +83,6 @@ impl ProviderRegistry {
         self.providers.insert(id, provider);
     }
 
-    /// Set explicit preference order (unlisted providers keep insertion order
-    /// after the listed ones).
     pub fn set_priority(&mut self, priority: Vec<ProviderId>) {
         let mut ordered = priority;
         for id in self.providers.keys() {
@@ -111,10 +97,6 @@ impl ProviderRegistry {
         self.providers.get(id).cloned()
     }
 
-    /// Resolve a model reference to `(provider, model_id)`.
-    ///
-    /// `"anthropic/claude-x"` selects the named provider; a bare `"claude-x"`
-    /// selects the highest-priority registered provider.
     pub fn resolve(&self, model: &ModelRef) -> Option<(Arc<dyn Provider>, String)> {
         let (provider_part, model_part) = model.split();
         match provider_part {

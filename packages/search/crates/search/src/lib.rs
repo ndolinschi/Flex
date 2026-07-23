@@ -1,22 +1,3 @@
-//! Deep-search plugin: web search + page scraping + researcher role.
-//!
-//! ## Quick start
-//!
-//! ```no_run
-//! use agentloop_search::SearchPlugin;
-//!
-//! let plugin = SearchPlugin::default();
-//! ```
-//!
-//! Swap the search backend:
-//!
-//! ```no_run
-//! use std::sync::Arc;
-//! use agentloop_search::{SearchPlugin, DuckDuckGoBackend};
-//!
-//! let plugin = SearchPlugin::new(Arc::new(DuckDuckGoBackend::new()));
-//! ```
-
 pub mod plugin;
 pub mod rerank;
 pub mod scrape_page;

@@ -19,12 +19,6 @@ export const ToolStepList = ({
   rows: TimelineToolRowLike[]
   renderOther: (row: TimelineToolRowLike) => ReactNode
   progress?: Record<string, string>
-  /**
-   * @deprecated No longer forces tool clusters open for the whole live turn.
-   * Clusters auto-expand only while a call inside them is running, then
-   * collapse so the user can re-expand manually. Kept as an optional unused
-   * prop so WorkGroupBody call sites stay stable.
-   */
   forceOpenDetails?: boolean
 }) => {
   const openSubagentViewer = useAppStore((s) => s.openSubagentViewer)
@@ -35,8 +29,6 @@ export const ToolStepList = ({
         if (cluster.kind === "tools") {
           return (
             <ToolStepGroup
-              // Stable across the cluster's lifetime: keyed on the FIRST call's
-              // id only, not the full (growing) id list.
               key={`tools:${cluster.calls[0].id}`}
               calls={cluster.calls}
               forceOpen={cluster.calls.some(isRunning)}

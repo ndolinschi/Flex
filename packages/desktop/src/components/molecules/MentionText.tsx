@@ -3,14 +3,10 @@ import { cn } from "../../lib/utils"
 
 type MentionTextProps = {
   text: string
-  /** When set, only these @names become pills (composer). Omit for timeline
-   * heuristic highlighting of any @token. */
   knownNames?: readonly string[]
   className?: string
 }
 
-/** Renders plain text with @-mention pills — same accent chip language as
- * the composer backdrop, so sent user bubbles match what you typed. */
 export const MentionText = ({ text, knownNames, className }: MentionTextProps) => {
   const segments = segmentAtMentions(text, knownNames)
   return (

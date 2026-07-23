@@ -1,6 +1,3 @@
-//! Context compaction: summarize conversation history so future turns send a
-//! compressed prefix instead of the full transcript.
-
 use std::sync::Arc;
 
 use futures::StreamExt;
@@ -23,8 +20,6 @@ const SUMMARIZE_SYSTEM: &str = "You are a conversation summarizer. Summarize the
     file paths, code changes, errors, and open tasks. Omit filler and redundant tool output. \
     Output only the summary — no preamble or closing remarks.";
 
-/// System prompt for `TurnPair` mode: produce a bulleted list of nicknamed
-/// user→assistant turn pairs so the model can skim the session arc quickly.
 const TURN_PAIR_SUMMARIZE_SYSTEM: &str = "You are a conversation summarizer. Condense the \
     following conversation history into a numbered list of turn-pair summaries. Each entry \
     covers one user message and the assistant's response. Format each entry as:\n\
@@ -32,7 +27,6 @@ const TURN_PAIR_SUMMARIZE_SYSTEM: &str = "You are a conversation summarizer. Con
     Preserve file paths, tool results, and key decisions in the summaries. Omit filler. \
     Output only the numbered list — no preamble or closing remarks.";
 
-/// Summarize the session's current context view and record a compaction boundary.
 pub(crate) async fn compact_session(
     deps: &Arc<TurnDeps>,
     handle: Arc<SessionHandle>,
@@ -97,8 +91,6 @@ pub(crate) async fn compact_session(
 
     let tokens_before = estimate_tokens(&source);
 
-    // Live cue for UIs: summarizer stream is local (no markdown deltas), so
-    // without this the chat would sit on a silent "Working" with no text.
     handle.emit_ephemeral(
         None,
         AgentEvent::CompactionStarted {
@@ -167,14 +159,6 @@ pub(crate) async fn compact_session(
     Ok(summary)
 }
 
-/// Build the text fed to the summarizer: the prior compaction summary (kept
-/// whole) plus as many of the *newest* tail items as fit within a char budget
-/// derived from the model's context window. Older overflowing items are
-/// dropped so the summarization request itself never exceeds the limit.
-///
-/// The budget targets ~half the window (`estimate_tokens` is ~4 chars/token,
-/// so `limit/2` tokens ≈ `limit * 2` chars), leaving room for the system
-/// prompt, the request wrapper, and the model's summary output.
 fn compact_source_text(transcript: &Transcript, context_limit: u64) -> String {
     let (prior, tail) = transcript.context_view();
 
@@ -219,7 +203,6 @@ fn compact_source_text(transcript: &Transcript, context_limit: u64) -> String {
     parts.join("\n\n")
 }
 
-/// Render a single transcript item to markdown (for per-item budget accounting).
 fn render_item(item: &TranscriptItem) -> String {
     markdown::transcript_to_markdown(&Transcript {
         items: vec![item.clone()],

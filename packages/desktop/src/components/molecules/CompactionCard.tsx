@@ -11,15 +11,12 @@ type CompactionCardProps = {
   strategy: string
   tokensBefore?: number
   tokensAfter?: number
-  /** Fired when expansion changes so the timeline can re-stick to bottom. */
   onLayoutChange?: () => void
 }
 
 const isAutoStrategy = (strategy: string): boolean =>
   strategy.startsWith("auto_")
 
-/** Settled context-compaction boundary: separator divider, readable title,
- * optional token delta, expandable summary of what the model will see. */
 export const CompactionCard = ({
   summaryMarkdown,
   strategy,

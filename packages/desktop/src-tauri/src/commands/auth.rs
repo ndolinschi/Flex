@@ -1,15 +1,6 @@
-//! Copilot and ChatGPT device-flow authentication.
 
 use super::prelude::*;
 use super::providers::{chatgpt_oauth_discoverable, uuid_like_suffix};
-
-// ---------------------------------------------------------------------------
-// GitHub Copilot device-flow sign-in. The private `device_code` never leaves
-// AppState — the frontend only sees a session id plus the public user code
-// and verification URI. On success the token is written to the shared
-// `~/.config/github-copilot/apps.json` that VS Code / JetBrains / Copilot CLI
-// also use.
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,8 +45,6 @@ pub async fn copilot_auth_start(state: State<'_, AppState>) -> DesktopResult<Cop
     };
 
     let mut pending = state.pending_copilot_auth.lock().await;
-    // A new start cancels any prior in-flight wait so only one dialog can
-    // own the poll loop at a time.
     for (_, prior) in pending.drain() {
         prior.cancel.cancel();
     }
@@ -87,8 +76,6 @@ pub async fn copilot_auth_wait(
     };
 
     let result = DeviceFlow::new().poll(&auth, cancel).await;
-    // Drop the session either way so a cancelled/failed wait can't be
-    // retried against an expired device code.
     state.pending_copilot_auth.lock().await.remove(&session_id);
 
     match result {
@@ -116,12 +103,6 @@ pub async fn copilot_auth_cancel(
     }
     Ok(())
 }
-
-// ---------------------------------------------------------------------------
-// ChatGPT Plus/Pro subscription OAuth (Codex CLI headless device flow).
-// Tokens land in `~/.config/agentloop/openai-auth.json` and unlock the
-// native `chatgpt` provider (Codex Responses backend).
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -1,4 +1,3 @@
-//! `ComputerPlugin` — OS computer-use tools with an animated agent cursor.
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -75,7 +74,6 @@ impl Plugin for ComputerPlugin {
     }
 
     fn force_ask_tools(&self) -> Vec<String> {
-        // Computer use is high-impact — always ask even in BypassPermissions.
         vec![
             "ComputerClick".into(),
             "ComputerType".into(),
@@ -125,9 +123,7 @@ struct ComputerMoveTool {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ComputerMoveInput {
-    /// Absolute screen X in points (primary monitor, top-left origin).
     x: f64,
-    /// Absolute screen Y in points.
     y: f64,
 }
 
@@ -176,7 +172,6 @@ struct ComputerClickTool {
 struct ComputerClickInput {
     x: f64,
     y: f64,
-    /// Optional button: "left" (default) or "right".
     button: Option<String>,
 }
 
@@ -225,7 +220,6 @@ struct ComputerTypeTool {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ComputerTypeInput {
-    /// Text to type via the keyboard into the focused OS application.
     text: String,
 }
 
@@ -267,7 +261,6 @@ struct ComputerOpenAppTool {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ComputerOpenAppInput {
-    /// Application name (macOS: "Safari", "Notes") or executable path.
     name: String,
 }
 
@@ -300,8 +293,6 @@ impl Tool for ComputerOpenAppTool {
         Ok(ToolOutput::text(format!("Opened {}", input.name)))
     }
 }
-
-// ─── OS backends ─────────────────────────────────────────────────────────────
 
 async fn capture_screen() -> Result<PathBuf, ToolError> {
     let path = crate::screen_capture::temp_png("agent-computer-screenshot");

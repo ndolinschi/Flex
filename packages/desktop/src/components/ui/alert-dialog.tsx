@@ -28,7 +28,6 @@ function AlertDialogOverlay({
     <AlertDialogPrimitive.Backdrop
       data-slot="alert-dialog-overlay"
       className={cn(
-        // Modal tier stays above menus, tooltips, and transient toasts.
         "fixed inset-0 isolate z-[var(--z-modal)] bg-black/30 duration-[var(--duration-normal)] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}

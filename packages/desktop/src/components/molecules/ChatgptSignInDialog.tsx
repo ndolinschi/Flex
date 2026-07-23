@@ -23,8 +23,6 @@ type ChatgptSignInDialogProps = {
   cancel: (sessionId: string) => Promise<void>
 }
 
-/** ChatGPT Plus/Pro headless device-flow modal: show the one-time user code,
- * open the OpenAI verification page, and poll until the user confirms. */
 export const ChatgptSignInDialog = ({
   open,
   onClose,

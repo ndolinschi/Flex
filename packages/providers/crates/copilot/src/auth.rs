@@ -1,6 +1,3 @@
-//! Copilot session tokens: exchange the long-lived GitHub OAuth token for a
-//! short-lived API bearer, cache it, refresh ahead of expiry.
-
 use reqwest::Client;
 use serde::Deserialize;
 use tokio::sync::Mutex;
@@ -11,10 +8,8 @@ use agentloop_provider_common::status_to_provider_error;
 
 use crate::config::{COPILOT_PROVIDER_ID, CopilotConfig};
 
-/// Refresh this many seconds before the reported expiry.
 const REFRESH_MARGIN_SECS: u64 = 120;
 
-/// An exchanged Copilot session: the API bearer plus where to call.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CopilotSession {
     pub(crate) bearer: String,
@@ -42,7 +37,6 @@ struct ExchangeEndpoints {
     api: Option<String>,
 }
 
-/// Parse the token-exchange response body into a session.
 pub(crate) fn parse_exchange_response(
     provider: &ProviderId,
     value: serde_json::Value,
@@ -66,7 +60,6 @@ pub(crate) fn parse_exchange_response(
     })
 }
 
-/// Owns the GitHub token and the cached session.
 pub(crate) struct TokenExchanger {
     config: CopilotConfig,
     cached: Mutex<Option<CopilotSession>>,
@@ -80,7 +73,6 @@ impl TokenExchanger {
         }
     }
 
-    /// A fresh session, exchanging or refreshing when needed.
     pub(crate) async fn session(&self, client: &Client) -> Result<CopilotSession, ProviderError> {
         let provider = ProviderId::from(COPILOT_PROVIDER_ID);
         let now_secs = now_ms() / 1000;

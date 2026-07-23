@@ -42,18 +42,11 @@ type FileExplorerProps = {
   sessionId: string
   sessionKey: string
   cwd: string
-  /** Prefer when `cwd` is a missing isolated worktree (`session.base_cwd`). */
   fallbackCwd?: string
-  /** Currently open editor buffer, highlighted with the persistent fill. */
   activePath?: string
-  /** Called with a repo-relative file path (never a directory). */
   onOpenFile: (path: string) => void
 }
 
-/** VS Code–style workspace browser for the Files right-panel tab.
- * Browse mode: expandable folder tree via `list_dir_children`.
- * Search mode: flat `list_files` results (files + folders).
- * Create / rename / delete via header button + right-click context menu. */
 export const FileExplorer = ({
   sessionId,
   sessionKey,
@@ -78,7 +71,6 @@ export const FileExplorer = ({
   const searching = debounced.length > 0
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
 
-  // Fresh tree when the workspace root changes.
   useEffect(() => {
     setExpanded(new Set())
   }, [cwd, fallbackCwd])
@@ -111,7 +103,6 @@ export const FileExplorer = ({
     placeholderData: keepPreviousData,
   })
 
-  // Shared with Changes / sidebar — color dirty files in the tree.
   const { data: gitSummary } = useQuery({
     queryKey: ["git-status", cwd, sessionId],
     queryFn: () => gitStatusSinceBaseline(sessionId),
@@ -228,7 +219,6 @@ export const FileExplorer = ({
         const path = draftPath.trim().replace(/\\/g, "/")
         const created = await createTextFile(sessionId, path)
         await refreshLists([created])
-        // Expand parent so the new file is visible in the tree.
         const parent = dirPrefix(created).replace(/\/$/, "")
         if (parent) {
           setExpanded((prev) => new Set(prev).add(parent))

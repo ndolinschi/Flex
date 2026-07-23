@@ -1,8 +1,3 @@
-//! Temporary prompt attachment path resolution.
-//!
-//! `BlobSource::Path` intake belongs at the future engine boundary; for now the
-//! native loop resolves paths before provider requests are built.
-
 use std::path::Path;
 
 use agentloop_contracts::{BlobSource, ContentBlock, PromptInput};
@@ -11,8 +6,6 @@ use base64::Engine as _;
 
 const MAX_BLOB_BYTES: u64 = 5 * 1024 * 1024;
 
-/// Resolve `BlobSource::Path` attachments to base64 before anything reaches a
-/// provider. Size-capped; relative paths resolve against the session cwd.
 pub(crate) async fn resolve_blob_paths(
     input: &mut PromptInput,
     cwd: &Path,

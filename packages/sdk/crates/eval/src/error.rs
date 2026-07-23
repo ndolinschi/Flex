@@ -1,8 +1,5 @@
-//! Error type for the eval harness.
-
 use std::path::PathBuf;
 
-/// Everything that can go wrong while loading tasks or running a suite.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum EvalError {

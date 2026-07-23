@@ -1,14 +1,11 @@
-//! `RepoMap` tool: compact PageRank/import-graph map of the session's
-//! repo, sized to a caller-supplied token budget.
-
 use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
 
-use agentloop_contracts::{ToolOutput, ToolResultBlock};
+use agentloop_contracts::{AgentEvent, ToolOutput, ToolResultBlock};
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
-use crate::repomap::build_repo_map;
+use crate::repomap::build_repo_map_cached;
 use crate::tools::shared::{IndexOpenMode, open_and_build_with_events_mode};
 
 const DEFAULT_BUDGET: usize = 2_000;
@@ -18,12 +15,9 @@ const MAX_BUDGET: usize = 8_000;
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct RepoMapInput {
-    /// Approximate token budget for the rendered map (default 2000,
-    /// clamped to 200..=8000). Larger budgets include more files/symbols.
     token_budget: Option<usize>,
 }
 
-/// Compact orientation map of the working directory's indexed code.
 #[derive(Debug, Clone, Copy)]
 pub struct RepoMapTool {
     open_mode: IndexOpenMode,
@@ -48,10 +42,12 @@ impl Tool for RepoMapTool {
             name: "RepoMap".to_owned(),
             description: "Return a compact map of the repository: the most central files \
                  (PageRank over the import graph, boosted by symbol density) with their \
-                 key symbols. Use this first when orienting in an unfamiliar repo, or when \
-                 you need a high-level picture before diving into `SearchCode` / `FindSymbol` \
-                 / `Read`. Set `token_budget` to control how much of the map fits (default \
-                 2000 tokens, max 8000)."
+                 key symbols. Call at most once per project/workspace when you need \
+                 orientation in an unfamiliar repo — the result is cached on disk and \
+                 reused across chats until the index changes. Prefer `SearchCode` / \
+                 `FindSymbol` / `Read` when you already know what to look for. Set \
+                 `token_budget` to control how much of the map fits (default 2000 \
+                 tokens, max 8000)."
                 .to_owned(),
             input_schema: schema_of::<RepoMapInput>(),
             read_only: true,
@@ -83,7 +79,7 @@ impl Tool for RepoMapTool {
         let handle = tokio::task::spawn_blocking(move || {
             run_map(&cwd, budget, &events, &call_id, open_mode)
         });
-        let rendered = tokio::select! {
+        let (rendered, file_count, cache_hit) = tokio::select! {
             _ = cancel.cancelled() => return Err(ToolError::Cancelled),
             result = handle => result.map_err(|err| {
                 ToolError::Execution(format!("RepoMap worker failed before producing results: {err}."))
@@ -96,6 +92,8 @@ impl Tool for RepoMapTool {
             structured: Some(serde_json::json!({
                 "token_budget": budget,
                 "chars": rendered.len(),
+                "file_count": file_count,
+                "cache_hit": cache_hit,
             })),
         })
     }
@@ -107,9 +105,33 @@ fn run_map(
     events: &agentloop_core::EventSink,
     call_id: &agentloop_contracts::ToolCallId,
     open_mode: IndexOpenMode,
-) -> Result<String, ToolError> {
+) -> Result<(String, usize, bool), ToolError> {
     let store = open_and_build_with_events_mode(cwd, events, Some(call_id), open_mode)?;
-    Ok(build_repo_map(&store, budget))
+    let file_count = store.indexed_file_count();
+    if file_count == 0 {
+        events.emit(AgentEvent::ToolProgress {
+            call_id: call_id.clone(),
+            note: "Repo map: no indexed files yet".to_owned(),
+        });
+    } else {
+        events.emit(AgentEvent::ToolProgress {
+            call_id: call_id.clone(),
+            note: format!("Building repo map… {file_count} files"),
+        });
+    }
+    let (map, count, cache_hit) = build_repo_map_cached(&store, budget);
+    if cache_hit {
+        events.emit(AgentEvent::ToolProgress {
+            call_id: call_id.clone(),
+            note: format!("Repo map ready · {count} files (cached)"),
+        });
+    } else if count > 0 {
+        events.emit(AgentEvent::ToolProgress {
+            call_id: call_id.clone(),
+            note: format!("Repo map ready · {count} files"),
+        });
+    }
+    Ok((map, count, cache_hit))
 }
 
 fn schema_of<I: JsonSchema>() -> serde_json::Value {
@@ -185,5 +207,46 @@ mod tests {
             other => panic!("expected markdown, got {other:?}"),
         };
         assert!(text.contains("src/core.rs"), "map missing hub: {text}");
+        let structured = output.structured.expect("structured");
+        assert!(
+            structured
+                .get("file_count")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0)
+                >= 3,
+            "{structured}"
+        );
+    }
+
+    #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
+    async fn repo_map_tool_cache_hit_on_second_call() {
+        let index_root = tempfile::tempdir().unwrap_or_else(|e| panic!("{e}"));
+        let repo = tempfile::tempdir().unwrap_or_else(|e| panic!("{e}"));
+        write(repo.path(), "src/lib.rs", "pub fn lib() {}\n");
+
+        let _ = open_and_build_in(repo.path(), index_root.path()).unwrap_or_else(|e| panic!("{e}"));
+
+        let _gate = lock_index_root_override();
+        set_index_root_override(Some(index_root.path().to_path_buf()));
+        let first = RepoMapTool::default()
+            .run(tool_ctx(repo.path()), serde_json::json!({}))
+            .await
+            .unwrap_or_else(|e| panic!("{e}"));
+        let second = RepoMapTool::default()
+            .run(tool_ctx(repo.path()), serde_json::json!({}))
+            .await
+            .unwrap_or_else(|e| panic!("{e}"));
+        set_index_root_override(None);
+        drop(_gate);
+
+        assert_eq!(
+            first.structured.as_ref().and_then(|s| s.get("cache_hit")),
+            Some(&serde_json::json!(false))
+        );
+        assert_eq!(
+            second.structured.as_ref().and_then(|s| s.get("cache_hit")),
+            Some(&serde_json::json!(true))
+        );
     }
 }

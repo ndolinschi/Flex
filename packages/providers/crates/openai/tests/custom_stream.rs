@@ -1,8 +1,3 @@
-//! End-to-end streaming through a custom identity: a DeepSeek-style SSE
-//! response (reasoning + text + tool call + usage) served by wiremock is
-//! normalized into the unified provider stream, and the outgoing request
-//! carries the Bearer key and the extended-thinking config.
-
 use futures::StreamExt;
 use tokio_util::sync::CancellationToken;
 use wiremock::matchers::{method, path};

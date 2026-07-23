@@ -1,12 +1,3 @@
-//! `RunWorkflow`: a declarative pipeline of subagent steps.
-//!
-//! This crate ships only the descriptor — execution is intercepted and run by
-//! the engine loop, same as `Agent` (each step is itself a subagent spawn, so
-//! it needs the same session-creation machinery a pure tool cannot reach).
-//! The plan is *data*, not executable code: no sandboxed script, no arbitrary
-//! model-authored control flow — just an ordered list of steps, each either
-//! one subagent task or a barrier fan-out of several.
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -19,22 +10,14 @@ use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescri
 
 use crate::fs::schema_of;
 
-/// One subagent task within a workflow step.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct WorkflowStepInput {
-    /// Which role runs the task (same roles the `Agent` tool lists).
     pub role: String,
-    /// The self-contained brief for this task; the loop appends every
-    /// earlier step's combined results before this text, so it can build on
-    /// them without repeating them here.
     pub prompt: String,
-    /// A short label shown to the user, e.g. "map session event flow".
     #[serde(default)]
     pub label: Option<String>,
 }
 
-/// One step of a workflow: a single task, or a barrier fan-out of several
-/// that all run concurrently before the next step starts.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum WorkflowStepKind {
@@ -42,17 +25,12 @@ pub enum WorkflowStepKind {
     Parallel { tasks: Vec<WorkflowStepInput> },
 }
 
-/// The `RunWorkflow` tool's input — also the shape the loop deserializes a
-/// dispatched call's raw JSON into (see `loop::workflow::run_workflow`).
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RunWorkflowInput {
-    /// Ordered pipeline steps; each completes before the next starts.
     pub steps: Vec<WorkflowStepKind>,
 }
 
-/// The `RunWorkflow` descriptor. `run` is never reached in a correct build —
-/// the loop intercepts calls by name and runs the pipeline instead.
 struct WorkflowTool {
     description: String,
 }
@@ -83,9 +61,6 @@ impl Tool for WorkflowTool {
     }
 }
 
-/// Build a `RunWorkflow` tool whose description advertises the spawnable
-/// `roles` as `(name, one-line summary)` pairs (same shape `subagent_tool`
-/// takes).
 pub fn workflow_tool(roles: &[(String, String)]) -> Arc<dyn Tool> {
     let role_lines = if roles.is_empty() {
         "  (no roles configured)".to_owned()

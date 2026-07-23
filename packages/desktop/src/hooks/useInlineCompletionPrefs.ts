@@ -9,7 +9,6 @@ import { INLINE_COMPLETION_ENABLED } from "../lib/featureFlags"
 
 export const INLINE_COMPLETION_PREFS_KEY = ["inline-completion-prefs"] as const
 
-/** Shared TanStack query for desktop inline-completion prefs. */
 export const useInlineCompletionPrefs = () => {
   const queryClient = useQueryClient()
   const enabled = INLINE_COMPLETION_ENABLED

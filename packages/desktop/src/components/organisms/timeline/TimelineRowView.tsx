@@ -36,30 +36,14 @@ export const TimelineRowView = memo(({
   row: TimelineRow
   showActions?: boolean
   dimmed?: boolean
-  /** messageId → thinking duration (ms), from `useSessionEvents`. */
   thinkingDurations?: Record<string, number>
-  /** Needed by `checkpoint` rows to call `revertSnapshot`. */
   sessionId?: string | null
-  /** True while the session is streaming — checkpoint chips render disabled. */
   checkpointsDisabled?: boolean
-  /** Set when this row is the LAST rendered item of a completed turn (see
-   * `buildDisplayItems`'s `footer` attachment) — renders the end-of-turn
-   * `TurnFooter` right after the row. On this row `MessageActions` is
-   * suppressed entirely: the footer already shows time + duration + a copy
-   * button, so rendering the per-message actions too put two adjacent
-   * copy icons on the same message (read as a duplicate). The footer's
-   * "Copy response" is the single copy affordance here; non-footer rows keep
-   * their own per-message `MessageActions` copy. */
   footer?: TurnFooterInfo
-  /** When true (row lives inside an open live WorkGroup whose header already
-   * shows the Thinking cue), ThinkingBlock skips its shimmer status label. */
   suppressThinkingStatusLabel?: boolean
 }) => {
   switch (row.type) {
     case "user": {
-      // Design-Mode / Components-tab messages carry injected context blocks.
-      // Show only the typed instruction + compact chips; full context still
-      // went to the model.
       const style = parseComponentStyleMessage(row.text)
       const afterStyle = style ? style.instruction : row.text
       const dom = parseDomContextMessage(afterStyle)
@@ -90,9 +74,6 @@ export const TimelineRowView = memo(({
             {showActions && !footer ? (
               <MessageActions text={row.text} tsMs={row.tsMs} />
             ) : isLive && !footer ? (
-              // Reserve the actions row height while streaming so materialization
-              // (MessageActions mount) does not jump the virtual row — matches
-              // MessageActions `mt-1 h-5` (not legacy h-7).
               <div className="mt-1 h-5" aria-hidden />
             ) : null}
             {footer ? <TurnFooter {...footer} /> : null}
@@ -101,10 +82,6 @@ export const TimelineRowView = memo(({
       )
     }
     case "thinking":
-      // Show even without a measurable duration ("Thought") — deltas aren't
-      // persisted on replay, and some providers emit a thinking block with
-      // no span. Only skip empty shells. `row.durationMs` is set when
-      // consecutive settled thoughts were merged in `buildDisplayItems`.
       if (!row.text.trim()) return null
       return (
         <ThinkingBlock
@@ -117,7 +94,6 @@ export const TimelineRowView = memo(({
     case "tool":
       return <ToolCallChip call={row.call} />
     case "plan":
-      // Right-panel Plan tab owns the plan — skip duplicate timeline card.
       return null
     case "fallback":
       return (
@@ -163,8 +139,6 @@ export const TimelineRowView = memo(({
         />
       )
     case "subagent":
-      // Standalone subagent (not clustered by ToolStepList into WorkersGroup)
-      // — enriched card with activity + viewer click-through.
       return (
         <SubagentGroup
           task={row.task}
@@ -188,7 +162,6 @@ export const TimelineRowView = memo(({
         />
       )
     case "turn":
-      // Turn markers are consumed by the work-group builder.
       return null
     case "error":
       return <ErrorBanner message={row.error.message} />
@@ -201,10 +174,6 @@ export const TimelineRowView = memo(({
         />
       )
     case "verdict": {
-      // "cancelled" (forced by the turn-end sweep on a dangling Verify call)
-      // is a settled-without-a-verdict state, not "still running" — without
-      // this the badge would show a "Verifying…" spinner forever after the
-      // turn already ended.
       const s = row.status.state
       const running = s === "pending" || s === "running" || s === "awaiting_permission"
       return <VerdictBadge verdict={row.verdict} running={running} />
@@ -262,8 +231,6 @@ export const TimelineRowView = memo(({
       return null
   }
 }, (prev, next) => {
-  // Custom compare so a fresh `thinkingDurations` object from every rAF flush
-  // does not bust memo for rows that never read it (assistant/user/tool/…).
   if (prev.row !== next.row) return false
   if (prev.showActions !== next.showActions) return false
   if (prev.dimmed !== next.dimmed) return false
@@ -275,7 +242,6 @@ export const TimelineRowView = memo(({
   }
   if (prev.thinkingDurations === next.thinkingDurations) return true
   if (next.row.type === "thinking") {
-    // Merged shorts bake `durationMs` on the row — ignore map churn.
     const prevMs =
       prev.row.type === "thinking" ? prev.row.durationMs : undefined
     const nextMs = next.row.durationMs
@@ -287,7 +253,6 @@ export const TimelineRowView = memo(({
       next.thinkingDurations?.[next.row.messageId]
     )
   }
-  // Subagent children may nest thinking rows — treat the map as relevant.
   if (next.row.type === "subagent") return false
   return true
 })

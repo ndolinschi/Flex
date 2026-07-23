@@ -1,36 +1,39 @@
 import type { SessionId } from "../lib/types"
 import type { RightPanelTab } from "./types"
 
-/** Tool surfaces formerly hosted in the right panel. */
 export type ToolTabId = RightPanelTab
 
-/** A named color group that tabs can belong to. Persists in `PaneState.groups`. */
 export type TabGroup = {
   id: string
   name?: string
-  /** CSS color — drawn as a 2px underbar on member tabs. */
   color: string
 }
 
 export type ContentTab =
   | { id: string; kind: "chat"; sessionId: SessionId; groupId?: string }
   | { id: string; kind: "tool"; tool: ToolTabId; sessionId: SessionId; groupId?: string }
+  | {
+      id: string
+      kind: "file"
+      path: string
+      sessionId: SessionId
+      groupId?: string
+    }
 
 export type PaneState = {
   tabs: ContentTab[]
   activeTabId: string | null
-  /** Named color groups for this pane's tabs. Keyed by group id. */
   groups?: Record<string, TabGroup>
 }
 
-/** Reference-like chat/work split: a compact conversation rail beside a
- * larger implementation surface. Near the 760px eligibility floor, panel
- * min-size constraints still rebalance both panes to fit. */
-export const DEFAULT_SPLIT_RATIO = 0.38
+/** Chat | work within ContentWorkspace — ~50/50 matches Cursor Agents silhouette. */
+export const DEFAULT_SPLIT_RATIO = 0.48
+
+/** Default right-pane tool when an active session opens the Agents 3-col shell. */
+export const DEFAULT_WORK_TAB = "changes" as const satisfies ToolTabId
 
 export type ContentLayout = {
   mode: "single" | "split"
-  /** Left pane fraction when split (0.2–0.8). */
   splitRatio: number
   focusedPane: 0 | 1
   panes: [PaneState] | [PaneState, PaneState]
@@ -41,9 +44,12 @@ export const chatTabId = (sessionId: SessionId): string => `chat:${sessionId}`
 export const toolTabId = (sessionId: SessionId, tool: ToolTabId): string =>
   `tool:${sessionId}:${tool}`
 
+/** Document tab id — path is session-relative (`/` separators). */
+export const fileTabId = (sessionId: SessionId, path: string): string =>
+  `file:${sessionId}:${path.replace(/\\/g, "/")}`
+
 export const emptyPane = (): PaneState => ({ tabs: [], activeTabId: null, groups: {} })
 
-/** Replace one pane; keep the sibling pane's object identity for React. */
 export const replacePane = (
   layout: ContentLayout,
   pane: 0 | 1,
@@ -73,6 +79,19 @@ export const makeToolTab = (
   sessionId,
 })
 
+export const makeFileTab = (
+  sessionId: SessionId,
+  path: string,
+): ContentTab => {
+  const normalized = path.replace(/\\/g, "/")
+  return {
+    id: fileTabId(sessionId, normalized),
+    kind: "file",
+    path: normalized,
+    sessionId,
+  }
+}
+
 export const defaultContentLayout = (
   sessionId: SessionId | null = null,
 ): ContentLayout => {
@@ -96,11 +115,6 @@ export const defaultContentLayout = (
 export const clampSplitRatio = (ratio: number): number =>
   Math.min(0.8, Math.max(0.2, ratio))
 
-/**
- * Move an item within a tab list. `insertAt` is the index in the *current*
- * array before which the item should land (0…length). After removal, the
- * insert index is adjusted so the final order matches Chrome-style DnD.
- */
 export const reorderContentTabs = <T,>(
   tabs: T[],
   fromIndex: number,
@@ -114,7 +128,6 @@ export const reorderContentTabs = <T,>(
   ) {
     return tabs
   }
-  // No-op: dropping immediately before/after self.
   if (insertAt === fromIndex || insertAt === fromIndex + 1) return tabs
   const next = [...tabs]
   const [item] = next.splice(fromIndex, 1)
@@ -124,10 +137,6 @@ export const reorderContentTabs = <T,>(
   return next
 }
 
-/**
- * Place a tab at `dest` in the list *after* it has been removed (0…length-1
- * after splice). Used by pointer DnD live-preview hit-testing.
- */
 export const placeTabAt = <T,>(
   tabs: T[],
   fromIndex: number,
@@ -138,18 +147,11 @@ export const placeTabAt = <T,>(
   const [item] = next.splice(fromIndex, 1)
   if (item === undefined) return tabs
   const at = Math.max(0, Math.min(dest, next.length))
-  // Removed from fromIndex; inserting back at fromIndex is a no-op.
   if (at === fromIndex) return tabs
   next.splice(at, 0, item)
   return next
 }
 
-/**
- * Move a tab from one pane to another (or reorder if same pane).
- * `insertAt` is Chrome-style (index in the target list before splice).
- * Dedupes by tab id: if the target already has it, activate and drop the
- * source copy. Collapses split when a side pane empties.
- */
 export const moveTabBetweenPanes = (
   layout: ContentLayout,
   fromPane: 0 | 1,
@@ -162,10 +164,8 @@ export const moveTabBetweenPanes = (
     if (!pane) return layout
     const fromIndex = pane.tabs.findIndex((t) => t.id === tabId)
     if (fromIndex < 0) return layout
-    // `insertAt` is after-removal index (pointer DnD / placeTabAt).
     const tabs = placeTabAt(pane.tabs, fromIndex, insertAt)
     if (tabs === pane.tabs) return layout
-    // Preserve the other pane's object identity so inactive panes skip re-render.
     const nextPane: PaneState = { ...pane, tabs, activeTabId: tabId }
     return {
       ...layout,
@@ -174,7 +174,6 @@ export const moveTabBetweenPanes = (
     }
   }
 
-  // Ensure split when targeting pane 1.
   let working: ContentLayout = layout
   if (toPane === 1 && working.mode !== "split") {
     working = {
@@ -203,7 +202,6 @@ export const moveTabBetweenPanes = (
   const [tab] = source.tabs.splice(fromIndex, 1)
   if (!tab) return layout
   if (source.activeTabId === tabId) {
-    // Prefer right neighbor at the removed index, else left neighbor.
     source.activeTabId =
       source.tabs[fromIndex]?.id ?? source.tabs[fromIndex - 1]?.id ?? null
   }
@@ -217,7 +215,6 @@ export const moveTabBetweenPanes = (
     target.activeTabId = tabId
   }
 
-  // Collapse when either side is empty after the move.
   if (panes[1].tabs.length === 0) {
     return {
       mode: "single",
@@ -243,7 +240,6 @@ export const moveTabBetweenPanes = (
   }
 }
 
-/** Ensure pane 0 has a chat tab for `sessionId`; returns updated layout. */
 export const ensureChatInPane = (
   layout: ContentLayout,
   paneIndex: 0 | 1,
@@ -263,7 +259,6 @@ export const ensureChatInPane = (
   return { ...layout, panes }
 }
 
-/** Open/activate a tool tab in `paneIndex`, creating the tab if needed. */
 export const upsertToolInPane = (
   layout: ContentLayout,
   paneIndex: 0 | 1,
@@ -297,10 +292,40 @@ export const upsertToolInPane = (
   }
 }
 
-/**
- * Migrate legacy ui.json panel/chat-tab fields into ContentLayout.
- * Prefer an already-persisted `contentLayout` when present.
- */
+export const upsertFileInPane = (
+  layout: ContentLayout,
+  paneIndex: 0 | 1,
+  sessionId: SessionId,
+  path: string,
+): ContentLayout => {
+  const normalized = path.replace(/\\/g, "/")
+  const panes = layout.panes.map((p) => ({
+    ...p,
+    tabs: [...p.tabs],
+  })) as [PaneState, PaneState] | [PaneState]
+  while (panes.length <= paneIndex) {
+    ;(panes as PaneState[]).push(emptyPane())
+  }
+  const pane = panes[paneIndex]!
+  const id = fileTabId(sessionId, normalized)
+  if (!pane.tabs.some((t) => t.id === id)) {
+    pane.tabs.push(makeFileTab(sessionId, normalized))
+  }
+  pane.activeTabId = id
+  const mode: ContentLayout["mode"] =
+    panes.length > 1 ? "split" : layout.mode
+  const nextPanes =
+    mode === "split"
+      ? ([panes[0]!, panes[1] ?? emptyPane()] as [PaneState, PaneState])
+      : ([panes[0]!] as [PaneState])
+  return {
+    ...layout,
+    mode,
+    focusedPane: paneIndex,
+    panes: nextPanes,
+  }
+}
+
 export const migrateToContentLayout = (opts: {
   contentLayout?: ContentLayout | null
   activeSessionId: SessionId | null

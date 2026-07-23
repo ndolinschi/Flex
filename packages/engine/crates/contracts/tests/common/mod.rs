@@ -1,6 +1,3 @@
-//! Shared builders for contract tests. Fixed ids and timestamps keep
-//! snapshots deterministic.
-
 #![allow(dead_code, unreachable_pub)]
 
 use std::path::PathBuf;
@@ -52,7 +49,6 @@ pub fn sample_tool_call(status: ToolCallStatus) -> ToolCall {
     }
 }
 
-/// A representative persisted event log: one turn with a tool round-trip.
 pub fn sample_event_log() -> Vec<AgentEvent> {
     vec![
         AgentEvent::SessionCreated {

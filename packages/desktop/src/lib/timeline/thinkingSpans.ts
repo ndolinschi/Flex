@@ -1,14 +1,7 @@
 import type { SessionEvent } from "../types"
 
-/** First/last `thinking_delta` timestamp per message, used to derive "Thought for Xs". */
 export type ThinkingSpan = { startMs: number; endMs: number }
 
-/**
- * Track thinking-delta timestamps so the timeline can show "Thought for Xs".
- * Only live streams carry per-delta timestamps — replayed history collapses
- * thinking into a single materialized row with no span, so those messages
- * are simply absent from the map (ThinkingBlock falls back to plain "Thought").
- */
 export const trackThinkingSpan = (
   spans: Record<string, ThinkingSpan>,
   event: SessionEvent,

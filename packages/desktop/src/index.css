@@ -10,14 +10,9 @@
 @custom-variant light (&:is([data-theme="light"] *));
 
 @theme {
-  /* Source of truth: tokens.css `--font-weight-semibold` (production 600). */
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 
-  /* Do NOT register `--color-base` in @theme: it collides with the
-   * `text-base` font-size utility (Tailwind prefers the color token), which
-   * paints primary buttons white-on-white (`--color-base` is the light ink
-   * on dark). Surfaces use chrome/panel/elevated; body ink uses `text-ink`. */
   --color-chrome: var(--color-chrome);
   --color-panel: var(--color-panel);
   --color-elevated: var(--color-elevated);
@@ -83,7 +78,6 @@
   --color-settings-card: var(--color-settings-card);
   --color-switch-on: var(--color-switch-on);
 
-  /* Composer mode tints (Cursor mode semantic map). */
   --color-mode-agent-bg: var(--color-mode-agent-bg);
   --color-mode-agent-fg: var(--color-mode-agent-fg);
   --color-mode-plan-bg: var(--color-mode-plan-bg);
@@ -93,7 +87,6 @@
   --color-mode-flex-bg: var(--color-mode-flex-bg);
   --color-mode-flex-fg: var(--color-mode-flex-fg);
 
-  /* Dense Cursor spacing (half-steps + full 4px grid). */
   --spacing-0-25: var(--space-0-25);
   --spacing-0-5: var(--space-0-5);
   --spacing-0-75: var(--space-0-75);
@@ -143,7 +136,6 @@
   --shadow-composer-focus: var(--shadow-composer-focus);
   --shadow-popover: var(--shadow-popover);
 
-  /* Cursor semantic surface / text ladders (utility-ready). */
   --color-brand: var(--color-brand);
   --color-bg-chrome: var(--color-bg-chrome);
   --color-bg-sidebar: var(--color-bg-sidebar);
@@ -231,8 +223,6 @@ body,
 
 html,
 body {
-  /* Transparent window: vibrancy (macOS) / desktop show through only where the
-   * app shell does not paint an opaque fill. */
   background: transparent;
 }
 
@@ -244,24 +234,17 @@ body {
   letter-spacing: var(--tracking-body);
   color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
-  /* Native <select>/<option> popups inherit this — without it, WebView2 on
-   * Windows often opens a light system menu while page text stays light. */
   color-scheme: dark;
   transition: color var(--duration-normal) var(--easing-default);
   overflow: hidden;
 }
 
 #root {
-  /* Clip web content to the native corner radius so opaque fills don't
-   * square off the vibrancy / CALayer mask (especially on non-macOS where
-   * we only have CSS rounding). */
   overflow: hidden;
   border-radius: var(--window-radius);
   background: transparent;
 }
 
-/* Framed app shell: opaque enough for readability, hairline edge so the
- * transparent window doesn't look cut out of the wallpaper. */
 .app-shell {
   height: 100%;
   overflow: hidden;
@@ -271,37 +254,36 @@ body {
   box-shadow: inset 0 0.5px 0 color-mix(in srgb, var(--color-text-1) 8%, transparent);
 }
 
-/* macOS: HudWindow vibrancy reads through soft glass fills (not a solid sheet).
- * Keep readable ink; surfaces stay translucent pure-gray, not cool-blue. */
 html[data-platform="macos"] .app-shell {
-  background: color-mix(in srgb, var(--color-bg) 86%, transparent);
-  backdrop-filter: blur(24px) saturate(1.15);
-  -webkit-backdrop-filter: blur(24px) saturate(1.15);
+  background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+  backdrop-filter: blur(28px) saturate(1.12);
+  -webkit-backdrop-filter: blur(28px) saturate(1.12);
 }
 
-html[data-platform="macos"] .app-shell header[role="banner"] {
-  background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+html[data-platform="macos"] .app-shell header[role="banner"],
+html[data-platform="macos"] .app-shell [data-slot="glass-titleband"],
+html[data-platform="macos"] .app-shell [data-component="glass-titlebar"] {
+  /* Titleband reads glassier than body; keep pure-gray (no blue cast). */
+  background-color: color-mix(in srgb, var(--color-chrome) 52%, transparent);
 }
 
-/* Sidebar + chat panes: let vibrancy through instead of fully opaque paint. */
 html[data-platform="macos"] .app-shell aside[aria-label="Sessions sidebar"] {
-  background-color: color-mix(in srgb, var(--color-panel) 82%, transparent);
+  background-color: color-mix(in srgb, var(--color-panel) 78%, transparent);
 }
 
-html[data-platform="macos"] .app-shell .bg-chrome {
-  background-color: color-mix(in srgb, var(--color-chrome) 88%, transparent);
+html[data-platform="macos"] .app-shell .bg-chrome,
+html[data-platform="macos"] .app-shell .bg-bg {
+  background-color: color-mix(in srgb, var(--color-chrome) 86%, transparent);
 }
 
 html[data-platform="macos"] .app-shell .bg-sidebar {
-  background-color: color-mix(in srgb, var(--color-panel) 82%, transparent);
+  background-color: color-mix(in srgb, var(--color-panel) 78%, transparent);
 }
 
 [data-theme="light"] body {
   color-scheme: light;
 }
 
-/* Themed native selects (completion setup, settings) — closed control +
- * option list follow panel/ink rather than OS defaults. */
 select {
   background-color: var(--color-elevated);
   color: var(--color-ink);
@@ -313,10 +295,6 @@ select option {
   color: var(--color-ink);
 }
 
-/* Custom title bar: mark drag regions for Tauri + Chromium app-region.
- * Keep drag on dedicated empty chrome (TitleBarDragRegion / sidebar header
- * spacer) — not on whole interactive strips — so Mac trackpad gestures and
- * button clicks stay reliable. */
 [data-tauri-drag-region] {
   -webkit-app-region: drag;
   app-region: drag;
@@ -337,21 +315,15 @@ select,
   app-region: no-drag;
 }
 
-/* UA `<button>` defaults to text-align:center — that centers labels inside
- * flex-1 slots (sidebar rows, menu items). Pin shadcn buttons left; flex
- * `justify-*` still controls icon-only centering. */
 button[data-slot="button"] {
   text-align: left;
 }
 
-/* Keyboard-first focus — Phase 0 tokens; neutral stroke, never accent glow. */
 :focus-visible:not(input):not(textarea):not(select) {
   outline: var(--focus-ring);
   outline-offset: var(--focus-ring-offset);
 }
 
-/* Shared primitives and tabs paint their own neutral ring; suppress the global
- * fallback so keyboard focus is one crisp stroke rather than ring + outline. */
 :where(
   [data-slot="button"],
   [data-slot="toggle"],
@@ -362,7 +334,6 @@ button[data-slot="button"] {
   outline: none;
 }
 
-/* Composer textarea owns its own chrome — suppress the global ring. */
 [data-composer]:focus-visible,
 textarea[data-composer]:focus-visible {
   outline: none;
@@ -373,10 +344,6 @@ textarea[data-composer]:focus-visible {
   color: var(--color-ink);
 }
 
-/* Plan tab's Find-in-Plan highlight pass (usePlanFind) — plain <mark>s
- * inserted over the rendered markdown's text nodes, so both themes just
- * need this one rule rather than per-theme Tailwind classes on generated
- * DOM nodes. */
 mark[data-plan-find-mark] {
   background: var(--color-accent-subtle);
   color: inherit;
@@ -390,9 +357,6 @@ mark[data-plan-find-mark].plan-find-mark-active {
   box-shadow: 0 0 0 1px var(--color-accent);
 }
 
-/* Plan-tab comment highlights (usePlanCommentHighlights). Distinct from
- * find marks so both can coexist conceptually (find temporarily clears
- * comment marks while open). */
 mark[data-plan-comment-id] {
   background: color-mix(in srgb, var(--color-yellow, #c9a227) 28%, transparent);
   color: inherit;
@@ -406,47 +370,31 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-yellow, #c9a227) 70%, transparent);
 }
 
-/*
- * Timeline row containment helpers (`.cv-auto*`) — kept for potential
- * non-virtualized surfaces. The chat timeline itself does NOT apply these:
- * `@tanstack/react-virtual` already unmounts off-screen rows, and
- * `content-visibility: auto` on the mounted overscan window races with
- * ResizeObserver measurement on WebView2 (Windows scroll overlap).
- *
- * DO NOT re-enable cv on virtualized TurnTimeline rows (see shouldSkipCv).
- * Safe elsewhere: SessionSidebar rows, settings lists, static panels.
- */
 .cv-auto {
   content-visibility: auto;
   contain-intrinsic-size: auto 80px;
 }
 
-/* User bubbles are short one-liners most of the time. */
 .cv-auto-user {
   content-visibility: auto;
   contain-intrinsic-size: auto 80px;
 }
 
-/* Assistant markdown answers run longer on average than a user bubble. */
 .cv-auto-assistant {
   content-visibility: auto;
   contain-intrinsic-size: auto 120px;
 }
 
-/* Collapsed "Worked for Ns" groups — short header row when collapsed. */
 .cv-auto-group {
   content-visibility: auto;
   contain-intrinsic-size: auto 120px;
 }
 
-/* Meta/fallback/command/error rows are single lines. */
 .cv-auto-meta {
   content-visibility: auto;
   contain-intrinsic-size: auto 32px;
 }
 
-/* Utility used by shadcn components (sidebar, command, combobox) to suppress the
-   native scrollbar where custom scrolling chrome is undesirable. */
 @utility no-scrollbar {
   scrollbar-width: none;
   &::-webkit-scrollbar {
@@ -454,7 +402,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   }
 }
 
-/* Thin dark scrollbars — Cursor production (8px, border-tertiary thumb). */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) transparent;
@@ -482,7 +429,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   background-color: var(--scrollbar-thumb-active);
 }
 
-/* Running indicator */
 @keyframes dot-grid-pulse {
   0%,
   100% {
@@ -493,7 +439,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   }
 }
 
-/* Tray / popover — closed-transform: -4px Y + 0.99 scale */
 @keyframes tray-in {
   from {
     opacity: 0;
@@ -505,10 +450,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   }
 }
 
-/* Live-stacking tool rows ("Explored 3 files" cluster growing
- * one row at a time while streaming) — a new row slides in from just below
- * its own resting position rather than popping in, so a fast run of tool
- * events reads as a smooth stack instead of a jump-cut. */
 @keyframes tool-step-in {
   from {
     opacity: 0;
@@ -524,7 +465,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   animation: tool-step-in var(--duration-normal) var(--easing-out) both;
 }
 
-/* Soft content fade for pane swaps (settings ↔ chat) */
 @keyframes pane-fade {
   from {
     opacity: 0;
@@ -554,7 +494,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   }
 }
 
-/* Content reveal — "fadeInSlideUp": opacity + a short lift. */
 @keyframes content-in {
   from {
     opacity: 0;
@@ -566,9 +505,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   }
 }
 
-/* Wizard step transition — light slide/fade between question steps,
- * reusing the content-in "fadeInSlideUp" convention but on
- * --duration-normal so a step-to-step advance stays snappy. */
 @keyframes wizard-step-in {
   from {
     opacity: 0;
@@ -580,7 +516,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   }
 }
 
-/* Streaming label shimmer — a soft highlight sweeps across the text. */
 @keyframes text-shimmer {
   from {
     background-position: 200% 0;
@@ -590,7 +525,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   }
 }
 
-/* Modal entrance — reference modal scale-in. */
 @keyframes modal-in {
   from {
     opacity: 0;
@@ -602,7 +536,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   }
 }
 
-/* Toast entrance — reference notifications: slide up from below + fade in. */
 @keyframes toast-in {
   from {
     opacity: 0;
@@ -618,11 +551,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   animation: tray-in var(--duration-fast) var(--easing-out-strong) both;
 }
 
-/* Subagent viewer panel — bottom-anchored overlay open/close (150ms
- * ease-out both, translateY(4px)+scale(.99)+opacity), reusing the same
- * closed-transform shape as tray-in but on --duration-normal/--easing-out
- * per the reference design's tray primitive timing (not the fast/strong pair
- * `tray-in` uses elsewhere). */
 @keyframes subagent-viewer-in {
   from {
     opacity: 0;
@@ -653,8 +581,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   animation: subagent-viewer-out var(--duration-normal) var(--easing-out) both;
 }
 
-/* Feed dim mask behind the open subagent viewer — tokenized to end-turn
- * duration (160ms) so reduced-motion / design audit stay consistent. */
 .subagent-viewer-mask {
   transition: opacity var(--duration-end-turn) var(--easing-out);
 }
@@ -675,7 +601,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   animation: wizard-step-in var(--duration-normal) var(--easing-out-strong) both;
 }
 
-/* Applied to a running label; needs a gradient background clipped to text. */
 .animate-shimmer-text {
   background: linear-gradient(
     100deg,
@@ -700,7 +625,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
 }
 
 .animate-modal-in {
-  /* Overlay enter: fade + scale 0.97→1 over --duration-slow (200ms). */
   animation: modal-in var(--duration-slow) var(--easing-out-strong) both;
 }
 
@@ -708,14 +632,10 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   animation: toast-in var(--duration-slower) var(--easing-out) both;
 }
 
-/* RunningDot diagonal wave — delay via --dot-delay so reduced-motion can kill it. */
 .animate-dot-grid-pulse {
   animation: dot-grid-pulse 1.8s ease-in-out var(--dot-delay, 0ms) infinite;
 }
 
-/* Settings search "jump to result" pulse (DESIGN.md Settings) —
- * ring grows 2px→4px then fades to transparent, once, over the row the
- * search result navigated to. */
 @keyframes settings-row-highlight {
   0% {
     box-shadow: 0 0 0 2px var(--color-accent);
@@ -730,11 +650,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   animation: settings-row-highlight 1.5s cubic-bezier(0, 0, 0.2, 1) 1;
 }
 
-/* sash hover-highlight transition — shared utility so RightPanel's
- * (and, as a follow-up, SessionSidebar's) drag-sash hover-line can pick up
- * the same timing without duplicating the value. Targets the sash's own
- * `::after` highlight line, since Tailwind's `after:` variant can't apply an
- * arbitrary custom class. */
 .sash-line-transition::after {
   transition: background-color var(--duration-fast) var(--easing-out);
 }
@@ -756,13 +671,11 @@ mark[data-plan-comment-id].plan-comment-mark-active {
     animation: none;
   }
 
-  /* Live activity grid — freeze mid-opacity; do not leave the keyframe running. */
   .animate-dot-grid-pulse {
     animation: none;
     opacity: 0.7;
   }
 
-  /* Tailwind pulse: streaming caret, tab activity, skeletons, live dots. */
   .animate-pulse,
   .animate-spin {
     animation: none;
@@ -776,7 +689,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
     transition: none;
   }
 
-  /* Keep shimmer text readable (not transparent) without the sweep. */
   .animate-shimmer-text {
     animation: none;
     background: none;
@@ -784,14 +696,12 @@ mark[data-plan-comment-id].plan-comment-mark-active {
     color: var(--color-ink-secondary);
   }
 
-  /* tw-animate enter/exit used by shadcn overlays (dialog, popover, select…). */
   .animate-in,
   .animate-out {
     animation-duration: 0.01ms !important;
     animation-delay: 0s !important;
   }
 
-  /* tw-animate accordion height open/close (ui/accordion) — not covered by .animate-in. */
   .animate-accordion-down,
   .animate-accordion-up {
     animation-duration: 0.01ms !important;
@@ -806,7 +716,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
     transition: none !important;
   }
 
-  /* Sheet / drawer slide+fade (base-ui data-starting/ending-style). Instant. */
   [data-slot="sheet-overlay"],
   [data-slot="sheet-content"],
   [data-slot="drawer-overlay"],
@@ -817,9 +726,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
 }
 
 @theme inline {
-  /* shadcn semantic colors → Flex tokens (Flex wins on conflict).
-   * Do NOT remount `--color-accent`, `--color-border`, `--font-sans`, or
-   * `--radius-*` here — those already come from Flex `@theme` + tokens.css. */
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--color-stroke-2);
   --color-sidebar-border: var(--color-stroke-3);
@@ -849,16 +755,9 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   --color-card: var(--color-elevated);
   --color-foreground: var(--color-ink);
   --color-background: var(--color-chrome);
-  /* Brand accent stays on `--color-accent` (near-white in dark). Tailwind
-   * `bg-accent` therefore paints the product brand — use `bg-fill-4` for
-   * quiet chrome hover/expanded fills, or `bg-accent` + `text-accent-foreground`
-   * only when you intentionally want a brand pill. Menu/button hovers must
-   * NOT use `bg-accent` with `text-foreground` (white-on-white). */
   --color-accent-foreground: var(--color-accent-text);
 }
 
-/* shadcn runtime vars — alias onto Flex; no second theme system.
- * Keep `data-theme` as the only light/dark switch (not `.dark`). */
 :root,
 [data-theme="dark"],
 [data-theme="light"] {
@@ -874,7 +773,6 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   --secondary-foreground: var(--color-ink);
   --muted: var(--color-fill-3);
   --muted-foreground: var(--color-text-2);
-  /* shadcn "accent" = muted hover surface, NOT Flex product accent */
   --accent: var(--color-fill-4);
   --accent-foreground: var(--color-ink);
   --destructive: var(--color-danger);

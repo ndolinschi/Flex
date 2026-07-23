@@ -13,10 +13,6 @@ import {
 import { appVersion, debugLogPath, toInvokeError } from "../../lib/tauri"
 import { useAppStore } from "../../stores/appStore"
 
-/** Diagnostics/Developer section: app-wide debug logging, opt-in local crash
- * capture, and "Export diagnostics" (frontend rings + backend log tail —
- * no session required). Remote crash upload (Sentry DSN) is intentionally
- * not wired. */
 export const DiagnosticsContent = () => {
   const debugLoggingEnabled = useAppStore((s) => s.debugLoggingEnabled)
   const setDebugLoggingEnabled = useAppStore((s) => s.setDebugLoggingEnabled)

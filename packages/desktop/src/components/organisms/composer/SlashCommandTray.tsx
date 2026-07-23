@@ -32,7 +32,6 @@ export const SlashCommandTray = ({
       open={open}
       autoFocus={false}
       onClose={() => {
-        /* keep draft; Esc handled in textarea keydown */
       }}
       anchorRef={anchorRef}
       placement="above"

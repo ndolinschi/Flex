@@ -1,11 +1,3 @@
-//! `AcpAgent`: drives an ACP-speaking agent (JSON-RPC over the child's stdio)
-//! behind the engine's `Agent` interface.
-//!
-//! Unlike the one-shot line delegators, the child is long-lived: one spawn +
-//! `initialize` + `session/new` handshake per session, then one
-//! `session/prompt` per turn while `session/update` notifications stream in.
-//! Client-side requests (permissions) are auto-answered by policy in v1.
-
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -32,7 +24,6 @@ use crate::mapper::AcpLineMapper;
 use crate::profile::{AcpAgentProfile, AcpLaunchConfig};
 use crate::protocol::AcpNotification;
 
-/// The ACP protocol version this client speaks.
 const ACP_PROTOCOL_VERSION: u64 = 1;
 
 struct AcpSession {
@@ -44,8 +35,6 @@ struct AcpSession {
     turn_gate: tokio::sync::Mutex<()>,
 }
 
-/// ACP delegator agent. Generic over the [`StreamHost`] so tests can script
-/// the child; production uses [`TokioStreamHost`].
 pub struct AcpAgent<H = TokioStreamHost> {
     profile: AcpAgentProfile,
     policy: AcpPermissionPolicy,
@@ -54,7 +43,6 @@ pub struct AcpAgent<H = TokioStreamHost> {
     sessions: Mutex<HashMap<SessionId, Arc<AcpSession>>>,
 }
 
-/// Build an ACP agent with the real duplex host.
 pub fn acp_agent(config: AcpLaunchConfig, store: Arc<dyn SessionStore>) -> AcpAgent {
     AcpAgent::with_host(config, store, Arc::new(TokioStreamHost::new()))
 }
@@ -86,7 +74,6 @@ impl<H: StreamHost + 'static> AcpAgent<H> {
             .ok_or_else(|| AgentError::SessionNotFound(id.clone()))
     }
 
-    /// Spawn the child and run the `initialize` → `session/new` handshake.
     async fn connect(
         &self,
         cwd: &PathBuf,
@@ -183,11 +170,8 @@ impl<H: StreamHost + 'static> AcpAgent<H> {
         let mut mapped_error: Option<String> = None;
 
         let mut updates = session.updates.lock().await;
-        // All notification handling is synchronous, so it lives in one closure
-        // used both inside the select loop and to drain the queue afterwards
-        // (the prompt response can win the race against a queued update).
+
         let mut apply = |notification: AcpNotification| {
-            // Reuse the line mapper: notifications round-trip as lines.
             let Ok(line) = serde_json::to_string(&notification) else {
                 return;
             };
@@ -229,9 +213,7 @@ impl<H: StreamHost + 'static> AcpAgent<H> {
                     DelegatorEvent::Error { message } => {
                         mapped_error = Some(message);
                     }
-                    // Tool call/result events carry ToolCall state the
-                    // handle-level helpers own in line_agent; v1 counts
-                    // them and surfaces results as ephemeral deltas only.
+
                     DelegatorEvent::ToolCall { .. } => {
                         num_tool_calls = num_tool_calls.saturating_add(1);
                     }
@@ -250,8 +232,7 @@ impl<H: StreamHost + 'static> AcpAgent<H> {
                 response = &mut prompt_request => break Some(response),
             }
         };
-        // The response can arrive while updates are still queued — drain them
-        // so no streamed content is lost.
+
         while let Ok(notification) = updates.try_recv() {
             apply(notification);
         }
@@ -417,8 +398,6 @@ impl<H: StreamHost + 'static> Agent for AcpAgent<H> {
     }
 
     async fn resume_session(&self, id: &SessionId) -> Result<(), AgentError> {
-        // A dead child cannot be reattached; reconnect with a fresh ACP
-        // session and keep appending to the same event log.
         let meta = self.store.get_meta(id).await?;
         let events = self.store.read(id, 0).await?;
         let next_seq = events.last().map(|e| e.seq + 1).unwrap_or(0);
@@ -528,8 +507,6 @@ mod tests {
     use agentloop_delegator_common::{DelegatorHostError, DelegatorProcessSpec, DuplexProcess};
     use agentloop_session::MemoryStore;
 
-    /// Scripted ACP agent: answers the handshake and streams one text update
-    /// before completing the prompt request.
     struct ScriptedAcpHost;
 
     #[async_trait]

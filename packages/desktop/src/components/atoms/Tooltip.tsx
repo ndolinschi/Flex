@@ -13,9 +13,6 @@ type TooltipProps = {
   children: ReactElement
 }
 
-/** Preserves the original `{ label, side?, children }` public API while
- * delegating to shadcn's Base UI Tooltip. Delay is provided by the
- * `TooltipProvider` mounted in main.tsx (300 ms). */
 export const Tooltip = ({ label, side = "top", children }: TooltipProps) => (
   <TooltipRoot>
     <TooltipTrigger render={children} />

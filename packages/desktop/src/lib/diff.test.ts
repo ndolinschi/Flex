@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 import {
   describeHunklessDiff,
   parseUnifiedDiff,
+  unmodifiedLinesBeforeHunk,
+  unmodifiedLinesBetweenHunks,
 } from "./diff"
 
 describe("describeHunklessDiff", () => {
@@ -23,7 +25,6 @@ describe("describeHunklessDiff", () => {
       "index 0000000..abc1234",
       "Binary files /dev/null and b/icon.png differ",
     ].join("\n")
-    // Binary notice still carries "new file mode" — prefer Binary when present.
     const file = parseUnifiedDiff(text).files[0]
     expect(describeHunklessDiff(file)).toBe("Binary file")
   })
@@ -38,5 +39,27 @@ describe("describeHunklessDiff", () => {
     const file = parseUnifiedDiff(text).files[0]
     expect(file.hunks).toEqual([])
     expect(describeHunklessDiff(file)).toBe("Renamed — no content change")
+  })
+})
+
+describe("unmodified line gaps", () => {
+  it("counts leading and between-hunk unmodified lines", () => {
+    const text = [
+      "diff --git a/f.ts b/f.ts",
+      "--- a/f.ts",
+      "+++ b/f.ts",
+      "@@ -10,3 +10,4 @@",
+      " a",
+      "+b",
+      " c",
+      "@@ -50,2 +51,2 @@",
+      "-x",
+      "+y",
+    ].join("\n")
+    const file = parseUnifiedDiff(text).files[0]
+    expect(file.hunks).toHaveLength(2)
+    expect(unmodifiedLinesBeforeHunk(file.hunks[0])).toBe(9)
+    // first hunk covers new lines 10..13 (4 lines); second starts at 51 → gap 37
+    expect(unmodifiedLinesBetweenHunks(file.hunks[0], file.hunks[1])).toBe(37)
   })
 })

@@ -1,9 +1,3 @@
-//! In-memory [`SessionStore`] backed by a mutex-guarded map.
-//!
-//! Intended for tests and short-lived embedded use; nothing survives the
-//! process. The JSONL store (M2) shares the same trait semantics, so callers
-//! can swap implementations without behavioral drift.
-
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -14,11 +8,6 @@ use agentloop_contracts::{
 };
 use agentloop_core::{SessionStore, StoreError, StoredEvent};
 
-/// Everything stored for one session: its metadata plus the append-only
-/// event log. An event's sequence number is its index in `events`, so seqs
-/// are gapless and start at 0 by construction. Each entry pairs the event
-/// with the wall-clock `ts_ms` captured at append, mirroring the JSONL store
-/// so conformance parity holds.
 #[derive(Debug)]
 struct Record {
     meta: SessionMeta,
@@ -26,26 +15,16 @@ struct Record {
     checkpoints: Vec<CheckpointRef>,
 }
 
-/// In-memory [`SessionStore`].
-///
-/// All state lives in a single `std::sync::Mutex<HashMap<..>>`. The lock is
-/// never held across an `.await` (every method completes synchronously after
-/// taking it), so the store is safe to call from any async context. A
-/// poisoned lock is recovered by taking the inner value: every method leaves
-/// the map in a consistent state before any point that could panic, so the
-/// data is still coherent after a poison.
 #[derive(Debug, Default)]
 pub struct MemoryStore {
     sessions: Mutex<HashMap<SessionId, Record>>,
 }
 
 impl MemoryStore {
-    /// Create an empty store.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Lock the session map, recovering from poisoning.
     fn lock(&self) -> std::sync::MutexGuard<'_, HashMap<SessionId, Record>> {
         self.sessions
             .lock()
@@ -78,8 +57,6 @@ impl SessionStore for MemoryStore {
             .ok_or_else(|| StoreError::SessionNotFound(id.clone()))?;
         let first_seq = record.events.len() as u64;
         if !events.is_empty() {
-            // Stamp emit time once per batch, matching the JSONL store so the
-            // two implementations stay behavior-identical under conformance.
             let ts_ms = now_ms();
             record
                 .events
@@ -152,10 +129,6 @@ impl SessionStore for MemoryStore {
         if let Some(mode) = mode {
             record.meta.mode = Some(mode);
         }
-        // Convention on the string/path patch fields for `workspace_id`,
-        // `base_cwd`, and `reuse_workspace_id`: `Some(empty)` clears the
-        // underlying `Option`; a non-empty value sets it. Callers that don't
-        // want to touch the field leave the outer `Option` as `None`.
         if let Some(workspace_id) = workspace_id {
             record.meta.workspace_id = if workspace_id.is_empty() {
                 None
@@ -189,10 +162,6 @@ impl SessionStore for MemoryStore {
             .ok_or_else(|| StoreError::SessionNotFound(id.clone()))
     }
 
-    /// Records the compaction as an [`AgentEvent::CompactionBoundary`]
-    /// appended through [`SessionStore::append`] — a single mechanism, so the
-    /// boundary gets a sequence number, bumps `updated_at_ms`, and replays
-    /// exactly like every other persisted event.
     async fn record_compaction(
         &self,
         id: &SessionId,

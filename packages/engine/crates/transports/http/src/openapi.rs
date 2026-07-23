@@ -1,7 +1,3 @@
-//! `GET /openapi.json`: the spec, generated from the same `#[utoipa::path]`
-//! annotations and `ToSchema` derives that define the routes — docs and code
-//! can't silently drift apart the way a hand-maintained spec would.
-
 use utoipa::OpenApi;
 
 use crate::dto::{

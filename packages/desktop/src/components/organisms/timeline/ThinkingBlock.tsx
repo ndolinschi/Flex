@@ -15,21 +15,12 @@ export const ThinkingBlock = ({
   text: string
   durationMs?: number
   streaming?: boolean
-  /** When true (open live WorkGroup already owns the "Thinking" cue), skip
-   * the shimmering status label so the turn shows exactly one live status.
-   * While streaming, also skip the chevron-only chrome row — an orphan ▸
-   * under tool steps (Glob/Grep "Explored…") reads as a layout bug. Settled
-   * blocks still show "Thought for Xs" + expand. */
   suppressStatusLabel?: boolean
 }) => {
   const [collapsed, setCollapsed] = useState(true)
 
-  // Empty shells are dropped in `mergeShortThinkingRows`; keep this guard so a
-  // stray whitespace-only row never paints a bare "Thought" chevron.
   if (!text.trim()) return null
 
-  // Parent WorkGroup already shows "Thinking" — don't render a chevron-only
-  // header (no label left), which floats under the last tool detail.
   if (streaming && suppressStatusLabel) {
     return (
       <div className="min-h-5">

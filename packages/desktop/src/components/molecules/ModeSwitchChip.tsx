@@ -4,9 +4,6 @@ import { Button } from "@/components/ui/button"
 import { useAppStore } from "../../stores/appStore"
 import { respondModeSwitch } from "../../lib/tauri"
 
-/** Docked chip shown above the composer when the engine proposes a
- * composer-mode switch (`ModeSwitchProposed`). Shows a countdown, lets the
- * user cancel, and auto-accepts when the veto window expires. */
 export const ModeSwitchChip = () => {
   const pending = useAppStore((s) => s.pendingModeSwitch)
   const clearPending = useAppStore((s) => s.setPendingModeSwitch)
@@ -27,7 +24,6 @@ export const ModeSwitchChip = () => {
         resolvedRef.current = true
         clearPending(null)
         void respondModeSwitch(pending.sessionId, pending.id, true).catch(() => {
-          // Engine may have already auto-applied — safe no-op.
         })
       }
     }

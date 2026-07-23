@@ -1,4 +1,3 @@
-/** Prompt review helpers — map model findings onto character spans. */
 
 import type { PromptReviewFinding } from "./tauri"
 
@@ -30,7 +29,6 @@ const normalizeSeverity = (raw: string): PromptSeverity => {
   return "warn"
 }
 
-/** Locate each finding's quote in `draft` (first unused occurrence). */
 export const annotationsFromFindings = (
   draft: string,
   findings: PromptReviewFinding[],
@@ -69,7 +67,6 @@ export const annotationsFromFindings = (
   return out.sort((a, b) => a.start - b.start || b.end - a.end)
 }
 
-/** Split draft into plain + marked segments for the review view. */
 export const segmentAnnotatedPrompt = (
   draft: string,
   annotations: PromptAnnotation[],
@@ -77,7 +74,6 @@ export const segmentAnnotatedPrompt = (
   if (!draft) return [{ kind: "text", value: "" }]
   if (annotations.length === 0) return [{ kind: "text", value: draft }]
 
-  // Greedy non-overlapping: keep earliest, skip overlaps.
   const picked: PromptAnnotation[] = []
   for (const a of annotations) {
     if (picked.some((p) => a.start < p.end && a.end > p.start)) continue
@@ -164,7 +160,6 @@ export const appendPromptSection = (
   return `${base}\n\n${sectionMarkdown}`
 }
 
-/** Rough token estimate (~4 chars/token). */
 export const estimateTokens = (text: string): number => {
   const trimmed = text.trim()
   if (!trimmed) return 0

@@ -10,7 +10,6 @@ import type { ChatgptAuthStart } from "../lib/types"
 
 const CHATGPT_AUTH_KEY = ["chatgpt-auth-status"] as const
 
-/** ChatGPT Plus/Pro headless OAuth status + start/wait/cancel. */
 export const useChatgptAuth = (enabled = true) => {
   const queryClient = useQueryClient()
 

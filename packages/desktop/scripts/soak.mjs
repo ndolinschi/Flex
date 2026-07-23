@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-/**
- * Nightly soak skeleton (phase 3.2).
- *
- * The previous Vite + browserMock soak was removed — there is no mock IPC
- * backend. A real soak needs Tauri + provider harness; until that lands this
- * script exits 0 with a clear skip summary so nightly stays green.
- *
- * Usage:
- *   pnpm soak
- *
- * Env:
- *   SOAK_OUT        optional JSON summary path
- */
 import { writeFile } from "node:fs/promises"
 import { mkdir } from "node:fs/promises"
 import path from "node:path"

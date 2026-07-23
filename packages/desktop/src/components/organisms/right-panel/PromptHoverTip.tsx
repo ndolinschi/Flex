@@ -7,7 +7,6 @@ type PromptHoverTipProps = {
   } | null
 }
 
-/** Fixed-position tooltip for an annotated prompt mark under the pointer. */
 export const PromptHoverTip = ({ tip }: PromptHoverTipProps) => {
   if (!tip) return null
 

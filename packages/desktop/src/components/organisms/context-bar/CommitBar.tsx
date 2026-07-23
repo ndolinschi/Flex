@@ -24,13 +24,6 @@ import {
 import { Spinner } from "@/components/ui/spinner"
 import { Input } from "@/components/ui/input"
 
-/** Right-aligned "N changes" pill + Commit button, shown above the
- * composer for non-isolated sessions with a dirty working tree (design:
- * "Changes +9745 -737" pill + button). Clicking the pill jumps to the
- * Changes tab; the button opens an inline popover to compose the message.
- *
- * Label / actions depend on remotes: no remote → Commit only; with a
- * remote → Commit, Commit & Push, and Commit & Create PR. */
 export const CommitBar = ({
   sessionId,
   cwd,
@@ -47,7 +40,6 @@ export const CommitBar = ({
   const queryClient = useQueryClient()
   const pushToast = useAppStore((s) => s.pushToast)
   const openToolBesideChat = useAppStore((s) => s.openToolBesideChat)
-  // Hide pre-turn repo dirt on a brand-new chat (same gate as FilesChangedCard).
   const hasActivity = useAppStore((s) => sessionHasActivity(s, sessionId))
 
   const { data: summary } = useQuery({
@@ -66,9 +58,6 @@ export const CommitBar = ({
     refetchOnWindowFocus: true,
   })
 
-  // This pill only ever shows a count + aggregate +/- badge (no file rows),
-  // so it reads straight from the summary's totals — always accurate even
-  // past the server-side row cap.
   const totalCount = summary?.totalCount ?? 0
   const totals = {
     added: summary?.totalAdded ?? 0,
@@ -83,10 +72,6 @@ export const CommitBar = ({
     if (andPush && !hasRemote) return
     setBusy("commit")
     try {
-      // TODO: gitCommit stages the whole repo (`git add -A` in the Rust
-      // `git_commit` command) even though the count/list above is
-      // session-scoped (gitStatusSinceBaseline). A session with 0 tracked
-      // changes can still commit unrelated pre-existing dirty files repo-wide.
       const sha = await gitCommit(sessionId, trimmed)
       invalidateGitQueries(queryClient)
       pushToast(`Committed ${sha}`, "success")
@@ -142,14 +127,14 @@ export const CommitBar = ({
   if (totalCount === 0) return null
 
   return (
-    <div className="relative flex shrink-0 items-center gap-1.5">
+    <div className="relative flex shrink-0 items-center gap-1">
       <Button
-        variant="secondary"
+        variant="ghost"
         size="xs"
         onClick={() => {
           openToolBesideChat(sessionId, "changes")
         }}
-        className="max-w-[12rem] shrink gap-1.5 truncate font-normal"
+        className="h-5 max-w-[11rem] shrink gap-1 truncate px-1.5 font-normal text-ink-muted opacity-80 hover:bg-fill-4 hover:text-ink hover:opacity-100"
       >
         <span className="truncate">
           {totalCount} change{totalCount === 1 ? "" : "s"}
@@ -161,9 +146,9 @@ export const CommitBar = ({
         <PopoverTrigger
           render={
             <Button
-              variant="default"
+              variant="ghost"
               size="xs"
-              className="shrink-0 gap-1 font-normal"
+              className="h-5 shrink-0 gap-1 px-1.5 font-normal text-ink-muted opacity-80 hover:bg-fill-4 hover:text-ink hover:opacity-100"
             />
           }
         >

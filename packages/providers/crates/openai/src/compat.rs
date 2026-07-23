@@ -1,11 +1,3 @@
-//! Building blocks for OpenAI-compatible endpoints.
-//!
-//! Several services speak the Chat Completions dialect with their own base
-//! URL and authentication (GitHub Copilot, local gateways, hosted routers).
-//! This module exposes the crate's request building, stream normalization,
-//! and model-list parsing so those providers reuse one wire implementation
-//! instead of re-mapping the dialect.
-
 use futures::StreamExt;
 
 use agentloop_contracts::{ModelInfo, ProviderId};
@@ -14,14 +6,10 @@ use agentloop_core::{ChatRequest, ProviderError, ProviderStream};
 use crate::provider::provider_stream;
 use crate::wire::{ModelList, build_request, models_from_response};
 
-/// Serialize a canonical [`ChatRequest`] as a streaming Chat Completions
-/// request body.
 pub fn chat_body(request: ChatRequest) -> serde_json::Value {
     serde_json::to_value(build_request(request)).unwrap_or_else(|_| serde_json::json!({}))
 }
 
-/// Normalize a successful streaming Chat Completions response into the
-/// unified provider stream, attributed to `provider`.
 pub fn stream_response(
     provider: ProviderId,
     model: String,
@@ -35,7 +23,6 @@ pub fn stream_response(
     Box::pin(provider_stream(provider, model, chunks))
 }
 
-/// Parse a `/models` listing response body.
 pub fn models_from_json(
     provider: &ProviderId,
     value: serde_json::Value,

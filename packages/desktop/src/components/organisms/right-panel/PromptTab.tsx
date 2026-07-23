@@ -40,8 +40,6 @@ type PromptTabProps = {
   active: boolean
 }
 
-/** Session-scoped prompt pad: Verify grill, apply fixes without ending review,
- * clarifying questions, and composer-style @ / autocomplete. */
 export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
   const draft = useAppStore((s) => s.draftsBySession[sessionId] ?? "")
   const setComposerDraft = useAppStore((s) => s.setComposerDraft)
@@ -114,7 +112,6 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
     },
   })
 
-  // Findings whose quote still exists in the draft (after partial applies/edits).
   const liveFindings = useMemo(() => {
     if (!review) return []
     return review.findings.filter((f) => f.quote && draft.includes(f.quote))
@@ -158,7 +155,6 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
     if (!ann.fix || !review) return
     const next = draft.slice(0, ann.start) + ann.fix + draft.slice(ann.end)
     setDraft(next)
-    // Drop this finding; keep the rest of the review open.
     setReview({
       ...review,
       findings: review.findings.filter(
@@ -352,8 +348,6 @@ export const PromptTab = ({ sessionId, active }: PromptTabProps) => {
               }}
               placeholder="Write the prompt… Use @ for files/MCP and / for commands. Then Verify."
               className={cn(
-                // Overlay chrome: transparent text over the suggestion backdrop;
-                // strip Textarea surface/border/ring defaults that fight it.
                 "relative h-full min-h-0 w-full field-sizing-fixed resize-none overflow-y-auto",
                 "rounded-none border-0 bg-transparent px-2.5 py-2 shadow-none",
                 "text-sm leading-relaxed text-transparent caret-ink outline-none",

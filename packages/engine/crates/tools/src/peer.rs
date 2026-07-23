@@ -1,13 +1,3 @@
-//! Peer-agent coordination: mailbox, active-agent discovery, and messaging.
-//!
-//! Three tools share one `Arc<PeerMailbox>` and one `Arc<dyn SessionStore>`:
-//!
-//! - **`GetActiveAgents`** — list sessions whose project root matches the
-//!   caller's cwd; lets the model know who else is working in the same repo.
-//! - **`SendMessage`** — drop a structured message in a peer's inbox and
-//!   emit an outbound copy on the sender's event stream for UI threading.
-//! - **`GetMessages`** — drain (or peek at) pending inbound messages.
-
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 
@@ -23,11 +13,6 @@ use agentloop_core::{
 
 use crate::fs::schema_of;
 
-// ---------------------------------------------------------------------------
-// Mailbox
-// ---------------------------------------------------------------------------
-
-/// One peer message sitting in a recipient's inbox.
 #[derive(Debug, Clone)]
 pub struct PeerEnvelope {
     pub id: PeerMessageId,
@@ -37,8 +22,6 @@ pub struct PeerEnvelope {
     pub thread_id: Option<String>,
 }
 
-/// In-process cross-session message bus. Shared via `Arc` across all tool
-/// instances that belong to the same engine service.
 #[derive(Debug, Default)]
 pub struct PeerMailbox {
     inner: Mutex<HashMap<SessionId, VecDeque<PeerEnvelope>>>,
@@ -49,13 +32,11 @@ impl PeerMailbox {
         Self::default()
     }
 
-    /// Enqueue `env` for `to`.
     pub fn send(&self, to: SessionId, env: PeerEnvelope) {
         let mut map = self.inner.lock().unwrap_or_else(|p| p.into_inner());
         map.entry(to).or_default().push_back(env);
     }
 
-    /// Remove and return all pending messages for `session`.
     pub fn drain(&self, session: &SessionId) -> Vec<PeerEnvelope> {
         let mut map = self.inner.lock().unwrap_or_else(|p| p.into_inner());
         map.remove(session)
@@ -63,7 +44,6 @@ impl PeerMailbox {
             .unwrap_or_default()
     }
 
-    /// Return a snapshot of pending messages without removing them.
     pub fn peek(&self, session: &SessionId) -> Vec<PeerEnvelope> {
         let map = self.inner.lock().unwrap_or_else(|p| p.into_inner());
         map.get(session)
@@ -71,10 +51,6 @@ impl PeerMailbox {
             .unwrap_or_default()
     }
 }
-
-// ---------------------------------------------------------------------------
-// Serializable peer info (tool output)
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize, JsonSchema)]
 struct PeerInfo {
@@ -86,21 +62,13 @@ struct PeerInfo {
     depth: u8,
 }
 
-// ---------------------------------------------------------------------------
-// GetActiveAgents
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct GetActiveAgentsInput {
-    /// Only return peers that are working on this file path (substring
-    /// match against `SessionMeta.cwd`). Omit to return all peers in the
-    /// same project.
     #[serde(default)]
     about_path: Option<String>,
 }
 
-/// Returns peer sessions sharing the same project root as the caller.
 pub struct GetActiveAgentsTool {
     store: Arc<dyn SessionStore>,
 }
@@ -142,8 +110,6 @@ impl Tool for GetActiveAgentsTool {
             ))
         })?;
 
-        // Determine the current session's project root (base_cwd takes priority
-        // over cwd when isolation is active).
         let current_meta = self
             .store
             .get_meta(&ctx.session_id)
@@ -168,17 +134,13 @@ impl Tool for GetActiveAgentsTool {
         let peers: Vec<PeerInfo> = all_sessions
             .into_iter()
             .filter(|meta| {
-                // Exclude self.
                 if meta.id == ctx.session_id {
                     return false;
                 }
-                // Same project root.
                 let root = meta.base_cwd.as_ref().unwrap_or(&meta.cwd);
                 if root.to_string_lossy() != current_root_str {
                     return false;
                 }
-                // Optional path filter: at least one of cwd or base_cwd
-                // contains the requested path substring.
                 if let Some(filter) = &input.about_path {
                     let cwd_str = meta.cwd.to_string_lossy();
                     let base_str = meta
@@ -220,26 +182,17 @@ impl Tool for GetActiveAgentsTool {
     }
 }
 
-// ---------------------------------------------------------------------------
-// SendMessage
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct SendMessageInput {
-    /// Session id of the recipient agent (from `GetActiveAgents`).
     to: String,
-    /// The message body.
     content: String,
-    /// Optional file or directory path this message is about.
     #[serde(default)]
     about_path: Option<String>,
-    /// Optional thread id to group related messages.
     #[serde(default)]
     thread_id: Option<String>,
 }
 
-/// Deliver a message to a peer agent's inbox.
 pub struct SendMessageTool {
     mailbox: Arc<PeerMailbox>,
 }
@@ -298,11 +251,8 @@ impl Tool for SendMessageTool {
             thread_id: input.thread_id.clone(),
         };
 
-        // Enqueue for the recipient.
         self.mailbox.send(to.clone(), envelope);
 
-        // Emit an outbound copy on the sender's event stream so the UI can
-        // show the full thread from the sender's side.
         ctx.events.emit(AgentEvent::PeerMessage {
             id,
             from: ctx.session_id.clone(),
@@ -322,15 +272,9 @@ impl Tool for SendMessageTool {
     }
 }
 
-// ---------------------------------------------------------------------------
-// GetMessages
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct GetMessagesInput {
-    /// When `true` (default), remove the messages from the inbox after
-    /// reading. Set to `false` to peek without consuming.
     #[serde(default = "default_drain")]
     drain: bool,
 }
@@ -348,7 +292,6 @@ struct MessageItem {
     thread_id: Option<String>,
 }
 
-/// Read pending inbound peer messages for the current session.
 pub struct GetMessagesTool {
     mailbox: Arc<PeerMailbox>,
 }
@@ -419,10 +362,6 @@ impl Tool for GetMessagesTool {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Unit tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod mailbox_tests {
     use super::*;
@@ -455,9 +394,7 @@ mod mailbox_tests {
         assert_eq!(drained[0].content, "hello");
         assert_eq!(drained[1].content, "world");
 
-        // Second drain should be empty.
         assert!(mb.drain(&bob).is_empty());
-        // Alice's inbox was never touched.
         assert!(mb.drain(&alice).is_empty());
     }
 
@@ -472,7 +409,6 @@ mod mailbox_tests {
         assert_eq!(peeked.len(), 1);
         assert_eq!(peeked[0].content, "ping");
 
-        // Message is still there.
         let drained = mb.drain(&bob);
         assert_eq!(drained.len(), 1);
     }

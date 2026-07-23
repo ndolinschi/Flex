@@ -1,6 +1,3 @@
-//! MCP bridge: configuration, rmcp client, dynamic tool registration, and task
-//! spawn interfaces.
-
 pub mod bridge;
 pub mod client;
 pub mod config;

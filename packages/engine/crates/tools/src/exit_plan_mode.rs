@@ -1,11 +1,3 @@
-//! `ExitPlanMode`: hand a finished implementation plan to the user for approval.
-//!
-//! Read-only signalling tool used during plan mode. The model calls it once it
-//! has researched and written a plan; the client (CLI) intercepts the call,
-//! shows the plan, and — on approval — switches the session out of plan mode so
-//! the work can be carried out. The tool itself performs no mutation, so it is
-//! allowed by the plan-mode permission gate.
-
 use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -19,11 +11,9 @@ use crate::fs::schema_of;
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ExitPlanModeInput {
-    /// The implementation plan to present, as concise Markdown (numbered steps).
     plan: String,
 }
 
-/// Signals that planning is complete and a plan is ready for approval.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ExitPlanModeTool;
 

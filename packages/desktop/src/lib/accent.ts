@@ -1,10 +1,3 @@
-/** Accent color presets + DOM application for Appearance settings.
- *
- * Product chrome (`Button` primary, links, focus rings, selection) reads
- * `--color-accent` / `--color-accent-hover` / `--color-accent-subtle` /
- * `--color-accent-text`. Default is **neutral** (white on dark / black on
- * light) so active controls stay high-contrast; users can pick a hue preset
- * or any custom hex from Settings → Appearance. */
 
 export type AccentId =
   | "neutral"
@@ -27,19 +20,16 @@ type ThemePair = { dark: AccentTokens; light: AccentTokens }
 export type AccentPreset = {
   id: Exclude<AccentId, "custom">
   label: string
-  /** Swatch shown in the picker (theme-agnostic mid tone). */
   swatch: string
   tokens: ThemePair
 }
 
-/** Built-in hues — `neutral` is the factory default. */
 export const ACCENT_PRESETS: readonly AccentPreset[] = [
   {
     id: "neutral",
     label: "Neutral",
     swatch: "#f0f0f0",
     tokens: {
-      /* Neutral white on pure-gray chrome (Agents Web — no cool blue). */
       dark: { accent: "#f0f0f0", hover: "#ffffff", text: "#141414" },
       light: { accent: "#1a1a1a", hover: "#000000", text: "#ffffff" },
     },
@@ -110,7 +100,6 @@ export const isValidAccentHex = (value: string): boolean => HEX_RE.test(value.tr
 export const normalizeAccentHex = (value: string): string | null => {
   const trimmed = value.trim()
   if (HEX_RE.test(trimmed)) return trimmed.toLowerCase()
-  // Allow bare RRGGBB
   if (/^[0-9a-fA-F]{6}$/.test(trimmed)) return `#${trimmed.toLowerCase()}`
   return null
 }
@@ -125,7 +114,6 @@ const parseRgb = (hex: string): { r: number; g: number; b: number } | null => {
   }
 }
 
-/** Relative luminance (sRGB) — used to pick black vs white label text. */
 export const accentLuminance = (hex: string): number => {
   const rgb = parseRgb(hex)
   if (!rgb) return 0
@@ -144,7 +132,6 @@ const clampByte = (n: number) => Math.max(0, Math.min(255, Math.round(n)))
 const toHex = (r: number, g: number, b: number): string =>
   `#${[r, g, b].map((c) => clampByte(c).toString(16).padStart(2, "0")).join("")}`
 
-/** Lighten/darken a hex by mixing toward white or black. */
 export const mixAccent = (hex: string, towardWhite: boolean, amount: number): string => {
   const rgb = parseRgb(hex)
   if (!rgb) return hex
@@ -176,7 +163,6 @@ export const resolveAccentTokens = (
   return preset.tokens[theme]
 }
 
-/** Write accent CSS variables onto `<html>`. Safe no-op without `document`. */
 export const applyAccentToDom = (
   id: AccentId,
   customHex: string,

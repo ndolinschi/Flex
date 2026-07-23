@@ -1,15 +1,9 @@
-//! Markdown projection: render any transcript as one continuous, readable
-//! markdown document. This is the debug view, the runner's `--render md`
-//! output, and the seed-history text for delegated agents that only accept
-//! plain prompts. Deterministic — snapshot-tested.
-
 use std::fmt::Write as _;
 
 use crate::content::Role;
 use crate::reduce::{Transcript, TranscriptBlock};
 use crate::tool_call::{ToolCall, ToolCallStatus};
 
-/// Render a transcript to a single markdown document.
 pub fn transcript_to_markdown(transcript: &Transcript) -> String {
     let mut out = String::new();
     for (index, item) in transcript.items.iter().enumerate() {

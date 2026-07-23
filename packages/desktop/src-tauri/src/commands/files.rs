@@ -1,4 +1,3 @@
-//! Workspace file search, tree listing, and text file CRUD.
 
 use super::common::{
     normalize_path_slashes, require_service, resolve_review_path, validate_repo_relative_path,
@@ -8,18 +7,12 @@ use super::prelude::*;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileHit {
-    /// Path relative to `cwd`, forward-slashed.
     pub path: String,
-    /// Basename, shown as the primary label.
     pub name: String,
-    /// True when the hit is a directory (folder icon in @-mentions / Files).
     #[serde(default)]
     pub is_dir: bool,
 }
 
-/// Directory basenames we never descend into, even if a project forgot to
-/// gitignore them — walking `node_modules` / build outputs is what made
-/// composer `@` feel multi-second on ordinary apps.
 const SKIP_DIR_NAMES: &[&str] = &[
     "node_modules",
     ".git",
@@ -51,13 +44,9 @@ pub(crate) fn is_skipped_dir_name(name: &str) -> bool {
         .any(|skip| name.eq_ignore_ascii_case(skip))
 }
 
-/// Rank a path against a lowercase needle. Lower is better; `None` = no match.
-/// Basename prefix/contains beat full-path contains. Subsequence matching is
-/// intentionally omitted — it matched almost everything and made ranking +
-/// result lists feel random/laggy.
 pub(crate) fn score_file(rel_path: &str, name: &str, needle: &str) -> Option<i32> {
     if needle.is_empty() {
-        return Some(100); // browse mode — rank by path length afterwards
+        return Some(100);
     }
     let path_l = rel_path.to_lowercase();
     let name_l = name.to_lowercase();
@@ -73,19 +62,6 @@ pub(crate) fn score_file(rel_path: &str, name: &str, needle: &str) -> Option<i32
     None
 }
 
-/// Read-only fuzzy file **and folder** search under `cwd` for composer
-/// @-mentions and the Files explorer search box. Folders are included so the
-/// suggestion tray can show distinct file/folder icons.
-///
-/// By default (`include_ignored = false` / omitted): respects `.gitignore` /
-/// `.ignore` / `.git/exclude` and skips hidden files — correct for agent
-/// @-mentions. Pass `include_ignored = true` for the human Files search so
-/// `.env` and other gitignored paths are findable (heavy vendor dirs are still
-/// pruned so typing stays snappy).
-///
-/// Walks once per `(root, include_ignored)` into
-/// [`AppState::workspace_path_cache`]; subsequent keystrokes score against
-/// the warm list until TTL expiry or explicit invalidation.
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
 pub async fn list_files(
@@ -104,7 +80,6 @@ pub async fn list_files(
     let root_key = root.to_string_lossy().to_string();
     let cache_key = (root_key.clone(), include_ignored);
 
-    // Fast path: reuse a fresh warm walk without leaving the async worker.
     {
         let cache = state
             .workspace_path_cache
@@ -140,9 +115,6 @@ pub async fn list_files(
     Ok(score_cached_paths(&entries, &needle))
 }
 
-/// Drop the warm `list_files` path cache. Pass `cwd` to clear only entries
-/// for that workspace root; omit to clear everything (used after FS-mutating
-/// tools / turn settle).
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
 pub fn invalidate_workspace_path_cache(state: State<'_, AppState>, cwd: Option<String>) {
@@ -155,20 +127,16 @@ pub fn invalidate_workspace_path_cache(state: State<'_, AppState>, cwd: Option<S
             let resolved = crate::path_resolve::resolve_existing_dir(cwd, None)
                 .map(|p| p.to_path_buf())
                 .unwrap_or_else(|| std::path::PathBuf::from(cwd));
-            // Component-aware prefix: string `starts_with` would also evict a
-            // sibling root like `/project2` when invalidating `/project`.
             cache.retain(|(root, _), _| {
                 let root_path = std::path::Path::new(root);
                 root_path != resolved.as_path() && !root_path.starts_with(&resolved)
             });
-            // Also drop keys that were stored before canonicalize (raw cwd).
             cache.retain(|(root, _), _| root != cwd);
         }
         None => cache.clear(),
     }
 }
 
-/// Bound the walk so huge repos can't stall an interactive keystroke.
 const MAX_HITS: usize = 40;
 const MAX_WALK_SEARCH: usize = 8_000;
 
@@ -181,7 +149,6 @@ pub(crate) fn walk_workspace_paths(
 
     let mut builder = ignore::WalkBuilder::new(root);
     if include_ignored {
-        // Human Files search: show hidden + gitignored (e.g. `.env`).
         builder
             .standard_filters(false)
             .hidden(false)
@@ -193,14 +160,11 @@ pub(crate) fn walk_workspace_paths(
             .follow_links(false);
     } else {
         builder
-            .standard_filters(true) // hidden + gitignore + .ignore + exclude
+            .standard_filters(true)
             .parents(true)
             .follow_links(false);
     }
     builder.filter_entry(|entry| {
-        // Always prune heavy vendor dirs before descending — otherwise a
-        // missing ignore rule (or include_ignored) walks tens of thousands
-        // of node_modules files on every keystroke.
         if entry.depth() > 0 && entry.file_type().is_some_and(|ft| ft.is_dir()) {
             let name = entry.file_name().to_string_lossy();
             if is_skipped_dir_name(&name) {
@@ -223,7 +187,6 @@ pub(crate) fn walk_workspace_paths(
         if !is_dir && !is_file {
             continue;
         }
-        // Skip the walk root itself.
         if entry.depth() == 0 {
             continue;
         }
@@ -252,16 +215,12 @@ pub(crate) fn score_cached_paths(
     entries: &[crate::state::CachedPathEntry],
     needle: &str,
 ) -> Vec<FileHit> {
-    // Warm-cache scoring is cheap (string checks only) — score the full list
-    // then rank, instead of the walk-time early-exit that stopped disk I/O.
     let mut hits: Vec<(i32, FileHit)> = Vec::with_capacity(MAX_HITS * 2);
 
     for entry in entries {
         let Some(score) = score_file(&entry.path, &entry.name, needle) else {
             continue;
         };
-        // Prefer files slightly over folders when scores tie (files more often
-        // what users @-mention), but still surface folders with folder icons.
         let rank = if entry.is_dir { score + 10 } else { score };
         hits.push((
             rank,
@@ -282,9 +241,6 @@ pub(crate) fn score_cached_paths(
     hits.into_iter().map(|(_, h)| h).collect()
 }
 
-/// Resolve a usable workspace directory from `cwd`, falling back to
-/// `fallback_cwd` (typically `base_cwd`) when the primary path is missing.
-/// Returns the absolute/normalized path string, or `None` when neither exists.
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
 pub fn resolve_workspace_cwd(cwd: String, fallback_cwd: Option<String>) -> Option<String> {
@@ -292,11 +248,6 @@ pub fn resolve_workspace_cwd(cwd: String, fallback_cwd: Option<String>) -> Optio
         .map(|p| p.to_string_lossy().into_owned())
 }
 
-/// Immediate children of `relative_dir` under `cwd` (empty = workspace root).
-/// Human Files tree: shows **everything** at this level — including `.env`,
-/// gitignored paths, and heavy dirs like `node_modules` — so the panel matches
-/// what a person sees in Explorer/Finder. (Composer `@` still uses
-/// gitignore-aware [`list_files`].) Soft-capped; dirs-first then name.
 #[tracing::instrument(level = "debug", skip_all)]
 #[tauri::command]
 pub async fn list_dir_children(
@@ -403,22 +354,8 @@ mod list_files_ranking_tests {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Plan tab: Save to Workspace — writes the rendered plan markdown to a file
-// inside the session's cwd. Traversal-hardened: canonicalize the cwd, join
-// the (resolved) relative path, then verify the written file's parent still
-// sits inside the canonical cwd. Absolute Write/Edit-style paths are
-// accepted via [`resolve_review_path`] and stripped to repo-relative first.
-// ---------------------------------------------------------------------------
-
-/// Hard cap for the Files (Monaco) editor — keeps the UI responsive and
-/// rejects accidental binary dumps. Matches ~ Cursor's soft ceiling for
-/// opening source in the side editor.
 const READ_TEXT_MAX_BYTES: u64 = 1_500_000;
 
-/// Reads a UTF-8 text file relative to `session_id`'s cwd. Same path
-/// sanitation as [`save_text_file`]. Rejects files larger than
-/// [`READ_TEXT_MAX_BYTES`] and non-UTF-8 content.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn read_text_file(
@@ -481,11 +418,6 @@ pub async fn read_text_file(
     .map_err(|e| DesktopError::Message(format!("read join: {e}")))?
 }
 
-/// Writes `content` to `relative_path` inside `session_id`'s cwd, creating
-/// parent directories as needed (e.g. a not-yet-existing `plans/` folder).
-/// Returns the absolute path written. Used by the Plan tab's "Save to
-/// Workspace" menu item (`PlanToolbar`); the frontend passes
-/// `plans/<slug>-<date>.md`.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn save_text_file(
@@ -513,9 +445,6 @@ pub async fn save_text_file(
     std::fs::create_dir_all(parent)
         .map_err(|e| DesktopError::Message(format!("cannot create `{}`: {e}", parent.display())))?;
 
-    // Re-canonicalize the parent now that it's guaranteed to exist, and
-    // verify it's still inside the session cwd — belt-and-suspenders against
-    // `..` traversal via symlinks that the component scan above can't see.
     let canonical_parent = parent
         .canonicalize()
         .map_err(|e| DesktopError::Message(format!("invalid target directory: {e}")))?;
@@ -531,9 +460,6 @@ pub async fn save_text_file(
     Ok(target.display().to_string())
 }
 
-/// Creates an empty UTF-8 text file at `relative_path` inside `session_id`'s
-/// cwd (creating parent dirs as needed). Fails if the target already exists —
-/// use [`save_text_file`] to overwrite. Returns the repo-relative path.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn create_text_file(
@@ -585,10 +511,6 @@ pub async fn create_text_file(
     .map_err(|e| DesktopError::Message(format!("create join: {e}")))?
 }
 
-/// Renames a file under `session_id`'s cwd from `from_path` to `to_path`
-/// (both repo-relative). Fails if the destination already exists, if the
-/// source is missing, or if either path escapes the session cwd. Returns the
-/// new repo-relative path.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn rename_path(
@@ -654,8 +576,6 @@ pub async fn rename_path(
     .map_err(|e| DesktopError::Message(format!("rename join: {e}")))?
 }
 
-/// Deletes a file under `session_id`'s cwd. Refuses directories (explorer is
-/// file-scoped). Returns the deleted repo-relative path.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn delete_path(

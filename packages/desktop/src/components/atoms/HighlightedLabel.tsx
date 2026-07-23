@@ -6,7 +6,6 @@ type HighlightedLabelProps = {
   query: string
 }
 
-/** Renders `label` with fuzzy-matched characters accent-colored. */
 export const HighlightedLabel = ({ label, query }: HighlightedLabelProps) => {
   const matches = useMemo(
     () => new Set(fuzzyMatchIndices(query, label)),

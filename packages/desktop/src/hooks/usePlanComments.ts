@@ -10,10 +10,6 @@ type CommentDraft = {
   endOffset: number
 }
 
-/**
- * Add / remove plan annotations and optionally send one to the agent as
- * plan-mode feedback. Persistence is handled by the session slice.
- */
 export const usePlanComments = (sessionId: SessionId | null, planId: string | null) => {
   const addPlanComment = useAppStore((s) => s.addPlanComment)
   const removePlanComment = useAppStore((s) => s.removePlanComment)

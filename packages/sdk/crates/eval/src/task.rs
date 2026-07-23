@@ -1,22 +1,3 @@
-//! Declarative TOML task definitions and discovery.
-//!
-//! A task is one prompt run in a temp-copied workspace, scored by a shell
-//! command and/or cheap file assertions:
-//!
-//! ```toml
-//! id = "fix-failing-test"
-//! prompt = "The test in tests/math.sh fails. Fix src/math.sh so it passes."
-//! fixture = "fixtures/fix-failing-test"   # relative to the suite root
-//! timeout_secs = 300
-//! max_turns = 1
-//!
-//! [check]
-//! cmd = "bash tests/math.sh"
-//! expect_files = ["src/math.sh"]
-//! [check.expect_contains]
-//! "src/math.sh" = "return"
-//! ```
-
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -32,54 +13,44 @@ fn default_max_turns() -> u32 {
     1
 }
 
-/// How a run is scored. At least one of the fields must be present.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CheckSpec {
-    /// Shell command run in the run workspace; exit 0 = pass.
     #[serde(default)]
     pub cmd: Option<String>,
-    /// Workspace-relative paths that must exist after the run.
+
     #[serde(default)]
     pub expect_files: Vec<PathBuf>,
-    /// Workspace-relative file → substring that must appear in it.
+
     #[serde(default)]
     pub expect_contains: BTreeMap<PathBuf, String>,
 }
 
 impl CheckSpec {
-    /// Whether the spec asserts anything at all.
     pub fn is_empty(&self) -> bool {
         self.cmd.is_none() && self.expect_files.is_empty() && self.expect_contains.is_empty()
     }
 }
 
-/// One benchmark task, deserialized from a TOML file.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TaskSpec {
-    /// Stable task identifier (used in reports and baseline comparison).
     pub id: String,
-    /// The user prompt driven through the agent.
+
     pub prompt: String,
-    /// Directory copied into the run workspace before the turn. Relative
-    /// paths resolve against the suite root (the tasks dir's parent), falling
-    /// back to the tasks dir itself. `None` = empty workspace.
+
     #[serde(default)]
     pub fixture: Option<PathBuf>,
-    /// Wall-clock budget for the agent turn.
+
     #[serde(default = "default_timeout_secs")]
     pub timeout_secs: u64,
-    /// Reserved for multi-turn tasks; v1 always runs one prompt.
+
     #[serde(default = "default_max_turns")]
     pub max_turns: u32,
-    /// Pass/fail scoring.
+
     pub check: CheckSpec,
 }
 
-/// Parse and validate one task file, resolving a relative fixture path
-/// against the suite root (the task file's grandparent directory) or the
-/// task file's own directory — whichever exists.
 pub fn load_task(path: &Path) -> Result<TaskSpec, EvalError> {
     let text = std::fs::read_to_string(path)?;
     let mut task: TaskSpec = toml::from_str(&text).map_err(|err| EvalError::Task {
@@ -148,8 +119,6 @@ fn resolve_fixture(task_path: &Path, fixture: &Path) -> Result<PathBuf, EvalErro
     })
 }
 
-/// Load every `*.toml` under `dir` (non-recursive), sorted by task id.
-/// `filter` narrows to the named task ids; empty = all.
 pub fn discover_tasks(dir: &Path, filter: &[String]) -> Result<Vec<TaskSpec>, EvalError> {
     let mut tasks = Vec::new();
     for entry in std::fs::read_dir(dir)? {

@@ -21,8 +21,6 @@ import {
 import { ChatDiffCard } from "./ChatDiffCard"
 import { StreamingCaret } from "./StreamingCaret"
 
-/** Stable identity — a fresh `[remarkGfm]` each render makes ReactMarkdown
- * treat plugins as changed and re-run the Unified pipeline. */
 const REMARK_PLUGINS: NonNullable<
   ComponentProps<typeof ReactMarkdown>["remarkPlugins"]
 > = [remarkGfm]
@@ -30,8 +28,6 @@ const REMARK_PLUGINS: NonNullable<
 type MarkdownBodyProps = {
   content: string
   className?: string
-  /** Live streaming text: skip react-markdown + highlight (plain pre-wrap).
-   * Full GFM rendering runs after the row materializes. */
   live?: boolean
 }
 
@@ -39,7 +35,6 @@ type RehypePlugins = NonNullable<
   ComponentProps<typeof ReactMarkdown>["rehypePlugins"]
 >
 
-/** Module-singleton: one highlight.js chunk shared by every MarkdownBody. */
 let cachedHighlightPlugins: RehypePlugins | null = null
 let highlightPluginsPromise: Promise<RehypePlugins> | null = null
 
@@ -56,7 +51,6 @@ const ensureHighlightPlugins = (): Promise<RehypePlugins> => {
   return highlightPluginsPromise
 }
 
-/** Preload while streaming / on idle so settle does not wait on the chunk. */
 export const preloadMarkdownHighlight = (): void => {
   void ensureHighlightPlugins()
 }
@@ -66,24 +60,16 @@ const scheduleIdle = (fn: () => void, timeoutMs = 400): (() => void) => {
     const id = requestIdleCallback(() => fn(), { timeout: timeoutMs })
     return () => cancelIdleCallback(id)
   }
-  // WebKit may lack requestIdleCallback — defer past the settle frame
-  // instead of setTimeout(0) which races the GFM paint.
   const t = setTimeout(fn, Math.min(timeoutMs, 120))
   return () => clearTimeout(t)
 }
 
-/** Longer answers (repo overviews) make remark-gfm block for 1–3s. Scale the
- * idle deadline so stream-end chrome stays interactive before that parse. */
 const gfmIdleTimeoutMs = (len: number): number => {
   if (len < 2_000) return 280
   if (len < 8_000) return 900
   return 1_600
 }
 
-/** Recursively flattens a React children tree to plain text — rehype-highlight
- * wraps highlighted tokens in nested `<span>`s, so the raw code string isn't
- * available as a single string child. Defensive: streaming markdown can hand
- * us partial/odd shapes (undefined children, bare strings, etc). */
 const childrenToText = (node: ReactNode): string => {
   if (node == null || typeof node === "boolean") return ""
   if (typeof node === "string" || typeof node === "number") return String(node)
@@ -94,8 +80,6 @@ const childrenToText = (node: ReactNode): string => {
   return ""
 }
 
-/** Pulls the `language-x` class off a fenced code block's info string, if
- * present, from the (single) `<code>` child react-markdown passes to `pre`. */
 const languageFromPreChildren = (node: ReactNode): string | null => {
   const child = Array.isArray(node) ? node[0] : node
   if (!isValidElement<{ className?: string }>(child)) return null
@@ -104,9 +88,6 @@ const languageFromPreChildren = (node: ReactNode): string | null => {
   return match ? match[1] : null
 }
 
-/** Code-block chrome: language label + copy button, revealed on hover. Wraps
- * the existing `pre` styling untouched — only adds the overlay. Diff fences
- * (and bodies that look like unified diffs) render as `ChatDiffCard`. */
 const CodeBlock = (props: HTMLAttributes<HTMLPreElement>) => {
   const { children, ...rest } = props
   const [copied, setCopied] = useState(false)
@@ -125,7 +106,6 @@ const CodeBlock = (props: HTMLAttributes<HTMLPreElement>) => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      // Clipboard access can fail (permissions, insecure context) — no-op.
     }
   }
 
@@ -161,22 +141,17 @@ const MARKDOWN_BODY_CLASS =
   "markdown-body text-base leading-relaxed text-ink"
 
 const MARKDOWN_PROSE_CLASS = cn(
-  // Headings — balanced retreat above/below; first-child drops top margin.
   "[&_h1]:my-[0.5em] [&_h1]:text-[1.214em] [&_h1]:font-semibold [&_h1]:leading-tight",
   "[&_h2]:my-[0.5em] [&_h2]:text-[1.214em] [&_h2]:font-semibold [&_h2]:leading-tight",
   "[&_h3]:my-[0.5em] [&_h3]:text-[1.1em] [&_h3]:font-semibold [&_h3]:leading-tight",
   "[&_h4]:my-2 [&_h4]:text-[1em] [&_h4]:font-semibold",
   "[&_h1:first-child]:mt-0 [&_h2:first-child]:mt-0 [&_h3:first-child]:mt-0 [&_h4:first-child]:mt-0",
-  // Blocks — equal top/bottom so stacks don't feel top-heavy; last child
-  // drops bottom so the message doesn't trail empty space.
   "[&_p]:my-1.5 [&_p]:first:mt-0 [&_p]:last:mb-0",
   "[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:first:mt-0 [&_ul]:last:mb-0",
   "[&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:first:mt-0 [&_ol]:last:mb-0",
   "[&_li]:my-0.5 [&_li]:first:mt-0 [&_li]:last:mb-0",
   "[&_li>_ul]:my-0.5 [&_li>_ol]:my-0.5",
   "[&_strong]:font-semibold",
-  // Per-link hover only — `hover:[&_a]:…` would light every link when the
-  // markdown container itself is hovered.
   "[&_a]:text-link [&_a]:underline-offset-2 [&_a:hover]:underline",
   "[&_code]:rounded-[5px] [&_code]:bg-code-inline [&_code]:px-1 [&_code]:py-px [&_code]:font-mono [&_code]:text-[0.9em]",
   "[&_pre]:my-1.5 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-stroke-3 [&_pre]:bg-panel [&_pre]:p-2.5 [&_pre]:text-[0.9em] [&_pre]:first:mt-0 [&_pre]:last:mb-0",
@@ -198,9 +173,6 @@ const MARKDOWN_COMPONENTS: NonNullable<
     </div>
   ),
   pre: CodeBlock,
-  // Links must never navigate the app's own webview (that replaces the
-  // whole UI with the page). Route web links into the embedded Browser
-  // panel; hand any other scheme to the OS opener.
   a: ({ href, children }) => (
     <a
       href={href}
@@ -225,19 +197,8 @@ const MARKDOWN_COMPONENTS: NonNullable<
   ),
 }
 
-/**
- * Render phase for conversation markdown:
- * - `plain` — streaming (or brief post-stream hold): no remark/rehype work
- * - `gfm` — remark-gfm only; structure lands without highlight.js cost
- * - `full` — GFM + rehype-highlight (idle upgrade)
- *
- * Live→settled used to mount full GFM+highlight on the same frame the stream
- * ended, which could hitch the WebView ~1–3s on long answers. GFM now waits
- * for an idle deadline scaled by content length; highlight still upgrades later.
- */
 type RenderPhase = "plain" | "gfm" | "full"
 
-/** Fence opener — only then is rehype-highlight worth a second parse. */
 const hasCodeFence = (text: string): boolean => /```[\w+-]*/.test(text)
 
 const upgradeToFull = (
@@ -256,9 +217,6 @@ const upgradeToFull = (
     })
   })
 
-/** Conversation markdown — compact reference-like body scale.
- * Highlight.js language packs load lazily via `lib/markdownHighlight` so the
- * initial chunk stays lean; GFM still renders immediately for history. */
 export const MarkdownBody = memo(({ content, className, live = false }: MarkdownBodyProps) => {
   const [phase, setPhase] = useState<RenderPhase>(() => (live ? "plain" : "gfm"))
   const [rehypePlugins, setRehypePlugins] = useState<RehypePlugins>(
@@ -281,17 +239,12 @@ export const MarkdownBody = memo(({ content, className, live = false }: Markdown
     let cancelled = false
     const isCancelled = () => cancelled
 
-    // Historical / non-stream mount: GFM immediately; highlight on idle when
-    // fences exist (skip a second parse for prose-only answers).
     if (!wasLiveRef.current) {
       setPhase("gfm")
       if (!wantsHighlight) return
       return upgradeToFull(isCancelled, setPhase, setRehypePlugins)
     }
 
-    // Just finished streaming: keep plain until the main thread is idle so
-    // turn-end chrome (scroll, stop, git invalidate) paints before remark-gfm
-    // blocks. startTransition alone does not time-slice the Unified parse.
     wasLiveRef.current = false
     setPhase("plain")
     let cancelHighlight: (() => void) | null = null

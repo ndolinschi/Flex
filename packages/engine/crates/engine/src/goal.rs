@@ -1,5 +1,3 @@
-//! Goal-loop orchestration: repeated turns until a stop rule fires.
-
 use agentloop_contracts::{
     GoalOutcome, GoalSpec, GoalStopReason, PromptInput, SessionId, TokenUsage, TurnOptions,
     TurnStopReason, VerdictOutcome,
@@ -8,11 +6,6 @@ use agentloop_contracts::{
 use crate::EngineResult;
 use crate::service::EngineService;
 
-/// Per-category failure tally for [`EngineService::run_goal`]. Deliberately
-/// coarse — grouped by [`TurnStopReason`], not by error message — since a
-/// `TurnSummary` carries no error text (that lives in a separate
-/// `SessionError` event); this is the signal actually available without
-/// scanning the log for prose to fuzzy-match.
 #[derive(Debug, Default)]
 struct FailureCounts {
     error: u32,
@@ -21,8 +14,6 @@ struct FailureCounts {
 }
 
 impl FailureCounts {
-    /// Record `stop_reason` if it is failure-like, returning the updated
-    /// count for its category (`0` for a non-failure stop reason).
     fn record(&mut self, stop_reason: TurnStopReason) -> u32 {
         match stop_reason {
             TurnStopReason::Error => {
@@ -43,12 +34,6 @@ impl FailureCounts {
 }
 
 impl EngineService {
-    /// Drive repeated turns on `session` toward `goal`, stopping at the
-    /// first applicable rule (see `agentloop_contracts::goal` for the
-    /// stop-reason vocabulary — `Parked` is reserved and never returned
-    /// here). Each iteration after the first re-states the goal rather than
-    /// repeating the original prompt verbatim, since a single-turn "continue"
-    /// nudge is what actually drives repeated turns forward.
     pub async fn run_goal(&self, session: &SessionId, goal: GoalSpec) -> EngineResult<GoalOutcome> {
         let mut turns = Vec::new();
         let mut total_usage = TokenUsage::default();
@@ -123,9 +108,6 @@ impl EngineService {
                         );
                         continue;
                     }
-                    // The verifier plugin is disabled, or the model didn't
-                    // call Verify — fall through to the weaker signal below
-                    // rather than loop forever on a check that can't run.
                     None => {}
                 }
             } else if summary.stop_reason == TurnStopReason::EndTurn && summary.num_tool_calls == 0

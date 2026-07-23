@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch"
 import { ErrorBanner, SettingsCard, SettingRow } from "../../components/molecules"
 import { useProviderConfig } from "../../hooks/useProviderConfig"
 import { useSessions } from "../../hooks/useSessions"
+import { projectCwd } from "../../lib/sessionGrouping"
 import { indexRebuild, indexStatus, toInvokeError } from "../../lib/tauri"
 import type { IndexStatus } from "../../lib/types"
 import { basename } from "../../lib/utils"
@@ -20,7 +21,6 @@ type RowState = {
   error: string | null
 }
 
-/** Settings → Indexing: per-repo status, plugin toggle, auto-context, rebuild. */
 export const IndexingContent = () => {
   const { config, isLoading, save } = useProviderConfig()
   const { sessions } = useSessions()
@@ -36,14 +36,16 @@ export const IndexingContent = () => {
     const out: Array<{ cwd: string; label: string }> = []
     for (const session of sessions) {
       if (session.parent_id) continue
-      const cwd = session.cwd?.trim()
-      if (!cwd || seen.has(cwd)) continue
+      const cwd = projectCwd(session).trim()
+      if (!cwd || cwd === "~" || seen.has(cwd)) continue
       seen.add(cwd)
       out.push({ cwd, label: basename(cwd) || cwd })
     }
     out.sort((a, b) => a.label.localeCompare(b.label))
     return out
   }, [sessions])
+
+  const reposKey = useMemo(() => repos.map((r) => r.cwd).join("\0"), [repos])
 
   useEffect(() => {
     let cancelled = false
@@ -65,7 +67,15 @@ export const IndexingContent = () => {
       const next = await Promise.all(
         repos.map(async (r) => {
           try {
-            const status = await indexStatus(r.cwd)
+            const status = await Promise.race([
+              indexStatus(r.cwd),
+              new Promise<never>((_, reject) => {
+                window.setTimeout(
+                  () => reject(new Error("Timed out reading index status")),
+                  15_000,
+                )
+              }),
+            ])
             return {
               cwd: r.cwd,
               label: r.label,
@@ -92,7 +102,7 @@ export const IndexingContent = () => {
     return () => {
       cancelled = true
     }
-  }, [plugins?.index, repos])
+  }, [plugins?.index, reposKey])
 
   const handleSavePlugins = async (
     patch: Partial<{
@@ -177,7 +187,7 @@ export const IndexingContent = () => {
         <SettingRow
           rowId="indexing-enabled"
           title="Enable code index"
-          description="SearchCode, FindSymbol, and RepoMap tools. Index files live in app data, never inside the repo."
+          description="SearchCode, FindSymbol, and RepoMap tools. Off by default. Index files live in app data, never inside the repo."
           first
         >
           {isLoading || !plugins ? (
@@ -253,12 +263,13 @@ export const IndexingContent = () => {
                   : row.loading
                     ? "Loading status…"
                     : row.status?.ready
-                      ? `${row.status.fileCount} files · ${row.status.symbolCount} symbols`
+                      ? `${row.status.fileCount.toLocaleString()} files · ${row.status.symbolCount.toLocaleString()} symbols`
                       : "Not indexed yet"
               }
               first={i === 0}
             >
               <div className="flex items-center gap-2">
+                {row.loading ? <Spinner size="sm" /> : null}
                 {row.status?.ready ? (
                   <span className="text-xs text-green">indexed</span>
                 ) : null}

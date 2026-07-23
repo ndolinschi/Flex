@@ -7,7 +7,6 @@ type IndexingCardProps = {
   unchanged: number
 }
 
-/** Settled code-index boundary: centered separator label with file counts. */
 export const IndexingCard = ({
   added,
   changed,

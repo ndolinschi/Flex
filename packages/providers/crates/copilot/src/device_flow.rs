@@ -1,7 +1,3 @@
-//! GitHub device-code sign-in: obtain the long-lived GitHub OAuth token by
-//! showing the user a one-time code to confirm on github.com, then polling
-//! until GitHub reports the confirmation.
-
 use std::time::Duration;
 
 use reqwest::Client;
@@ -14,37 +10,26 @@ use agentloop_provider_common::status_to_provider_error;
 
 use crate::config::COPILOT_PROVIDER_ID;
 
-/// GitHub App client id used by the official Copilot editor sign-ins, so the
-/// resulting OAuth token carries Copilot access.
 pub const COPILOT_DEVICE_CLIENT_ID: &str = "Iv1.b507a08c87ecfe98";
 
-/// GitHub host serving the device flow.
 const DEFAULT_BASE_URL: &str = "https://github.com";
 
-/// OAuth scope requested for the sign-in.
 const DEVICE_FLOW_SCOPE: &str = "read:user";
 
-/// RFC 8628 grant type sent when polling for the token.
 const DEVICE_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:device_code";
 
-/// Polling interval when the device-code response omits one.
 const DEFAULT_POLL_INTERVAL_SECS: u64 = 5;
 
-/// Extra seconds added when GitHub says `slow_down` without a new interval.
 const SLOW_DOWN_BUMP_SECS: u64 = 5;
 
-/// A pending device authorization: show [`user_code`](Self::user_code) and
-/// [`verification_uri`](Self::verification_uri) to the user, then hand the
-/// value back to [`DeviceFlow::poll`] until they confirm on github.com.
 #[derive(Debug, Clone, Deserialize)]
 pub struct DeviceAuthorization {
-    /// One-time code the user types at the verification page.
     pub user_code: String,
-    /// Page where the user enters the code (usually `https://github.com/login/device`).
+
     pub verification_uri: String,
-    /// Seconds until the device code expires and the flow must be restarted.
+
     pub expires_in: u64,
-    /// Seconds to wait between polls.
+
     #[serde(default = "default_poll_interval")]
     pub interval: u64,
     device_code: String,
@@ -54,22 +39,16 @@ fn default_poll_interval() -> u64 {
     DEFAULT_POLL_INTERVAL_SECS
 }
 
-/// Runs the GitHub device-code OAuth flow (RFC 8628): [`start`](Self::start)
-/// requests a one-time code, [`poll`](Self::poll) waits for the user to
-/// confirm it and returns the long-lived GitHub OAuth token.
 pub struct DeviceFlow {
     client: Client,
     base_url: String,
 }
 
 impl DeviceFlow {
-    /// A flow talking to github.com.
     pub fn new() -> Self {
         Self::with_base_url(DEFAULT_BASE_URL)
     }
 
-    /// A flow talking to an alternate host — used by tests to point at a mock
-    /// server.
     pub fn with_base_url(url: impl Into<String>) -> Self {
         Self {
             client: Client::new(),
@@ -77,8 +56,6 @@ impl DeviceFlow {
         }
     }
 
-    /// Request a device code. Returns the code and verification page to show
-    /// the user.
     pub async fn start(&self) -> Result<DeviceAuthorization, ProviderError> {
         let provider = provider_id();
         let url = format!("{}/login/device/code", self.base_url);
@@ -116,13 +93,6 @@ impl DeviceFlow {
         parse_device_code_response(&provider, value)
     }
 
-    /// Poll until the user confirms the code on github.com, then return the
-    /// GitHub OAuth access token (`ghu_…`/`gho_…`).
-    ///
-    /// Waits the server-provided interval before every poll (GitHub rejects
-    /// immediate polls), honors `slow_down`, gives up once
-    /// [`DeviceAuthorization::expires_in`] has elapsed, and returns
-    /// [`ProviderError::Cancelled`] promptly when `cancel` trips.
     pub async fn poll(
         &self,
         auth: &DeviceAuthorization,
@@ -215,7 +185,6 @@ fn expired_error(provider: &ProviderId) -> ProviderError {
     }
 }
 
-/// Parse the `POST /login/device/code` response body.
 fn parse_device_code_response(
     provider: &ProviderId,
     value: serde_json::Value,
@@ -236,24 +205,19 @@ fn parse_device_code_response(
     })
 }
 
-/// Non-terminal outcomes of one `POST /login/oauth/access_token` poll.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum PollState {
-    /// The user has not confirmed the code yet — poll again.
     Pending,
-    /// GitHub asked us to poll less often, possibly naming a new interval.
+
     SlowDown { interval: Option<u64> },
-    /// The user confirmed — here is the OAuth access token.
+
     Token(String),
 }
 
-/// The interval to use after a `slow_down`: the server-provided one, or the
-/// current interval plus [`SLOW_DOWN_BUMP_SECS`].
 fn bumped_interval(current: u64, suggested: Option<u64>) -> u64 {
     suggested.unwrap_or(current + SLOW_DOWN_BUMP_SECS)
 }
 
-/// Parse one token-poll response body.
 fn parse_poll_response(
     provider: &ProviderId,
     value: serde_json::Value,
@@ -452,7 +416,6 @@ mod tests {
         assert!(matches!(err, ProviderError::Stream { .. }), "{err}");
     }
 
-    /// Replays a fixed sequence of responses, repeating the last one.
     struct SequenceResponder(Mutex<Vec<ResponseTemplate>>);
 
     impl SequenceResponder {

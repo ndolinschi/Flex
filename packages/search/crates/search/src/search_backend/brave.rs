@@ -1,14 +1,9 @@
-//! Brave Search API — set `BRAVE_SEARCH_API_KEY` to enable.
-
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::Deserialize;
 
 use super::{SearchBackend, SearchError, SearchResult, http_client, map_status_error};
 
-/// Brave Search API — set `BRAVE_SEARCH_API_KEY` to enable.
-///
-/// Docs: <https://api.search.brave.com/app/documentation/web-search/get-started>
 pub struct BraveSearchBackend {
     client: Client,
     api_key: String,

@@ -1,5 +1,3 @@
-//! Integration: ChatgptProvider streams Codex Responses SSE via wiremock.
-
 use agentloop_core::{ChatRequest, Provider};
 use agentloop_provider_chatgpt::{CHATGPT_PROVIDER_ID, ChatgptConfig, ChatgptProvider};
 use agentloop_provider_openai::{OpenAiOAuthTokens, store_oauth_tokens};

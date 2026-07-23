@@ -36,11 +36,8 @@ import { PlanFindBar, type PlanFindState } from "./PlanFindBar"
 export type PlanBuildStatus = "draft" | "ready" | "building" | "built"
 
 type PlanToolbarProps = {
-  /** repo basename (breadcrumb root). */
   repo: string
-  /** Truncated title — first heading of the plan doc, or the session title. */
   title: string
-  /** When true, the "Plans" crumb is a button that returns to the multi-plan list. */
   showPlansListCrumb?: boolean
   onBackToPlans?: () => void
   models: ModelInfoDto[]
@@ -51,24 +48,19 @@ type PlanToolbarProps = {
   status: PlanBuildStatus
   onBuild: () => void
   onKeepPlanning?: () => void
-  /** Only rendered when Keep-planning applies (awaiting approval). */
   showKeepPlanning?: boolean
   onCopyMarkdown: () => void
-  /** `null` disables Find-in-Plan entirely (no plan doc yet). */
   find: PlanFindState | null
   onSaveToWorkspace: () => void
   saveDisabled?: boolean
   saveDisabledReason?: string
   onRewrite?: () => void
   onRestart?: () => void
-  /** Opens the select-to-comment flow (not an agent review prompt). */
   onAddComment?: () => void
   actionsDisabled?: boolean
   className?: string
 }
 
-/** Header toolbar for the right panel's Plan tab: breadcrumbs, build model
- * pill, Build/Keep-planning actions, and a "…" overflow menu. */
 export const PlanToolbar = ({
   repo,
   title,

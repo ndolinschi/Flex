@@ -1,5 +1,3 @@
-//! Route handlers mapping HTTP requests onto `EngineService` calls.
-
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -63,9 +61,6 @@ fn status_for(code: ErrorCode) -> StatusCode {
     }
 }
 
-/// The session-scoped API surface, state left unapplied so the caller can
-/// add more state-needing routes (`/openapi.json`) and middleware before
-/// calling `.with_state()` once, at the top.
 pub(crate) fn router() -> Router<AppState> {
     Router::new()
         .route("/sessions", post(create_session).get(list_sessions))
@@ -159,10 +154,6 @@ pub(crate) async fn prompt(
         ),
         None => None,
     };
-    // The turn runs on its own task: this endpoint answers as soon as the
-    // turn is admitted (202), and the caller watches `/events` for progress —
-    // same shape as `EngineService::prompt` already being one turn-gate per
-    // session, just not awaited inline here.
     let service = service.clone();
     tokio::spawn(async move {
         let _ = service

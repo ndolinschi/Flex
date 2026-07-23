@@ -1,10 +1,4 @@
-//! Headless runner — the composition root and the only brand-named artifact.
-//!
-//! The runner composes the native loop with real provider clients and prints
-//! the canonical event stream as NDJSON.
-
 #![allow(clippy::print_stdout, clippy::print_stderr)]
-
 mod cli;
 mod eval_cmd;
 mod resolve;
@@ -55,8 +49,6 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-/// Logs go to stderr (stdout carries the NDJSON event stream). Controlled by
-/// the engine's log env var; silent by default.
 fn init_tracing() {
     let env_var = format!("{}_LOG", branding::ENV_PREFIX);
     let filter = tracing_subscriber::EnvFilter::try_from_env(&env_var)

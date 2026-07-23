@@ -1,6 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window"
 
-/** Host OS for window-chrome layout (traffic lights vs Windows controls). */
 export type WindowHost = "macos" | "windows" | "linux" | "unknown"
 
 export const detectWindowHost = (): WindowHost => {
@@ -25,17 +24,12 @@ export const toggleMaximizeWindow = async (): Promise<void> => {
   await appWindow().toggleMaximize()
 }
 
-/** Toggle native fullscreen (macOS spaces). Prefer this over maximize on Mac. */
 export const toggleFullscreenWindow = async (): Promise<void> => {
   const win = appWindow()
   const fullscreen = await win.isFullscreen()
   await win.setFullscreen(!fullscreen)
 }
 
-/**
- * Platform zoom affordance: macOS green / title-bar double-click → fullscreen;
- * Windows/Linux caption maximize → toggleMaximize.
- */
 export const toggleZoomWindow = async (): Promise<void> => {
   if (detectWindowHost() === "macos") {
     await toggleFullscreenWindow()

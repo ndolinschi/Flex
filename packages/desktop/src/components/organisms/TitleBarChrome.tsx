@@ -23,11 +23,6 @@ type TitleBarChromeHostProps = {
   onOpenSearch?: () => void
 }
 
-/**
- * Keeps native macOS menus + undecorated window + bug dialog mounted without
- * painting a full-width titlebar. Chat tabs live in ContentPane top chrome;
- * the expanded sidebar header owns traffic lights.
- */
 export const TitleBarChromeHost = ({
   onOpenCommandPalette,
   onOpenSearch,
@@ -66,16 +61,13 @@ export const TitleBarChromeHost = ({
 }
 
 type TitleBarLeadingProps = {
-  /** Traffic lights / menus (when sidebar is collapsed). */
   showWindowControls?: boolean
-  /** Sidebar reopen control. */
   showSidebarReopen?: boolean
   onOpenCommandPalette?: () => void
   onOpenSearch?: () => void
   className?: string
 }
 
-/** Leading cluster for the top content chrome when the sidebar is collapsed. */
 export const TitleBarLeading = memo(({
   showWindowControls = false,
   showSidebarReopen = false,
@@ -153,7 +145,6 @@ type TitleBarTrailingProps = {
   className?: string
 }
 
-/** Trailing cluster — split, session menu, Windows/Linux caption buttons. */
 export const TitleBarTrailing = memo(({
   showChatActions = true,
   className,
@@ -209,7 +200,6 @@ export const TitleBarTrailing = memo(({
 })
 TitleBarTrailing.displayName = "TitleBarTrailing"
 
-/** Drag-fill between tabs and trailing actions (double-click zooms). */
 export const TitleBarDragRegion = ({ className }: { className?: string }) => (
   <div
     className={cn("h-full min-w-[24px] flex-1", className)}

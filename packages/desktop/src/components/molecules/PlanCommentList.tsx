@@ -11,7 +11,6 @@ type PlanCommentListProps = {
   className?: string
 }
 
-/** Sidebar list of annotations on the open plan. */
 export const PlanCommentList = ({
   comments,
   activeCommentId,

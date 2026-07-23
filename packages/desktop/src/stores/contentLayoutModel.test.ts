@@ -6,7 +6,7 @@ import {
 
 describe("content layout defaults", () => {
   it("reserves more room for the work surface than the chat rail", () => {
-    expect(DEFAULT_SPLIT_RATIO).toBe(0.38)
+    expect(DEFAULT_SPLIT_RATIO).toBe(0.48)
     expect(defaultContentLayout("session-a").splitRatio).toBe(
       DEFAULT_SPLIT_RATIO,
     )

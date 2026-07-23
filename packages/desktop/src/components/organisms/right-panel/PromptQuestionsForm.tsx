@@ -9,7 +9,6 @@ type PromptQuestionsFormProps = {
   onSubmit: () => void
 }
 
-/** Coach clarifying questions after a Verify pass — answer & re-verify. */
 export const PromptQuestionsForm = ({
   questions,
   answers,

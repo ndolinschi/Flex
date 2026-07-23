@@ -14,8 +14,6 @@ type SidebarResumeErrorProps = {
   onDismiss: () => void
 }
 
-/** Inline banner when `resume_session` fails for a sidebar row.
- * Matches ErrorBanner quiet danger (no loud red slab). */
 export const SidebarResumeError = ({
   message,
   onRetry,
@@ -25,7 +23,6 @@ export const SidebarResumeError = ({
     <Alert
       variant="destructive"
       className={cn(
-        // Edge-to-edge in the sidebar stack, same whisper danger as ErrorBanner.
         "rounded-none border-x-0 border-b-0 border-t border-danger/15 bg-danger-subtle/70 py-1.5 text-danger",
       )}
     >

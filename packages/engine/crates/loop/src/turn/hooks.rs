@@ -1,5 +1,3 @@
-//! Hook dispatch for a native turn.
-
 use std::sync::Arc;
 
 use agentloop_contracts::{AgentEvent, HookOutcomeKind, HookPoint, TurnId};
@@ -10,8 +8,6 @@ use agentloop_core::hook::{HookContext, HookData, HookOutcome};
 use crate::deps::TurnDeps;
 use crate::session_handle::SessionHandle;
 
-/// Run all hooks interested in `point`; first `Block` wins. Non-`Continue`
-/// outcomes are recorded in the event stream.
 pub(super) async fn run_hooks(
     deps: &Arc<TurnDeps>,
     handle: &Arc<SessionHandle>,

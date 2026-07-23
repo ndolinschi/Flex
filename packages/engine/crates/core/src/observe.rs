@@ -1,15 +1,6 @@
-//! Metric recording — the single mapping from persisted events to metrics.
-//!
-//! Called at the one choke point where events are appended and broadcast, so
-//! native and delegated agents produce identical metrics, and any third-party
-//! `Agent` implementation that reuses the shared session pipeline gets
-//! metrics for free. The `metrics` facade is a no-op unless the runner
-//! installs a recorder.
-
 use agentloop_contracts::observe::*;
 use agentloop_contracts::{AgentEvent, ToolCallStatus};
 
-/// Record metrics for one persisted event. Ephemeral events are ignored.
 pub fn record_event_metrics(agent_id: &str, event: &AgentEvent) {
     match event {
         AgentEvent::TurnCompleted { summary, .. } => {

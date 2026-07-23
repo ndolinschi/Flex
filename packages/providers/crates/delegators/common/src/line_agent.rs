@@ -21,38 +21,26 @@ use crate::{
     DelegatorRunRequest, LineMapper, ProcessHost,
 };
 
-/// Everything one external agent contributes to the shared line-oriented
-/// delegator runtime: identity, capabilities, how to probe and launch its
-/// CLI, and the mapper that normalizes its output into canonical events.
 pub trait DelegatorProfile: Send + Sync + 'static {
     type Mapper: LineMapper + Send;
 
-    /// Stable agent key ("claude-code", "copilot", ...).
     fn agent_id(&self) -> &str;
 
     fn display_name(&self) -> &str;
 
     fn capabilities(&self) -> AgentCaps;
 
-    /// How to check the CLI is installed (e.g. `--version`).
     fn probe_spec(&self) -> DelegatorProcessSpec;
 
-    /// Build the one-shot run for a prompt.
     fn prompt_request(&self, prompt: String) -> DelegatorRunRequest;
 
-    /// A fresh mapper for one turn's output.
     fn mapper(&self) -> Self::Mapper;
 
-    /// Lines recorded in `EngineInfo.resolution_trace` at session creation.
     fn resolution_note(&self) -> Vec<String> {
         Vec::new()
     }
 }
 
-/// Shared runtime for delegators that run an external CLI once per turn and
-/// map its line-oriented output into canonical events. Parameterized by a
-/// [`DelegatorProfile`] (identity + launch + mapper) and a [`ProcessHost`]
-/// (real tokio commands in production, fakes in tests).
 pub struct LineDelegatorAgent<P, H> {
     profile: P,
     host: Arc<H>,
@@ -664,10 +652,6 @@ where
     }
 }
 
-/// Per-session emit machinery shared by delegator runtimes: append-then-
-/// broadcast persistence, ephemeral streaming, turn gating, cancellation.
-/// Public so protocol delegators (ACP) that cannot ride [`LineDelegatorAgent`]
-/// still reuse the exact same event path.
 pub struct DelegatedSessionHandle {
     id: SessionId,
     agent_id: String,
@@ -701,7 +685,6 @@ impl DelegatedSessionHandle {
         &self.id
     }
 
-    /// Subscribe to this session's live event stream.
     pub fn subscribe(&self) -> broadcast::Receiver<SessionEvent> {
         self.broadcast.subscribe()
     }

@@ -1,7 +1,3 @@
-//! `SearchCode` tool: hybrid (BM25 + symbol-boost, fused with cosine vector
-//! rank when embeddings are enabled) search over the repo at the session's
-//! cwd, returning a compact, token-frugal ranked list.
-
 use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -12,8 +8,6 @@ use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescri
 use crate::retrieve::{Hit, search_hybrid};
 use crate::tools::shared::{IndexOpenMode, open_and_build_with_events_mode};
 
-/// Cap on total rendered output, chosen to stay well under ~2k tokens
-/// (roughly 4 chars/token, so ~8000 chars is a comfortable ceiling).
 const MAX_OUTPUT_CHARS: usize = 8_000;
 
 const DEFAULT_K: usize = 8;
@@ -22,18 +16,10 @@ const MAX_K: usize = 30;
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct SearchCodeInput {
-    /// Natural-language or keyword query, e.g. "where is the session title
-    /// generated" or "retry logic for provider requests".
     query: String,
-    /// Number of ranked hits to return (default 8, capped at 30).
     k: Option<usize>,
 }
 
-/// Lexical + symbol code search over the session's working directory.
-///
-/// Builds (or incrementally updates) a per-repo BM25 index on first use
-/// according to [`IndexOpenMode`], then returns a compact ranked list of
-/// `path:start-end — symbol — snippet` lines.
 #[derive(Debug, Clone, Copy)]
 pub struct SearchCodeTool {
     open_mode: IndexOpenMode,
@@ -222,8 +208,6 @@ mod tests {
         fs::write(path, content).unwrap_or_else(|e| panic!("{e}"));
     }
 
-    /// Medium fixture (~200 source files) with one distinctive target file
-    /// for live-acceptance ranking + timing.
     fn build_medium_repo(repo: &Path) {
         write(
             repo,
@@ -259,12 +243,8 @@ pub fn generate_session_title(first_message: &str) -> String {
         }
     }
 
-    /// M1/M2 live-acceptance (scripted): build under a scratch app-data root,
-    /// assert top-1 ranking + warm-query timing, then exercise the real
-    /// `SearchCode` `Tool::run` path with the index-root override so tests
-    /// never write to the real platform Application Support directory.
     #[tokio::test]
-    #[allow(clippy::await_holding_lock)] // gate must cover Tool::run's spawn_blocking
+    #[allow(clippy::await_holding_lock)]
     async fn live_accept_search_code_ranks_expected_file_top_1() {
         let index_root = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
         let repo = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
@@ -300,9 +280,6 @@ pub fn generate_session_title(first_message: &str) -> String {
             store.indexed_file_count()
         );
 
-        // Real agent tool-call path (`Tool::run` → spawn_blocking →
-        // open_and_build), redirected via the process override so sandbox/CI
-        // never needs write access to ~/Library/Application Support.
         let _gate = lock_index_root_override();
         set_index_root_override(Some(index_root.path().to_path_buf()));
         let live_index = index_dir_for(repo.path(), &index_root_base());

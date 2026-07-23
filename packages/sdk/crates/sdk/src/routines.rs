@@ -1,12 +1,3 @@
-//! Routines: run a [`GoalSpec`] on a schedule (cron) or via webhook, without
-//! a human keeping a session open — Anthropic Routines (14 Apr 2026 research
-//! preview) for Flex. Composition-time glue over `EngineService::run_goal`
-//! (goal-loops) and `agentloop_channel`'s routine contracts; this crate is
-//! where it lives because it needs `EngineService`, which `gateway` (a
-//! contract-only, engine-agnostic sibling workspace) deliberately does not
-//! depend on — the same reasoning that put `LoopAgent`/`ClawBot` here rather
-//! than in `engine`.
-
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -27,8 +18,6 @@ use agentloop_contracts::{GoalOutcome, now_ms};
 use agentloop_engine::{EngineService, EngineServiceError};
 use agentloop_transport_http::{AuthToken, require_bearer_token};
 
-/// Failures from running a routine by id (as opposed to a store failure
-/// while listing/loading routines in general — see [`RoutineError`]).
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum RoutineRunError {
@@ -40,15 +29,11 @@ pub enum RoutineRunError {
     Engine(#[from] EngineServiceError),
 }
 
-/// Drives `EngineService::{create_session,run_goal}` from saved [`RoutineSpec`]s.
 pub struct RoutineRunner {
     engine: Arc<EngineService>,
     store: Arc<dyn RoutineStore>,
 }
 
-/// How often the cron loop wakes to check for due routines. Cron itself is
-/// minute-granularity, so this trades a little wakeup overhead for a much
-/// simpler loop than computing an exact per-routine sleep-until-next-fire.
 const CRON_POLL_INTERVAL: Duration = Duration::from_secs(30);
 
 impl RoutineRunner {
@@ -56,15 +41,10 @@ impl RoutineRunner {
         Self { engine, store }
     }
 
-    /// The backing store, for callers that need to look up a spec themselves
-    /// (e.g. the webhook route checking existence before returning `202`).
     pub fn store(&self) -> &Arc<dyn RoutineStore> {
         &self.store
     }
 
-    /// Open a fresh session from `spec.session_seed` and run `spec.goal` to
-    /// completion. Recording the run in the store is best-effort — a store
-    /// hiccup must not make an otherwise-successful run look like a failure.
     pub async fn run_once(&self, spec: &RoutineSpec) -> Result<GoalOutcome, EngineServiceError> {
         let session = self
             .engine
@@ -87,8 +67,6 @@ impl RoutineRunner {
         Ok(outcome)
     }
 
-    /// Look up a routine by id and run it once — the CLI `run <id>` and the
-    /// HTTP webhook trigger both go through this.
     pub async fn run_by_id(&self, id: &str) -> Result<GoalOutcome, RoutineRunError> {
         let spec = self
             .store
@@ -99,9 +77,6 @@ impl RoutineRunner {
         Ok(self.run_once(&spec).await?)
     }
 
-    /// Poll for due cron-triggered routines until `cancel` fires. Each due
-    /// routine runs in its own spawned task so one long-running goal doesn't
-    /// delay checking the others.
     pub async fn spawn_cron_loop(self: Arc<Self>, cancel: CancellationToken) {
         let mut last_tick = Utc::now();
         loop {
@@ -115,9 +90,6 @@ impl RoutineRunner {
         }
     }
 
-    /// Run every cron routine whose next scheduled fire time (computed from
-    /// `since`) falls at or before `now` — i.e. a fire time landed in
-    /// `(since, now]` since the last poll.
     async fn run_due_cron_routines(self: &Arc<Self>, since: DateTime<Utc>, now: DateTime<Utc>) {
         let specs = match self.store.list().await {
             Ok(specs) => specs,
@@ -151,19 +123,11 @@ impl RoutineRunner {
     }
 }
 
-/// Whether a cron expression has a scheduled fire time in `(since, now]`.
-/// `None` when `expr` doesn't parse.
 fn cron_is_due(expr: &str, since: DateTime<Utc>, now: DateTime<Utc>) -> Option<bool> {
     let cron: Cron = expr.parse().ok()?;
     Some(matches!(cron.find_next_occurrence(&since, false), Ok(next) if next <= now))
 }
 
-/// Build the extra router `flex serve --enable-routines` merges into the
-/// main HTTP router via `agentloop_transport_http::serve_http_with_extra` —
-/// one route, `POST /routines/{id}/trigger`, behind the same bearer token as
-/// every other authenticated route. Exposed at the library level (not just
-/// wired into the CLI) since an embedder running their own axum server over
-/// `EngineService` may want the same route without going through `flex serve`.
 pub fn routine_webhook_router(runner: Arc<RoutineRunner>, token: AuthToken) -> Router {
     Router::new()
         .route("/routines/{id}/trigger", post(trigger_webhook))
@@ -192,7 +156,6 @@ async fn trigger_webhook(
     Ok(StatusCode::ACCEPTED)
 }
 
-/// The default routines directory: `~/.config/agentloop/routines`.
 pub fn default_routines_dir() -> Option<PathBuf> {
     std::env::var_os("HOME").map(|home| {
         PathBuf::from(home)
@@ -202,11 +165,6 @@ pub fn default_routines_dir() -> Option<PathBuf> {
     })
 }
 
-/// File-backed [`RoutineStore`]: one `<id>.toml` per routine, plus an
-/// append-only `<id>.history.jsonl` of [`RoutineRunRecord`]s — the same
-/// append-only-log-as-ground-truth shape the session store uses, kept small
-/// and dependency-free rather than reusing `SessionStore` (a routine's run
-/// history isn't a session; it's metadata *about* a series of sessions).
 pub struct FileRoutineStore {
     dir: PathBuf,
 }
@@ -216,8 +174,6 @@ impl FileRoutineStore {
         Self { dir: dir.into() }
     }
 
-    /// Use the default user-level routines directory. `None` when the home
-    /// directory cannot be resolved.
     pub fn with_default_dir() -> Option<Self> {
         default_routines_dir().map(Self::new)
     }
@@ -326,7 +282,7 @@ mod tests {
     #[test]
     fn cron_is_due_does_not_fire_on_an_empty_window() {
         let now = Utc::now();
-        // Same instant on both ends: no time has passed for a fire to land in.
+
         assert_eq!(cron_is_due("0 0 1 1 *", now, now), Some(false));
     }
 

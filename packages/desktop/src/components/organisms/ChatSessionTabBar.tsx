@@ -6,8 +6,6 @@ import { useSessions } from "../../hooks/useSessions"
 import { useAppStore } from "../../stores/appStore"
 import { Tab, TabStrip, Tooltip } from "../atoms"
 
-/** Open-chat pills for content pane strips — same `Tab`/`TabStrip` as tool tabs.
- * Horizontal scroll when tabs overflow; closing a tab does not delete the session. */
 export const ChatSessionTabBar = () => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const setActiveSessionId = useAppStore((s) => s.setActiveSessionId)
@@ -23,7 +21,6 @@ export const ChatSessionTabBar = () => {
     return map
   }, [sessions])
 
-  // Drop tabs whose sessions vanished from the list (deleted elsewhere).
   const tabs = useMemo(
     () => openChatSessionIds.filter((id) => sessionsById.has(id)),
     [openChatSessionIds, sessionsById],
@@ -69,7 +66,6 @@ export const ChatSessionTabBar = () => {
     [activeSessionId, closeChatTab, setActiveSessionId, setRoute],
   )
 
-  // Keep a flex spacer so left/right chrome stay pinned when no tabs are open.
   if (tabs.length === 0) {
     return <div className="min-w-0 flex-1" aria-hidden />
   }
@@ -90,7 +86,6 @@ export const ChatSessionTabBar = () => {
           <Tab
             key={id}
             selected={id === activeSessionId}
-            // Same md pill as ContentPane tabs; max-w keeps long titles truncating.
             className="max-w-[200px] shrink-0"
             title={label}
             onSelect={() => void handleSelect(id)}

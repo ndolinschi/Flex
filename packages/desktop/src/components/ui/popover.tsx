@@ -24,7 +24,6 @@ function PopoverContent({
     PopoverPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset"
   > & {
-    /** Extra classes on the portal positioner (e.g. raised z-index for chrome menus). */
     positionerClassName?: string
   }) {
   return (

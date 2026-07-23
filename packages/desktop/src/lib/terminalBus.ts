@@ -1,14 +1,5 @@
 import { listenTerminalExit, listenTerminalOutput } from "./tauri"
 
-/**
- * Singleton fan-out for terminal output. The Tauri event listener must exist
- * BEFORE `terminal_create` resolves, otherwise the shell's first output (the
- * prompt) races the per-instance subscription and is lost — xterm instances
- * mount asynchronously after create, and StrictMode remounts widen the gap.
- * The bus subscribes once, buffers per-terminal scrollback, and replays it to
- * every late subscriber, so remounts and tab switches never drop output.
- */
-
 type TerminalSubscriber = (data: string) => void
 
 const MAX_BUFFER_CHARS = 200_000
@@ -28,7 +19,6 @@ const dispatch = (id: string, data: string) => {
   }
 }
 
-/** Idempotent; await before any `terminalCreate` so no early output is lost. */
 export const ensureTerminalBus = (): Promise<void> => {
   if (started) return Promise.resolve()
   if (startPromise) return startPromise
@@ -45,10 +35,6 @@ export const ensureTerminalBus = (): Promise<void> => {
   return startPromise
 }
 
-/**
- * Subscribe an xterm instance to a terminal's output. Replays the buffered
- * scrollback synchronously before live chunks. Returns an unsubscribe fn.
- */
 export const subscribeTerminal = (
   id: string,
   onData: TerminalSubscriber,
@@ -72,12 +58,6 @@ export const dropTerminalBuffer = (id: string) => {
   subscribers.delete(id)
 }
 
-/**
- * Push data into a terminal's buffer/fan-out from a source other than the
- * backend PTY (e.g. agent exec_chunk session-events routed to a synthetic
- * `agent:${sessionId}` terminal id). Buffers and dispatches exactly like PTY
- * output, so late-subscribing xterm instances still replay scrollback.
- */
 export const pushTerminalData = (id: string, data: string): void => {
   dispatch(id, data)
 }

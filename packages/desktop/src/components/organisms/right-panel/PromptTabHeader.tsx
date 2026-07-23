@@ -35,8 +35,6 @@ type PromptTabHeaderProps = {
   onSend: () => void
 }
 
-/** Prompt pad chrome: title, token count, insert/marks/verify/send controls.
- * Matches Browser/Changes 30px header recipe (`px-2.5`, `h-6` icon buttons). */
 export const PromptTabHeader = ({
   chars,
   tokens,

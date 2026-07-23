@@ -1,11 +1,3 @@
-//! Normalize Copilot CLI output.
-//!
-//! Copilot's programmatic mode prints plain markdown with no structured
-//! framing, so every content line becomes an `AssistantDelta` and the message
-//! materializes at process exit. ANSI escapes are stripped defensively (the
-//! launch sets `NO_COLOR=1`, but older builds ignore it), and the CLI's
-//! trailing usage footer is filtered out of the transcript.
-
 use agentloop_delegator_common::{DelegatorEvent, DelegatorMapError, LineMapper};
 
 #[derive(Debug, Default)]
@@ -38,7 +30,6 @@ impl LineMapper for CopilotLineMapper {
     }
 }
 
-/// Remove ANSI CSI/OSC escape sequences.
 fn strip_ansi(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     let mut chars = input.chars().peekable();

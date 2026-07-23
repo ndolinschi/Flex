@@ -130,8 +130,6 @@ const triggerComposerSend = (): void => {
   })
 }
 
-/** Components workspace — Terminal-style inventory, Files-style mini-tabs,
- * local mini-prompt that packages component context + CSS diffs for the agent. */
 export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
   const cwd = session?.cwd?.trim() ?? ""
   const fallbackCwd = session?.base_cwd?.trim() || undefined
@@ -210,7 +208,6 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
     ? diffStyleDrafts(baseline, styleDraft)
     : []
 
-  // Seed CSS from Design Mode selection when opening / focusing a component.
   useEffect(() => {
     if (!activeId || !domTarget) return
     const seeded = stylesFromDom(domTarget.styles)
@@ -263,7 +260,6 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
       void browserApplyStyleOverrides(domTarget.selector, {
         [property]: value,
       }).catch(() => {
-        // Preview injection is best-effort.
       })
     }
   }
@@ -305,8 +301,6 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
     setSending(true)
     try {
       const payload = buildPayload(detail)
-      // Drop prior component-style chips so this send is scoped to the
-      // active open component (the local mini-prompt's context).
       const keep = attachments.filter((a) => a.kind !== "component-style")
       clearAttachments()
       for (const att of keep) addAttachment(att)
@@ -316,8 +310,6 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
         name: `${detail.name} edit`,
         payload,
       })
-      // Visible instruction goes to the composer; packaged context is hidden
-      // in the attachment (timeline shows a compact chip).
       setComposerDraft(
         instruction ||
           `Apply the style changes to ${detail.name} (${detail.file}).`,
@@ -375,7 +367,6 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
 
   return (
     <div className="absolute inset-0 flex flex-col">
-      {/* Header — Terminal pattern */}
       <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
         <span className="min-w-0 flex-1 truncate text-sm text-ink">
           {list
@@ -494,7 +485,6 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
           ) : null}
 
           <main className="flex min-w-0 flex-1 flex-col">
-            {/* Mini-tabs — FilesTab chip strip */}
             {openIds.length > 0 ? (
               <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-stroke-3 px-2.5">
                 {openIds.map((id) => {
@@ -533,7 +523,6 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
                   dirtyCount={dirtyChanges.length}
                   onSetProp={setProp}
                 />
-                {/* Local mini-prompt — independent of the main chat draft */}
                 <div className="flex shrink-0 flex-col gap-1.5 border-t border-stroke-3 px-2.5 py-2">
                   {dirtyChanges.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
@@ -624,7 +613,6 @@ const ComponentCanvas = ({
 }: CanvasProps) => (
   <ScrollArea className="min-h-0 flex-1">
     <div className="flex flex-col">
-      {/* Neutral preview canvas */}
       <div
         className={cn(
           "relative flex shrink-0 flex-col items-center justify-center gap-2",

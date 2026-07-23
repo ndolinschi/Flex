@@ -20,9 +20,6 @@ import {
 const LEFT_PANEL_ID = "content-left"
 const RIGHT_PANEL_ID = "content-right"
 
-/** Layout passed to `ResizablePanelGroup` for the current pane count.
- * Must match rendered panel count — a leftover `[50, 50]` under a single
- * panel throws `Invalid 1 panel layout: 50%, 50%`. */
 export const contentWorkspaceDefaultLayout = (
   split: boolean,
   splitRatio: number,
@@ -35,7 +32,6 @@ export const contentWorkspaceDefaultLayout = (
   }
 }
 
-/** Floating label that follows the pointer while a tab is dragged. */
 const TabDragGhost = () => {
   const dragUi = useTabDragUi()
   const contentLayout = useAppStore((s) => s.contentLayout)
@@ -46,14 +42,14 @@ const TabDragGhost = () => {
   const label =
     tab.kind === "chat"
       ? "Chat"
-      : tab.tool.charAt(0).toUpperCase() + tab.tool.slice(1)
+      : tab.kind === "file"
+        ? tab.path.split(/[/\\]/).pop() || tab.path
+        : tab.tool.charAt(0).toUpperCase() + tab.tool.slice(1)
   return createPortal(
     <div
       aria-hidden
       className={cn(
-        // Match Tab md pill density (h-6, rounded-md, caption tracking).
         "pointer-events-none fixed z-[var(--z-overlay)] flex h-6 max-w-[180px] items-center truncate rounded-md",
-        // Floating chrome: panel + shadow-popover (stroke ring lives in the shadow).
         "bg-panel px-2 text-sm tracking-[var(--tracking-caption)] text-ink shadow-popover",
         "opacity-90",
         !dragUi.overTarget && "opacity-40",
@@ -69,9 +65,6 @@ const TabDragGhost = () => {
   )
 }
 
-/** Main content host: one or two ContentPanes with a resizable sash.
- * Top chrome is each pane's TabStrip (`--titlebar-height`), flush with the
- * sidebar header — no stacked WindowTitleBar above chat. */
 export const ContentWorkspace = ({
   onOpenCommandPalette,
   onOpenSearch,
@@ -84,12 +77,9 @@ export const ContentWorkspace = ({
   const contentLayout = useAppStore((s) => s.contentLayout)
   const setSplitRatio = useAppStore((s) => s.setSplitRatio)
   const setRightPanelDragging = useAppStore((s) => s.setRightPanelDragging)
-  // Local drag paint only — store flag is also read by browser bounds logic.
   const rightPanelDragging = useAppStore((s) => s.rightPanelDragging)
   const groupImperativeRef = useGroupRef()
   const containerRef = useRef<HTMLDivElement | null>(null)
-  // Threshold boolean — avoid re-rendering on every resize pixel while the
-  // sash eligibility does not change.
   const [canShowSash, setCanShowSash] = useState(false)
 
   useEffect(() => {
@@ -112,8 +102,6 @@ export const ContentWorkspace = ({
     const set = new Set<string>()
     for (const pane of contentLayout.panes) {
       for (const t of pane.tabs) {
-        // Prompt is cheap to remount and otherwise re-renders on every
-        // composer keystroke via draftsBySession while keep-alive hidden.
         if (
           t.kind === "tool" &&
           (t.tool === "files" || t.tool === "terminal" || t.tool === "browser")
@@ -126,19 +114,11 @@ export const ContentWorkspace = ({
   }, [contentLayout.panes])
 
   const split = contentLayout.mode === "split" && contentLayout.panes.length > 1
-  // Only show the resize handle when the container is wide enough for two
-  // minimum-width panes. Both panes stay mounted while split to preserve
-  // scroll/xterm; the handle just hides when there is no room to drag it.
   const showSash = split && canShowSash
 
-  // Snapshot sizes for the *current* panel count. Remount via `key` + matching
-  // `defaultLayout` so collapsing split→single never validates a stale
-  // two-size layout against one panel (see `contentWorkspaceDefaultLayout`).
   const defaultLayout = useMemo(
     () => contentWorkspaceDefaultLayout(split, contentLayout.splitRatio),
-    // Ratio is snapshotted at mode change only — drag updates must not remount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [split],
+    [split, contentLayout.splitRatio],
   )
 
   return (
@@ -154,9 +134,6 @@ export const ContentWorkspace = ({
           layout: Record<string, number>,
           meta: LayoutChangedMeta,
         ) => {
-          // Persist only on drag end — live panel sizes are owned by
-          // react-resizable-panels; writing the store every frame re-renders
-          // the whole chat/editor shell for no visual gain.
           if (!split || !meta.isUserInteraction) return
           const leftPct = layout[LEFT_PANEL_ID]
           if (leftPct === undefined) return
@@ -183,13 +160,8 @@ export const ContentWorkspace = ({
             <ResizableHandle
               disabled={!showSash}
               className={cn(
-                // Hit target w-2; paint only the 1px ::after hairline.
-                // Neutralize shadcn ResizableHandle defaults (bg-border, after:w-1).
-                // Always keep the hairline when split — only drag is gated by
-                // showSash (narrow content row), so panes stay visually separated.
                 "sash-line-transition z-20 w-2 shrink-0 bg-transparent",
                 "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-stroke-3",
-                // Quiet sash: white-alpha 12% hover only — never accent (Feel: Quiet chrome).
                 showSash && "cursor-col-resize",
                 showSash &&
                   "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_12%,transparent)]",

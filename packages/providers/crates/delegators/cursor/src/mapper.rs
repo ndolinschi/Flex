@@ -2,15 +2,8 @@ use agentloop_contracts::{ToolCallId, ToolOutput, ToolResultBlock, TurnStopReaso
 use agentloop_delegator_common::{DelegatorEvent, DelegatorMapError, LineMapper};
 use serde::Deserialize;
 
-/// Maps `cursor-agent --print --output-format stream-json` lines into
-/// normalized events. The wire format is modeled on Claude Code's stream-json
-/// (`system`/`user`/`assistant`/`result` envelopes); the `system` and `user`
-/// frames in the tests were recorded live (2026-07-08), the rest follow the
-/// same documented shape.
 #[derive(Debug, Default)]
 pub struct CursorLineMapper {
-    /// cursor-agent echoes the final text again in its `result` frame; once
-    /// assistant text has streamed the echo must be suppressed.
     saw_assistant_text: bool,
 }
 
@@ -29,7 +22,6 @@ impl LineMapper for CursorLineMapper {
 
         let event: CursorWireEvent = serde_json::from_str(trimmed)?;
         Ok(match event {
-            // Session bookkeeping / prompt echo — nothing to surface.
             CursorWireEvent::System | CursorWireEvent::User => Vec::new(),
             CursorWireEvent::Assistant { message } => {
                 let events = map_assistant_message(message)?;
@@ -208,13 +200,9 @@ fn tool_output_from_value(value: serde_json::Value, is_error: bool) -> ToolOutpu
 mod tests {
     use super::*;
 
-    // Recorded live from `cursor-agent --print --output-format stream-json`
-    // (cursor-agent on PATH, 2026-07-08). Never hand-edit; re-record instead.
     const LIVE_SYSTEM_INIT: &str = r#"{"type":"system","subtype":"init","apiKeySource":"login","cwd":"/private/tmp/work","session_id":"37618ac0-4d30-4dd4-bb87-1abc269069b4","model":"Composer 2.5 Fast","permissionMode":"default"}"#;
     const LIVE_USER_ECHO: &str = r#"{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Read the file note.txt and tell me its contents"}]},"session_id":"37618ac0-4d30-4dd4-bb87-1abc269069b4"}"#;
-    // UNVERIFIED: recorded from cursor-agent's documented stream-json format
-    // (Claude-Code-shaped), not a live CLI — the live run hit a usage limit
-    // before assistant output. Re-record when a working account is available.
+
     const DOC_ASSISTANT: &str = r#"{"type":"assistant","message":{"content":[{"type":"text","text":"pong"}]},"session_id":"37618ac0"}"#;
     const DOC_RESULT: &str = r#"{"type":"result","subtype":"success","is_error":false,"duration_ms":1204,"result":"pong","session_id":"37618ac0"}"#;
 

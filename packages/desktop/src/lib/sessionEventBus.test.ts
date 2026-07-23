@@ -30,7 +30,6 @@ describe("sessionEventBus", () => {
     vi.resetModules()
     listenMock.mockReset()
     listenMock.mockImplementation(async (handler: (e: SessionEvent) => void) => {
-      // Stash the wire handler so tests can emit.
       ;(listenMock as unknown as { wire?: (e: SessionEvent) => void }).wire =
         handler
       return () => {
@@ -49,7 +48,6 @@ describe("sessionEventBus", () => {
     const unsubA = subscribeSessionEvents(a)
     const unsubB = subscribeSessionEvents(b)
 
-    // Allow attach promise to resolve.
     await Promise.resolve()
     await Promise.resolve()
 

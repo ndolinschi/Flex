@@ -1,5 +1,3 @@
-//! Shared synthetic tool-result text for incomplete tool calls.
-
 use agentloop_contracts::{ToolCallStatus, ToolOutput, ToolResultBlock};
 
 pub(crate) fn output_or_synthetic(

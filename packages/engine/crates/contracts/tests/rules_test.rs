@@ -1,5 +1,3 @@
-//! `ToolName(specifier)` permission-rule syntax.
-
 use agentloop_contracts::PermissionRule;
 
 #[test]

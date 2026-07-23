@@ -12,16 +12,8 @@ export type ModelGroup = {
 
 const EMPTY_GROUPS: ModelGroup[] = []
 
-/** Cap total rows rendered in searchable model menus. Large catalogs
- * (OpenRouter-style) otherwise mount hundreds of menu items per open. */
 export const MODEL_MENU_VISIBLE_CAP = 80
 
-/** Shared provider-grouping + search-filter logic behind both `ModelPicker`
- * (composer) and `ModelSelect` / plan toolbar pills. Groups preserve each
- * group's first-seen order (the models list's own ordering).
- *
- * Pass `enabled: false` while the menu is closed so composers/settings don't
- * rebuild group trees on every parent re-render. */
 export const useGroupedModels = (
   models: ModelInfoDto[],
   query: string,

@@ -18,16 +18,9 @@ type UseComposerAutocompleteArgs = {
   cwd: string | undefined
   textareaRef: RefObject<HTMLTextAreaElement | null>
   enabled: boolean
-  /**
-   * When true, `/` autocomplete triggers on a caret token (after whitespace /
-   * start of line) — for multi-line surfaces like the Prompt tab. Default
-   * false keeps composer behavior (whole draft must be `/query`).
-   */
   slashAtCaret?: boolean
 }
 
-/** Slash-command and @-mention autocomplete: token detection/segmenting state
- * machine plus the underlying queries (commands + file/folder/plugin hits). */
 export const useComposerAutocomplete = ({
   composerDraft,
   setComposerDraft,
@@ -223,7 +216,6 @@ export const useComposerAutocomplete = ({
     setSlashDismissed,
     atOpen,
     atToken,
-    /** @deprecated alias — prefer `atHits`. */
     fileHits: atHits,
     atHits,
     atHighlight,

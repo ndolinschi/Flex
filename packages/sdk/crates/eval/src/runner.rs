@@ -1,6 +1,3 @@
-//! Per-(task × target) execution: workspace prep, one agent turn under a
-//! timeout, check evaluation, metrics, and a raw JSONL event dump.
-
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
@@ -16,10 +13,8 @@ use crate::error::EvalError;
 use crate::metrics::RunMetrics;
 use crate::task::{CheckSpec, TaskSpec};
 
-/// One agent/provider/model combination a suite is run against.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvalTarget {
-    /// Agent implementation id (`native`, `claude-code`, ...); `None` = auto.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -29,7 +24,6 @@ pub struct EvalTarget {
 }
 
 impl EvalTarget {
-    /// Compact human-readable label, e.g. `native:anthropic/claude-sonnet-4`.
     pub fn label(&self) -> String {
         let mut label = self.agent.clone().unwrap_or_else(|| "auto".to_owned());
         if let Some(provider) = &self.provider {
@@ -44,34 +38,27 @@ impl EvalTarget {
     }
 }
 
-/// Future returned by a [`ServiceFactory`].
 pub type ServiceFuture = Pin<Box<dyn Future<Output = Result<EngineService, EvalError>> + Send>>;
 
-/// Builds a fresh [`EngineService`] for one run, rooted at the run workspace.
-/// Injected by the caller (the CLI wires its resolver; tests wire a mock).
 pub type ServiceFactory = Arc<dyn Fn(EvalTarget, PathBuf) -> ServiceFuture + Send + Sync>;
 
-/// Outcome of one task run against one target.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunResult {
     pub task_id: String,
-    /// [`EvalTarget::label`] of the target this run used.
+
     pub target: String,
-    /// 0-based repeat index.
+
     pub run_index: u32,
     pub passed: bool,
-    /// Why the run failed (check output, timeout, session error); `None` on pass.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failure: Option<String>,
     pub metrics: RunMetrics,
-    /// Raw JSONL dump of the session's persisted events, when captured.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transcript_path: Option<PathBuf>,
 }
 
-/// Execute one task against one target: copy the fixture into a temp git
-/// workspace, drive the prompt to completion under the task's timeout, run
-/// the check, and dump the raw event log under `out_dir`.
 pub async fn run_task(
     task: &TaskSpec,
     target: &EvalTarget,
@@ -118,9 +105,6 @@ pub async fn run_task(
     Ok(result)
 }
 
-/// Build the service, run the prompt under the timeout, fold metrics, and dump
-/// the transcript. A returned `Err(String)` is a *run* failure (recorded on
-/// the result), not an infrastructure error.
 async fn drive(
     task: &TaskSpec,
     target: &EvalTarget,
@@ -154,7 +138,6 @@ async fn drive(
     )
     .await;
 
-    // Dump the persisted event log regardless of how the turn ended.
     match service.replay(&session, 0).await {
         Ok(events) => {
             match dump_transcript(
@@ -173,7 +156,6 @@ async fn drive(
 
     match turn {
         Err(_elapsed) => {
-            // Best effort: stop the in-flight turn before the workspace drops.
             let _ = service.cancel(&session).await;
             Err(format!("timed out after {}s", task.timeout_secs))
         }
@@ -185,7 +167,6 @@ async fn drive(
     }
 }
 
-/// Run the task's check in the workspace; `Err` carries the failure reason.
 async fn evaluate_check(check: &CheckSpec, workspace: &Path) -> Result<(), String> {
     if let Some(cmd) = &check.cmd {
         let output = tokio::process::Command::new("sh")
@@ -221,7 +202,6 @@ async fn evaluate_check(check: &CheckSpec, workspace: &Path) -> Result<(), Strin
     Ok(())
 }
 
-/// Serialize the persisted events as JSONL under `out_dir`.
 fn dump_transcript(
     out_dir: &Path,
     task_id: &str,
@@ -254,7 +234,6 @@ fn sanitize(label: &str) -> String {
         .collect()
 }
 
-/// Recursively copy `src` into `dst` (which must exist), skipping `.git`.
 fn copy_dir(src: &Path, dst: &Path) -> Result<(), EvalError> {
     for entry in std::fs::read_dir(src)? {
         let entry = entry?;
@@ -274,9 +253,6 @@ fn copy_dir(src: &Path, dst: &Path) -> Result<(), EvalError> {
     Ok(())
 }
 
-/// Turn the workspace into a git repo with an initial commit so per-turn
-/// snapshots have something to work with and diffs are easy to inspect.
-/// Best-effort: a missing `git` degrades to a plain directory.
 async fn init_git(workspace: &Path) {
     for args in [
         vec!["init", "-q"],

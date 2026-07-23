@@ -1,17 +1,8 @@
-//! Top-level symbol extraction via `tree-sitter`.
-//!
-//! Extracts function/struct/class/const/impl-method definitions (name, kind,
-//! path, 1-based line range) for the languages we ship grammars for
-//! (TypeScript/TSX, JavaScript, Rust, Python, Go). Markdown gets a
-//! lightweight heading-as-symbol pass with no grammar involved. Unknown
-//! languages return no symbols — callers fall back to lexical-only chunking.
-
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use tree_sitter::{Node, Parser};
 
-/// Kind of a top-level symbol.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SymbolKind {
@@ -25,20 +16,15 @@ pub enum SymbolKind {
     Heading,
 }
 
-/// A single extracted definition.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Symbol {
     pub name: String,
     pub kind: SymbolKind,
-    /// Repo-relative path, forward-slash separated.
     pub path: String,
-    /// 1-based, inclusive start line.
     pub start_line: usize,
-    /// 1-based, inclusive end line.
     pub end_line: usize,
 }
 
-/// Language recognized from a file extension, or `Unknown` (lexical-only).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Language {
     TypeScript,
@@ -65,7 +51,6 @@ impl Language {
         }
     }
 
-    /// Human-readable tag stored in the tantivy schema.
     pub fn tag(self) -> &'static str {
         match self {
             Language::TypeScript => "typescript",
@@ -80,10 +65,6 @@ impl Language {
     }
 }
 
-/// Extract top-level symbols from `source`, given its repo-relative `rel_path`.
-///
-/// Returns an empty vec for [`Language::Unknown`] or on parse failure —
-/// callers treat that as "fall back to fixed-window chunking", never an error.
 pub fn extract_symbols(rel_path: &str, source: &str) -> Vec<Symbol> {
     let language = Language::from_path(Path::new(rel_path));
     match language {
@@ -121,9 +102,6 @@ fn extract_via_tree_sitter(
     Some(symbols)
 }
 
-/// Walk direct children of `node` (and one level into `export`/visibility
-/// wrappers) looking for definitions. Deliberately shallow — "top-level defs"
-/// per the spec, not every nested closure.
 fn walk_top_level(
     node: Node,
     src: &[u8],
@@ -137,8 +115,6 @@ fn walk_top_level(
             out.push(sym);
             continue;
         }
-        // Unwrap common one-level wrappers (export statements, impl blocks)
-        // so their inner definitions still count as top-level.
         if is_wrapper_node(child.kind(), language) {
             walk_top_level(child, src, rel_path, language, out);
         }
@@ -201,7 +177,6 @@ fn classify_ts_js(node: Node, src: &[u8], kind_str: &str) -> Option<(String, Sym
             Some((name.to_owned(), SymbolKind::Interface))
         }
         "lexical_declaration" | "variable_declaration" => {
-            // `const foo = ...` / `const foo = () => ...`
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
                 if child.kind() == "variable_declarator" {
@@ -266,7 +241,6 @@ fn classify_go(node: Node, src: &[u8], kind_str: &str) -> Option<(String, Symbol
             Some((name.to_owned(), SymbolKind::Method))
         }
         "type_declaration" => {
-            // `type Foo struct { ... }` — grab the first type_spec's name.
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
                 if child.kind() == "type_spec" {
@@ -291,8 +265,6 @@ fn classify_go(node: Node, src: &[u8], kind_str: &str) -> Option<(String, Symbol
     }
 }
 
-/// Markdown headings-as-symbols: no grammar, just a line scan for
-/// `#`..`######` ATX headings.
 fn extract_markdown_headings(rel_path: &str, source: &str) -> Vec<Symbol> {
     let lines: Vec<&str> = source.lines().collect();
     let mut headings = Vec::new();

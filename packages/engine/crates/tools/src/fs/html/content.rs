@@ -1,21 +1,6 @@
-//! High-level HTML → model-facing markdown cleaning.
-
 use super::nav::strip_navigation_blocks;
 use super::strip::strip_html_boilerplate;
 
-/// Extract the main content from a markdown page by finding the densest
-/// paragraph region.
-///
-/// Strategy:
-/// 1. Split by double-newline into paragraphs.
-/// 2. Find the longest paragraph as the anchor point.
-/// 3. Expand left and right from the anchor, including neighboring paragraphs
-///    that exceed the minimum length threshold (30 chars).
-/// 4. If the resulting block is at least 30% of total content, return it;
-///    otherwise return the full text.
-///
-/// This drops short boilerplate like nav bars and footers while keeping the
-/// article body.
 pub(crate) fn extract_content_core(markdown: &str) -> String {
     const MIN_PARAGRAPH_LEN: usize = 30;
     const CORE_MIN_FRACTION: f64 = 0.30;
@@ -68,11 +53,6 @@ pub(crate) fn extract_content_core(markdown: &str) -> String {
     }
 }
 
-/// Process raw HTML into clean, model-friendly markdown.
-///
-/// Pipeline: strip script/style/metadata tags → htmd convert → nav stripping
-/// → content-core extraction. Falls back to the cleaned HTML if htmd
-/// conversion fails.
 pub(crate) fn clean_html_for_model(html: &str) -> String {
     let cleaned = strip_html_boilerplate(html);
     match htmd::convert(&cleaned) {
@@ -83,7 +63,3 @@ pub(crate) fn clean_html_for_model(html: &str) -> String {
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Link extraction
-// ---------------------------------------------------------------------------

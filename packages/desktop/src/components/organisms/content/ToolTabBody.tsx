@@ -10,8 +10,6 @@ import { PromptTab } from "../right-panel/PromptTab"
 import { Spinner } from "../../atoms"
 import { cn } from "../../../lib/utils"
 
-/** Heavy / secondary panels — keep out of the initial JS graph (Monaco ~3MB,
- * xterm, browser). Status is light but still not needed until opened. */
 const FilesTab = lazy(() =>
   import("../right-panel/FilesTab").then((m) => ({ default: m.FilesTab })),
 )
@@ -28,9 +26,7 @@ const StatusTab = lazy(() =>
 type ToolTabBodyProps = {
   tool: RightPanelTab
   session: SessionMeta | undefined
-  /** Whether this tab is the active one in its pane (visibility). */
   active: boolean
-  /** Keep Files/Terminal/Browser/Prompt mounted while the tab exists in any pane. */
   keepAlive: boolean
 }
 
@@ -41,7 +37,6 @@ const PanelFallback = () => (
   </div>
 )
 
-/** Renders one tool surface; keep-alive hosts stay mounted when inactive. */
 export const ToolTabBody = ({
   tool,
   session,
@@ -150,11 +145,16 @@ export const ToolTabBody = ({
   }
 
   if (pluginTab) {
-    return active ? (
-      <div className="absolute inset-0 flex flex-col">
+    return (
+      <div
+        className={cn(
+          "absolute inset-0 flex flex-col",
+          active ? "flex" : "hidden",
+        )}
+      >
         {pluginTab.render({ active, session })}
       </div>
-    ) : null
+    )
   }
 
   return null

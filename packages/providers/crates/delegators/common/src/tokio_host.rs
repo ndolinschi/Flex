@@ -75,7 +75,7 @@ impl ProcessHost for TokioCommandHost {
             Stdio::null()
         });
         command.kill_on_drop(true);
-        // GUI parents (desktop) must not flash a conhost for connector CLIs.
+
         #[cfg(windows)]
         {
             const CREATE_NO_WINDOW: u32 = 0x0800_0000;

@@ -11,7 +11,6 @@ import { cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-/** Accent swatch grid + custom hex/color picker for Appearance settings. */
 export const AccentColorPicker = () => {
   const theme = useAppStore((s) => s.theme)
   const accentId = useAppStore((s) => s.accentId)

@@ -34,12 +34,10 @@ const waitApp = async () => {
 await page.goto(base, { waitUntil: "networkidle" })
 await waitApp()
 
-// 1) Filled chat (collapsed tool rows)
 await page.waitForSelector("text=Tighten the chat shell spacing", { timeout: 10_000 })
 await page.waitForTimeout(500)
 await shot("01-chat-filled.png")
 
-// 1b) Expand Explore + Edit tool rows
 await page.getByRole("button", { name: /Explored 8 files/i }).click()
 await page.waitForSelector("text=packages/desktop/src/App.tsx", { timeout: 5_000 })
 await page.getByRole("button", { name: /Edit Composer\.tsx/i }).click()
@@ -47,11 +45,9 @@ await page.waitForSelector("text=Updated Composer.tsx", { timeout: 5_000 })
 await page.waitForTimeout(400)
 await shot("01b-tools-expanded.png")
 
-// Collapse for subsequent nav
 await page.getByRole("button", { name: /Explored 8 files/i }).click()
 await page.getByRole("button", { name: /Edit Composer\.tsx/i }).click()
 
-// 2) Empty hero
 await page.getByRole("button", { name: /Session Empty session hero/i }).click()
 await page.waitForSelector("text=Describe a task to start the native agent loop", {
   timeout: 10_000,
@@ -59,7 +55,6 @@ await page.waitForSelector("text=Describe a task to start the native agent loop"
 await page.waitForTimeout(500)
 await shot("02-empty-hero.png")
 
-// 3) Settings
 await page.getByRole("button", { name: "Settings" }).click()
 await page.waitForSelector("header >> text=Provider settings", { timeout: 10_000 })
 await page.waitForTimeout(500)
@@ -71,14 +66,12 @@ await page.waitForSelector("text=Describe a task to start the native agent loop"
   timeout: 10_000,
 })
 
-// 4) Welcome (browser mock: ?welcome=1 forces unconfigured)
 await page.goto(`${base}/?welcome=1`, { waitUntil: "networkidle" })
 await waitApp()
 await page.waitForSelector("text=Configure a provider to get started", { timeout: 10_000 })
 await page.waitForTimeout(500)
 await shot("04-welcome.png")
 
-// IA checks back on filled chat
 await page.goto(base, { waitUntil: "networkidle" })
 await waitApp()
 await page.getByRole("button", { name: /Session Visual balance preview/i }).click()

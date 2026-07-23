@@ -3,37 +3,6 @@ import { applyEventToTimeline } from "./applyEvent"
 import { buildDisplayItems } from "../../components/organisms/timeline/buildDisplayItems"
 import type { SessionEvent, ToolCall, TimelineRow } from "../types"
 
-/**
- * Regression coverage for the #1 confirmed-live bug (see HANDOFF-OPUS.md /
- * real-session.jsonl): within ONE turn, the engine feeds each agent-loop
- * iteration's tool results back to the model as a `user_message` whose
- * `content` is ENTIRELY `tool_result` blocks — never a genuine human turn.
- * A real captured transcript (uxtestproj / deepseek-v4-flash) showed exactly
- * this shape:
- *
- *   turn_started
- *   user_message      content=[{type:"markdown", ...}]        (real prompt)
- *   assistant_message + tool_call_updated×2                    (iteration 1)
- *   user_message      content=[{type:"tool_result", ...}×2]    (plumbing)
- *   assistant_message + tool_call_updated×3                    (iteration 2)
- *   user_message      content=[{type:"tool_result", ...}×3]    (plumbing)
- *   assistant_message + tool_call_updated×1                    (iteration 3)
- *   user_message      content=[{type:"tool_result", ...}×1]    (plumbing)
- *   assistant_message (final answer)
- *   turn_completed
- *
- * Before the fix, `applyEventToTimeline`'s `user_message` case pushed a
- * `user` row for EVERY `user_message`, including the tool-result-only ones.
- * `buildDisplayItems` treats a `user` row as a hard turn/group boundary
- * (see its main loop: `row.type === "user"` always flushes), so what is
- * genuinely ONE turn fragmented into 4 pieces — no single WorkGroup ever
- * spanned the turn, and `clusterToolRows` never saw iteration 1's tool rows
- * adjacent to iteration 2's, so "Read 2 files" never clustered across
- * iterations. The fix drops any `user_message` with no visible
- * markdown/image/file content instead of materializing a row for it (see
- * `hasVisibleUserContent` in `types/ui.ts`).
- */
-
 let seq = 0
 const nextSeq = () => {
   seq += 1
@@ -131,7 +100,6 @@ describe("applyEventToTimeline — tool-result-only user_message", () => {
       payload: { kind: "turn_started", turn_id: "turn-1" },
     })
 
-    // Iteration 1: two tool calls.
     apply({
       session_id: sessionId,
       seq: nextSeq(),
@@ -150,7 +118,6 @@ describe("applyEventToTimeline — tool-result-only user_message", () => {
         call: makeCall({ id: "call-glob", tool_name: "Glob", input: { pattern: "*" } }),
       },
     })
-    // Tool-result-only plumbing — must NOT break the group or fragment it.
     apply(
       toolResultEvent(
         sessionId,
@@ -163,8 +130,6 @@ describe("applyEventToTimeline — tool-result-only user_message", () => {
       ),
     )
 
-    // Iteration 2: three Read calls — should cluster WITH each other (same
-    // family, adjacent once plumbing is dropped).
     apply({
       session_id: sessionId,
       seq: nextSeq(),
@@ -217,7 +182,6 @@ describe("applyEventToTimeline — tool-result-only user_message", () => {
       ),
     )
 
-    // Iteration 3: narration + one Bash call.
     apply({
       session_id: sessionId,
       seq: nextSeq(),
@@ -253,7 +217,6 @@ describe("applyEventToTimeline — tool-result-only user_message", () => {
       ),
     )
 
-    // Final genuine answer.
     apply({
       session_id: sessionId,
       seq: nextSeq(),
@@ -285,16 +248,11 @@ describe("applyEventToTimeline — tool-result-only user_message", () => {
       },
     })
 
-    // No row for any of the 3 tool-result-only user_messages: 1 user row +
-    // 2 turn rows (started/completed) + 6 tool rows + 1 narration assistant
-    // row + 1 final assistant row = 11 total.
     expect(rows.filter((r) => r.type === "user")).toHaveLength(1)
     expect(rows).toHaveLength(11)
 
     const items = buildDisplayItems(rows, false)
 
-    // user row, one work group, one final answer row — NOT fragmented into
-    // multiple groups by the tool-result plumbing.
     expect(items).toHaveLength(3)
     expect(items[0]).toMatchObject({ kind: "row", row: { type: "user" } })
 
@@ -303,10 +261,6 @@ describe("applyEventToTimeline — tool-result-only user_message", () => {
     if (group.kind !== "group") throw new Error("expected group")
     expect(group.isOpen).toBe(false)
 
-    // Tools cluster across iterations: the 3 Read calls from iteration 2
-    // form ONE cluster (not fragmented into singletons) once
-    // `clusterToolRows` is applied downstream, and every tool row from every
-    // iteration is present in original order inside the single group.
     expect(group.rows.map((r) => (r.type === "tool" ? r.call.tool_name : r.type))).toEqual([
       "Bash",
       "Glob",

@@ -1,7 +1,3 @@
-// This whole file is a test binary (`tests/serve.rs`); unlike a `#[cfg(test)]
-// mod` inside a lib target, clippy's expect_used/unwrap_used lints don't
-// treat plain helper fns here (e.g. `spawn_test_server`) as test code, even
-// though they're only ever reachable from `#[tokio::test]` functions below.
 #![allow(clippy::expect_used)]
 
 use std::sync::Arc;
@@ -87,8 +83,6 @@ async fn full_session_lifecycle_over_http() {
         .expect("prompt request");
     assert_eq!(prompt_response.status(), 202, "turn admitted");
 
-    // Read the SSE stream until we see the turn complete, then drop the
-    // connection — `KeepAlive` would otherwise hold it open indefinitely.
     let mut stream = client
         .get(format!("{base}/sessions/{session_id}/events?from_seq=0"))
         .bearer_auth(token.as_str())

@@ -15,7 +15,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-/** Isolated-workspace badge → menu with the diff summary + integrate/discard. */
 export const IsolationBadge = ({
   sessionId,
   onError,
@@ -52,7 +51,7 @@ export const IsolationBadge = ({
           <Button
             type="button"
             variant="ghost"
-            className="ml-1 h-6 rounded-full bg-transparent px-2 text-xs font-normal text-ink-muted hover:bg-fill-4 hover:text-ink aria-expanded:bg-fill-4 aria-expanded:text-ink"
+            className="ml-1 h-5 rounded-full bg-transparent px-2 text-xs font-normal text-ink-muted hover:bg-fill-4 hover:text-ink aria-expanded:bg-fill-4 aria-expanded:text-ink"
           />
         }
       >

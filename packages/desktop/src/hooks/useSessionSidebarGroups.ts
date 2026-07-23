@@ -15,23 +15,16 @@ import type { SessionMeta } from "../lib/types"
 export type SessionSidebarGroups = {
   pinnedSessions: SessionMeta[]
   archivedSessions: SessionMeta[]
-  /** Primary chrome: project/repo folders with nested sessions. */
   repoGroups: RepoGroup[]
-  /** Optional recency buckets (Search / helpers — not default sidebar chrome). */
   timeBuckets: TimeBucket[]
 }
 
 export type SessionSidebarGroupOptions = {
   sort?: SidebarProjectSort
   visibility?: SidebarProjectVisibility
-  /** Active session — its project stays visible under the Active filter. */
   activeSession?: SessionMeta | null
 }
 
-/** Pin / archive / repo grouping for the session sidebar, with stable
- * repo-group and row order under recency sort (bug #36 — recency reshuffles
- * must not move rows under the cursor mid-hover). Alphabetical sort skips
- * the freeze so an intentional A–Z order always wins. */
 export const useSessionSidebarGroups = (
   sessions: SessionMeta[],
   pinnedSessionIds: readonly string[],
@@ -50,9 +43,6 @@ export const useSessionSidebarGroups = (
     [archivedSessionIds],
   )
 
-  // Ordered by pin-order (see `orderByPinnedIds`), NOT by `sessions`'
-  // recency order — `sessions` is sorted most-recent-first and can silently
-  // reorder whenever any pinned session's `updated_at_ms` changes.
   const pinnedSessions = useMemo(
     () => orderByPinnedIds(sessions, pinnedSessionIds),
     [sessions, pinnedSessionIds],
@@ -78,11 +68,6 @@ export const useSessionSidebarGroups = (
     [groupableSessions, sort, visibility, keepCwd],
   )
 
-  // Freeze repo-group and row order once shown under recency (bug #36).
-  // Alphabetical sort is name-stable already — applying the freeze would
-  // pin a stale order after the user switches sort mode. Visibility changes
-  // must also clear the freeze: otherwise groups reappearing under "All"
-  // look "fresh" and jump to the front of the list.
   const groupOrderRef = useRef<string[]>([])
   const rowOrderByGroupRef = useRef<Map<string, string[]>>(new Map())
   const lastPrefsRef = useRef(`${sort}:${visibility}`)

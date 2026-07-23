@@ -1,5 +1,3 @@
-//! `MemoryWrite`: persist a durable note into the local memory directory.
-
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -10,49 +8,33 @@ use agentloop_contracts::ToolOutput;
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
 const NAME_MAX: usize = 48;
-/// Per-file cap; memories are always resident in the prompt, so keep them tiny.
 const CONTENT_MAX: usize = 4_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 enum MemoryWriteMode {
-    /// Replace the note (default).
     Replace,
-    /// Append to the note's end.
     Append,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 enum MemoryScope {
-    /// User-level facts (preferences, identity). Loads into every session
-    /// regardless of which project is open. Default.
     Global,
-    /// Facts about the current project/codebase. Stored under the session's
-    /// working directory so they only load when that project is open.
     Project,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct MemoryWriteInput {
-    /// Kebab-case note name, e.g. `user-preferences`. One topic per note.
     name: String,
-    /// The note content in markdown (max 4000 chars). Only durable,
-    /// user-confirmed facts and preferences — never session-specific state.
     content: String,
-    /// `replace` (default) or `append`.
     #[serde(default)]
     mode: Option<MemoryWriteMode>,
-    /// `global` (default) or `project`. Use `project` when the user asks to
-    /// remember something for *this* project/codebase; use `global` (or
-    /// omit) for user-level facts that should follow the user everywhere.
     #[serde(default)]
     scope: Option<MemoryScope>,
 }
 
-/// Writes `<name>.md` files under the local memory directory; they load into
-/// every future session's system prompt.
 pub struct MemoryWriteTool {
     memory_dir: PathBuf,
 }

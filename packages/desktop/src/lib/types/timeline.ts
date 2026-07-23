@@ -18,9 +18,7 @@ export type StreamingBuffers = {
   markdown: Record<MessageId, string>
   thinking: Record<MessageId, string>
   toolCalls: Record<ToolCallId, ToolCall>
-  /** Latest progress note per running tool call (from `tool_progress`). */
   toolProgress: Record<ToolCallId, string>
-  /** Accumulated partial input JSON per running tool call (from `tool_args_delta`). */
   toolArgs: Record<ToolCallId, string>
 }
 
@@ -39,20 +37,16 @@ export type PendingQuestion = {
   questions: Question[]
 }
 
-/** One subagent task parsed from a `RunWorkflow` call's raw input JSON. */
 export type WorkflowStepTaskInput = {
   role: string
   prompt: string
   label?: string
 }
 
-/** One step of a `RunWorkflow` plan, parsed from `ToolCall.input.steps`. */
 export type WorkflowStepInput =
   | { kind: "task"; task: WorkflowStepTaskInput }
   | { kind: "parallel"; tasks: WorkflowStepTaskInput[] }
 
-/** Lifecycle of one subagent slot consumed by a workflow step, tracked in
- * arrival order (engine emits no step index — see WorkflowGroup.tsx). */
 export type WorkflowSubagentSlot = {
   childSession: SessionId
   task: string
@@ -71,7 +65,6 @@ export type TimelineRow =
       messageId: MessageId
       text: string
       tsMs: number
-      /** Display-only: set when consecutive settled thoughts are merged. */
       durationMs?: number
     }
   | { type: "tool"; id: string; call: ToolCall; tsMs: number }
@@ -105,9 +98,6 @@ export type TimelineRow =
       childSession: SessionId
       task: string
       role?: string
-      /** The parent tool call that spawned this subagent, when tool-driven
-       * (e.g. `Task`). Used to route it into a `workflow` row instead of
-       * rendering it as a top-level subagent block. */
       callId?: ToolCallId
       phase: "started" | "completed"
       summary?: TurnSummary
@@ -121,9 +111,6 @@ export type TimelineRow =
       toolName: string
       steps: WorkflowStepInput[]
       status: ToolCallStatus
-      /** Subagent slots observed so far, in arrival order — consumed
-       * front-to-back to infer each step's progress (no step index/total
-       * exists on the wire; see WorkflowGroup.tsx). */
       subagents: WorkflowSubagentSlot[]
       tsMs: number
     }
@@ -131,9 +118,6 @@ export type TimelineRow =
       type: "verdict"
       id: string
       callId: ToolCallId
-      /** Pending/running while the `Verify` call is in flight; a settled
-       * verdict only exists once `status.state === "completed"` and the
-       * call's `result.structured` parsed as a `VerificationVerdict`. */
       status: ToolCallStatus
       verdict?: VerificationVerdict
       tsMs: number
@@ -158,7 +142,6 @@ export type TimelineRow =
   | {
       type: "mode_switch"
       id: string
-      /** "proposed" | "applied" | "rejected" */
       state: string
       mode: string
       reason?: string

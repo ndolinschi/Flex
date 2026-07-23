@@ -1,5 +1,3 @@
-//! Codex Responses API wire types (ChatGPT subscription backend).
-
 use std::collections::HashMap;
 
 use agentloop_contracts::{
@@ -45,16 +43,15 @@ struct CodexReasoning {
     effort: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     summary: Option<String>,
-    /// Responses Lite asks for `all_turns` so prior reasoning stays in context.
+
     #[serde(skip_serializing_if = "Option::is_none")]
     context: Option<String>,
 }
 
-/// Body + optional Lite session headers for the Codex Responses POST.
 #[derive(Debug)]
 pub(crate) struct BuiltCodexRequest {
     pub body: CodexResponsesRequest,
-    /// When set, the provider must send Responses Lite headers with this id.
+
     pub lite_session_id: Option<String>,
 }
 
@@ -112,7 +109,7 @@ struct OutputTokenDetails {
 pub(crate) struct CodexStreamMapper {
     requested_model: String,
     message_started: bool,
-    /// Map Responses item id / call_id → ToolCallId.
+
     tool_ids: HashMap<String, ToolCallId>,
     ended: bool,
     saw_tool_use: bool,
@@ -203,7 +200,6 @@ impl CodexStreamMapper {
                         self.saw_tool_use = true;
                         let call_id = self.track_tool(item);
                         if let Some(args) = item.arguments.as_ref().filter(|a| !a.is_empty()) {
-                            // Some backends only emit full args on done.
                             if !self.tool_ids.contains_key(&call_id.to_string()) {
                                 events.push(ProviderStreamEvent::ToolCallArgsDelta {
                                     call_id: call_id.clone(),
@@ -230,7 +226,7 @@ impl CodexStreamMapper {
                                 .and_then(|d| d.reasoning_tokens),
                         }));
                     }
-                    // Scan output for any function calls we missed.
+
                     for item in &response.output {
                         if item.kind.as_deref() == Some("function_call") {
                             self.saw_tool_use = true;

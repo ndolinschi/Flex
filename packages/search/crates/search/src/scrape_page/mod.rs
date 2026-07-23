@@ -1,13 +1,3 @@
-//! `scrape_page` tool: fetch a URL and return its text content.
-//!
-//! Follows the same pattern as the engine's `WebFetch` tool: reqwest for
-//! HTTP, `htmd` for HTML-to-markdown conversion, and truncation with
-//! explicit markers so the model knows content was cut.
-//!
-//! After markdown conversion, a heuristic extracts the "content core" — the
-//! largest contiguous block of paragraphs — to keep the output token-efficient
-//! by dropping boilerplate (nav, footer, sidebars) from the response.
-
 mod body;
 mod extract;
 mod fetch;
@@ -21,11 +11,6 @@ use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescri
 use extract::schema_of;
 use fetch::ScrapePageInput;
 
-/// Fetches a web page and returns its text content as markdown.
-///
-/// HTML pages are converted to markdown via `htmd`; non-HTML content is
-/// returned as plain text. The output is truncated with an explicit marker
-/// so the model can decide whether to refine the query.
 #[derive(Clone)]
 pub struct ScrapePageTool {
     client: reqwest::Client,

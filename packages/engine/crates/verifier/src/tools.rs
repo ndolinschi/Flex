@@ -1,16 +1,3 @@
-//! `Verify` + `SubmitVerdict`: an independent verifier — "maker is never the
-//! grader".
-//!
-//! `Verify` spawns a fresh `verifier`-role subagent seeded with only a
-//! rubric and a list of artifact paths; the input schema has no field for
-//! "what I did" or "why", so the caller cannot smuggle in the maker's
-//! reasoning. This crate ships only the descriptor — the loop intercepts
-//! calls by name and runs the subagent, same as `Agent`.
-//!
-//! `SubmitVerdict` is what the verifier calls to report its outcome: a real,
-//! executable, role-restricted tool whose only effect is producing a
-//! structured [`VerificationVerdict`] on the result.
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -21,7 +8,6 @@ use agentloop_contracts::{ToolOutput, ToolResultBlock, VerificationVerdict};
 use agentloop_core::tool::{SUBMIT_VERDICT_TOOL_NAME, VERIFIER_TOOL_NAME};
 use agentloop_core::{PermissionHint, Tool, ToolCategory, ToolContext, ToolDescriptor, ToolError};
 
-/// JSON Schema for `T`, generated via `schemars`.
 fn schema_of<T: JsonSchema>() -> serde_json::Value {
     let schema = schemars::schema_for!(T);
     serde_json::to_value(schema).unwrap_or_else(|_| serde_json::json!({}))
@@ -31,19 +17,12 @@ fn schema_of<T: JsonSchema>() -> serde_json::Value {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct VerifyInput {
-    /// What must be true for the artifacts to pass — a rubric, not a
-    /// transcript of what was done or why.
     rubric: String,
-    /// Paths (relative to the working directory) the verifier may read.
-    /// This is the *only* context it gets about the work under review.
     artifacts: Vec<String>,
-    /// Optional model override; defaults to the `verifier` role's own chain.
     #[serde(default)]
     model: Option<String>,
 }
 
-/// The `Verify` descriptor. `run` is never reached in a correct build — the
-/// loop intercepts calls by name and runs a `verifier`-role subagent instead.
 struct VerifyTool;
 
 #[async_trait]
@@ -81,14 +60,10 @@ impl Tool for VerifyTool {
     }
 }
 
-/// Build the `Verify` tool descriptor.
 pub fn verify_tool() -> Arc<dyn Tool> {
     Arc::new(VerifyTool)
 }
 
-/// The `SubmitVerdict` tool: parses a [`VerificationVerdict`] and returns it
-/// as the call's structured result. No side effects beyond that — it exists
-/// so a verifier's outcome is machine-readable, not just prose.
 struct SubmitVerdictTool;
 
 #[async_trait]
@@ -144,7 +119,6 @@ impl Tool for SubmitVerdictTool {
     }
 }
 
-/// Build the `SubmitVerdict` tool.
 pub fn submit_verdict_tool() -> Arc<dyn Tool> {
     Arc::new(SubmitVerdictTool)
 }

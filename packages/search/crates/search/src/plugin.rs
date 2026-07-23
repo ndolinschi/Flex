@@ -1,9 +1,3 @@
-//! `SearchPlugin` — the deep-search capability.
-//!
-//! Contributes two web tools (`search_web`, `scrape_page`) and a `researcher`
-//! role that encodes a structured deep-research workflow with iterative
-//! reflection, parallel fan-out, incremental compaction, and layered search.
-
 use std::sync::Arc;
 
 use agentloop_contracts::{IsolationPolicy, ModelRef};
@@ -14,19 +8,13 @@ use crate::scrape_page::ScrapePageTool;
 use crate::search_backend::{FallbackSearchBackend, SearchBackend, default_search_backends};
 use crate::search_web::SearchWebTool;
 
-/// The deep-search plugin.
-///
-/// Enabled via `AgentBuilder::enable_plugin("search")`. Uses a swappable
-/// [`SearchBackend`]; the default is Instant Answer + Wikipedia (optional
-/// Brave / SearXNG via env) with keyword-based result re-ranking.
 pub struct SearchPlugin {
     backend: Arc<dyn SearchBackend>,
-    /// Ordered model preference for the `researcher` role; empty = inherit.
+
     researcher_models: Vec<ModelRef>,
 }
 
 impl SearchPlugin {
-    /// Create a plugin with the given search backend.
     pub fn new(backend: Arc<dyn SearchBackend>) -> Self {
         Self {
             backend,
@@ -34,9 +22,6 @@ impl SearchPlugin {
         }
     }
 
-    /// Pin the `researcher` role to an ordered model preference chain
-    /// (e.g. a cheap/fast model). Empty keeps the default inherit-session
-    /// behavior.
     pub fn with_researcher_models(mut self, models: Vec<ModelRef>) -> Self {
         self.researcher_models = models;
         self
@@ -44,9 +29,6 @@ impl SearchPlugin {
 }
 
 impl Default for SearchPlugin {
-    /// Defaults to Instant Answer + Wikipedia (and optional Brave/SearXNG).
-    /// Public SearXNG instances are *not* hard-coded — they 429 constantly
-    /// and made `search_web` look permanently rate-limited.
     fn default() -> Self {
         Self {
             backend: Arc::new(FallbackSearchBackend::new(default_search_backends())),
@@ -89,12 +71,6 @@ impl Plugin for SearchPlugin {
     }
 }
 
-/// System prompt for the researcher role.
-///
-/// Encodes a structured deep-research workflow: Analyze & Plan →
-/// Execute & Evaluate with mandatory reflection checkpoints →
-/// Synthesis & Citation. Includes instructions for parallel fan-out,
-/// incremental compaction, and layered search patterns.
 const RESEARCHER_PROMPT: &str = r#"You are an Autonomous Deep Search Agent. Your objective is to provide comprehensive, highly accurate, and deeply researched answers to complex user queries. You do not just guess or rely on your internal training data; you actively plan, search, read, and verify information from the internet.
 
 ### YOUR AVAILABLE TOOLS:

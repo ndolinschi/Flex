@@ -38,11 +38,6 @@ fn default_model() -> ModelRef {
     ModelRef(format!("{MOCK_PROVIDER_ID}/{MOCK_MODEL}"))
 }
 
-/// `LoopLimits` with an empty retry schedule: the patient same-model retry
-/// added for RETRYABLE failures is exhausted immediately, so a scripted
-/// failure falls through to the fallback-chain/model-exhausted handling on
-/// the first attempt — exactly like before the retry schedule existed. Used
-/// by tests that exercise fallback-chain behavior itself, not retries.
 fn limits_without_retry() -> LoopLimits {
     LoopLimits {
         retry: RetryPolicy {
@@ -344,9 +339,6 @@ async fn bypass_permissions_skips_ask() {
 
 #[tokio::test]
 async fn force_ask_tool_still_asks_under_bypass_permissions() {
-    // A governance checkpoint (e.g. the learning plugin's
-    // require_human_approval) must survive --bypass-permissions, which would
-    // otherwise auto-allow this tool with no prompt at all.
     let (turn, _ids) = MockProvider::tool_turn(&[("needs_permission", serde_json::json!({}))]);
     let provider = Arc::new(MockProvider::with_turns([
         turn,
@@ -716,9 +708,6 @@ async fn session_level_fallback_chain_is_used_when_turn_options_specify_none() {
         .limits(limits_without_retry())
         .build();
 
-    // The fallback chain comes from NewSessionParams, not TurnOptions —
-    // the session-level default lets a client set it once instead of on
-    // every prompt.
     let session = agent
         .create_session(NewSessionParams {
             fallback_models: vec![ModelRef::from("mock-b/model-two")],
@@ -895,9 +884,6 @@ async fn mid_stream_failure_is_retried_on_same_model_before_falling_back() {
     );
 }
 
-/// A near-zero test schedule: exercises the patient retry layer's control
-/// flow (attempt counting, event emission, cancellation race) without
-/// actually waiting real backoff durations in the test suite.
 fn fast_retry_limits(attempts: usize) -> LoopLimits {
     LoopLimits {
         retry: RetryPolicy {
@@ -911,13 +897,6 @@ fn fast_retry_limits(attempts: usize) -> LoopLimits {
 async fn connect_failure_is_retried_on_same_model_and_then_succeeds() {
     use agentloop_testkit::ScriptedError;
 
-    // `Http` covers timeouts/connection failures classified upstream in
-    // `agentloop_providers_common::http::is_retryable_transport_error`. The
-    // first two failures are absorbed by the existing fast `stream_retries`
-    // micro-retry layer (silent, sub-second, no `RetryScheduled` event —
-    // that layer is unchanged by this feature); once it's exhausted, the
-    // patient schedule takes over for attempts 1-3, then the model finally
-    // succeeds. All six requests land on the same model — no fallback.
     let provider = Arc::new(MockProvider::with_turns(vec![
         Err(ScriptedError::Http("connection reset by peer".to_owned())),
         Err(ScriptedError::Http("connection reset by peer".to_owned())),
@@ -1004,10 +983,6 @@ async fn connect_failure_is_retried_on_same_model_and_then_succeeds() {
 async fn retry_schedule_exhaustion_falls_back_to_next_model() {
     use agentloop_testkit::ScriptedError;
 
-    // The first two failures are absorbed by the existing fast
-    // `stream_retries` layer; the schedule here allows exactly one more
-    // scheduled retry, so the fourth failure must advance the fallback chain
-    // instead of retrying forever.
     let failing = Arc::new(MockProvider::with_id("mock-a"));
     failing.push_turns([
         Err(ScriptedError::Http("connection reset".to_owned())),
@@ -1066,10 +1041,6 @@ async fn retry_schedule_exhaustion_falls_back_to_next_model() {
 async fn stop_during_backoff_cancels_immediately_without_waiting_out_the_schedule() {
     use agentloop_testkit::ScriptedError;
 
-    // The first two failures are absorbed by the fast `stream_retries` layer
-    // (sub-second backoff); the third is where the 1-hour scheduled delay
-    // below would kick in. If cancellation didn't race that sleep, this test
-    // would hang for an hour.
     let provider = Arc::new(MockProvider::with_turns(vec![
         Err(ScriptedError::Http("connection reset".to_owned())),
         Err(ScriptedError::Http("connection reset".to_owned())),
@@ -1202,7 +1173,6 @@ async fn read_only_batch_runs_in_parallel_on_the_pool() {
     );
 }
 
-/// A descriptor-only stand-in for the Task tool: the loop intercepts by name.
 struct TaskStub;
 
 #[async_trait::async_trait]
@@ -1345,9 +1315,6 @@ impl Tool for SubmitVerdictStub {
         _ctx: agentloop_core::ToolContext,
         input: serde_json::Value,
     ) -> Result<ToolOutput, agentloop_core::ToolError> {
-        // Real behavior (structured verdict on the output) lives in
-        // `agentloop_verifier::submit_verdict_tool`; this stub only needs to be
-        // callable so the verifier's tool call round-trips in the test.
         agentloop_verifier::submit_verdict_tool()
             .run(_ctx, input)
             .await
@@ -1448,8 +1415,6 @@ async fn verify_call_spawns_a_verifier_and_carries_the_structured_verdict() {
         "hello.txt:1 contains a greeting, matching the rubric"
     );
 
-    // Sanity: the verifier's own SubmitVerdict call id is distinct from the
-    // parent's Verify call id — they live in different sessions.
     assert_ne!(root_ids[0], verifier_ids[0]);
 }
 
@@ -1541,7 +1506,6 @@ async fn run_workflow_pipeline_orders_steps_and_threads_context() {
             "expected `{expected}` in workflow result:\n{result_text}"
         );
     }
-    // Step order in the summary: research's section appears before summary's.
     assert!(
         result_text.find("Step 1").unwrap() < result_text.find("Step 2").unwrap()
             && result_text.find("Step 2").unwrap() < result_text.find("Step 3").unwrap()
@@ -2012,10 +1976,6 @@ async fn unknown_role_teaches_and_turn_continues() {
     );
 }
 
-/// Per-call `model` override (mirrors `Verify`'s `model` field): an Agent
-/// call that sets `model` pins the child to that model, taking precedence
-/// over the role's own `models` chain — same precedence Verify already uses
-/// for its verifier subagents.
 #[tokio::test]
 async fn agent_call_model_override_takes_precedence_over_role_models() {
     use agentloop_loop::roles::RoleSpec;
@@ -2088,11 +2048,6 @@ async fn agent_call_model_override_takes_precedence_over_role_models() {
 
 #[tokio::test]
 async fn plan_mode_ends_turn_immediately_after_successful_exit_plan_mode() {
-    // Script only ONE model turn: a call to `ExitPlanMode`. If the loop wrongly
-    // fed the tool result back for a second model iteration, `MockProvider`
-    // would have no more scripted turns and the test would fail loudly
-    // (panic/error) rather than silently looping — proving the turn stopped
-    // right after the tool call instead of continuing.
     let (turn, _ids) = MockProvider::tool_turn(&[(
         "ExitPlanMode",
         serde_json::json!({ "plan": "1. Do the thing\n2. Verify it" }),
@@ -2144,9 +2099,6 @@ async fn plan_mode_ends_turn_immediately_after_successful_exit_plan_mode() {
 
 #[tokio::test]
 async fn non_plan_mode_exit_plan_mode_does_not_force_end_turn() {
-    // Outside Plan mode, a (misplaced) `ExitPlanMode` call must not trigger
-    // the special turn-ending behavior: the loop should feed the tool result
-    // back to the model and run another iteration as usual.
     let (turn, _ids) = MockProvider::tool_turn(&[(
         "ExitPlanMode",
         serde_json::json!({ "plan": "1. Do the thing" }),
@@ -2186,10 +2138,6 @@ async fn non_plan_mode_exit_plan_mode_does_not_force_end_turn() {
     assert_eq!(provider.requests().len(), 2);
 }
 
-/// `leak_sink` — clones the turn's event sink and never drops the clone,
-/// mirroring the executor's background reader task, which holds a sink clone
-/// to stream a `run_in_background` process's output for the process's whole
-/// lifetime (a dev server never exits).
 #[derive(Debug)]
 struct LeakySinkTool;
 
@@ -2212,19 +2160,11 @@ impl Tool for LeakySinkTool {
         ctx: ToolContext,
         _input: serde_json::Value,
     ) -> Result<ToolOutput, ToolError> {
-        // Simulate a background process holding the sink open past turn end.
         std::mem::forget(ctx.events.clone());
         Ok(ToolOutput::text("started in background"))
     }
 }
 
-/// Regression: a turn that leaves a background process holding a clone of the
-/// event sink must still COMPLETE. The event-drain task only ends once every
-/// sink sender drops; before the fix, `run_turn` awaited it unconditionally,
-/// so a background sink (a dev server that never exits) wedged the turn — and
-/// its `turn_gate` — forever, and every later prompt was rejected with "a turn
-/// is already in progress". `prompt()` returning here proves the gate is
-/// released.
 #[tokio::test]
 async fn background_sink_does_not_wedge_turn_completion() {
     let (turn, _ids) = MockProvider::tool_turn(&[("leak_sink", serde_json::json!({}))]);
@@ -2238,8 +2178,6 @@ async fn background_sink_does_not_wedge_turn_completion() {
         .await
         .expect("session is created");
 
-    // Without the fix this hangs forever on the event drain; bound it so the
-    // test fails loudly instead of hanging.
     let summary = tokio::time::timeout(
         Duration::from_secs(5),
         agent.prompt(
@@ -2255,14 +2193,6 @@ async fn background_sink_does_not_wedge_turn_completion() {
     assert_eq!(summary.stop_reason, TurnStopReason::EndTurn);
 }
 
-/// Regression for the residual after the wedge fix: the turn gate must be
-/// released as soon as the turn is LOGICALLY complete (terminal event emitted),
-/// not held across the post-turn event flush. With a background process the
-/// flush runs its full bounded window; a follow-up prompt fired during that
-/// window must be ACCEPTED (gate already free), not rejected with
-/// `TurnInProgress`. Before the early-release change the gate stayed locked for
-/// the whole flush, so a queued follow-up draining right after `TurnCompleted`
-/// bounced and only recovered on the frontend's multi-second safety retry.
 #[tokio::test]
 async fn gate_released_before_post_turn_flush_admits_followup() {
     let (turn, _ids) = MockProvider::tool_turn(&[("leak_sink", serde_json::json!({}))]);
@@ -2277,8 +2207,6 @@ async fn gate_released_before_post_turn_flush_admits_followup() {
         .await
         .expect("session is created");
 
-    // Turn 1 leaks a sink clone → its post-turn flush runs the full bounded
-    // window (~500ms). Run it in the background.
     let bg_agent = agent.clone();
     let bg_session = session.clone();
     let first = tokio::spawn(async move {
@@ -2291,8 +2219,6 @@ async fn gate_released_before_post_turn_flush_admits_followup() {
             .await
     });
 
-    // Well after turn 1's terminal event (mock turns settle in ms) but well
-    // before its ~500ms flush window ends: the gate must already be free.
     tokio::time::sleep(Duration::from_millis(150)).await;
 
     let followup = agent

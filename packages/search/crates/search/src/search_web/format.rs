@@ -1,5 +1,3 @@
-//! Formatting helpers for `search_web` tool output.
-
 use schemars::JsonSchema;
 
 use crate::search_backend::SearchResult;

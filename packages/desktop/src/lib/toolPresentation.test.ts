@@ -7,14 +7,6 @@ import {
 } from "./toolPresentation"
 import type { ToolCall } from "./types/wire"
 
-/**
- * Regression coverage for `clusterToolRows` — the twice-regressed
- * timeline clustering bug. Fixtures mirror historical preview-session
- * event sequences: a real turn interleaves mid-turn assistant
- * narration (visible or empty-text/invisible) between same-family tool
- * calls, and clustering must not treat that narration as a boundary.
- */
-
 let callSeq = 0
 
 const makeCall = (overrides: Partial<ToolCall> & { tool_name: string }): ToolCall => {
@@ -47,17 +39,12 @@ const bashCall = (command: string) => makeCall({ tool_name: "Bash", input: { com
 
 const toolRow = (call: ToolCall): TimelineToolRowLike => ({ type: "tool", id: call.id, call })
 
-/** A mid-turn assistant narration row — visible text, the regression case
- * from `preview-session-8` ("Good — the project uses plain CommonJS…"). */
 const narrationRow = (text: string): TimelineToolRowLike => ({
   type: "assistant",
   id: "asst-narration",
   text,
 })
 
-/** An empty/whitespace-only thinking row — the earlier, milder case from
- * `preview-session-6` (a thinking-only assistant_message chunk with no
- * markdown yet, renders as nothing). */
 const invisibleThinkingRow = (): TimelineToolRowLike => ({
   type: "thinking",
   id: "think-1",
@@ -95,8 +82,6 @@ describe("clusterToolRows", () => {
     )
     const out = clusterToolRows([toolRow(r1), narration, toolRow(r2)])
 
-    // Exactly one tool cluster containing BOTH reads, plus the narration
-    // still emitted (in position) as its own "other" row.
     expect(out).toHaveLength(2)
     expect(out[0]).toEqual({ kind: "tools", calls: [r1, r2] })
     expect(out[1]).toEqual({ kind: "other", row: narration })
@@ -149,8 +134,6 @@ describe("clusterToolRows", () => {
       toolRow(bash2),
     ])
 
-    // bash cluster, read cluster (spanning the narration), narration itself,
-    // edit cluster, then a new bash cluster (shell doesn't merge with edit).
     expect(out).toEqual([
       { kind: "tools", calls: [bash1] },
       { kind: "tools", calls: [read1, read2] },
@@ -275,11 +258,26 @@ describe("RepoMap / bare generic tools", () => {
       result: {
         content: [{ type: "markdown", text: "map" }],
         is_error: false,
+        structured: { file_count: 42, cache_hit: false },
       },
     })
     const summary = summarizeToolCalls([call])
-    expect(summary.title).toBe("RepoMap")
+    expect(summary.title).toBe("Repo map · 42 files")
     expect(summary.details).toEqual([])
+  })
+
+  it("shows cached file count when structured cache_hit is true", () => {
+    const call = makeCall({
+      tool_name: "RepoMap",
+      input: {},
+      result: {
+        content: [{ type: "markdown", text: "map" }],
+        is_error: false,
+        structured: { file_count: 12, cache_hit: true },
+      },
+    })
+    const summary = summarizeToolCalls([call])
+    expect(summary.title).toBe("Repo map · 12 files (cached)")
   })
 
   it("keeps running state when details are filtered out", () => {
@@ -290,7 +288,7 @@ describe("RepoMap / bare generic tools", () => {
     })
     const summary = summarizeToolCalls([call])
     expect(summary.running).toBe(true)
-    expect(summary.title).toBe("Running RepoMap…")
+    expect(summary.title).toBe("Building repo map…")
     expect(summary.details).toEqual([])
   })
 

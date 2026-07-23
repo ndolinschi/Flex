@@ -17,10 +17,6 @@ type HumanMessageCardProps = {
   footer?: TurnFooterInfo
 }
 
-/**
- * Full-width sticky human turn card: elevated surface, collapse + bottom
- * fade, hover-reveal actions — not a right-aligned chat bubble.
- */
 export const HumanMessageCard = ({
   displayText,
   copyText,

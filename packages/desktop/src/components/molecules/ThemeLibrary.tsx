@@ -21,8 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-/** Curated subset of allowlisted tokens exposed in the visual editor.
- * The full allowlist is still honored in JSON import. */
 const EDITOR_TOKENS: Array<{ key: (typeof THEME_TOKEN_ALLOWLIST)[number]; label: string }> = [
   { key: "--color-chrome", label: "Chrome (main surface)" },
   { key: "--color-panel", label: "Panel (sidebar / popovers)" },
@@ -38,7 +36,6 @@ const EDITOR_TOKENS: Array<{ key: (typeof THEME_TOKEN_ALLOWLIST)[number]; label:
 
 const FACTORY_ID = "factory"
 
-/** Slugify a display name for use as a theme id. */
 const slugify = (name: string): string =>
   name
     .toLowerCase()
@@ -58,14 +55,12 @@ const emptyEditor = (): EditorState => ({
   tokens: {},
 })
 
-/** Populate editor from an existing ThemeSpec for the given mode. */
 const editorFromSpec = (spec: ThemeSpec, mode: "dark" | "light"): EditorState => ({
   id: spec.id,
   name: spec.name,
   tokens: { ...(spec.tokens?.[mode] ?? {}) },
 })
 
-/** Merge editor state back into a ThemeSpec (preserving the other mode). */
 const applyEditorToSpec = (
   editor: EditorState,
   existing: ThemeSpec | undefined,
@@ -91,7 +86,6 @@ const applyEditorToSpec = (
 type ThemeEditorDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** null = create new, spec = editing existing */
   initialSpec: ThemeSpec | null
   mode: "dark" | "light"
   onSave: (spec: ThemeSpec) => void
@@ -108,7 +102,6 @@ const ThemeEditorDialog = ({
     initialSpec ? editorFromSpec(initialSpec, mode) : emptyEditor(),
   )
 
-  // Reset when dialog opens with new initial spec.
   const prevOpenRef = useRef(open)
   if (open !== prevOpenRef.current) {
     prevOpenRef.current = open
@@ -149,7 +142,6 @@ const ThemeEditorDialog = ({
                 setEditor((prev) => ({
                   ...prev,
                   name,
-                  // Auto-derive id from name unless user has an existing id.
                   id: initialSpec ? prev.id : slugify(name),
                 }))
               }}
@@ -237,11 +229,6 @@ const ThemeEditorDialog = ({
   )
 }
 
-/** Appearance card: theme library select + import/export/delete + mini editor.
- *
- * Placed below the Accent card in Settings → Appearance. Follows the same
- * inline CSS-var pattern as `accent.ts` — custom token overrides layer on top
- * of the existing `data-theme` factory palette without replacing it. */
 export const ThemeLibrary = () => {
   const theme = useAppStore((s) => s.theme)
   const activeThemeId = useAppStore((s) => s.activeThemeId)
@@ -284,7 +271,6 @@ export const ThemeLibrary = () => {
       }
     }
     reader.readAsText(file)
-    // Reset input so the same file can be re-imported.
     e.target.value = ""
   }
 

@@ -1,5 +1,3 @@
-//! Session event replay and transcript materialization.
-
 use agentloop_contracts::{AgentEvent, SessionEvent, SessionId, Transcript, TurnId, reduce};
 use agentloop_core::StoredEvent;
 
@@ -24,8 +22,6 @@ impl EngineService {
                     session_id: session.clone(),
                     seq,
                     turn_id: current_turn.clone(),
-                    // Use the ts captured at emit, not now_ms(): reopening a
-                    // session must never rewrite historical timestamps.
                     ts_ms,
                     payload: event.clone(),
                 });

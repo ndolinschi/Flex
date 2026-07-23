@@ -1,4 +1,3 @@
-//! Code index status and rebuild.
 
 use super::prelude::*;
 
@@ -15,8 +14,6 @@ pub async fn index_status(cwd: String) -> DesktopResult<agentloop_sdk::index::In
         .map_err(|e| DesktopError::Message(e.to_string()))
 }
 
-/// Force a (re)build of the code index for `cwd`. Returns status + update
-/// stats so Settings can show progress after a rebuild click.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn index_rebuild(cwd: String) -> DesktopResult<IndexRebuildResult> {

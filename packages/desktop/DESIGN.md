@@ -24,7 +24,7 @@ audit and fix UI against this file. For shadcn adds/rewrites, also load the
 | Whisper fills | Selected `fill-2` (~8%), hover `fill-4` (~6%) (list rows, tabs, chrome buttons) |
 | Opacity hover | Quiet icon controls: idle `.5` → hover `.8`; mode/model pills idle `.8` → hover `1` |
 | Mode tint | Composer mode pill uses semantic fill (agent green / plan yellow / ask cyan / flex purple) — whisper ~10%, never neon |
-| Glass dark | Neutral pure-gray glass (Agents Web surfaces + glass structure): chrome `#141414` · sidebar `#181818` · elevated `#1d1e20` · ink `#f0f0f0` — no cool-blue cast |
+| Glass dark | Neutral pure-gray glass (Agents Web surfaces + glass structure): chrome `#141414` · sidebar `#181818` · elevated `#1d1e20` · ink `#f0f0f0` — no cool-blue cast. Titleband uses `glass-titleband` (transparent wash over HudWindow vibrancy) |
 | 4px grid | Dense spacing `--space-1`…`--space-16` with half-steps (`1.5`, `2.5`, …) |
 | Radius by role | Controls `rounded-md` (8); composer/bubbles **14**; settings cards 12; pills full; sidebar rows 6 |
 | Keyboard focus | Neutral `stroke-2` ring; no accent glow |
@@ -106,10 +106,11 @@ colored icon only).
 - Product monochrome accent default (Settings can override) — not Cursor blue CTA.
 - Green switch ON track (`--color-switch-on`) for settings.
 - ContextBar: empty agent = bare folder + Direct **above** composer; active =
-  thin footer **below** composer; tool-tab pane repeats that footer on
-  `ContentPane` (chat body + Composer ContextBar are hidden). Sidebar footer =
+  thin footer **below** composer (quiet Commit CTA); tool-tab pane uses a
+  quieter strip (`ContextBar quiet` — no Commit duplication). Sidebar footer =
   theme + settings. Pristine New Agent selection collapses split and prunes
-  sibling tool tabs.
+  sibling tool tabs; non-pristine sessions keep the work pane open by default
+  (Cursor Agents 3-col silhouette).
 - Domain chrome stays custom: `Tab`/`TabStrip`, `WindowTitleBar`, Monaco/xterm,
   timeline WorkGroup/tool cards, HITL docks.
 - Light theme: production ladder (`#f8f8f8` chrome / `#f3f3f3` panel / `#fcfcfc`
@@ -150,7 +151,7 @@ Production Cursor Agents Web (2026-07-23) maps to Flex desktop as:
 │ bg-sidebar                 │ TabStrip IS the titlebar for this column        │
 │ border-r stroke-3          │ body: chat thread + docked composer             │
 │                            │ optional split pane | sash                      │
-│ pad 0 8 12 · top = 35      │ sticky human turns · timeline · composer        │
+│ pad 0 8 8 · top = 35        │ sticky human turns · timeline · composer        │
 │  nav gap-px                │ rail max ~45rem (not full-bleed)                │
 │   New Agent (h-8)          │                                                 │
 │   Search / Memory          │                                                 │
@@ -243,13 +244,17 @@ ContentPane(s)
   └── ContextBar footer — when active body is a tool tab (chat keeps it under Composer)
 ```
 
-- **Single:** one pane fills the column.
-- **Split (wide only):** left | sash | right; each pane has its own tabs.
+- **Single:** one pane fills the column (pristine New Agent drafts; or after
+  the user hides the work pane).
+- **Split (wide only, default for active sessions):** chat | sash | work
+  (Changes / Files / …); each pane has its own tabs.
 - **Split eligibility:** entering split requires both `viewport === "wide"` AND
   `(window.innerWidth - sidebarUsed) >= CHAT_MIN_WIDTH * 2` (760px). The sash
   is additionally hidden in `ContentWorkspace` when the measured content row is
   narrower than `CHAT_MIN_WIDTH * 2` (e.g. after a window resize mid-session).
-- Auto-open (plan approval, PR, files, browser, terminal) uses `openToolBesideChat`.
+- Auto-open (plan approval, PR, files, browser, terminal) uses `openToolBesideChat`;
+  selecting a non-pristine session uses `ensureDefaultWorkPane` (Changes, or the
+  session’s existing tool tabs).
 - Narrow/tight: force single pane.
 
 ### Settings (`SettingsShell`)
@@ -278,7 +283,7 @@ main (px-4 gap-6 overflow-y-auto)
 | Pane | Default | Min | Max |
 |---|---|---|---|
 | Sidebar | 280px | 210 | 400 |
-| Content panes (when split) | First split starts **38% chat / 62% work**; user-resizable (minimum constraints rebalance near the width floor) | **380px** each | — |
+| Content panes (when split) | First split starts **48% chat / 52% work** (~Cursor Agents); user-resizable (minimum constraints rebalance near the width floor) | **380px** each | — |
 | Chat body (single) | fluid | **380px** floor | — |
 
 Sashes never shrink a content pane below `CHAT_MIN_WIDTH` when split.
@@ -294,9 +299,11 @@ Sashes never shrink a content pane below `CHAT_MIN_WIDTH` when split.
 Browser / Terminal always fill remaining height.
 
 **Closed-panel mini tabs:** removed — the right column no longer exists.
-On wide viewports, tool surfaces open **beside chat** (chat left rail ≈38%,
-work surface right) so the composer stays visible — matching IDE chat|editor
-density rather than swapping peer tabs in one pane.
+On wide viewports, an active (non-pristine) session opens the work pane
+**beside chat by default** (chat ≈48%, work ≈52%) — Changes unless the
+session already has open tool tabs. Pristine New Agent drafts stay chat-only
+(`panel: "closed"`). Users can hide the work pane (split toggle / close pane);
+that preference is sticky via `rightPanelCollapsed` until they reopen it.
 
 
 ---
@@ -307,9 +314,9 @@ Use these gutters unless a surface documents an exception.
 
 | Surface | Horizontal | Vertical / rhythm |
 |---|---|---|
-| **Chat chrome** (timeline, composer outer) | `px-2.5` (10px) | Timeline `py-3`; composer `pt-1 pb-1.5`; ContextBar air `mb-1` (hero) / `mt-1` (active) |
-| **Content pane chrome** (TabStrip, tool tab headers, banners, CommitCenter) | `px-2.5` (10px) | Rows = `--header-height` (30px) |
-| **Session sidebar** (header, nav, list) | header `px-2`; cells own `px-2.5`; list **no** horizontal pad | header `pb-3` (no top pad); section titles `h-6 px-2.5`; nav `gap-px` |
+| **Chat chrome** (timeline, composer outer) | `px-2.5` (10px) | Timeline `py-3`; composer `pt-1 pb-1.5`; shell under composer `pb-1`; ContextBar air `mb-1` (hero) / `mt-1` (active) |
+| **Content pane chrome** (TabStrip, tool tab headers, banners, CommitCenter) | `px-2.5` (10px) | Top TabStrip = `--titlebar-height` (35px) + `glass-titleband`; nested rows = `--header-height` (30px) |
+| **Session sidebar** (header, nav, list) | header `px-2`; cells own `px-2.5`; list **no** horizontal pad | header cluster `pb-2` (no top pad); section titles `h-6 px-1.5`; nav `gap-px` |
 | **Sidebar footer** | `px-2` | icons `min-h-8 py-1`; creating-strip `py-1.5` |
 | **Composer toolbar / textarea** | `px-2.5` | Bubble `gap-1.5`; toolbar `pb-1.5` (no top pad — gap owns it); textarea `pt-2` |
 | **Settings shell** | `px-4` | Nav↔content `gap-6`; cards `gap-3` |
@@ -324,16 +331,16 @@ Use these gutters unless a surface documents an exception.
 | `--content-rail` | `min(100%, 45rem)` | Timeline + composer middle-column density; gutters via `px-2.5` |
 | `--welcome-rail` | 28rem (448px) | Welcome page |
 | `--form-rail` | 32rem | Defined; unused in components today |
-| `--sidebar-width` | 16.25rem (260px) | Defined; runtime width is the store, not this token |
+| `--sidebar-width` | 17.5rem (280px) | Defined; runtime width is the store, not this token |
 
 ### Chrome heights
 
 | Token | Value | Surfaces |
 |---|---|---|
-| `--titlebar-height` | **35px** (glass) | Sidebar header + content `TabStrip` (top chrome) |
+| `--titlebar-height` | **35px** (glass) | Sidebar header + content `TabStrip` (top chrome); `glass-titleband` |
 | `--window-radius` | 10px | `#root` / `.app-shell` clip; macOS vibrancy + CALayer |
 | `--header-height` | 30px | Nested tool chrome / buffer strips (not the top TabStrip) |
-| `--status-bar-height` | 1.75rem (28px) | ContextBar min height |
+| `--status-bar-height` | 1.25rem (20px) | ContextBar / quiet pane footer target |
 | `--composer-min/max-height` | 1.5rem / 10rem | Textarea grow |
 
 ### Gaps (chrome)
@@ -344,7 +351,7 @@ Use these gutters unless a surface documents an exception.
 | TabStrip tabs | `gap-1.5` |
 | Composer left (Plus / Mode) | `gap-1` |
 | Composer right (Model / Bypass / Send) | `gap-1.5` |
-| ContextBar outer | `gap-2` |
+| ContextBar outer | `gap-1.5` |
 | Sidebar action rows | `gap-0.5` |
 | Settings cards | `gap-3` |
 | Settings shell columns | `gap-6` |
@@ -377,12 +384,13 @@ Use **padding** (`pt-*`), not margin — virtualizer `measureElement` must inclu
 | Sidebar nav action | **`h-8`** `px-2.5` `gap-2` `rounded-sm` font-medium | Production New Agent row |
 | File tree / Changes file row | `h-7` `px-2.5` `rounded-sm` | Same whisper fills as sidebar cells |
 | Tool-call line | `gap-1` `text-base` `leading-[1.5]` icon slot `16×18` | Idle `text-ink-muted` → hover secondary; title secondary |
-| Section headers (sidebar) | `px-1.5 py-2` `text-sm` tertiary | Repo / date labels; wrapper adds matching inset |
+| Section headers (sidebar) | **`h-6`** `px-1.5` `text-sm` tertiary | Repo / date labels; wrapper adds matching inset |
 | Human message card | `rounded-[14px]` `px-2.5 py-2` `border-stroke-3` | hover `border-stroke-2` + whisper `fill-5` |
 | Composer card | `rounded-[14px]` inset stroke ladder + `backdrop-blur(10px)` | idle stroke-3 → hover stroke-2 → focus `--shadow-composer-focus` |
 | Chat thread header | **`h-[40px]`** `pl-3 pr-2` title `text-base font-medium` | `ChatThreadHeader` |
 | Terminal / panel toolbar | **`h-10`** `px-2` `border-b stroke-3` | `panel-toolbar` recipe |
 | Message action icon | **`h-5 w-5`** icon `3.5` | Copy / Edit / Fork density |
+| ContextBar triggers | **`h-5`** quiet ghost pills | Project / branch / isolation / usage |
 
 **Rule:** never put `h-7` pills inside a `--header-height` (30px) bar — they
 read flush against the border. Use `h-6` (3px inset each side).
@@ -447,6 +455,8 @@ empty CTAs; bright skeleton shimmer; loud red alert slabs; accent-filled quiz op
 6. Footer — theme + settings quiet icons (opacity `.5` → `.8` + `fill-4` hover); no account/avatar
 7. **Sash** — right-edge resize hit target (`z-30`); aside uses `overflow-visible` so the sash is not clipped; inner shell clips list content
 
+Repo / section labels use **`h-6`** (not `py-2`) so list density matches nav `h-8` cells.
+
 Tab pills still use `fill-2` selected / `fill-4` hover elsewhere in the app.
 
 **Row-level gutter rule:** the `px-2.5` gutter is carried by each interactive row/button/label, NOT by a wrapper container. Do not add `px-2.5` to `SidebarContent` or the action-rows div — that doubles the effective indent to 20px and narrows the hover fills away from the sidebar edge.
@@ -455,23 +465,26 @@ Tab pills still use `fill-2` selected / `fill-4` hover elsewhere in the app.
 
 ### WindowTitleBar / top chrome
 
-Chat route: **no full-width titlebar row**. One 35px band:
+Chat route: **no full-width titlebar row**. One 35px band with `glass-titleband`:
 
 - **Sidebar header** — traffic lights (macOS) / menus (Windows/Linux), collapse,
-  plus a `TitleBarDragRegion` flex spacer (undecorated window move); **no Flex mark**
-- **ContentPane `TabStrip`** — `h-[var(--titlebar-height)]`; quiet `h-6`
-  **centered** pills (Agents); tabs size-to-content, then `TitleBarDragRegion`,
-  then `+` / eastmost actions — drag is **not** on the whole strip (keeps Mac
-  gestures + tab clicks reliable)
+  plus a `TitleBarDragRegion` flex spacer (undecorated window move); **no Flex mark**;
+  `data-slot="glass-titleband"`
+- **ContentPane `TabStrip`** — `h-[var(--titlebar-height)]` + `glass-titleband`;
+  quiet `h-6` **centered** pills (Agents); tabs size-to-content, then
+  `TitleBarDragRegion`, then `+` / eastmost actions — drag is **not** on the
+  whole strip (keeps Mac gestures + tab clicks reliable)
 
 When the sidebar is collapsed, traffic / reopen move into the left of the
 TabStrip. Welcome / bootstrap still use full-width `WindowTitleBar`.
 `TitleBarChromeHost` keeps native macOS menus + undecorated window alive on
 chat without painting a second row.
 
-Quiet `h-6` icon buttons. Title bar paint is transparent so macOS HudWindow
-vibrancy can read through; `.app-shell` supplies the rounded clip
-(`--window-radius`) over a transparent window.
+Quiet `h-6` icon buttons. Title bar paint is a transparent charcoal wash so
+macOS HudWindow vibrancy can read through (`index.css` platform overrides);
+`.app-shell` supplies the rounded clip (`--window-radius`) over a transparent
+window. Do **not** nest a second `backdrop-filter` on the titleband — the
+shell owns blur; the band only lowers opacity.
 
 **Anti-pattern:** `items-end` tabs + `self-center` trailing actions — different
 baselines vs the sidebar mark read as «crooked». Keep the whole band
@@ -492,11 +505,16 @@ single-row pill:
 3. ContextBar placement:
    - **Empty agent (`isHero`)**: bare folder\|Direct pills **above** the
      bubble (`mb-1`) — no nested card chrome.
-   - **Active chat**: thin footer **below** the bubble (`mt-1`, `min-h-6`)
-     with project/branch/isolation/commit/usage — not a second toolbar above.
-   - **Tool tab active** (Files / Terminal / …): same footer strip on the
-     `ContentPane` (`border-t`, `px-2.5`) — Composer (and its ContextBar)
-     are hidden with the chat body, so the pane owns the chrome.
+   - **Active chat**: thin footer **below** the bubble (`mt-1`, `min-h-5`)
+     with project/branch/isolation + quiet Commit CTA + usage — not a second
+     toolbar above. Commit triggers are ghost `h-5` (not primary slabs).
+   - **Tool tab active** (Files / Terminal / …): quiet pane footer on the
+     `ContentPane` (`border-t`, `px-2.5 py-0.5`, `ContextBar quiet`) —
+     project/branch/isolation/usage only; **no** Commit CTA (Changes owns
+     commit chrome; split view must not duplicate Commit & Push).
+     Composer (and its ContextBar) are hidden with the chat body when the
+     tool fills the same pane; in a split, chat keeps its footer and the
+     tool pane uses the quiet strip.
    Project/branch closed triggers are quiet ghost pills (`ComboboxTrigger` +
    search inside the popup). Isolation uses the same `contextBarTriggerClass`.
 4. Bubble: column + `gap-1.5`, always `--radius-composer` (14px) via
@@ -551,9 +569,9 @@ Color palette constants (`lib/sessionColor.ts`): `GROUP_PALETTE` (8 colors for g
 | Tab | Header notes |
 |---|---|
 | Plan | `PlanToolbar` breadcrumbs + Build (`h-6` controls); find bar is a secondary `h-8` row with `border-y border-stroke-3` |
-| Changes | Quiet title row (no `border-b`); select toolbar `h-6` (dedicated row, not `--header-height`); file list `px-2` / rows `px-2.5`; empties use shared `EmptyState` |
+| Changes | Quiet Local / branch title cues (no `border-b`); header trailing `N files` + DiffStat beside CTAs; one `h-6` **Last Turn Changes** + select checkbox row (`border-b`); file list `@tanstack/react-virtual` (native overflow, not `ScrollArea`); auto-expands **one** path for inline `DiffView` (lazy IPC; unmodified collapse bars); rows own `h-7 px-2.5 gap-2` (list has no horizontal pad); empties use shared `EmptyState`; header CTA scrolls to `CommitCenter`; backend caps listed files at 300 (`truncated`) |
 | Pull Request | Fixed `--header-height` chrome (`#` · title · checks · Open `h-6`); body `ScrollArea` + `DiffView` / `EmptyState` |
-| Files | Open-buffer chips (`Tab` sm, strip `gap-1.5` + `border-b`) + path breadcrumbs (`h-6`) + Monaco (`bg-editor`) with inline completions + Problems strip; Explorer toggle keeps a compact right-side tree (`clamp(160px, 28%, 220px)`) open by default beside an editor; active buffer uses `fill-2` + 2px `border-l-accent` edge; explorer is full-width while empty |
+| Files | **Explorer only** (`FileExplorer` full-pane). Opening a file creates a content `kind: "file"` document tab (basename label + file icon) in the work-pane TabStrip — not an in-Files chip strip. Document body: quiet title chrome (Preview/Source for md, Save `h-6`) + path breadcrumbs (`h-6` + `border-b`) + Monaco (`bg-editor`) / markdown preview + Problems strip. Multiple file tabs; drag between west/east panes via existing pointer DnD. |
 | Status | Quiet title row + body `ScrollArea` (session metrics) |
 | Prompt | Quiet title row (`h-6` icon controls; Insert uses Base UI `Popover`); marks / findings scroll via `ScrollArea` |
 | Memory | Quiet title row + body `ScrollArea` reusing Settings `MemoryContent` |

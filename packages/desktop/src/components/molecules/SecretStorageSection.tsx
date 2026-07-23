@@ -24,7 +24,6 @@ type SecretStorageSectionProps = {
   onChange: (mode: SecretStorageMode) => void
 }
 
-/** Security section — where the encryption key for stored API keys lives. */
 export const SecretStorageSection = ({
   secretStorage,
   isMac,

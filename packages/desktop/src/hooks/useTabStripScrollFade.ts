@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject, type WheelEvent } from "react"
 
-/** Build a single CSS mask-image with optional left/right edge fades. */
 const buildScrollMask = (left: boolean, right: boolean): string | undefined => {
   if (!left && !right) return undefined
   const start = left ? "transparent 0px, black 20px" : "black 0px"
@@ -8,12 +7,6 @@ const buildScrollMask = (left: boolean, right: boolean): string | undefined => {
   return `linear-gradient(to right, ${start}, ${end})`
 }
 
-/**
- * Manages the tab-strip scroll-fade mask, ResizeObserver, scroll listener,
- * and wheel→horizontal-scroll handler for a horizontally-scrollable tab strip.
- *
- * @param tabsLength - current tab count; re-checks fade whenever it changes.
- */
 export function useTabStripScrollFade(tabsLength: number): {
   tabsScrollRef: RefObject<HTMLDivElement | null>
   scrollMask: string | undefined
@@ -45,12 +38,10 @@ export function useTabStripScrollFade(tabsLength: number): {
     }
   }, [updateScrollFade])
 
-  // Re-check fade whenever the tab count changes (scrollWidth may change).
   useEffect(() => {
     updateScrollFade()
   }, [tabsLength, updateScrollFade])
 
-  // Vertical wheel → horizontal scroll over the tab strip (trackpad/mouse).
   const handleTabsWheel = useCallback((e: WheelEvent<HTMLDivElement>) => {
     const el = tabsScrollRef.current
     if (!el) return

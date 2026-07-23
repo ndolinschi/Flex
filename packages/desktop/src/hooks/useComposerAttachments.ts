@@ -5,10 +5,6 @@ import { isBrowserPreview, NATIVE_APP_REQUIRED } from "../lib/browserPreview"
 import { toInvokeError } from "../lib/tauri"
 import { useAppStore } from "../stores/appStore"
 
-/** Owns the composer's attachment list (paste/drop/file-pick) and surfaces the
- * error string the view should show in the `ErrorBanner`. Attachment state
- * itself lives in the store (shared with send/queue logic in
- * `useComposerSend`), this hook only owns the handlers that mutate it. */
 export const useComposerAttachments = () => {
   const attachments = useAppStore((s) => s.attachments)
   const addAttachment = useAppStore((s) => s.addAttachment)

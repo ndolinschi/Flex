@@ -1,5 +1,3 @@
-//! `AskQuestion`: pause a turn for structured user input.
-
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -20,14 +18,10 @@ const MAX_TIMEOUT_MS: u64 = 900_000;
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct AskQuestionInput {
-    /// Questions to present to the user.
     questions: Vec<Question>,
-    /// Optional timeout in milliseconds. Defaults to 300000, capped at 900000.
     timeout_ms: Option<u64>,
 }
 
-/// Emits `QuestionRequested`, waits for `respond_question`, then emits
-/// `QuestionResolved`.
 pub struct AskQuestionTool {
     pending: Arc<PendingMap<QuestionId, Vec<Answer>>>,
 }

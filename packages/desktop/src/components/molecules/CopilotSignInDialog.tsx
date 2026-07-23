@@ -23,8 +23,6 @@ type CopilotSignInDialogProps = {
   cancel: (sessionId: string) => Promise<void>
 }
 
-/** GitHub Copilot device-flow modal: show the one-time user code, open the
- * verification page, and poll until the user confirms on github.com. */
 export const CopilotSignInDialog = ({
   open,
   onClose,

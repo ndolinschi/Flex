@@ -1,6 +1,3 @@
-//! SSH backend: run commands on a remote host, mapping the session cwd onto a
-//! configured remote root and syncing files with `rsync`.
-
 use std::path::Path;
 
 use async_trait::async_trait;
@@ -11,18 +8,11 @@ use agentloop_core::{ExecError, ExecOutcome, ExecSpec, Executor, ExecutorHealth,
 
 use crate::run::{probe_binary, run_command};
 
-/// Timeout for the file-sync phases, independent of per-command timeouts.
 const SYNC_TIMEOUT_MS: u64 = 300_000;
 
-/// Runs commands on `host` over `ssh`, inside `remote_root`. The session's
-/// working tree is pushed with `rsync` before commands run ([`Executor::sync_in`])
-/// and pulled back after ([`Executor::sync_out`]); callers decide the cadence.
-/// Cannot honor [`NetworkPolicy::Denied`].
 #[derive(Debug, Clone)]
 pub struct SshExecutor {
-    /// `user@host` or an `ssh_config` alias.
     host: String,
-    /// Absolute directory on the remote host that mirrors the session cwd.
     remote_root: String,
 }
 
@@ -35,7 +25,6 @@ impl SshExecutor {
     }
 
     fn rsync_spec(&self) -> String {
-        // Trailing slashes make rsync mirror directory *contents*.
         format!("{}:{}/", self.host, self.remote_root.trim_end_matches('/'))
     }
 }
@@ -91,8 +80,6 @@ impl Executor for SshExecutor {
                 "the ssh backend cannot isolate the network on the remote host".to_owned(),
             ));
         }
-        // cd into the mapped root and run under a login shell, mirroring the
-        // local `/bin/sh -lc` semantics.
         let mut remote = String::new();
         for (key, value) in &spec.env {
             remote.push_str(&format!("export {key}={}; ", shell_quote(value)));
@@ -159,7 +146,6 @@ impl Executor for SshExecutor {
     }
 }
 
-/// Minimal POSIX single-quote escaping.
 fn shell_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
 }

@@ -1,4 +1,3 @@
-//! Slash-command listing from agent capabilities.
 
 use super::common::require_service;
 use super::prelude::*;

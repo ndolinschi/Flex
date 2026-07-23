@@ -20,11 +20,6 @@ type WindowTitleBarProps = {
   className?: string
 }
 
-/**
- * Full-width window chrome for welcome / bootstrap only.
- * Chat route uses sidebar header + ContentPane TabStrip as the top row
- * (see TitleBarChrome + ContentPane) — no second stacked header.
- */
 const WindowTitleBarImpl = ({
   onOpenCommandPalette,
   onOpenSearch,
@@ -64,13 +59,14 @@ const WindowTitleBarImpl = ({
     <>
       <header
         className={cn(
-          "flex h-[var(--titlebar-height)] shrink-0 items-center select-none",
-          "border-b border-stroke-3 bg-transparent",
+          "glass-titleband flex h-[var(--titlebar-height)] shrink-0 items-center select-none",
+          "border-b border-stroke-3",
           className,
         )}
         role="banner"
         aria-label="Window"
         data-component="glass-titlebar"
+        data-slot="glass-titleband"
       >
         <div className="flex h-full shrink-0 items-center gap-0.5">
           {isMac ? (

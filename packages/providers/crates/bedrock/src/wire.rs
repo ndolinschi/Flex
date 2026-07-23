@@ -1,5 +1,3 @@
-//! Bedrock Converse request building and stream-event mapping.
-
 use std::collections::BTreeMap;
 
 use agentloop_contracts::{
@@ -25,9 +23,6 @@ pub(crate) struct ConverseRequest {
     additional_model_request_fields: Option<AdditionalModelRequestFields>,
 }
 
-/// Model-specific passthrough — Claude-on-Bedrock reads `thinking` the same
-/// way direct Anthropic does (`{"type": "enabled", "budget_tokens": N}`), just
-/// nested under this Converse-API envelope instead of a top-level field.
 #[derive(Debug, Serialize)]
 struct AdditionalModelRequestFields {
     thinking: BedrockThinking,
@@ -52,7 +47,6 @@ struct BedrockMessage {
     content: Vec<ContentItem>,
 }
 
-/// A Converse content block: exactly one key per item.
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 enum ContentItem {
@@ -126,8 +120,6 @@ struct InputSchema {
     json: serde_json::Value,
 }
 
-/// Build a Converse request body from the canonical [`ChatRequest`]. The model
-/// id goes in the URL path, not the body.
 pub(crate) fn build_request(request: ChatRequest) -> ConverseRequest {
     let system = request
         .system
@@ -135,9 +127,6 @@ pub(crate) fn build_request(request: ChatRequest) -> ConverseRequest {
         .map(|text| vec![SystemContent { text }])
         .unwrap_or_default();
 
-    // Extended thinking and `temperature` are mutually exclusive on Claude's
-    // Converse API (same constraint as direct Anthropic) — drop temperature
-    // whenever thinking is requested rather than let the call fail upstream.
     let temperature = request.temperature.filter(|_| request.thinking.is_none());
     let inference_config =
         (request.max_tokens.is_some() || temperature.is_some()).then_some(InferenceConfig {
@@ -208,8 +197,6 @@ fn build_messages(messages: Vec<Message>) -> Vec<BedrockMessage> {
     out
 }
 
-/// Bedrock requires tool input to be a JSON object; coerce a null/absent input
-/// to `{}`.
 fn normalize_input(input: serde_json::Value) -> serde_json::Value {
     if input.is_null() {
         serde_json::json!({})
@@ -276,7 +263,6 @@ fn role_name(role: Role) -> &'static str {
     }
 }
 
-/// Maps decoded Converse stream events onto the canonical event stream.
 #[derive(Debug)]
 pub(crate) struct ConverseStreamMapper {
     requested_model: String,
@@ -301,7 +287,6 @@ impl ConverseStreamMapper {
         self.ended
     }
 
-    /// The stop reason to use if the stream ends without a `metadata` event.
     pub(crate) fn stop_reason(&self) -> StopReason {
         self.stop_reason
     }
@@ -436,9 +421,6 @@ fn map_stop_reason(reason: Option<&str>) -> StopReason {
     }
 }
 
-/// A curated set of common Bedrock model ids for the picker. Bedrock has no
-/// bearer-token model-list endpoint, so this is static; any id can still be set
-/// explicitly via `/model`.
 pub(crate) fn static_models() -> Vec<ModelInfo> {
     const MODELS: &[(&str, &str, u32, bool)] = &[
         (
@@ -629,8 +611,7 @@ mod tests {
             body["additionalModelRequestFields"]["thinking"]["budget_tokens"],
             8192
         );
-        // Thinking and temperature are mutually exclusive on Claude's Converse
-        // API — the config must be dropped, not merely defaulted.
+
         assert!(body["inferenceConfig"].get("temperature").is_none());
     }
 

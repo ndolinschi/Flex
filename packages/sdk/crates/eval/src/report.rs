@@ -1,6 +1,3 @@
-//! Suite reports: markdown rendering, JSON artifact, and the baseline
-//! regression gate.
-
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::Path;
@@ -10,15 +7,12 @@ use serde::{Deserialize, Serialize};
 use crate::error::EvalError;
 use crate::runner::RunResult;
 
-/// Full result of one suite invocation — the CI artifact (`report.json`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SuiteReport {
-    /// Unix epoch milliseconds when the suite finished.
     pub generated_at_ms: u64,
     pub results: Vec<RunResult>,
 }
 
-/// A `(task, target)` cell aggregated over repeats: passed iff every run passed.
 type Cells = BTreeMap<(String, String), bool>;
 
 impl SuiteReport {
@@ -40,7 +34,6 @@ impl SuiteReport {
         cells
     }
 
-    /// Fraction of `(task, target)` cells whose every run passed.
     pub fn pass_rate(&self) -> f64 {
         let cells = self.cells();
         if cells.is_empty() {
@@ -49,7 +42,6 @@ impl SuiteReport {
         cells.values().filter(|passed| **passed).count() as f64 / cells.len() as f64
     }
 
-    /// Render one markdown table per target plus a summary line.
     pub fn to_markdown(&self) -> String {
         let mut targets: Vec<&str> = self.results.iter().map(|r| r.target.as_str()).collect();
         targets.sort_unstable();
@@ -98,7 +90,6 @@ impl SuiteReport {
         out
     }
 
-    /// Write the JSON artifact.
     pub fn write_json(&self, path: &Path) -> Result<(), EvalError> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -107,7 +98,6 @@ impl SuiteReport {
         Ok(())
     }
 
-    /// Load a previously written JSON artifact (the gate baseline).
     pub fn load_json(path: &Path) -> Result<Self, EvalError> {
         let bytes = std::fs::read(path)?;
         serde_json::from_slice(&bytes).map_err(|err| EvalError::Baseline {
@@ -116,9 +106,6 @@ impl SuiteReport {
         })
     }
 
-    /// Regressions versus a baseline: every `(task, target)` cell that passed
-    /// in the baseline and fails (or vanished) now, plus an overall pass-rate
-    /// drop. Empty = the gate is green.
     pub fn regressions_against(&self, baseline: &SuiteReport) -> Vec<String> {
         let mut regressions = Vec::new();
         let current = self.cells();

@@ -21,10 +21,6 @@ import type {
 } from "../../lib/types"
 import { sessionHasActivity, useAppStore } from "../../stores/appStore"
 
-/** `"provider/model, other/model"` <-> ordered id array, matching the wire
- * shape `ProviderProfile::fallback_models` actually stores (a comma-joined
- * string — see `src-tauri/src/config.rs`). The UI only ever deals in
- * ordered arrays; this is the one place the string is touched. */
 const parseFallbacks = (raw?: string): string[] =>
   raw
     ? raw
@@ -69,10 +65,6 @@ export const ProviderSettingsForm = () => {
     }
   }
 
-  // `editingId` is `null` in "create" mode (form cleared, "New connection"),
-  // or a profile id in "edit" mode (row clicked, form hydrated from it).
-  // `screen` swaps the connections list for a dedicated editor surface so the
-  // form is not stacked under the list on the same page.
   const [screen, setScreen] = useState<"list" | "editor">("list")
   const [editingId, setEditingId] = useState<string | null>(null)
   const [label, setLabel] = useState("")
@@ -107,10 +99,6 @@ export const ProviderSettingsForm = () => {
     refetchStatus: refetchChatgptStatus,
   } = useChatgptAuth(isChatgptProvider)
 
-  // Platform gate for the Security section's "System Keychain" option —
-  // detected once via `@tauri-apps/plugin-os` (mock mode reports "macos" so
-  // preview always shows it). Backend already rejects keychain on non-mac;
-  // this just keeps the option from being offered where it can't work.
   const [platform, setPlatform] = useState<string | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -174,9 +162,6 @@ export const ProviderSettingsForm = () => {
   const hasStoredKey = editingProfile?.hasKey ?? false
   const isBedrock = provider === "bedrock"
 
-  // Default model is scoped to THIS connection's provider (picking a model
-  // from a different provider than the connection makes no sense); fallbacks
-  // may span any provider (that's the point of a failover chain).
   const defaultModelOptions = provider
     ? models.filter((m) => m.providerId === provider)
     : models
@@ -223,9 +208,6 @@ export const ProviderSettingsForm = () => {
       return
     }
     try {
-      // Validates the exact values currently in the form (including a
-      // freshly pasted key) — never env/stored config. See
-      // `commands::validate_profile`.
       const found = await validate(buildInput())
       setValidateMessage(`Validated — ${found.length} model(s) available`)
     } catch (err) {
@@ -244,10 +226,6 @@ export const ProviderSettingsForm = () => {
     try {
       const wasActive = editingProfile?.isActive ?? false
       const saved = await upsert(buildInput())
-      // Newly created connections (or the only one) become the active one
-      // automatically on the backend; explicitly (re-)activate on every save
-      // so editing the *currently* active connection's key/region takes
-      // effect immediately without a separate "Activate" click.
       await activate(saved.id)
       if (!wasActive) logProviderChange(saved.id, saved.label)
       setApiKey("")
@@ -261,10 +239,6 @@ export const ProviderSettingsForm = () => {
     const state = useAppStore.getState()
     const activeSessionId = state.activeSessionId
     if (!activeSessionId) return
-    // Gate on prior activity — same predicate Composer.tsx's
-    // `handleModelChange` uses — so a fresh session with no turns yet
-    // doesn't get a "Provider changed" row before the user has said
-    // anything.
     if (!sessionHasActivity(state, activeSessionId)) return
     const nextLabel = profiles.find((p) => p.id === id)?.label ?? fallbackLabel ?? id
     state.addSessionLogRow(activeSessionId, `Provider changed to ${nextLabel}`)
@@ -304,9 +278,6 @@ export const ProviderSettingsForm = () => {
   }
 
   return (
-    // Self-managed gap (matches AutomationsContent's pattern) — each section
-    // below cancels its own `mb-8` so the parent SettingsShell's `gap-3` is
-    // the only spacing applied between them, instead of stacking both.
     <div className="flex flex-col gap-3">
       {screen === "list" ? (
         <>
@@ -355,11 +326,6 @@ export const ProviderSettingsForm = () => {
           onLabelChange={setLabel}
           onProviderChange={(value) => {
             setProvider(value)
-            // Auto-fill the connection Name from the provider so it isn't a
-            // hidden required field. Users (esp. right after a Copilot sign-in,
-            // which has no name prompt of its own) otherwise hit
-            // "Connection name is required" on save with nothing pointing at the
-            // empty Name field up top. Still fully editable.
             if (!label.trim() && value) {
               const preset = builtinProviders.find((p) => p.id === value)?.label
               if (preset) setLabel(preset)

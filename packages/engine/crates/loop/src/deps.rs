@@ -1,6 +1,3 @@
-//! `TurnDeps`: everything a turn needs, `Arc`-shared so turn execution can
-//! move onto child tasks without borrowing [`crate::NativeAgent`].
-
 use std::sync::{Arc, Weak};
 
 use agentloop_contracts::{
@@ -13,15 +10,9 @@ use agentloop_core::{
 use crate::builder::LoopLimits;
 use crate::permission::PermissionPolicy;
 
-/// Immutable (or internally synchronized) dependencies shared by every turn
-/// of a [`crate::NativeAgent`].
 pub(crate) struct TurnDeps {
-    /// Spawned tool execution: bounded, panic-isolated (see [`crate::pool`]).
     pub(crate) pool: Arc<crate::pool::ToolWorkerPool>,
-    /// Role definitions for subagent spawning and failover chains.
     pub(crate) roles: Arc<crate::roles::RoleRegistry>,
-    /// Back-reference to the owning agent, for spawning child sessions from
-    /// the Task tool. A `Weak` avoids the `Arc` cycle (agent → deps → agent).
     pub(crate) agent: Weak<crate::agent::NativeAgent>,
     pub(crate) agent_id: String,
     pub(crate) providers: ProviderRegistry,
@@ -32,23 +23,11 @@ pub(crate) struct TurnDeps {
     pub(crate) limits: LoopLimits,
     pub(crate) system_prompt: String,
     pub(crate) default_model: Option<ModelRef>,
-    /// Engine-wide default fallback chain; a session created with an empty
-    /// `NewSessionParams.fallback_models` uses this.
     pub(crate) default_fallback_models: Vec<ModelRef>,
-    /// Optional isolation backend. When set, root sessions whose effective
-    /// policy asks for isolation are provisioned an isolated workspace.
     pub(crate) workspace: Option<Arc<dyn Workspaces>>,
-    /// Id of the configured command-execution backend, recorded on session
-    /// metadata. `None` = host execution (legacy).
     pub(crate) executor_id: Option<String>,
     pub(crate) pending_permissions: Arc<PendingMap<PermissionRequestId, PermissionDecision>>,
     pub(crate) pending_questions: Arc<PendingMap<QuestionId, Vec<Answer>>>,
-    /// Pending mode-switch proposals waiting for a `respond_mode_switch`
-    /// reply. Always present; only populated when `SwitchMode` is registered
-    /// (`EngineConfig::enable_switch_mode`).
     pub(crate) pending_mode_switches: Arc<PendingMap<ModeSwitchId, bool>>,
-    /// Routing overrides written by `SetRouting` mid-turn and consumed at the
-    /// start of the next model iteration. Always present; populated only when
-    /// `EngineConfig::enable_set_routing` is `true`.
     pub(crate) routing: Arc<RoutingTable>,
 }

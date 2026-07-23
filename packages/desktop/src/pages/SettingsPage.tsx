@@ -51,11 +51,6 @@ const DESCRIPTIONS: Partial<Record<SettingsSectionId, string>> = {
   diagnostics: "Debug logging, local crash capture, diagnostics export, and updates.",
 }
 
-/** General section — notification preferences (see DESIGN.md Settings).
- * "System notifications" gates the native OS notification
- * entirely (`notifyTurnCompleted`, background-session completions only);
- * "Completion sound" plays a short WebAudio chime on ANY turn completion
- * (active session included) when enabled — see `useGlobalSessionEvents`. */
 const GeneralContent = () => {
   const notificationsEnabled = useAppStore((s) => s.notificationsEnabled)
   const setNotificationsEnabled = useAppStore((s) => s.setNotificationsEnabled)
@@ -93,10 +88,6 @@ const GeneralContent = () => {
   )
 }
 
-/** Appearance section — theme toggle moved here from the sidebar footer
- * icon-button (see DESIGN.md Settings). The sidebar's quick-access icon stays as a convenience
- * shortcut; this is now the canonical settings location. Accent color
- * (neutral by default, or a hue / custom hex) lives here too. */
 const AppearanceContent = () => {
   const theme = useAppStore((s) => s.theme)
   const toggleTheme = useAppStore((s) => s.toggleTheme)
@@ -162,8 +153,6 @@ const COMPACTION_MODE_OPTIONS = [
   { value: "turn_pair", label: "Turn pair" },
 ]
 
-/** Shared plugin-prefs save helper for the Behavior section. Round-trips all
- * fields so a partial patch doesn't accidentally wipe siblings. */
 const useSavePlugins = () => {
   const { config, save } = useProviderConfig()
   return async (patch: Partial<PluginPrefs>) => {
@@ -205,14 +194,6 @@ const useSavePlugins = () => {
   }
 }
 
-/** Behavior section — session defaults (isolation) and secret storage live
- * inside `ProviderSettingsForm` today, coupled to the same form state as
- * Connections/Models (one save flow, one set of mutations). Splitting that
- * component so "Behavior" fields render standalone here is exactly the
- * restructuring the build brief defers to a later wave ("mount the EXISTING
- * ProviderSettingsForm content for now — restructuring it is a SEPARATE
- * later wave"); for this pass, Behavior cross-links to Models & Connections
- * instead of duplicating a live form in two places. */
 const BehaviorContent = () => {
   const setSettingsSection = useAppStore((s) => s.setSettingsSection)
   const defaultPermissionMode = useAppStore((s) => s.defaultPermissionMode)
@@ -288,7 +269,6 @@ const BehaviorContent = () => {
         </SettingRow>
       </SettingsCard>
 
-      {/* Auto mode */}
       <SettingsCard label="Auto mode">
         <SettingRow
           rowId="behavior-auto-mode"
@@ -442,7 +422,6 @@ const BehaviorContent = () => {
         </SettingRow>
       </SettingsCard>
 
-      {/* Compaction */}
       <SettingsCard label="Context compaction">
         <SettingRow
           rowId="behavior-auto-compact"
@@ -517,11 +496,6 @@ const BehaviorContent = () => {
   )
 }
 
-/** Settings shell composition root — assembles all sections (see DESIGN.md
- * Settings) and mounts the persistent-nav `SettingsShell`.
- * This one component now backs all four legacy routes (settings / customize
- * / automations / memory); `App.tsx` renders it for each and `appStore`
- * preselects the matching nav section (see `setRoute`). */
 type SettingsPageProps = {
   embedded?: boolean
 }

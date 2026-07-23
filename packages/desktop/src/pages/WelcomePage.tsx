@@ -40,11 +40,9 @@ const stepHint: Record<Step, string> = {
     "Choose a native provider. Paste an API key, or sign in with GitHub for Copilot. Credentials stay encrypted locally.",
   model: "This becomes the default for new agents. You can change it anytime in the composer.",
   project:
-    "Open a folder to start in that workspace. The code index builds on first search and is reused across chats unless you enable auto-update in Settings → Indexing.",
+    "Open a folder to start in that workspace. Code indexing is off by default — enable it in Settings → Indexing when you want SearchCode / FindSymbol / RepoMap.",
 }
 
-/** First-run wizard: provider key → model → optional project folder.
- * Goal: first turn in under ~2 minutes without the full Settings form. */
 export const WelcomePage = () => {
   const { builtinProviders, models, isLoading: modelsLoading } = useModels()
   const { upsert, activate, isUpserting } = useProviderProfiles()

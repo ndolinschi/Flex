@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { formatCompactCount, formatDiffStat } from "./DiffStat"
 
-/**
- * Regression coverage for the diffstat formatting core:
- * `formatDiffStat` keeps raw integer counts; `formatCompactCount` shortens
- * large sidebar/display numbers so +2168 does not blow the agent row.
- */
 describe("formatDiffStat", () => {
   it("returns raw added/removed counts when both are present", () => {
     expect(formatDiffStat({ added: 472, removed: 81 })).toEqual({

@@ -10,7 +10,6 @@ type BadgeProps = {
   className?: string
 }
 
-/** Production whisper chips — quaternary semantic fills (Phase 4). */
 const toneClasses: Record<BadgeTone, string> = {
   default: "border-transparent bg-bg-quaternary text-ink-secondary",
   success: "border-transparent bg-bg-success-quaternary text-text-success",

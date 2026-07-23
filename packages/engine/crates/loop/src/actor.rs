@@ -1,20 +1,3 @@
-//! Single-writer front for one session's persisted append + broadcast.
-//!
-//! `SessionHandle::emit_persistent` used to call `store.append().await` then
-//! `broadcast.send()` directly. Two concurrent callers on the same session
-//! (e.g. a subagent relay racing the parent's own turn) could have their
-//! `append`s serialized correctly by the store's internal lock, yet their
-//! *broadcasts* land in the opposite order — a live subscriber could observe
-//! seq 6 before seq 5 even though the log itself is correctly ordered. This
-//! actor closes that window: every append for a session goes through one
-//! mailbox, processed strictly one at a time, so append-then-broadcast is
-//! atomic relative to every other append on the same session.
-//!
-//! Subscribing is unaffected and untouched — `broadcast::Sender::subscribe()`
-//! may still be called directly at any time; a receiver only misses messages
-//! sent before it existed, which `next_seq`-stamped ephemeral events and the
-//! session log (always readable from `seq` onward) already cover.
-
 use std::sync::Arc;
 
 use tokio::sync::{mpsc, oneshot};
@@ -30,16 +13,12 @@ struct AppendJob {
     reply: oneshot::Sender<Result<u64, StoreError>>,
 }
 
-/// Handle to a session's single-writer append task. Cheap to clone; cloning
-/// shares the same mailbox.
 #[derive(Clone)]
 pub(crate) struct SessionActorHandle {
     tx: mpsc::Sender<AppendJob>,
 }
 
 impl SessionActorHandle {
-    /// Append one event and broadcast it, as a single ordered step relative
-    /// to every other call on this handle. Returns the assigned seq.
     pub(crate) async fn append(
         &self,
         turn_id: Option<TurnId>,
@@ -59,10 +38,6 @@ impl SessionActorHandle {
     }
 }
 
-/// Spawn the single-writer task owning `id`'s append+broadcast(+checkpoint)
-/// sequencing. `broadcast_tx` is the same sender `SessionHandle` hands out
-/// for `.subscribe()` — this task is the only writer, but not the only
-/// reader/subscriber path.
 pub(crate) fn spawn_session_actor(
     id: SessionId,
     store: Arc<dyn SessionStore>,
@@ -149,10 +124,6 @@ mod tests {
         }
     }
 
-    /// The regression test for the fixed race: many concurrent callers append
-    /// through the same actor handle; every live subscriber must observe
-    /// seqs in strictly increasing order with no gaps or duplicates, matching
-    /// the persisted log exactly.
     #[tokio::test]
     async fn concurrent_appends_broadcast_in_seq_order() {
         let store: Arc<dyn SessionStore> = Arc::new(MemoryStore::new());

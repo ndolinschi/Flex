@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils"
 import { Tooltip } from "./Tooltip"
 
 type BypassPermissionsButtonProps = {
-  /** Current composer mode — bypass applies in Agent and Debug. */
   composerMode: string
   sessionBypass: boolean
   disabled?: boolean
@@ -14,7 +13,6 @@ type BypassPermissionsButtonProps = {
 const allowsBypass = (mode: string): boolean =>
   mode === "agent" || mode === "debug"
 
-/** Session-scoped bypass-permissions shield — pressed Toggle in the composer. */
 export const BypassPermissionsButton = ({
   composerMode,
   sessionBypass,

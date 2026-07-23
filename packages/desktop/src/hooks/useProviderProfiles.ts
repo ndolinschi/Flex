@@ -12,10 +12,6 @@ import type { ProviderProfileInput, ProviderProfileView } from "../lib/types"
 const PROFILES_KEY = ["provider-profiles"] as const
 const CONFIG_KEY = ["provider-config"] as const
 
-/** CRUD + switching for named provider connections ("profiles"). Mirrors
- * `useProviderConfig`'s query/mutation shape. `validate` is form-values-only
- * (no persisted state involved) — it's the fix for Validate ignoring a
- * freshly typed key, so it must never read from the query cache. */
 export const useProviderProfiles = () => {
   const queryClient = useQueryClient()
 

@@ -11,13 +11,6 @@ import {
 } from "./sessionGrouping"
 import type { SessionMeta } from "./types"
 
-/**
- * Regression coverage for the sidebar "Pinned rows re-sort under the
- * cursor" report: `orderByPinnedIds` must key off pin-order, not
- * `updated_at_ms` recency, so a background turn bumping one pinned
- * session's timestamp can never reshuffle the Pinned group.
- */
-
 const makeSession = (
   id: string,
   updatedAtMs: number,
@@ -122,13 +115,11 @@ describe("groupByRepo", () => {
 
 describe("orderByPinnedIds", () => {
   it("orders by pin-order, ignoring the sessions array's own order", () => {
-    // `sessions` is recency-sorted (most-recent-first): b, c, a.
     const sessions = [
       makeSession("b", 300),
       makeSession("c", 200),
       makeSession("a", 100),
     ]
-    // Pinned in order a, b, c.
     const pinnedIds = ["a", "b", "c"]
     const result = orderByPinnedIds(sessions, pinnedIds)
     expect(result.map((s) => s.id)).toEqual(["a", "b", "c"])
@@ -140,8 +131,6 @@ describe("orderByPinnedIds", () => {
       [makeSession("a", 100), makeSession("b", 200), makeSession("c", 300)],
       pinnedIds,
     )
-    // Simulate a background turn bumping "a" to be the most recent —
-    // `sessions`' own order changes, but pin-order does not.
     const after = orderByPinnedIds(
       [makeSession("b", 200), makeSession("c", 300), makeSession("a", 999)],
       pinnedIds,
@@ -169,19 +158,11 @@ describe("orderByPinnedIds", () => {
   })
 })
 
-/**
- * Regression coverage for bug #36: non-pinned repo-group rows (and the
- * group order itself) must not reorder just because `updated_at_ms`
- * changed on an existing row during a passive refetch — only a brand-new
- * item's arrival should move anything, and it inserts at the front rather
- * than displacing existing rows.
- */
 describe("orderStably", () => {
   const keyOf = (s: SessionMeta) => s.id
 
   it("updated_at change does NOT reorder existing rows", () => {
     const prevOrder = ["a", "b", "c"]
-    // Recency-sorted input already reflects "a" jumping to most-recent.
     const bumped = [
       makeSession("a", 999),
       makeSession("b", 200),
@@ -240,7 +221,7 @@ describe("nestSessionsByParent", () => {
     const nested = nestSessionsByParent([parent, other], [parent, childA, childB, other])
     expect(nested).toHaveLength(2)
     expect(nested[0]!.session.id).toBe("p")
-    expect(nested[0]!.children.map((c) => c.id)).toEqual(["c2", "c1"]) // recency
+    expect(nested[0]!.children.map((c) => c.id)).toEqual(["c2", "c1"])
     expect(nested[1]!.children).toHaveLength(0)
   })
 
@@ -256,7 +237,7 @@ describe("groupByRecencyBuckets", () => {
   const DAY_MS = 24 * 60 * 60 * 1000
 
   it("buckets sessions like Cursor Agents (Today / Yesterday / Last 7 / Last 30 / Older)", () => {
-    const now = new Date(2026, 6, 23, 15, 0, 0).getTime() // July 23 2026 local
+    const now = new Date(2026, 6, 23, 15, 0, 0).getTime()
     const today0 = startOfLocalDay(now)
     const sessions = [
       makeSession("today", today0 + 3_600_000),

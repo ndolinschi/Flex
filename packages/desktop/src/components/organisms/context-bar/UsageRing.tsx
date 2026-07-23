@@ -9,8 +9,6 @@ import {
 } from "@/components/ui/hover-card"
 import { Separator } from "@/components/ui/separator"
 
-/** Fallback context budget used for the usage ring when the selected
- * model's own context window isn't known (the reference design shows a similar %). */
 const CONTEXT_BUDGET_TOKENS = 200_000
 
 const ContextRing = ({ fraction }: { fraction: number }) => {
@@ -54,7 +52,6 @@ const UsageDetailRow = ({ label, value }: { label: string; value: string }) => (
   </div>
 )
 
-/** Context ring + % with a hover popover breaking down the last turn's usage. */
 export const UsageRing = ({ sessionId }: { sessionId?: string | null }) => {
   const summary = useAppStore((s) =>
     sessionId ? s.lastTurnSummary[sessionId] : undefined,
@@ -68,19 +65,6 @@ export const UsageRing = ({ sessionId }: { sessionId?: string | null }) => {
   const selectedModelId = useAppStore((s) => s.selectedModelId)
   const { models } = useModels(true)
 
-  // `usage` (from `TurnSummary.usage`) is the SUM of every model call's
-  // input tokens across the whole turn — an agent turn can make many calls,
-  // each re-sending the growing conversation + cache-read tokens, so this
-  // total is NOT how full the model's context window currently is (it can
-  // read multiples of the window on a long tool-calling turn). What the
-  // ring needs is the size of the single most recent request. The engine
-  // doesn't yet expose a discrete "last request" token count to the
-  // frontend (only the turn-aggregated `TokenUsage` — see `TurnSummary` in
-  // wire.ts), so the best available approximation is this turn's average
-  // per-call input: total input+cache_read divided by `num_model_calls`.
-  // For a single-call turn (the common case) this equals the exact request
-  // size; for multi-call turns it's a reasonable stand-in for current
-  // context occupancy rather than the meaningless cumulative sum.
   const totalInput = usage ? usage.input + (usage.cache_read ?? 0) : null
   const numCalls = Math.max(1, summary?.num_model_calls ?? 1)
   const used = totalInput === null ? null : totalInput / numCalls
@@ -89,8 +73,6 @@ export const UsageRing = ({ sessionId }: { sessionId?: string | null }) => {
     models.find((m) => m.id === selectedModelId)?.contextWindow ??
     CONTEXT_BUDGET_TOKENS
   const rawFraction = used / budget
-  // The ring itself must never exceed 100% — clamp the visual fraction, but
-  // keep `rawFraction` around for the ">99%" over-limit label below.
   const fraction = Math.min(1, rawFraction)
   const isOverLimit = rawFraction > 1
   const nearLimitClass = isOverLimit
@@ -108,7 +90,7 @@ export const UsageRing = ({ sessionId }: { sessionId?: string | null }) => {
           <Button
             variant="ghost"
             className={cn(
-              "h-6 gap-1 rounded-md px-1.5 text-sm font-normal hover:text-ink-secondary",
+              "h-5 gap-1 rounded-md px-1.5 text-sm font-normal hover:text-ink-secondary",
               nearLimitClass,
             )}
             aria-label="Context usage"

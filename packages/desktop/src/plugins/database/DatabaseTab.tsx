@@ -59,7 +59,6 @@ import { cn } from "../../lib/utils"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
-/** Rows per page for table preview (server) and query results (client). */
 const PAGE_SIZE = 50
 
 type DatabaseTabProps = {
@@ -70,11 +69,8 @@ type DatabaseTabProps = {
 const ENGINE_OPTIONS: Array<{
   id: DbEngine
   label: string
-  /** Short placeholder shown in the Target input. */
   hint: string
-  /** Default target when switching to this engine (empty = clear). */
   defaultTarget: (cwd: string | undefined) => string
-  /** Dialog blurb for this engine. */
   description: string
 }> = [
   {
@@ -113,8 +109,6 @@ const isUrlLikeTarget = (engine: DbEngine, target: string): boolean => {
   return target.trim().length > 0
 }
 
-/** Right-panel Database plugin — connections, schemas/tables, tabular data.
- * Connections are scoped to the active session's project cwd. */
 export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
   const queryClient = useQueryClient()
   const projectKey = session?.cwd?.trim() ?? ""
@@ -123,7 +117,6 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
   const [selectedTable, setSelectedTable] = useState<DbTableInfo | null>(null)
   const [sql, setSql] = useState("SELECT 1")
   const [result, setResult] = useState<DbQueryResult | null>(null)
-  /** `preview` = server-paged table browse; `query` = client-paged Run result. */
   const [resultKind, setResultKind] = useState<"preview" | "query">("query")
   const [page, setPage] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -139,8 +132,6 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
   })
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
-  // Drop selection when the project cwd changes so another project's
-  // connection never stays highlighted.
   useEffect(() => {
     setSelectedId(null)
     setSchema(null)
@@ -164,9 +155,6 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
     setForm((f) => ({
       ...f,
       engine,
-      // Always swap the target when the engine changes so a leftover SQLite
-      // path never sits under MySQL/Postgres (the bug that made docker-compose
-      // URLs look "broken" in the form).
       target: opt?.defaultTarget(session?.cwd) ?? "",
     }))
   }
@@ -178,7 +166,6 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
     staleTime: 10_000,
   })
 
-  // Restore this project's last active connection after a session/cwd switch.
   useEffect(() => {
     if (!active || !projectKey) return
     let cancelled = false
@@ -327,9 +314,6 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Tab strip already labels the panel — don't repeat "Database" here.
-          Empty state owns the Add CTA; chrome only appears once there are
-          connections (count + refresh/add), so stacked headers stay balanced. */}
       {connections.length > 0 ? (
         <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
           <span className="min-w-0 flex-1 truncate text-sm text-ink-muted">
@@ -415,8 +399,6 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
         />
       ) : (
         <div className="flex min-h-0 flex-1">
-          {/* Single sidebar (Terminal pattern) — connections + tables.
-              The old 3-col layout left ~36px for SQL/Run at default panel width. */}
           <aside className="flex w-[180px] shrink-0 flex-col border-r border-stroke-3">
             <ScrollArea className="min-h-0 flex-1 py-1.5">
               <ul>
@@ -719,8 +701,6 @@ const ResultGrid = ({
     )
   }
 
-  // Query: page client-side over the fetched batch (backend caps at 500).
-  // Preview: each `result` is already one server page.
   const totalFetched = result.rows.length
   const start = page * pageSize
   const pageRows =
@@ -731,7 +711,6 @@ const ResultGrid = ({
   const showingTo = start + pageRows.length
 
   const canPrev = page > 0
-  // Preview: full page ⇒ likely more rows; query: more pages in the batch.
   const canNext =
     kind === "preview"
       ? pageRows.length >= pageSize

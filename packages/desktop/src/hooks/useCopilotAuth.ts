@@ -10,8 +10,6 @@ import type { CopilotAuthStart } from "../lib/types"
 
 const COPILOT_AUTH_KEY = ["copilot-auth-status"] as const
 
-/** GitHub Copilot device-flow status + start/wait/cancel. Used by the
- * Copilot connection branch and the sign-in dialog. */
 export const useCopilotAuth = (enabled = true) => {
   const queryClient = useQueryClient()
 

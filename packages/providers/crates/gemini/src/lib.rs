@@ -1,9 +1,3 @@
-//! Gemini provider client.
-//!
-//! The public surface is provider configuration plus the [`GeminiProvider`].
-//! GenerateContent wire types are private and normalized into
-//! `ProviderStreamEvent` before leaving this crate.
-
 mod config;
 mod provider;
 mod wire;

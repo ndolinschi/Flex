@@ -14,19 +14,8 @@ import { log } from "../lib/debug/log"
 export { applyGlobalSessionEvent }
 export { agentTerminalId }
 
-// Backstop for the "draining" grace period below: if a stopped session's
-// terminal event (turn_completed/session_error) never arrives at all — the
-// engine process died, the cancel ack itself was lost, etc. — don't leak the
-// subscription forever. 10s is generous relative to the real teardown delay
-// (engine's turn_gate release) and the mock's MOCK_CANCEL_TEARDOWN_MS (400ms).
 const DRAIN_TIMEOUT_MS = 10_000
 
-/**
- * App-level fan-out: demuxed `session-event` subscriber for all sessions, plus
- * subscribe/unsubscribe for the active session and any still-streaming ones.
- * The Tauri listen itself lives in `sessionEventBus` (shared with
- * `useSessionEvents`).
- */
 export const useGlobalSessionEvents = () => {
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const streamingSessions = useAppStore((s) => s.streamingSessions)
@@ -46,9 +35,6 @@ export const useGlobalSessionEvents = () => {
     })
   }, [])
 
-  // Deferred baseline capture finishes after create/resume returns. Early
-  // git-status polls may have cached full-repo status; bust them once the
-  // session-scoped baseline is ready so Changes / badges switch filters.
   useEffect(() => {
     let disposed = false
     let unlisten: (() => void) | undefined
@@ -73,16 +59,6 @@ export const useGlobalSessionEvents = () => {
     for (const [id, streaming] of Object.entries(streamingSessions)) {
       if (streaming) wanted.add(id)
     }
-    // Keep a just-stopped session subscribed past the optimistic
-    // streamingSessions[id] = false clear (see Composer.handleStop /
-    // App.tsx's Esc-cancel branch) — the engine's cancel is async, so its
-    // terminal event (turn_completed/session_error) can still arrive after
-    // this effect re-runs. Dropping the subscription immediately would lose
-    // that event forever (tokio::sync::broadcast has no replay buffer),
-    // leaving lastTurnUsage/totals/auto-title/notifications for that turn
-    // silently never applied. drainingSessions[id] is cleared the moment the
-    // terminal event actually lands (applyGlobalSessionEvent) or after
-    // DRAIN_TIMEOUT_MS below, whichever comes first.
     for (const [id, draining] of Object.entries(drainingSessions)) {
       if (draining) wanted.add(id)
     }
@@ -98,10 +74,6 @@ export const useGlobalSessionEvents = () => {
       if (!wanted.has(id)) toRemove.push(id)
     }
 
-    // Start a timeout backstop for each newly-draining session (cleared
-    // early if the terminal event arrives first — see applyGlobalEvent.ts —
-    // or if the drain timer already exists), and cancel + drop the backstop
-    // for any session that stopped draining (event arrived, or timed out).
     for (const id of Object.keys(drainingSessions)) {
       if (drainingSessions[id] && !drainTimersRef.current.has(id)) {
         const timer = window.setTimeout(() => {
@@ -120,32 +92,15 @@ export const useGlobalSessionEvents = () => {
 
     for (const id of toAdd) {
       prev.add(id)
-      // Mark subscribed only once the IPC call resolves — the backend
-      // broadcast channel (`tokio::sync::broadcast`, no replay buffer) only
-      // fans out events emitted after this completes. Composer's handleSend
-      // awaits `subscribedSessions[id]` before firing `prompt()` on a
-      // brand-new session so `turn_started` can't race ahead of the
-      // subscription and get silently dropped. See appStore's
-      // `subscribedSessions` doc comment.
       void subscribeSession(id)
         .then(() => {
           useAppStore.getState().setSessionSubscribed(id, true)
         })
         .catch((err) => {
-          // An unhandled rejection here would otherwise surface as a bare
-          // console error with no recovery — a session that never gets
-          // marked subscribed leaves Composer's `waitForSubscription` (see
-          // `useComposerSend.ts`) waiting out its full timeout on every send
-          // for this session, and any live events for it are silently
-          // dropped (no subscriber attached on the backend's broadcast
-          // channel). Backend subscribe now auto-resumes missing handles;
-          // remaining failures are still worth surfacing.
           log.error("session", "subscribe_session failed", {
             sessionId: id,
             err,
           })
-          // Allow a later activeSession effect to retry: drop from the local
-          // "already subscribed" set so toAdd can fire again on next run.
           prev.delete(id)
         })
     }
@@ -161,8 +116,6 @@ export const useGlobalSessionEvents = () => {
     }
   }, [activeSessionId, streamingSessions, drainingSessions])
 
-  // Drain timers are keyed off drainTimersRef (a ref, not state) so they must
-  // be swept on unmount too, not just when drainingSessions changes to {}.
   useEffect(() => {
     const timers = drainTimersRef.current
     return () => {
@@ -171,7 +124,6 @@ export const useGlobalSessionEvents = () => {
     }
   }, [])
 
-  // Sync isStreaming when the active session changes.
   useEffect(() => {
     if (!activeSessionId) {
       useAppStore.getState().setIsStreaming(false)

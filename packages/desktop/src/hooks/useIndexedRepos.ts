@@ -14,15 +14,6 @@ const scheduleIdle = (fn: () => void, timeoutMs = 1_500): (() => void) => {
   return () => window.clearTimeout(t)
 }
 
-/** Low-cost map of `cwd → indexed` for sidebar badges.
- *
- * Per-cwd React Query cache (5 min stale) so expanding/collapsing repos does
- * not re-hit `index_status` IPC for every path on each cwd-set change.
- * Skips entirely when the index plugin is off.
- *
- * Fetches are deferred until after first paint / idle so the chat shell is
- * interactive before badge IPC runs (status itself is metadata-only now, but
- * N parallel invokes still compete with boot). */
 export const useIndexedRepos = (cwds: string[]): Record<string, boolean> => {
   const { config } = useProviderConfig()
   const indexEnabled = !!config?.plugins?.index
@@ -54,7 +45,6 @@ export const useIndexedRepos = (cwds: string[]): Record<string, boolean> => {
     })),
   })
 
-  // Derive a stable key — `useQueries` returns a new array each render.
   const readyKey = results
     .map((r) => (r.data === true ? "1" : r.data === false ? "0" : "?"))
     .join("")
@@ -66,6 +56,5 @@ export const useIndexedRepos = (cwds: string[]): Record<string, boolean> => {
       if (typeof ready === "boolean") out[cwd] = ready
     })
     return out
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- readyKey tracks result data
   }, [paths, readyKey])
 }

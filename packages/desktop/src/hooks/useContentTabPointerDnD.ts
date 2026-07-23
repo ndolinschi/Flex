@@ -23,13 +23,8 @@ type PendingPointer = {
   startY: number
 }
 
-/** Single in-flight pointer gesture (only one tab drag at a time). */
 let pendingPointer: PendingPointer | null = null
 
-/**
- * Install workspace-level pointer listeners once. Call from ContentWorkspace
- * so both panes share one drag session (cross-pane drops work).
- */
 export const useInstallContentTabPointerDnD = (): void => {
   const reorderTabInPane = useAppStore((s) => s.reorderTabInPane)
   const moveTabBetweenPanes = useAppStore((s) => s.moveTabBetweenPanes)
@@ -42,7 +37,6 @@ export const useInstallContentTabPointerDnD = (): void => {
 
     const finish = (commit: boolean) => {
       const ui = getTabDragUi()
-      // Outside a drop zone → no-op (do not sticky-commit the last hit).
       if (commit && ui?.dragging && ui.overTarget) {
         if (ui.fromPane === ui.toPane) {
           reorderTabInPane(ui.toPane, ui.tabId, ui.insertAt)
@@ -73,8 +67,6 @@ export const useInstallContentTabPointerDnD = (): void => {
         ) {
           return
         }
-        // First publish only after the threshold — ordinary clicks never
-        // notify `useTabDragUi` subscribers (both panes).
         document.body.style.cursor = "grabbing"
         document.body.style.userSelect = "none"
         const hit = hitTestTabDrop(e.clientX, e.clientY, pendingPointer.tabId)
@@ -135,8 +127,6 @@ export const useInstallContentTabPointerDnD = (): void => {
     const onMove = (e: PointerEvent) => {
       if (!pendingPointer || e.pointerId !== pendingPointer.pointerId) return
 
-      // Coalesce hit-tests to one per frame — pointermove can fire 100+/s
-      // and each hitTest walks the tab strip DOM.
       moveEvent = e
       if (moveRaf != null) return
       moveRaf = requestAnimationFrame(() => {
@@ -196,13 +186,9 @@ export const useInstallContentTabPointerDnD = (): void => {
   }, [reorderTabInPane, moveTabBetweenPanes])
 }
 
-/** Shared drag UI for drop markers / opacity in each ContentPane. */
 export const useTabDragUi = () =>
   useSyncExternalStore(subscribeTabDragUi, getTabDragUi, () => null)
 
-/** Begin a pending tab drag from a pane's tab (threshold gated).
- * Does not publish drag UI until the pointer moves past the threshold —
- * clicks must not re-render every content pane via `useTabDragUi`. */
 export const startContentTabPointerDrag = (
   e: ReactPointerEvent<HTMLElement>,
   paneIndex: 0 | 1,

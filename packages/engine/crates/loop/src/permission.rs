@@ -1,5 +1,3 @@
-//! The permission policy: modes + allow rules decide Allow / Deny / Ask.
-
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::RwLock;
@@ -13,9 +11,6 @@ use crate::rules::{CallFacts, resolve};
 
 type RuleSink = Box<dyn Fn(&PermissionRule) + Send + Sync>;
 
-/// Always-on deny rules seeded into every policy: secrets stay unreadable and
-/// unwritable unless a later user rule explicitly re-allows them
-/// (last-match-wins). Dotenv files are the classic footgun.
 fn builtin_deny_rules() -> Vec<PermissionRule> {
     ["!Read(**/.env*)", "!Edit(**/.env*)", "!Write(**/.env*)"]
         .iter()
@@ -23,7 +18,6 @@ fn builtin_deny_rules() -> Vec<PermissionRule> {
         .collect()
 }
 
-/// What the policy decided for one call.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {
     Allow,
@@ -31,21 +25,13 @@ pub enum Verdict {
     Ask,
 }
 
-/// Mode + persistent allow rules. `AllowAlways` decisions add rules at
-/// runtime; a `RuleSink` callback lets the composition root persist them.
 pub struct PermissionPolicy {
     default_mode: PermissionMode,
     rules: RwLock<Vec<PermissionRule>>,
-    /// Always-on deny rules, evaluated *before* user rules so a user allow
-    /// rule can still override them (last-match-wins).
     builtin_denies: Vec<PermissionRule>,
-    /// How long an `Ask` waits for a client decision before denying.
     pub ask_timeout: Duration,
-    /// Called when an `AllowAlways` decision adds a rule (for persistence).
     rule_sink: Option<RuleSink>,
     home: Option<PathBuf>,
-    /// Tool names that always resolve to `Ask`, regardless of mode (see
-    /// [`Self::with_force_ask`]).
     force_ask: HashSet<String>,
 }
 
@@ -85,18 +71,11 @@ impl PermissionPolicy {
         self
     }
 
-    /// Tool names that always resolve to `Ask`, overriding `BypassPermissions`
-    /// (would otherwise auto-allow) and `DontAsk` (would otherwise
-    /// auto-deny) — a governance checkpoint independent of the session's
-    /// general permission mode. An explicit user permission rule for the
-    /// tool still wins (evaluated first); `Plan` mode's mutation-deny is
-    /// also unaffected (planning has no side effects to approve).
     pub fn with_force_ask(mut self, tools: impl IntoIterator<Item = String>) -> Self {
         self.force_ask = tools.into_iter().collect();
         self
     }
 
-    /// Add an allow rule at runtime (`AllowAlways`).
     pub fn add_rule(&self, rule: PermissionRule) {
         if let Some(sink) = &self.rule_sink {
             sink(&rule);
@@ -107,7 +86,6 @@ impl PermissionPolicy {
         }
     }
 
-    /// Decide for one tool call.
     pub fn evaluate(
         &self,
         descriptor: &ToolDescriptor,
@@ -117,11 +95,6 @@ impl PermissionPolicy {
     ) -> Verdict {
         let mode = mode_override.unwrap_or(self.default_mode);
 
-        // A force-ask tool always asks — even under BypassPermissions
-        // (would otherwise auto-allow below) and DontAsk (would otherwise
-        // auto-deny below) — unless an explicit rule already decided it.
-        // Plan mode is excluded: its mutation-deny already has no side
-        // effects to approve, and force-ask has nothing useful to add there.
         if !matches!(mode, PermissionMode::Plan) && self.force_ask.contains(&descriptor.name) {
             if let Some(verdict) = self.resolve_rule_verdict(descriptor, input, cwd) {
                 return verdict;
@@ -185,8 +158,6 @@ impl PermissionPolicy {
         }
     }
 
-    /// User rules (checked before builtin denies) resolved against one call,
-    /// if any matched.
     fn resolve_rule_verdict(
         &self,
         descriptor: &ToolDescriptor,
@@ -213,9 +184,6 @@ impl PermissionPolicy {
         })
     }
 
-    /// Build the rule an `AllowAlways` decision should persist for a call.
-    /// Bash gets a first-word prefix rule; path tools get a bare tool rule
-    /// (path-scoped always-rules can be added by clients explicitly).
     pub fn rule_for_always(
         descriptor: &ToolDescriptor,
         input: &serde_json::Value,
@@ -502,7 +470,6 @@ mod tests {
             eval(&policy, &skill_save, serde_json::json!({})),
             Verdict::Ask
         );
-        // An unrelated tool is unaffected — bypass still auto-allows it.
         let bash = descriptor("Bash", false, PermissionHint::Always);
         assert_eq!(eval(&policy, &bash, serde_json::json!({})), Verdict::Allow);
     }
@@ -516,7 +483,6 @@ mod tests {
             eval(&policy, &skill_save, serde_json::json!({})),
             Verdict::Ask
         );
-        // An unrelated tool is unaffected — dont-ask still auto-denies it.
         let bash = descriptor("Bash", false, PermissionHint::Always);
         assert!(matches!(
             eval(&policy, &bash, serde_json::json!({})),

@@ -1,34 +1,14 @@
-//! MCP-oriented capability surface for [`OfficeArtifact`] backends.
-//!
-//! Native tools (`CreateDocument` / `CreateSpreadsheet` / `CreatePresentation`)
-//! already expose each backend to the agent loop. This module documents how the
-//! same trait maps to an MCP tool catalog so an external MCP server (or a
-//! future in-process bridge) can wrap backends without touching the loop.
-//!
-//! Each [`OfficeArtifact::capability_id`] is the stable MCP tool name. Input
-//! schemas mirror the native tools; generation still goes through
-//! [`OfficeArtifact::build`].
-
 use std::sync::Arc;
 
 use crate::OfficeArtifact;
 
-/// One MCP-shaped capability descriptor derived from an [`OfficeArtifact`].
 #[derive(Debug, Clone)]
 pub struct ArtifactMcpCapability {
-    /// MCP / native tool name (`CreateDocument`, …).
     pub name: &'static str,
-    /// File extension without a leading dot.
     pub extension: &'static str,
-    /// Human-readable summary for MCP `tools/list`.
     pub description: &'static str,
 }
 
-/// Describe the three standard office backends as MCP capabilities.
-///
-/// Callers that host an MCP server can register one tool per capability and
-/// forward arguments into the matching [`OfficeArtifact`] from
-/// [`ArtifactsPlugin::with_backends`](crate::ArtifactsPlugin::with_backends).
 pub fn mcp_capabilities(
     word: &Arc<dyn OfficeArtifact>,
     sheet: &Arc<dyn OfficeArtifact>,

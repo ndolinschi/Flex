@@ -1,17 +1,9 @@
-//! Shared helpers for the post-edit hooks: which tools count as edits, the
-//! edited file, extension matching, the `$PATH` availability gate, and argv
-//! substitution.
-
 use std::path::{Path, PathBuf};
 
-/// The tools that write file content; only these trigger post-edit hooks.
 pub(crate) fn is_edit_tool(name: &str) -> bool {
     matches!(name, "Write" | "Edit")
 }
 
-/// The absolute `file_path` a `Write`/`Edit` call targeted. The fs tools
-/// require absolute paths (`require_absolute` in `agentloop-tools`), so no cwd
-/// resolution is needed here.
 pub(crate) fn edited_file(input: &serde_json::Value) -> Option<&str> {
     input
         .get("file_path")
@@ -19,7 +11,6 @@ pub(crate) fn edited_file(input: &serde_json::Value) -> Option<&str> {
         .or_else(|| input.get("path").and_then(|v| v.as_str()))
 }
 
-/// Lowercased file extension without the dot, e.g. `"rs"`.
 pub(crate) fn extension_of(path: &str) -> Option<String> {
     Path::new(path)
         .extension()
@@ -27,9 +18,6 @@ pub(crate) fn extension_of(path: &str) -> Option<String> {
         .map(|s| s.to_ascii_lowercase())
 }
 
-/// The availability gate: whether `program` resolves to an existing file, either
-/// as an explicit path or on `$PATH`. An unresolved program means the hook
-/// silently skips (the correctness step only runs when the tool is available).
 pub(crate) fn program_on_path(program: &str) -> bool {
     let p = Path::new(program);
     if p.is_absolute() || p.components().count() > 1 {
@@ -41,12 +29,10 @@ pub(crate) fn program_on_path(program: &str) -> bool {
     std::env::split_paths(&path).any(|dir| dir.join(program).is_file())
 }
 
-/// Replace the literal token `$FILE` in each argv element with `file`.
 pub(crate) fn substitute_file(args: &[String], file: &str) -> Vec<String> {
     args.iter().map(|arg| arg.replace("$FILE", file)).collect()
 }
 
-/// The directory a post-edit command should run in: the edited file's parent.
 pub(crate) fn parent_dir(file: &str) -> Option<PathBuf> {
     Path::new(file).parent().map(Path::to_path_buf)
 }

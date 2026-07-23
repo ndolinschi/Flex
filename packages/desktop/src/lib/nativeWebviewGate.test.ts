@@ -53,7 +53,6 @@ describe("isNativeWebviewSuppressed", () => {
         getBoundingClientRect: () => rect(0, 0, 200, 100),
       },
     ])
-    // Slot is on the right; dialog is on the left — no overlap.
     expect(isNativeWebviewSuppressed(rect(400, 0, 200, 400))).toBe(false)
   })
 

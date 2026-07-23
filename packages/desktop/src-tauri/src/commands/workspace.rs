@@ -1,4 +1,3 @@
-//! Workspace isolation integrate/discard/revert.
 
 use super::common::require_service;
 use super::prelude::*;
@@ -10,17 +9,11 @@ pub struct WorkspaceStatusDto {
     pub summary: String,
 }
 
-/// One provisioned workspace that belongs to a base project directory,
-/// returned by [`list_workspaces`] for the UI's reuse picker.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceInfo {
-    /// Stable identifier — pass this back as `reuseWorkspaceId` on
-    /// `create_session` to attach an existing worktree.
     pub id: String,
-    /// Absolute path of the worktree root.
     pub path: String,
-    /// Commit the worktree currently has checked out (workspace's HEAD).
     pub base_ref: String,
 }
 

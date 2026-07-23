@@ -10,9 +10,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 
-/** One accordion "Global" or per-project section, styled like a Settings
- * section header (title + entry count), holding a list of `MemoryRow`s
- * scoped to whichever get/remove/expiry functions the caller passes in. */
 export const MemoryScopeSection = ({
   title,
   hint,

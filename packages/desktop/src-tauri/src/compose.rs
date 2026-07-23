@@ -1,4 +1,3 @@
-//! Sole `AgentBuilder` call site — the desktop composition root.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -18,13 +17,6 @@ use crate::config::{sessions_dir, worktrees_dir, ProviderConfig};
 use crate::error::{DesktopError, DesktopResult};
 use crate::plugins::{BrowserPlugin, ComputerPlugin};
 
-/// Read every enabled MCP server spec from `~/.config/agentloop/mcp/*.toml`
-/// (blocking `std::fs`, since `build_service` itself is sync and runs both
-/// from `setup()` and from `async fn` command bodies — the same file layout
-/// `FileMcpStore` reads asynchronously, but composition needs a plain
-/// synchronous read here). A missing directory or an unreadable/malformed
-/// file is non-fatal: MCP servers are additive, so a bad entry just logs a
-/// warning and is skipped rather than blocking the whole engine build.
 fn load_enabled_mcp_servers() -> McpBridgeConfig {
     let Some(dir) = default_mcp_dir() else {
         return McpBridgeConfig::default();
@@ -78,9 +70,6 @@ fn load_enabled_mcp_servers() -> McpBridgeConfig {
     config
 }
 
-/// Merge encrypted MCP secrets (env + positional-arg suffix) into a server
-/// config so stdio spawn sees real tokens. Used by [`load_enabled_mcp_servers`]
-/// and by `commands::mcp_test`.
 pub(crate) fn resolve_mcp_server_secrets(mut config: McpServerConfig) -> McpServerConfig {
     let (secret_env, args_suffix) = match crate::config::load_mcp_server_secrets(&config.name) {
         Ok(pair) => pair,
@@ -114,7 +103,6 @@ pub(crate) fn resolve_mcp_server_secrets(mut config: McpServerConfig) -> McpServ
     config
 }
 
-/// Map a provider id to the env var its client reads for host/base URL.
 fn base_url_env(provider: &str) -> Option<&'static str> {
     match provider {
         "openai" | "deepseek" => Some("OPENAI_BASE_URL"),
@@ -129,15 +117,10 @@ fn base_url_env(provider: &str) -> Option<&'static str> {
     }
 }
 
-/// Apply an optional host override the same way the CLI does (env), then
-/// clear it after build so we don't leak into other processes' expectations
-/// within this app lifetime beyond the current service.
 fn with_base_url_env<T>(provider: &str, base_url: Option<&str>, f: impl FnOnce() -> T) -> T {
     let env_key = base_url_env(provider);
     let previous = env_key.and_then(|k| std::env::var(k).ok());
     if let (Some(key), Some(url)) = (env_key, base_url.filter(|s| !s.is_empty())) {
-        // SAFETY: single-threaded at composition time in the desktop shell;
-        // we restore the previous value immediately after `f`.
         unsafe { std::env::set_var(key, url) };
     }
     let out = f();
@@ -154,24 +137,6 @@ fn provider_of_model(model: &str) -> Option<&str> {
     model.split_once('/').map(|(p, _)| p)
 }
 
-/// Bug fix (form-supplied Bedrock key ignored by Validate): `resolve_real_providers`
-/// (`packages/providers/crates/providers/src/resolve.rs`, read-only from here — see
-/// AGENTS.md) resolves its *initial* Bedrock provider purely from
-/// `BedrockProvider::from_env()` and returns `AuthMissing` immediately if
-/// `AWS_BEARER_TOKEN_BEDROCK`/SigV4 env vars are unset, **before**
-/// `native()`'s follow-up `connect_bedrock(&opts.provider_keys, ...)` call
-/// (which *does* honor a client-supplied key) ever runs. A freshly pasted
-/// form key never reaches env, so that first call always fails and the whole
-/// `AgentBuilder::build()` errors out with "authentication missing for
-/// bedrock" even though a perfectly good key was passed via `.provider_key`.
-///
-/// Desktop-layer workaround (mirrors `with_base_url_env`): scope
-/// `AWS_BEARER_TOKEN_BEDROCK` (and `BEDROCK_REGION`, if given) to the
-/// duration of `f`, just enough to satisfy the early `has_credentials()`
-/// check. `connect_bedrock` still runs afterward and re-registers Bedrock
-/// with the exact key/region passed in `provider_keys`/`provider_regions`
-/// (`ProviderRegistry::register` replaces by id), so the final registered
-/// provider is correct regardless of what this scoped env var held.
 fn with_bedrock_env<T>(key: Option<&str>, region: Option<&str>, f: impl FnOnce() -> T) -> T {
     let key = key.filter(|k| !k.is_empty());
     let Some(key) = key else {
@@ -179,8 +144,6 @@ fn with_bedrock_env<T>(key: Option<&str>, region: Option<&str>, f: impl FnOnce()
     };
     let prev_token = std::env::var("AWS_BEARER_TOKEN_BEDROCK").ok();
     let prev_region = std::env::var("BEDROCK_REGION").ok();
-    // SAFETY: single-threaded at composition time in the desktop shell; both
-    // vars are restored immediately after `f`.
     unsafe { std::env::set_var("AWS_BEARER_TOKEN_BEDROCK", key) };
     if let Some(region) = region.filter(|r| !r.is_empty()) {
         unsafe { std::env::set_var("BEDROCK_REGION", region) };
@@ -197,9 +160,6 @@ fn with_bedrock_env<T>(key: Option<&str>, region: Option<&str>, f: impl FnOnce()
     out
 }
 
-/// The provider/model/key inputs `build_service` needs, resolved from either
-/// the active profile or (fallback) the legacy top-level prefs fields — see
-/// `ProviderConfig::active_profile`.
 struct ActiveConnection<'a> {
     provider: &'a str,
     base_url: Option<&'a str>,
@@ -229,9 +189,6 @@ fn resolve_active_connection(cfg: &ProviderConfig) -> DesktopResult<ActiveConnec
             api_key: cfg.active_profile_key().map(String::as_str),
         });
     }
-    // Legacy fallback: no profile migrated yet (shouldn't normally happen —
-    // `load_config` always migrates — but keeps this function correct if
-    // called with a hand-built `ProviderConfig`, e.g. in tests).
     let preferred = cfg
         .prefs
         .preferred_provider
@@ -247,15 +204,6 @@ fn resolve_active_connection(cfg: &ProviderConfig) -> DesktopResult<ActiveConnec
     })
 }
 
-/// Build (or rebuild) an [`EngineService`] from keychain-backed config.
-///
-/// Always goes through [`AgentBuilder`] — never `EngineService::native` or
-/// `providers::resolve_*`. No connectors/delegators. Reads the active
-/// profile (see `ProviderConfig::active_profile`) as its single source for
-/// provider/key/region/model/fallbacks/isolation.
-///
-/// `app` is required so desktop-only plugins (Browser / Computer) can hold
-/// a Tauri handle; tools resolve `AppState` at call time.
 pub fn build_service(
     cfg: &ProviderConfig,
     store: Arc<JsonlStore>,
@@ -279,8 +227,6 @@ pub fn build_service(
         .provider_id
         .as_deref()
         .filter(|p| !p.is_empty());
-    // Fallbacks or inline-completion models on another provider need the
-    // full registry so `ProviderRegistry::resolve` can find them.
     let needs_all = fallbacks.iter().any(|m| {
         provider_of_model(m)
             .map(|p| p != preferred)
@@ -300,9 +246,6 @@ pub fn build_service(
             if let Some(key) = conn.api_key {
                 builder = builder.provider_key(preferred.to_owned(), key.to_owned());
             }
-            // Bedrock is the only region-scoped built-in today; the settings
-            // form's "Region" field (repurposed per-provider, like `base_url`)
-            // carries it through to `BedrockConfig` instead of the AWS env vars.
             if preferred == "bedrock" {
                 if let Some(region) = conn.region.filter(|r| !r.is_empty()) {
                     builder = builder.provider_region("bedrock", region.to_owned());
@@ -358,7 +301,6 @@ pub fn build_service(
                 let config = builder.config_mut();
                 config.session_store = Some(store.clone());
                 config.verbosity = agentloop_sdk::OutputVerbosity::High;
-                // Auto-compact config from prefs.
                 config.auto_compact = cfg.prefs.plugins.auto_compact;
                 config.auto_compact_threshold_percent =
                     cfg.prefs.plugins.auto_compact_threshold_percent;
@@ -366,8 +308,6 @@ pub fn build_service(
                     "turn_pair" => CompactionMode::TurnPair,
                     _ => CompactionMode::Standard,
                 };
-                // Cost-tier routing: enable SetRouting + SwitchMode when Auto
-                // is on. Peer messaging stays opt-in via the Messaging plugin.
                 if cfg.prefs.plugins.auto_mode {
                     config.enable_set_routing = true;
                     config.enable_switch_mode = true;
@@ -376,7 +316,6 @@ pub fn build_service(
                 config.cost_models_low = cfg.prefs.plugins.cost_models_low.clone();
                 config.cost_models_medium = cfg.prefs.plugins.cost_models_medium.clone();
                 config.cost_models_high = cfg.prefs.plugins.cost_models_high.clone();
-                // Opt-in isolation per session; backend always available for undo snapshots.
                 let worktrees = worktrees_dir()
                     .unwrap_or_else(|_| std::env::temp_dir().join("agentloop-desktop-worktrees"));
                 let mut backend = GitWorktrees::new(worktrees);
@@ -384,34 +323,8 @@ pub fn build_service(
                     backend = backend.with_max_per_base(cap.max(1) as usize);
                 }
                 config.workspace = Some(Arc::new(backend));
-                // User-configured MCP servers (`~/.config/agentloop/mcp/*.toml`,
-                // managed by the "MCP Servers" section of the Customize page).
-                // Loading them here means a saved add/remove/toggle only takes
-                // effect once the service is rebuilt (`save_provider_config` or
-                // the MCP commands below) — no hot-reload of a running session.
                 config.mcp = load_enabled_mcp_servers();
 
-                // Flex composer-mode roles: orchestrated planning -> independent
-                // review -> isolated implementation. These back the Flex
-                // composer mode (a later wave wires an orchestrator prompt and a
-                // "composer" turn mode that instructs the model to use them);
-                // registering them here is inert on its own — nothing in today's
-                // Agent-mode system prompt or turn options references these role
-                // names, so existing sessions are unaffected until a future wave
-                // tells the model to spawn them via `Agent`/`RunWorkflow`.
-                //
-                // `enable_workflow_tool` is turned on alongside them: the
-                // composer mode's orchestrator needs `RunWorkflow` to run a
-                // multi-step plan (`planner` -> `plan-reviewer` -> one or more
-                // `flex-worker`s) without waiting on its own next turn between
-                // steps. This does add one more tool to every session's tool
-                // list (not just composer-mode ones) — but `workflow_tool`'s
-                // description (`agentloop_tools::workflow.rs`) is purely
-                // descriptive of whatever roles are registered and says to
-                // "prefer `Agent` for a single task"; it does not claim
-                // composer-specific behavior, so a normal Agent-mode session
-                // reading it is not misled, just offered a pipeline tool it can
-                // reasonably choose to ignore.
                 config.roles.extend(flex_composer_roles());
             }
 
@@ -422,13 +335,6 @@ pub fn build_service(
     })
 }
 
-/// Roles backing the Flex composer mode: orchestrated planning, an
-/// independent plan review, and isolated implementation workers. All three
-/// leave `models` empty (inherit / per-call override) so composer-specific
-/// tier picks stay a prompt-side decision. Built-in `searcher`/`worker` (and
-/// the search plugin's `researcher`) still get cheap/strong pinning from
-/// [`agentloop_sdk::apply_research_model_tiers`] inside `AgentBuilder::build`.
-/// Inert until a turn's system prompt instructs the model to spawn them.
 fn flex_composer_roles() -> Vec<RoleSpec> {
     let planner = RoleSpec {
         prompt: Some(

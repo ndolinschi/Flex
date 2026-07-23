@@ -1,9 +1,6 @@
 import type { LanguageFn } from "highlight.js"
 import rehypeHighlight from "rehype-highlight"
 
-/** Core language pack for rehype-highlight — loaded as a separate chunk so
- * the main timeline bundle does not pull full highlight.js until settled
- * markdown needs it. Aliases mirror highlight.js common names. */
 import bash from "highlight.js/lib/languages/bash"
 import css from "highlight.js/lib/languages/css"
 import go from "highlight.js/lib/languages/go"
@@ -48,7 +45,6 @@ const languages: Record<string, LanguageFn> = {
   yml: yaml,
 }
 
-/** rehype-highlight configured with the core language subset. */
 export const rehypeHighlightPlugin: [typeof rehypeHighlight, { languages: Record<string, LanguageFn> }] = [
   rehypeHighlight,
   { languages },

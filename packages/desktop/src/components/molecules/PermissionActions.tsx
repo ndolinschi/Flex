@@ -12,9 +12,6 @@ type PermissionActionsProps = {
   className?: string
 }
 
-/** Composer-footer Allow once / Always allow / Deny — replaces Send while a
- * tool permission is pending (Claude Code–style inline HITL). `size="xs"`
- * keeps the footer row aligned with Plus / Mode / Model / Send controls. */
 export const PermissionActions = ({
   permission,
   className,

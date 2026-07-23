@@ -1,5 +1,3 @@
-//! Response-body conversion for `scrape_page`.
-
 use agentloop_tools::fs::extract_page_links;
 
 use super::extract::{extract_content_core, truncate_chars};

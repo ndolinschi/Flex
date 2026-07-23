@@ -2,7 +2,6 @@ import { Clock, Webhook } from "lucide-react"
 import { humanizeCron } from "../../../lib/cron"
 import type { RoutineTriggerDto } from "../../../lib/types"
 
-/** Trigger summary shown under the routine name: icon + human text. */
 export const TriggerSummary = ({ trigger }: { trigger: RoutineTriggerDto }) => {
   if (trigger.kind === "cron") {
     return (

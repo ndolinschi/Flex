@@ -1,4 +1,3 @@
-/** Design Mode (Cursor-style) helpers: DOM element payload + prompt serialization. */
 
 export type BrowserDomRect = {
   x: number
@@ -35,7 +34,6 @@ export type BrowserDesignEvent =
   | BrowserDesignSelectEvent
   | BrowserDesignExitEvent
 
-/** Best-effort CSS selector for an element (mirrors the injected picker). */
 export const buildCssSelector = (el: Element): string => {
   const owner = el.ownerDocument
   if (el.id && /^[A-Za-z][\w:-]*$/.test(el.id)) {
@@ -117,7 +115,6 @@ const STYLE_KEYS = [
   "margin",
 ] as const
 
-/** Describe a live DOM element for Design Mode (preview iframe path). */
 export const describeDomElement = (el: Element): BrowserDomElement => {
   const owner = el.ownerDocument
   const win = owner.defaultView
@@ -135,7 +132,6 @@ export const describeDomElement = (el: Element): BrowserDomElement => {
         styles[key] = cs[key as keyof CSSStyleDeclaration] as string
       }
     } catch {
-      /* cross-realm / detached */
     }
   }
   let classes: string | null = null
@@ -191,7 +187,6 @@ export const describeDomElement = (el: Element): BrowserDomElement => {
   }
 }
 
-/** Serialize DOM chips into a markdown context block for the agent. */
 export const formatDomContextMarkdown = (
   attachments: Array<{ name: string; payload: BrowserDomElement }>,
 ): string => {
@@ -243,12 +238,6 @@ export const formatDomContextMarkdown = (
 const DOM_CONTEXT_HEADING = "## Selected page elements"
 const DOM_CONTEXT_SEPARATOR = "\n\n---\n\n"
 
-/** Reverse of {@link mergeDomContextWithDraft} for DISPLAY: a user message
- * whose text was built with a Design-Mode DOM-context block is shown in the
- * timeline as just the typed instruction plus a compact "N element(s)" chip —
- * never the raw injected markdown (which reads like a system prompt). Returns
- * `null` for ordinary messages (render them verbatim). The full context still
- * goes to the model unchanged; this only affects presentation. */
 export const parseDomContextMessage = (
   text: string,
 ): { instruction: string; elementCount: number } | null => {
@@ -261,7 +250,6 @@ export const parseDomContextMessage = (
   return { instruction: instruction.trim(), elementCount: Math.max(elementCount, 1) }
 }
 
-/** Merge DOM context markdown with the user's typed instruction. */
 export const mergeDomContextWithDraft = (
   draft: string,
   domAttachments: Array<{ name: string; payload: BrowserDomElement }>,

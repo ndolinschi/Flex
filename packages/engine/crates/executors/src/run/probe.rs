@@ -1,10 +1,7 @@
-//! Binary probe helper for executor diagnostics.
-
 use std::process::Stdio;
 
 use tokio::process::Command;
 
-/// Probe helper: run `binary --version`-style invocation and summarize.
 pub(crate) async fn probe_binary(binary: &str, args: &[&str]) -> Result<String, String> {
     let mut command = Command::new(binary);
     crate::win_console::hide_console(&mut command);

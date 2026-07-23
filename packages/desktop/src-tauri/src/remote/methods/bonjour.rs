@@ -1,4 +1,3 @@
-//! Bonjour / mDNS discovery for the desktop Remote Access listener.
 
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -13,7 +12,6 @@ use crate::error::{DesktopError, DesktopResult};
 use crate::remote::config::RemoteAccessConfig;
 use crate::remote::pairing::PairingEndpoint;
 
-/// DNS-SD service type clients browse for on the LAN.
 pub const BONJOUR_SERVICE_TYPE: &str = "_agentloop-desktop._tcp.local.";
 
 pub struct BonjourMethod {
@@ -21,7 +19,6 @@ pub struct BonjourMethod {
     daemon: Option<ServiceDaemon>,
     fullname: Option<String>,
     listen_port: u16,
-    /// Last error reason when unavailable.
     note: Arc<Mutex<Option<String>>>,
 }
 

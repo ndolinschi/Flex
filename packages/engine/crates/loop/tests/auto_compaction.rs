@@ -1,5 +1,3 @@
-//! Auto-compaction triggers when estimated prompt tokens approach the context limit.
-
 use std::sync::Arc;
 
 use agentloop_contracts::{

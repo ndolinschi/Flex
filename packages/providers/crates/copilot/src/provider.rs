@@ -1,6 +1,3 @@
-//! The Copilot provider: Copilot session auth over the OpenAI-compatible
-//! wire layer.
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -15,9 +12,6 @@ use agentloop_provider_openai::compat;
 use crate::auth::TokenExchanger;
 use crate::config::{COPILOT_PROVIDER_ID, CopilotConfig};
 
-/// Integration identity headers the Copilot API requires. These identify the
-/// API dialect spoken (VS Code chat integration), which is how every
-/// third-party Copilot client authenticates its request shape.
 const COPILOT_INTEGRATION_ID: &str = "vscode-chat";
 const EDITOR_VERSION: &str = "vscode/1.99.0";
 const EDITOR_PLUGIN_VERSION: &str = "copilot-chat/0.26.0";
@@ -157,8 +151,6 @@ impl Provider for CopilotProvider {
     }
 }
 
-/// Whether a Copilot model id belongs to the Codex family, which is served by
-/// the Responses API rather than `/chat/completions`.
 fn is_codex_model(id: &str) -> bool {
     id.to_ascii_lowercase().contains("codex")
 }

@@ -1,10 +1,7 @@
-//! `SpreadsheetDocument` — builds `.xlsx` via `rust_xlsxwriter`.
-
 use rust_xlsxwriter::Workbook;
 
 use crate::{ArtifactBuildSpec, ArtifactError, ArtifactKind, OfficeArtifact};
 
-/// Builds Excel spreadsheets (.xlsx) using the `rust_xlsxwriter` library.
 #[derive(Debug, Default)]
 pub struct SpreadsheetDocument;
 
@@ -83,7 +80,6 @@ mod tests {
         };
         let bytes = sheet.build(&spec).expect("build");
         assert!(!bytes.is_empty(), "xlsx bytes must not be empty");
-        // .xlsx is a ZIP — starts with PK signature
         assert_eq!(&bytes[..2], b"PK", "xlsx must start with ZIP magic");
     }
 

@@ -1,5 +1,3 @@
-//! The engine service error type and its mapping to a wire `EngineError`.
-
 use agentloop_contracts::{EngineError, ErrorCode, SessionId};
 use agentloop_core::{AgentError, ExecError, ProviderError, StoreError, WorkspaceError};
 use agentloop_loop::roles::RoleError;

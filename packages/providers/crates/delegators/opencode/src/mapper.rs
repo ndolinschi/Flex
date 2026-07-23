@@ -2,14 +2,6 @@ use agentloop_contracts::{ToolCallId, ToolOutput, ToolResultBlock, TurnStopReaso
 use agentloop_delegator_common::{DelegatorEvent, DelegatorMapError, LineMapper};
 use serde::Deserialize;
 
-/// Maps `opencode run --format json` output lines into normalized events.
-///
-/// The wire shape was recorded from a live `opencode run --format json` (see
-/// the fixtures in the tests below): every line is an envelope
-/// `{"type": ..., "part": {...}}` where `text` parts carry assistant prose,
-/// `tool_use` parts arrive already-completed (call + result in one frame),
-/// and `step_finish` parts carry token/cost accounting plus the step's stop
-/// reason (`"stop"` ends the turn; `"tool-calls"` means more steps follow).
 #[derive(Debug, Default)]
 pub struct OpencodeLineMapper;
 
@@ -49,8 +41,6 @@ impl LineMapper for OpencodeLineMapper {
                     });
                 }
                 match part.reason.as_deref() {
-                    // "tool-calls": the model paused to run tools; more steps
-                    // follow in the same turn.
                     Some("tool-calls") => {}
                     Some("error") => events.push(DelegatorEvent::TurnFinished {
                         stop_reason: TurnStopReason::Error,
@@ -103,8 +93,7 @@ fn map_tool_use(part: OpencodeToolPart) -> Vec<DelegatorEvent> {
                 output: tool_output_from_value(serde_json::Value::String(detail), true),
             });
         }
-        // pending/running frames (if any) map to the call alone; a later
-        // frame for the same callID completes it.
+
         _ => {}
     }
     events
@@ -228,8 +217,6 @@ fn tool_output_from_value(value: serde_json::Value, is_error: bool) -> ToolOutpu
 mod tests {
     use super::*;
 
-    // Recorded from live `opencode run --format json` invocations
-    // (opencode on PATH, 2026-07-08). Never hand-edit; re-record instead.
     const LIVE_STEP_START: &str = r#"{"type":"step_start","timestamp":1783526453528,"sessionID":"ses_0bd8a4b6bffed7eNJevDYVvE0Z","part":{"id":"prt_f4275f113001mlEBPUAbiarPAS","messageID":"msg_f4275bfc9001gwP911o0G6xiGU","sessionID":"ses_0bd8a4b6bffed7eNJevDYVvE0Z","type":"step-start"}}"#;
     const LIVE_TEXT: &str = r#"{"type":"text","timestamp":1783527293400,"sessionID":"ses_0bd7d6dc2ffeqobEaABDn5cAcJ","part":{"id":"prt_f4282c10b001mKjnNX343Vqe3Y","messageID":"msg_f4282b6b5001R1gHBMrOw16VMI","sessionID":"ses_0bd7d6dc2ffeqobEaABDn5cAcJ","type":"text","text":"The file `note.txt` contains one line:\n\n```\nhello fixture\n```","time":{"start":1783527293195,"end":1783527293397}}}"#;
     const LIVE_TOOL_USE: &str = r#"{"type":"tool_use","timestamp":1783527290547,"sessionID":"ses_0bd7d6dc2ffeqobEaABDn5cAcJ","part":{"type":"tool","tool":"read","callID":"tooluse_fG2C1dGsvmYvhwchLvpwcF","state":{"status":"completed","input":{"filePath":"/work/note.txt"},"output":"<path>/work/note.txt</path>\n<type>file</type>\n<content>\n1: hello fixture\n\n(End of file - total 1 lines)\n</content>","metadata":{"preview":"hello fixture","truncated":false,"loaded":[]},"title":"work/note.txt"}}}"#;

@@ -1,6 +1,3 @@
-//! Claude Code as a [`DelegatorProfile`] over the shared line-oriented
-//! delegator runtime.
-
 use std::sync::Arc;
 
 use agentloop_contracts::{
@@ -18,7 +15,6 @@ use crate::CLAUDE_CODE_AGENT_ID;
 use crate::config::ClaudeCodeConfig;
 use crate::mapper::ClaudeCodeLineMapper;
 
-/// Claude Code's identity, capabilities, and launch shape.
 pub struct ClaudeCodeProfile {
     pub config: ClaudeCodeConfig,
 }
@@ -79,10 +75,8 @@ impl DelegatorProfile for ClaudeCodeProfile {
     }
 }
 
-/// The Claude Code delegator agent.
 pub type ClaudeCodeAgent<H = TokioCommandHost> = LineDelegatorAgent<ClaudeCodeProfile, H>;
 
-/// Build a Claude Code agent with the real process host.
 pub fn claude_code_agent(
     config: ClaudeCodeConfig,
     store: Arc<dyn SessionStore>,
@@ -94,13 +88,10 @@ pub fn claude_code_agent(
     )
 }
 
-/// Build a Claude Code agent with an ephemeral in-memory store (probing,
-/// doctor).
 pub fn ephemeral_claude_code_agent(config: ClaudeCodeConfig) -> ClaudeCodeAgent {
     claude_code_agent(config, Arc::new(MemoryStore::new()))
 }
 
-/// Build a Claude Code agent over a custom [`ProcessHost`] (tests).
 pub fn claude_code_agent_with_host<H: ProcessHost + 'static>(
     config: ClaudeCodeConfig,
     store: Arc<dyn SessionStore>,

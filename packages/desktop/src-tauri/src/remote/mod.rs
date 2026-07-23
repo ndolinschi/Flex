@@ -1,8 +1,3 @@
-//! Desktop-owned Remote Access transport.
-//!
-//! In-process HTTP/SSE API plus pluggable connection-method adapters
-//! (manual, LAN, Bonjour, public port, Cloudflare stub, Bluetooth stub).
-//! Clients talk to this surface — not to `flex serve` / the engine transport.
 
 pub mod api;
 pub mod auth;
@@ -31,12 +26,9 @@ pub struct RemoteAccessStatus {
     pub config: RemoteAccessConfig,
     pub running: bool,
     pub bind_addr: Option<String>,
-    /// Bearer token (for Settings reveal/copy). Always present once remote
-    /// has been enabled at least once.
     pub token: Option<String>,
     pub pairing: Option<PairingInfo>,
     pub pairing_json: Option<String>,
-    /// SVG markup for a QR of `pairing_json`, when encodable.
     pub pairing_qr_svg: Option<String>,
     pub method_notes: Vec<MethodNote>,
 }
@@ -143,8 +135,6 @@ pub async fn remote_access_save(
         cfg.methods = methods;
     }
 
-    // Enabling remote access requires a persisted explicit token (needed for
-    // non-loopback methods; also used for loopback-only manual pairing).
     if cfg.enabled {
         let _ = ensure_remote_token()?;
     }

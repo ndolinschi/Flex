@@ -1,12 +1,3 @@
-//! Provider detection, construction, and default-model resolution.
-//!
-//! Given provider-scoped options, decide which built-in providers have
-//! credentials, build them (plus client-configured OpenAI-compatible specs and
-//! first-party keys like Bedrock), and pick the default model. Two entry points
-//! mirror the two service constructors — [`resolve_real_providers`] (single
-//! preferred provider) and [`resolve_available_providers`] (every provider
-//! whose credentials resolve).
-
 use std::sync::Arc;
 
 use agentloop_contracts::{ModelRef, ProviderId};
@@ -24,7 +15,6 @@ use agentloop_provider_openai::{OPENAI_PROVIDER_ID, OpenAiConfig, OpenAiProvider
 
 use crate::CustomProviderSpec;
 
-/// Whether an environment variable is set and non-empty.
 fn env_is_set(name: &str) -> bool {
     std::env::var(name)
         .ok()
@@ -32,11 +22,6 @@ fn env_is_set(name: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// The built-in provider ids custom specs may not shadow. `openai` and
-/// `deepseek` are deliberately absent: both are OpenAI-compatible endpoints a
-/// user can supply credentials for via `/connect <id> <key>`, so a custom spec
-/// of either id must resolve (and win over the env built-in) rather than be
-/// rejected as a conflict.
 const BUILTIN_PROVIDER_IDS: [&str; 6] = [
     ANTHROPIC_PROVIDER_ID,
     BEDROCK_PROVIDER_ID,
@@ -46,8 +31,6 @@ const BUILTIN_PROVIDER_IDS: [&str; 6] = [
     OLLAMA_PROVIDER_ID,
 ];
 
-/// `true` when `id` matches `^[a-z0-9][a-z0-9_-]*$` (which also excludes `/`,
-/// the [`ModelRef`] separator).
 fn valid_custom_id(id: &str) -> bool {
     let mut chars = id.chars();
     let Some(first) = chars.next() else {
@@ -57,12 +40,6 @@ fn valid_custom_id(id: &str) -> bool {
         && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
 }
 
-/// Build one custom provider plus its default model id.
-///
-/// Validates the spec (id shape, non-empty base URL and key) so failures are
-/// attributed to the custom id instead of surfacing as `openai` errors.
-/// Default model precedence: `spec.default_model`, else the first static
-/// model, else the OpenAI config default as a documented last resort.
 fn build_custom_provider(
     spec: &CustomProviderSpec,
 ) -> Result<(Arc<dyn agentloop_core::Provider>, String), EngineServiceError> {
@@ -93,22 +70,12 @@ fn build_custom_provider(
     Ok((Arc::new(provider), default_model))
 }
 
-/// A constructed provider paired with its default model id.
 type ProviderWithDefault = (Arc<dyn agentloop_core::Provider>, String);
 
-/// DeepSeek is served over an OpenAI-compatible Chat Completions API, so it's
-/// a built-in on top of [`OpenAiProvider`] rather than a bespoke crate.
 pub(crate) const DEEPSEEK_PROVIDER_ID: &str = "deepseek";
 const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com/v1";
 pub(crate) const DEEPSEEK_DEFAULT_MODEL: &str = "deepseek-v4-pro";
 
-/// Build the built-in DeepSeek provider from `DEEPSEEK_API_KEY` (optional
-/// `DEEPSEEK_MODEL`). Returns `Ok(None)` when the key is unset, so callers
-/// auto-register it only when the user has opted in — matching how Ollama is
-/// gated. `(provider, default_model)` on success.
-///
-/// Note: speculative decoding (dSpark) is applied server-side by DeepSeek and
-/// is transparent here — there is no request-time knob to set.
 fn build_deepseek_from_env() -> Result<Option<ProviderWithDefault>, ProviderError> {
     let Some(api_key) = std::env::var("DEEPSEEK_API_KEY")
         .ok()
@@ -121,10 +88,6 @@ fn build_deepseek_from_env() -> Result<Option<ProviderWithDefault>, ProviderErro
     build_deepseek(api_key, model).map(Some)
 }
 
-/// Pure builder for the DeepSeek provider (no env access, so it's directly
-/// testable). `model` falls back to `DEEPSEEK_DEFAULT_MODEL` (`deepseek-v4-pro`)
-/// — passing an explicit model matters because `from_values` otherwise defaults
-/// to the OpenAI model (`gpt-4.1-mini`), which is wrong for DeepSeek.
 pub(crate) fn build_deepseek(
     api_key: String,
     model: Option<String>,
@@ -142,10 +105,6 @@ pub(crate) fn build_deepseek(
     Ok((Arc::new(provider), model))
 }
 
-/// An OpenAI-compatible provider preset, gated on its API-key env var —
-/// exactly the DeepSeek pattern, table-driven. Preset ids are deliberately
-/// NOT in [`BUILTIN_PROVIDER_IDS`], so a user's custom spec of the same id
-/// resolves and wins over the env built-in.
 pub(crate) struct CompatPreset {
     pub(crate) id: &'static str,
     pub(crate) key_env: &'static str,
@@ -154,8 +113,6 @@ pub(crate) struct CompatPreset {
     pub(crate) default_model: &'static str,
 }
 
-/// Built-in OpenAI-compatible presets. OpenRouter is the aggregator route to
-/// GLM/Kimi/MiniMax and hundreds of other models without a bespoke client.
 pub(crate) const COMPAT_PRESETS: [CompatPreset; 4] = [
     CompatPreset {
         id: "openrouter",
@@ -187,7 +144,6 @@ pub(crate) const COMPAT_PRESETS: [CompatPreset; 4] = [
     },
 ];
 
-/// Pure builder for a compat preset (no env access, directly testable).
 pub(crate) fn build_compat(
     preset: &CompatPreset,
     api_key: String,
@@ -206,7 +162,6 @@ pub(crate) fn build_compat(
     Ok((Arc::new(provider), model))
 }
 
-/// Build a preset from its env vars; `Ok(None)` when the key is unset.
 fn build_compat_from_env(
     preset: &CompatPreset,
 ) -> Result<Option<ProviderWithDefault>, ProviderError> {
@@ -221,11 +176,6 @@ fn build_compat_from_env(
     build_compat(preset, api_key, model).map(Some)
 }
 
-/// Register a Bedrock provider built from a client-connected API key
-/// (`provider_keys["bedrock"]`), overriding any credential-less Bedrock the
-/// environment may have registered. Region/model still come from the
-/// environment (or Bedrock defaults). Returns its default model ref so callers
-/// can adopt it when they have no other default; no-op without a bedrock key.
 pub fn connect_bedrock(
     providers: &mut ProviderRegistry,
     provider_keys: &std::collections::BTreeMap<String, String>,
@@ -366,11 +316,6 @@ pub fn resolve_real_providers(
         }
         BEDROCK_PROVIDER_ID => {
             let provider = if let Some(key) = provider_keys.get(BEDROCK_PROVIDER_ID) {
-                // Mirror the other arms: a caller-supplied key wins over the
-                // environment. Region still falls back through
-                // `BedrockConfig::from_env`'s precedence (`BEDROCK_REGION` ->
-                // `AWS_REGION` -> `AWS_DEFAULT_REGION` -> default) so a client
-                // key alone doesn't lose region/model env overrides.
                 let mut config = BedrockConfig::from_env();
                 config.auth = BedrockAuth::Bearer(key.clone());
                 BedrockProvider::new(config)
@@ -436,30 +381,12 @@ pub fn resolve_real_providers(
     }
 }
 
-/// Register every provider whose credentials resolve from the environment,
-/// in the same precedence order [`resolve_real_providers`] detects them,
-/// followed by every `custom` spec in vec order.
-///
-/// Providers with missing credentials are skipped (debug-traced); any other
-/// construction error propagates. Custom specs shadowing a built-in id are
-/// rejected with [`EngineServiceError::CustomProviderConflict`]; malformed or
-/// duplicate specs with [`EngineServiceError::CustomProviderInvalid`].
-/// `preferred` must resolve (it may name a custom id) and becomes the
-/// registry priority. The returned [`ModelRef`] is provider-qualified:
-/// `model_arg` wins (qualified against the priority provider unless it
-/// already names one), else the priority provider's default model.
-///
-/// No credentials anywhere and no custom provider configured is not an
-/// error here: it returns an empty registry and `None` default model,
-/// deferring the failure to turn time so a client can open with no provider
-/// configured and let the user add one (e.g. via `/connect`) before prompting.
 pub fn resolve_available_providers(
     preferred: Option<&str>,
     model_arg: Option<String>,
     custom: &[CustomProviderSpec],
     provider_keys: &std::collections::BTreeMap<String, String>,
 ) -> EngineResult<(ProviderRegistry, Option<ModelRef>)> {
-    /// `(provider, its default model)` for a known name; `None` for unknown.
     fn build_provider(
         name: &str,
         provider_keys: &std::collections::BTreeMap<String, String>,
@@ -570,12 +497,7 @@ pub fn resolve_available_providers(
             Err(err) => return Err(err.into()),
         }
     }
-    // Ollama needs a host, not credentials — always register with the default
-    // localhost when building the multi-provider registry. Gating on
-    // `OLLAMA_HOST`/`OLLAMA_MODEL` hid local Ollama from desktop inline
-    // completion (and any other all_providers consumer) when chat used a
-    // different preferred provider. `list_models` already tolerates a down
-    // daemon; stream calls surface the connection error.
+
     if let Ok(Some((provider, model))) = build_provider(OLLAMA_PROVIDER_ID, provider_keys) {
         register(&mut providers, provider, model);
     }
@@ -734,10 +656,6 @@ mod tests {
 
     #[test]
     fn bedrock_client_key_wins_over_missing_env_in_single_provider_resolver() {
-        // Root-cause regression: a caller-supplied Bedrock key must resolve
-        // even when no Bedrock env vars are set at all — previously this arm
-        // called `BedrockProvider::from_env()` unconditionally and returned
-        // `AuthMissing` before ever looking at `provider_keys`.
         let keys = std::collections::BTreeMap::from([(
             BEDROCK_PROVIDER_ID.to_owned(),
             "bedrock-api-key".to_owned(),

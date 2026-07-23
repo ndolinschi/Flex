@@ -64,9 +64,3 @@ export const TurnFooter = ({
   )
 }
 
-/**
- * Bottom-of-feed "Reconnecting" banner — replaces the plain "Working"
- * indicator while a `retry_scheduled` status is live (see `ReconnectStatus`
- * / `useSessionEvents`). Shows the attempt counter and a live countdown to
- * the next retry, plus a faint second line with the error that triggered it.
- */

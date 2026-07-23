@@ -1,5 +1,3 @@
-//! [`Tool`] implementation for [`super::BashTool`].
-
 use async_trait::async_trait;
 
 use agentloop_contracts::ToolOutput;
@@ -79,12 +77,6 @@ impl Tool for BashTool {
             .unwrap_or(DEFAULT_TIMEOUT_MS)
             .min(MAX_TIMEOUT_MS);
 
-        // Register a demote handle for the duration of this blocking call —
-        // `background_demote` (via `DemoteRegistry::request_demote`) can fire
-        // it any time between now and the `unregister` below. Backends that
-        // don't implement `exec_demotable` (docker, ssh, …) ignore
-        // `spec.demote` entirely, so the registration is harmless dead
-        // weight for them, not a behavior change.
         let call_id = ctx.call_id.as_str().to_owned();
         let demote_token = self
             .demote
@@ -106,9 +98,6 @@ impl Tool for BashTool {
         let outcome = match result {
             Ok(ExecOrDemoted::Completed(outcome)) => outcome,
             Ok(ExecOrDemoted::Demoted { accumulated, entry }) => {
-                // Fill in the bookkeeping the executor left for us (it only
-                // knows the process handle, not the originating call's
-                // command line or true start time).
                 let status = entry.handle.status();
                 self.background.insert(
                     ctx.session_id.clone(),
@@ -133,12 +122,6 @@ impl Tool for BashTool {
                 return Ok(ToolOutput {
                     content: vec![agentloop_contracts::ToolResultBlock::markdown(rendered)],
                     is_error: false,
-                    // Same shape as `run_in_background`'s structured result
-                    // (`process_id`/`pid`/`running`) so the desktop UI's
-                    // background-row detection doesn't need a second code
-                    // path for a demoted call vs. one started in the
-                    // background from the outset — see `ToolStepGroup`'s
-                    // `isBackgroundBashCall`.
                     structured: Some(serde_json::json!({
                         "process_id": call_id,
                         "pid": status.pid,

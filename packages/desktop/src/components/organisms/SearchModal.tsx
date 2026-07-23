@@ -29,12 +29,10 @@ type SearchModalProps = {
   onClose: () => void
 }
 
-/** "Search Agents" modal — same chrome as CommandPalette. */
 export const SearchModal = ({ open, onClose }: SearchModalProps) => {
   const [query, setQuery] = useState("")
 
   const { sessions: allSessions } = useSessions()
-  // Match the sidebar: subagent child sessions are not directly searchable.
   const sessions = useMemo(
     () => allSessions.filter((s) => !s.parent_id),
     [allSessions],

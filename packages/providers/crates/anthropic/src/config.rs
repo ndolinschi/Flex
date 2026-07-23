@@ -1,5 +1,3 @@
-//! Anthropic environment configuration.
-
 use agentloop_contracts::{ModelInfo, ProviderId};
 use agentloop_core::ProviderError;
 use agentloop_provider_common::required_env;
@@ -9,13 +7,8 @@ pub const DEFAULT_ANTHROPIC_BASE_URL: &str = "https://api.anthropic.com/v1";
 pub const DEFAULT_ANTHROPIC_MODEL: &str = "claude-sonnet-4-5";
 pub(crate) const ANTHROPIC_VERSION: &str = "2023-06-01";
 
-/// Page size for Anthropic `/models` listing (API default is small).
 pub(crate) const MODEL_LIST_PAGE_LIMIT: u32 = 100;
 
-/// Baseline Claude model ids merged into live listings when the API omits
-/// them (pagination gaps, account visibility). Direct Anthropic API keys list
-/// every tier here; Copilot uses its own `/models` endpoint via the
-/// `copilot/` provider.
 pub(crate) fn known_anthropic_models() -> Vec<ModelInfo> {
     const IDS: &[&str] = &[
         "claude-opus-4-6",

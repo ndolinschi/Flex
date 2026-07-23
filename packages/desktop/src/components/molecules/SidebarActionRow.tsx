@@ -12,19 +12,12 @@ type SidebarActionRowProps = {
   }>
   label: string
   kbd?: string
-  /** Outlink marker (e.g. `ArrowUpRight`) for rows that open a separate pane
-   * — rendered right-aligned in place of the `kbd` slot. */
   trailingIcon?: ComponentType<{ className?: string; "aria-hidden"?: boolean }>
   onClick?: () => void
   disabled?: boolean
-  /** Swap the leading icon for a spinner while an async action runs. */
   loading?: boolean
 }
 
-/** Sidebar nav action row (Cursor Agents Web 2026-07-23):
- * `h-8` · `px-2.5` · `gap-2` · `rounded-sm` (6) · hover `bg-quaternary`.
- * Icon + label flush start + trailing shortcut — no flex-1 on the label
- * (that + UA `text-align:center` centers the text mid-row). */
 export const SidebarActionRow = ({
   icon: Icon,
   label,
@@ -42,7 +35,6 @@ export const SidebarActionRow = ({
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        // Nav: h-8 gap-2 px-2.5 rounded-sm — same gutter as agent-row.
         "h-8 w-full justify-start gap-2 rounded-sm px-2.5 font-medium",
         "text-ink hover:bg-[var(--color-bg-quaternary-opaque)] hover:text-ink",
         "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",

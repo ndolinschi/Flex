@@ -9,20 +9,6 @@ export const extForMimeType = (mimeType: string): string => {
   return "jpg"
 }
 
-/** Attach a clipboard/drop image blob.
- *
- * Preview: no filesystem — return false so the caller can surface an error.
- *
- * Native: the blob only exists in memory (clipboard/drag data), and the
- * engine's attachment contract only understands file paths
- * (`PromptAttachment.path` → `BlobSource::Path`, see
- * `src-tauri/src/commands.rs::build_prompt_input`) — there's no inline/base64
- * attachment path. So the bytes are persisted to a temp file via the
- * `write_temp_blob` command and the attachment's `path` is the real absolute
- * path the engine will read at send time.
- *
- * Returns `false` only on failure (e.g. the native write rejected the blob),
- * so the caller can surface an error instead of silently dropping the paste. */
 export const attachImageBlob = async (
   blob: File | Blob,
   addAttachment: (att: ComposerAttachment) => void,

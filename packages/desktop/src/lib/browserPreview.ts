@@ -1,5 +1,3 @@
-/** Detect Vite/browser runs without the Tauri runtime. Native desktop is
- * required for IPC — preview must not simulate a backend. */
 export const isBrowserPreview = (): boolean =>
   typeof window !== "undefined" &&
   !(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__

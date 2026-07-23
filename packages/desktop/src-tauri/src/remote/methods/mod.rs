@@ -1,4 +1,3 @@
-//! Connection-method adapters — ingress onto the shared desktop Remote API.
 
 mod bluetooth;
 mod bonjour;
@@ -26,12 +25,9 @@ pub enum MethodRuntimeStatus {
     ComingSoon,
 }
 
-/// Shared context passed when starting a connection method.
 pub struct MethodContext<'a> {
     pub config: &'a RemoteAccessConfig,
-    /// Port the shared HTTP listener is bound to (or will bind to).
     pub listen_port: u16,
-    /// Bound address string, e.g. `0.0.0.0:4520` or `127.0.0.1:4520`.
     #[allow(dead_code)]
     pub bind_addr: String,
 }
@@ -46,7 +42,6 @@ pub trait ConnectionMethod: Send + Sync {
     fn pairing_endpoints(&self, cfg: &RemoteAccessConfig) -> Vec<PairingEndpoint>;
 }
 
-/// Build the set of method adapters from current prefs (not yet started).
 pub fn build_methods(cfg: &RemoteAccessConfig) -> Vec<Box<dyn ConnectionMethod>> {
     let mut methods: Vec<Box<dyn ConnectionMethod>> = Vec::new();
     if cfg.methods.manual {

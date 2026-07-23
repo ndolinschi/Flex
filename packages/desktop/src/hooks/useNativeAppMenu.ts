@@ -9,7 +9,6 @@ import type { TitleBarActionHandlers } from "./useTitleBarActions"
 const APP_NAME = "Flex"
 
 type UseNativeAppMenuOpts = {
-  /** Install the macOS menu bar when true (macOS host only). */
   enabled: boolean
   isBootstrapped: boolean
   canSearch: boolean
@@ -17,10 +16,6 @@ type UseNativeAppMenuOpts = {
   handlers: TitleBarActionHandlers
 }
 
-/**
- * Installs a native macOS application menu (File / Edit / View / Help plus
- * the standard app submenu). No-ops outside Tauri or when `enabled` is false.
- */
 export const useNativeAppMenu = ({
   enabled,
   isBootstrapped,
@@ -28,7 +23,6 @@ export const useNativeAppMenu = ({
   canCommandPalette,
   handlers,
 }: UseNativeAppMenuOpts): void => {
-  // Keep the latest handlers without rebuilding the menu every render.
   const handlersRef = useRef(handlers)
   handlersRef.current = handlers
 
@@ -184,7 +178,6 @@ export const useNativeAppMenu = ({
         if (cancelled) return
         await menu.setAsAppMenu()
       } catch {
-        // Browser preview / missing ACL / older runtime — leave default menu.
       }
     }
 

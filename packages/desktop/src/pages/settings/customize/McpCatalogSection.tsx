@@ -14,11 +14,6 @@ import type { McpServerDto } from "../../../lib/types"
 import { EMPTY_MCP_SERVERS, MCP_SERVERS_KEY } from "./mcpServersKey"
 import { Input } from "@/components/ui/input"
 
-/** Curated "Browse catalog" grid of popular MCP servers, additive above the
- * manual add-server flow below. Cards with no required args/env install
- * directly; cards that need them (a path, a token, a connection string)
- * open `McpInstallDialog` first. Installed catalog entries that need config
- * expose Configure (re-opens the dialog; secrets keep-if-blank). */
 export const McpCatalogSection = () => {
   const queryClient = useQueryClient()
   const pushToast = useAppStore((s) => s.pushToast)
@@ -139,8 +134,6 @@ export const McpCatalogSection = () => {
           if (!pendingEntry) return
           const dto = buildCatalogServerDto(pendingEntry, values)
           if (dialogMode === "configure" && existing) {
-            // Preserve enabled flag and only send secret fields that the user
-            // typed (empty = keep existing — handled by Rust upsert).
             installMutation.mutate({
               ...dto,
               enabled: existing.enabled,

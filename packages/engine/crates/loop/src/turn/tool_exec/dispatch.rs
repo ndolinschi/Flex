@@ -1,5 +1,3 @@
-//! Pre/post hooks and worker-pool execution for a regular tool call.
-
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::{Semaphore, mpsc};

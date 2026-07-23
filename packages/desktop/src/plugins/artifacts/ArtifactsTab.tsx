@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useMemo, useState, type MouseEvent } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import {
   ExternalLink,
@@ -6,6 +6,7 @@ import {
   FileText,
   Image,
   LayoutTemplate,
+  MoreHorizontal,
   Package,
   RefreshCw,
   Share2,
@@ -23,7 +24,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { EmptyState } from "../../components/molecules"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ContextMenu, EmptyState } from "../../components/molecules"
+import {
+  buildArtifactOpenWithMenuItems,
+  availableArtifactOpenWithIds,
+  runArtifactOpenWith,
+  type ArtifactOpenWithId,
+} from "../../lib/artifacts/openWith"
 import {
   artifactsList,
   artifactsOpenExternal,
@@ -35,13 +49,13 @@ import {
 import type { SessionMeta } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import type { ArtifactKind } from "../../lib/artifacts/types"
+import { sessionScopeKey, useAppStore } from "../../stores/appStore"
 
 type ArtifactsTabProps = {
   active: boolean
   session: SessionMeta | undefined
 }
 
-/** Icon by artifact kind. */
 const KindIcon = ({ kind, className }: { kind: ArtifactKind; className?: string }) => {
   switch (kind) {
     case "presentation":
@@ -61,22 +75,39 @@ const KindIcon = ({ kind, className }: { kind: ArtifactKind; className?: string 
   }
 }
 
-/** Short label for session affinity — uses the full id for now; callers
- *  pass the active session id to detect "This agent". */
 const affinityLabel = (artifact: Artifact, activeSessionId: string | undefined): string => {
   if (!artifact.sessionId) return "Unknown agent"
   if (artifact.sessionId === activeSessionId) return "This agent"
-  // Show last 8 chars of the session id as a short handle.
   return artifact.sessionId.slice(-8)
+}
+
+const OPEN_WITH_LABELS: Record<ArtifactOpenWithId, string> = {
+  artifacts: "Open in Artifacts",
+  file: "Open as file tab",
+  files: "Reveal in Files",
+  folder: "Show in Folder",
+  external: "Open externally",
+  browser: "Open in Browser",
 }
 
 export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
   const projectKey = session?.cwd?.trim() ?? ""
   const activeSessionId = session?.id
+  const sessionKey = sessionScopeKey(activeSessionId ?? null)
+  const pushToast = useAppStore((s) => s.pushToast)
+  const focusPath = useAppStore(
+    (s) => s.artifactFocusPathBySession[sessionKey] ?? null,
+  )
+  const setArtifactFocusPath = useAppStore((s) => s.setArtifactFocusPath)
 
   const [selected, setSelected] = useState<Artifact | null>(null)
   const [csvPreview, setCsvPreview] = useState<CsvPreview | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
+  const [menu, setMenu] = useState<{
+    artifact: Artifact
+    x: number
+    y: number
+  } | null>(null)
 
   const {
     data: artifacts = [],
@@ -109,6 +140,40 @@ export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
     }
   }
 
+  useEffect(() => {
+    if (!focusPath || artifacts.length === 0) return
+    const match = artifacts.find((a) => a.relativePath === focusPath)
+    if (!match) return
+    void handleSelect(match)
+    setArtifactFocusPath(sessionKey, null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- select once per focus path
+  }, [focusPath, artifacts, sessionKey, setArtifactFocusPath])
+
+  const openWithCtx = (artifact: Artifact) => ({
+    sessionId: activeSessionId ?? null,
+    cwd: projectKey || null,
+    relativePath: artifact.relativePath,
+    artifactId: artifact.id,
+    kind: artifact.kind,
+  })
+
+  const onOpenWithError = (message: string) => {
+    setPreviewError(message)
+    pushToast(message, "error")
+  }
+
+  const handleRowContextMenu = (e: MouseEvent, artifact: Artifact) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenu({ artifact, x: e.clientX, y: e.clientY })
+  }
+
+  const contextMenuItems = useMemo(() => {
+    if (!menu) return []
+    return buildArtifactOpenWithMenuItems(openWithCtx(menu.artifact), onOpenWithError)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menu, activeSessionId, projectKey])
+
   const countLabel =
     artifacts.length === 0
       ? null
@@ -118,7 +183,6 @@ export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Header — only rendered once we have artifacts (same pattern as DatabaseTab). */}
       {artifacts.length > 0 ? (
         <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 px-2.5">
           <span className="min-w-0 flex-1 truncate text-sm text-ink-muted">
@@ -157,7 +221,6 @@ export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
         />
       ) : (
         <div className="flex min-h-0 flex-1">
-          {/* ── Left list — 180px sidebar (Terminal / Database pattern) ────── */}
           <aside className="flex w-[180px] shrink-0 flex-col border-r border-stroke-3">
             <ScrollArea className="min-h-0 flex-1 py-1.5">
               <ul>
@@ -168,6 +231,7 @@ export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
                       <Button
                         variant="ghost"
                         onClick={() => void handleSelect(artifact)}
+                        onContextMenu={(e) => handleRowContextMenu(e, artifact)}
                         className={cn(
                           "h-auto w-full flex-col items-start justify-start gap-0.5 rounded-none px-2.5 py-1.5 font-normal",
                           isActive
@@ -198,7 +262,6 @@ export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
             </ScrollArea>
           </aside>
 
-          {/* ── Right preview pane ─────────────────────────────────────────── */}
           <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
             {!selected ? (
               <div className="flex flex-1 items-center justify-center px-4 text-center text-sm text-ink-muted">
@@ -210,6 +273,12 @@ export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
                 csvPreview={csvPreview}
                 error={previewError}
                 isOpeningExternal={openExternalMut.isPending}
+                openWithIds={availableArtifactOpenWithIds(openWithCtx(selected))}
+                onOpenWith={(id) => {
+                  void runArtifactOpenWith(id, openWithCtx(selected)).catch(
+                    (err) => onOpenWithError(toInvokeError(err)),
+                  )
+                }}
                 onOpenExternal={() => openExternalMut.mutate(selected.id)}
                 onDismissError={() => setPreviewError(null)}
               />
@@ -217,17 +286,23 @@ export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
           </div>
         </div>
       )}
+
+      <ContextMenu
+        position={menu ? { x: menu.x, y: menu.y } : null}
+        items={contextMenuItems}
+        onClose={() => setMenu(null)}
+      />
     </div>
   )
 }
-
-// ── Preview pane ──────────────────────────────────────────────────────────────
 
 type ArtifactPreviewProps = {
   artifact: Artifact
   csvPreview: CsvPreview | null
   error: string | null
   isOpeningExternal: boolean
+  openWithIds: ArtifactOpenWithId[]
+  onOpenWith: (id: ArtifactOpenWithId) => void
   onOpenExternal: () => void
   onDismissError: () => void
 }
@@ -237,17 +312,45 @@ const ArtifactPreview = ({
   csvPreview,
   error,
   isOpeningExternal,
+  openWithIds,
+  onOpenWith,
   onOpenExternal,
   onDismissError,
 }: ArtifactPreviewProps) => {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Sub-header: title + kind badge + open-external */}
       <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5">
         <KindIcon kind={artifact.kind} className="h-3.5 w-3.5 text-icon-3" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink">
           {artifact.title}
         </span>
+        {openWithIds.length > 0 ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Open with"
+                  title="Open with"
+                  className="h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink"
+                />
+              }
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" aria-hidden />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={4} className="w-52">
+              <DropdownMenuGroup>
+                {openWithIds.map((id) => (
+                  <DropdownMenuItem key={id} onClick={() => onOpenWith(id)}>
+                    {OPEN_WITH_LABELS[id]}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
         <Button
           type="button"
           variant="ghost"
@@ -275,7 +378,6 @@ const ArtifactPreview = ({
         </div>
       ) : null}
 
-      {/* Body */}
       <ScrollArea className="min-h-0 flex-1">
         {artifact.kind === "csv" ? (
           <CsvPreviewPanel preview={csvPreview} />
@@ -288,8 +390,6 @@ const ArtifactPreview = ({
     </div>
   )
 }
-
-// ── CSV table preview ─────────────────────────────────────────────────────────
 
 const CsvPreviewPanel = ({ preview }: { preview: CsvPreview | null }) => {
   if (!preview) {
@@ -353,11 +453,7 @@ const CsvPreviewPanel = ({ preview }: { preview: CsvPreview | null }) => {
   )
 }
 
-// ── Image preview ─────────────────────────────────────────────────────────────
-
 const ImagePreviewPanel = ({ artifact }: { artifact: Artifact }) => {
-  // Use Tauri's convertFileSrc to get a URL accessible from the webview.
-  // This is the standard pattern for local files in Tauri apps.
   const [errored, setErrored] = useState(false)
 
   if (errored) {
@@ -381,8 +477,6 @@ const ImagePreviewPanel = ({ artifact }: { artifact: Artifact }) => {
     </div>
   )
 }
-
-// ── Generic "open externally" placeholder ─────────────────────────────────────
 
 const GenericPreviewPanel = ({
   artifact,

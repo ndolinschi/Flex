@@ -1,7 +1,3 @@
-//! `ToolCallManager`: owns every tool call of a turn, enforces the status
-//! machine, stamps timing, and yields the updated record for each transition
-//! so the loop can emit `ToolCallUpdated` events.
-
 use std::collections::HashMap;
 
 use agentloop_contracts::{
@@ -9,7 +5,6 @@ use agentloop_contracts::{
     ToolOutput, TurnId, now_ms,
 };
 
-/// Attempted an illegal status transition (a loop bug, not a user error).
 #[derive(Debug, thiserror::Error)]
 #[error("illegal tool-call transition for {call_id}: {from:?} -> {to:?}")]
 pub struct InvalidTransition {
@@ -18,7 +13,6 @@ pub struct InvalidTransition {
     pub to: ToolCallStatus,
 }
 
-/// In-flight tool calls of one turn.
 #[derive(Default)]
 pub struct ToolCallManager {
     calls: HashMap<ToolCallId, ToolCall>,
@@ -29,7 +23,6 @@ impl ToolCallManager {
         Self::default()
     }
 
-    /// Admit a parsed call as `Pending`. Returns the record to emit.
     #[allow(clippy::too_many_arguments)]
     pub fn admit(
         &mut self,
@@ -62,7 +55,6 @@ impl ToolCallManager {
         call
     }
 
-    /// Transition a call, stamping timing. Returns the updated record.
     pub fn transition(
         &mut self,
         id: &ToolCallId,
@@ -104,7 +96,6 @@ impl ToolCallManager {
         Ok(call.clone())
     }
 
-    /// Cancel every non-terminal call; returns the updated records to emit.
     pub fn cancel_in_flight(&mut self) -> Vec<ToolCall> {
         let ids: Vec<ToolCallId> = self
             .calls

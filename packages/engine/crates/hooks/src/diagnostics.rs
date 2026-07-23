@@ -1,8 +1,3 @@
-//! `DiagnosticsHook` — feed compiler/linter diagnostics back to the model after
-//! `Write`/`Edit`, so it can fix breakage it introduced. Availability-gated:
-//! disabled by default, and skipped entirely when no configured check matches
-//! the edited file's language or the check binary is not on `$PATH`.
-
 use std::process::Stdio;
 use std::time::Duration;
 
@@ -13,7 +8,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::util;
 
-/// A diagnostics run is bounded so a slow check cannot stall a turn.
 const CHECK_TIMEOUT: Duration = Duration::from_secs(60);
 const DEFAULT_MAX_LINES: usize = 40;
 
@@ -21,19 +15,12 @@ fn default_max_lines() -> usize {
     DEFAULT_MAX_LINES
 }
 
-/// A per-language diagnostics command (a compiler or linter) run after edits.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CheckSpec {
-    /// File extensions (without the dot) this check applies to.
     pub extensions: Vec<String>,
-    /// Command argv; `$FILE` is replaced with the edited file's absolute path
-    /// (e.g. `["cargo", "check", "--message-format=short"]`,
-    /// `["ruff", "check", "$FILE"]`, `["tsc", "--noEmit"]`).
     pub command: Vec<String>,
-    /// Extra environment variables for the check process.
     #[serde(default)]
     pub env: Vec<(String, String)>,
-    /// When true, this spec is ignored.
     #[serde(default)]
     pub disabled: bool,
 }
@@ -46,18 +33,12 @@ impl CheckSpec {
     }
 }
 
-/// Diagnostics feedback configuration. Disabled by default; when enabled, a
-/// matching check runs after each edit and its failure output is appended to
-/// the tool result for the model to act on.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiagnosticsConfig {
-    /// Master switch. When false the hook is inert regardless of `checks`.
     #[serde(default)]
     pub enabled: bool,
-    /// Per-language check commands.
     #[serde(default)]
     pub checks: Vec<CheckSpec>,
-    /// Cap on the number of diagnostic lines appended to a tool result.
     #[serde(default = "default_max_lines")]
     pub max_lines: usize,
 }
@@ -72,9 +53,6 @@ impl Default for DiagnosticsConfig {
     }
 }
 
-/// Availability-gated diagnostics hook. It is a silent no-op when diagnostics
-/// are disabled, no check matches the file's language, or the check binary is
-/// not on `$PATH` — honoring "run the correctness step only when available".
 pub struct DiagnosticsHook {
     config: DiagnosticsConfig,
     interests: Vec<HookPoint>,
@@ -88,7 +66,6 @@ impl DiagnosticsHook {
         }
     }
 
-    /// Whether diagnostics are enabled and at least one check is configured.
     pub fn is_active(&self) -> bool {
         self.config.enabled
             && self
@@ -150,9 +127,6 @@ impl Hook for DiagnosticsHook {
     }
 }
 
-/// Run the check (capturing stdio) and return its combined output when it
-/// reports a problem (non-zero exit); `None` when it passes, cannot be run, or
-/// times out. Diagnostics are advisory feedback, never a loop failure.
 async fn run_check(argv: &[String], env: &[(String, String)], file: &str) -> Option<String> {
     let (program, args) = argv.split_first()?;
     let mut cmd = tokio::process::Command::new(program);
@@ -193,8 +167,6 @@ async fn run_check(argv: &[String], env: &[(String, String)], file: &str) -> Opt
     Some(combined)
 }
 
-/// Keep the last `max_lines` lines (diagnostics tools put the summary last),
-/// marking any truncation explicitly.
 fn tail_lines(text: &str, max_lines: usize) -> String {
     let lines: Vec<&str> = text.lines().collect();
     if max_lines == 0 || lines.len() <= max_lines {

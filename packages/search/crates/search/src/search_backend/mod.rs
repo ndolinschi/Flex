@@ -1,10 +1,3 @@
-//! Pluggable search backends.
-//!
-//! The `SearchBackend` trait lets the `search_web` tool query different search
-//! engines. The default chain (see [`default_search_backends`]) prefers free,
-//! non-scraping APIs that do not rate-limit datacenter IPs the way DuckDuckGo
-//! HTML and public SearXNG instances do.
-
 mod brave;
 mod chain;
 mod ddg_html;
@@ -23,7 +16,6 @@ pub use ddg_instant::DuckDuckGoInstantBackend;
 pub use searxng::SearxNGBackend;
 pub use wikipedia::WikipediaBackend;
 
-/// A single search result from a backend.
 #[derive(Debug, Clone)]
 pub struct SearchResult {
     pub title: String,
@@ -31,7 +23,6 @@ pub struct SearchResult {
     pub snippet: String,
 }
 
-/// Errors that can occur during a search.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum SearchError {
@@ -45,10 +36,8 @@ pub enum SearchError {
     ParseError(String),
 }
 
-/// A pluggable search backend.
 #[async_trait::async_trait]
 pub trait SearchBackend: Send + Sync {
-    /// Execute a web search and return parsed results.
     async fn search(&self, query: &str) -> Result<Vec<SearchResult>, SearchError>;
 }
 
@@ -66,9 +55,7 @@ pub(crate) fn http_client() -> Client {
 pub(crate) fn map_status_error(err: reqwest::Error) -> SearchError {
     match err.status() {
         Some(reqwest::StatusCode::TOO_MANY_REQUESTS) => SearchError::RateLimited,
-        // HTML scrapers often get 400/403/202 challenge pages from DDG —
-        // treat as "no usable results" so the fallback chain can continue
-        // instead of surfacing a permanent-feeling rate-limit to the model.
+
         Some(
             reqwest::StatusCode::BAD_REQUEST
             | reqwest::StatusCode::FORBIDDEN
@@ -78,7 +65,6 @@ pub(crate) fn map_status_error(err: reqwest::Error) -> SearchError {
     }
 }
 
-/// Percent-encode a query string for a URL.
 pub(crate) fn urlencoding(s: &str) -> String {
     let mut encoded = String::with_capacity(s.len() * 3);
     for byte in s.as_bytes() {

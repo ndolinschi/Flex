@@ -15,7 +15,6 @@ const sizeMap: Record<SpinnerSize, string> = {
   lg: "size-7",
 }
 
-/** Indeterminate loading — muted ink, not a bright accent spinner. */
 export const Spinner = ({
   size = "md",
   className,

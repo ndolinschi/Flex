@@ -1,15 +1,7 @@
-//! AWS Signature Version 4 signing for Bedrock control-plane and runtime calls.
-//!
-//! Self-contained: HMAC-SHA256 is built on `sha2` (no extra dependency), and
-//! the timestamp is derived from `SystemTime` without a calendar crate. The
-//! implementation is checked against AWS's canonical worked example (see
-//! `matches_aws_documented_example`).
-
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use sha2::{Digest, Sha256};
 
-/// AWS credentials for SigV4.
 #[derive(Debug, Clone)]
 pub(crate) struct Sigv4Credentials {
     pub access_key_id: String,
@@ -17,10 +9,6 @@ pub(crate) struct Sigv4Credentials {
     pub session_token: Option<String>,
 }
 
-/// Compute the headers to attach to a request so it is SigV4-signed: `host`,
-/// `x-amz-date`, `x-amz-content-sha256`, the optional `content-type` and
-/// `x-amz-security-token`, and `Authorization`. The caller must set exactly
-/// these headers on the outgoing request (the signature covers them).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn signed_headers(
     creds: &Sigv4Credentials,
@@ -79,7 +67,6 @@ pub(crate) fn signed_headers(
     out
 }
 
-/// Derive `(YYYYMMDDTHHMMSSZ, YYYYMMDD)` from a wall-clock instant.
 pub(crate) fn amz_timestamps(now: SystemTime) -> (String, String) {
     let secs = now
         .duration_since(UNIX_EPOCH)
@@ -95,7 +82,6 @@ pub(crate) fn amz_timestamps(now: SystemTime) -> (String, String) {
     )
 }
 
-/// Days-since-epoch → (year, month, day), after Howard Hinnant's `civil_from_days`.
 fn civil_from_days(z: i64) -> (i64, i64, i64) {
     let z = z + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
@@ -123,7 +109,6 @@ fn sha256(bytes: &[u8]) -> [u8; 32] {
     out
 }
 
-/// HMAC-SHA256 (RFC 2104) over `sha2`, avoiding an extra crate.
 fn hmac_sha256(key: &[u8], message: &[u8]) -> [u8; 32] {
     const BLOCK: usize = 64;
     let mut block_key = [0u8; BLOCK];

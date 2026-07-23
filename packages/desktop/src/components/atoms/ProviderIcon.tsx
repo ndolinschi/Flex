@@ -10,10 +10,7 @@ type ProviderIconProps = {
   providerId: string
   label?: string
   className?: string
-  /** Pixel box — defaults to 16 (h-4 w-4). */
   size?: number
-  /** When true (default), sit the mark on a neutral chip so light/dark
-   * brand fills stay readable on both themes. */
   chip?: boolean
 }
 
@@ -42,9 +39,6 @@ const LetterMark = ({
   </span>
 )
 
-/** Brand mark for a provider id from `public/providers/{id}.{png,svg,webp}`.
- * Monochrome PNGs are black-on-transparent and get `dark:invert`.
- * Falls back to a letter chip when no asset loads (custom providers, missing file). */
 export const ProviderIcon = ({
   providerId,
   label,
@@ -59,7 +53,6 @@ export const ProviderIcon = ({
   }, [providerId])
   const src = candidates[index]
   const title = label ?? providerId
-  // Inner glyph is slightly inset when chipped so brand fills don't touch the edge.
   const glyph = Math.max(10, size - (chip ? 4 : 0))
 
   if (!src) {
@@ -83,7 +76,6 @@ export const ProviderIcon = ({
       draggable={false}
       className={cn(
         "shrink-0 object-contain",
-        // User PNGs are black glyphs on transparent; invert in dark UI.
         isMonochromeProviderPng(src) && "dark:invert",
         !chip && className,
       )}

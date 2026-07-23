@@ -9,19 +9,6 @@ type ErrorBoundaryState = {
   error: Error | null
 }
 
-/** Root-level render-error boundary. Without this, one uncaught render error
- * anywhere in the tree unmounts React entirely and leaves a white screen —
- * this catches it, logs the component stack, and renders a calm fallback
- * instead. Mounted in `main.tsx` around `<App/>`, inside `<StrictMode>`.
- * Dependency-free by design (no atoms/molecules imports) so it can never
- * itself fail to render because of an app-level regression. Uses the same
- * CSS custom properties the rest of the app themes off of (`--color-*`,
- * set on `<html data-theme>` in `stores/appStore.ts`), so it stays
- * dark/light aware even though it renders above the themed component tree.
- * `componentDidCatch` still always `console.error`s directly first — the
- * `log.error` call (ring buffer + gated) is best-effort and wrapped in its
- * own try/catch so a failure in the logging module itself can never stop
- * this boundary from rendering its fallback. */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { error: null }
 
@@ -38,7 +25,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         componentStack: info.componentStack,
       })
     } catch {
-      // Never let logging itself take down the error boundary.
     }
   }
 

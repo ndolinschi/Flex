@@ -4,9 +4,6 @@ use serde::Deserialize;
 
 #[derive(Debug, Default)]
 pub struct ClaudeCodeLineMapper {
-    /// Claude Code emits complete `assistant` messages *and* echoes the final
-    /// text again in its `result` frame. Once assistant text has streamed,
-    /// the result echo must be suppressed or the message doubles.
     saw_assistant_text: bool,
 }
 

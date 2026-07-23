@@ -1,5 +1,3 @@
-//! Native-loop composition over a prebuilt [`ProviderRegistry`].
-
 mod compose;
 
 use std::sync::Arc;
@@ -24,14 +22,6 @@ use self::compose::{
 };
 
 impl EngineService {
-    /// Compose the native loop over a prebuilt [`ProviderRegistry`] and an
-    /// optional default [`ModelRef`], plus the engine-scoped [`EngineConfig`].
-    ///
-    /// Provider *selection and construction* happen outside the engine (the
-    /// `providers` facade); this constructor is provider-agnostic. Enabled
-    /// plugins from `config.plugins` contribute tools, prompt fragments, and
-    /// roles, folded in deterministically. An empty registry is valid — the
-    /// service opens with no default model and the failure defers to turn time.
     pub fn native(
         providers: ProviderRegistry,
         default_model: Option<ModelRef>,
@@ -77,7 +67,6 @@ impl EngineService {
             .take()
             .unwrap_or_else(|| Arc::new(MemoryStore::new()));
 
-        // Peer-messaging tools: share one mailbox across all three tools.
         if config.enable_peer_messaging {
             let mailbox = Arc::new(PeerMailbox::new());
             tools.register(Arc::new(GetActiveAgentsTool::new(store.clone())));
@@ -85,8 +74,6 @@ impl EngineService {
             tools.register(Arc::new(GetMessagesTool::new(mailbox)));
         }
 
-        // SwitchMode: wire the same pending map the builder will expose via
-        // `respond_mode_switch`, so the tool and the reply path share state.
         let active_mode_switches = if config.enable_switch_mode {
             tools.register(Arc::new(SwitchModeTool::new(pending_mode_switches.clone())));
             Some(pending_mode_switches.clone())
@@ -94,9 +81,6 @@ impl EngineService {
             None
         };
 
-        // SetRouting: create a shared RoutingTable and hand it to both the
-        // tool (so it can write overrides) and the builder (so the loop can
-        // read them next iteration).
         let routing = Arc::new(RoutingTable::new());
         if config.enable_set_routing {
             let allowed = Arc::new(AllowedRouting {

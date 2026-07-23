@@ -1,18 +1,3 @@
-//! Flat-file vector store: the simplest robust v1 for the embedding half of
-//! hybrid retrieval.
-//!
-//! Chunk vectors are kept as a `Vec<(chunk_id, Vec<f32>)>`, bincode-encoded
-//! to a single file alongside the manifest/symbol table (see [`crate::store`]).
-//! Search is brute-force cosine similarity over every stored vector — fine
-//! up to roughly 100k chunks (a few hundred ms at that scale on a modern
-//! laptop CPU). Bigger corpora should upgrade to an ANN index (HNSW, e.g.
-//! via `usearch` or `hnsw_rs`) behind the same `VectorStore` query surface;
-//! nothing in `retrieve`/the tools depends on the brute-force scan itself.
-//!
-//! Keyed by [`EmbedderKey`] (provider id + dim): reopening a store whose
-//! persisted key doesn't match the configured embedder wipes the vectors
-//! and starts fresh, rather than mixing vectors from incompatible models.
-
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -22,7 +7,6 @@ use thiserror::Error;
 
 use crate::embed::EmbedderKey;
 
-/// Bumped whenever the on-disk vector file's shape changes.
 const VECTOR_STORE_VERSION: u32 = 1;
 
 #[derive(Debug, Error)]
@@ -42,23 +26,16 @@ pub enum VectorStoreError {
 struct Persisted {
     version: u32,
     embedder: EmbedderKey,
-    /// chunk_id -> (path, vector). Path is kept alongside the vector so a
-    /// whole-file removal doesn't require a second index structure.
     vectors: HashMap<String, (String, Vec<f32>)>,
 }
 
-/// One scored nearest-neighbor result from [`VectorStore::search`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct VectorHit {
     pub chunk_id: String,
     pub path: String,
-    /// Cosine similarity, in `[-1.0, 1.0]` (typically `[0.0, 1.0]` for
-    /// embeddings from a model trained with normalized outputs).
     pub score: f32,
 }
 
-/// Per-repo store of chunk embedding vectors, persisted as a single bincode
-/// file at `<index_dir>/vectors.bin`.
 pub struct VectorStore {
     path: PathBuf,
     embedder: EmbedderKey,
@@ -66,10 +43,6 @@ pub struct VectorStore {
 }
 
 impl VectorStore {
-    /// Open (or create) the vector store at `index_dir/vectors.bin` for the
-    /// given `embedder` identity. If a persisted store exists but was built
-    /// with a different embedder id/dim, it's discarded — mixing vectors
-    /// from two different models would make cosine similarity meaningless.
     pub fn open(index_dir: &Path, embedder: EmbedderKey) -> Result<Self, VectorStoreError> {
         let path = index_dir.join("vectors.bin");
         let persisted = load(&path)?;
@@ -86,9 +59,6 @@ impl VectorStore {
         })
     }
 
-    /// Whether the persisted store (before any writes this session) matched
-    /// the requested embedder — `false` means it was invalidated and started
-    /// empty (mismatched id/dim, or a version bump).
     pub fn is_empty(&self) -> bool {
         self.vectors.is_empty()
     }
@@ -97,8 +67,6 @@ impl VectorStore {
         &self.embedder
     }
 
-    /// Chunk ids already present in the store — used by callers to skip
-    /// re-embedding chunks that haven't changed.
     pub fn has(&self, chunk_id: &str) -> bool {
         self.vectors.contains_key(chunk_id)
     }
@@ -107,14 +75,11 @@ impl VectorStore {
         self.vectors.len()
     }
 
-    /// Insert or overwrite a chunk's vector.
     pub fn upsert(&mut self, chunk_id: &str, path: &str, vector: Vec<f32>) {
         self.vectors
             .insert(chunk_id.to_owned(), (path.to_owned(), vector));
     }
 
-    /// Drop every vector belonging to `path` (a file was deleted or
-    /// re-chunked with different chunk ids). Returns the removed chunk ids.
     pub fn remove_path(&mut self, path: &str) -> Vec<String> {
         let removed: Vec<String> = self
             .vectors
@@ -128,7 +93,6 @@ impl VectorStore {
         removed
     }
 
-    /// Persist the current contents to disk.
     pub fn save(&self) -> Result<(), VectorStoreError> {
         let persisted = Persisted {
             version: VECTOR_STORE_VERSION,
@@ -143,11 +107,6 @@ impl VectorStore {
         })
     }
 
-    /// Brute-force cosine top-k over every stored vector.
-    ///
-    /// O(n) in the number of stored chunks — acceptable up to ~100k chunks;
-    /// see the module doc for the ANN upgrade path once that stops being
-    /// true for a given repo.
     pub fn search(&self, query: &[f32], k: usize) -> Vec<VectorHit> {
         if self.vectors.is_empty() || query.is_empty() {
             return Vec::new();
@@ -190,9 +149,6 @@ fn load(path: &Path) -> Result<Option<Persisted>, VectorStoreError> {
     })?;
     match bincode::serde::decode_from_slice::<Persisted, _>(&bytes, bincode::config::standard()) {
         Ok((persisted, _)) => Ok(Some(persisted)),
-        // Corrupt or foreign-format file: treat like "no store yet" rather
-        // than a hard error, mirroring `store::load_manifest`'s version-drift
-        // handling.
         Err(_) => Ok(None),
     }
 }

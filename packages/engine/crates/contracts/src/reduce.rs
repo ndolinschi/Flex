@@ -1,15 +1,3 @@
-//! The pure reducer — Layer C of the unified stream format.
-//!
-//! `reduce(events)` folds a session's *persisted* events into a materialized
-//! [`Transcript`]: one item per message, with tool calls resolved to their
-//! latest records. It is the single place transcript state is derived — the
-//! loop uses it to build model context, stores use it to serve snapshots,
-//! delegators use it to build seed history.
-//!
-//! Streaming deltas are intentionally ignored: live consumers apply deltas
-//! themselves and re-sync from materialized items; the durable log never
-//! contains deltas in the first place.
-
 use std::collections::HashMap;
 
 use schemars::JsonSchema;
@@ -21,7 +9,6 @@ use crate::ids::{MessageId, ProviderId, SessionId, ToolCallId, TurnId};
 use crate::session::{CompactionSummary, TokenUsage};
 use crate::tool_call::{ToolCall, ToolCallOrigin, ToolCallStatus, ToolCallTiming};
 
-/// One block of a materialized transcript item.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
@@ -34,8 +21,6 @@ pub enum TranscriptBlock {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         signature: Option<String>,
     },
-    /// The full tool-call record in its latest known state (result embedded).
-    /// Boxed: the record is much larger than the other variants.
     ToolCall(Box<ToolCall>),
     Image {
         media_type: String,
@@ -52,7 +37,6 @@ pub enum TranscriptBlock {
     },
 }
 
-/// One materialized message with its blocks.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct TranscriptItem {
     pub message_id: MessageId,
@@ -64,21 +48,16 @@ pub struct TranscriptItem {
     pub usage: Option<TokenUsage>,
 }
 
-/// The materialized view of a session.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Transcript {
     pub items: Vec<TranscriptItem>,
-    /// The latest compaction, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub compaction: Option<CompactionSummary>,
-    /// Index into `items`: entries before it are superseded by
-    /// `compaction.summary_markdown` when building model context.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub boundary_index: Option<usize>,
 }
 
 impl Transcript {
-    /// Aggregate usage across all items that reported it.
     pub fn total_usage(&self) -> TokenUsage {
         let mut total = TokenUsage::default();
         for item in &self.items {
@@ -89,8 +68,6 @@ impl Transcript {
         total
     }
 
-    /// The view used to build model context: the latest compaction summary
-    /// (if any) plus the items after the boundary.
     pub fn context_view(&self) -> (Option<&CompactionSummary>, &[TranscriptItem]) {
         match (&self.compaction, self.boundary_index) {
             (Some(summary), Some(idx)) if idx <= self.items.len() => {
@@ -101,8 +78,6 @@ impl Transcript {
     }
 }
 
-/// Fold persisted events into a [`Transcript`]. Pure and total: unknown or
-/// out-of-order input degrades gracefully, never panics.
 pub fn reduce<'a>(events: impl IntoIterator<Item = &'a AgentEvent> + Clone) -> Transcript {
     let mut calls: HashMap<ToolCallId, ToolCall> = HashMap::new();
     let mut session_id: Option<SessionId> = None;

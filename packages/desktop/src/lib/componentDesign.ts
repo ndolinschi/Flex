@@ -1,4 +1,3 @@
-/** Components Design Mode helpers: style-edit payload + composer merge. */
 
 export type ComponentStyleChange = {
   property: string
@@ -10,12 +9,9 @@ export type ComponentStyleEditPayload = {
   componentName: string
   file: string
   exportName: string
-  /** CSS selector when a live Design Mode / Browser target is known. */
   targetSelector?: string | null
   propsSummary?: string[]
-  /** Dependent component ids / names discovered from imports. */
   dependencies?: string[]
-  /** Short source excerpt for the agent (optional). */
   sourceSnippet?: string | null
   changes: ComponentStyleChange[]
 }
@@ -23,7 +19,6 @@ export type ComponentStyleEditPayload = {
 const STYLE_EDIT_HEADING = "## Component style edit"
 const STYLE_EDIT_SEPARATOR = "\n\n---\n\n"
 
-/** Serialize a Components-tab CSS save into markdown for the agent. */
 export const formatComponentStyleMarkdown = (
   payload: ComponentStyleEditPayload,
 ): string => {
@@ -65,7 +60,6 @@ export const formatComponentStyleMarkdown = (
   return lines.join("\n")
 }
 
-/** Merge style-edit context with the user's typed instruction. */
 export const mergeComponentStyleWithDraft = (
   draft: string,
   payloads: ComponentStyleEditPayload[],
@@ -77,7 +71,6 @@ export const mergeComponentStyleWithDraft = (
   return `${context}${STYLE_EDIT_SEPARATOR}${text}`
 }
 
-/** Reverse of merge for DISPLAY: strip injected style-edit blocks from timeline. */
 export const parseComponentStyleMessage = (
   text: string,
 ): { instruction: string; editCount: number } | null => {
@@ -90,7 +83,6 @@ export const parseComponentStyleMessage = (
   return { instruction: instruction.trim(), editCount: Math.max(editCount, 1) }
 }
 
-/** Diff baseline vs draft CSS maps into change rows. */
 export const diffStyleDrafts = (
   baseline: Record<string, string>,
   draft: Record<string, string>,
@@ -107,7 +99,6 @@ export const diffStyleDrafts = (
   return changes
 }
 
-/** CSS properties editable in the Components panel (subset aligned with Design Mode). */
 export const COMPONENT_CSS_PROPERTIES = [
   "color",
   "background-color",

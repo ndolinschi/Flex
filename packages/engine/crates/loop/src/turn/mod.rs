@@ -1,14 +1,3 @@
-//! One turn of the native loop: prompt → model → tools → repeat until idle.
-//!
-//! Concurrency rule: consecutive read-only tool calls execute concurrently
-//! (bounded); mutating calls execute strictly sequentially at their position.
-//! Results are keyed by call id, so protocol correctness never depends on
-//! completion order while write-then-read hazards are impossible.
-//!
-//! Cancellation is not an error: an interrupted turn marks in-flight calls
-//! `Cancelled`, completes with `TurnStopReason::Cancelled`, and `prompt()`
-//! returns `Ok`.
-
 mod hooks;
 mod iteration;
 pub(crate) mod tool_exec;
@@ -33,13 +22,11 @@ use crate::session_handle::SessionHandle;
 use self::hooks::run_hooks;
 use self::iteration::run_iteration;
 
-/// Outcome of one loop iteration.
 pub(super) enum IterationOutcome {
     Continue,
     Stop(TurnStopReason),
 }
 
-/// Aborts the wrapped task when dropped (turn finished before the deadline).
 struct AbortOnDrop(tokio::task::JoinHandle<()>);
 
 impl Drop for AbortOnDrop {
@@ -48,40 +35,12 @@ impl Drop for AbortOnDrop {
     }
 }
 
-/// Flush the turn's event-drain task, but NEVER block turn completion on it
-/// indefinitely.
-///
-/// The drain ends only when every `EventSink` sender is dropped. A
-/// `run_in_background` command (dev server, watcher, `tail -f`) hands the
-/// executor a *clone* of the turn sink so its output keeps streaming to the
-/// terminal for the process's whole lifetime — which can far outlive the turn.
-/// Awaiting the drain unconditionally therefore wedges the turn (and its
-/// `turn_gate`) forever the moment a background process is still alive: every
-/// later `prompt` is rejected with "a turn is already in progress" with no
-/// event left to clear it.
-///
-/// All TURN-scoped events are emitted (and mostly drained, since the task runs
-/// concurrently during the turn) before this is called, so a bounded wait
-/// flushes the small tail. If a background sender is still holding the channel
-/// open past that, we leave the drain running detached: it keeps forwarding
-/// that process's `ExecChunk`s until it exits, and drops itself when the sink
-/// finally closes.
-///
-/// `done` fires FIRST, before the flush: the turn is logically complete (its
-/// terminal event was already emitted directly via the handle), so the caller
-/// can release the `turn_gate` now instead of holding it across this cleanup.
-/// Otherwise a queued follow-up prompt, draining the instant the frontend sees
-/// TurnCompleted, races the still-held gate during the flush window (up to the
-/// full bounded wait for a background process) and is bounced with
-/// "a turn is already in progress".
 async fn flush_turn_events(
     drain: tokio::task::JoinHandle<()>,
     done: tokio::sync::oneshot::Sender<()>,
 ) {
     let _ = done.send(());
     const FLUSH_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(500);
-    // Ok => sink fully closed (no live background process); Err => timed out,
-    // JoinHandle dropped here detaches the task (tokio does NOT abort on drop).
     let _ = tokio::time::timeout(FLUSH_TIMEOUT, drain).await;
 }
 
@@ -93,13 +52,6 @@ pub(crate) async fn run_turn(
     done: tokio::sync::oneshot::Sender<()>,
 ) -> Result<TurnSummary, AgentError> {
     let initial_meta = deps.store.get_meta(&handle.id).await?;
-    // Deferred isolation: for a depth-0 session with an isolation policy
-    // that wants a workspace but hasn't been provisioned yet, provision (or
-    // attach a reuse hint) now. This is a no-op for every other case,
-    // including subagents (depth != 0) which inherit their parent's cwd.
-    // On success the returned meta reflects the new cwd/workspace_id so the
-    // rest of the turn — attachments, tool cwd, snapshot label — uses the
-    // worktree instead of the base project directory.
     let meta = crate::workspace_ensure::ensure_root_workspace(deps, &handle, initial_meta).await?;
     let turn_id = TurnId::generate();
     let cancel = CancellationToken::new();
@@ -109,9 +61,6 @@ pub(crate) async fn run_turn(
         .unwrap_or_else(|p| p.into_inner()) = Some(cancel.clone());
     let started_at = now_ms();
 
-    // Per-turn wall-clock budget: trip the turn's cancel token when it
-    // elapses, so the loop winds down gracefully (in-flight calls marked
-    // cancelled, `TurnCompleted` emitted) instead of being aborted mid-emit.
     let _watchdog = opts.turn_timeout_ms.map(|ms| {
         let cancel = cancel.clone();
         AbortOnDrop(tokio::spawn(async move {
@@ -132,13 +81,8 @@ pub(crate) async fn run_turn(
         handle.set_turn_permission_mode(opts.permission_mode);
         handle.set_turn_disable_tools(opts.disable_tools);
         handle.set_turn_effort(opts.effort);
-        // Clear any routing override left from a previous turn so each turn
-        // starts from scratch (Auto mode re-establishes it once it classifies
-        // the new task).
         deps.routing.clear(&handle.id);
 
-        // Sink is created before UserPromptSubmit so hooks (e.g. auto-context
-        // indexing) can emit live progress into the same drain as tools.
         let (sink, mut sink_rx) = EventSink::channel();
         let drain = tokio::spawn({
             let handle = handle.clone();
@@ -222,9 +166,6 @@ pub(crate) async fn run_turn(
             let mut num_tool_calls = 0u32;
             let mut manager = ToolCallManager::new();
             let mut stop_reason = TurnStopReason::MaxIterations;
-            // Model that produced the most recent assistant message this turn;
-            // used to price `usage_total` (see the attribution note in
-            // `run_iteration`).
             let mut last_model: Option<String> = None;
 
             for _iteration in 0..deps.limits.max_iterations {
@@ -376,10 +317,6 @@ pub(crate) async fn run_turn(
     .await
 }
 
-/// Estimate a turn's USD cost from its accumulated usage, priced at `model`'s
-/// rate. Returns `None` when no model produced a message yet (e.g. the turn
-/// errored before any model call) or the model isn't in the price table
-/// (unknown/local models degrade gracefully — see `agentloop_contracts::pricing`).
 fn cost_for_turn(model: Option<&str>, usage: &TokenUsage) -> Option<f64> {
     let price = price_for(model?)?;
     Some(price.cost(usage))

@@ -1,4 +1,3 @@
-//! Desktop shell errors — mapped to strings for Tauri invoke.
 
 use agentloop_sdk::EngineServiceError;
 

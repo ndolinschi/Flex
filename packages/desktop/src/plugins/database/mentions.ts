@@ -1,8 +1,6 @@
 import { dbMentionTables } from "../../lib/tauri"
 import type { UiMentionHit } from "../types"
 
-/** @-mention provider for tables on live Database plugin connections
- * for the active project cwd. */
 export const searchDatabaseMentions = async (
   query: string,
   cwd: string | undefined,

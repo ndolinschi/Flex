@@ -1,14 +1,3 @@
-//! `SetRouting`: let the model escalate to a stronger model and/or higher
-//! reasoning effort within the current turn.
-//!
-//! Registered only when `EngineConfig::enable_set_routing` is `true`. In
-//! Auto mode the loop starts every turn with the cheapest configured model
-//! and `Effort::Low`; the model calls `SetRouting` once it has classified
-//! the task and knows a different tier is warranted. The loop reads the
-//! override from the [`RoutingTable`] at the start of the next iteration
-//! (i.e. after the current tool round-trip), so the escalated model answers
-//! the follow-up request in the same turn.
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -23,14 +12,8 @@ use agentloop_core::{
 
 use crate::fs::schema_of;
 
-// ---------------------------------------------------------------------------
-// AllowedRouting — cost-mode policy
-// ---------------------------------------------------------------------------
-
-/// The set of models and the effort cap that the current cost mode permits.
 #[derive(Debug, Clone)]
 pub struct AllowedRouting {
-    /// `"low"` | `"medium"` | `"high"` | `"auto"`.
     pub cost_mode: String,
     pub low: Vec<String>,
     pub medium: Vec<String>,
@@ -38,7 +21,6 @@ pub struct AllowedRouting {
 }
 
 impl AllowedRouting {
-    /// Full `provider/model` ids (and bare model suffixes) the cost mode permits.
     pub fn allowed_models(&self) -> Vec<String> {
         match self.cost_mode.as_str() {
             "low" => self.low.clone(),
@@ -56,7 +38,6 @@ impl AllowedRouting {
                     self.high.clone()
                 }
             }
-            // "auto" and anything unrecognized
             _ => {
                 let mut v = self.low.clone();
                 v.extend(self.medium.iter().cloned());
@@ -66,11 +47,6 @@ impl AllowedRouting {
         }
     }
 
-    /// Cap the requested effort to what this cost mode allows.
-    ///
-    /// - `low` → max `Medium`
-    /// - `medium` → max `High`
-    /// - `high` / `auto` → no cap
     pub fn cap_effort(&self, effort: Effort) -> Effort {
         match self.cost_mode.as_str() {
             "low" => effort.min(Effort::Medium),
@@ -79,8 +55,6 @@ impl AllowedRouting {
         }
     }
 
-    /// Check whether `model_id` (full `provider/model` OR bare model suffix)
-    /// is in the allowed set.
     pub fn model_allowed(&self, model_id: &str) -> bool {
         let allowed = self.allowed_models();
         allowed.iter().any(|a| {
@@ -96,31 +70,16 @@ impl AllowedRouting {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tool input
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct SetRoutingInput {
-    /// Full `provider/model` id from the allowed list, e.g.
-    /// `"anthropic/claude-sonnet-4-5"`. Omit to change effort only.
     #[serde(default)]
     model: Option<String>,
-    /// Reasoning effort: `"low"` | `"medium"` | `"high"` | `"xhigh"` |
-    /// `"max"`. Omit to change model only.
     #[serde(default)]
     effort: Option<String>,
-    /// Short, user-facing explanation why you are escalating, e.g.
-    /// `"multi-file refactor — escalating to strong model"`.
     reason: String,
 }
 
-// ---------------------------------------------------------------------------
-// Tool
-// ---------------------------------------------------------------------------
-
-/// Escalate routing mid-turn: pick a stronger model and/or higher effort.
 pub struct SetRoutingTool {
     table: Arc<RoutingTable>,
     allowed: Arc<AllowedRouting>,
@@ -237,7 +196,6 @@ impl Tool for SetRoutingTool {
             ));
         }
 
-        // Validate + resolve model.
         let model_ref: Option<ModelRef> = if let Some(m) = input.model.as_deref() {
             let m = m.trim();
             if !self.allowed.model_allowed(m) {
@@ -254,7 +212,6 @@ impl Tool for SetRoutingTool {
             None
         };
 
-        // Validate + cap effort.
         let effort: Option<Effort> = if let Some(e) = input.effort.as_deref() {
             let parsed = parse_effort_wire(e.trim()).ok_or_else(|| {
                 ToolError::InvalidInput(format!(
@@ -267,7 +224,6 @@ impl Tool for SetRoutingTool {
             None
         };
 
-        // Write to routing table.
         self.table.set(
             &ctx.session_id,
             RoutingOverride {
@@ -276,7 +232,6 @@ impl Tool for SetRoutingTool {
             },
         );
 
-        // Emit event.
         ctx.events.emit(AgentEvent::RoutingChanged {
             model: model_ref.as_ref().map(|m| m.0.clone()),
             effort: effort.map(effort_to_wire).map(str::to_owned),
@@ -307,10 +262,6 @@ impl Tool for SetRoutingTool {
         })
     }
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -421,7 +372,6 @@ mod tests {
         let ov = table
             .get(&SessionId(session.to_owned()))
             .expect("override should be set");
-        // max capped to medium in low cost mode
         assert_eq!(ov.effort, Some(Effort::Medium));
     }
 
@@ -446,7 +396,6 @@ mod tests {
         let ov = table
             .get(&SessionId(session.to_owned()))
             .expect("override should be set");
-        // xhigh capped to high in medium cost mode
         assert_eq!(ov.effort, Some(Effort::High));
     }
 
@@ -471,7 +420,6 @@ mod tests {
         let tool = SetRoutingTool::new(table.clone(), Arc::new(allowed("auto")));
         let session = "s6";
 
-        // Pass bare suffix "claude-opus-4-5" instead of "anthropic/claude-opus-4-5"
         let output = tool
             .run(
                 make_ctx(session),

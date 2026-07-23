@@ -1,5 +1,3 @@
-//! Private Ollama chat wire types.
-
 use agentloop_contracts::{
     BlobSource, ContentBlock, Message, MessageId, ModelInfo, Role, StopReason, TokenUsage,
     ToolCallId, ToolResultBlock,

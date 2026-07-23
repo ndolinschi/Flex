@@ -1,5 +1,3 @@
-//! opencode delegator: drives `opencode run --json` and normalizes its output.
-
 mod config;
 mod mapper;
 mod profile;

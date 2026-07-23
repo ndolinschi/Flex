@@ -48,7 +48,6 @@ describe("chrome primitives", () => {
     )
     expect(html).toContain('role="tab"')
     expect(html).toContain('aria-label="Close Chat"')
-    // Select control closes before the close button opens (sibling, not nested).
     expect(html).toMatch(/role="tab"[^>]*>[\s\S]*?<\/button>\s*<button[^>]*aria-label="Close Chat"/)
     expect(html.match(/<button/g)?.length).toBe(2)
   })

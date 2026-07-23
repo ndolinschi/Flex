@@ -1,51 +1,38 @@
-//! Bedrock endpoint + auth configuration.
-
-/// Registry id for the Bedrock provider.
 pub const BEDROCK_PROVIDER_ID: &str = "bedrock";
 
-/// Default region when none is configured.
 const DEFAULT_REGION: &str = "us-east-1";
 
-/// Default model — a stable, widely-available Bedrock model id. Override with
-/// `BEDROCK_MODEL` or `/model bedrock/<id>`; `list_models` fetches the live set.
 const DEFAULT_MODEL: &str = "anthropic.claude-3-5-sonnet-20241022-v2:0";
 
-/// How the provider authenticates to AWS.
 #[derive(Debug, Clone)]
 pub enum BedrockAuth {
-    /// Bedrock API key (bearer token, `AWS_BEARER_TOKEN_BEDROCK`).
     Bearer(String),
-    /// SigV4 with AWS credentials (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
-    /// / optional `AWS_SESSION_TOKEN`).
+
     SigV4 {
         access_key_id: String,
         secret_access_key: String,
         session_token: Option<String>,
     },
-    /// No credentials resolved; requests fail with an actionable error.
+
     None,
 }
 
 impl BedrockAuth {
-    /// Whether any usable credential is present.
     pub fn is_present(&self) -> bool {
         !matches!(self, BedrockAuth::None)
     }
 }
 
-/// Resolved Bedrock configuration.
 #[derive(Debug, Clone)]
 pub struct BedrockConfig {
-    /// AWS region, e.g. `us-east-1`.
     pub region: String,
-    /// How to authenticate.
+
     pub auth: BedrockAuth,
-    /// Default model id used when a request carries no model.
+
     pub default_model: String,
 }
 
 impl BedrockConfig {
-    /// Build with an explicit auth strategy.
     pub fn new(
         region: impl Into<String>,
         auth: BedrockAuth,
@@ -62,7 +49,6 @@ impl BedrockConfig {
         }
     }
 
-    /// Convenience: bearer-token config (empty key → `None` auth).
     pub fn bearer(
         region: impl Into<String>,
         api_key: impl Into<String>,
@@ -75,11 +61,6 @@ impl BedrockConfig {
         Self::new(region, auth, default_model)
     }
 
-    /// Read region/credentials/model from the environment.
-    ///
-    /// Region: `BEDROCK_REGION` → `AWS_REGION` → `AWS_DEFAULT_REGION` → default.
-    /// Auth: `AWS_BEARER_TOKEN_BEDROCK` (preferred), else the SigV4 credential
-    /// trio, else none. Model: `BEDROCK_MODEL` → default.
     pub fn from_env() -> Self {
         let region = env("BEDROCK_REGION")
             .or_else(|| env("AWS_REGION"))
@@ -94,18 +75,14 @@ impl BedrockConfig {
         }
     }
 
-    /// Base host for the runtime (inference) endpoint.
     pub fn runtime_host(&self) -> String {
         format!("bedrock-runtime.{}.amazonaws.com", self.region)
     }
 
-    /// Base host for the control-plane (model listing) endpoint.
     pub fn control_host(&self) -> String {
         format!("bedrock.{}.amazonaws.com", self.region)
     }
 
-    /// The `converse-stream` URL for `model` (model id percent-encoded for the
-    /// path — Bedrock model ids contain `:`).
     pub fn converse_stream_url(&self, model: &str) -> String {
         format!(
             "https://{}/model/{}/converse-stream",
@@ -114,24 +91,14 @@ impl BedrockConfig {
         )
     }
 
-    /// The `ListFoundationModels` control-plane URL. No query — results are
-    /// filtered client-side, which keeps SigV4 canonicalization query-free.
     pub fn foundation_models_url(&self) -> String {
         format!("https://{}/foundation-models", self.control_host())
     }
 
-    /// The `ListInferenceProfiles` control-plane URL (cross-region profiles).
     pub fn inference_profiles_url(&self) -> String {
         format!("https://{}/inference-profiles", self.control_host())
     }
 
-    /// `ListInferenceProfiles` URL for one page of a given `profile_type`
-    /// (`SYSTEM_DEFINED` for the cross-region built-ins, `APPLICATION` for
-    /// user-created ones): `maxResults=1000` plus an optional `nextToken`
-    /// continuation and the type filter. Query params are pre-sorted
-    /// (`maxResults` < `nextToken` < `typeEquals`) and the token is RFC-3986
-    /// encoded, so the string is a valid SigV4 canonical query as-is — signing
-    /// reads it back from this same URL.
     pub fn inference_profiles_page_url(
         &self,
         next_token: Option<&str>,
@@ -151,7 +118,6 @@ impl BedrockConfig {
     }
 }
 
-/// Resolve auth from the environment: bearer token wins, then SigV4 creds.
 fn resolve_env_auth() -> BedrockAuth {
     if let Some(token) = env("AWS_BEARER_TOKEN_BEDROCK") {
         return BedrockAuth::Bearer(token);
@@ -166,16 +132,10 @@ fn resolve_env_auth() -> BedrockAuth {
     }
 }
 
-/// Percent-encode the characters in a Bedrock model id that are unsafe in a URL
-/// path segment (`:` in `…v2:0`, `/` in ARNs). Alphanumerics and `-._~` pass
-/// through unchanged.
 fn encode_model_id(model: &str) -> String {
     percent_encode_rfc3986(model)
 }
 
-/// RFC-3986 percent-encoding: only the unreserved set (`A-Za-z0-9-._~`) passes
-/// through; every other byte becomes `%XX`. This matches AWS SigV4's canonical
-/// encoding for both path segments and query-parameter values.
 fn percent_encode_rfc3986(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for byte in value.bytes() {

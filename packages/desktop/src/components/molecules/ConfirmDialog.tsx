@@ -22,16 +22,12 @@ type ConfirmDialogProps = {
   cancelLabel?: string
   danger?: boolean
   isLoading?: boolean
-  /** Extra disable for confirm (e.g. empty required fields). */
   confirmDisabled?: boolean
   onConfirm: () => void
   onCancel: () => void
   children?: ReactNode
 }
 
-/** In-app confirm / short-form modal on shadcn Base UI `AlertDialog`.
- * Controlled `open` — parent owns state; Esc / Cancel call `onCancel`.
- * Outside click does not dismiss (Alert Dialog default). */
 export const ConfirmDialog = ({
   open,
   title,
@@ -55,7 +51,6 @@ export const ConfirmDialog = ({
       <AlertDialogContent
         size="sm"
         className={cn(
-          // Forms (rename, Create PR) need more than the default sm width.
           children && "max-w-[min(100%,32rem)] sm:max-w-lg",
         )}
       >
@@ -85,8 +80,6 @@ export const ConfirmDialog = ({
             variant={danger ? "destructive" : "default"}
             disabled={confirmDisabled || isLoading}
             onClick={(e) => {
-              // Action is a plain Button (not Close) — keep dialog open until
-              // the parent sets `open={false}` after the async work finishes.
               e.preventDefault()
               if (confirmDisabled || isLoading) return
               onConfirm()

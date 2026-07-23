@@ -10,9 +10,6 @@ type SidebarFooterProps = {
   isCreating?: boolean
 }
 
-/**
- * Theme + settings chrome only — no account / avatar row (Flex is local).
- */
 export const SidebarFooter = ({
   theme,
   onToggleTheme,

@@ -1,5 +1,3 @@
-//! ChatGPT subscription provider implementation.
-
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -85,8 +83,6 @@ impl ChatgptProvider {
                 .header("chatgpt-account-id", &account);
         }
         if let Some(session_id) = lite_session_id {
-            // Responses Lite (GPT-5.6 family): without this header the backend
-            // 404s with "Model not found" even when the id is valid.
             request = request
                 .header("x-openai-internal-codex-responses-lite", "true")
                 .header("session-id", session_id)

@@ -1,8 +1,8 @@
-import { memo, useState, type MouseEvent as ReactMouseEvent } from "react"
+import { memo, useCallback, useState, type MouseEvent as ReactMouseEvent } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, ChevronRight, FileCode2, Undo2 } from "lucide-react"
-import { Checkbox, DiffStat, Spinner } from "../../atoms"
-import { Collapsible, ConfirmDialog, DiffView } from "../../molecules"
+import { ChevronRight, Plus, Undo2 } from "lucide-react"
+import { DiffStat, Spinner } from "../../atoms"
+import { ConfirmDialog, DiffView } from "../../molecules"
 import { Button } from "@/components/ui/button"
 import { invalidateReviewQueries } from "../../../hooks/useWorkspaceActions"
 import { buildPatch, type Hunk, type ParsedDiffFile } from "../../../lib/diff"
@@ -25,15 +25,11 @@ export const STATUS_COLOR: Record<string, string> = {
   R: "text-blue",
 }
 
-/** Dir prefix of a file row's path, truncated from the LEFT when it doesn't
- * fit — the reference trick: the outer span is `direction: rtl` so ellipsis lands
- * on the left, but the text itself must stay logically LTR (a path, not
- * Arabic), so it's wrapped in an inner `direction: ltr` span. */
 const PathPrefix = ({ dir }: { dir: string }) => {
   if (!dir) return null
   return (
     <span
-      className="min-w-0 shrink overflow-hidden text-ellipsis whitespace-nowrap text-xs opacity-40"
+      className="min-w-0 shrink overflow-hidden text-ellipsis whitespace-nowrap text-xs text-ink-faint"
       style={{ direction: "rtl" }}
     >
       <span style={{ direction: "ltr", unicodeBidi: "embed" }}>{dir}</span>
@@ -41,11 +37,6 @@ const PathPrefix = ({ dir }: { dir: string }) => {
   )
 }
 
-/** Memoized: a Changes tab with hundreds of files (e.g. after scaffolding a
- * project) re-renders the list on every 5s poll / selection toggle — without
- * memoization every row would re-render even though only one row's props
- * actually changed. Props are simple primitives/callbacks per row, so a
- * shallow prop comparison is enough (no custom comparator needed). */
 export const FileRow = memo(function FileRow({
   file,
   sessionId,
@@ -61,26 +52,23 @@ export const FileRow = memo(function FileRow({
   sessionId: string | null
   isolated: boolean
   expanded: boolean
-  onToggle: () => void
+  onToggle: (path: string) => void
   onError: (message: string) => void
-  /** Show the commit-center checkbox (non-isolated sessions only). */
   selectable?: boolean
   selected?: boolean
-  onToggleSelected?: () => void
+  onToggleSelected?: (path: string) => void
 }) {
-  // A trailing-slash path is an untracked-directory porcelain entry (e.g.
-  // "public/"), not a file — render it as just "public/" instead of
-  // splitting it into a "public/" prefix + "public" basename, which would
-  // duplicate the name (see `capture_session_baseline`'s "dir" sentinel).
   const isDir = file.path.endsWith("/")
   const dir = !isDir && file.path.includes("/")
     ? file.path.slice(0, file.path.lastIndexOf("/") + 1)
     : ""
   const name = isDir ? file.path : basename(file.path)
   const FileGlyph = fileIconForPath(file.path)
+  const isNew = file.status === "A" || file.status === "?"
   const queryClient = useQueryClient()
   const [busyAction, setBusyAction] = useState<"keep" | "undo" | null>(null)
   const [confirmUndo, setConfirmUndo] = useState(false)
+  const [actionsReady, setActionsReady] = useState(false)
 
   const {
     data: diff,
@@ -97,6 +85,10 @@ export const FileRow = memo(function FileRow({
   const openWorkspaceFile = useAppStore((s) => s.openWorkspaceFile)
   const sessionKey = sessionId ? sessionScopeKey(sessionId) : ""
 
+  const armActions = useCallback(() => {
+    setActionsReady(true)
+  }, [])
+
   const handleOpenFile = (e: ReactMouseEvent) => {
     e.stopPropagation()
     if (!sessionId || isDir || file.status === "D") return
@@ -106,6 +98,10 @@ export const FileRow = memo(function FileRow({
   const handleKeepFile = async (e: ReactMouseEvent) => {
     e.stopPropagation()
     if (!sessionId || busyAction) return
+    if (!isolated) {
+      onToggleSelected?.(file.path)
+      return
+    }
     setBusyAction("keep")
     try {
       await reviewKeepFile(sessionId, file.path)
@@ -159,10 +155,6 @@ export const FileRow = memo(function FileRow({
   const handleUndoHunk = async (hunk: Hunk, diffFile: ParsedDiffFile) => {
     if (!sessionId) return
     try {
-      // Reverse-apply in the working dir — for non-isolated sessions
-      // "worktree" still resolves to the repo cwd (review_apply_patch /
-      // review_dirs in commands.rs: target "worktree" is always meta.cwd,
-      // isolated or not), so this hunk-undo works the same either way.
       await reviewApplyPatch(
         sessionId,
         buildPatch(diffFile, [hunk]),
@@ -179,24 +171,10 @@ export const FileRow = memo(function FileRow({
     }
   }
 
-  const statusTitle =
-    file.status === "?"
-      ? "Untracked"
-      : file.status === "M"
-        ? "Modified"
-        : file.status === "A"
-          ? "Added"
-          : file.status === "D"
-            ? "Deleted"
-            : file.status === "R"
-              ? "Renamed"
-              : file.status
-
   return (
-    <li>
+    <div className="pb-0.5">
       <div
         className={cn(
-          // Changes file row: h-7 px-2.5 r6; selected fill-2, hover fill-4 only when idle.
           "group relative flex h-7 w-full items-center gap-1.5 rounded-sm px-2.5",
           "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
           selectable && selected
@@ -205,25 +183,15 @@ export const FileRow = memo(function FileRow({
               ? "bg-fill-5 hover:bg-fill-4"
               : "hover:bg-fill-4",
         )}
+        onPointerEnter={armActions}
+        onFocusCapture={armActions}
       >
-        {/* Reserve checkbox column so selectable + non-selectable rows share
-            the same path/stat alignment when the list mixes modes. */}
-        <span className="flex w-3.5 shrink-0 items-center justify-center">
-          {selectable ? (
-            <Checkbox
-              checked={selected}
-              onChange={() => onToggleSelected?.()}
-              onClick={(e) => e.stopPropagation()}
-              label={`Include ${name} in commit`}
-            />
-          ) : null}
-        </span>
         <Button
           variant="ghost"
-          onClick={onToggle}
+          onClick={() => onToggle(file.path)}
           onDoubleClick={handleOpenFile}
           aria-expanded={expanded}
-          className="h-auto min-w-0 flex-1 justify-start gap-2 px-0 py-0 font-normal hover:bg-transparent"
+          className="h-auto min-w-0 flex-1 justify-start gap-1.5 px-0 py-0 font-normal hover:bg-transparent"
         >
           <FileGlyph
             className="h-3.5 w-3.5 shrink-0 text-ink-muted"
@@ -233,16 +201,6 @@ export const FileRow = memo(function FileRow({
             <PathPrefix dir={dir} />
             <span className="min-w-0 truncate text-sm text-ink">{name}</span>
           </span>
-          <ChevronRight
-            className={cn(
-              "h-3 w-3 shrink-0 text-icon-3",
-              "transition-[transform,opacity] duration-[var(--duration-fast)]",
-              expanded
-                ? "rotate-90 opacity-100"
-                : "opacity-40 group-hover:opacity-100",
-            )}
-            aria-hidden
-          />
         </Button>
         <DiffStat
           summary={{
@@ -250,85 +208,77 @@ export const FileRow = memo(function FileRow({
             removed: file.removed ?? 0,
           }}
           size="xs"
-          className="w-[4.5rem] justify-end"
+          className="shrink-0 justify-end"
         />
-        <span
+        {isNew ? (
+          <span className="shrink-0 rounded-sm bg-green/15 px-1 text-[10px] font-medium text-green">
+            New
+          </span>
+        ) : null}
+        <ChevronRight
           className={cn(
-            "w-3.5 shrink-0 text-center font-mono text-xs font-medium",
-            STATUS_COLOR[file.status] ?? "text-ink-muted",
+            "h-3 w-3 shrink-0 text-icon-3",
+            "transition-[transform,opacity] duration-[var(--duration-fast)]",
+            expanded
+              ? "rotate-90 opacity-100"
+              : "opacity-0 group-hover:opacity-40",
           )}
-          title={statusTitle}
-        >
-          {file.status === "?" ? "U" : file.status}
-        </span>
-        {/* Hover actions overlay the trailing stats so revealing them does
-            not shove the row layout. */}
-        <span
-          className={cn(
-            "absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5",
-            // Solid panel chip — no backdrop-blur (list-row GPU tax); opacity-only reveal.
-            "rounded-md bg-panel px-0.5 opacity-0 shadow-sm",
-            "transition-opacity duration-[var(--duration-fast)]",
-            "group-hover:opacity-100 focus-within:opacity-100",
-          )}
-        >
-          {!isDir && file.status !== "D" ? (
+          aria-hidden
+          onClick={() => onToggle(file.path)}
+        />
+        {actionsReady ? (
+          <span
+            className={cn(
+              "absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5",
+              "rounded-md bg-panel px-0.5 opacity-0 shadow-sm",
+              "transition-opacity duration-[var(--duration-fast)]",
+              "group-hover:opacity-100 focus-within:opacity-100",
+            )}
+          >
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
-              aria-label="Open file"
-              title="Open file"
-              onClick={handleOpenFile}
+              aria-label="Undo"
+              title="Undo"
+              onClick={(e) => {
+                e.stopPropagation()
+                setConfirmUndo(true)
+              }}
+              disabled={busyAction !== null}
               className="h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink"
             >
-              <FileCode2 className="h-3.5 w-3.5" aria-hidden />
+              {busyAction === "undo" ? (
+                <Spinner size="sm" />
+              ) : (
+                <Undo2 className="h-3.5 w-3.5" aria-hidden />
+              )}
             </Button>
-          ) : null}
-          {isolated ? (
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
-              aria-label="Keep"
-              title="Keep"
-              onClick={handleKeepFile}
+              aria-label={isolated ? "Keep" : selected ? "Deselect" : "Select"}
+              title={isolated ? "Keep" : selected ? "Deselect" : "Select"}
+              onClick={(e) => void handleKeepFile(e)}
               disabled={busyAction !== null}
               className="h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink"
             >
               {busyAction === "keep" ? (
                 <Spinner />
               ) : (
-                <Check className="h-3.5 w-3.5" aria-hidden />
+                <Plus className="h-3.5 w-3.5" aria-hidden />
               )}
             </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Undo"
-            title="Undo"
-            onClick={(e) => {
-              e.stopPropagation()
-              setConfirmUndo(true)
-            }}
-            disabled={busyAction !== null}
-            className="h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink"
-          >
-            {busyAction === "undo" ? (
-              <Spinner size="sm" />
-            ) : (
-              <Undo2 className="h-3.5 w-3.5" aria-hidden />
-            )}
-          </Button>
-        </span>
+          </span>
+        ) : null}
       </div>
-      <Collapsible open={expanded}>
-        <div className="mx-1 mb-1 overflow-hidden rounded-[var(--radius-sm)] border border-stroke-4 bg-fill-5">
+
+      {expanded ? (
+        <div className="mx-2.5 mb-1 overflow-hidden rounded-[var(--radius-sm)] border border-stroke-4 bg-fill-5">
           {isLoading ? (
             <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-ink-muted">
-                <Spinner size="sm" /> Loading diff…
+              <Spinner size="sm" /> Loading diff…
             </div>
           ) : (
             <DiffView
@@ -338,19 +288,20 @@ export const FileRow = memo(function FileRow({
             />
           )}
         </div>
-      </Collapsible>
+      ) : null}
 
-      <ConfirmDialog
-        open={confirmUndo}
-        title={`Undo changes to ${name}?`}
-        description="This reverts the file to its base state."
-        confirmLabel="Undo"
-        danger
-        isLoading={busyAction === "undo"}
-        onConfirm={() => void runUndoFile()}
-        onCancel={() => setConfirmUndo(false)}
-      />
-    </li>
+      {confirmUndo ? (
+        <ConfirmDialog
+          open={confirmUndo}
+          title={`Undo changes to ${name}?`}
+          description="This reverts the file to its base state."
+          confirmLabel="Undo"
+          danger
+          isLoading={busyAction === "undo"}
+          onConfirm={() => void runUndoFile()}
+          onCancel={() => setConfirmUndo(false)}
+        />
+      ) : null}
+    </div>
   )
 })
-

@@ -24,13 +24,11 @@ export type ContextMenuItem =
   | { type: "separator" }
 
 export type ContextMenuProps = {
-  /** Anchor point in viewport coordinates; null closes the menu. */
   position: { x: number; y: number } | null
   items: ContextMenuItem[]
   onClose: () => void
 }
 
-/** right-click menu — imperative anchor + shadcn context-menu primitives. */
 export const ContextMenu = ({ position, items, onClose }: ContextMenuProps) => {
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
@@ -49,21 +47,15 @@ export const ContextMenu = ({ position, items, onClose }: ContextMenuProps) => {
     const close = () => onCloseRef.current()
 
     const handleContextMenu = (_e: MouseEvent) => {
-      // A right-click elsewhere opens its own menu — close this one first.
       close()
     }
 
     const handleBlur = () => {
-      // Native webview show/hide (data-suppress-native-webview gate) can
-      // fire window.blur on Windows WebView2 without the user leaving —
-      // only dismiss when the app window actually lost focus.
       requestAnimationFrame(() => {
         if (!document.hasFocus()) close()
       })
     }
     const handleScroll = (e: Event) => {
-      // Stick-to-bottom + virtualizer followOnAppend scroll the timeline on
-      // every stream tick. Ignore those so "+" / Browser stays usable mid-turn.
       if (isProgrammaticScroll() || isTimelineScrollEvent(e)) return
       close()
     }

@@ -12,7 +12,6 @@ import { useInlineCompletionPrefs } from "../../hooks/useInlineCompletionPrefs"
 import { INLINE_COMPLETION_ENABLED } from "../../lib/featureFlags"
 import { CompletionSetupModal } from "./CompletionSetupModal"
 
-/** Customize settings card for inline prompt ghost-text completion. */
 export const InlineCompletionSettingsCard = () => {
   const { prefs, isLoading, save, isSaving, error } = useInlineCompletionPrefs()
   const [setupOpen, setSetupOpen] = useState(false)

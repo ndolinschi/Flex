@@ -5,13 +5,10 @@ import { cn } from "../../lib/utils"
 type TabCloseProps = {
   label: string
   onClose: () => void
-  /** Also expand on `group-focus-within` (file chips / keyboard). */
   revealOnFocusWithin?: boolean
   className?: string
 }
 
-/** Hover-collapse close control shared by panel tabs and file chips.
- * Collapses to zero width at rest and expands on group hover. */
 export const TabClose = ({
   label,
   onClose,
@@ -28,7 +25,6 @@ export const TabClose = ({
         onClose()
       }}
       onMouseDown={(e: ReactMouseEvent) => {
-        // Keep tab drag from starting when grabbing the close control.
         e.stopPropagation()
       }}
       onDragStart={(e: ReactDragEvent) => {

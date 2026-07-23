@@ -11,12 +11,6 @@ type CollapsibleProps = {
   className?: string
 }
 
-/**
- * Controlled animation panel: content stays mounted; expansion animates via
- * grid-template-rows so there's no fixed max-height cap that clips long groups.
- * Thin adapter over ui/collapsible — keeps the same `open`/`children` API
- * used by WorkGroup, ToolStepGroup, CompactionCard, SubagentGroup, etc.
- */
 export const Collapsible = ({ open, children, className }: CollapsibleProps) => {
   return (
     <CollapsibleRoot open={open}>

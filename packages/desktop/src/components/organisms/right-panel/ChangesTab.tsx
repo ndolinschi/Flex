@@ -1,10 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useVirtualizer } from "@tanstack/react-virtual"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { GitMerge, RefreshCw, XCircle } from "lucide-react"
-import { Checkbox, DiffStat } from "../../atoms"
+import { ChevronDown, GitMerge, PlusSquare, RefreshCw, Undo2, XCircle } from "lucide-react"
+import { DiffStat } from "../../atoms"
 import { BranchPrStatusChip, ConfirmDialog, CreatePrDialog, EmptyState, ErrorBanner } from "../../molecules"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useWorkspaceActions } from "../../../hooks/useWorkspaceActions"
 import { useIsGitRepo } from "../../../hooks/useIsGitRepo"
 import {
@@ -15,6 +23,7 @@ import {
   gitPrStatus,
   gitStatusSinceBaseline,
   isIsolated,
+  reviewUndoFile,
   toInvokeError,
 } from "../../../lib/tauri"
 import { toastPrOutcome } from "../../../lib/prOutcomeToast"
@@ -24,7 +33,11 @@ import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
 import { CommitCenter } from "./CommitCenter"
 import { FileRow } from "./FileRow"
-import { ScrollArea } from "@/components/ui/scroll-area"
+
+/** Collapsed file row = h-7 + 2px gap (padding). */
+const ROW_ESTIMATE_PX = 30
+/** Rough open-diff estimate until measureElement runs. */
+const EXPANDED_ESTIMATE_PX = 220
 
 export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
   const cwd = active?.cwd ?? ""
@@ -33,23 +46,15 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
   const [error, setError] = useState<string | null>(null)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const queryClient = useQueryClient()
+  const commitCenterRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
-  // Gate session-scoped git queries/actions on the cwd actually being a git
-  // repo — defaults to `true` while loading/no cwd so this never flashes the
-  // "not a git repository" empty state for an instant on a real repo before
-  // the query resolves (mirrors ContextBar's `isRepo` gating).
-  //
-  // Re-check aggressively: `git init` in the Terminal (or mid-session) must
-  // not leave a sticky `false` that permanently disables the status query.
-  // Nested repos under this cwd are intentionally NOT auto-detected — the
-  // session's own cwd is the product boundary.
   const {
     data: isRepo = true,
     isFetching: isRepoFetching,
     refetch: refetchIsRepo,
   } = useIsGitRepo(cwd || undefined)
 
-  // Agent turns usually touch files — refresh when this session stops streaming.
   const isStreaming = useAppStore((s) =>
     sessionId ? !!s.streamingSessions[sessionId] : false,
   )
@@ -58,8 +63,6 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     queryKey: ["git-status", cwd, sessionId],
     queryFn: () => gitStatusSinceBaseline(sessionId!),
     enabled: !!cwd && !!sessionId && isRepo,
-    // Hot while this session streams (agent edits); cool down when idle —
-    // turn-end invalidate still refreshes immediately.
     refetchInterval: isStreaming ? 5_000 : 30_000,
     refetchOnWindowFocus: true,
   })
@@ -70,20 +73,10 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     if (isRepo) void refetch()
   }
 
-  // `files` is the server-capped row list (see `MAX_STATUS_FILES` in
-  // commands.rs) — a session with hundreds of changed files (e.g. after
-  // scaffolding a project) never asks this list to render every row.
-  // `totalCount`/totals reflect the full, untruncated set so the header
-  // count and +/- badge stay accurate past the cap.
   const files = summary?.files ?? []
   const totalCount = summary?.totalCount ?? 0
   const truncated = summary?.truncated ?? false
 
-  // Commit-center selection (spec #48): which files are staged when the
-  // split-button commit runs. Defaults to "all selected" and reconciles
-  // against the live file list on every change — new files default to
-  // selected, files that disappeared (committed/undone elsewhere) are
-  // dropped so a stale path never gets passed to a commit command.
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(files.map((f) => f.path)),
   )
@@ -97,6 +90,17 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
       }
       return next
     })
+  }, [files])
+
+  // Dense collapsed list by default (Cursor Changes); clear stale expansion.
+  useEffect(() => {
+    if (files.length === 0) {
+      setExpandedPath(null)
+      return
+    }
+    setExpandedPath((prev) =>
+      prev && files.some((f) => f.path === prev) ? prev : null,
+    )
   }, [files])
 
   const { data: branch } = useQuery({
@@ -174,9 +178,66 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     [summary],
   )
 
-  // design: the aggregate bar's buttons read "Keep All"/"Undo All" when
-  // multiple files are pending, singular "Keep"/"Undo" for exactly one — one
-  // bar, label swaps, not separate components.
+  const selectedPaths = useMemo(() => [...selected], [selected])
+
+  const toggleExpand = useCallback((path: string) => {
+    setExpandedPath((prev) => (prev === path ? null : path))
+  }, [])
+
+  const toggleSelected = useCallback((path: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }, [])
+
+  const selectAll = useCallback(() => {
+    setSelected(new Set(files.map((f) => f.path)))
+  }, [files])
+
+  const [discardBusy, setDiscardBusy] = useState(false)
+
+  const handleDiscardAll = async () => {
+    if (!sessionId || discardBusy) return
+    if (isolated) {
+      void workspace.discard()
+      setConfirmDiscard(false)
+      return
+    }
+    setDiscardBusy(true)
+    try {
+      for (const file of files) {
+        try {
+          await reviewUndoFile(sessionId, file.path)
+        } catch {
+          /* continue remaining */
+        }
+      }
+      invalidateGitQueries(queryClient)
+      pushToast("Discarded changes", "success")
+      setConfirmDiscard(false)
+    } catch (err) {
+      setError(toInvokeError(err))
+    } finally {
+      setDiscardBusy(false)
+    }
+  }
+
+  const virtualizer = useVirtualizer({
+    count: files.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: (index) =>
+      expandedPath === files[index]?.path
+        ? EXPANDED_ESTIMATE_PX
+        : ROW_ESTIMATE_PX,
+    overscan: 10,
+    getItemKey: (index) => files[index]?.path ?? index,
+    measureElement: (element) => (element as HTMLElement).offsetHeight,
+    useAnimationFrameWithResizeObserver: true,
+  })
+
   const aggregateSuffix = totalCount === 1 ? "" : " All"
 
   if (!active) {
@@ -189,11 +250,6 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     )
   }
 
-  // No git repo in this cwd at all — calm empty state, not an error. A repo
-  // with an unborn HEAD (no commits yet) is still `isRepo === true` and
-  // keeps the regular UI below (see `git_is_repo`'s doc comment). Refresh
-  // re-runs `git_is_repo` so a just-ran `git init` in this session cwd is
-  // picked up without leaving and re-entering the tab.
   if (!isRepo) {
     return (
       <EmptyState
@@ -224,39 +280,78 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     )
   }
 
-  const showSelectAll = !isolated && files.length > 0
-  const allSelected = showSelectAll && selected.size === files.length
-  const someSelected = showSelectAll && selected.size > 0 && selected.size < files.length
-  const headline =
-    totalCount === 0
-      ? "No changes"
-      : `${totalCount} file${totalCount === 1 ? "" : "s"} changed`
+  const virtualItems = virtualizer.getVirtualItems()
+  const listHeight = virtualizer.getTotalSize()
+  const scrollToCommit = () => {
+    commitCenterRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    })
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Quiet chrome row — title / branch / PR / diffstat / refresh.
-          Selection lives on a dedicated toolbar below so the header stays
-          balanced with Plan / Files / Terminal. */}
+      {/* Quiet Local | branch + inverse Create Branch & Commit pill (Cursor). */}
       <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5 [font-variant-numeric:tabular-nums]">
-        <div className="min-w-0 flex-1 truncate">
-          <span className="text-sm text-ink">{headline}</span>
+        <div
+          className="flex min-w-0 items-center gap-1.5 text-sm tracking-[var(--tracking-caption)]"
+          aria-label={branch ? `Local on ${branch}` : "Local changes"}
+        >
+          <span className="shrink-0 text-ink-muted">Local</span>
           {branch ? (
-            <span className="text-sm text-ink-faint"> · {branch}</span>
+            <>
+              <span className="shrink-0 text-ink-faint" aria-hidden>
+                |
+              </span>
+              <span className="min-w-0 truncate text-ink-muted" title={branch}>
+                {branch}
+              </span>
+            </>
           ) : null}
         </div>
-        {branchPr ? (
-          <BranchPrStatusChip pr={branchPr} />
-        ) : hasRemote && prStatus?.ghAvailable ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 shrink-0 px-1.5 text-xs"
-            onClick={() => setCreatePrOpen(true)}
-          >
-            Create PR
-          </Button>
+        <div className="min-w-0 flex-1" />
+        {branchPr ? <BranchPrStatusChip pr={branchPr} /> : null}
+        {!isolated && totalCount > 0 ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  type="button"
+                  size="xs"
+                  className="h-6 shrink-0 gap-1 rounded-full bg-ink px-2.5 text-xs font-medium text-bg hover:bg-ink/90"
+                />
+              }
+            >
+              Create Branch & Commit
+              <ChevronDown className="size-3 opacity-70" aria-hidden />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={4} className="w-56">
+              <DropdownMenuGroup>
+                <DropdownMenuItem
+                  onClick={() => {
+                    selectAll()
+                    scrollToCommit()
+                  }}
+                >
+                  Commit selected…
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    selectAll()
+                    scrollToCommit()
+                  }}
+                >
+                  Create Branch & Commit…
+                </DropdownMenuItem>
+                {hasRemote && prStatus?.ghAvailable ? (
+                  <DropdownMenuItem onClick={() => setCreatePrOpen(true)}>
+                    Create PR…
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : null}
-        {totalCount > 0 ? <DiffStat summary={totals} size="sm" /> : null}
         <Button
           type="button"
           variant="ghost"
@@ -264,10 +359,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
           aria-label="Refresh changes"
           title="Refresh changes"
           onClick={handleRefresh}
-          className={cn(
-            "text-ink-muted hover:bg-fill-4 hover:text-ink",
-            "h-6 w-6",
-          )}
+          className="h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink"
         >
           <RefreshCw
             className={cn(
@@ -279,31 +371,44 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
         </Button>
       </div>
 
-      {showSelectAll ? (
-        <div className="flex h-6 shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5">
-          <Checkbox
-            checked={allSelected}
-            indeterminate={someSelected}
-            onChange={() =>
-              setSelected(
-                allSelected
-                  ? new Set()
-                  : new Set(files.map((f) => f.path)),
-              )
-            }
-            label={
-              allSelected
-                ? "Deselect all files"
-                : `Select all ${files.length} files`
-            }
-          />
-          <span className="min-w-0 flex-1 truncate text-xs text-ink-muted">
-            {allSelected
-              ? "All selected"
-              : someSelected
-                ? `${selected.size} of ${files.length} selected`
-                : "Select files to commit"}
+      {totalCount > 0 ? (
+        <div className="flex h-6 shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5 [font-variant-numeric:tabular-nums]">
+          <span className="min-w-0 truncate text-sm font-medium text-ink">
+            {totalCount} Uncommitted Change{totalCount === 1 ? "" : "s"}
           </span>
+          <DiffStat
+            summary={totals}
+            size="sm"
+            compact={false}
+            className="shrink-0"
+          />
+          <div className="min-w-0 flex-1" />
+          {!isolated ? (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Select all files"
+                title="Select all"
+                onClick={selectAll}
+                className="h-5 w-5 text-ink-muted hover:bg-fill-4 hover:text-ink"
+              >
+                <PlusSquare className="h-3.5 w-3.5" aria-hidden />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Discard all changes"
+                title="Discard all"
+                onClick={() => setConfirmDiscard(true)}
+                className="h-5 w-5 text-ink-muted hover:bg-fill-4 hover:text-ink"
+              >
+                <Undo2 className="h-3.5 w-3.5" aria-hidden />
+              </Button>
+            </>
+          ) : null}
         </div>
       ) : null}
 
@@ -314,7 +419,13 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
         />
       ) : null}
 
-      <ScrollArea className="min-h-0 flex-1">
+      <div
+        ref={listRef}
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+          "[scrollbar-width:thin] [scrollbar-color:var(--color-stroke-3)_transparent]",
+        )}
+      >
         {totalCount === 0 ? (
           <EmptyState
             className="px-2.5"
@@ -323,52 +434,61 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             description={branch ? `on ${branch}` : undefined}
           />
         ) : (
-          <ul className="flex flex-col gap-0.5 px-2.5 py-1.5">
-            {files.map((file) => (
-              <FileRow
-                key={file.path}
-                file={file}
-                sessionId={sessionId}
-                isolated={isolated}
-                expanded={expandedPath === file.path}
-                onToggle={() =>
-                  setExpandedPath((prev) =>
-                    prev === file.path ? null : file.path,
-                  )
-                }
-                onError={setError}
-                selectable={!isolated}
-                selected={selected.has(file.path)}
-                onToggleSelected={() =>
-                  setSelected((prev) => {
-                    const next = new Set(prev)
-                    if (next.has(file.path)) next.delete(file.path)
-                    else next.add(file.path)
-                    return next
-                  })
-                }
-              />
-            ))}
-          </ul>
+          <div
+            role="list"
+            className="relative w-full py-1"
+            style={{ height: listHeight + (truncated ? 28 : 0) }}
+          >
+            {virtualItems.map((vItem) => {
+              const file = files[vItem.index]
+              if (!file) return null
+              return (
+                <div
+                  key={vItem.key}
+                  role="listitem"
+                  data-index={vItem.index}
+                  ref={virtualizer.measureElement}
+                  className="absolute top-0 left-0 w-full"
+                  style={{
+                    transform: `translateY(${Math.round(vItem.start)}px)`,
+                  }}
+                >
+                  <FileRow
+                    file={file}
+                    sessionId={sessionId}
+                    isolated={isolated}
+                    expanded={expandedPath === file.path}
+                    onToggle={toggleExpand}
+                    onError={setError}
+                    selectable={!isolated}
+                    selected={selected.has(file.path)}
+                    onToggleSelected={toggleSelected}
+                  />
+                </div>
+              )
+            })}
+            {truncated ? (
+              <p
+                className="absolute left-0 w-full px-2.5 py-1.5 text-center text-xs text-ink-faint"
+                style={{ top: listHeight }}
+              >
+                +{totalCount - files.length} more files not shown
+              </p>
+            ) : null}
+          </div>
         )}
-        {/* Server-side cap (MAX_STATUS_FILES in commands.rs) — a session with
-            hundreds of changed files still only mounts `files.length` rows;
-            this tells the user more exist without rendering them. */}
-        {truncated ? (
-          <p className="px-2.5 py-2 text-center text-xs text-ink-faint">
-            +{totalCount - files.length} more files not shown
-          </p>
-        ) : null}
-      </ScrollArea>
+      </div>
 
       {!isolated && sessionId ? (
-        <CommitCenter
-          sessionId={sessionId}
-          cwd={cwd}
-          selectedPaths={[...selected]}
-          totalFiles={files.length}
-          onError={setError}
-        />
+        <div ref={commitCenterRef}>
+          <CommitCenter
+            sessionId={sessionId}
+            cwd={cwd}
+            selectedPaths={selectedPaths}
+            totalFiles={files.length}
+            onError={setError}
+          />
+        </div>
       ) : null}
 
       {isolated && files.length > 0 ? (
@@ -397,16 +517,17 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
         open={confirmDiscard}
         title={`Undo${aggregateSuffix === "" ? "" : " all"} changes?`}
         description={
-          files.length === 1
-            ? "This discards the isolated workspace's change and reverts the file to its base state."
-            : "This discards the isolated workspace and reverts every changed file to its base state."
+          isolated
+            ? files.length === 1
+              ? "This discards the isolated workspace's change and reverts the file to its base state."
+              : "This discards the isolated workspace and reverts every changed file to its base state."
+            : "This reverts every listed file to its base state."
         }
         confirmLabel={`Undo${aggregateSuffix}`}
         danger
-        isLoading={workspace.busy}
+        isLoading={workspace.busy || discardBusy}
         onConfirm={() => {
-          void workspace.discard()
-          setConfirmDiscard(false)
+          void handleDiscardAll()
         }}
         onCancel={() => setConfirmDiscard(false)}
       />
@@ -426,14 +547,3 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     </div>
   )
 }
-
-/* ── Panel shell ──────────────────────────────────────────────────────── */
-
-/** right panel: Plan / Changes tabs, resizable via a left sash.
- *
- * Below the "narrow" viewport breakpoint (~940px, see hooks/useViewportWidth)
- * the panel switches from a side-by-side flex column to an absolutely
- * positioned overlay anchored to the right edge of the chat area, with a
- * dim backdrop that closes it on click — same width clamp, same open/close
- * state (`rightPanelOpen` semantics are unchanged, this is presentational
- * only). At "wide" it renders exactly as before. */

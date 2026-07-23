@@ -3,11 +3,6 @@ import type { ITheme, Terminal } from "@xterm/xterm"
 import { terminalResize, terminalWrite } from "../lib/tauri"
 import { subscribeTerminal } from "../lib/terminalBus"
 
-/**
- * xterm's canvas theme parser does not accept CSS Color Level 4
- * `rgb(20 20 20 / 0.92)` (space-separated + slash alpha) from our tokens.
- * Convert to `#rrggbb` / `rgba(r,g,b,a)` so text stays visible.
- */
 const cssColorToXterm = (raw: string, fallback: string): string => {
   const value = raw.trim()
   if (!value) return fallback
@@ -30,12 +25,10 @@ const cssColorToXterm = (raw: string, fallback: string): string => {
     return `rgba(${r}, ${g}, ${b}, ${Number.isFinite(a) ? a : 1})`
   }
 
-  // Legacy rgb(r, g, b) / rgba(r, g, b, a) — already xterm-safe.
   if (/^rgba?\(/i.test(value)) return value
   return fallback
 }
 
-/** Read live CSS custom properties so the terminal tracks theme switches. */
 const readThemeVars = (): ITheme => {
   const styles = getComputedStyle(document.documentElement)
   const read = (name: string, fallback: string) =>
@@ -51,29 +44,11 @@ const readThemeVars = (): ITheme => {
 }
 
 export type UseTerminalOptions = {
-  /**
-   * Read-only terminal (e.g. the agent's terminal, mirrored from
-   * `exec_chunk` session-events). Disables stdin and skips the backend
-   * `terminalWrite`/`terminalResize` IPC calls — there is no PTY behind
-   * this id, only local fit + bus playback.
-   */
   readOnly?: boolean
 }
 
 type FitAddonLike = { fit: () => void }
 
-/**
- * Owns one xterm.js `Terminal` instance bound to a backend PTY session `id`.
- * Mount one `useTerminal` per rendered terminal container; the hook wires
- * input/output/resize/exit and disposes everything on unmount.
- *
- * xterm + CSS are dynamic-imported inside the effect so the chat shell does
- * not pay for the terminal vendor chunk until a terminal tab mounts.
- *
- * When `active` is false the bus subscription is dropped (the singleton bus
- * still buffers output). Re-activating clears the screen and resubscribes so
- * scrollback replays without writing into a hidden canvas every chunk.
- */
 export const useTerminal = (
   id: string,
   containerRef: RefObject<HTMLDivElement | null>,

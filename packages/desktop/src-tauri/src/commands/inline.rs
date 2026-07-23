@@ -1,4 +1,3 @@
-//! Composer / Prompt-tab inline (ghost-text) completion.
 
 use super::common::require_service;
 use super::prelude::*;
@@ -6,7 +5,6 @@ use super::routines::respawn_cron_loop;
 
 pub const INLINE_COMPLETION_NOT_CONFIGURED: &str = "inline_completion_not_configured";
 
-/// Read desktop inline-completion prefs (ghost-text model + enable flag).
 #[tauri::command]
 pub async fn get_inline_completion_prefs(
     state: State<'_, AppState>,
@@ -15,8 +13,6 @@ pub async fn get_inline_completion_prefs(
     Ok(cfg.prefs.inline_completion.clone())
 }
 
-/// Persist inline-completion prefs and rebuild the engine when the chosen
-/// provider differs from the active chat profile (so it lands in the registry).
 #[tauri::command]
 pub async fn save_inline_completion_prefs(
     app: AppHandle,
@@ -45,9 +41,6 @@ pub async fn save_inline_completion_prefs(
     Ok(prefs)
 }
 
-/// One-shot ghost-text continuation for the composer / Prompt tab.
-/// Tool-free `stream_chat` (same pattern as `suggest_session_title`).
-/// Returns only the continuation text; empty string when the model yields nothing.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn complete_prompt_inline(
@@ -88,9 +81,6 @@ pub struct CheckInlineCompletionResult {
     pub sample: Option<String>,
 }
 
-/// Probe inline-completion connectivity without persisting prefs. Rebuilds a
-/// throwaway engine snapshot so Ollama (or another non-active provider) can be
-/// registered via `all_providers` before the user saves.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn check_inline_completion_connection(
@@ -139,7 +129,6 @@ pub async fn check_inline_completion_connection(
     let prefix = "Please help me write a prompt to";
     match stream_inline_completion(&service, &model_ref, prefix, None).await {
         Ok(sample) if sample.trim().is_empty() => {
-            // Still install so Refresh models can list Ollama tags next.
             *state.service.lock().await = Some(service);
             respawn_cron_loop(&state).await;
             Ok(CheckInlineCompletionResult {
@@ -160,8 +149,6 @@ pub async fn check_inline_completion_connection(
             })
         }
         Err(err) => {
-            // Provider registered but call failed (daemon down, missing model, …).
-            // Keep the rebuilt registry so Refresh models can surface tags.
             *state.service.lock().await = Some(service);
             respawn_cron_loop(&state).await;
             Ok(CheckInlineCompletionResult {
@@ -234,11 +221,9 @@ pub(crate) async fn stream_inline_completion(
     Ok(sanitize_inline_completion(&text))
 }
 
-/// Strip fences/quotes models sometimes wrap around a bare continuation.
 pub(crate) fn sanitize_inline_completion(raw: &str) -> String {
     let mut t = raw.trim().to_string();
     if t.starts_with("```") {
-        // Drop opening fence line (` ``` ` or ` ```lang `), then closing fence.
         let after_fence = t.find('\n').map(|i| &t[i + 1..]).unwrap_or("").to_string();
         t = after_fence
             .rsplit_once("```")

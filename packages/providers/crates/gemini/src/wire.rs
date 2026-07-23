@@ -1,5 +1,3 @@
-//! Private Gemini GenerateContent wire types.
-
 use std::collections::BTreeMap;
 
 use agentloop_contracts::{

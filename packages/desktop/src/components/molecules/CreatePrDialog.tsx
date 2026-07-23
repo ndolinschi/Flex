@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input"
 
 type CreatePrDialogProps = {
   open: boolean
-  /** Prefill when the dialog opens; ignored while closed. */
   initialTitle?: string
   initialBody?: string
   isLoading?: boolean
@@ -15,8 +14,6 @@ type CreatePrDialogProps = {
   onCancel: () => void
 }
 
-/** Editable title/body modal before `gh pr create` — used from Changes and
- * Commit & Create PR so the model-facing fill defaults stay overridable. */
 export const CreatePrDialog = ({
   open,
   initialTitle = "",

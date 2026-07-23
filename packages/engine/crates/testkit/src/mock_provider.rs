@@ -1,11 +1,3 @@
-//! `MockProvider`: a fully scripted [`Provider`] for loop and engine tests.
-//!
-//! Each call to [`Provider::stream_chat`] records the incoming request and
-//! plays back the next [`ScriptedTurn`] from a FIFO script. An `Ok` turn is a
-//! sequence of [`ProviderStreamEvent`]s; an `Err` turn plays as a single
-//! stream error. When the script is exhausted, the provider plays a default
-//! end-of-turn message so tests never hang on a missing script entry.
-
 use std::collections::VecDeque;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
@@ -18,37 +10,24 @@ use agentloop_core::contracts::{
 };
 use agentloop_core::{ChatRequest, Provider, ProviderError, ProviderStream, ProviderStreamEvent};
 
-/// The stable provider key the mock reports from [`Provider::id`].
 pub const MOCK_PROVIDER_ID: &str = "mock";
 
-/// The single model the mock advertises and stamps on every message.
 pub const MOCK_MODEL: &str = "mock-1";
 
-/// One scripted model response: either a full event sequence or an error.
 pub type ScriptedTurn = Result<Vec<ProviderStreamEvent>, ScriptedError>;
 
-/// A scriptable provider failure. Cloneable (unlike [`ProviderError`]) so
-/// scripts can be built up front; converted into the corresponding
-/// [`ProviderError`] when the turn is played.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ScriptedError {
-    /// Plays as [`ProviderError::Http`].
     Http(String),
-    /// Plays as [`ProviderError::RateLimited`].
     RateLimited { retry_after_ms: Option<u64> },
-    /// Plays as [`ProviderError::Stream`].
     Stream(String),
-    /// Plays as [`ProviderError::ContextOverflow`].
     ContextOverflow(String),
-    /// Plays as [`ProviderError::InvalidRequest`].
     InvalidRequest(String),
-    /// Plays as [`ProviderError::Cancelled`].
     Cancelled,
 }
 
 impl ScriptedError {
-    /// The [`ProviderError`] this scripted failure plays as.
     pub fn into_provider_error(self) -> ProviderError {
         let provider = ProviderId::from(MOCK_PROVIDER_ID);
         match self {
@@ -71,38 +50,29 @@ impl From<ScriptedError> for ProviderError {
     }
 }
 
-/// A scripted, request-recording [`Provider`] test double.
 #[derive(Default)]
 pub struct MockProvider {
     script: Mutex<VecDeque<ScriptedTurn>>,
     requests: Mutex<Vec<ChatRequest>>,
-    /// Provider id override; [`MOCK_PROVIDER_ID`] when unset.
     id: Option<ProviderId>,
-    /// Capability override; [`MockProvider::default_caps`] when unset.
     caps: Option<ProviderCaps>,
 }
 
-/// Test doubles must never deadlock a suite on a poisoned lock: a panic in
-/// one assertion should not cascade into unrelated tests, so recover the data.
 fn lock_unpoisoned<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 impl MockProvider {
-    /// A provider with an empty script (every call plays the default turn).
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// A provider preloaded with `turns`, played in order.
     pub fn with_turns(turns: impl IntoIterator<Item = ScriptedTurn>) -> Self {
         let provider = Self::new();
         provider.push_turns(turns);
         provider
     }
 
-    /// A provider registering under `id` instead of [`MOCK_PROVIDER_ID`], so
-    /// multi-provider tests can tell two mocks apart in one registry.
     pub fn with_id(id: impl Into<ProviderId>) -> Self {
         Self {
             id: Some(id.into()),
@@ -110,9 +80,6 @@ impl MockProvider {
         }
     }
 
-    /// A provider advertising `caps` instead of [`MockProvider::default_caps`],
-    /// so capability-gated code paths (e.g. thinking forwarding) can be
-    /// exercised from tests.
     pub fn with_caps(caps: ProviderCaps) -> Self {
         Self {
             caps: Some(caps),
@@ -120,7 +87,6 @@ impl MockProvider {
         }
     }
 
-    /// The capabilities advertised when no override is set.
     pub fn default_caps() -> ProviderCaps {
         ProviderCaps {
             tool_use: true,
@@ -130,27 +96,22 @@ impl MockProvider {
         }
     }
 
-    /// Append one turn to the end of the script.
     pub fn push_turn(&self, turn: ScriptedTurn) {
         lock_unpoisoned(&self.script).push_back(turn);
     }
 
-    /// Append several turns to the end of the script.
     pub fn push_turns(&self, turns: impl IntoIterator<Item = ScriptedTurn>) {
         lock_unpoisoned(&self.script).extend(turns);
     }
 
-    /// How many scripted turns have not been played yet.
     pub fn remaining_turns(&self) -> usize {
         lock_unpoisoned(&self.script).len()
     }
 
-    /// Every [`ChatRequest`] received so far, in call order.
     pub fn requests(&self) -> Vec<ChatRequest> {
         lock_unpoisoned(&self.requests).clone()
     }
 
-    /// The token usage stamped on every generated turn (input 10 / output 5).
     pub fn default_usage() -> TokenUsage {
         TokenUsage {
             input: 10,
@@ -166,7 +127,6 @@ impl MockProvider {
         }
     }
 
-    /// A plain text response ending the turn.
     pub fn text_turn(text: impl Into<String>) -> ScriptedTurn {
         Ok(vec![
             Self::message_start(),
@@ -178,7 +138,6 @@ impl MockProvider {
         ])
     }
 
-    /// A thinking block followed by a text response ending the turn.
     pub fn thinking_turn(thinking: impl Into<String>, text: impl Into<String>) -> ScriptedTurn {
         Ok(vec![
             Self::message_start(),
@@ -193,15 +152,10 @@ impl MockProvider {
         ])
     }
 
-    /// A turn requesting one tool call per `(tool_name, args)` pair, stopping
-    /// with [`StopReason::ToolUse`]. Returns the generated [`ToolCallId`]s in
-    /// pair order so tests can reference them in results and assertions.
     pub fn tool_turn(pairs: &[(&str, serde_json::Value)]) -> (ScriptedTurn, Vec<ToolCallId>) {
         Self::tool_turn_with_text(None, pairs)
     }
 
-    /// Like [`Self::tool_turn`], with an optional markdown preamble emitted
-    /// before the tool calls.
     pub fn tool_turn_with_text(
         preamble: Option<&str>,
         pairs: &[(&str, serde_json::Value)],
@@ -235,7 +189,6 @@ impl MockProvider {
         (Ok(events), call_ids)
     }
 
-    /// The turn played when the script is empty.
     fn default_turn_events() -> Vec<ProviderStreamEvent> {
         Self::text_turn("Done.").unwrap_or_default()
     }

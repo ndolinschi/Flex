@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest"
 
-/**
- * Frontend mirror of the Rust `summarize_status_checks` chip labels — keeps
- * the Changes header copy stable without spinning up `gh`. The real parsing
- * lives in `commands.rs`; these cases document the contract the chip expects.
- */
 const summarize = (
   items: Array<{ conclusion?: string; status?: string; state?: string }>,
 ): string => {

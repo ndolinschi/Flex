@@ -27,8 +27,6 @@ import {
 import { log } from "../lib/debug/log"
 import type { BrowserDomElement } from "../lib/browserDesign"
 
-/* ── Viewport presets ─────────────────────────────────────────────────── */
-
 export const VIEWPORT_PRESETS: Array<{
   id: BrowserViewportPreset
   label: string
@@ -40,16 +38,6 @@ export const VIEWPORT_PRESETS: Array<{
   { id: "fill", label: "Fill", width: null },
 ]
 
-/** Browser session/webview-ownership logic for the Browser right-panel tab.
- * Extracted from `BrowserTab.tsx` — owns the child-webview lifecycle, bounds
- * watchdog, navigation state, session ownership, and toast side effects.
- * `BrowserTab.tsx` remains the chrome view and consumes this hook.
- *
- * Scoped to the session that owns this content tab (prop `sessionId`).
- *
- * Bounds map 1:1 to the empty `data-browser-webview-slot` (`contentRef`).
- * PRESERVES: the 500ms drift-watchdog + resize/scale reapply + reveal/hide
- * gating (see Effect 2 below) and all navigation behavior. */
 export const useBrowserSession = (active: boolean, sessionId: string | null) => {
   const sessionKey = sessionScopeKey(sessionId)
 
@@ -73,8 +61,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
   const isOwner = browserOwnerSessionId === sessionKey
   const browserDesignMode = useAppStore((s) => s.browserDesignMode)
   const rightPanelDragging = useAppStore((s) => s.rightPanelDragging)
-  // Slow the child-webview bounds watchdog while a turn is streaming — timeline
-  // growth shifts the slot every frame and rapid set_bounds freezes WebView2.
   const sessionStreaming = useAppStore((s) =>
     sessionId ? !!s.streamingSessions[sessionId] : false,
   )
@@ -90,10 +76,7 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
   const setComposerDraft = useAppStore((s) => s.setComposerDraft)
   const pushToast = useAppStore((s) => s.pushToast)
 
-  /** Browser chrome column (toolbar + body). Observed for resize only. */
   const hostRef = useRef<HTMLDivElement>(null)
-  /** Empty `data-browser-webview-slot` — sole bounds source for the native
-   * child webview (`getBoundingClientRect` → `browser_set_bounds`). */
   const contentRef = useRef<HTMLDivElement>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
   const loadingTimeoutRef = useRef<number | null>(null)
@@ -102,7 +85,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     if (loadingTimeoutRef.current !== null) {
       window.clearTimeout(loadingTimeoutRef.current)
     }
-    // Safety: if Finished never arrives (SPA / 1×1 webview), clear spinner.
     loadingTimeoutRef.current = window.setTimeout(() => {
       loadingTimeoutRef.current = null
       setBrowserSessionState(sessionKey, { loading: false })
@@ -164,8 +146,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     setBrowserOwnerSessionId,
     setBrowserSessionState,
   ])
-
-  /* ── "…" overflow menu actions ──────────────────────────────────────── */
 
   const handleScreenshot = useCallback(async () => {
     if (isBrowserPreview()) {
@@ -231,9 +211,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
       .catch(() => pushToast("Couldn't copy URL", "error"))
   }, [browserUrl, pushToast])
 
-  /** Cursor parity: clear the embedded session (close native webview + UI
-   * state). Only the owning session destroys the webview; other chats just
-   * drop their remembered URL/title. */
   const handleClearHistory = useCallback(async () => {
     try {
       if (!isBrowserPreview() && isOwner && browserStarted) {
@@ -261,8 +238,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     setBrowserOwnerSessionId,
   ])
 
-  /** Cursor parity: clear cookies/cache for the live webview, then hard-reload
-   * so the page reflects the wipe. */
   const handleClearData = useCallback(async () => {
     if (isBrowserPreview()) {
       pushToast(NATIVE_APP_REQUIRED, "error")
@@ -370,7 +345,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
   const addDomChip = useCallback(
     (name: string, element: BrowserDomElement, additive: boolean) => {
       if (!additive) {
-        // Replace prior DOM chips; keep image/file attachments.
         const keep = useAppStore
           .getState()
           .attachments.filter((a) => a.kind !== "dom")
@@ -394,8 +368,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     [addAttachment, clearAttachments, pushToast],
   )
 
-  // Effect 1: browser-state subscription (mount once). Applies to whichever
-  // session currently owns the webview, not necessarily the viewed session.
   useEffect(() => {
     let cancelled = false
     let unlisten: (() => void) | null = null
@@ -404,9 +376,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
       unlisten = await listenBrowserState((e) => {
         const ownerKey = useAppStore.getState().browserOwnerSessionId
         if (!ownerKey) return
-        // Clear loadError on loading pulses; set it when native emits error.
-        // Title-only pulses may omit `error` — don't clobber an existing one
-        // unless loading started or Finished reported success/failure.
         const patch: {
           url: string
           title: string | null
@@ -424,7 +393,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
         } else if (e.error) {
           patch.loadError = e.error
         } else if (e.title == null) {
-          // Page-load Finished emits title: null — clear prior error on success.
           patch.loadError = null
         }
         useAppStore.getState().setBrowserSessionState(ownerKey, patch)
@@ -461,7 +429,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     }
   }, [])
 
-  // Design Mode events → composer DOM chips; Escape-exit syncs the toolbar flag.
   useEffect(() => {
     let cancelled = false
     let unlisten: (() => void) | null = null
@@ -487,7 +454,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     }
   }, [addDomChip])
 
-  // ⌘⇧D / Ctrl⇧D toggles Design Mode when the Browser tab is active.
   useEffect(() => {
     if (!active) return
     const onKey = (e: KeyboardEvent) => {
@@ -500,19 +466,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     return () => window.removeEventListener("keydown", onKey)
   }, [active, toggleDesignMode])
 
-  // Effect 2: bounds sync (native only) — re-run when webview starts or tab activates.
-  // Owns reveal too: the webview must never be shown before its first real
-  // (non-degenerate) rect has been applied, otherwise it paints at whatever
-  // stale position it last had (e.g. (0,0) from creation), which sits on top
-  // of the toolbar.
-  //
-  // Bounds are 1:1 with the empty `data-browser-webview-slot` rect. Spacing
-  // (e.g. top gap) is CSS on that slot; Rust applies the measured height as-is.
-  //
-  // Visibility is NOT gated on `browserLoading`. Hide only when the tab is
-  // inactive, this session doesn't own the webview, the browser hasn't
-  // started, a confirmed loadError, or a blocking HTML overlay is open
-  // (native child webviews always paint above React).
   useEffect(() => {
     if (isBrowserPreview()) return
     const shouldShow = active && isOwner && browserStarted && !loadError
@@ -523,15 +476,12 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     const slot = contentRef.current
     const host = hostRef.current
     if (!slot || !host) {
-      // Refs not committed yet — never leave a stale visible webview up.
       void browserSetVisible(false)
       return
     }
 
     let cancelled = false
     let rafId: number | null = null
-    // Last bounds sent to Rust — the watchdog only re-sends on real drift so
-    // the 500ms interval never spams IPC when layout is stable.
     let lastSent: { x: number; y: number; w: number; h: number } | null = null
     const panelEl = document.querySelector<HTMLElement>(
       '[aria-label="Details panel"]',
@@ -542,8 +492,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     const measure = (force: boolean) => {
       if (cancelled) return
       const rect = slot.getBoundingClientRect()
-      // Native child webviews sit above every HTML stacking context — hide only
-      // when a modal/menu actually covers this slot (or the sash is dragging).
       if (shouldHideWebview(rect)) {
         lastSent = null
         void browserSetVisible(false)
@@ -597,8 +545,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     }
     const schedule = () => {
       if (rafId !== null) return
-      // Double-rAF so flex chrome has a committed layout before we read
-      // the slot — a single rAF can still see pre-toolbar geometry.
       rafId = requestAnimationFrame(() => {
         rafId = requestAnimationFrame(() => {
           rafId = null
@@ -618,17 +564,8 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     if (panelEl) panelEl.addEventListener("scroll", onScroll, true)
     window.addEventListener("resize", schedule)
     schedule()
-    // Drift watchdog: ResizeObserver misses position-only moves (sidebar
-    // toggle, narrow-overlay transitions) and rAF can be throttled/suspended
-    // by WKWebView (live window resize, occlusion), leaving the native child
-    // webview over the toolbar. A plain interval keeps firing in those cases;
-    // measure(false) only re-sends when the rect actually drifted.
-    // While streaming, poll slowly — chat growth would otherwise spam
-    // set_bounds every 500ms + RO storms on Windows WebView2.
     const watchdogMs = sessionStreaming ? 2000 : 500
     const watchdog = window.setInterval(() => measure(false), watchdogMs)
-    // Overlay open/close doesn't resize the content host — observe DOM so
-    // CommandPalette / ConfirmDialog / etc. immediately hide the webview.
     const overlayObserver = new MutationObserver(() => schedule())
     overlayObserver.observe(document.body, {
       childList: true,

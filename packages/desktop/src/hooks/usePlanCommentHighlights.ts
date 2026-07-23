@@ -18,11 +18,6 @@ const clearCommentMarks = (root: HTMLElement) => {
 const escapeRegExp = (s: string): string =>
   s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
-/**
- * Paint persistent comment highlights over the rendered plan markdown by
- * matching each comment's quote in the DOM text (same approach as
- * `usePlanFind`). Skips painting while Find-in-Plan is open.
- */
 export const usePlanCommentHighlights = (
   containerRef: RefObject<HTMLElement | null>,
   comments: PlanComment[],
@@ -76,7 +71,7 @@ export const usePlanCommentHighlights = (
             frag.appendChild(document.createTextNode(value.slice(end)))
           }
           textNode.parentNode?.replaceChild(frag, textNode)
-          break // one highlight per comment
+          break
         }
       }
     }
@@ -87,7 +82,6 @@ export const usePlanCommentHighlights = (
       const el = containerRef.current
       if (el) clearCommentMarks(el)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [containerRef, commentsKey, findOpen])
 
   useEffect(() => {

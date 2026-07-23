@@ -24,9 +24,7 @@ type ModeOption = {
   label: string
   description: string
   icon: typeof Sparkles
-  /** Icon/label hue in the menu list. */
   accent: string
-  /** Selected trigger pill — tinted surface + text (Cursor mode semantics). */
   triggerClass: string
 }
 
@@ -78,7 +76,6 @@ const MODES: ModeOption[] = [
   },
 ]
 
-/** Modes shown in the picker — Flex gated by `FLEX_MODE_ENABLED`. */
 export const visibleComposerModes = (): ModeOption[] =>
   MODES.filter((mode) => mode.id !== "flex" || FLEX_MODE_ENABLED)
 
@@ -88,7 +85,6 @@ type ModePickerProps = {
   disabled?: boolean
 }
 
-/** Agent / Plan / Ask / Debug (/ Flex when flagged) mode picker for the composer footer. */
 export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
   const modes = useMemo(() => visibleComposerModes(), [])
   const items = useMemo(
@@ -100,7 +96,6 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
   const selected = modes.find((m) => m.id === effectiveValue) ?? modes[0]
   const Icon = selected.icon
 
-  // Persisted Flex mode while the flag is off → fall back to Agent.
   useEffect(() => {
     if (value === "flex" && !FLEX_MODE_ENABLED) onChange("agent")
   }, [value, onChange])
@@ -123,8 +118,6 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
         size="xs"
         aria-label={`Mode: ${selected.label}`}
         className={cn(
-          // Cursor mode pill: 12px type, h-6 rounded-full, whisper tint + hairline.
-          // triggerClass owns bg + hover (overrides SelectTrigger fill-4 hover).
           "border shadow-none opacity-90 hover:opacity-100 data-open:opacity-100",
           selected.triggerClass,
         )}
@@ -173,12 +166,6 @@ export const modePlaceholder = (mode: ComposerMode, isHero: boolean): string => 
   return "Plan, search, build anything"
 }
 
-/** Agent/Debug defer to the user's configured default (Settings → Behavior →
- * Permissions, `appStore.defaultPermissionMode`) — read live via
- * `getState()` since this is a plain function, not a component/hook, and
- * callers (Composer.tsx, usePlanBuild.ts) invoke it at turn-submit time, not
- * render time. Plan/Ask/Flex keep their own fixed safeguards regardless of
- * that setting. */
 export const modeToPermission = (mode: ComposerMode): PermissionMode => {
   if (mode === "plan") return "plan"
   if (mode === "ask") return "dont_ask"
@@ -186,6 +173,5 @@ export const modeToPermission = (mode: ComposerMode): PermissionMode => {
   return useAppStore.getState().defaultPermissionMode
 }
 
-/** Bypass-permissions shield applies in Agent and Debug (full-tool modes). */
 export const modeAllowsBypass = (mode: ComposerMode | string): boolean =>
   mode === "agent" || mode === "debug"

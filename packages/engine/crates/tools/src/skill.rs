@@ -1,17 +1,3 @@
-//! `Skill`: load a discovered skill's full instructions into context.
-//!
-//! This crate has no dependency on the skill-discovery logic (that lives in
-//! `agentloop-prompts`, alongside slash-command discovery) — the caller
-//! resolves skills to plain `(name, description)` pairs plus a lookup
-//! closure, matching how [`crate::subagent_tool`] takes pre-resolved role
-//! data instead of depending on the `loop` crate's role registry.
-//!
-//! This is the progressive-disclosure mechanism: only names + descriptions
-//! sit in the tool's own description (and therefore every request's context)
-//! until the model decides one is relevant and calls this tool, at which
-//! point the full `SKILL.md` body enters context as this call's result and
-//! stays resident for the rest of the session.
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -27,12 +13,9 @@ use crate::fs::schema_of;
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct SkillInput {
-    /// The skill's name, exactly as it appears in this tool's description.
     name: String,
 }
 
-/// Resolves a skill name to its full `SKILL.md` body (frontmatter stripped),
-/// or `None` if the name is unknown at call time.
 pub type SkillLoader = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 
 struct SkillTool {
@@ -68,10 +51,6 @@ impl Tool for SkillTool {
     }
 }
 
-/// Build a `Skill` tool advertising `skills` (name, description pairs) for
-/// the model to invoke by name. Returns `None` when there are no
-/// model-invocable skills, so an empty registry doesn't clutter the tool
-/// list with a useless entry.
 pub fn skill_tool(skills: &[(String, String)], loader: SkillLoader) -> Option<Arc<dyn Tool>> {
     if skills.is_empty() {
         return None;

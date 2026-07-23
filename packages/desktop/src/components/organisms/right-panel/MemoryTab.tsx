@@ -2,10 +2,6 @@ import { Brain } from "lucide-react"
 import { MemoryContent } from "../../../pages/settings/memory/MemoryContent"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
-/** Right-panel Memory tab — same durable-notes UI as Settings → Memory.
- * Gated by `MEMORY_TAB_ENABLED` at the tab-strip / open sites; this body
- * only mounts when the tab is open. Works empty (no memories yet).
- * Chrome matches Browser/PlanList: 30px `--header-height` row + `px-2.5`. */
 export const MemoryTab = () => {
   return (
     <div className="flex h-full min-h-0 flex-col">

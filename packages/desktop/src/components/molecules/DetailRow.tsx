@@ -1,14 +1,17 @@
-import { useEffect, useState, type MouseEvent } from "react"
+import { useEffect, useMemo, useState, type MouseEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { ChevronRight, FileCode2, ListEnd, LoaderCircle } from "lucide-react"
 import { backgroundDemote, reviewFileDiff, toInvokeError } from "../../lib/tauri"
+import { buildArtifactOpenWithMenuItems } from "../../lib/artifacts/openWith"
+import { inferArtifactKind } from "../../lib/artifacts/types"
 import { cn, toSessionRelativePath } from "../../lib/utils"
 import { sessionScopeKey, useAppStore } from "../../stores/appStore"
 import { useSessions } from "../../hooks/useSessions"
 import { Collapsible } from "./Collapsible"
 import { ChatDiffCard } from "./ChatDiffCard"
 import { BackgroundBashRow } from "./BackgroundBashRow"
+import { ContextMenu } from "./ContextMenu"
 import { DiffBadge, ExecErrorAction, ExecTail } from "./ExecTail"
 import type { ToolStepDetail } from "../../lib/toolPresentation"
 
@@ -41,15 +44,9 @@ const DemoteButton = ({ callId }: { callId: string }) => {
 type DetailRowProps = {
   detail: ToolStepDetail
   note?: string
-  /** When true, expand and fetch the file diff on mount (single Edit/Write groups). */
   autoExpandDiff?: boolean
 }
 
-/** Single detail line under a tool-step group. Edit/write rows that carry a
- * resolvable `diffPath` become expandable: first expand lazy-fetches the
- * file's diff against its pre-agent base state and renders it inline
- * (display-only chat card — no hunk actions; Changes tab owns Keep/Undo).
- * Rows without a path behave exactly as before. */
 export const DetailRow = ({
   detail,
   note,
@@ -57,19 +54,47 @@ export const DetailRow = ({
 }: DetailRowProps) => {
   const sessionId = useAppStore((s) => s.activeSessionId)
   const openWorkspaceFile = useAppStore((s) => s.openWorkspaceFile)
+  const openToolBesideChat = useAppStore((s) => s.openToolBesideChat)
+  const pushToast = useAppStore((s) => s.pushToast)
   const { sessions } = useSessions()
   const cwd = sessions.find((s) => s.id === sessionId)?.cwd
   const [expanded, setExpanded] = useState(autoExpandDiff)
   const [diff, setDiff] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
 
   const rawPath = detail.diffPath ?? detail.filePath
   const relativePath = rawPath
     ? toSessionRelativePath(rawPath, cwd)
     : undefined
+  const isArtifactPath = !!relativePath && !!inferArtifactKind(relativePath)
 
-  // Auto-expand single Edit/Write: fetch once when the row can resolve a path.
+  const revealPath = (path: string) => {
+    if (!sessionId) return
+    if (inferArtifactKind(path)) {
+      openToolBesideChat(sessionId, "artifacts")
+      return
+    }
+    openWorkspaceFile(sessionScopeKey(sessionId), path)
+  }
+
+  const artifactMenuItems = useMemo(
+    () =>
+      !isArtifactPath || !relativePath
+        ? []
+        : buildArtifactOpenWithMenuItems(
+            {
+              sessionId: sessionId ?? null,
+              cwd: cwd ?? null,
+              relativePath,
+              kind: inferArtifactKind(relativePath),
+            },
+            (message) => pushToast(message, "error"),
+          ),
+    [isArtifactPath, relativePath, sessionId, cwd, pushToast],
+  )
+
   useEffect(() => {
     if (!autoExpandDiff) return
     if (!detail.diffPath || !sessionId || !relativePath) return
@@ -128,7 +153,7 @@ export const DetailRow = ({
   const handleOpenFile = (e: MouseEvent) => {
     e.stopPropagation()
     if (!sessionId || !relativePath) return
-    openWorkspaceFile(sessionScopeKey(sessionId), relativePath)
+    revealPath(relativePath)
   }
 
   return (
@@ -144,6 +169,15 @@ export const DetailRow = ({
         tabIndex={canExpand ? 0 : undefined}
         aria-expanded={canExpand ? expanded : undefined}
         onClick={canExpand ? handleToggle : undefined}
+        onContextMenu={
+          isArtifactPath
+            ? (e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setMenuPos({ x: e.clientX, y: e.clientY })
+              }
+            : undefined
+        }
         onKeyDown={
           canExpand
             ? (e) => {
@@ -155,15 +189,11 @@ export const DetailRow = ({
             : undefined
         }
         className={cn(
-          // Cursor tool detail: secondary label + tertiary meta, gap 4.
           "group/detail flex min-h-6 items-center gap-1 text-base leading-[1.5] text-ink-muted",
           "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
           canExpand && "cursor-pointer hover:text-ink-secondary",
         )}
       >
-        {/* Fixed-size leading slot — running→done swaps the spinner for a
-         * chevron (or nothing, when not expandable) in place, so the box
-         * itself never changes size and the row never shifts. */}
         <span className="flex h-[18px] w-4 shrink-0 items-center justify-center">
           {detail.running ? (
             <LoaderCircle className="h-3 w-3 animate-spin" aria-hidden />
@@ -216,8 +246,6 @@ export const DetailRow = ({
         <Collapsible open={expanded}>
           <div className="ml-3.5 mt-0.5">
             {loading ? (
-              // Match ChatDiffCard shell (r-lg, pad 10×6, hairline) so expand
-              // states don't jump chrome density.
               <div className="rounded-[var(--radius-lg)] border border-stroke-3 bg-panel px-2.5 py-1.5 text-xs leading-[1.5] text-ink-faint">
                 Loading diff…
               </div>
@@ -233,11 +261,8 @@ export const DetailRow = ({
                 onOpenFile={
                   canOpenFile
                     ? () => {
-                        if (!sessionId || !relativePath) return
-                        openWorkspaceFile(
-                          sessionScopeKey(sessionId),
-                          relativePath,
-                        )
+                        if (!relativePath) return
+                        revealPath(relativePath)
                       }
                     : undefined
                 }
@@ -250,6 +275,11 @@ export const DetailRow = ({
           </div>
         </Collapsible>
       ) : null}
+      <ContextMenu
+        position={menuPos}
+        items={artifactMenuItems}
+        onClose={() => setMenuPos(null)}
+      />
     </li>
   )
 }

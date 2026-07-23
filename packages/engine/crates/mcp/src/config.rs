@@ -31,7 +31,6 @@ impl McpBridgeConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct McpServerConfig {
-    /// Stable config key used for tool names and permission routing.
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
@@ -39,7 +38,6 @@ pub struct McpServerConfig {
     pub enabled: bool,
     #[serde(flatten)]
     pub transport: McpServerTransport,
-    /// Optional model-facing prefix. Defaults to `name`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_name_prefix: Option<String>,
 }

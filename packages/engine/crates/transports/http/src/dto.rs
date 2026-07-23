@@ -1,27 +1,14 @@
-//! Wire DTOs for the HTTP transport. Deliberately separate from
-//! `agentloop_contracts` types: `contracts` depends on nothing heavy
-//! (serde/schemars/uuid only), and `utoipa::ToSchema` derives stay confined
-//! to this crate's own request/response boundary.
-
 use agentloop_contracts::{PermissionDecision, PermissionMode, SessionMeta};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub(crate) struct CreateSessionRequest {
-    /// Working directory for the session; defaults to the server's own cwd.
     pub cwd: Option<String>,
     pub title: Option<String>,
-    /// Role this root session runs as (e.g. `searcher`); `None` = main.
     pub role: Option<String>,
-    /// Model for this session, optionally `provider/`-qualified; `None`
-    /// defers to the role's model chain, then the server's `--model` default.
     #[serde(default)]
     pub model: Option<String>,
-    /// This session's fallback chain, in order; empty defers to the server's
-    /// `--fallback-model` default (if any). A `provider/`-qualified entry
-    /// naming a provider the server didn't register fails when the chain
-    /// reaches it, not at session creation.
     #[serde(default)]
     pub fallback_models: Vec<String>,
 }
@@ -61,14 +48,9 @@ impl From<SessionMeta> for SessionSummary {
 #[derive(Debug, Deserialize, ToSchema)]
 pub(crate) struct PromptRequest {
     pub prompt: String,
-    /// One of `default`, `accept_edits`, `plan`, `dont_ask`,
-    /// `bypass_permissions`; omit to keep the session's current mode.
     pub permission_mode: Option<String>,
 }
 
-/// Parse the wire string for `permission_mode`. Kept local (not a
-/// `From`/`TryFrom` on the contracts type) so contracts stays free of any
-/// HTTP-transport-specific parsing concerns.
 pub(crate) fn parse_permission_mode(value: &str) -> Result<PermissionMode, String> {
     match value {
         "default" => Ok(PermissionMode::Default),
@@ -94,7 +76,6 @@ pub enum PermissionResolveDecision {
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct PermissionResolveRequest {
     pub decision: PermissionResolveDecision,
-    /// Only meaningful when `decision` is `deny`.
     pub reason: Option<String>,
 }
 

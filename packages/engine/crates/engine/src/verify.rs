@@ -1,5 +1,3 @@
-//! Goal-progress verification via the `Verify` tool.
-
 use agentloop_contracts::{
     AgentEvent, PromptInput, SessionId, ToolCallStatus, TurnOptions, VerificationVerdict,
 };
@@ -8,12 +6,6 @@ use crate::EngineResult;
 use crate::service::EngineService;
 
 impl EngineService {
-    /// Prompt the model to call `Verify` against `goal_prompt`, then read the
-    /// resulting structured verdict back out of the session's own log (same
-    /// extraction the `verifier` plugin's `Verify` tool already performs for
-    /// the caller that spawned it — see `agentloop_loop::subagent`). Returns
-    /// `None` when no completed `Verify` call is found (tool unavailable, or
-    /// the model didn't call it).
     pub(crate) async fn verify_goal_progress(
         &self,
         session: &SessionId,

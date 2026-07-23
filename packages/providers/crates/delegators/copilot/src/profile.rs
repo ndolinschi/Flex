@@ -1,5 +1,3 @@
-//! Copilot as a [`DelegatorProfile`] over the shared line-oriented runtime.
-
 use std::sync::Arc;
 
 use agentloop_contracts::{
@@ -17,7 +15,6 @@ use crate::COPILOT_AGENT_ID;
 use crate::config::CopilotConfig;
 use crate::mapper::CopilotLineMapper;
 
-/// GitHub Copilot's identity, capabilities, and launch shape.
 pub struct CopilotProfile {
     pub config: CopilotConfig,
 }
@@ -86,10 +83,8 @@ impl DelegatorProfile for CopilotProfile {
     }
 }
 
-/// The GitHub Copilot delegator agent.
 pub type CopilotAgent<H = TokioCommandHost> = LineDelegatorAgent<CopilotProfile, H>;
 
-/// Build a Copilot agent with the real process host.
 pub fn copilot_agent(config: CopilotConfig, store: Arc<dyn SessionStore>) -> CopilotAgent {
     LineDelegatorAgent::new(
         CopilotProfile { config },
@@ -98,12 +93,10 @@ pub fn copilot_agent(config: CopilotConfig, store: Arc<dyn SessionStore>) -> Cop
     )
 }
 
-/// Build a Copilot agent with an ephemeral in-memory store (probing, doctor).
 pub fn ephemeral_copilot_agent(config: CopilotConfig) -> CopilotAgent {
     copilot_agent(config, Arc::new(MemoryStore::new()))
 }
 
-/// Build a Copilot agent over a custom [`ProcessHost`] (tests).
 pub fn copilot_agent_with_host<H: ProcessHost + 'static>(
     config: CopilotConfig,
     store: Arc<dyn SessionStore>,

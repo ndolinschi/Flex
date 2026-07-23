@@ -1,17 +1,3 @@
-//! `IndexPlugin` — the agentic code-index capability.
-//!
-//! Contributes `SearchCode`, `FindSymbol`, and `RepoMap`, backed by a
-//! per-repo lexical (BM25) + symbol (+ optional embedding) index built
-//! lazily on first use. Optionally installs an [`AutoContextHook`] that
-//! injects top-k chunks into the first user message of a turn — **off by
-//! default**; enable via [`IndexPlugin::with_auto_context`] or
-//! `AGENTLOOP_AUTO_CONTEXT=1`.
-//!
-//! Index refresh on tool use is also opt-in ([`IndexPlugin::with_auto_update`]
-//! / `AGENTLOOP_INDEX_AUTO_UPDATE=1`): when off (default), a warm on-disk
-//! index is reused across chats; Settings → Rebuild (or turning auto-update
-//! on) refreshes it.
-
 use std::sync::Arc;
 
 use agentloop_core::{Hook, Plugin, Tool};
@@ -20,11 +6,6 @@ use crate::auto_context::{AutoContextHook, env_auto_context_enabled};
 use crate::tools::shared::{IndexOpenMode, env_auto_update_enabled};
 use crate::tools::{FindSymbolTool, RepoMapTool, SearchCodeTool};
 
-/// The agentic code-index plugin.
-///
-/// Enabled via `AgentBuilder::enable_plugin("index")` (env-gated auto-context
-/// / auto-update) or composed explicitly with
-/// [`IndexPlugin::with_auto_context`] / [`IndexPlugin::with_auto_update`].
 #[derive(Debug, Clone, Copy)]
 pub struct IndexPlugin {
     auto_context: bool,
@@ -41,22 +22,15 @@ impl Default for IndexPlugin {
 }
 
 impl IndexPlugin {
-    /// Construct with auto-context / auto-update from their env vars.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Force auto-context on or off (overrides the env default).
     pub fn with_auto_context(mut self, on: bool) -> Self {
         self.auto_context = on;
         self
     }
 
-    /// Force index auto-update on tool use on or off (overrides the env default).
-    ///
-    /// When off, SearchCode / FindSymbol / RepoMap reuse a warm on-disk index
-    /// and only build when the index is empty. When on, each tool call
-    /// incrementally rescans for changed files (previous always-on behavior).
     pub fn with_auto_update(mut self, on: bool) -> Self {
         self.auto_update = on;
         self
@@ -92,9 +66,12 @@ impl Plugin for IndexPlugin {
     fn system_prompt_fragment(&self) -> Option<String> {
         Some(
             "# Code index\n\
-             Prefer `SearchCode` for natural-language / keyword code search, \
-             `FindSymbol` for exact identifier lookup, and `RepoMap` when you \
-             need a high-level map of an unfamiliar repository."
+             Prefer `SearchCode` for natural-language / keyword code search and \
+             `FindSymbol` for exact identifier lookup. Call `RepoMap` at most \
+             once per project when you need a high-level orientation map of an \
+             unfamiliar repository — it is cached across chats until the index \
+             changes. Skip `RepoMap` when you already know the area to edit or \
+             a prior turn already mapped this workspace."
                 .to_owned(),
         )
     }

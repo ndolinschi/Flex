@@ -1,5 +1,3 @@
-//! Foreground command execution with timeout, cancel, and optional streaming.
-
 use std::process::Stdio;
 use std::time::Duration;
 
@@ -10,18 +8,6 @@ use agentloop_core::{ChunkSink, ExecError, ExecOutcome, ExecStream};
 
 use super::io::read_and_forward;
 
-/// Run `command` to completion under `timeout_ms` and `cancel`.
-///
-/// The command must not have its stdio configured; this sets stdin to null and
-/// captures stdout/stderr. `kill_on_drop` guarantees the child dies when the
-/// future is dropped (cancellation or timeout).
-///
-/// When `chunk_sink` is `Some`, stdout/stderr are additionally forwarded to it
-/// as they arrive (8KB reads, lossy-UTF8 decoded) while still being
-/// accumulated in full for the returned [`ExecOutcome`] — the streaming path
-/// is purely additive over the historical behavior. `chunk_sink` is `None` at
-/// every call site except the local backend today; other backends simply
-/// don't stream yet, which is safe (the final output is unaffected).
 pub(crate) async fn run_command(
     command: Command,
     timeout_ms: u64,
@@ -31,8 +17,6 @@ pub(crate) async fn run_command(
     run_command_with_sink(command, timeout_ms, cancel, label, None).await
 }
 
-/// Same as [`run_command`], but takes an optional [`ChunkSink`] for
-/// incremental stdout/stderr forwarding. See [`run_command`] for semantics.
 pub(crate) async fn run_command_with_sink(
     mut command: Command,
     timeout_ms: u64,
@@ -42,7 +26,6 @@ pub(crate) async fn run_command_with_sink(
 ) -> Result<ExecOutcome, ExecError> {
     crate::win_console::hide_console(&mut command);
     let Some(sink) = chunk_sink else {
-        // No sink: keep the original, simplest path untouched.
         let child = command
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -88,8 +71,6 @@ pub(crate) async fn run_command_with_sink(
         });
     };
 
-    // Streaming path: pipe stdio, read both streams chunk-by-chunk, forward
-    // to the sink, and accumulate into buffers for the final result.
     let mut child: Child = command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -153,9 +134,6 @@ pub(crate) async fn run_command_with_sink(
         }
     };
 
-    // The child has exited, so its pipes will hit EOF; join the read loops to
-    // collect the full accumulated buffers (bounded wait — pipes close once
-    // the process is gone).
     let stdout_buf = stdout_task
         .await
         .map_err(|err| ExecError::Failed(format!("{label} stdout reader failed: {err}")))?;

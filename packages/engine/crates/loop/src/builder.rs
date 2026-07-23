@@ -1,5 +1,3 @@
-//! Builder and limits for [`NativeAgent`](crate::NativeAgent).
-
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -16,31 +14,15 @@ use crate::agent::NativeAgent;
 use crate::deps::TurnDeps;
 use crate::permission::PermissionPolicy;
 
-/// Bounds on a turn.
 #[derive(Debug, Clone)]
 pub struct LoopLimits {
-    /// Model-call iterations per turn.
     pub max_iterations: u32,
-    /// Concurrent read-only tool executions.
     pub tool_concurrency: usize,
-    /// Hard per-tool-call timeout.
     pub tool_timeout: Duration,
-    /// Optional global cross-session cap on concurrently running tools.
-    /// `None` (default) keeps today's per-session bound only.
     pub tool_pool_size: Option<usize>,
-    /// Escalating backoff schedule for provider/network failures that
-    /// survive a dropped connection instead of failing the turn or burning a
-    /// fallback model. See [`RetryPolicy`].
     pub retry: RetryPolicy,
-    /// Enable proactive auto-compaction when estimated context usage nears
-    /// `auto_compact_threshold_percent`. Default `true`. When `false`,
-    /// compaction is still triggered reactively on a hard context-overflow
-    /// error from the provider.
     pub auto_compact: bool,
-    /// Percentage (1–100) of the resolved context window that triggers
-    /// proactive auto-compaction. Default 85.
     pub auto_compact_threshold_percent: u64,
-    /// How the conversation is condensed during compaction.
     pub compaction_mode: CompactionMode,
 }
 
@@ -59,31 +41,12 @@ impl Default for LoopLimits {
     }
 }
 
-/// Escalating same-model retry schedule for RETRYABLE provider/network
-/// failures (timeouts, dropped connections, mid-stream cuts, 5xx, rate
-/// limits) that occur while calling the model.
-///
-/// This is deliberately separate from the mid-stream `stream_retries` bound
-/// in [`crate::turn::iteration`]: that one is a handful of fast, low-backoff
-/// retries for a corrupted frame on an otherwise healthy connection. This
-/// policy is the outer, patient layer — it survives a connection actually
-/// dropping (Wi-Fi hiccup, VPN reset, provider outage) by holding the turn
-/// open across the fallback-chain boundary, sleeping the scheduled delay,
-/// and retrying the *same* model before the existing fallback/model-exhausted
-/// semantics ever see the failure.
 #[derive(Debug, Clone)]
 pub struct RetryPolicy {
-    /// Delay before each successive retry attempt, in order. The default is
-    /// approximately 10 attempts total (initial call + `schedule.len()`
-    /// retries): three 30s spacings, two 60s spacings, then four 300s (5m)
-    /// spacings for a patient tail — enough to ride out a laptop sleep/wake
-    /// or a several-minute network blip without failing the turn.
     pub schedule: Vec<Duration>,
 }
 
 impl RetryPolicy {
-    /// The default escalating schedule: `[30s, 30s, 30s, 60s, 60s, 300s,
-    /// 300s, 300s, 300s]` — 9 retries plus the initial attempt, ~10 total.
     pub fn default_schedule() -> Vec<Duration> {
         vec![
             Duration::from_secs(30),
@@ -98,14 +61,10 @@ impl RetryPolicy {
         ]
     }
 
-    /// Total attempts the schedule allows, counting the initial call.
     pub fn max_attempts(&self) -> u32 {
         self.schedule.len() as u32 + 1
     }
 
-    /// The delay for the given 1-indexed retry attempt (`1` = first retry,
-    /// after the initial call fails), or `None` once the schedule is
-    /// exhausted.
     pub fn delay_for(&self, attempt: u32) -> Option<Duration> {
         let index = attempt.checked_sub(1)? as usize;
         self.schedule.get(index).copied()
@@ -120,7 +79,6 @@ impl Default for RetryPolicy {
     }
 }
 
-/// Builder for [`NativeAgent`].
 pub struct NativeAgentBuilder {
     store: Arc<dyn SessionStore>,
     providers: ProviderRegistry,
@@ -199,8 +157,6 @@ impl NativeAgentBuilder {
         self
     }
 
-    /// Engine-wide default fallback chain, used by a session created with an
-    /// empty `NewSessionParams.fallback_models`.
     pub fn default_fallback_models(mut self, models: Vec<ModelRef>) -> Self {
         self.default_fallback_models = models;
         self
@@ -211,51 +167,36 @@ impl NativeAgentBuilder {
         self
     }
 
-    /// Share the pending-question map with the `AskUserQuestion` tool: build
-    /// the map first, hand a clone to the tool, and a clone here.
     pub fn questions(mut self, pending: Arc<PendingMap<QuestionId, Vec<Answer>>>) -> Self {
         self.pending_questions = pending;
         self
     }
 
-    /// Share the pending mode-switch map with the `SwitchMode` tool: build
-    /// the map first, hand a clone to the tool, and a clone here.
     pub fn mode_switches(mut self, pending: Arc<PendingMap<ModeSwitchId, bool>>) -> Self {
         self.pending_mode_switches = pending;
         self
     }
 
-    /// Role definitions for multi-agent orchestration (built-ins are always
-    /// present; these override or extend them).
     pub fn roles(mut self, roles: Vec<crate::roles::RoleSpec>) -> Self {
         self.roles = roles;
         self
     }
 
-    /// Register bridged MCP tools from a loaded manager after base tools.
     pub fn mcp(mut self, manager: std::sync::Arc<McpManager>) -> Self {
         self.mcp = Some(manager);
         self
     }
 
-    /// Inject an isolation backend. When set, a root session whose effective
-    /// policy asks for isolation runs in an isolated workspace it provisions.
     pub fn workspace(mut self, workspace: Arc<dyn Workspaces>) -> Self {
         self.workspace = Some(workspace);
         self
     }
 
-    /// Record the id of the command-execution backend shell tools run
-    /// through, stamped onto each session's metadata. `None` (default) =
-    /// host execution.
     pub fn executor_id(mut self, id: impl Into<String>) -> Self {
         self.executor_id = Some(id.into());
         self
     }
 
-    /// Share a [`RoutingTable`] with the `SetRouting` tool: build the table
-    /// first, hand a clone to the tool, and a clone here so the loop sees
-    /// mid-turn overrides written by the tool.
     pub fn routing(mut self, routing: Arc<RoutingTable>) -> Self {
         self.routing = routing;
         self
@@ -317,7 +258,6 @@ mod loop_limits_tests {
             ..LoopLimits::default()
         };
         assert!(!limits.auto_compact);
-        // Threshold and mode fields remain accessible even when compaction is off.
         assert_eq!(limits.auto_compact_threshold_percent, 85);
     }
 
@@ -364,8 +304,6 @@ mod retry_policy_tests {
 
     #[test]
     fn delay_for_rejects_attempt_zero() {
-        // Attempt numbering is 1-indexed (attempt 1 = first retry); 0 has no
-        // meaning and must not panic via underflow.
         let policy = RetryPolicy::default();
         assert_eq!(policy.delay_for(0), None);
     }

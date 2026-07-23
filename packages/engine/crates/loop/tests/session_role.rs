@@ -1,6 +1,3 @@
-//! Root sessions can serve a named role: the role is validated at creation,
-//! recorded on the session meta, and drives the default model chain.
-
 use std::path::PathBuf;
 use std::sync::Arc;
 

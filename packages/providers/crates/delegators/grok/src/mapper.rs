@@ -2,15 +2,8 @@ use agentloop_contracts::{ToolCallId, ToolOutput, ToolResultBlock, TurnStopReaso
 use agentloop_delegator_common::{DelegatorEvent, DelegatorMapError, LineMapper};
 use serde::Deserialize;
 
-/// Maps `grok -p --output-format streaming-json` lines into normalized events.
-///
-/// Wire shape is modeled on the documented headless NDJSON stream (status /
-/// tool_call / tool_result / file_edit / complete / text / error). Fixtures
-/// below are **UNVERIFIED** — recorded from public docs/blog samples, not a
-/// live `grok` CLI capture (no binary on PATH in this environment).
 #[derive(Debug, Default)]
 pub struct GrokLineMapper {
-    /// Open tool calls awaiting a matching `tool_result` (id + tool name).
     pending: Vec<(ToolCallId, String)>,
 }
 
@@ -62,7 +55,6 @@ impl LineMapper for GrokLineMapper {
 
         let event: GrokWireEvent = serde_json::from_str(trimmed)?;
         Ok(match event {
-            // Progress chatter — nothing to surface in the transcript.
             GrokWireEvent::Status => Vec::new(),
             GrokWireEvent::Text { text, message } => {
                 let text = text.or(message).unwrap_or_default();
@@ -149,8 +141,6 @@ impl LineMapper for GrokLineMapper {
                 }
                 if tokens_used.is_some() || cost.is_some() {
                     events.push(DelegatorEvent::Usage {
-                        // Blog samples expose a single `tokens_used` total with
-                        // no input/output split — stash it in `output`.
                         usage: agentloop_contracts::TokenUsage {
                             input: 0,
                             output: tokens_used.unwrap_or(0),
@@ -275,9 +265,6 @@ fn tool_output_from_value(value: serde_json::Value, is_error: bool) -> ToolOutpu
 mod tests {
     use super::*;
 
-    // UNVERIFIED: recorded from docs/blog samples, not a live CLI.
-    // https://www.aimadetools.com/blog/grok-build-headless-ci-automation/
-    // https://docs.x.ai/build/cli/headless-scripting
     const DOC_STATUS: &str = r#"{"type":"status","message":"Reading src/auth.ts..."}"#;
     const DOC_TOOL_CALL: &str = r#"{"type":"tool_call","tool":"file_read","path":"src/auth.ts"}"#;
     const DOC_TOOL_RESULT: &str = r#"{"type":"tool_result","tool":"file_read","success":true}"#;

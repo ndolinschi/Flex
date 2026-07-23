@@ -1,4 +1,3 @@
-// Wire types hand-synced with engine contracts + desktop Tauri commands.
 
 export type SessionId = string
 export type TurnId = string
@@ -56,7 +55,6 @@ export type TurnSummary = {
   duration_ms: number
 }
 
-/** Record of a context compaction (`compaction_boundary` payload). */
 export type CompactionSummary = {
   summary_markdown: string
   strategy: string
@@ -156,10 +154,6 @@ export type ToolCall = {
   result?: ToolOutput
 }
 
-/** `commands::BackgroundProcessDto` — one background process started via
- * `Bash`'s `run_in_background`, tracked by the engine's
- * `BackgroundProcessRegistry` and reachable via `background_list`/
- * `background_kill` (`src-tauri/src/commands.rs`). */
 export type BackgroundProcessDto = {
   process_id: string
   command?: string | null
@@ -175,12 +169,8 @@ export type PlanEntry = {
   status: PlanStatus
 }
 
-/** `agentloop_contracts::VerdictOutcome` — the `Verify` tool's graded result. */
 export type VerdictOutcome = "pass" | "fail" | "inconclusive"
 
-/** `agentloop_contracts::VerificationVerdict`, read out of a completed `Verify`
- * call's `ToolOutput.structured` (see `agentloop_core::tool::VERIFIER_TOOL_NAME`
- * and `EngineService::verify_goal_progress` in `packages/engine/crates/engine/src/lib.rs`). */
 export type VerificationVerdict = {
   outcome: VerdictOutcome
   findings: string[]
@@ -230,19 +220,10 @@ export type AgentEvent =
   | { kind: "question_resolved"; id: string; answers: Answer[] }
   | { kind: "command_expanded"; name: string; args: string }
   | { kind: "compaction_boundary"; summary: CompactionSummary }
-  /** Ephemeral, live-broadcast only — never persisted. Fires right before
-   * the summarizer runs so the UI can show "Compacting context…" until the
-   * following `compaction_boundary` (or turn end / error) lands. */
   | { kind: "compaction_started"; strategy: string }
-  /** Ephemeral — UI shows "Indexing repository…" until `indexing_completed`. */
   | { kind: "indexing_started"; reason: string }
-  /** Persisted — settled "Indexed N files" card in the chat timeline. */
   | { kind: "indexing_completed"; added: number; changed: number; removed: number; unchanged: number }
   | { kind: "model_fallback"; from: string; to?: string; reason: EngineError }
-  /** Ephemeral, live-broadcast only — never persisted to replay/JSONL. Fires
-   * once per retry attempt right before the engine sleeps that attempt's
-   * backoff. Success = normal stream events resume; exhaustion is signaled
-   * separately via `model_fallback` or a terminal turn error. */
   | { kind: "retry_scheduled"; attempt: number; max_attempts: number; delay_ms: number; error: string }
   | { kind: "hook_fired"; point: string; outcome: string }
   | { kind: "subagent_started"; child_session: SessionId; task: string; call_id?: ToolCallId; role?: string }
@@ -253,15 +234,10 @@ export type AgentEvent =
   | { kind: "workspace_discarded"; workspace_id: string }
   | { kind: "snapshot_created"; snapshot_id: string; turn_id: TurnId }
   | { kind: "snapshot_restored"; snapshot_id: string }
-  /** Peer-to-peer agent message — persisted on the recipient session log. */
   | { kind: "peer_message"; id: string; from: SessionId; to?: SessionId; thread_id?: string; content: string; about_path?: string }
-  /** Auto/router proposed a composer-mode switch; UI shows a veto countdown. */
   | { kind: "mode_switch_proposed"; id: string; mode: string; reason: string; timeout_ms: number }
-  /** The proposed mode switch was accepted and applied. */
   | { kind: "mode_switch_applied"; id: string; mode: string }
-  /** The proposed mode switch was vetoed by the user or timed out. */
   | { kind: "mode_switch_rejected"; id: string; mode: string; reason?: string }
-  /** Auto/router changed the session's model and/or effort mid-turn. */
   | { kind: "routing_changed"; model?: string; effort?: string; reason: string }
   | { kind: "gap"; from_seq: number }
   | { kind: "unknown"; raw: unknown }
@@ -274,73 +250,39 @@ export type SessionEvent = {
   payload: AgentEvent
 }
 
-// Desktop command DTOs (camelCase serde)
-
 export type PluginPrefs = {
   search: boolean
   index: boolean
-  /** Inject top-k indexed snippets into each turn's first user message. Default off. */
   autoContext: boolean
-  /**
-   * Rescan/update the on-disk index on every SearchCode / FindSymbol / RepoMap.
-   * Default off — reuse a warm index across chats; Rebuild from Settings to refresh.
-   */
   autoUpdateIndex: boolean
   learning: boolean
-  /** When Learning is on: force-ask on SkillSave / MemoryWrite. Default off. */
   learningRequireHumanApproval: boolean
-  /**
-   * When Learning is on: require a passing Verify before memory writes.
-   * Default off; pair with Verifier enabled.
-   */
   learningRequireVerifiedMemory: boolean
   verifier: boolean
-  /** Office deliverables: CreateDocument / CreateSpreadsheet / CreatePresentation. Default on. */
   artifacts: boolean
-  /** Embedded Browser panel tools (navigate / screenshot / eval / console). Default off. */
   browser: boolean
-  /** OS computer-use tools with animated agent cursor. Default off. */
   computer: boolean
 
-  // --- Agent coordination / auto mode ---
-
-  /** Peer agent messaging + SwitchMode tools. Default off. */
   messaging: boolean
-  /** Council mode — enables Verifier for second-opinion grading. Default off. */
   council: boolean
-  /** Composer Auto routing — shows "Auto" in the model picker. Default off. */
   autoMode: boolean
-  /** Model used in Auto mode (e.g. "anthropic/claude-sonnet-4-5"). */
   autoModeRouterModel?: string
-  /** Proactive auto-compaction when context nears threshold. Default true. */
   autoCompact: boolean
-  /** Context % threshold for proactive compaction (1–100). Default 85. */
   autoCompactThresholdPercent: number
-  /** Compaction strategy: "standard" | "turn_pair". Default "standard". */
   compactionMode: string
-  /** Ms the UI waits before auto-accepting a ModeSwitchProposed. Default 2000. */
   modeSwitchVetoMs: number
-  /** System delegation rules for Auto mode (empty = use built-in defaults). */
   delegationRules: string
 
-  // --- Cost-tier routing ---
-
-  /** Which cost tier SetRouting may escalate to: "low" | "medium" | "high" | "auto". Default "auto". */
   costMode: string
-  /** Models at the low cost tier (fast, cheap). Auto starts here. */
   costModelsLow: string[]
-  /** Models at the medium cost tier (balanced). */
   costModelsMedium: string[]
-  /** Models at the high cost tier (powerful, expensive). */
   costModelsHigh: string[]
 }
 
-/** Desktop UI prefs for ghost-text prompt completion (not an engine plugin). */
 export type InlineCompletionPrefs = {
   enabled: boolean
   providerId?: string
   modelId?: string
-  /** User dismissed setup without connecting — stop auto-prompting. */
   setupDismissed?: boolean
 }
 
@@ -369,10 +311,6 @@ export type IndexRebuildResult = {
   }
 }
 
-/** Secret storage backend: `"file"` stores the encryption key in a local
- * file (no OS prompts, ever); `"keychain"` stores it in the OS Keychain
- * (protected by the OS, but may prompt). See
- * `src-tauri/src/secrets.rs::SecretStorageMode`. */
 export type SecretStorageMode = "file" | "keychain"
 
 export type ProviderConfigView = {
@@ -407,13 +345,10 @@ export type BuiltinProvider = {
   requiresApiKey: boolean
 }
 
-/** Result of `copilot_auth_status` / `copilot_auth_wait`. */
 export type CopilotAuthStatus = {
   signedIn: boolean
 }
 
-/** Public half of a pending device-flow session (`copilot_auth_start`). The
- * private device code stays in the Tauri backend. */
 export type CopilotAuthStart = {
   sessionId: string
   userCode: string
@@ -421,22 +356,16 @@ export type CopilotAuthStart = {
   expiresIn: number
 }
 
-/** Result of `chatgpt_auth_status` / `chatgpt_auth_wait`. */
 export type ChatgptAuthStatus = {
   signedIn: boolean
 }
 
-/** Public half of a pending ChatGPT headless OAuth session. */
 export type ChatgptAuthStart = {
   sessionId: string
   userCode: string
   verificationUri: string
 }
 
-/** A named provider connection ("profile") — e.g. "AWS work" (Bedrock, key A,
- * us-east-1) vs. "AWS personal" (Bedrock, key B, eu-west-1). The API key
- * itself is never returned; `hasKey` reports whether one is stored. See
- * `src-tauri/src/config.rs::ProviderProfile`. */
 export type ProviderProfileView = {
   id: string
   label: string
@@ -450,10 +379,6 @@ export type ProviderProfileView = {
   isActive: boolean
 }
 
-/** Create/update input for one profile (`profile_upsert`). `id` empty/omitted
- * creates a new profile; `apiKey` empty/omitted keeps the existing stored key
- * on update. Also the shape `validate_profile` takes, so Validate always
- * checks the exact values currently in the form. */
 export type ProviderProfileInput = {
   id?: string
   label: string
@@ -478,9 +403,6 @@ export type CreateSessionInput = {
   model?: string
   cwd?: string
   isolation?: IsolationPolicy
-  /** Attach an existing worktree (from `listWorkspaces`) on first prompt
-   * instead of provisioning a new one. Ignored when `isolation` doesn't
-   * resolve to a policy that wants isolation. */
   reuseWorkspaceId?: string | null
 }
 
@@ -501,23 +423,13 @@ export type WorkspaceStatusDto = {
   summary: string
 }
 
-/** One changed file from `git_status` (Changes panel). */
 export type GitFileStatus = {
-  /** Path relative to the session cwd. */
   path: string
-  /** Porcelain letter: "M" | "A" | "D" | "R" | "?" (untracked). */
   status: string
   added?: number
   removed?: number
 }
 
-/** `git_status`/`git_status_since_baseline` response. `files` is capped at a
- * server-side row limit (see `MAX_STATUS_FILES` in commands.rs) so a session
- * with hundreds of changed files (e.g. after scaffolding a project) never
- * asks the UI to render every row — `totalCount`/`totalAdded`/`totalRemoved`
- * are computed over the *full*, untruncated set so the aggregate file-count
- * and +/- badges stay correct regardless of the cap, and `truncated` tells
- * the UI whether to show a "+N more" indicator. */
 export type GitStatusSummary = {
   files: GitFileStatus[]
   totalCount: number
@@ -526,13 +438,9 @@ export type GitStatusSummary = {
   truncated: boolean
 }
 
-/** A file or folder match from `list_files`, used by composer @-mentions and Files browse. */
 export type FileHit = {
-  /** Path relative to the session cwd, forward-slashed. */
   path: string
-  /** Basename, shown as the primary label. */
   name: string
-  /** True for directories (folder icon in the @ tray / Files tree). */
   isDir?: boolean
 }
 
@@ -556,24 +464,13 @@ export type PromptCommandInput = {
   model?: string
   permissionMode?: PermissionMode
   attachments?: PromptAttachment[]
-  /** Wire values of contracts::request::Effort (`#[serde(rename_all =
-   * "lowercase")]`): "low" | "medium" | "high" | "xhigh" | "max". Omitted =
-   * engine default. */
   effort?: string
-  /** The composer mode the user picked ("agent" | "plan" | "ask" | "flex" | "debug"),
-   * separate from `permissionMode` (its derived wire value). Backend appends
-   * mode-specific system prompts for flex / plan / debug (see
-   * `commands.rs::prompt`); it does not affect permission handling on its own. */
   composerMode?: string
 }
 
-/** Mirrors contracts::request::Effort's serde wire values (lowercase),
- * ordered low → high. "Default" (unset) is represented as `null` in state,
- * not a member of this list. */
 export const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const
 export type EffortLevel = (typeof EFFORT_LEVELS)[number]
 
-/** Display label for an effort wire value ("xhigh" -> "X-High"). */
 export const effortLabel = (effort: string): string => {
   if (effort === "xhigh") return "X-High"
   return effort.charAt(0).toUpperCase() + effort.slice(1)
@@ -612,50 +509,23 @@ export type RoutineRunRecordDto = {
   iterations: number
 }
 
-/** A user-configured MCP (Model Context Protocol) server (stdio transport
- * only — see `agentloop_mcp::McpServerConfig` / `commands::McpServerDto`).
- * Its tools are bridged into the native tool registry as `<id>__<tool>` at
- * the next engine service rebuild (saving/removing rebuilds it; there is no
- * hot-reload of already-open sessions). */
 export type McpServerDto = {
   id: string
   command: string
   args: string[]
-  /** Non-secret env vars (persisted in the MCP TOML file). */
   env: Record<string, string>
-  /**
-   * Secret env values to write into the encrypted secrets store.
-   * On upsert: non-empty overwrites; empty string keeps the existing secret.
-   * List responses leave this empty — see `configuredSecretEnv`.
-   */
   secretEnv?: Record<string, string>
-  /**
-   * Secret positional-arg values appended after `args` at resolve time
-   * (e.g. Postgres connection string). Omitted on list.
-   */
   secretArgs?: string[]
-  /** Env key names that have a stored secret (values never returned). */
   configuredSecretEnv?: string[]
-  /** Whether a secret positional-args suffix is stored for this server. */
   hasSecretArgs?: boolean
   enabled: boolean
 }
 
-/** A durable note the `learning` plugin's `MemoryWrite` tool persisted —
- *  loads into every future session's system prompt. */
 export type MemoryEntryDto = {
-  /** The note's name (file stem), e.g. `user-preferences`. */
   id: string
-  /** First non-empty line of the note, used as a title in the list view. */
   title: string
-  /** Full markdown body. `undefined` in the list view — call `memoryGet`. */
   content?: string
-  /** Milliseconds since epoch, from the file's last-modified time. */
   updatedAtMs?: number
-  /** Milliseconds since epoch when this entry expires and is purged.
-   * `undefined` = long-term (never expires). Sourced from a sidecar
-   * `expiry.json` file next to the `.md` notes — never from the note body
-   * itself, since the engine's prompt loader reads `.md` files raw. */
   expiresAtMs?: number
 }
 
@@ -665,13 +535,10 @@ export type RespondQuestionInput = {
   answers: Answer[]
 }
 
-// Right-panel Terminal + Browser features (desktop-only, camelCase serde)
-
 export type TerminalInfo = {
   id: string
   cwd: string
   createdAtMs: number
-  /** Set when the session cwd was missing and the PTY opened in home instead. */
   cwdFallbackFrom?: string
 }
 
@@ -685,10 +552,6 @@ export type BrowserStateEvent = {
   loading: boolean
   canGoBack: boolean
   canGoForward: boolean
-  /** Navigation/load failure, when detected. Native emits this after
-   * `PageLoadEvent::Finished` when the document looks like a chrome-error /
-   * about:neterror / connection-refused page (eval probe). Preview mock
-   * also sets it for `FAILING_MOCK_HOST`. */
   error?: { host: string; message: string } | null
 }
 
@@ -700,9 +563,4 @@ export type {
   BrowserDomRect,
 } from "../browserDesign"
 
-// Per-file / per-hunk review actions (Changes tab Keep/Undo — the reference design pattern).
-
-/** Where a `review_apply_patch` call applies its patch: the session's
- * working dir (worktree root if isolated, else the repo itself), or the
- * isolated session's base repo (errors if the session isn't isolated). */
 export type ReviewPatchTarget = "worktree" | "base"

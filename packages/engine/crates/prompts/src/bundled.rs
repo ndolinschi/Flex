@@ -1,37 +1,11 @@
-//! Bundled skills: engine-curated `SKILL.md`s installed into the user skill
-//! directory, embedded at compile time.
-//!
-//! Mirrors how the built-in system-prompt parts ship (`assembler::BUILT_IN_PARTS`,
-//! `include_str!` from `packages/engine/prompts/`): the `prompts/` tree is data
-//! that lives next to this crate at dev time but has no guaranteed filesystem
-//! path once the binary is installed, so bundled skill bodies are compiled in
-//! rather than copied from a source-tree path.
-//!
-//! Installation is a one-way, non-destructive seed: [`install_bundled_skills`]
-//! writes each bundled skill's directory under a target skills root only if no
-//! directory of that name already exists there, so a user's own customization
-//! of a same-named skill is never overwritten. This mirrors the precedence
-//! rule in [`crate::skills::SkillRegistry::discover`] (project > user >
-//! learned) — here applied at install time instead of discovery time, since a
-//! bundled skill has no dedicated [`crate::skills::SkillSource`] variant of its
-//! own; once installed, it is discovered as an ordinary user-dir skill.
-
 use std::fs;
 use std::path::Path;
 
-/// One bundled skill: its directory name and its `SKILL.md` contents.
 struct BundledSkill {
-    /// Directory name under the skills root, e.g. `debugging-and-error-recovery`.
     dir_name: &'static str,
-    /// Full `SKILL.md` contents (frontmatter + body), embedded at compile time.
     skill_md: &'static str,
 }
 
-/// The engine-curated skill bundle, embedded at compile time from
-/// `packages/engine/prompts/skills-bundled/`.
-///
-/// Ordered alphabetically by directory name; order has no behavioral effect
-/// (install is independent per-directory), it just keeps diffs stable.
 const BUNDLED_SKILLS: [BundledSkill; 6] = [
     BundledSkill {
         dir_name: "code-simplification",
@@ -77,18 +51,15 @@ const BUNDLED_SKILLS: [BundledSkill; 6] = [
     },
 ];
 
-/// Errors from installing the bundled skill set.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum BundledSkillError {
-    /// Could not create a bundled skill's directory under the skills root.
     #[error("cannot create bundled skill directory `{}`: {source}", path.display())]
     CreateDir {
         path: std::path::PathBuf,
         #[source]
         source: std::io::Error,
     },
-    /// Could not write a bundled skill's `SKILL.md`.
     #[error("cannot write bundled skill file `{}`: {source}", path.display())]
     WriteFile {
         path: std::path::PathBuf,
@@ -97,15 +68,6 @@ pub enum BundledSkillError {
     },
 }
 
-/// Seeds `skills_root` with any bundled skill whose directory doesn't already
-/// exist there, then returns the names actually installed (empty if the root
-/// already has all of them, or already existed with every name taken).
-///
-/// User customization always wins: a pre-existing directory of the same name
-/// — whether it's the user's own fork of a bundled skill or something
-/// unrelated that happens to share the name — is never touched. Call this
-/// before [`crate::skills::SkillRegistry::discover`] so a freshly installed
-/// bundled skill is visible in the same run.
 pub fn install_bundled_skills(skills_root: &Path) -> Result<Vec<&'static str>, BundledSkillError> {
     let mut installed = Vec::new();
     for skill in &BUNDLED_SKILLS {

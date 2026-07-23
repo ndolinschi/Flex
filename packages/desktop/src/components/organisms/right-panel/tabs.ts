@@ -23,11 +23,9 @@ export type RightPanelTabDef = {
   id: RightPanelTab
   label: string
   icon: LucideIcon
-  /** Present only for plugin-contributed tabs. */
   pluginId?: string
 }
 
-/** Built-in (non-plugin) tab metadata. Plugin tabs come from the UI registry. */
 export const BUILTIN_TABS: RightPanelTabDef[] = [
   { id: "status", label: "Status", icon: Activity },
   { id: "prompt", label: "Prompt", icon: SquarePen },
@@ -40,11 +38,8 @@ export const BUILTIN_TABS: RightPanelTabDef[] = [
   { id: "memory", label: "Memory", icon: Brain },
 ]
 
-/** @deprecated Prefer `visibleRightPanelTabs()` — kept for callers that still
- * import `TABS` as the full static catalog of builtins. */
 export const TABS = BUILTIN_TABS
 
-/** Pinned workspace rows for the closed-panel mini list (Cursor order). */
 export const PROJECT_PINNED_TABS: readonly RightPanelTab[] = [
   "changes",
   "browser",
@@ -52,9 +47,6 @@ export const PROJECT_PINNED_TABS: readonly RightPanelTab[] = [
   "files",
 ] as const
 
-/** Tabs shown in the strip / "+" menu — builtins + registered UI plugins.
- * Pass `hasBranchPr` so the Pull Request tab only appears when the current
- * branch has an open PR (polled via `git_pr_status`). */
 export const visibleRightPanelTabs = (opts?: {
   hasBranchPr?: boolean
 }): RightPanelTabDef[] => {
@@ -69,10 +61,8 @@ export const visibleRightPanelTabs = (opts?: {
     icon: t.icon,
     pluginId: t.id,
   }))
-  // Prefer the plugin definition when it re-registers a known id (e.g. database).
   const builtinIds = new Set(builtins.map((t) => t.id))
   const pluginOnly = fromPlugins.filter((t) => !builtinIds.has(t.id))
-  // If a plugin contributes `database`, surface it even though it's not in BUILTIN_TABS.
   return [...builtins, ...pluginOnly]
 }
 

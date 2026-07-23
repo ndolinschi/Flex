@@ -1,6 +1,3 @@
-//! OpenAI ChatGPT Pro/Plus OAuth (Codex CLI flow): browser PKCE on
-//! `localhost:1455` and headless device authorization.
-
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -23,14 +20,12 @@ const OAUTH_PORT: u16 = 1455;
 const OAUTH_POLLING_SAFETY_MARGIN_MS: u64 = 3000;
 const CALLBACK_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
-/// Which OAuth UX the user chose in `/connect`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpenAiOAuthMethod {
     Browser,
     Headless,
 }
 
-/// Persisted OAuth credentials at `~/.config/agentloop/openai-auth.json`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OpenAiOAuthTokens {
     pub access_token: String,
@@ -41,15 +36,14 @@ pub struct OpenAiOAuthTokens {
     pub account_id: Option<String>,
 }
 
-/// What to show the user while they authorize.
 #[derive(Debug)]
 pub struct OpenAiOAuthStart {
     pub url: String,
     pub instructions: String,
     pub method: OpenAiOAuthMethod,
-    /// One-time user code for headless device flow (empty for browser).
+
     pub user_code: String,
-    /// Verification URI the user should open (same as [`Self::url`] for headless).
+
     pub verification_uri: String,
     browser: Option<BrowserPending>,
     headless: Option<HeadlessPending>,
@@ -95,8 +89,6 @@ struct PkceCodes {
     challenge: String,
 }
 
-/// Start browser or headless OAuth. Call [`OpenAiOAuthStart::complete`] to
-/// poll/callback until tokens arrive or `cancel` trips.
 pub async fn start_oauth(method: OpenAiOAuthMethod) -> Result<OpenAiOAuthStart, ProviderError> {
     let provider = provider_id();
     match method {
@@ -162,7 +154,6 @@ pub async fn start_oauth(method: OpenAiOAuthMethod) -> Result<OpenAiOAuthStart, 
 }
 
 impl OpenAiOAuthStart {
-    /// Wait for the user to finish authorization.
     pub async fn complete(
         self,
         cancel: CancellationToken,
@@ -185,12 +176,10 @@ impl OpenAiOAuthStart {
     }
 }
 
-/// Whether stored OAuth credentials exist on disk.
 pub fn oauth_tokens_discoverable() -> bool {
     load_oauth_tokens().is_ok()
 }
 
-/// Load stored OAuth tokens, refreshing when expired.
 pub async fn resolve_oauth_access_token() -> Result<Option<String>, ProviderError> {
     let mut tokens = match load_oauth_tokens() {
         Ok(tokens) => tokens,
@@ -203,7 +192,6 @@ pub async fn resolve_oauth_access_token() -> Result<Option<String>, ProviderErro
     Ok(Some(tokens.access_token))
 }
 
-/// Persist OAuth tokens (merge-upsert the file).
 pub fn store_oauth_tokens(tokens: &OpenAiOAuthTokens) -> Result<PathBuf, ProviderError> {
     let Some(dir) = default_config_dir() else {
         return Err(ProviderError::AuthMissing {
@@ -259,7 +247,6 @@ pub(crate) fn load_oauth_tokens() -> Result<OpenAiOAuthTokens, ProviderError> {
     })
 }
 
-/// ChatGPT account / workspace id from stored OAuth tokens, if present.
 pub fn oauth_account_id() -> Option<String> {
     load_oauth_tokens()
         .ok()

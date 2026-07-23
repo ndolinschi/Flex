@@ -1,8 +1,3 @@
-//! Base tool set. Arrives with M1.
-//!
-//! The crate exports concrete tools behind the [`agentloop_core::Tool`]
-//! boundary plus one composition helper for the runner/engine front door.
-
 mod agent;
 mod ask_question;
 mod bash;

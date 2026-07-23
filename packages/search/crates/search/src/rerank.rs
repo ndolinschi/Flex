@@ -1,21 +1,9 @@
-//! Search result re-ranking.
-//!
-//! The `SearchReranker` trait lets the `search_web` tool reorder results
-//! by relevance to the original query. The default implementation uses
-//! simple keyword overlap (no LLM needed, works offline).
-
 use crate::search_backend::SearchResult;
 
-/// Re-ranks search results by relevance to the query.
 pub trait SearchReranker: Send + Sync {
-    /// Re-order the given results so the most relevant appear first.
     fn rerank(&self, query: &str, results: &[SearchResult]) -> Vec<SearchResult>;
 }
 
-/// Simple keyword-overlap re-ranker — works offline without an LLM.
-///
-/// Scores each result by counting how many query words (case-insensitive)
-/// appear in its title and snippet. Results are sorted descending by score.
 pub struct KeywordReranker;
 
 impl KeywordReranker {
@@ -64,7 +52,6 @@ impl SearchReranker for KeywordReranker {
             })
             .collect();
 
-        // Stable sort descending by score. Ties preserve the original backend order.
         scored.sort_by_key(|b| std::cmp::Reverse(b.0));
 
         scored.into_iter().map(|(_, r)| r.clone()).collect()
@@ -98,9 +85,6 @@ mod tests {
         let reranker = KeywordReranker::new();
         let reranked = reranker.rerank("Rust programming", &results);
 
-        // "Rust programming language" has 2 keyword matches (Rust, programming)
-        // "Rust for Python developers" has 1 (Rust)
-        // "Python history" has 0
         assert_eq!(reranked[0].url, "https://b.com");
         assert_eq!(reranked[1].url, "https://c.com");
         assert_eq!(reranked[2].url, "https://a.com");

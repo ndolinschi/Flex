@@ -15,22 +15,6 @@ import { useBrowserSession } from "../../hooks/useBrowserSession"
 import { NATIVE_APP_REQUIRED } from "../../lib/browserPreview"
 import { BrowserToolbar } from "./browser/BrowserToolbar"
 
-/** Browser right-panel tab: toolbar + omnibar + content area.
- * Scoped to the active session. Only one native webview / iframe exists;
- * `browserOwnerSessionId` tracks which session's content it currently shows.
- * Navigating from a session takes ownership. A session that previously
- * navigated but lost ownership shows a "Page is open in another chat" state
- * with a button to reclaim the webview. Stays mounted when inactive (parent
- * hides via display:none).
- *
- * Layout: toolbar sibling above a body. The native webview maps 1:1 onto an
- * empty `data-browser-webview-slot` (no children). React empty/error/spinner
- * UI is a sibling overlay — never inside the slot — so bounds/spacing stay
- * CSS-controlled (`inset-0`, or e.g. `top-2` for extra top gap).
- *
- * All session/ownership/webview-bounds/navigation logic lives in
- * `useBrowserSession` (src/hooks/useBrowserSession.ts) — this component is
- * the chrome view that consumes it. Toolbar/overflow live under `./browser/`. */
 export const BrowserTab = ({
   active,
   sessionId,
@@ -71,13 +55,10 @@ export const BrowserTab = ({
   const [menuOpen, setMenuOpen] = useState(false)
   const [showErrorDetails, setShowErrorDetails] = useState(false)
 
-  // Collapse the expanded error details whenever a fresh error page renders.
   useEffect(() => {
     setShowErrorDetails(false)
   }, [loadError])
 
-  // Overlays are siblings of the empty webview slot — never inside it.
-  // Live pages paint via the native child webview (no React cover).
   const showOverlay =
     preview ||
     !browserStarted ||
@@ -116,7 +97,6 @@ export const BrowserTab = ({
       />
 
       <div className="relative min-h-0 flex-1">
-        {/* Empty measure target — native child webview paints into this box. */}
         <div
           ref={contentRef}
           data-browser-webview-slot=""

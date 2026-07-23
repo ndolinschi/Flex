@@ -1,4 +1,3 @@
-//! Shared imports for command modules.
 #![allow(unused_imports)]
 
 pub(crate) use std::path::PathBuf;

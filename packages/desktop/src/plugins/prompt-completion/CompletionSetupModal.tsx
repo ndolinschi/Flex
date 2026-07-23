@@ -40,14 +40,9 @@ type Path = "ollama" | "provider"
 type CompletionSetupModalProps = {
   open: boolean
   onClose: () => void
-  /** Soft dismiss (set setupDismissed) vs just close after save. */
   onDismiss?: () => void
 }
 
-/**
- * First-run / change-model modal: connect Ollama (with pull guidance) or pick
- * any model already listed from connected providers.
- */
 export const CompletionSetupModal = ({
   open,
   onClose,
@@ -96,8 +91,6 @@ export const CompletionSetupModal = ({
     setCheckOk(null)
     if (prefs?.providerId && prefs?.modelId) {
       setProviderId(prefs.providerId)
-      // Prefer bare model ids in local state; ModelSelect gets a qualified
-      // value via `qualifiedCompletionModelId` below.
       setModelId(normalizeCompletionModelId(prefs.providerId, prefs.modelId))
       setPath(prefs.providerId === "ollama" ? "ollama" : "provider")
     } else {

@@ -1,7 +1,3 @@
-//! Workspace automation. `cargo xtask schema` regenerates the committed JSON
-//! Schemas under `schemas/v1/`; `cargo xtask schema --check` fails if the
-//! committed files drift from the code (CI runs the check).
-
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use std::path::PathBuf;

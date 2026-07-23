@@ -37,10 +37,8 @@ describe("PermissionPrompt layout", () => {
     expect(html).toContain("ls -la")
     expect(html).toContain("rounded-t-[var(--radius-composer)]")
     expect(html).toContain("border-b-0")
-    // No centered modal chrome / portal wrapper.
     expect(html).not.toContain("fixed inset-0")
     expect(html).not.toContain("sm:items-center")
-    // Actions live in the composer footer, not this card.
     expect(html).not.toContain("Allow once")
     expect(html).not.toContain("Always allow")
     expect(html).not.toContain(">Deny<")

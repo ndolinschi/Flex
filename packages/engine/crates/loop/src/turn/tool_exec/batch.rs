@@ -1,5 +1,3 @@
-//! Tool-call batching across a turn.
-
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
 
@@ -20,7 +18,6 @@ use crate::tool_results::output_or_synthetic;
 
 use super::one_call::execute_one_call;
 
-/// Hard cap on subagents spawned in one turn — a runaway-spawn backstop.
 pub(crate) const MAX_CHILDREN_PER_TURN: usize = 8;
 
 #[allow(clippy::too_many_arguments)]

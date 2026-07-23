@@ -1,7 +1,3 @@
-//! ACP delegator: the *client* side of the Agent Client Protocol (JSON-RPC
-//! over a child agent's stdio). Independent of the engine's ACP transport
-//! crate by design — one is a connector, the other serves clients.
-
 mod agent;
 mod client;
 mod mapper;

@@ -37,8 +37,6 @@ export const PlusMenu = ({
             aria-label="Add context"
             title={open ? undefined : "Add context"}
             className={cn(
-              // Quiet chrome circle: idle whisper fill-4 + .5 → hover fill-2 + .8
-              // (visible rest fill so + isn't naked next to Mode / Send).
               "size-6 rounded-full bg-fill-4 text-icon-2 opacity-50",
               "transition-[opacity,background-color,color,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
               "hover:bg-fill-2 hover:text-icon-1 hover:opacity-80",

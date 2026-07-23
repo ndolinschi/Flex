@@ -1,6 +1,3 @@
-//! Minimal Server-Sent Events decoder.
-
-/// One decoded Server-Sent Event.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SseEvent {
     pub event: Option<String>,
@@ -14,7 +11,6 @@ pub enum SseError {
     MissingData,
 }
 
-/// Incrementally decodes SSE records split by blank lines.
 #[derive(Debug, Default)]
 pub struct SseDecoder {
     buffer: String,
@@ -52,12 +48,6 @@ impl SseDecoder {
     }
 }
 
-/// A block with no `data:` line — a comment-only heartbeat (`: ping`) or an
-/// `event:`-only frame — is valid SSE, not a protocol violation: per the
-/// spec, an event with an empty data buffer is simply never dispatched.
-/// Servers and intermediary proxies rely on exactly this to keep long-lived
-/// connections alive during slow model turns, so treating it as fatal turns
-/// routine keep-alives into spurious stream failures.
 fn parse_block(block: &str) -> Option<SseEvent> {
     let mut event = None;
     let mut data = Vec::new();

@@ -1,9 +1,3 @@
-//! OpenAI provider client.
-//!
-//! The public surface is provider configuration plus the [`OpenAiProvider`].
-//! Chat Completions wire types are private and normalized into
-//! `ProviderStreamEvent` before leaving this crate.
-
 pub mod compat;
 mod config;
 mod oauth;

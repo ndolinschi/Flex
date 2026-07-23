@@ -1,5 +1,3 @@
-//! Background process start / status / kill paths for [`super::BashTool`].
-
 use agentloop_contracts::ToolOutput;
 use agentloop_core::{BackgroundEntry, ExecError, ExecSpec, ToolContext, ToolError};
 
@@ -20,8 +18,6 @@ impl BashTool {
             command: command.clone(),
             cwd: ctx.cwd.clone(),
             env: Vec::new(),
-            // Background processes are not subject to the blocking timeout —
-            // the executor's own initial-output window bounds this call.
             timeout_ms: MAX_TIMEOUT_MS,
             network: self.network,
             chunk_sink: Some(exec_chunk_sink(ctx)),
@@ -83,8 +79,6 @@ impl BashTool {
         })
     }
 
-    /// Handle `background_action: "status"|"kill"` against a previously
-    /// started process id.
     pub(super) async fn run_background_action(
         &self,
         ctx: &ToolContext,

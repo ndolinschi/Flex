@@ -1,11 +1,3 @@
-//! Headless HTTP/SSE transport boundary for `EngineService`, with OpenAPI.
-//!
-//! Security posture (non-negotiable, not a knob to relax later): binds
-//! `127.0.0.1` unless the caller opts into a wider bind *and* supplies an
-//! explicit token; every route but `/health` requires a bearer token; no
-//! CORS layer, so browser-origin requests are refused by the browser itself
-//! (nothing here whitelists an `Access-Control-Allow-Origin`).
-
 mod auth;
 mod dto;
 mod openapi;
@@ -45,9 +37,6 @@ pub enum HttpServeError {
 pub struct HttpServeOptions {
     pub bind: SocketAddr,
     pub token: AuthToken,
-    /// Whether `token` was explicitly provided (flag/env) vs auto-generated.
-    /// Re-validated here (not just at CLI parse time) so embedders calling
-    /// `serve_http` directly get the same non-loopback guard.
     pub token_was_explicit: bool,
 }
 
@@ -62,20 +51,10 @@ async fn openapi_json(State(_service): State<Arc<EngineService>>) -> axum::Json<
     ))
 }
 
-/// Build the full router: `/health` unauthenticated, everything else behind
-/// the bearer-token middleware.
 pub fn build_router(service: Arc<EngineService>, token: AuthToken) -> Router {
     build_router_with_extra(service, token, Router::new())
 }
 
-/// Like [`build_router`], but merges `extra` in alongside the engine's own
-/// routes. `extra` must already have its state fully applied (`.with_state`)
-/// — this crate has no reason to know what that state is; a caller can mount
-/// unrelated routes (e.g. the SDK's routine webhook) without this crate
-/// needing to know they exist. `extra` is merged in before the trace layer,
-/// so it's covered by the same request tracing as everything else, but *not*
-/// behind the bearer-token middleware — an `extra` route that needs auth
-/// must apply its own.
 pub fn build_router_with_extra(
     service: Arc<EngineService>,
     token: AuthToken,
@@ -96,9 +75,6 @@ pub fn build_router_with_extra(
         .layer(TraceLayer::new_for_http())
 }
 
-/// Serve `engine` over HTTP until the process is signaled to stop (this
-/// function runs the accept loop forever on success — callers that want a
-/// shutdown hook should race this future against their own signal).
 pub async fn serve_http(
     engine: Arc<EngineService>,
     opts: HttpServeOptions,
@@ -106,7 +82,6 @@ pub async fn serve_http(
     serve_http_with_extra(engine, opts, Router::new()).await
 }
 
-/// Like [`serve_http`], but merges `extra` in via [`build_router_with_extra`].
 pub async fn serve_http_with_extra(
     engine: Arc<EngineService>,
     opts: HttpServeOptions,

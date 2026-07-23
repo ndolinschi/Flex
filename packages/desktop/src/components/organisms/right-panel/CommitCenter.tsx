@@ -36,17 +36,6 @@ const MODE_LABEL: Record<CommitMode, string> = {
 
 const PUSH_MODES: ReadonlySet<CommitMode> = new Set(["commit-push", "commit-pr"])
 
-/**
- * Commit center footer for the Changes tab (Cursor parity, spec #48):
- * commit-message textarea + a split button (primary action + dropdown of
- * commit variants). Only rendered for non-isolated sessions with at least
- * one file in the (checkbox-driven) selection — isolated sessions use the
- * Keep/Undo integrate flow instead (see `ChangesTab`).
- *
- * Push / PR modes are offered only when the session cwd has a configured
- * remote — otherwise the primary action is plain Commit (push would fail
- * with "No configured push destination").
- */
 export const CommitCenter = ({
   sessionId,
   cwd,
@@ -64,7 +53,6 @@ export const CommitCenter = ({
   const [busy, setBusy] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [prDialogOpen, setPrDialogOpen] = useState(false)
-  // null = use the remote-aware default until the user picks a mode.
   const [lastMode, setLastMode] = useState<CommitMode | null>(null)
   const queryClient = useQueryClient()
   const pushToast = useAppStore((s) => s.pushToast)
@@ -178,7 +166,7 @@ export const CommitCenter = ({
 
   return (
     <>
-      <div className="flex shrink-0 flex-col gap-2 border-t border-stroke-3 bg-fill-5/40 px-2.5 py-2.5">
+      <div className="flex shrink-0 flex-col gap-1.5 border-t border-stroke-3 bg-fill-5/40 px-2.5 py-2">
         <Textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
@@ -189,7 +177,7 @@ export const CommitCenter = ({
           disabled={busy}
           className="min-h-[2.5rem] resize-none rounded-[var(--radius-md)] text-sm"
         />
-        <div className="relative flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2">
           <span
             className={cn(
               "min-w-0 truncate text-xs",

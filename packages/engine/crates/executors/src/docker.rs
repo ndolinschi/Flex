@@ -1,6 +1,3 @@
-//! Docker backend: one ephemeral container per command, session cwd
-//! bind-mounted at `/work`.
-
 use async_trait::async_trait;
 use tokio::process::Command;
 use tokio_util::sync::CancellationToken;
@@ -9,13 +6,9 @@ use agentloop_core::{ExecError, ExecOutcome, ExecSpec, Executor, ExecutorHealth,
 
 use crate::run::{probe_binary, run_command};
 
-/// Runs each command in `docker run --rm`, bind-mounting the session cwd, so
-/// files persist across calls but the process is isolated. Honors
-/// [`NetworkPolicy::Denied`] with `--network none`.
 #[derive(Debug, Clone)]
 pub struct DockerExecutor {
     image: String,
-    /// Override the container binary (e.g. `podman`); defaults to `docker`.
     binary: String,
 }
 
@@ -27,7 +20,6 @@ impl DockerExecutor {
         }
     }
 
-    /// Use a docker-CLI-compatible binary (e.g. `podman`).
     pub fn with_binary(mut self, binary: impl Into<String>) -> Self {
         self.binary = binary.into();
         self

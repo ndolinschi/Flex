@@ -16,30 +16,14 @@ type ChatShellProps = {
   timeline: ReactNode
   composer: ReactNode
   overlay?: ReactNode
-  /** True for floating overlays that should sit flush above the composer
-   * section. Prefer `Composer.dockedOverlay` for Permission/Question cards
-   * that must merge with the bubble (avoids a page-bg gap at the seam). */
   overlayDocked?: boolean
-  /** Empty conversation — utility void; composer stays docked at bottom. */
   composerHero?: boolean
   heroTitle?: string
   heroHint?: string
-  /**
-   * Production chat thread header title (40px row). Shown when the
-   * conversation has turns; empty hero uses the large void title instead.
-   */
   threadTitle?: string
-  /** Optional trailing controls for the thread header (repo chip, etc.). */
   threadTrailing?: ReactNode
 }
 
-/**
- * Chat column shell. Composer always docks at the bottom (IDE rail), even
- * when the conversation is empty — never a centered marketing hero.
- *
- * Empty composition: muted header title + whisper chips in the upper void;
- * the primary control is the docked input below.
- */
 export const ChatShell = ({
   sidebar,
   hideSidebar = false,
@@ -65,8 +49,6 @@ export const ChatShell = ({
     })
   }
 
-  /* Explicit empty string = hide title (tab already names the session);
-   * undefined falls back to heroTitle for callers that omit the prop. */
   const headerTitle =
     threadTitle !== undefined ? threadTitle : composerHero ? heroTitle : ""
   const showThreadHeader =
@@ -79,7 +61,6 @@ export const ChatShell = ({
   const pane = (
     <div
       className={cn(
-        // Glass chat surface = chrome (#141414 pure gray), not elevated chip.
         "flex h-full min-h-0 min-w-0 flex-1 flex-col bg-chrome",
         wide && "min-w-[380px]",
       )}
@@ -122,7 +103,7 @@ export const ChatShell = ({
           ) : null}
         </div>
 
-        <div className="relative z-50 shrink-0 pb-2">
+        <div className="relative z-50 shrink-0 pb-1">
           {overlay ? (
             <div
               className={cn(

@@ -1,13 +1,3 @@
-//! Offline retrieval eval harness (M4).
-//!
-//! Builds a golden multi-file fixture, indexes it with a deterministic
-//! [`crate::embed::MockEmbedder`], runs hybrid retrieval, and scores
-//! **recall@10**. The CI gate is `recall_at_k >= `[`RECALL_THRESHOLD`].
-//!
-//! No network, no API keys, no live LLM. An optional [`AgentAbStub`] estimates
-//! "tokens to first correct file" from retrieval rank as a cheap A/B proxy —
-//! not a real agent run.
-
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -18,21 +8,14 @@ use crate::embed::MockEmbedder;
 use crate::retrieve::{Hit, HybridSearchError, search_hybrid};
 use crate::store::{IndexStore, StoreError};
 
-/// Top-k used for the recall gate (recall@10).
 pub const RECALL_AT_K: usize = 10;
 
-/// Minimum acceptable recall@[`RECALL_AT_K`] for the CI gate.
 pub const RECALL_THRESHOLD: f64 = 0.8;
 
-/// Assumed tokens spent opening one wrong file during Grep-style exploration
-/// (A/B stub only).
 const TOKENS_PER_MISS: u64 = 150;
-/// Fixed overhead before the first file open (A/B stub only).
 const TOKENS_BASE: u64 = 200;
-/// Without an index, assume the correct file sits at this exploratory rank.
 const NO_INDEX_BASELINE_RANK: usize = 25;
 
-/// Errors from materializing the golden fixture or running the eval.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum EvalError {
@@ -55,37 +38,28 @@ pub enum EvalError {
     },
 }
 
-/// One golden query → expected repo-relative path.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GoldenQuery {
     pub query: String,
     pub expected_path: String,
 }
 
-/// Per-query retrieval outcome.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QueryResult {
     pub query: String,
     pub expected_path: String,
     pub found: bool,
-    /// 1-based rank of the expected path in the top-k, if present.
     pub rank: Option<usize>,
     pub top_paths: Vec<String>,
 }
 
-/// Cheap offline proxy for agent A/B "tokens to first correct file".
-///
-/// Not a live LLM measurement: ranks from hybrid retrieval stand in for
-/// how many wrong files an agent would open before the right one.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AgentAbStub {
     pub tokens_to_first_correct_with_index: u64,
     pub tokens_to_first_correct_without_index: u64,
-    /// `1 - with/without`, clamped to `[0, 1]`.
     pub savings_ratio: f64,
 }
 
-/// Aggregated golden-set report.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RetrievalEvalReport {
     pub k: usize,
@@ -98,7 +72,6 @@ pub struct RetrievalEvalReport {
 }
 
 impl RetrievalEvalReport {
-    /// Fail if [`Self::recall_at_k`] is below [`RECALL_THRESHOLD`].
     pub fn assert_gate(&self) -> Result<(), EvalError> {
         if self.recall_at_k >= RECALL_THRESHOLD {
             return Ok(());
@@ -114,7 +87,6 @@ impl RetrievalEvalReport {
     }
 }
 
-/// The golden query set used by the CI gate.
 pub fn golden_queries() -> Vec<GoldenQuery> {
     [
         ("authenticate user credentials", "src/auth.rs"),
@@ -136,7 +108,6 @@ pub fn golden_queries() -> Vec<GoldenQuery> {
     .collect()
 }
 
-/// Write the golden multi-file fixture under `repo_root`.
 pub fn materialize_golden_fixture(repo_root: &Path) -> Result<(), EvalError> {
     let files: &[(&str, &str)] = &[
         (
@@ -203,11 +174,6 @@ fn unit(dim: usize, axis: usize) -> Vec<f32> {
     v
 }
 
-/// Deterministic embedder with orthogonal unit vectors per golden symbol /
-/// query so hybrid RRF ranks the expected file first offline.
-///
-/// The banner decoy is left on the hash fallback so it never collides with a
-/// golden target axis.
 pub fn golden_mock_embedder() -> MockEmbedder {
     const D: usize = 10;
     MockEmbedder::new(D)
@@ -233,7 +199,6 @@ pub fn golden_mock_embedder() -> MockEmbedder {
         .with_override("serialize events to json lines", unit(D, 9))
 }
 
-/// Open + build an index over a materialized golden fixture.
 pub fn open_golden_store(repo_root: &Path, index_dir: &Path) -> Result<IndexStore, EvalError> {
     let embedder = Arc::new(golden_mock_embedder());
     let mut store = IndexStore::open_with_embeddings(repo_root, index_dir, embedder)?;
@@ -241,7 +206,6 @@ pub fn open_golden_store(repo_root: &Path, index_dir: &Path) -> Result<IndexStor
     Ok(store)
 }
 
-/// Score hybrid retrieval against [`golden_queries`] on an already-built store.
 pub fn run_hybrid_retrieval_eval(store: &IndexStore) -> Result<RetrievalEvalReport, EvalError> {
     score_queries(store, &golden_queries(), RECALL_AT_K)
 }

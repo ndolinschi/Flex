@@ -29,7 +29,6 @@ export type BrowserOverflowMenuProps = {
   onClearData: () => void | Promise<void>
 }
 
-/** Browser "…" overflow actions menu. */
 export const BrowserOverflowMenu = ({
   open,
   onOpenChange,

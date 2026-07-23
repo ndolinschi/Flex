@@ -1,11 +1,8 @@
-//! Wikipedia OpenSearch API — free, no key, rarely rate-limited.
-
 use async_trait::async_trait;
 use reqwest::Client;
 
 use super::{SearchBackend, SearchError, SearchResult, http_client, map_status_error};
 
-/// Wikipedia OpenSearch API — free, no key, rarely rate-limited.
 pub struct WikipediaBackend {
     client: Client,
 }

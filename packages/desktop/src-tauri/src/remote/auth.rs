@@ -1,4 +1,3 @@
-//! Bearer-token auth for the desktop Remote Access HTTP surface.
 
 use axum::extract::State;
 use axum::http::{Request, StatusCode};
@@ -6,7 +5,6 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use subtle::ConstantTimeEq;
 
-/// The bearer token guarding every route except `/health`.
 #[derive(Clone)]
 pub struct AuthToken(String);
 
@@ -15,7 +13,6 @@ impl AuthToken {
         Self(token.into())
     }
 
-    /// A fresh, randomly generated token (two UUIDs, hex-concatenated).
     pub fn generate() -> Self {
         Self(format!(
             "{}{}",
@@ -29,9 +26,6 @@ impl AuthToken {
     }
 
     pub fn matches(&self, presented: &str) -> bool {
-        // Length mismatch is non-secret (tokens are fixed length) but still
-        // avoid short-circuiting on content bytes: only compare when lengths
-        // match; otherwise return false.
         if self.0.len() != presented.len() {
             return false;
         }
@@ -39,8 +33,6 @@ impl AuthToken {
     }
 }
 
-/// Axum middleware: every request must carry `Authorization: Bearer <token>`
-/// matching the configured token, or gets `401`.
 pub async fn require_bearer_token(
     State(token): State<AuthToken>,
     request: Request<axum::body::Body>,

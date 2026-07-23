@@ -7,7 +7,6 @@ type ArchivedSectionHeaderProps = {
   onToggle: () => void
 }
 
-/** Collapsible header for the sidebar's Archived group. */
 export const ArchivedSectionHeader = ({
   count,
   collapsed,

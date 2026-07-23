@@ -15,21 +15,17 @@ import {
   runningWorkersSignature,
   type SubagentTimelineRow,
 } from "../../../lib/workerPresentation"
+import { cancel, toInvokeError } from "../../../lib/tauri"
 import { useSessions } from "../../../hooks/useSessions"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
 
 type ChatSessionBodyProps = {
   sessionId: SessionId
-  /** True while this tab is the visible active tab in its pane (keeps live
-   * subscription running even when the pane is unfocused). */
   visible: boolean
-  /** True when the pane is also the focused one — gates HITL overlays and
-   * interactive controls so they only respond in the front pane. */
   interactive: boolean
 }
 
-/** Timeline + composer for one chat tab inside a content pane. */
 export const ChatSessionBody = ({
   sessionId,
   visible,
@@ -44,8 +40,6 @@ export const ChatSessionBody = ({
   )
   const lastWorkersSigRef = useRef("")
   const { sessions } = useSessions()
-  // Belt-and-suspenders with ChatShell keeping TurnTimeline mounted: leave
-  // hero as soon as this session starts streaming so chrome cannot stick.
   const isStreaming = useAppStore((s) => !!s.streamingSessions[sessionId])
 
   useEffect(() => {
@@ -58,9 +52,6 @@ export const ChatSessionBody = ({
     setConversationEmpty(empty)
   }, [])
 
-  // Only lift workers into parent state when the running set (or nested tool
-  // tip) changes — streaming markdown deltas would otherwise re-render
-  // Composer every rAF via a full liveRows copy.
   const handleLiveRows = useCallback((rows: TimelineRow[]) => {
     const sig = runningWorkersSignature(rows)
     if (sig === lastWorkersSigRef.current) return
@@ -72,6 +63,25 @@ export const ChatSessionBody = ({
     document
       .getElementById(`active-workers-group-${sessionId}`)
       ?.scrollIntoView({ behavior: "smooth", block: "center" })
+  }, [sessionId])
+
+  const handleStopAll = useCallback(() => {
+    const state = useAppStore.getState()
+    state.setIsStreaming(false)
+    state.setSessionStreaming(sessionId, false)
+    state.clearStreamingForSession(sessionId)
+    state.markTurnCompleted(sessionId, undefined)
+    state.requestSweep(sessionId)
+    state.setSessionDraining(sessionId, true)
+    void cancel(sessionId)
+      .then(() => {
+        useAppStore.getState().pushToast("Turn stopped", "success")
+      })
+      .catch((err) => {
+        useAppStore
+          .getState()
+          .pushToast(`Couldn't stop: ${toInvokeError(err)}`, "error")
+      })
   }, [sessionId])
 
   const composerHero = conversationEmpty && !isStreaming
@@ -123,6 +133,7 @@ export const ChatSessionBody = ({
               <WorkingAgentsPill
                 workers={runningWorkers}
                 onScrollToWorkers={handleScrollToWorkers}
+                onStopAll={interactive ? handleStopAll : undefined}
               />
             }
           />
@@ -130,8 +141,6 @@ export const ChatSessionBody = ({
         composerHero={composerHero}
         heroTitle={heroTitle}
         heroHint="Describe a task to get started."
-        /* Tab strip names the session; ContextBar owns the project chip.
-         * No second title / second Flex label in the thread chrome. */
         threadTitle=""
         threadTrailing={undefined}
       />

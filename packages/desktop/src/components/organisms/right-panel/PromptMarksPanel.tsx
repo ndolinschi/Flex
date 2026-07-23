@@ -16,7 +16,6 @@ type PromptMarksPanelProps = {
 
 const markClass = (severity: PromptAnnotation["severity"]): string => {
   if (severity === "error") {
-    // Whisper danger — same family as ErrorBanner, not a solid red slab.
     return "rounded-[4px] bg-danger-subtle/70 text-danger ring-1 ring-danger/15"
   }
   if (severity === "info") {
@@ -25,7 +24,6 @@ const markClass = (severity: PromptAnnotation["severity"]): string => {
   return "rounded-[4px] bg-yellow/15 text-yellow ring-1 ring-yellow/35"
 }
 
-/** Annotated prompt view: highlight spans, hover tip, click-to-apply fixes. */
 export const PromptMarksPanel = ({
   segments,
   annotations,
@@ -99,7 +97,6 @@ type PromptFindingsListProps = {
   hasQuestions: boolean
 }
 
-/** Bottom findings list / empty-review status for the prompt pad. */
 export const PromptFindingsList = ({
   annotations,
   onApplyFix,

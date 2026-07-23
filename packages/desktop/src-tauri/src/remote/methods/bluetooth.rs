@@ -1,4 +1,3 @@
-//! Bluetooth connection method — stub for v1 (Coming soon).
 
 use async_trait::async_trait;
 

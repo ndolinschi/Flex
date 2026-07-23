@@ -7,12 +7,6 @@ import { useAppStore } from "../stores/appStore"
 const truncate = (s: string, max = 6000): string =>
   s.length <= max ? s : `${s.slice(0, max)}\n\n…(plan truncated)`
 
-/**
- * Plan-tab follow-up actions that talk to the agent: rewrite, restart
- * (fresh plan), keep planning, or send a selection comment as feedback.
- * Plan review/commenting itself is select-text UX in PlanTab — not an
- * agent prompt.
- */
 export const usePlanActions = () => {
   const [busy, setBusy] = useState(false)
 
@@ -78,7 +72,6 @@ export const usePlanActions = () => {
     )
   }
 
-  /** User declined Build — stay in plan mode and keep refining. */
   const keepPlanning = async (sessionId: SessionId, planMarkdown?: string) => {
     const body = [
       "The user chose to keep planning — the plan is not approved yet.",

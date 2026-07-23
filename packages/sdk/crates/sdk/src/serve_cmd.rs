@@ -1,7 +1,4 @@
-//! `serve` subcommand: headless HTTP/SSE server over the resolved engine.
-
 #![allow(clippy::print_stderr)]
-
 use std::sync::Arc;
 
 use agentloop_contracts::branding;

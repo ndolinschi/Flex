@@ -44,7 +44,6 @@ const TrafficButton = ({
   </button>
 )
 
-/** macOS-style traffic lights (close / minimize / zoom). */
 export const TrafficLights = ({ className }: { className?: string }) => (
   <div className={cn("flex items-center gap-[6px] px-1", className)}>
     <TrafficButton
@@ -96,7 +95,6 @@ export const TrafficLights = ({ className }: { className?: string }) => (
   </div>
 )
 
-/** Windows/Linux caption buttons (minimize / maximize / close). */
 export const CaptionButtons = ({ className }: { className?: string }) => {
   const [maximized, setMaximized] = useState(false)
 
@@ -117,7 +115,6 @@ export const CaptionButtons = ({ className }: { className?: string }) => {
       try {
         setMaximized(await appWindow.isMaximized())
       } catch {
-        /* browser / missing permission */
       }
       try {
         unlisten = await appWindow.onResized(async () => {
@@ -125,11 +122,9 @@ export const CaptionButtons = ({ className }: { className?: string }) => {
           try {
             setMaximized(await appWindow.isMaximized())
           } catch {
-            /* ignore */
           }
         })
       } catch {
-        /* ignore */
       }
     })()
 
@@ -202,7 +197,6 @@ export const CaptionButtons = ({ className }: { className?: string }) => {
   )
 }
 
-/** Platform-aware window controls — traffic lights on macOS, caption buttons elsewhere. */
 export const WindowControls = ({
   host = detectWindowHost(),
   className,

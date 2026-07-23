@@ -39,8 +39,6 @@ function AccordionTrigger({
         {...props}
       >
         {children}
-        {/* Single rotating chevron — dual Down/Up + `hidden`/`inline` loses the
-            open (collapse) glyph when `hidden` wins specificity over `inline`. */}
         <ChevronDownIcon
           data-slot="accordion-trigger-icon"
           className="pointer-events-none shrink-0 transition-transform duration-[var(--duration-fast)] group-aria-expanded/accordion-trigger:rotate-180"

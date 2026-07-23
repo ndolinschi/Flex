@@ -1,15 +1,12 @@
-//! ChatGPT subscription provider configuration.
-
 use agentloop_contracts::ProviderId;
 use agentloop_core::ProviderError;
 use agentloop_provider_openai::oauth_tokens_discoverable;
 
 pub const CHATGPT_PROVIDER_ID: &str = "chatgpt";
 pub const CODEX_RESPONSES_URL: &str = "https://chatgpt.com/backend-api/codex/responses";
-/// Balanced GPT-5.6 tier — strong default for Plus/Pro subscription OAuth.
+
 pub const DEFAULT_CHATGPT_MODEL: &str = "gpt-5.6-terra";
 
-/// Codex CLI originator the ChatGPT backend expects for CLI-shaped clients.
 pub(crate) const CODEX_ORIGINATOR: &str = "codex_cli_rs";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,7 +17,6 @@ pub struct ChatgptConfig {
 }
 
 impl ChatgptConfig {
-    /// Build from stored ChatGPT OAuth tokens. Fails when none are discoverable.
     pub fn from_oauth(model: Option<String>) -> Result<Self, ProviderError> {
         if !oauth_tokens_discoverable() {
             return Err(ProviderError::AuthMissing {
@@ -42,7 +38,6 @@ impl ChatgptConfig {
         })
     }
 
-    /// Whether stored ChatGPT OAuth credentials exist on disk.
     pub fn discoverable() -> bool {
         oauth_tokens_discoverable()
     }

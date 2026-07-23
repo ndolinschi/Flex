@@ -1,11 +1,3 @@
-//! The `Provider` trait: a thin, streaming client for one LLM API.
-//!
-//! Providers are the *only* place a model's wire format exists. Their single
-//! obligation beyond transport is normalization: every stream maps into
-//! [`ProviderStreamEvent`]s (the unified stream format), and provider quirks
-//! that must round-trip travel as [`agentloop_contracts::ContentBlock::Opaque`] blocks or the
-//! namespaced [`ChatRequest::extra`] passthrough — never as new core concepts.
-
 use std::collections::BTreeMap;
 use std::pin::Pin;
 
@@ -20,29 +12,21 @@ use agentloop_contracts::{
     StopReason, TokenUsage, ToolCallId,
 };
 
-/// A streaming response: normalized events until `MessageEnd` (or an error).
 pub type ProviderStream =
     Pin<Box<dyn Stream<Item = Result<ProviderStreamEvent, ProviderError>> + Send + 'static>>;
 
-/// One normalized streaming event from a provider.
-///
-/// The loop turns these into canonical `AgentEvent`s; the accumulated message
-/// is materialized when `MessageEnd` arrives.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProviderStreamEvent {
     MessageStart {
         message_id: MessageId,
         model: String,
     },
-    /// Canonical text is markdown — plain-text models pass through unchanged.
     MarkdownDelta {
         text: String,
     },
     ThinkingDelta {
         text: String,
     },
-    /// A signed/opaque thinking block completed (providers that sign
-    /// reasoning emit this so the signature can round-trip).
     ThinkingSignature {
         signature: String,
     },
@@ -54,27 +38,22 @@ pub enum ProviderStreamEvent {
         call_id: ToolCallId,
         json_fragment: String,
     },
-    /// Arguments are now complete and parseable.
     ToolCallEnd {
         call_id: ToolCallId,
     },
-    /// May arrive multiple times; later reports supersede earlier ones.
     Usage(TokenUsage),
     MessageEnd {
         stop_reason: StopReason,
     },
 }
 
-/// Agent-facing tool definition sent to the model (no `run`, just the spec).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ToolSpec {
     pub name: String,
     pub description: String,
-    /// Full JSON Schema of the input object.
     pub input_schema: serde_json::Value,
 }
 
-/// How the model is allowed to use tools for one request.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ToolChoice {
@@ -85,12 +64,8 @@ pub enum ToolChoice {
     Named(String),
 }
 
-/// Re-export: the canonical extended-thinking configuration lives in
-/// contracts (it is part of the `TurnOptions` wire type); providers keep
-/// importing it from here.
 pub use agentloop_contracts::ThinkingConfig;
 
-/// One chat request in canonical form. Providers map this onto their wire.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChatRequest {
     pub model: String,
@@ -101,8 +76,6 @@ pub struct ChatRequest {
     pub max_tokens: Option<u32>,
     pub temperature: Option<f32>,
     pub thinking: Option<ThinkingConfig>,
-    /// Namespaced passthrough: `{ "anthropic": {...}, "openai": {...} }`.
-    /// Each provider reads only its own key; core never inspects it.
     pub extra: BTreeMap<ProviderId, serde_json::Value>,
 }
 
@@ -122,9 +95,6 @@ impl ChatRequest {
     }
 }
 
-/// A failure from a provider client. Retryable failures (429/529) are retried
-/// *inside* the provider with bounded backoff; the loop only sees terminal
-/// errors.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum ProviderError {
@@ -171,7 +141,6 @@ pub enum ProviderError {
 }
 
 impl ProviderError {
-    /// Normalize into the wire-level [`EngineError`].
     pub fn to_engine_error(&self) -> EngineError {
         let (code, retryable, retry_after_ms) = match self {
             Self::AuthMissing { .. } => (ErrorCode::AuthMissing, false, None),
@@ -213,7 +182,6 @@ impl ProviderError {
     }
 }
 
-/// A thin, streaming client for one LLM API.
 #[async_trait]
 pub trait Provider: Send + Sync {
     fn id(&self) -> ProviderId;
@@ -222,8 +190,6 @@ pub trait Provider: Send + Sync {
 
     async fn list_models(&self) -> Result<Vec<ModelInfo>, ProviderError>;
 
-    /// The single entry point — always streaming (non-streaming consumers
-    /// collect the stream). Must emit unified-stream-format events only.
     async fn stream_chat(
         &self,
         request: ChatRequest,

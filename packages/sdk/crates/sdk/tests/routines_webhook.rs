@@ -1,9 +1,4 @@
-// This whole file is a test binary; see the identical justification in
-// transports/http/tests/serve.rs — clippy's expect_used/unwrap_used lints
-// don't treat plain helper fns here as test code even though they're only
-// ever reachable from #[tokio::test] functions below.
 #![allow(clippy::expect_used)]
-
 use std::sync::Arc;
 
 use agentloop_channel::{RoutineSpec, RoutineStore, RoutineTrigger};

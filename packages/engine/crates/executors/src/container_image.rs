@@ -1,6 +1,3 @@
-//! Container-image backend for HPC-style runtimes (`apptainer`, with
-//! `singularity` as the legacy fallback binary).
-
 use async_trait::async_trait;
 use tokio::process::Command;
 use tokio_util::sync::CancellationToken;
@@ -9,15 +6,10 @@ use agentloop_core::{ExecError, ExecOutcome, ExecSpec, Executor, ExecutorHealth,
 
 use crate::run::{probe_binary, run_command};
 
-/// Candidate binaries, newest first.
 const BINARIES: [&str; 2] = ["apptainer", "singularity"];
 
-/// Runs commands inside an Apptainer/Singularity image. The session cwd is
-/// visible via the runtime's default home/cwd bind. Honors
-/// [`NetworkPolicy::Denied`] with `--net --network none`.
 #[derive(Debug, Clone)]
 pub struct ContainerImageExecutor {
-    /// Path or URI of the image (`.sif`, `docker://…`).
     image: String,
 }
 

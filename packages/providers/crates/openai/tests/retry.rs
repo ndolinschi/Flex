@@ -1,8 +1,3 @@
-//! `stream_chat` must retry transient failures (429, transport errors)
-//! instead of surfacing a hard error on the very first hiccup, since a
-//! single-provider session (the common case — no `fallback_models`) has no
-//! other candidate to fall back to.
-
 use std::sync::Mutex;
 
 use futures::StreamExt;
@@ -34,8 +29,6 @@ fn config(server: &MockServer) -> OpenAiConfig {
     .expect("config builds from values")
 }
 
-/// Replays a fixed sequence of responses, repeating the last one — same
-/// pattern used by the Copilot device-flow tests.
 struct SequenceResponder(Mutex<Vec<ResponseTemplate>>);
 
 impl SequenceResponder {

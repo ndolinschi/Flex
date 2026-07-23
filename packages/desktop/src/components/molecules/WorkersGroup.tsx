@@ -9,14 +9,10 @@ import { Button } from "@/components/ui/button"
 
 type WorkersGroupProps = {
   workers: SubagentTimelineRow[]
-  /** Opens SubagentViewer for a child session. */
   onOpenViewer: (sessionId: string, title: string) => void
-  /** Anchor id for scroll-from-pill. */
   anchorId?: string
 }
 
-/** Parent card for parallel Agent fan-out: one "Working with N agents"
- * header that expands to enriched worker rows. */
 export const WorkersGroup = memo(function WorkersGroup({
   workers,
   onOpenViewer,
@@ -43,7 +39,6 @@ export const WorkersGroup = memo(function WorkersGroup({
     )
   }
 
-  // Single worker: no outer chrome — SubagentGroup already carries status.
   if (workers.length === 1) {
     const w = workers[0]
     return (
@@ -76,7 +71,6 @@ export const WorkersGroup = memo(function WorkersGroup({
         }}
         aria-expanded={open}
         className={cn(
-          // Tool-line header: gap 4, 16×18 icon slot, min row height, lh 1.5.
           "group h-auto min-h-[var(--timeline-row-min-height)] w-full justify-start gap-1 px-0 py-0 font-normal text-base leading-[1.5]",
           "text-ink-muted hover:bg-transparent hover:text-ink-secondary aria-expanded:bg-transparent",
           anyRunning && "cursor-default",

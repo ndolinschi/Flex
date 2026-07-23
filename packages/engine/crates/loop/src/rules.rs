@@ -1,29 +1,14 @@
-//! `ToolName(specifier)` rule matching semantics.
-//!
-//! The rule *syntax* lives in contracts ([`PermissionRule`]); this module
-//! owns what a specifier means per tool family:
-//!
-//! - `Bash(git *)` — command prefix (`git status` matches, `gitk` does not).
-//! - `Read(~/docs/**)` / `Edit(/src/**)` — path glob against the call's path
-//!   argument (`~` expands against the provided home directory).
-//! - `WebFetch(domain:example.com)` — host equality or subdomain suffix.
-//! - Bare `ToolName` — matches every call of that tool.
-
 use std::path::Path;
 
 use agentloop_contracts::PermissionRule;
 
-/// The call-site facts a rule is matched against.
 pub struct CallFacts<'a> {
     pub tool_name: &'a str,
     pub input: &'a serde_json::Value,
-    /// Session working directory (relative paths resolve against it).
     pub cwd: &'a Path,
-    /// Home directory for `~` expansion; `None` disables expansion.
     pub home: Option<&'a Path>,
 }
 
-/// Whether `rule` covers this call.
 pub fn rule_matches(rule: &PermissionRule, facts: &CallFacts<'_>) -> bool {
     if rule.tool != facts.tool_name {
         return false;
@@ -42,14 +27,10 @@ pub fn rule_matches(rule: &PermissionRule, facts: &CallFacts<'_>) -> bool {
     }
 }
 
-/// True if any rule in `rules` covers this call.
 pub fn any_rule_matches(rules: &[PermissionRule], facts: &CallFacts<'_>) -> bool {
     rules.iter().any(|rule| rule_matches(rule, facts))
 }
 
-/// The rule that decides this call under **last-match-wins** semantics: the
-/// last rule in `rules` that matches, or `None` when none match. The caller
-/// reads `rule.effect` to allow or deny.
 pub fn resolve<'a>(
     rules: &'a [PermissionRule],
     facts: &CallFacts<'_>,
@@ -61,13 +42,6 @@ fn string_field<'v>(input: &'v serde_json::Value, key: &str) -> Option<&'v str> 
     input.get(key).and_then(|v| v.as_str())
 }
 
-/// Substrings that let a command smuggle a second, unapproved command past a
-/// prefix rule when the shell runs it (chaining, piping, substitution, etc).
-/// A bare prefix rule (e.g. `git *`) must never match a command containing
-/// one of these — it falls through to Ask instead. This is a conservative,
-/// easy-to-verify allowlist-of-danger, not a full shell parser: it may cause
-/// a few legitimate compound commands to re-prompt, which is the correct
-/// tradeoff for a permission gate.
 const SHELL_METACHARACTERS: &[&str] =
     &["&&", "||", ";", "|", "`", "$(", "\n", "\r", "$((", ">", "<"];
 
@@ -77,14 +51,6 @@ fn has_shell_metacharacters(command: &str) -> bool {
         .any(|meta| command.contains(meta))
 }
 
-/// `git *` matches `git` and anything starting `git `; an exact spec matches
-/// exactly. A bare `*` matches everything.
-///
-/// Guard: if the candidate command contains shell control/chaining
-/// metacharacters (`&&`, `||`, `;`, `|`, backticks, `$(`, newlines, etc.),
-/// a prefix rule (`spec` ending in `*`) never matches — only an exact,
-/// full-command match is honored. This prevents an approved-once command
-/// like `git status` from silently authorizing `git status && rm -rf /`.
 fn command_prefix_matches(spec: &str, command: Option<&str>) -> bool {
     let Some(command) = command else { return false };
     let command = command.trim();
@@ -106,7 +72,6 @@ fn command_prefix_matches(spec: &str, command: Option<&str>) -> bool {
     }
 }
 
-/// `domain:example.com` matches `example.com` and `*.example.com`.
 fn domain_matches(spec: &str, url: Option<&str>) -> bool {
     let Some(domain) = spec.strip_prefix("domain:") else {
         return false;
@@ -118,7 +83,6 @@ fn domain_matches(spec: &str, url: Option<&str>) -> bool {
     host == domain || host.ends_with(&format!(".{domain}"))
 }
 
-/// Minimal host extraction without a URL dependency.
 fn host_of(url: &str) -> Option<&str> {
     let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
     let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());

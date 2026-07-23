@@ -1,5 +1,3 @@
-//! `Read`: inspect a text file and remember its freshness token.
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -16,15 +14,11 @@ const MAX_READ_CHARS: usize = 120_000;
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ReadInput {
-    /// Absolute path to the file to read. Relative paths are rejected.
     file_path: String,
-    /// Optional 1-based line number to start at.
     offset: Option<usize>,
-    /// Optional maximum number of lines to return.
     limit: Option<usize>,
 }
 
-/// Read a UTF-8-ish file, returning line-numbered content.
 pub struct ReadTool {
     state: Arc<FsState>,
 }

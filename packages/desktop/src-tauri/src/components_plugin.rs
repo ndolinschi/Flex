@@ -1,10 +1,3 @@
-//! Desktop Components UI plugin — React / Vue / Angular detection + inventory.
-//!
-//! Not part of the agent engine: Tauri IPC only, consumed by the right-panel
-//! Components tab registered through the frontend UI plugin registry.
-//!
-//! Discovery is heuristic (exports / SFC names / `@Component` classes + relative
-//! import edges), not a DevTools / Fiber / compiler bridge.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -18,11 +11,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{DesktopError, DesktopResult};
 
-/// Max files scanned per project (soft cap for large monorepos).
 const MAX_FILES: usize = 2_000;
-/// Max bytes read per source file when extracting exports / props.
 const MAX_FILE_BYTES: u64 = 256 * 1024;
-/// Lines of source returned for the detail pane.
 const SNIPPET_LINES: usize = 48;
 
 static RE_EXPORT_FN: LazyLock<Regex> = LazyLock::new(|| {
@@ -93,12 +83,9 @@ impl Framework {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ComponentsDetectResult {
-    /// True when React is among `frameworks` (compat with older UI).
     pub is_react: bool,
-    /// Detected UI frameworks: `"react"`, `"vue"`, `"angular"`.
     #[serde(default)]
     pub frameworks: Vec<String>,
-    /// Short reason shown in the empty state (e.g. "react in package.json").
     pub reason: String,
     pub package_name: Option<String>,
 }
@@ -108,10 +95,8 @@ pub struct ComponentsDetectResult {
 pub struct ComponentNode {
     pub id: String,
     pub name: String,
-    /// Path relative to project cwd, using `/` separators.
     pub file: String,
     pub export_name: String,
-    /// Child component ids (imported and used as PascalCase symbols).
     pub children: Vec<String>,
 }
 
@@ -122,7 +107,6 @@ pub struct ComponentsListResult {
     #[serde(default)]
     pub frameworks: Vec<String>,
     pub components: Vec<ComponentNode>,
-    /// Root ids (not imported by any other discovered component).
     pub roots: Vec<String>,
 }
 
@@ -369,8 +353,6 @@ fn frameworks_from_dir_markers(dir: &Path) -> Vec<(Framework, String)> {
     out
 }
 
-/// Scan one level of common monorepo / app folders when the root package.json
-/// is a workspace shell without UI deps.
 fn detect_in_children(root: &Path) -> Option<ComponentsDetectResult> {
     const CHILD_DIRS: &[&str] = &[
         "apps", "packages", "web", "frontend", "client", "app", "src",
@@ -456,7 +438,6 @@ fn detect_in_children(root: &Path) -> Option<ComponentsDetectResult> {
     None
 }
 
-/// Detect whether `cwd` looks like a React / Vue / Angular application.
 pub fn detect_ui_frameworks(cwd: &Path) -> ComponentsDetectResult {
     if !cwd.is_dir() {
         return make_detect(&[], "cwd is not a directory", None);
@@ -468,7 +449,6 @@ pub fn detect_ui_frameworks(cwd: &Path) -> ComponentsDetectResult {
         let reason = root_markers
             .iter()
             .map(|(_, r)| {
-                // Prefer short reasons at root ("next.config present").
                 if r.contains("next.config") {
                     "next.config present"
                 } else if r.contains("nuxt.config") {
@@ -599,7 +579,6 @@ fn extract_angular_exports(source: &str) -> Vec<String> {
     out
 }
 
-/// Resolve a relative import specifier to a component source file.
 fn resolve_import(from_file: &Path, spec: &str, _root: &Path) -> Option<PathBuf> {
     if !(spec.starts_with("./") || spec.starts_with("../")) {
         return None;
@@ -650,8 +629,6 @@ fn extract_component_imports(source: &str, from_file: &Path, root: &Path) -> Vec
         });
         let has_component_import =
             default_or_ns.is_some() || named.as_ref().is_some_and(|n| !n.is_empty());
-        // Vue often default-imports SFCs with any case alias — still resolve
-        // relative `.vue` specs even without a PascalCase binding.
         let is_vue_spec = spec.ends_with(".vue");
         if !has_component_import && !is_vue_spec {
             continue;
@@ -813,7 +790,6 @@ fn frameworks_from_detect(detect: &ComponentsDetectResult) -> Vec<Framework> {
         .collect()
 }
 
-/// Inventory UI components under `cwd` for detected frameworks.
 pub fn list_components(cwd: &Path) -> ComponentsListResult {
     let detect = detect_ui_frameworks(cwd);
     let frameworks = frameworks_from_detect(&detect);
@@ -891,7 +867,6 @@ pub fn list_components(cwd: &Path) -> ComponentsListResult {
     }
 }
 
-/// Detail for one component id (`file#ExportName`).
 pub fn component_detail(cwd: &Path, id: &str) -> DesktopResult<ComponentDetail> {
     let Some((file_rel, export_name)) = id.split_once('#') else {
         return Err(message("invalid component id"));

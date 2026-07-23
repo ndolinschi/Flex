@@ -14,7 +14,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { useGroupedModels, MODEL_MENU_VISIBLE_CAP } from "../../hooks/useGroupedModels"
 
-/** Compact provider-grouped model pill for the Plan tab's toolbar. */
 export const PlanModelPill = ({
   models,
   builtinProviders = [],

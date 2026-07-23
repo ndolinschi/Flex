@@ -11,13 +11,10 @@ import {
 import { cn } from "../../lib/utils"
 import type { PlanSelectionAnchor } from "../../hooks/usePlanSelectionComment"
 
-/** @deprecated Prefer `PlanSelectionAnchor` from `usePlanSelectionComment`. */
 export type PlanCommentDraft = PlanSelectionAnchor
 
 type PlanCommentPopoverProps = {
-  /** Current text selection; drives the floating Comment trigger position. */
   selection: PlanSelectionAnchor | null
-  /** Whether the comment form is open (trigger stays mounted for focus return). */
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (body: string) => void
@@ -25,9 +22,6 @@ type PlanCommentPopoverProps = {
   className?: string
 }
 
-/** Floating Comment trigger + composer for a plan-text selection.
- * The visible Comment button is the PopoverTrigger so aria-expanded and
- * focus-return attach to a real control (not a virtual coord span). */
 export const PlanCommentPopover = ({
   selection,
   open,
@@ -70,7 +64,6 @@ export const PlanCommentPopover = ({
               size="sm"
               aria-label="Comment on selection"
               onMouseDown={(e) => {
-                // Keep the selection; a click would otherwise collapse it.
                 e.preventDefault()
               }}
               className={cn(open && "pointer-events-none opacity-0")}

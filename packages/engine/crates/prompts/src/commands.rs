@@ -1,9 +1,3 @@
-//! Slash-command discovery and expansion.
-//!
-//! Commands are prompt templates. The registry is deterministic, has no global
-//! state, and treats missing user/project command directories as empty so a
-//! host can opt into discovery without making startup fragile.
-
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -11,16 +5,12 @@ use std::path::{Path, PathBuf};
 use agentloop_contracts::{CommandInfo, CommandSource, ContentBlock, ExpandedCommand, PromptInput};
 use serde::Deserialize;
 
-/// Where command files are discovered from.
 #[derive(Debug, Clone, Default)]
 pub struct CommandDiscoveryConfig {
-    /// User-level command directory, typically under a config directory.
     pub user_dir: Option<PathBuf>,
-    /// Project-level command directory, typically under the workspace root.
     pub project_dir: Option<PathBuf>,
 }
 
-/// A slash command after template expansion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandExpansion {
     pub name: String,
@@ -28,7 +18,6 @@ pub struct CommandExpansion {
     pub text: String,
 }
 
-/// Errors from command discovery/expansion.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum CommandError {
@@ -70,7 +59,6 @@ pub enum CommandError {
     Name { path: PathBuf },
 }
 
-/// A deterministic registry of slash-command templates.
 #[derive(Debug, Clone, Default)]
 pub struct CommandRegistry {
     commands: BTreeMap<String, Command>,
@@ -93,7 +81,6 @@ struct CommandFile {
 }
 
 impl CommandRegistry {
-    /// Built-ins only.
     pub fn builtins() -> Self {
         let mut registry = Self::default();
         registry.register(
@@ -127,9 +114,6 @@ impl CommandRegistry {
         registry
     }
 
-    /// Built-ins plus optional user/project command directories. Later sources
-    /// override earlier ones by command name, so project commands can customize
-    /// a built-in without changing clients.
     pub fn discover(config: CommandDiscoveryConfig) -> Result<Self, CommandError> {
         let mut registry = Self::builtins();
         if let Some(dir) = config.user_dir {
@@ -141,7 +125,6 @@ impl CommandRegistry {
         Ok(registry)
     }
 
-    /// Autocomplete-capability entries in deterministic name order.
     pub fn infos(&self) -> Vec<CommandInfo> {
         self.commands
             .values()
@@ -149,8 +132,6 @@ impl CommandRegistry {
             .collect()
     }
 
-    /// Expand the first markdown block when it begins with a known slash
-    /// command. Unknown commands pass through unchanged.
     pub fn expand_input(&self, mut input: PromptInput) -> PromptInput {
         let Some((index, text)) = first_markdown(&input.parts) else {
             return input;
@@ -170,8 +151,6 @@ impl CommandRegistry {
         input
     }
 
-    /// Expand raw command pieces; exposed for focused tests and transports
-    /// that parse command lines before constructing [`PromptInput`].
     pub fn expand(&self, name: &str, args: &str, rest: &str) -> Option<CommandExpansion> {
         let command = self.commands.get(name)?;
         let args = args.trim().to_owned();

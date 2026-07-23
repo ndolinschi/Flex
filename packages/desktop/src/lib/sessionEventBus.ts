@@ -6,13 +6,6 @@ import { log } from "./debug/log"
 
 export type SessionEventHandler = (event: SessionEvent) => void
 
-/**
- * Single Tauri `session-event` listener shared by all React subscribers.
- * `useGlobalSessionEvents` and each `useSessionEvents` used to attach their
- * own listeners — every event was deserialized/dispatched N times in JS.
- * Ref-counted attach/detach keeps exactly one wire listener while any
- * subscriber is alive (including SubagentViewer's second TurnTimeline).
- */
 const handlers = new Set<SessionEventHandler>()
 let unlisten: UnlistenFn | null = null
 let attachPromise: Promise<void> | null = null
@@ -37,7 +30,6 @@ const ensureAttached = (): void => {
     .then((fn) => {
       unlisten = fn
       attachPromise = null
-      // Race: last subscriber left while attach was in flight.
       if (handlers.size === 0) {
         unlisten()
         unlisten = null
@@ -60,7 +52,6 @@ const maybeDetach = (): void => {
   }
 }
 
-/** Subscribe to the demuxed session-event stream. Returns an unsubscribe. */
 export const subscribeSessionEvents = (
   handler: SessionEventHandler,
 ): (() => void) => {
@@ -72,7 +63,6 @@ export const subscribeSessionEvents = (
   }
 }
 
-/** Test helper — resets module state between vitest cases. */
 export const __resetSessionEventBusForTests = (): void => {
   handlers.clear()
   if (unlisten) unlisten()

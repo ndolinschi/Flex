@@ -5,10 +5,6 @@ type PermissionPromptProps = {
   permission: PendingPermission
 }
 
-/** Engine sends `title` pre-formatted as "Allow `ToolName`?" (see
- * packages/engine/crates/loop/src/turn/tool_exec.rs). Split out the
- * backticked tool name so it renders in code style; anything that doesn't
- * match (e.g. the browser mock's plain "Allow Bash?") just renders as-is. */
 const splitTitle = (
   title: string,
 ): { prefix: string; tool: string; suffix: string } | null => {
@@ -17,7 +13,6 @@ const splitTitle = (
   return { prefix: match[1], tool: match[2], suffix: match[3] }
 }
 
-/** Prefer a short human line over raw JSON blobs in the detail field. */
 export const formatPermissionDetail = (detail?: string): string | null => {
   if (!detail?.trim()) return null
   const trimmed = detail.trim()
@@ -31,7 +26,6 @@ export const formatPermissionDetail = (detail?: string): string | null => {
       }
     }
   } catch {
-    // plain text
   }
   if (trimmed.startsWith("{") && trimmed.length > 120) {
     return `${trimmed.slice(0, 100)}…`
@@ -39,8 +33,6 @@ export const formatPermissionDetail = (detail?: string): string | null => {
   return trimmed
 }
 
-/** Docked permission header above the composer bubble (QuestionPrompt seam).
- * Allow / Deny actions live in the composer footer via `PermissionActions`. */
 export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
   const detail = formatPermissionDetail(permission.detail)
   const titleParts = splitTitle(permission.title)
@@ -49,13 +41,10 @@ export const PermissionPrompt = ({ permission }: PermissionPromptProps) => {
     <div
       role="dialog"
       aria-labelledby="permission-title"
-      // Width comes from Composer's content-rail column; no max-w here so the
-      // card and bubble share the exact same edge.
       className="w-full animate-modal-in"
     >
       <div
         className={cn(
-          // Match docked composer stroke-2 so HITL+bubble read as one panel.
           "rounded-t-[var(--radius-composer)] border border-b-0 border-stroke-2",
           "bg-user-bubble px-3 pt-2.5 pb-2.5 shadow-[0_-4px_16px_-4px_var(--shadow-color)]",
         )}

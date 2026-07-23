@@ -6,9 +6,7 @@ import { Collapsible } from "./Collapsible"
 import { Button } from "@/components/ui/button"
 
 type VerdictBadgeProps = {
-  /** Absent while the `Verify` call is still running/pending. */
   verdict?: VerificationVerdict
-  /** True while the underlying `Verify` tool call hasn't settled yet. */
   running?: boolean
   className?: string
 }
@@ -31,10 +29,6 @@ const outcomeGlyph = (outcome: VerificationVerdict["outcome"]): string => {
   return "?"
 }
 
-/** verdict badge for a settled `Verify` tool call: a compact
- * pass/fail/inconclusive summary with the reason in a tooltip, expandable to
- * the full findings list. Used both inline in the timeline (one row per
- * `Verify` call) and in the right-panel Plan tab's Verification section. */
 export const VerdictBadge = ({
   verdict,
   running = false,

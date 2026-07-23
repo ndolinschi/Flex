@@ -1,11 +1,3 @@
-/** Searchable registry for the Settings shell (DESIGN.md Settings).
- *
- * Sections register their rows here (title/description only — no live
- * values) so `Search Settings` can do a flat, cross-section text search
- * without needing to mount every section at once. On selecting a result,
- * the shell navigates to `sectionId` and pulse-highlights the row via
- * `rowId` (see `SettingsShell.tsx`'s `data-settings-row` lookup +
- * `.animate-settings-row-highlight`). */
 
 import { AUTOMATIONS_UI_ENABLED } from "./featureFlags"
 
@@ -28,15 +20,7 @@ export type SettingsSearchEntry = {
   description?: string
 }
 
-/** Static — every section's searchable rows declared up front (simplest
- * mechanism per the build brief: "an array of {section, rowId, title,
- * description}"). Sections with dynamic, per-item content (Memory entries,
- * MCP servers, automations) are represented by their static group
- * title/description only; searching *into* dynamic list items is out of
- * scope for this pass. Automations rows are omitted when
- * `AUTOMATIONS_UI_ENABLED` is false. */
 const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
-  // General
   {
     section: "general",
     rowId: "general-notifications",
@@ -49,7 +33,6 @@ const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     title: "Completion sound",
     description: "Play a short chime when a turn finishes",
   },
-  // Appearance
   {
     section: "appearance",
     rowId: "appearance-theme",
@@ -70,7 +53,6 @@ const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     description:
       "Named color themes — import JSON, create in the editor, or export. Token overrides layered on the factory palette.",
   },
-  // Models & Connections
   {
     section: "models",
     rowId: "models-connections",
@@ -83,7 +65,6 @@ const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     title: "Models",
     description: "Default model and fallback chain",
   },
-  // Behavior
   {
     section: "behavior",
     rowId: "behavior-permissions",
@@ -174,7 +155,6 @@ const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     title: "Coordination plugins",
     description: "Agent messaging, SwitchMode, and council review plugins",
   },
-  // Remote Access
   {
     section: "remote-access",
     rowId: "remote-enabled",
@@ -217,19 +197,17 @@ const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     title: "Bearer token",
     description: "Auth token for remote clients",
   },
-  // Memory
   {
     section: "memory",
     rowId: "memory-global",
     title: "Memory",
     description: "Durable notes the agent saves as it works",
   },
-  // Indexing
   {
     section: "indexing",
     rowId: "indexing-enabled",
     title: "Enable code index",
-    description: "SearchCode, FindSymbol, and RepoMap over a local index",
+    description: "SearchCode, FindSymbol, and RepoMap over a local index (off by default)",
   },
   {
     section: "indexing",
@@ -243,7 +221,6 @@ const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     title: "Auto-context",
     description: "Inject top indexed snippets into each turn's first model call",
   },
-  // Tools & MCP
   {
     section: "tools-mcp",
     rowId: "tools-plugins",
@@ -274,14 +251,12 @@ const ALL_SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     title: "MCP servers",
     description: "Tools from stdio MCP servers",
   },
-  // Automations
   {
     section: "automations",
     rowId: "automations-routines",
     title: "Routines",
     description: "Run on a schedule or webhook and start a new session automatically",
   },
-  // Diagnostics
   {
     section: "diagnostics",
     rowId: "diagnostics-debug-logging",

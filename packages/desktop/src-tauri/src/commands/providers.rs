@@ -1,4 +1,3 @@
-//! Provider config, profiles, and model listing.
 
 use super::common::{parse_isolation, require_service};
 use super::prelude::*;
@@ -17,13 +16,6 @@ pub async fn get_provider_config(state: State<'_, AppState>) -> DesktopResult<Pr
     Ok(cfg.view())
 }
 
-/// Switch the secret storage backend (`"file"` | `"keychain"`), migrating
-/// the master key from wherever it currently lives to the new backend (see
-/// `config::set_secret_storage`/`secrets::SecretsStore::switch_mode`).
-/// `secrets.enc` itself is untouched — only the key's location changes.
-/// Returns the refreshed config view (which reports the new
-/// `secretStorage` value) on success; on failure the old backend is left
-/// intact and the config in `state` is unchanged.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn set_secret_storage(
@@ -52,10 +44,7 @@ pub async fn list_builtin_providers() -> DesktopResult<Vec<BuiltinProvider>> {
         BuiltinProvider::new("xai", "xAI", true),
         BuiltinProvider::new("ollama", "Ollama", false),
         BuiltinProvider::new("bedrock", "Amazon Bedrock", true),
-        // Copilot uses GitHub device-flow OAuth (or an existing editor
-        // sign-in), not a required pasted API key.
         BuiltinProvider::new("copilot", "GitHub Copilot", false),
-        // ChatGPT Plus/Pro subscription via Codex Responses OAuth.
         BuiltinProvider::new("chatgpt", "ChatGPT", false),
     ])
 }
@@ -111,19 +100,6 @@ pub async fn save_provider_config(
     Ok(cfg.view())
 }
 
-// ---------------------------------------------------------------------------
-// Named provider connections ("profiles"): the user can configure several
-// named connections (e.g. two AWS accounts under different Bedrock keys/
-// regions, plus "Anthropic direct") and switch which one is active. See
-// `config::ProviderProfile`/`ProviderConfig::active_profile` for the model
-// and `compose::build_service`, which reads the active profile as its sole
-// source of provider/key/region/model/fallbacks. `get_provider_config`/
-// `validate_provider`/`save_provider_config` above stay as thin adapters
-// over the legacy top-level `prefs` fields (unchanged) so existing call
-// sites keep working; these commands are the new profile-aware surface the
-// Settings page's "Connections" section drives.
-// ---------------------------------------------------------------------------
-
 pub(crate) fn chatgpt_oauth_discoverable() -> bool {
     agentloop_sdk::providers::chatgpt::ChatgptConfig::discoverable()
 }
@@ -160,9 +136,6 @@ pub async fn profiles_list(state: State<'_, AppState>) -> DesktopResult<Vec<Prov
         .collect())
 }
 
-/// Turn a `ProviderProfileInput` into the `ProviderProfile` to persist,
-/// validating shared fields. Does not touch the keychain — callers decide
-/// whether to write `input.api_key` (empty/omitted means "keep existing").
 pub(crate) fn build_profile(
     id: String,
     input: &ProviderProfileInput,
@@ -221,8 +194,6 @@ pub(crate) fn new_profile_id(existing: &[ProviderProfile]) -> String {
     }
 }
 
-/// Short random-ish suffix without pulling in a UUID dependency — collision
-/// risk is a non-issue given `new_profile_id`'s existing-id check above.
 pub(crate) fn uuid_like_suffix() -> String {
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -231,12 +202,6 @@ pub(crate) fn uuid_like_suffix() -> String {
     format!("{nanos:x}")
 }
 
-/// Create or update a profile. `input.id` empty/`None` creates a new profile
-/// (backend mints the id); a matching existing id updates it in place.
-/// `input.api_key`: empty/omitted keeps the existing stored key (update) or
-/// leaves the profile keyless (create — fine for providers like Ollama).
-/// Does not activate or rebuild the engine service — call `profile_activate`
-/// for that (mirrors the old save flow's explicit "Save & continue" step).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn profile_upsert(
@@ -274,9 +239,6 @@ pub async fn profile_upsert(
         cfg.prefs.profiles.push(built);
     }
 
-    // First profile ever created becomes active automatically so a
-    // brand-new install can go straight from "New connection" to a working
-    // engine without a separate activate step.
     if cfg.prefs.active_profile_id.is_none() {
         cfg.prefs.active_profile_id = Some(id.clone());
     }
@@ -294,11 +256,6 @@ pub async fn profile_upsert(
     Ok(view)
 }
 
-/// Remove a profile. Errors if it's the active one — activate a different
-/// profile first (mirrors why `delete_session` doesn't special-case "the
-/// last session": here it's specifically the *active* one that's protected,
-/// since removing it would leave the engine service pointed at a config
-/// that's no longer there).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn profile_remove(state: State<'_, AppState>, id: String) -> DesktopResult<()> {
@@ -319,8 +276,6 @@ pub async fn profile_remove(state: State<'_, AppState>, id: String) -> DesktopRe
     Ok(())
 }
 
-/// Activate a profile: persist the switch and rebuild the engine service
-/// from it (mirrors `save_provider_config`'s persist-then-rebuild sequence).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn profile_activate(
@@ -344,21 +299,6 @@ pub async fn profile_activate(
     Ok(cfg.view())
 }
 
-/// Validate a connection using *exactly* the passed-in form values — the bug
-/// this fixes: the old `validate_provider` path (still used by the legacy
-/// single-config form) and, more fundamentally, `resolve_real_providers`'s
-/// Bedrock arm (`packages/providers/crates/providers/src/resolve.rs`,
-/// read-only from here) resolve credentials from the environment/stored
-/// config rather than the freshly typed key, so pasting a new Bedrock key
-/// and clicking Validate failed with "authentication missing for bedrock"
-/// even though the key was right there in the form. This builds a one-off
-/// trial profile from `input` (falling back to the *stored* key for this
-/// profile id when `input.api_key` is empty, so re-validating an unchanged
-/// saved connection doesn't demand re-pasting the key) and runs it through
-/// the same `build_service` construction path `profile_activate` uses —
-/// including the `with_bedrock_env` scoped-env workaround in `compose.rs`
-/// that makes sure a client-supplied Bedrock key actually reaches the
-/// provider instead of being dropped in favor of an unset env var.
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
 pub async fn validate_profile(
@@ -378,11 +318,6 @@ pub async fn validate_profile(
 
     let built = build_profile(id.clone(), &input)?;
 
-    // Precedence: a freshly typed key always wins; otherwise fall back to
-    // whatever is already stored for this profile id (re-validating an
-    // existing connection without retyping the key). Copilot and Ollama
-    // may validate without a profile key when credentials are discoverable
-    // (editor/device-flow sign-in for Copilot; local host for Ollama).
     if let Some(key) = input
         .api_key
         .as_ref()
@@ -412,10 +347,6 @@ pub async fn validate_profile(
     list_models_from(&service).await
 }
 
-/// True when `provider_id` already has usable credentials — legacy
-/// `cfg.keys`, an active/matching profile key, or oauth/ollama discovery.
-/// Used by [`apply_save_input`] so plugins-only saves (Learning/Verifier
-/// toggles) do not falsely demand a pasted API key when profiles hold it.
 pub(crate) fn provider_credentials_present(cfg: &ProviderConfig, provider_id: &str) -> bool {
     if provider_id == "ollama" {
         return true;
@@ -465,8 +396,6 @@ pub(crate) fn apply_save_input(
         .as_ref()
         .map(|s| s.trim().to_owned())
         .filter(|s| !s.is_empty());
-    // Working directory is chosen per session via the project picker — settings
-    // no longer owns a default cwd. Leave any legacy prefs.cwd untouched.
 
     if let Some(plugins) = &input.plugins {
         cfg.prefs.plugins = plugins.clone();

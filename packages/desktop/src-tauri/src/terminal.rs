@@ -1,10 +1,3 @@
-//! Terminal panel commands — PTY-backed shells surfaced in the right panel.
-//!
-//! Invariant: `state.terminals` is a std (blocking) `Mutex`, not a tokio one,
-//! because PTY I/O (writer writes, resize, kill) is synchronous. Every
-//! command below locks the map, performs its blocking call, and drops the
-//! guard before returning — no `.await` ever happens while the guard is
-//! held, so blocking this mutex briefly is safe inside an async fn.
 
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -23,8 +16,6 @@ pub struct TerminalInfo {
     pub id: String,
     pub cwd: String,
     pub created_at_ms: u64,
-    /// Present when the requested session cwd was missing and the PTY fell
-    /// back to the home directory — UI can toast without guessing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cwd_fallback_from: Option<String>,
 }
@@ -50,12 +41,6 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// Per-OS home directory for `terminal_create` when no session cwd is given.
-///
-/// Uses [`dirs::home_dir`] (USERPROFILE on Windows, $HOME elsewhere) rather
-/// than reading `$HOME` alone — Windows often has no `HOME`, and the previous
-/// fallback of `/` is not a usable cwd (CreateProcess / PowerShell path errors
-/// that surface with doubled `\\` in the message).
 fn default_cwd() -> String {
     if let Some(home) = dirs::home_dir() {
         return home.to_string_lossy().into_owned();
@@ -77,10 +62,6 @@ fn default_cwd() -> String {
     }
 }
 
-/// Pick an existing directory for the PTY shell. Prefers the requested cwd,
-/// then a collapsed-backslash variant (Windows double-escape), then home.
-/// Returns `(resolved_path, fallback_from)` — `fallback_from` is set when the
-/// requested path was unusable.
 fn resolve_cwd(cwd: Option<String>) -> DesktopResult<(String, Option<String>)> {
     let raw = cwd.unwrap_or_else(default_cwd);
     if Path::new(&raw).is_dir() {
@@ -112,14 +93,6 @@ fn resolve_cwd(cwd: Option<String>) -> DesktopResult<(String, Option<String>)> {
     )))
 }
 
-/// Per-OS default shell binary for `terminal_create`, mirroring what each
-/// platform's own terminal apps default to: `$SHELL` (falling back to
-/// `/bin/zsh`, macOS's default login shell since Catalina) on macOS,
-/// `$SHELL` (falling back to `/bin/bash`) on Linux, and `powershell.exe` on
-/// Windows (`$SHELL` isn't a Windows convention). `portable-pty`'s
-/// `CommandBuilder::new_default_prog()` already does something close to this
-/// internally (`$SHELL`/`COMSPEC`), but doesn't expose the exact fallback
-/// chain the product wants here, so it's spelled out explicitly.
 #[cfg(target_os = "macos")]
 fn default_shell() -> String {
     std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_owned())
@@ -329,8 +302,6 @@ pub async fn terminal_list(state: State<'_, AppState>) -> DesktopResult<Vec<Term
     Ok(list)
 }
 
-/// Kill every live terminal — called on app window close so shells don't
-/// linger as orphans after the desktop app quits.
 pub fn kill_all_terminals(state: &AppState) {
     let Ok(mut terminals) = state.terminals.lock() else {
         return;
@@ -352,7 +323,9 @@ mod tests {
     #[test]
     fn resolve_cwd_accepts_existing_dir() {
         let tmp = std::env::temp_dir();
-        let resolved = resolve_cwd(Some(tmp.to_string_lossy().into_owned())).expect("tmp exists");
+        let (resolved, fallback) =
+            resolve_cwd(Some(tmp.to_string_lossy().into_owned())).expect("tmp exists");
         assert!(Path::new(&resolved).is_dir());
+        assert!(fallback.is_none());
     }
 }

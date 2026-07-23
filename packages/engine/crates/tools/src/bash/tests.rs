@@ -22,8 +22,6 @@ fn bash_tool() -> BashTool {
     BashTool::new(Arc::new(LocalExecutor))
 }
 
-/// Concatenate every markdown block's text — test helper only; real
-/// callers of `ToolOutput` render the whole `content` vec.
 fn markdown_text(output: &ToolOutput) -> String {
     output
         .content
@@ -87,7 +85,6 @@ async fn background_run_returns_early_with_a_process_id_while_still_running() {
         .expect("process_id present")
         .to_owned();
 
-    // Clean up: kill it through the same control surface the model uses.
     let kill_ctx = ctx();
     let kill_output = tool
         .run(
@@ -144,12 +141,6 @@ async fn background_status_reports_running_then_kill_stops_it() {
     );
 }
 
-/// `background_action: "kill"` must take down the whole process tree a
-/// backgrounded command started, not just the `/bin/sh` wrapper: this
-/// backgrounds a shell that forks a `sleep` grandchild and prints its
-/// pid, kills the tracked process, then confirms the grandchild pid is
-/// actually gone (not just reparented and still running) via `kill(pid,
-/// 0)`. Guards against a regression to killing only the immediate child.
 #[tokio::test]
 async fn kill_terminates_the_whole_process_group_not_just_the_shell() {
     let tool = bash_tool();
@@ -171,8 +162,6 @@ async fn kill_terminates_the_whole_process_group_not_just_the_shell() {
         .expect("process_id present")
         .to_owned();
 
-    // Poll the tracked tail for the echoed grandchild pid rather than a
-    // fixed sleep guess.
     let mut grandchild_pid: Option<u32> = None;
     for _ in 0..100 {
         let status = tool
@@ -224,13 +213,8 @@ async fn kill_terminates_the_whole_process_group_not_just_the_shell() {
     );
 }
 
-/// Portable liveness probe: `kill(pid, 0)` sends no signal, only checks
-/// whether the process (or an unreaped zombie) still exists.
 #[cfg(unix)]
 fn process_is_alive(pid: u32) -> bool {
-    // SAFETY: none needed — this crate has no `unsafe_code` allowance,
-    // so shell out to `kill -0` instead of linking a signals crate just
-    // for a one-line test probe.
     std::process::Command::new("kill")
         .args(["-0", &pid.to_string()])
         .status()
@@ -306,7 +290,6 @@ async fn session_teardown_kills_background_processes() {
 
     registry.kill_session(&session).await;
 
-    // Give the wait task a moment to observe the cancellation.
     for _ in 0..50 {
         match registry.status(&session, &process_id) {
             None => break,
@@ -319,12 +302,6 @@ async fn session_teardown_kills_background_processes() {
     );
 }
 
-/// Demoting a still-running foreground call returns early with the
-/// "moved to background" notice + output accumulated so far, and the
-/// process shows up in the shared background registry as still running
-/// — from there `background_action: "kill"` (the same control surface a
-/// process started via `run_in_background` uses) works exactly as it
-/// would on any other background entry.
 #[tokio::test]
 async fn demote_mid_run_returns_early_and_process_stays_running() {
     let background = Arc::new(BackgroundProcessRegistry::new());
@@ -352,9 +329,6 @@ async fn demote_mid_run_returns_early_and_process_stays_running() {
         .await
     });
 
-    // Give the command time to start and register its demote handle,
-    // then fire the demote — polling rather than a fixed sleep guess so
-    // the test isn't flaky under load.
     let mut demoted = false;
     for _ in 0..100 {
         if demote.request_demote(&session, call_id.as_str()) {
@@ -387,16 +361,12 @@ async fn demote_mid_run_returns_early_and_process_stays_running() {
         Some(&serde_json::Value::Bool(true))
     );
 
-    // The process itself is now tracked as a normal background entry,
-    // under the very call id the foreground call was running as.
     let (status, command, _tail) = background
         .status(&session, call_id.as_str())
         .expect("registered in the background registry after demote");
     assert!(status.running);
     assert_eq!(command, "echo ready; sleep 5");
 
-    // Kill it through the same control surface a `run_in_background`
-    // process uses, cleaning up the still-sleeping child.
     let killed = background
         .kill(&session, call_id.as_str())
         .await
@@ -404,10 +374,6 @@ async fn demote_mid_run_returns_early_and_process_stays_running() {
     assert!(killed);
 }
 
-/// A demote request for a call that already finished naturally (or was
-/// never running) is a no-op: `request_demote` returns `false`, and the
-/// call's own result is completely unaffected (no "moved to background"
-/// framing).
 #[tokio::test]
 async fn demote_after_natural_completion_is_a_noop() {
     let demote = Arc::new(DemoteRegistry::new());
@@ -431,8 +397,6 @@ async fn demote_after_natural_completion_is_a_noop() {
     assert!(!output.is_error);
     assert!(!markdown_text(&output).contains("Moved to background"));
 
-    // The registration was removed the instant the call finished, so a
-    // demote request that arrives after the fact finds nothing to signal.
     let demoted = demote.request_demote(&session, call_id.as_str());
     assert!(
         !demoted,
@@ -440,9 +404,6 @@ async fn demote_after_natural_completion_is_a_noop() {
     );
 }
 
-/// A normal (non-demoted) run through the demotable path stays
-/// byte-identical to the pre-demote behavior: same stdout/stderr split,
-/// same exit code, no "Moved to background" framing anywhere.
 #[tokio::test]
 async fn non_demoted_foreground_path_is_unaffected_by_demote_plumbing() {
     let tool = bash_tool();

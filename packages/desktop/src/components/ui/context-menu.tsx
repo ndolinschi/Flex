@@ -4,14 +4,6 @@ import { ContextMenu as ContextMenuPrimitive } from "@base-ui/react/context-menu
 import { cn } from "@/lib/utils"
 import { ChevronRightIcon, CheckIcon } from "lucide-react"
 
-/**
- * Flex maps Tailwind `accent` to the product brand color (near-white on dark).
- * shadcn menu hover expects a whisper fill — use `fill-4` / `ink` instead of
- * `bg-accent` / `text-accent-foreground` or hover is white-on-white.
- *
- * Base UI highlights via `data-highlighted` (mouse + keyboard); also keep
- * `focus:` for when the item receives DOM focus.
- */
 const itemHighlight =
   "data-highlighted:bg-fill-4 data-highlighted:text-ink focus:bg-fill-4 focus:text-ink"
 

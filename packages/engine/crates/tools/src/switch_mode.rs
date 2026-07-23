@@ -1,11 +1,3 @@
-//! `SwitchMode`: propose a composer-mode switch and let the UI veto it.
-//!
-//! Emits `ModeSwitchProposed`, then parks the turn waiting for a
-//! `respond_mode_switch` call. If the timeout expires before the user
-//! responds the switch is auto-applied (optimistic default), matching the
-//! intent that mode switches should be low-friction unless the user
-//! explicitly objects.
-
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -26,24 +18,12 @@ const MAX_TIMEOUT_MS: u64 = 30_000;
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct SwitchModeInput {
-    /// Target mode: `"agent"`, `"plan"`, `"ask"`, or `"debug"`.
     mode: String,
-    /// Short explanation of why the mode switch is proposed, shown to the
-    /// user in the veto window.
     reason: String,
-    /// Milliseconds the UI has to veto before the switch auto-applies.
-    /// Defaults to 2000, capped at 30000.
     #[serde(default)]
     timeout_ms: Option<u64>,
 }
 
-/// Proposes a composer mode switch.
-///
-/// The tool emits a `ModeSwitchProposed` event and waits up to `timeout_ms`
-/// for the client to call `respond_mode_switch`. If the client accepts (or
-/// the timeout fires), `ModeSwitchApplied` is emitted and the tool returns
-/// `"applied"`. If the client rejects, `ModeSwitchRejected` is emitted and
-/// the tool returns `"rejected"`.
 pub struct SwitchModeTool {
     pending: Arc<PendingMap<ModeSwitchId, bool>>,
 }
@@ -115,15 +95,13 @@ impl Tool for SwitchModeTool {
             timeout_ms,
         });
 
-        // Wait for the client to call respond_mode_switch, or let the timeout
-        // fire and auto-apply.
         let wait = self
             .pending
             .wait(id.clone(), Duration::from_millis(timeout_ms));
 
         let allowed = tokio::select! {
             _ = ctx.cancel.cancelled() => return Err(ToolError::Cancelled),
-            result = wait => result.unwrap_or(true), // timeout → auto-apply
+            result = wait => result.unwrap_or(true),
         };
 
         if allowed {
@@ -156,10 +134,6 @@ impl Tool for SwitchModeTool {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Unit tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod switch_mode_tests {
     use std::path::PathBuf;
@@ -184,7 +158,6 @@ mod switch_mode_tests {
         }
     }
 
-    /// When the timeout expires before any response, the tool auto-applies.
     #[tokio::test]
     async fn timeout_auto_applies() {
         let pending: Arc<PendingMap<ModeSwitchId, bool>> = Arc::new(PendingMap::new());
@@ -206,13 +179,11 @@ mod switch_mode_tests {
         assert_eq!(structured["mode"], "plan");
     }
 
-    /// A pending-map resolve with `false` (veto) before timeout → "rejected".
     #[tokio::test]
     async fn explicit_reject_via_event_sink() {
         let pending: Arc<PendingMap<ModeSwitchId, bool>> = Arc::new(PendingMap::new());
         let tool = Arc::new(SwitchModeTool::new(pending.clone()));
 
-        // Intercept the emitted ModeSwitchProposed to extract the id.
         let (sink, mut rx) = EventSink::channel();
         let ctx = ToolContext {
             session_id: SessionId("session-b".to_owned()),
@@ -233,7 +204,6 @@ mod switch_mode_tests {
         let pending_clone = pending.clone();
         let handle = tokio::spawn(async move { tool_clone.run(ctx, input).await });
 
-        // Wait for ModeSwitchProposed event to extract the id.
         let proposed_id = loop {
             if let Some(agentloop_contracts::AgentEvent::ModeSwitchProposed { id, .. }) =
                 rx.recv().await
@@ -242,7 +212,6 @@ mod switch_mode_tests {
             }
         };
 
-        // Veto it.
         pending_clone.resolve(&proposed_id, false);
 
         let output = handle

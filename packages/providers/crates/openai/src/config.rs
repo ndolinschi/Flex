@@ -1,5 +1,3 @@
-//! OpenAI environment configuration.
-
 use agentloop_contracts::ProviderId;
 use agentloop_core::ProviderError;
 use agentloop_provider_common::required_env;
@@ -13,7 +11,7 @@ pub struct OpenAiConfig {
     pub api_key: String,
     pub base_url: String,
     pub default_model: String,
-    /// Set when ChatGPT OAuth credentials are active.
+
     pub oauth_account_id: Option<String>,
 }
 
@@ -40,7 +38,6 @@ impl OpenAiConfig {
         })
     }
 
-    /// Build a config backed by stored OAuth tokens (access token as api_key).
     pub fn from_oauth(
         access_token: Option<String>,
         base_url: Option<String>,
@@ -66,10 +63,6 @@ impl OpenAiConfig {
         })
     }
 
-    /// Build a config from explicit values. An empty `api_key` is allowed —
-    /// it means a keyless local endpoint (LM Studio, llama.cpp) and no
-    /// Authorization header is sent. The env path (`from_env`) still
-    /// requires `OPENAI_API_KEY` via [`required_env`].
     pub fn from_values(
         api_key: String,
         base_url: Option<String>,

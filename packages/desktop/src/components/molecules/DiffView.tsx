@@ -5,6 +5,8 @@ import {
   describeHunklessDiff,
   isDiffTruncated,
   parseUnifiedDiff,
+  unmodifiedLinesBeforeHunk,
+  unmodifiedLinesBetweenHunks,
   type Hunk,
   type ParsedDiffFile,
 } from "../../lib/diff"
@@ -12,17 +14,11 @@ import {
 type DiffViewProps = {
   diff: string
   className?: string
-  /** Called when the user clicks a hunk's "Keep" quick action. Omitting this
-   * (along with `onUndoHunk`) keeps DiffView in its original plain-line
-   * rendering — existing callers (e.g. PlanTab, if it ever renders a diff)
-   * are unaffected. */
   onKeepHunk?: (hunk: Hunk, file: ParsedDiffFile) => void
   onUndoHunk?: (hunk: Hunk, file: ParsedDiffFile) => void
-  /** Explicit opt-in for hunk actions, independent of whether handlers are
-   * passed — lets a caller pass handlers but still suppress the UI (e.g.
-   * non-isolated sessions hiding "Keep"). Defaults to true whenever at least
-   * one handler is provided. */
   hunkActionsEnabled?: boolean
+  /** Cursor-style “N unmodified lines” bars between/before hunks (default on). */
+  collapseUnmodified?: boolean
 }
 
 const lineClass = (line: string): string => {
@@ -36,10 +32,6 @@ const lineClass = (line: string): string => {
   return "text-ink-muted"
 }
 
-/** Plain fallback: every line of the raw diff text, colored, no hunk
- * structure. Used when parsing fails, the diff is truncated, or the caller
- * didn't opt into hunk actions — byte-for-byte the same output as before
- * this component grew structured rendering. */
 const PlainDiff = ({ diff }: { diff: string }) => {
   const lines = diff.replace(/\n$/, "").split("\n")
   return (
@@ -56,6 +48,22 @@ const PlainDiff = ({ diff }: { diff: string }) => {
         </div>
       ))}
     </>
+  )
+}
+
+const UnmodifiedCollapse = ({ count }: { count: number }) => {
+  if (count <= 0) return null
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-center border-y border-stroke-4/50",
+        "bg-fill-4/40 px-3 py-1 font-sans text-xs text-ink-faint",
+        "tracking-[var(--tracking-caption)]",
+      )}
+      role="presentation"
+    >
+      {count} unmodified line{count === 1 ? "" : "s"}
+    </div>
   )
 }
 
@@ -116,18 +124,57 @@ const HunkBlock = ({
   )
 }
 
-/** Unified-diff renderer. Renders structured per-hunk sections (with
- * hover-revealed Keep/Undo actions) when `diff` parses cleanly, isn't
- * truncated, and the caller opted in via `onKeepHunk`/`onUndoHunk`.
- * Hunk-less files (empty adds, binary, rename-only) always get a short
- * label instead of raw git headers. Otherwise falls back to flat
- * colored-line rendering. */
+const FileHunks = ({
+  file,
+  collapseUnmodified,
+  onKeepHunk,
+  onUndoHunk,
+}: {
+  file: ParsedDiffFile
+  collapseUnmodified: boolean
+  onKeepHunk?: (hunk: Hunk, file: ParsedDiffFile) => void
+  onUndoHunk?: (hunk: Hunk, file: ParsedDiffFile) => void
+}) => {
+  if (file.hunks.length === 0) {
+    return (
+      <div className="px-3 py-2.5 text-sm text-ink-muted">
+        {describeHunklessDiff(file)}
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {file.hunks.map((hunk, hi) => {
+        const gap =
+          !collapseUnmodified
+            ? 0
+            : hi === 0
+              ? unmodifiedLinesBeforeHunk(hunk)
+              : unmodifiedLinesBetweenHunks(file.hunks[hi - 1], hunk)
+        return (
+          <div key={hi}>
+            <UnmodifiedCollapse count={gap} />
+            <HunkBlock
+              file={file}
+              hunk={hunk}
+              onKeepHunk={onKeepHunk}
+              onUndoHunk={onUndoHunk}
+            />
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
 export const DiffView = ({
   diff,
   className,
   onKeepHunk,
   onUndoHunk,
   hunkActionsEnabled,
+  collapseUnmodified = true,
 }: DiffViewProps) => {
   const wantsHunkActions =
     hunkActionsEnabled ?? (!!onKeepHunk || !!onUndoHunk)
@@ -143,14 +190,6 @@ export const DiffView = ({
     }
   }, [diff])
 
-  // Structured path when hunk actions are on, or when every file is
-  // hunk-less (so we can show "Empty new file" instead of raw headers
-  // even for callers that never opt into Keep/Undo).
-  const useStructured =
-    parsed !== null &&
-    (wantsHunkActions ||
-      parsed.files.every((file) => file.hunks.length === 0))
-
   return (
     <pre
       className={cn(
@@ -158,29 +197,16 @@ export const DiffView = ({
         className,
       )}
     >
-      {useStructured && parsed ? (
-        parsed.files.map((file, fi) =>
-          file.hunks.length > 0 ? (
-            file.hunks.map((hunk, hi) => (
-              <HunkBlock
-                key={`${fi}-${hi}`}
-                file={file}
-                hunk={hunk}
-                onKeepHunk={wantsHunkActions ? onKeepHunk : undefined}
-                onUndoHunk={wantsHunkActions ? onUndoHunk : undefined}
-              />
-            ))
-          ) : (
-            // No hunks: empty new file, binary, rename-only, etc. Show a
-            // short label instead of raw `diff --git` / `index` metadata.
-            <div
-              key={fi}
-              className="px-3 py-2.5 text-sm text-ink-muted"
-            >
-              {describeHunklessDiff(file)}
-            </div>
-          ),
-        )
+      {parsed ? (
+        parsed.files.map((file, fi) => (
+          <FileHunks
+            key={fi}
+            file={file}
+            collapseUnmodified={collapseUnmodified}
+            onKeepHunk={wantsHunkActions ? onKeepHunk : undefined}
+            onUndoHunk={wantsHunkActions ? onUndoHunk : undefined}
+          />
+        ))
       ) : (
         <PlainDiff diff={diff} />
       )}

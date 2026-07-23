@@ -7,13 +7,10 @@ type RepoSectionHeaderProps = {
   collapsed: boolean
   onToggle: () => void
   onNewSession: () => void
-  /** Low-cost "indexed" affordance when the code index is ready for this repo. */
   indexed?: boolean
-  /** Disable "+" and show a spinner while a session create is in flight. */
   isCreating?: boolean
 }
 
-/** Repository group head: always-visible expand chevron + name + hover "+". */
 export const RepoSectionHeader = ({
   label,
   collapsed,
@@ -32,8 +29,7 @@ export const RepoSectionHeader = ({
         if (e.key === "Enter") onToggle()
       }}
       className={cn(
-        // Section labels: px-1.5 py-2 text-sm text-tertiary (row gutter px-2.5 via wrapper).
-        "group flex w-full cursor-default items-center gap-0.5 rounded-sm px-1.5 py-2",
+        "group flex h-6 w-full cursor-default items-center gap-0.5 rounded-sm px-1.5",
         "text-sm tracking-[var(--tracking-caption)] text-ink-muted",
         "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)] hover:text-ink",
       )}

@@ -7,7 +7,6 @@ type ToolCallChipProps = {
   className?: string
 }
 
-/** Single tool call — renders as a step (also used for live streaming). */
 export const ToolCallChip = memo(function ToolCallChip({
   call,
   className,

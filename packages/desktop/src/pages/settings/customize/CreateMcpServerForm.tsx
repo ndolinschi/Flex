@@ -11,7 +11,6 @@ import { mcpUpsert, toInvokeError } from "../../../lib/tauri"
 import type { McpServerDto } from "../../../lib/types"
 import { Input } from "@/components/ui/input"
 
-/** Inline create form for a new MCP server — stdio transport only (MVP). */
 export const CreateMcpServerForm = ({
   onCancel,
   onSaved,

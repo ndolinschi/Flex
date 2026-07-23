@@ -1,18 +1,9 @@
 import type { CreateSessionInput, IsolationPolicy, SessionMeta } from "./types"
 import { DEFAULT_SESSION_TITLE, isPristineSession } from "./types"
 
-/** True when an engine error means the session id no longer exists (engine's
- * `StoreError::SessionNotFound` → "session {id} not found", surfaced via
- * `toInvokeError`). Distinct from other resume/delete failures — retrying a
- * not-found is meaningless, so callers should self-heal instead. */
 export const isSessionNotFoundError = (message: string): boolean =>
   /session\s+\S+\s+not found/i.test(message) || /session not found/i.test(message)
 
-/** Find an unused "New Agent" session for this project (design: one draft per cwd).
- * Matches on `base_cwd ?? cwd` so isolated drafts (cwd = worktree) still group
- * with their project. Only returns an *unprovisioned* draft — leftover
- * create-time worktrees from before deferred isolation must not be reused as
- * the empty New Agent surface (they still carry WorkspaceProvisioned history). */
 export const findDraftSession = (
   sessions: SessionMeta[],
   cwd?: string | null,
@@ -25,7 +16,6 @@ export const findDraftSession = (
   })
 }
 
-/** Resolve cwd preference: explicit → recent → active session. */
 export const resolveCreateCwd = (
   sessions: SessionMeta[],
   activeSessionId: string | null,
@@ -47,10 +37,6 @@ export const newAgentCreateInput = (
   title: DEFAULT_SESSION_TITLE,
   ...(cwd ? { cwd } : {}),
   ...(model ? { model } : {}),
-  // Omitted when unset — `create_session` then falls back to the provider
-  // profile's `default_isolation` (see commands.rs::create_session).
   ...(isolation ? { isolation } : {}),
-  // Only forwarded when the user picked an existing worktree; the backend
-  // ignores the hint unless the resolved isolation policy wants one.
   ...(reuseWorkspaceId ? { reuseWorkspaceId } : {}),
 })

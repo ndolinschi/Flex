@@ -1,10 +1,3 @@
-//! Filesystem tools and shared per-session state.
-//!
-//! `FsState` remembers which absolute paths were `Read` this session and the
-//! file's modification time at that moment. `Write` and `Edit` consult it to
-//! enforce the read-before-modify discipline and to detect files that changed
-//! on disk between the model's `Read` and its mutation.
-
 mod edit;
 mod helpers;
 mod html;
@@ -27,10 +20,6 @@ pub(crate) use helpers::{
 pub(crate) use html::clean_html_for_model;
 pub use html::extract_page_links;
 
-/// Tracks the paths read this session and their mtime at read.
-///
-/// One instance is shared (via `Arc`) by the `Read`, `Write`, and `Edit`
-/// tools of a session.
 #[derive(Default)]
 pub struct FsState {
     reads: Mutex<HashMap<PathBuf, SystemTime>>,
@@ -41,15 +30,11 @@ impl FsState {
         Self::default()
     }
 
-    /// Record that `path` was read while its mtime was `mtime`. Also called
-    /// after `Write`/`Edit` so a freshly mutated file stays editable.
     pub fn record_read(&self, path: PathBuf, mtime: SystemTime) {
         let mut map = self.reads.lock().unwrap_or_else(|p| p.into_inner());
         map.insert(path, mtime);
     }
 
-    /// The mtime `path` had when it was last read, or `None` if it was never
-    /// read this session.
     pub fn recorded_mtime(&self, path: &Path) -> Option<SystemTime> {
         let map = self.reads.lock().unwrap_or_else(|p| p.into_inner());
         map.get(path).copied()
@@ -80,6 +65,4 @@ mod tests {
         assert!(message.contains("absolute"), "{message}");
         assert!(message.contains("/work/src/main.rs"), "{message}");
     }
-
-    // --- strip_navigation_blocks tests ---
 }

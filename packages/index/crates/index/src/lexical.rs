@@ -1,9 +1,3 @@
-//! BM25 full-text index over code chunks, backed by `tantivy`.
-//!
-//! Schema: `path`, `language`, `chunk` (the indexed+stored text), `start_line`,
-//! `end_line`, and an optional `symbol` name field (boosted at query time by
-//! [`crate::retrieve`]).
-
 use std::path::Path;
 
 use tantivy::directory::MmapDirectory;
@@ -13,8 +7,6 @@ use tantivy::{Index, IndexReader, IndexWriter, TantivyDocument, doc};
 
 use crate::chunker::Chunk;
 
-/// Writer heap size for tantivy segment building. Small, since this indexes
-/// one repo's worth of code chunks, not a web-scale corpus.
 const WRITER_HEAP_BYTES: usize = 50_000_000;
 
 #[derive(Debug, thiserror::Error)]
@@ -32,7 +24,6 @@ impl From<tantivy::TantivyError> for LexicalError {
     }
 }
 
-/// Field handles for the fixed schema, resolved once at open time.
 #[derive(Clone, Copy)]
 struct Fields {
     path: tantivy::schema::Field,
@@ -65,7 +56,6 @@ fn build_schema() -> (Schema, Fields) {
     )
 }
 
-/// One BM25 hit straight from tantivy, before symbol-boost re-ranking.
 #[derive(Debug, Clone)]
 pub struct RawHit {
     pub path: String,
@@ -77,8 +67,6 @@ pub struct RawHit {
     pub score: f32,
 }
 
-/// A lexical (BM25) index over code chunks, persisted at a caller-chosen
-/// directory.
 pub struct LexicalIndex {
     index: Index,
     reader: IndexReader,
@@ -86,7 +74,6 @@ pub struct LexicalIndex {
 }
 
 impl LexicalIndex {
-    /// Open the index at `dir`, creating it (and the directory) if absent.
     pub fn open_or_create(dir: &Path) -> Result<Self, LexicalError> {
         std::fs::create_dir_all(dir)
             .map_err(|err| LexicalError::Directory(format!("{}: {err}", dir.display())))?;
@@ -102,7 +89,6 @@ impl LexicalIndex {
         })
     }
 
-    /// Replace the entire index contents with `chunks` (full rebuild).
     pub fn rebuild(
         &self,
         language_by_path: impl Fn(&str) -> &'static str,
@@ -118,8 +104,6 @@ impl LexicalIndex {
         Ok(())
     }
 
-    /// Remove every document for `path`, then re-add `chunks` for it.
-    /// Used for incremental per-file updates.
     pub fn update_file(
         &self,
         path: &str,
@@ -137,7 +121,6 @@ impl LexicalIndex {
         Ok(())
     }
 
-    /// Remove every document for `path`. Used when a file is deleted.
     pub fn remove_file(&self, path: &str) -> Result<(), LexicalError> {
         let mut writer: IndexWriter = self.index.writer(WRITER_HEAP_BYTES)?;
         let term = tantivy::Term::from_field_text(self.fields.path, path);
@@ -168,9 +151,6 @@ impl LexicalIndex {
         Ok(())
     }
 
-    /// BM25 search over the `chunk` and `symbol` fields, returning the top
-    /// `k` raw hits (before symbol-name boost merging, which lives in
-    /// `retrieve`).
     pub fn search(&self, query: &str, k: usize) -> Result<Vec<RawHit>, LexicalError> {
         let searcher = self.reader.searcher();
         let query_parser =
@@ -187,18 +167,10 @@ impl LexicalIndex {
         Ok(hits)
     }
 
-    /// All chunks currently indexed for `path`, in no particular order
-    /// (`score` is always `0.0` — this isn't a ranked search). Used by
-    /// [`crate::retrieve::search_hybrid`] to resolve a vector-only hit
-    /// (found by the embedding index but not surfaced by the BM25 query
-    /// itself, e.g. because it shares no literal terms with the query) back
-    /// into full chunk data (line range, snippet, symbol) by chunk id.
     pub fn chunks_for_path(&self, path: &str) -> Result<Vec<RawHit>, LexicalError> {
         let searcher = self.reader.searcher();
         let term = tantivy::Term::from_field_text(self.fields.path, path);
         let query = tantivy::query::TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
-        // A file's chunk count is small and bounded by chunker clamps; no
-        // realistic file needs more than a few hundred chunks back.
         let collector = tantivy::collector::TopDocs::with_limit(500).order_by_score();
         let top_docs = searcher.search(&query, &collector)?;
 

@@ -1,20 +1,3 @@
-//! Embeddable SDK — compose providers + the native engine + plugins behind a
-//! small builder.
-//!
-//! ```no_run
-//! use agentloop_sdk::AgentBuilder;
-//!
-//! # fn main() -> agentloop_sdk::EngineResult<()> {
-//! let service = AgentBuilder::new()
-//!     .provider("anthropic")
-//!     .model("claude-sonnet-4")
-//!     .enable_plugin("search")
-//!     .build()?;
-//! # let _ = service;
-//! # Ok(())
-//! # }
-//! ```
-
 mod loop_agent;
 pub mod mcp_store;
 mod role_tiers;
@@ -50,15 +33,12 @@ pub use agentloop_verifier::{self as verifier, VerifierPlugin};
 pub use loop_agent::{ClawBot, ClawBotBuilder, LoopAgent, PromptSource};
 pub use role_tiers::apply_research_model_tiers;
 
-/// Fluent builder that resolves providers, enables plugins, and composes a
-/// native [`EngineService`].
 pub struct AgentBuilder {
     provider_opts: ProviderOptions,
     config: EngineConfig,
     plugins: Vec<Arc<dyn Plugin>>,
     all_providers: bool,
-    /// Deferred `enable_plugin("search")` so build-time tier routing can pin
-    /// the researcher role to a cheap model when one is available.
+
     #[cfg(feature = "search")]
     enable_search: bool,
 }
@@ -75,22 +55,16 @@ impl AgentBuilder {
         }
     }
 
-    /// Preferred provider id (else auto-detected from the environment).
     pub fn provider(mut self, id: impl Into<String>) -> Self {
         self.provider_opts.provider = Some(id.into());
         self
     }
 
-    /// Default model id (optionally `provider/`-qualified).
     pub fn model(mut self, model: impl Into<String>) -> Self {
         self.provider_opts.model = Some(model.into());
         self
     }
 
-    /// Engine-wide default fallback chain (optionally `provider/`-qualified
-    /// entries), used by a session created without its own
-    /// `NewSessionParams.fallback_models`. Cross-provider entries need
-    /// [`AgentBuilder::all_providers`] so the other provider is registered.
     pub fn fallback_models(mut self, models: impl IntoIterator<Item = impl Into<String>>) -> Self {
         self.config.default_fallback_models = models
             .into_iter()
@@ -99,55 +73,40 @@ impl AgentBuilder {
         self
     }
 
-    /// Working directory the session (and its tools) are sandboxed to.
     pub fn cwd(mut self, cwd: impl Into<PathBuf>) -> Self {
         self.config.cwd = Some(cwd.into());
         self
     }
 
-    /// Run in headless/research mode with no project directory and read-only
-    /// tools. The agent can still use the search plugin if enabled.
     pub fn headless(mut self) -> Self {
         self.config.cwd = None;
         self
     }
 
-    /// Set the NDJSON event output verbosity level (default: [`OutputVerbosity::Medium`]).
     pub fn verbosity(mut self, level: OutputVerbosity) -> Self {
         self.config.verbosity = level;
         self
     }
 
-    /// Current date string injected into the system prompt.
     pub fn date(mut self, date: impl Into<String>) -> Self {
         self.config.date = date.into();
         self
     }
 
-    /// Client-configured OpenAI-compatible providers.
     pub fn custom_providers(mut self, custom: Vec<CustomProviderSpec>) -> Self {
         self.provider_opts.custom = custom;
         self
     }
 
-    /// Register every provider whose credentials resolve (instead of a single
-    /// preferred one), so provider-qualified models can switch per turn.
     pub fn all_providers(mut self, yes: bool) -> Self {
         self.all_providers = yes;
         self
     }
 
-    /// Enable a built-in plugin by id. Currently recognizes `"artifacts"`,
-    /// `"search"`, `"index"`, `"learning"`, `"verifier"`, and `"messaging"`
-    /// (when the matching feature is enabled); unknown or feature-disabled ids
-    /// are ignored with a warning. Use [`AgentBuilder::plugin`] for custom
-    /// plugins.
     pub fn enable_plugin(mut self, id: &str) -> Self {
         let mut matched = false;
         #[cfg(feature = "search")]
         if id == "search" {
-            // Deferred until [`AgentBuilder::build`] so tier routing can pin
-            // the researcher role to a cheap model when one is registered.
             self.enable_search = true;
             matched = true;
         }
@@ -184,58 +143,41 @@ impl AgentBuilder {
         self
     }
 
-    /// Register the peer-messaging tools (`GetActiveAgents`, `SendMessage`,
-    /// `GetMessages`). Off by default; also enabled by
-    /// `enable_plugin("messaging")`.
     pub fn peer_messaging(mut self, on: bool) -> Self {
         self.config.enable_peer_messaging = on;
         self
     }
 
-    /// Register the `SwitchMode` tool and wire the `respond_mode_switch`
-    /// reply path. Off by default; also enabled by
-    /// `enable_plugin("messaging")`.
     pub fn switch_mode(mut self, on: bool) -> Self {
         self.config.enable_switch_mode = on;
         self
     }
 
-    /// Add a plugin (the builder wraps it in `Arc` internally).
     pub fn plugin(mut self, plugin: impl Plugin + 'static) -> Self {
         self.plugins.push(Arc::new(plugin));
         self
     }
 
-    /// Set the command-execution backend shell tools run through (e.g. an
-    /// `agentloop_executors::DockerExecutor`). Default: local host execution.
     pub fn executor(mut self, executor: Arc<dyn agentloop_core::Executor>) -> Self {
         self.config.executor = Some(executor);
         self
     }
 
-    /// Scan tool results with prompt-injection heuristics, fencing flagged
-    /// content in an explicit warning before the model reads it.
     pub fn injection_scan(mut self, on: bool) -> Self {
         self.config.injection_scan = on;
         self
     }
 
-    /// Register the `RunWorkflow` tool (a declarative multi-step subagent
-    /// pipeline the model can run in one call). Off by default.
     pub fn enable_workflow_tool(mut self, on: bool) -> Self {
         self.config.enable_workflow_tool = on;
         self
     }
 
-    /// Network posture for shell commands (`Denied` requires a backend with
-    /// network isolation, e.g. docker).
     pub fn network(mut self, network: agentloop_core::NetworkPolicy) -> Self {
         self.config.network = network;
         self
     }
 
-    /// Set an API key for a built-in provider, bypassing the environment
-    /// variable. For example: `.provider_key("deepseek", "sk-...")`.
     pub fn provider_key(mut self, id: impl Into<String>, key: impl Into<String>) -> Self {
         self.provider_opts
             .provider_keys
@@ -243,10 +185,6 @@ impl AgentBuilder {
         self
     }
 
-    /// Set a region override for a region-scoped built-in provider, bypassing
-    /// the environment variable. Currently only Bedrock consults this
-    /// (`.provider_region("bedrock", "eu-west-1")`); ignored by providers that
-    /// have no region concept.
     pub fn provider_region(mut self, id: impl Into<String>, region: impl Into<String>) -> Self {
         self.provider_opts
             .provider_regions
@@ -254,29 +192,15 @@ impl AgentBuilder {
         self
     }
 
-    /// Replace the engine-scoped configuration wholesale (advanced: isolation,
-    /// MCP, hooks, roles, session store, …). Any plugins already added via the
-    /// builder are preserved and merged in at [`AgentBuilder::build`].
     pub fn with_config(mut self, config: EngineConfig) -> Self {
         self.config = config;
         self
     }
 
-    /// Mutable access to the engine-scoped configuration for fine-grained
-    /// tweaks without replacing it wholesale.
     pub fn config_mut(&mut self) -> &mut EngineConfig {
         &mut self.config
     }
 
-    /// Resolve providers, fold in enabled plugins, and build the service.
-    ///
-    /// When a known cheap/strong model pair is registered, pins `searcher`
-    /// to the cheap model and `worker` to the strong one (see
-    /// [`apply_research_model_tiers`]). Explicit `EngineConfig.roles` entries
-    /// for those names win. When search is enabled via
-    /// [`AgentBuilder::enable_plugin`], the `researcher` role is also pinned
-    /// to the cheap model (independent of searcher/worker overrides). Desktop
-    /// compose goes through this path automatically.
     pub fn build(mut self) -> EngineResult<EngineService> {
         let (mut providers, mut default_model) = if self.all_providers {
             resolve_available_providers(
@@ -347,9 +271,6 @@ mod index_wiring_tests {
     use super::*;
     use agentloop_core::Plugin;
 
-    /// Desktop `compose.rs` calls `enable_plugin("index")` when
-    /// `prefs.plugins.index` is true; this locks the tool names that call
-    /// must surface (`SearchCode` / `FindSymbol` / `RepoMap`).
     #[test]
     fn enable_plugin_index_registers_search_code_and_find_symbol() {
         let _builder = AgentBuilder::new().enable_plugin("index");

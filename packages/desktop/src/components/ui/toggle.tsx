@@ -10,7 +10,6 @@ const toggleVariants = cva(
     "focus-visible:border-stroke-2 focus-visible:ring-1 focus-visible:ring-stroke-2",
     "disabled:pointer-events-none disabled:opacity-50",
     "aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/30",
-    // Persistent selection is fill-2; fill-4 is reserved for transient hover.
     "aria-pressed:bg-fill-2 aria-pressed:text-ink data-pressed:bg-fill-2 data-pressed:text-ink",
     "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   ].join(" "),

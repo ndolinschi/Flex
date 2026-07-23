@@ -1,7 +1,3 @@
-//! Grok Build delegator: drives `grok -p --output-format streaming-json`
-//! and normalizes its output. ACP (`grok agent stdio`) remains available via
-//! `--agent acp --agent-cmd "grok agent stdio"`.
-
 mod config;
 mod mapper;
 mod profile;

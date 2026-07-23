@@ -1,9 +1,3 @@
-//! NDJSON stdio transport boundary.
-//!
-//! The runner composes an [`EngineService`];
-//! this crate owns the wire framing. Each line is one serialized
-//! [`SessionEvent`].
-
 use std::path::PathBuf;
 
 use futures::StreamExt;
@@ -15,7 +9,6 @@ use agentloop_contracts::{
 };
 use agentloop_engine::{EngineService, EngineServiceError, OutputVerbosity};
 
-/// Request served by the current headless NDJSON protocol.
 #[derive(Debug, Clone)]
 pub struct OneTurnRequest {
     pub prompt: String,
@@ -23,8 +16,6 @@ pub struct OneTurnRequest {
     pub cwd: Option<PathBuf>,
     pub permission_mode: PermissionMode,
     pub verbosity: OutputVerbosity,
-    /// This session's fallback chain; empty defers to the engine's own
-    /// default (see `EngineConfig.default_fallback_models`).
     pub fallback_models: Vec<ModelRef>,
 }
 
@@ -42,7 +33,6 @@ impl OneTurnRequest {
     }
 }
 
-/// Whether an [`AgentEvent`] should be emitted at the given verbosity level.
 fn event_visible(event: &AgentEvent, verbosity: OutputVerbosity) -> bool {
     match verbosity {
         OutputVerbosity::High => true,
@@ -76,7 +66,6 @@ fn event_visible(event: &AgentEvent, verbosity: OutputVerbosity) -> bool {
     }
 }
 
-/// Transport-level failures.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum StdioTransportError {
@@ -92,7 +81,6 @@ pub enum StdioTransportError {
 
 pub type StdioResult<T> = Result<T, StdioTransportError>;
 
-/// Serialize one event as exactly one NDJSON line.
 pub async fn write_event<W>(writer: &mut W, event: &SessionEvent) -> StdioResult<()>
 where
     W: AsyncWrite + Unpin,
@@ -104,10 +92,6 @@ where
     Ok(())
 }
 
-/// Serve a single prompt turn as NDJSON.
-///
-/// The initial `SessionCreated` and `EngineInfo` events are replayed before
-/// the live turn begins. Live events then continue until `TurnCompleted`.
 pub async fn serve_one_turn<W>(
     service: EngineService,
     request: OneTurnRequest,
@@ -257,12 +241,10 @@ mod tests {
             },
             OutputVerbosity::Low,
         ));
-        // Gap is present in Low verbosity (subscriber sync hint).
         assert!(event_visible(
             &AgentEvent::Gap { from_seq: 0 },
             OutputVerbosity::Low,
         ));
-        // Intermediate events like MessageStarted are hidden.
         assert!(!event_visible(
             &AgentEvent::MessageStarted {
                 message_id: agentloop_contracts::MessageId::generate(),

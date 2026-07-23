@@ -1,54 +1,18 @@
-//! Skill discovery: the two-tier progressive-disclosure model.
-//!
-//! A skill is a directory containing `SKILL.md`: minimal YAML frontmatter
-//! (`name`, `description`, optional `disable-model-invocation`) followed by a
-//! markdown body. This follows the community `SKILL.md` convention (matches
-//! Anthropic's public Skills spec and corpora like `mattpocock/skills`):
-//! directory-per-skill, flat frontmatter, optional sibling reference files or
-//! scripts the body may point at.
-//!
-//! Loading is two-tier, mirroring how the format is meant to be consumed:
-//! - **Tier 1** (always resident): [`SkillInfo`] — just `name` + `description`
-//!   — cheap enough to keep in context for every discovered skill, so the
-//!   model can decide relevance without paying for the full body.
-//! - **Tier 2** (on demand): [`SkillRegistry::load_body`] reads the full
-//!   `SKILL.md` body (frontmatter stripped) only when a skill is actually
-//!   invoked; callers (the `Skill` tool) inject it into context at that point
-//!   and it stays resident for the rest of the session.
-//!
-//! Tier 3 (supporting files/scripts referenced from the body) needs no
-//! special support here — the model reaches them with its own `Read`/`Bash`
-//! tools once the body tells it to.
-//!
-//! The registry is deterministic, has no global state, and treats a missing
-//! discovery directory as empty, matching [`crate::commands::CommandRegistry`].
-
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Where a skill was discovered from, for display and override precedence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SkillSource {
-    /// Skills the agent distilled from its own completed work
-    /// (`~/.config/agentloop/skills/learned/*/SKILL.md`). Lowest precedence:
-    /// any human-authored skill of the same name overrides a learned one.
     Learned,
-    /// `~/.config/agentloop/skills/*/SKILL.md`.
     User,
-    /// `<project>/.agent/skills/*/SKILL.md`.
     Project,
 }
 
-/// Cheap, always-resident metadata for one discovered skill (tier 1).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillInfo {
     pub name: String,
     pub description: String,
-    /// Mirrors the community convention's `disable-model-invocation: true`:
-    /// when set, the skill is never offered to the model (excluded from
-    /// [`SkillRegistry::model_visible`]) — reachable only by a human
-    /// explicitly naming it.
     pub user_only: bool,
     pub source: SkillSource,
 }
@@ -59,17 +23,13 @@ struct Skill {
     path: PathBuf,
 }
 
-/// Where skill directories are discovered from.
 #[derive(Debug, Clone, Default)]
 pub struct SkillDiscoveryConfig {
-    /// Agent-distilled skills; discovered first so human-authored skills of
-    /// the same name override them.
     pub learned_dir: Option<PathBuf>,
     pub user_dir: Option<PathBuf>,
     pub project_dir: Option<PathBuf>,
 }
 
-/// Errors from skill discovery or loading.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum SkillError {
@@ -98,17 +58,12 @@ pub enum SkillError {
     NotFound(String),
 }
 
-/// A deterministic registry of discovered skills.
 #[derive(Debug, Clone, Default)]
 pub struct SkillRegistry {
     skills: BTreeMap<String, Skill>,
 }
 
 impl SkillRegistry {
-    /// Discover from learned, then user, then project directories; when names
-    /// collide the later source wins (project > user > learned), so a human-
-    /// authored skill always overrides an agent-distilled one and a project
-    /// can pin its own version of any skill.
     pub fn discover(config: SkillDiscoveryConfig) -> Result<Self, SkillError> {
         let mut registry = Self::default();
         if let Some(dir) = config.learned_dir {
@@ -123,9 +78,6 @@ impl SkillRegistry {
         Ok(registry)
     }
 
-    /// Tier-1 metadata for skills the MODEL may invoke (excludes
-    /// `user_only` skills), in name order — feed straight into a tool
-    /// description's "available skills" listing.
     pub fn model_visible(&self) -> Vec<(String, String)> {
         self.skills
             .values()
@@ -134,17 +86,14 @@ impl SkillRegistry {
             .collect()
     }
 
-    /// Every discovered skill (model- and user-only alike), in name order.
     pub fn infos(&self) -> Vec<&SkillInfo> {
         self.skills.values().map(|skill| &skill.info).collect()
     }
 
-    /// Whether any skill was discovered.
     pub fn is_empty(&self) -> bool {
         self.skills.is_empty()
     }
 
-    /// Tier 2: read `name`'s full `SKILL.md` body (frontmatter stripped).
     pub fn load_body(&self, name: &str) -> Result<String, SkillError> {
         let skill = self
             .skills
@@ -227,10 +176,6 @@ impl SkillRegistry {
     }
 }
 
-/// Parse the `---`-delimited frontmatter block into flat `key: value` pairs.
-/// Only scalar lines are supported (no nested maps/lists, no multi-line
-/// scalars) — the SKILL.md convention only ever uses flat string/bool fields,
-/// so a full YAML parser (and its dependency) buys nothing here.
 fn parse_frontmatter(raw: &str) -> Option<BTreeMap<String, String>> {
     let rest = raw.strip_prefix("---")?;
     let rest = rest.strip_prefix('\n').unwrap_or(rest);
@@ -251,7 +196,6 @@ fn parse_frontmatter(raw: &str) -> Option<BTreeMap<String, String>> {
     Some(map)
 }
 
-/// Strip a leading frontmatter block, if present, returning just the body.
 fn strip_frontmatter(raw: &str) -> &str {
     let Some(rest) = raw.strip_prefix("---") else {
         return raw.trim();

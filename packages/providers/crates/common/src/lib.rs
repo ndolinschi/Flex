@@ -1,9 +1,3 @@
-//! Shared utilities for first-party provider crates.
-//!
-//! Provider-specific wire types stay in each provider crate. This crate only
-//! holds generic pieces: standard environment loading, HTTP error mapping, and
-//! Server-Sent Events decoding.
-
 mod env;
 mod http;
 mod sse;

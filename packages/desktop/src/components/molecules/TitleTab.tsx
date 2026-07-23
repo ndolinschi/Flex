@@ -5,9 +5,6 @@ type TitleTabProps = {
   className?: string
 }
 
-/** Chat title for the top bar — plain label, not a second panel control.
- * Split / session chrome lives on WindowTitleBar (⌘J).
- * Sidebar open/close also lives on WindowTitleBar. */
 export const TitleTab = ({ title, className }: TitleTabProps) => {
   return (
     <div

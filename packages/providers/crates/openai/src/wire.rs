@@ -1,5 +1,3 @@
-//! Private OpenAI Chat Completions wire types.
-
 use std::collections::{BTreeMap, HashSet};
 
 use agentloop_contracts::{
@@ -32,10 +30,6 @@ struct StreamOptions {
     include_usage: bool,
 }
 
-/// Extended-thinking request config in the DeepSeek-style dialect:
-/// `{"type":"enabled","budget_tokens":N}`. Only serialized when the caller
-/// set [`ChatRequest::thinking`]; strict Chat Completions endpoints never
-/// see the field.
 #[derive(Debug, Serialize)]
 struct OpenAiThinking {
     #[serde(rename = "type")]
@@ -126,9 +120,9 @@ struct Choice {
 #[derive(Debug, Default, Deserialize)]
 struct Delta {
     content: Option<String>,
-    /// DeepSeek dialect: reasoning text streamed alongside `content`.
+
     reasoning_content: Option<String>,
-    /// Router/GLM variant of the same field.
+
     reasoning: Option<String>,
     #[serde(default)]
     tool_calls: Vec<DeltaToolCall>,
@@ -278,10 +272,7 @@ pub(crate) fn build_request(request: ChatRequest) -> OpenAiChatRequest {
             },
         })
         .collect();
-    // Copilot (and some Chat Completions gateways) reject
-    // `tool_choice` when `tools` is absent/empty — "tools are required when
-    // tool choice is specified". Default `ChatRequest` uses Auto with no
-    // tools (throwaway completions like session titles); omit the field.
+
     let tool_choice = if tools.is_empty() {
         None
     } else {
@@ -564,9 +555,6 @@ mod tests {
 
     #[test]
     fn omits_tool_choice_when_tools_are_empty() {
-        // Default ChatRequest is Auto + no tools — must not serialize
-        // tool_choice (Copilot: "tools are required when tool choice is
-        // specified").
         let bare = ChatRequest::new("gpt-test", Vec::new());
         let json = match serde_json::to_value(build_request(bare)) {
             Ok(value) => value,

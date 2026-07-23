@@ -1,21 +1,4 @@
 #!/usr/bin/env bash
-# Phase 3.4 — provider matrix live-smoke (env-gated).
-#
-# Runs one short `flex run` turn per provider whose API key (or local daemon)
-# is present. Missing keys are skipped, never fail the job — safe for nightly
-# CI without secrets. Exit 1 only when at least one attempted provider fails.
-#
-# Usage:
-#   ./packages/sdk/scripts/provider-matrix-smoke.sh
-#   FLEX_BIN=~/.local/bin/flex ./packages/sdk/scripts/provider-matrix-smoke.sh
-#
-# Optional:
-#   PROVIDER_MATRIX="anthropic openai deepseek"  # subset / override
-#   MATRIX_PROMPT="reply with the single word pong"
-#
-# Follow-ups (not automated here): fallback-chain turns, Win/Linux (3.5),
-# large-repo battery (3.3).
-
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
@@ -35,7 +18,6 @@ if ! command -v "$FLEX_BIN" >/dev/null 2>&1; then
   fi
 fi
 
-# Resolve the env var name that gates a provider (empty = always attempt).
 key_for() {
   case "$1" in
     anthropic) echo ANTHROPIC_API_KEY ;;
@@ -53,7 +35,7 @@ key_for() {
 }
 
 if [[ -n "${PROVIDER_MATRIX:-}" ]]; then
-  # shellcheck disable=SC2206
+
   MATRIX=( $PROVIDER_MATRIX )
 else
   MATRIX=(anthropic openai gemini deepseek ollama openrouter groq mistral xai)
@@ -69,7 +51,7 @@ echo "provider-matrix: prompt=$PROMPT"
 for id in "${MATRIX[@]}"; do
   key_var="$(key_for "$id")"
   if [[ -n "$key_var" ]]; then
-    # Indirect expansion without nounset blowing up on missing keys.
+
     eval "key_val=\${$key_var:-}"
     if [[ -z "$key_val" ]]; then
       echo "  skip  $id (missing $key_var)"
@@ -78,7 +60,6 @@ for id in "${MATRIX[@]}"; do
     fi
   fi
 
-  # Ollama has no API key — probe the local daemon before attempting a turn.
   if [[ "$id" == "ollama" ]]; then
     if ! curl -fsS --max-time 1 http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
       echo "  skip  ollama (daemon not reachable at :11434)"

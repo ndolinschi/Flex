@@ -16,37 +16,18 @@ import {
 type PopoverTrayProps = {
   open: boolean
   onClose: () => void
-  /** Anchor element for click-outside (defaults to tray root). */
   anchorRef?: RefObject<HTMLElement | null>
   children: ReactNode
   className?: string
-  /** Prefer opening above the trigger (composer trays). */
   placement?: "above" | "below"
   role?: "listbox" | "menu" | "dialog"
   "aria-label"?: string
-  /**
-   * When false, the tray does not steal focus or handle arrow/enter keys — the
-   * anchor (e.g. the composer textarea) keeps focus and drives navigation, so
-   * typing keeps filtering live. Click-outside + Escape still close it.
-   */
   autoFocus?: boolean
 }
 
 const ITEM_SELECTOR =
   '[role="option"]:not([disabled]), [role="menuitem"]:not([disabled])'
 
-/**
- * Shared Esc/click-outside/↑↓ tray — Esc + click-outside + arrow keys, tray-in motion.
- * `onClose` is read via ref so stream-driven parent re-renders (inline closers)
- * do not tear down / rebind document listeners mid-open.
- *
- * Note: Base UI <PopoverTrigger> / <PopoverContent> cannot be used here.
- * Composer trays are positioned `absolute` inside a `relative` parent container
- * (full-width `left-0 right-0`). Base UI Popover portals content to document.body
- * via a floating Positioner — incompatible with the full-width layout and, more
- * critically, Base UI Popup steals focus on open, breaking the `autoFocus={false}`
- * live-filtering behavior where the textarea must retain focus while the tray shows.
- */
 export const PopoverTray = ({
   open,
   onClose,
@@ -71,8 +52,6 @@ export const PopoverTray = ({
       const target = e.target as Node
       if (trayRef.current?.contains(target)) return
       if (anchorRef?.current?.contains(target)) return
-      // Portaled submenus (e.g. ModelPicker effort) render under document.body
-      // and must not count as outside clicks or the tray unmounts before pick.
       if (
         target instanceof Element &&
         target.closest("[data-popover-outside-ignore]")
@@ -89,7 +68,6 @@ export const PopoverTray = ({
         return
       }
 
-      // Anchor-driven trays own arrow/enter (keeps textarea focus for filtering).
       if (!autoFocus) return
 
       if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Enter") {
@@ -149,8 +127,6 @@ export const PopoverTray = ({
       aria-label={ariaLabel}
       className={cn(
         "absolute z-50 overflow-hidden rounded-md",
-        // Chrome aligned with PopoverContent: solid panel + shadow-popover
-        // (1px stroke lives in the shadow — no extra ring).
         "bg-panel shadow-popover animate-tray-in",
         placement === "above" ? "bottom-full mb-1.5" : "top-full mt-1.5",
         className,
@@ -168,7 +144,6 @@ type PopoverSearchProps = {
   "aria-label"?: string
 }
 
-/** Search bar styled after CommandInput: semantic tokens, SearchIcon, stroke-3. */
 export const PopoverSearch = ({
   value,
   onChange,
@@ -199,12 +174,10 @@ export const PopoverSearch = ({
 
 type PopoverSectionProps = {
   label: string
-  /** Optional leading mark (e.g. provider brand icon). */
   icon?: ReactNode
   children?: ReactNode
 }
 
-/** Section heading styled after CommandGroup: text-ink-muted label. */
 export const PopoverSection = ({ label, icon, children }: PopoverSectionProps) => (
   <div className="py-1">
     <p className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-ink-muted">
@@ -224,10 +197,6 @@ type PopoverItemProps = {
   role?: "option" | "menuitem"
 }
 
-/**
- * List item styled after CommandItem: data-selected drives bg/text via CSS,
- * matching the Command primitive's selection state pattern.
- */
 export const PopoverItem = ({
   active = false,
   disabled = false,
@@ -245,9 +214,7 @@ export const PopoverItem = ({
     tabIndex={disabled ? -1 : 0}
     onClick={onClick}
     className={cn(
-      // Icon + label start; callers put trailing marks in children with ml-auto.
       "h-8 w-full justify-start gap-1.5 px-2.5 py-0 text-left font-normal text-sm",
-      // Matches list selection pattern: fill-2 selected / fill-4 hover
       "text-ink-secondary hover:bg-fill-4 hover:text-ink focus:bg-fill-4 focus:text-ink",
       "data-selected:bg-fill-2 data-selected:text-ink",
       className,

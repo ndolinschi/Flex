@@ -1,11 +1,3 @@
-//! Auto-context hook: on `UserPromptSubmit`, retrieve top-k code chunks
-//! matching the prompt and append them to the first-iteration user message.
-//!
-//! Soft-fail by design — index/open/search errors are logged and the turn
-//! continues without injected context. Gated by [`crate::IndexPlugin`]'s
-//! `auto_context` flag (env [`AUTO_CONTEXT_ENV`] or desktop prefs);
-//! default is **off**.
-
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -20,16 +12,11 @@ use crate::tools::shared::{
     open_and_build_with_mode,
 };
 
-/// Env var that enables auto-context when set to a truthy value
-/// (`1`/`true`/`on`/`yes`, case-insensitive). Used by
-/// [`crate::IndexPlugin::default`].
 pub const AUTO_CONTEXT_ENV: &str = "AGENTLOOP_AUTO_CONTEXT";
 
 const DEFAULT_K: usize = 5;
 const MAX_SNIPPET_CHARS: usize = 240;
 
-/// Injects top-k hybrid-search hits for the submitted prompt into the
-/// turn's first user message.
 #[derive(Debug, Clone)]
 pub struct AutoContextHook {
     enabled: bool,
@@ -169,7 +156,6 @@ fn truncate_chars(text: &str, max_chars: usize) -> String {
     out
 }
 
-/// Parse a truthy env value for [`AUTO_CONTEXT_ENV`].
 pub fn env_auto_context_enabled() -> bool {
     match std::env::var(AUTO_CONTEXT_ENV) {
         Ok(raw) => {
@@ -180,7 +166,6 @@ pub fn env_auto_context_enabled() -> bool {
     }
 }
 
-/// Public status snapshot for desktop polling (no AgentEvent).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct IndexStatus {
@@ -189,20 +174,9 @@ pub struct IndexStatus {
     pub file_count: usize,
     pub symbol_count: usize,
     pub embedded_chunk_count: usize,
-    /// True when the on-disk index exists and has at least one file.
     pub ready: bool,
 }
 
-/// Report status for `cwd`'s index from on-disk metadata only.
-///
-/// Does **not** open tantivy / mmap segment files — those are reserved for
-/// SearchCode / FindSymbol / RepoMap / rebuild. Desktop polls this on sidebar
-/// mount for "indexed" badges; opening the full store here was the boot-time
-/// mmap flood (`tantivy::directory::mmap_directory` DEBUG `Open Read`).
-///
-/// `embedded_chunk_count` stays `0` here: [`IndexStore::open`] (no embedder)
-/// never loaded vectors for status either, and Settings UI only shows file /
-/// symbol counts.
 pub fn status_for(cwd: &std::path::Path) -> Result<IndexStatus, IndexStoreError> {
     let index_dir = index_dir_for(cwd, &index_root_base());
     let repo_root = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
@@ -227,7 +201,6 @@ pub fn status_for(cwd: &std::path::Path) -> Result<IndexStatus, IndexStoreError>
     })
 }
 
-/// Build or incrementally update the index for `cwd`, returning status + stats.
 pub fn rebuild_with_stats(cwd: &std::path::Path) -> Result<(IndexStatus, UpdateStats), String> {
     use crate::embed::resolve_embedder;
 

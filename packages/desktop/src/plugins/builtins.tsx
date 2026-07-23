@@ -10,8 +10,6 @@ import {
   INLINE_COMPLETION_ENABLED,
 } from "../lib/featureFlags"
 
-/** Plugin tool tabs — lazy so the chat-shell graph does not pay for them
- * until the user opens the tab (mirrors Files/Terminal/Browser). */
 const DatabaseTab = lazy(() =>
   import("./database/DatabaseTab").then((m) => ({ default: m.DatabaseTab })),
 )
@@ -36,7 +34,6 @@ const LazyPluginTab = ({ children }: { children: ReactNode }) => (
   </Suspense>
 )
 
-/** Register built-in UI plugins. Safe to call once at app boot. */
 export const registerBuiltinUiPlugins = (): void => {
   registerUiPlugin({
     id: "database",
@@ -95,7 +92,6 @@ export const registerBuiltinUiPlugins = (): void => {
     ],
   })
 
-  // MCP servers as @-mentions (no tab — Settings owns MCP config).
   registerUiPlugin({
     id: "mcp",
     mentionProviders: [

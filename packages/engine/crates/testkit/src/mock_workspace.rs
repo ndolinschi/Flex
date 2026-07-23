@@ -1,6 +1,3 @@
-//! A `Workspaces` test double: canned provisioning with call counters, so
-//! loop/engine tests can assert isolation behavior without spawning `git`.
-
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -10,22 +7,12 @@ use async_trait::async_trait;
 use agentloop_contracts::{IntegrationOutcome, IsolationPolicy, SessionId};
 use agentloop_core::workspace::{Workspace, WorkspaceError, WorkspaceStatus, Workspaces};
 
-/// Configurable mock isolation backend.
 pub struct MockWorkspaces {
-    /// When false, `provision` falls back (`Ok(None)`) for `Optional` and errors
-    /// for `Required`, simulating a non-git base directory.
     available: bool,
-    /// When false, `snapshot` returns `Ok(None)`, simulating a non-git tree
-    /// where per-turn snapshots are silently disabled.
     snapshots_available: bool,
-    /// Where fake workspace roots are rooted (never touched on disk).
     root_prefix: PathBuf,
-    /// Canned result for `integrate`.
     integrate_outcome: IntegrationOutcome,
-    /// (base, workspace) pairs recorded from `provision` for `list`/`attach`
-    /// to serve back — Mutex is enough since tests don't hit this hot.
     provisioned: Mutex<Vec<(PathBuf, Workspace)>>,
-    /// Cap this backend advertises via [`Workspaces::max_per_base`].
     max_per_base: usize,
     provision_calls: AtomicUsize,
     integrate_calls: AtomicUsize,
@@ -57,12 +44,10 @@ impl Default for MockWorkspaces {
 }
 
 impl MockWorkspaces {
-    /// A backend that provisions successfully.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// A backend that cannot provision (as if the base weren't a git repo).
     pub fn unavailable() -> Self {
         Self {
             available: false,
@@ -70,28 +55,21 @@ impl MockWorkspaces {
         }
     }
 
-    /// A backend that provisions but cannot snapshot (as if the tree weren't a
-    /// git repo), so per-turn snapshots are silently skipped.
     pub fn without_snapshots(mut self) -> Self {
         self.snapshots_available = false;
         self
     }
 
-    /// Set the outcome `integrate` returns.
     pub fn with_integrate_outcome(mut self, outcome: IntegrationOutcome) -> Self {
         self.integrate_outcome = outcome;
         self
     }
 
-    /// Advertise a specific per-base cap (default 5).
     pub fn with_max_per_base(mut self, cap: usize) -> Self {
         self.max_per_base = cap.max(1);
         self
     }
 
-    /// Seed a workspace as if it had been provisioned earlier — useful for
-    /// exercising the `attach` and `list` paths from tests without going
-    /// through `provision` first.
     pub fn seed_workspace(self, base: impl Into<PathBuf>, workspace: Workspace) -> Self {
         self.provisioned
             .lock()

@@ -32,8 +32,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 const EMPTY_ENTRIES: PlanEntry[] = []
 const EMPTY_PLANS: SessionPlan[] = []
 
-/* ── Plan tab ─────────────────────────────────────────────────────────── */
-
 export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
   const liveEntries = useAppStore((s) =>
     active ? (s.plansBySession[active.id] ?? EMPTY_ENTRIES) : EMPTY_ENTRIES,
@@ -67,8 +65,6 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
   const latestVerdict = useLatestVerdict(active?.id ?? null)
 
   const multi = sessionPlans.length > 1
-  // Plan: with many plans, land on the Review plans list first. Pending
-  // approval (and an explicit row pick) open detail instead.
   const [browsingList, setBrowsingList] = useState(true)
   const [commentHint, setCommentHint] = useState(false)
 
@@ -77,7 +73,6 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     !!pendingPlanApproval &&
     pendingPlanApproval.sessionId === active.id
 
-  // New ExitPlanMode approval → open that plan's detail.
   useEffect(() => {
     if (!active || !awaitingApproval || !pendingPlanApproval) return
     setBrowsingList(false)
@@ -92,7 +87,6 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     setActivePlanId,
   ])
 
-  // Ensure a lone plan is always the active one (e.g. after restore).
   useEffect(() => {
     if (!active || sessionPlans.length !== 1) return
     if (activePlanId !== sessionPlans[0].id) {
@@ -111,9 +105,6 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
           ? sessionPlans.find((p) => p.id === pendingPlanApproval.planId)
           : undefined)
 
-  // Prefer the live session checklist while it still has items; fall back to
-  // the ExitPlanMode snapshot so to-dos don't vanish after handoff / empty
-  // Plan tool calls.
   const snapshotted = activePlan?.entries ?? EMPTY_ENTRIES
   const entries =
     liveEntries.length > 0
@@ -154,8 +145,6 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     !!planDoc && !findOpen && !showList,
   )
 
-  // Once the user starts selecting (or opens the composer), the menu hint
-  // has done its job.
   useEffect(() => {
     if (selection || composerOpen) setCommentHint(false)
   }, [selection, composerOpen])
@@ -266,7 +255,6 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     )
   }
 
-  // Detail view without a resolved plan (e.g. checklist-only) — show todos.
   const done = entries.filter((e) => e.status === "completed").length
   const running = entries.some((e) => e.status === "in_progress")
   const todosBuilt = entries.length > 0 && done === entries.length

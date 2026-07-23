@@ -35,14 +35,9 @@ type ModelSelectProps = {
   disabled?: boolean
   placeholder?: string
   className?: string
-  /** Provider id -> friendly label for the dropdown's section headers. */
   builtinProviders?: BuiltinProvider[]
 }
 
-/** Form-field-styled model dropdown: provider-grouped with search, shared
- * grouping logic with the composer's `ModelPicker` (see `useGroupedModels`).
- * Used for both the single "Default model" selector and as the picker
- * surface `ModelMultiSelect`'s "Add fallback" opens. */
 export const ModelSelect = ({
   id,
   label = "Model",

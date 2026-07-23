@@ -1,11 +1,3 @@
-//! `search_web` tool: query a web search engine and return formatted results.
-//!
-//! Powered by a swappable [`SearchBackend`]; the default implementation
-//! uses Instant Answer + Wikipedia (optional Brave / SearXNG via env). Results
-//! are returned as a
-//! token-efficient markdown list with titles, URLs, and snippets. An optional
-//! [`SearchReranker`] re-orders results by relevance.
-
 mod execute;
 mod format;
 
@@ -23,38 +15,28 @@ use crate::search_backend::SearchBackend;
 
 use format::schema_of;
 
-/// Maximum characters in the formatted output passed back to the model.
 const MAX_OUTPUT_CHARS: usize = 60_000;
 
-/// Default maximum number of results to include in the output.
 const DEFAULT_MAX_RESULTS: usize = 15;
 
-/// Absolute cap on the number of results.
 const HARD_MAX_RESULTS: usize = 20;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct SearchWebInput {
-    /// The search query string. Be specific: include keywords, dates, or
-    /// site restrictions (e.g. `site:docs.rs`) for better results.
     query: String,
-    /// How many results to return (1–20, default 15). Fewer results are
-    /// faster but less comprehensive; more results give broader coverage.
+
     max_results: Option<usize>,
-    /// Search depth: `"broad"` for overview queries (appends "overview" to
-    /// the query), `"specific"` or absent for targeted searches. The model
-    /// should use `"broad"` when exploring a new domain.
+
     depth: Option<String>,
 }
 
-/// Searches the web via a pluggable backend and returns results as markdown.
 pub struct SearchWebTool {
     backend: Arc<dyn SearchBackend>,
     reranker: Option<Arc<dyn SearchReranker>>,
 }
 
 impl SearchWebTool {
-    /// Create a tool that uses the given backend.
     pub fn new(backend: Arc<dyn SearchBackend>) -> Self {
         Self {
             backend,
@@ -62,7 +44,6 @@ impl SearchWebTool {
         }
     }
 
-    /// Attach a result re-ranker that re-orders results by relevance to the query.
     pub fn with_reranker(mut self, reranker: Arc<dyn SearchReranker>) -> Self {
         self.reranker = Some(reranker);
         self

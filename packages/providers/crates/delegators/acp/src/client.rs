@@ -1,10 +1,3 @@
-//! Minimal ACP (Agent Client Protocol) JSON-RPC client over a duplex child.
-//!
-//! Owns the read loop: routes responses to pending requests, forwards
-//! `session/update` notifications to the turn consumer, and auto-answers
-//! agent→client requests (permissions) with a configured policy. Interactive
-//! permission bridging is a follow-up; v1 always answers from policy.
-
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -15,14 +8,11 @@ use agentloop_delegator_common::{DelegatorHostError, DuplexProcess};
 
 use crate::protocol::AcpNotification;
 
-/// How the client answers `session/request_permission` on the agent's behalf.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AcpPermissionPolicy {
-    /// Pick the first option whose id/kind looks like an approval, else the
-    /// first offered option.
     #[default]
     AllowAlways,
-    /// Reject every permission request.
+
     DenyAlways,
 }
 
@@ -43,8 +33,6 @@ impl From<DelegatorHostError> for AcpClientError {
     }
 }
 
-/// One live ACP connection. `request` correlates responses by id; every
-/// `session/update` notification line is forwarded verbatim on `updates`.
 type PendingResponses =
     Arc<Mutex<HashMap<u64, oneshot::Sender<Result<serde_json::Value, AcpClientError>>>>>;
 
@@ -56,8 +44,6 @@ pub struct AcpClient {
 }
 
 impl AcpClient {
-    /// Wrap a spawned duplex child and start the read loop. Returns the
-    /// client plus the receiver of `session/update` notifications.
     pub fn start(
         proc: DuplexProcess,
         policy: AcpPermissionPolicy,
@@ -74,7 +60,6 @@ impl AcpClient {
         (client, updates_rx)
     }
 
-    /// Send a request and await its response result.
     pub async fn request(
         &self,
         method: &str,
@@ -98,7 +83,6 @@ impl AcpClient {
         rx.await.map_err(|_| AcpClientError::Closed)?
     }
 
-    /// Send a notification (no response expected).
     pub async fn notify(
         &self,
         method: &str,
@@ -117,12 +101,11 @@ impl AcpClient {
     async fn read_loop(&self, policy: AcpPermissionPolicy) {
         while let Some(line) = self.proc.next_line().await {
             let Ok(frame) = serde_json::from_str::<serde_json::Value>(&line) else {
-                continue; // non-JSON noise on stdout — skip
+                continue;
             };
             let has_id = frame.get("id").is_some();
             let has_method = frame.get("method").is_some();
             match (has_id, has_method) {
-                // Response to one of our requests.
                 (true, false) => {
                     let Some(id) = frame.get("id").and_then(serde_json::Value::as_u64) else {
                         continue;
@@ -146,7 +129,7 @@ impl AcpClient {
                         let _ = tx.send(outcome);
                     }
                 }
-                // Notification from the agent.
+
                 (false, true) => {
                     if let Ok(notification) = serde_json::from_value::<AcpNotification>(frame) {
                         if self.updates_tx.send(notification).await.is_err() {
@@ -154,7 +137,7 @@ impl AcpClient {
                         }
                     }
                 }
-                // Agent → client request: answer from policy.
+
                 (true, true) => {
                     let id = frame.get("id").cloned().unwrap_or(serde_json::Value::Null);
                     let method = frame
@@ -184,15 +167,13 @@ impl AcpClient {
                 _ => {}
             }
         }
-        // Connection gone: fail everything still pending.
+
         let mut pending = self.pending.lock().await;
         for (_, tx) in pending.drain() {
             let _ = tx.send(Err(AcpClientError::Closed));
         }
     }
 
-    /// v1 policy responder. `session/request_permission` is answered from the
-    /// configured policy; every other client capability is declined.
     fn answer_agent_request(
         &self,
         method: &str,

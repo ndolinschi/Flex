@@ -21,7 +21,7 @@ export const createLayoutSlice: StateCreator<
   sidebarCollapsed: false,
   sidebarWidth: SIDEBAR_DEFAULT_WIDTH,
   rightPanelOpen: false,
-  rightPanelTab: "plan" as RightPanelTab,
+  rightPanelTab: "changes" as RightPanelTab,
   rightPanelWidth: RIGHT_PANEL_DEFAULT_WIDTH,
   rightPanelCollapsed: false,
   rightPanelDragging: false,
@@ -46,7 +46,6 @@ export const createLayoutSlice: StateCreator<
       state.viewport === "wide" &&
       state.sidebarWidth <= SIDEBAR_MIN_WIDTH
     const nextWidth = widen ? SIDEBAR_DEFAULT_WIDTH : state.sidebarWidth
-    // Narrow: opening sidebar collapses content split.
     if (state.viewport !== "wide" && !collapsed && state.contentLayout.mode === "split") {
       get().collapseSplit()
     }
@@ -72,12 +71,19 @@ export const createLayoutSlice: StateCreator<
   },
   setRightPanelOpen: (open) => {
     if (open) {
+      get().setRightPanelCollapsed(false)
       if (get().viewport !== "wide") {
         set({ rightPanelOpen: true, sidebarCollapsed: true })
         return
       }
-      get().ensureSplit()
+      const sessionId = get().activeSessionId
+      if (sessionId) {
+        get().ensureDefaultWorkPane(sessionId)
+      } else {
+        get().ensureSplit()
+      }
     } else {
+      get().setRightPanelCollapsed(true)
       get().collapseSplit()
     }
   },

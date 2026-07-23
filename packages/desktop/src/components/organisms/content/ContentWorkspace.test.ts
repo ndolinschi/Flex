@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { contentWorkspaceDefaultLayout } from "./ContentWorkspace"
 
-/**
- * Regression: collapsing split → single while react-resizable-panels still
- * held a two-size layout threw `Invalid 1 panel layout: 50%, 50%`.
- */
 describe("contentWorkspaceDefaultLayout", () => {
   it("returns a single 100% panel when not split", () => {
     expect(contentWorkspaceDefaultLayout(false, 0.5)).toEqual({
@@ -22,10 +18,10 @@ describe("contentWorkspaceDefaultLayout", () => {
     expect(Object.values(layout).reduce((a, b) => a + b, 0)).toBe(100)
   })
 
-  it("uses the reference 38/62 default split proportions", () => {
-    expect(contentWorkspaceDefaultLayout(true, 0.38)).toEqual({
-      "content-left": 38,
-      "content-right": 62,
+  it("uses the reference 48/52 default split proportions", () => {
+    expect(contentWorkspaceDefaultLayout(true, 0.48)).toEqual({
+      "content-left": 48,
+      "content-right": 52,
     })
   })
 

@@ -1,5 +1,3 @@
-//! opencode as a [`DelegatorProfile`] over the shared line-oriented runtime.
-
 use std::sync::Arc;
 
 use agentloop_contracts::{
@@ -17,7 +15,6 @@ use crate::OPENCODE_AGENT_ID;
 use crate::config::OpencodeConfig;
 use crate::mapper::OpencodeLineMapper;
 
-/// opencode's identity, capabilities, and launch shape.
 pub struct OpencodeRuntimeProfile {
     pub config: OpencodeConfig,
 }
@@ -43,8 +40,7 @@ impl DelegatorProfile for OpencodeRuntimeProfile {
                 tool_scoping: false,
             },
             reasoning_visible: false,
-            // JSON events are structured, but the one-shot host maps them
-            // post-hoc, so clients see a snapshot replay, not live deltas.
+
             streaming: StreamingGranularity::SnapshotOnly,
             resume: ResumeSupport::Replay,
             attachments: AttachmentCaps {
@@ -80,10 +76,8 @@ impl DelegatorProfile for OpencodeRuntimeProfile {
     }
 }
 
-/// The opencode delegator agent.
 pub type OpencodeAgent<H = TokioCommandHost> = LineDelegatorAgent<OpencodeRuntimeProfile, H>;
 
-/// Build an opencode agent with the real process host.
 pub fn opencode_agent(config: OpencodeConfig, store: Arc<dyn SessionStore>) -> OpencodeAgent {
     LineDelegatorAgent::new(
         OpencodeRuntimeProfile { config },
@@ -92,12 +86,10 @@ pub fn opencode_agent(config: OpencodeConfig, store: Arc<dyn SessionStore>) -> O
     )
 }
 
-/// Build an opencode agent with an ephemeral in-memory store (probing, doctor).
 pub fn ephemeral_opencode_agent(config: OpencodeConfig) -> OpencodeAgent {
     opencode_agent(config, Arc::new(MemoryStore::new()))
 }
 
-/// Build an opencode agent over a custom [`ProcessHost`] (tests).
 pub fn opencode_agent_with_host<H: ProcessHost + 'static>(
     config: OpencodeConfig,
     store: Arc<dyn SessionStore>,
@@ -160,7 +152,6 @@ mod tests {
 
     #[tokio::test]
     async fn json_run_output_becomes_assistant_message_with_usage() {
-        // Live-recorded frames, trimmed to the fields the mapper reads.
         let host = Arc::new(ScriptedHost {
             stdout_lines: vec![
                 r#"{"type":"step_start","part":{"type":"step-start"}}"#.to_owned(),
@@ -193,7 +184,7 @@ mod tests {
         {
             let requests = host.requests.lock().unwrap();
             assert_eq!(requests.len(), 1);
-            // Default transport is stdin: the prompt must not leak into args.
+
             assert_eq!(requests[0].spec.args, vec!["run", "--json"]);
             assert_eq!(requests[0].stdin.as_deref(), Some("say pong"));
         }

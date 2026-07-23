@@ -1,62 +1,30 @@
-//! Role definitions for multi-agent orchestration.
-//!
-//! A role names a job (`searcher`, `worker`, `reviewer`, …) and carries an
-//! ordered model-preference chain, a tool profile, and spawn limits. The
-//! interactive session uses the reserved `main` role's chain for mid-turn
-//! failover; subagents spawned by the Task tool get their role's chain,
-//! filtered tools, and prompt.
-
 use agentloop_contracts::{IsolationPolicy, ModelRef};
 use agentloop_core::{ToolFilter, ToolRegistry};
 
-/// Reserved role driving the interactive session; never spawnable.
 pub const MAIN_ROLE: &str = "main";
 
-/// Built-in independent-verifier role, spawned by the `Verify` tool
-/// (`agentloop_core::tool::VERIFIER_TOOL_NAME`) — "maker is never the
-/// grader". Tighter than `reviewer`: no `Bash`/`Write`/`Edit`, and it cannot
-/// spawn further subagents.
 pub const VERIFIER_ROLE: &str = "verifier";
 
-/// How a role's tool set is derived from the registry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RoleToolProfile {
-    /// Every registry tool whose descriptor says `read_only`.
     ReadOnly,
-    /// Every registry tool.
     Full,
-    /// An explicit allow-list of tool names.
     Allow(Vec<String>),
 }
 
-/// One role definition (user-configured or built-in).
 #[derive(Debug, Clone, PartialEq)]
 pub struct RoleSpec {
-    /// Role name: `^[a-z0-9][a-z0-9_-]{0,31}$`.
     pub name: String,
-    /// Ordered model preference chain; empty = inherit the spawning
-    /// session's effective model.
     pub models: Vec<ModelRef>,
-    /// Which tools the role may use.
     pub tools: RoleToolProfile,
-    /// System-prompt addition delivered via `TurnOptions.system_append`.
     pub prompt: Option<String>,
-    /// Distribute parallel spawns across the chain (round-robin).
     pub split: bool,
-    /// Concurrent subagents of this role per batch (clamped 1..=8).
     pub max_parallel: usize,
-    /// Spawn-tree depth this role may create below itself (clamped 0..=3).
     pub max_depth: u8,
-    /// Whether a root session serving this role runs in an isolated workspace.
-    /// Only consulted for root sessions (depth 0); subagents inherit the
-    /// parent's working directory. Defaults to [`IsolationPolicy::Never`], so
-    /// isolation is opt-in.
     pub isolation: IsolationPolicy,
 }
 
 impl RoleSpec {
-    /// A role with conservative defaults: inherit model, read-only tools, no
-    /// isolation.
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -71,28 +39,21 @@ impl RoleSpec {
     }
 }
 
-/// Why a role set was rejected.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum RoleError {
-    /// The name violates `^[a-z0-9][a-z0-9_-]{0,31}$`.
     #[error("role `{0}` has an invalid name (use a-z, 0-9, -, _; max 32 chars)")]
     InvalidName(String),
-    /// The same role appears twice.
     #[error("role `{0}` is declared more than once")]
     Duplicate(String),
 }
 
-/// Built-in defaults overlaid by user specs; the lookup used by the Task
-/// tool and by chain resolution.
 #[derive(Debug, Default)]
 pub struct RoleRegistry {
     roles: std::collections::BTreeMap<String, RoleSpec>,
 }
 
 impl RoleRegistry {
-    /// Built-ins (`searcher`, `worker`, `reviewer`, `main`) overlaid by
-    /// `user` specs (same-name user specs replace built-ins).
     pub fn with_defaults(user: Vec<RoleSpec>) -> Result<Self, RoleError> {
         let mut registry = Self::default();
         for spec in builtin_roles() {
@@ -106,9 +67,6 @@ impl RoleRegistry {
             if !seen.insert(spec.name.clone()) {
                 return Err(RoleError::Duplicate(spec.name));
             }
-            // Models-only overlays (e.g. composition-root tier routing) keep
-            // builtin prompt / knobs when the overlay left those fields at
-            // [`RoleSpec::new`] defaults.
             if let Some(existing) = registry.roles.get(&spec.name) {
                 let defaults = RoleSpec::new(&spec.name);
                 if spec.models.is_empty() {
@@ -142,12 +100,10 @@ impl RoleRegistry {
         Ok(registry)
     }
 
-    /// Look up a role by name.
     pub fn get(&self, name: &str) -> Option<&RoleSpec> {
         self.roles.get(name)
     }
 
-    /// The fallback chain for a session serving `role` (`None` = main).
     pub fn chain(&self, role: Option<&str>) -> &[ModelRef] {
         self.roles
             .get(role.unwrap_or(MAIN_ROLE))
@@ -155,8 +111,6 @@ impl RoleRegistry {
             .unwrap_or(&[])
     }
 
-    /// The isolation policy for a session serving `role` (`None` = main).
-    /// Unknown roles fall back to [`IsolationPolicy::Never`].
     pub fn isolation(&self, role: Option<&str>) -> IsolationPolicy {
         self.roles
             .get(role.unwrap_or(MAIN_ROLE))
@@ -164,12 +118,6 @@ impl RoleRegistry {
             .unwrap_or(IsolationPolicy::Never)
     }
 
-    /// The tool filter for a session serving `role` at spawn `depth`.
-    /// Subagents never get `AskUserQuestion` (they have no user) and lose
-    /// the `Task`/`Verify`/`RunWorkflow` tools once they reach their role's
-    /// `max_depth` — `Verify` and `RunWorkflow` also spawn children (a
-    /// constrained `verifier` subagent, and each workflow step
-    /// respectively), so both are gated by the same depth budget as `Agent`.
     pub fn tool_filter(&self, role: &str, registry: &ToolRegistry, depth: u8) -> ToolFilter {
         let mut deny = vec![
             agentloop_core::tool::SUBAGENT_TOOL_NAME.to_owned(),
@@ -206,11 +154,6 @@ impl RoleRegistry {
         ToolFilter { allow, deny }
     }
 
-    /// Roles the Task tool may spawn: everything except `main`, as
-    /// `(name, one-line summary)` pairs for the tool description. The summary
-    /// leads with the role's model so the orchestrator can see that different
-    /// roles run different models (e.g. a fast model for research, a strong one
-    /// for implementation) and route by task accordingly.
     pub fn spawnable(&self) -> Vec<(String, String)> {
         self.roles
             .values()
@@ -232,9 +175,6 @@ impl RoleRegistry {
     }
 }
 
-/// Whether `name` is a legal role name: `^[a-z0-9][a-z0-9_-]{0,31}$`.
-/// Exposed so clients can pre-validate config entries with the same rule
-/// instead of failing the whole engine build on one bad role.
 pub fn valid_name(name: &str) -> bool {
     let mut chars = name.chars();
     let Some(first) = chars.next() else {
@@ -371,7 +311,6 @@ mod tests {
     fn tool_filter_denies_verify_beyond_max_depth() {
         let registry = RoleRegistry::with_defaults(Vec::new()).expect("defaults build");
         let tools = ToolRegistry::new();
-        // worker's max_depth is 1 by default: permitted at depth 0, denied at depth 1.
         let at_root = registry.tool_filter("worker", &tools, 0);
         assert!(at_root.permits(agentloop_core::tool::VERIFIER_TOOL_NAME));
         let at_max_depth = registry.tool_filter("worker", &tools, 1);

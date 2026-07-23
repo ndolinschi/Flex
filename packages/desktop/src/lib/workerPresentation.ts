@@ -11,13 +11,10 @@ export type SubagentTimelineRow = Extract<TimelineRow, { type: "subagent" }>
 
 export type WorkerStatus = "running" | "completed" | "failed"
 
-/** Live / settled activity line for one worker's nested timeline. */
 export type WorkerActivity = {
   status: WorkerStatus
-  /** Latest useful action, e.g. "Read Foo.tsx" or "Running command…". */
   latestLabel: string | null
   toolCount: number
-  /** True when any nested tool / error row failed. */
   hasError: boolean
 }
 
@@ -37,7 +34,6 @@ export const workerStatusFromPhase = (
   return "completed"
 }
 
-/** Derive glanceable progress from a subagent's nested rows. */
 export const summarizeWorkerActivity = (
   children: TimelineRow[],
   phase: "started" | "completed",
@@ -80,8 +76,6 @@ export const summarizeWorkerActivity = (
   }
 }
 
-/** Drop empty thinking shells inside a worker's nested feed — they add noise
- * without content (parallel thought-coalesce owns parent-turn thoughts). */
 export const filterWorkerDisplayChildren = (
   children: TimelineRow[],
 ): TimelineRow[] => {
@@ -97,11 +91,6 @@ export const filterWorkerDisplayChildren = (
   })
 }
 
-/**
- * Agent tool chips duplicate the worker card once `subagent_started` arrives
- * with a matching `call_id` — drop those parent tool rows so the feed shows
- * workers, not "4 tool calls" + Bot rows.
- */
 export const stripMatchedAgentToolRows = <T extends TimelineToolRowLike>(
   rows: T[],
 ): T[] => {
@@ -124,12 +113,6 @@ export type WorkRowCluster =
   | { kind: "workers"; workers: SubagentTimelineRow[] }
   | { kind: "other"; row: TimelineToolRowLike }
 
-/**
- * Like `clusterToolRows`, but also:
- * 1. strips Agent tool rows that already have a matching subagent, and
- * 2. groups consecutive `subagent` rows into a single `workers` cluster
- *    (parallel Agent fan-out). Non-worker segments reuse `clusterToolRows`.
- */
 export const clusterWorkRows = (
   rows: TimelineToolRowLike[],
 ): WorkRowCluster[] => {
@@ -159,7 +142,6 @@ export const clusterWorkRows = (
   return out
 }
 
-/** Collect running workers from a flat timeline (for the composer pill). */
 export const collectRunningWorkers = (
   rows: TimelineRow[],
 ): SubagentTimelineRow[] => {
@@ -193,8 +175,6 @@ export const collectRunningWorkers = (
   return out
 }
 
-/** Cheap fingerprint for Composer / WorkingAgentsPill — changes on worker
- * start/stop and nested tool status boundaries, not on every markdown delta. */
 export const runningWorkersSignature = (rows: TimelineRow[]): string => {
   const workers = collectRunningWorkers(rows)
   if (workers.length === 0) return ""

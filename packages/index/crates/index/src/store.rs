@@ -1,15 +1,3 @@
-//! `IndexStore`: owns the on-disk lexical index plus a manifest of
-//! `path -> content_hash` so re-running a build only re-processes files that
-//! actually changed. The manifest and the symbol table are persisted as JSON
-//! next to the tantivy directory.
-//!
-//! Embeddings are optional and additive: [`IndexStore::open`] never touches
-//! vectors (pure BM25 + symbols, as in M1). [`IndexStore::open_with_embeddings`]
-//! also opens a [`VectorStore`] and embeds new/changed chunks incrementally
-//! as part of `build`/`update`, reusing the same per-file manifest diff that
-//! already drives lexical incrementality — a file that didn't change never
-//! gets re-chunked or re-embedded.
-
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -24,11 +12,6 @@ use crate::scanner::scan_repo;
 use crate::symbols::{Language, Symbol, extract_symbols};
 use crate::vector_store::VectorStore;
 
-/// Bumped whenever the manifest or on-disk layout changes shape. v2 adds the
-/// optional embeddings vector store alongside the manifest; older (v1)
-/// manifests are not migrated in place — they trigger a clean rebuild (every
-/// file is re-scanned as "new", which also naturally (re-)populates
-/// embeddings for a store that now has an embedder configured).
 const MANIFEST_VERSION: u32 = 2;
 
 const MANIFEST_FILE: &str = "manifest.json";
@@ -54,16 +37,12 @@ pub enum StoreError {
     Serde(#[from] serde_json::Error),
 }
 
-/// Persisted manifest: schema version + per-file content hash, so a rebuild
-/// can diff against the last run and only touch changed files.
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct Manifest {
     version: u32,
-    /// repo-relative path -> blake3 hex content hash at last index time.
     files: HashMap<String, String>,
 }
 
-/// Result of a build/update pass, useful for tests and progress logging.
 #[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateStats {
@@ -73,9 +52,6 @@ pub struct UpdateStats {
     pub unchanged: usize,
 }
 
-/// Owns a lexical index + symbol table + manifest rooted at `index_dir`,
-/// indexing source from `repo_root`. Optionally also owns a vector store and
-/// embedding provider, for hybrid (BM25 + cosine) retrieval.
 pub struct IndexStore {
     repo_root: PathBuf,
     index_dir: PathBuf,
@@ -91,13 +67,6 @@ struct Embeddings {
 }
 
 impl IndexStore {
-    /// Open an existing index at `index_dir` or create a fresh (empty) one.
-    /// Does not scan `repo_root` — call [`Self::build`] or [`Self::update`]
-    /// to populate it.
-    ///
-    /// No embedding provider is configured, so retrieval degrades to
-    /// BM25 + symbol boost only (see [`crate::retrieve::search_hybrid`]).
-    /// Use [`Self::open_with_embeddings`] to also embed chunks.
     pub fn open(
         repo_root: impl Into<PathBuf>,
         index_dir: impl Into<PathBuf>,
@@ -105,9 +74,6 @@ impl IndexStore {
         Self::open_impl(repo_root.into(), index_dir.into(), None)
     }
 
-    /// Like [`Self::open`], but also opens a per-repo vector store keyed by
-    /// `embedder`'s id/dim, so `build`/`update` embed new/changed chunks and
-    /// [`crate::retrieve::search_hybrid`] fuses in cosine ranks.
     pub fn open_with_embeddings(
         repo_root: impl Into<PathBuf>,
         index_dir: impl Into<PathBuf>,
@@ -150,25 +116,18 @@ impl IndexStore {
         &self.repo_root
     }
 
-    /// Absolute path of the on-disk index directory (app-data, never inside
-    /// the repo).
     pub fn index_dir(&self) -> &Path {
         &self.index_dir
     }
 
-    /// Repo-relative paths currently tracked in the manifest, unsorted.
     pub fn indexed_paths(&self) -> impl Iterator<Item = &str> {
         self.manifest.files.keys().map(String::as_str)
     }
 
-    /// The vector store, if an embedding provider was configured. Used by
-    /// [`crate::retrieve::search_hybrid`]; empty/`None` means "degrade to
-    /// BM25 + symbol boost".
     pub(crate) fn vector_store(&self) -> Option<&VectorStore> {
         self.embeddings.as_ref().map(|e| &e.store)
     }
 
-    /// Embed `query` with the configured provider, if any.
     pub(crate) fn embed_query(&self, query: &str) -> Result<Option<Vec<f32>>, StoreError> {
         let Some(embeddings) = &self.embeddings else {
             return Ok(None);
@@ -177,23 +136,6 @@ impl IndexStore {
         Ok(vectors.into_iter().next())
     }
 
-    /// Full (re)build: scan the repo, diff against the manifest, and
-    /// re-index only files whose content hash changed (or are new).
-    /// Files that vanished since the last manifest are dropped from the
-    /// lexical index and the symbol table.
-    ///
-    /// A file whose *content* is unchanged but that has no vectors yet
-    /// (e.g. right after an embedder switch invalidated the vector store,
-    /// or embeddings were just enabled for a previously BM25-only index) is
-    /// still re-embedded, even though its lexical/symbol data is left
-    /// alone — this is what lets the index "self-heal" its vectors on the
-    /// very next `build()` after invalidation, rather than requiring every
-    /// file to change first.
-    /// Same as [`Self::build`], but invokes `on_progress(done, total)` after
-    /// each file that is actually re-indexed (added/changed). `total` is the
-    /// number of files that need work at the start of the pass; unchanged
-    /// files are skipped silently. Callers that don't care about progress
-    /// should use [`Self::build`].
     pub fn build_with_progress<F>(&mut self, mut on_progress: F) -> Result<UpdateStats, StoreError>
     where
         F: FnMut(usize, usize),
@@ -228,7 +170,6 @@ impl IndexStore {
             on_progress(done, total);
         }
 
-        // Drop files that disappeared since the last manifest.
         let removed_paths: Vec<String> = self
             .manifest
             .files
@@ -251,10 +192,6 @@ impl IndexStore {
         self.build_with_progress(|_, _| {})
     }
 
-    /// Incremental update over an explicit set of repo-relative paths
-    /// (e.g. from a file-watcher). Paths that no longer exist on disk are
-    /// treated as deletions; everything else is re-hashed and re-indexed
-    /// only if the hash actually changed.
     pub fn update(&mut self, changed_paths: &[String]) -> Result<UpdateStats, StoreError> {
         let mut stats = UpdateStats::default();
         for rel_path in changed_paths {
@@ -291,9 +228,6 @@ impl IndexStore {
     fn reindex_file(&mut self, rel_path: &str, content_hash: &str) -> Result<(), StoreError> {
         let abs = self.repo_root.join(rel_path);
         let Ok(source) = fs::read_to_string(&abs) else {
-            // Unreadable as UTF-8 text after all (race, or a sniff false
-            // negative) — treat as untouchable rather than erroring the
-            // whole build.
             return Ok(());
         };
         let language = Language::from_path(Path::new(rel_path));
@@ -312,11 +246,6 @@ impl IndexStore {
         Ok(())
     }
 
-    /// Embed only the chunks of `rel_path` that aren't already in the vector
-    /// store under their (stable, line-range-derived) chunk id — a no-op
-    /// when no embedder is configured. Stale vectors for chunk ids that no
-    /// longer exist in `chunks` (e.g. the file shrank) are dropped first, so
-    /// a changed file never leaves orphaned vectors behind.
     fn embed_chunks(&mut self, rel_path: &str, chunks: &[Chunk]) -> Result<(), StoreError> {
         let Some(embeddings) = &mut self.embeddings else {
             return Ok(());
@@ -335,11 +264,6 @@ impl IndexStore {
         Ok(())
     }
 
-    /// For a file whose manifest hash is unchanged (so `reindex_file` was
-    /// skipped): if an embedder is configured and any of its chunks are
-    /// missing from the vector store, (re-)chunk and embed just the missing
-    /// ones. A no-op — no file read, no chunking — when no embedder is
-    /// configured, or when every chunk already has a vector.
     fn embed_if_missing(&mut self, rel_path: &str) -> Result<(), StoreError> {
         if self.embeddings.is_none() {
             return Ok(());
@@ -350,9 +274,6 @@ impl IndexStore {
         };
         let chunks = chunk_file(rel_path, &source);
 
-        // Two short, non-overlapping borrows of `self.embeddings` (read to
-        // find what's missing, then write the new vectors) rather than one
-        // long-lived mutable borrow across the `embed` call.
         let missing_ids: Vec<usize> = {
             let Some(embeddings) = &self.embeddings else {
                 return Ok(());
@@ -433,31 +354,37 @@ impl IndexStore {
         &self.symbols
     }
 
-    /// Manifest content-hash for `rel_path`, if it has been indexed.
     pub fn manifest_hash(&self, rel_path: &str) -> Option<&str> {
         self.manifest.files.get(rel_path).map(String::as_str)
     }
 
-    /// Number of files currently tracked in the manifest.
     pub fn indexed_file_count(&self) -> usize {
         self.manifest.files.len()
     }
 
-    /// Number of chunk vectors currently in the vector store (`0` if no
-    /// embedder is configured). Exposed mainly for tests asserting
-    /// incremental-embedding behavior.
+    pub fn manifest_fingerprint(&self) -> String {
+        let mut entries: Vec<(&str, &str)> = self
+            .manifest
+            .files
+            .iter()
+            .map(|(path, hash)| (path.as_str(), hash.as_str()))
+            .collect();
+        entries.sort_unstable_by(|a, b| a.0.cmp(b.0));
+        let mut hasher = blake3::Hasher::new();
+        for (path, hash) in entries {
+            hasher.update(path.as_bytes());
+            hasher.update(b"\0");
+            hasher.update(hash.as_bytes());
+            hasher.update(b"\n");
+        }
+        hasher.finalize().to_hex().to_string()
+    }
+
     pub fn embedded_chunk_count(&self) -> usize {
         self.embeddings.as_ref().map(|e| e.store.len()).unwrap_or(0)
     }
 
-    /// File + symbol counts from on-disk metadata only.
-    ///
-    /// Does **not** open the tantivy mmap directory (which eagerly maps every
-    /// segment file and floods DEBUG logs). Used by desktop `index_status`
-    /// / sidebar badges so app launch never pays an index-open cost.
-    pub fn status_counts(
-        index_dir: &Path,
-    ) -> Result<(usize /* files */, usize /* symbols */), StoreError> {
+    pub fn status_counts(index_dir: &Path) -> Result<(usize, usize), StoreError> {
         let manifest = load_manifest(index_dir)?;
         let symbol_count = count_symbols_len(index_dir)?;
         Ok((manifest.files.len(), symbol_count))
@@ -478,7 +405,6 @@ fn load_manifest(index_dir: &Path) -> Result<Manifest, StoreError> {
     })?;
     let manifest: Manifest = serde_json::from_slice(&bytes)?;
     if manifest.version != MANIFEST_VERSION {
-        // Schema drift: start fresh rather than trust stale hashes.
         return Ok(Manifest {
             version: MANIFEST_VERSION,
             files: HashMap::new(),
@@ -499,7 +425,6 @@ fn load_symbols(index_dir: &Path) -> Result<Vec<Symbol>, StoreError> {
     Ok(serde_json::from_slice(&bytes).unwrap_or_default())
 }
 
-/// Length of `symbols.json` without fully deserializing into [`Symbol`].
 fn count_symbols_len(index_dir: &Path) -> Result<usize, StoreError> {
     let path = index_dir.join(SYMBOLS_FILE);
     if !path.exists() {
@@ -542,13 +467,11 @@ mod tests {
         assert_eq!(stats.changed, 0);
         assert_eq!(store.indexed_file_count(), 2);
 
-        // Re-build with no changes: everything should be "unchanged".
         let stats = store.build().unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(stats.added, 0);
         assert_eq!(stats.changed, 0);
         assert_eq!(stats.unchanged, 2);
 
-        // Touch only `a.rs`.
         let a_hash_before = store.manifest_hash("b.rs").map(str::to_owned);
         write(repo.path(), "a.rs", "fn a_fn() { 999; }");
         let stats = store.build().unwrap_or_else(|e| panic!("{e}"));
@@ -596,10 +519,6 @@ mod tests {
         assert!(reopened.symbols().iter().any(|s| s.name == "persisted_fn"));
     }
 
-    /// Wraps [`crate::embed::MockEmbedder`], recording every text handed to
-    /// `embed` (in call order) — lets a test assert *which* chunks were
-    /// (re-)embedded on a given `build`/`update` call, distinct from merely
-    /// observing the resulting vector count.
     struct CountingEmbedder {
         inner: crate::embed::MockEmbedder,
         calls: std::sync::Mutex<Vec<String>>,
@@ -613,7 +532,6 @@ mod tests {
             }
         }
 
-        /// All texts embedded so far, across every `embed` call.
         fn embedded_texts(&self) -> Vec<String> {
             self.calls.lock().unwrap_or_else(|e| panic!("{e}")).clone()
         }
@@ -654,7 +572,6 @@ mod tests {
         assert!(first_pass.iter().any(|t| t.contains("alpha")));
         assert!(first_pass.iter().any(|t| t.contains("beta")));
 
-        // Rebuild with nothing changed: no new embed calls at all.
         store.build().unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(
             embedder.embedded_texts().len(),
@@ -662,7 +579,6 @@ mod tests {
             "no file changed, so no chunk should be re-embedded"
         );
 
-        // Touch only a.rs.
         write(repo.path(), "a.rs", "fn alpha() { 999; }");
         store.build().unwrap_or_else(|e| panic!("{e}"));
         let after_touch = embedder.embedded_texts();
@@ -712,11 +628,7 @@ mod tests {
             store.build().unwrap_or_else(|e| panic!("{e}"));
         }
 
-        // Reopen with a *fresh* embedder instance sharing the same id/dim —
-        // build() should not need to re-embed anything (the manifest still
-        // says "unchanged" for a.rs, so `reindex_file`/`embed_chunks` never
-        // runs), and the persisted vectors should already be there.
-        let embedder = Arc::new(CountingEmbedder::new(8)); // id: "mock", dim: 8 — matches.
+        let embedder = Arc::new(CountingEmbedder::new(8));
         let mut reopened =
             IndexStore::open_with_embeddings(repo.path(), index_dir.path(), embedder.clone())
                 .unwrap_or_else(|e| panic!("{e}"));
@@ -749,10 +661,7 @@ mod tests {
             assert_eq!(store.embedded_chunk_count(), 1);
         }
 
-        // Reopen with a different embedder id (a "model switch"): the vector
-        // store must invalidate wholesale rather than silently mixing
-        // vectors from two different models.
-        let embedder = Arc::new(CountingEmbedder::new(8)); // id: "mock" != "model-v1".
+        let embedder = Arc::new(CountingEmbedder::new(8));
         let mut reopened =
             IndexStore::open_with_embeddings(repo.path(), index_dir.path(), embedder.clone())
                 .unwrap_or_else(|e| panic!("{e}"));
@@ -762,11 +671,6 @@ mod tests {
             "mismatched embedder id must invalidate the persisted vectors on open"
         );
 
-        // The file-content manifest still says "unchanged", so `reindex_file`
-        // is skipped for it — but `build()` separately self-heals any
-        // manifest-tracked file that has no vector yet (see
-        // `embed_if_missing`), so the very next build repopulates it under
-        // the new embedder without requiring the file itself to change.
         reopened.build().unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(embedder.embedded_texts().len(), 1);
         assert_eq!(reopened.embedded_chunk_count(), 1);
@@ -774,8 +678,6 @@ mod tests {
 
     #[test]
     fn status_counts_reads_metadata_without_tantivy_dir() {
-        // Simulate a warm index that only has manifest/symbols on disk —
-        // status must not require creating/opening the tantivy mmap dir.
         let index_dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
         let manifest = Manifest {
             version: MANIFEST_VERSION,

@@ -1,5 +1,3 @@
-//! Compaction reduces the message count sent to the model on subsequent turns.
-
 use std::sync::Arc;
 
 use agentloop_contracts::{
@@ -181,7 +179,6 @@ async fn compaction_boundary_event_is_persisted() {
             }
         }
     }
-    // Drain any remaining events after compact returns.
     while let Ok(Some(SessionEvent { payload, .. })) =
         tokio::time::timeout(std::time::Duration::from_millis(50), stream.next()).await
     {

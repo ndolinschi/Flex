@@ -1,5 +1,3 @@
-//! Private Anthropic Messages API wire types.
-
 use std::collections::{BTreeMap, HashSet};
 
 use agentloop_contracts::{
@@ -450,8 +448,6 @@ fn model_data_to_info(model: ModelData) -> ModelInfo {
     }
 }
 
-/// Merge paginated `/models` pages, preserving first-seen order and dropping
-/// duplicate ids.
 pub(crate) fn merge_model_pages(pages: impl IntoIterator<Item = Vec<ModelInfo>>) -> Vec<ModelInfo> {
     let mut seen = std::collections::HashSet::new();
     let mut out = Vec::new();
@@ -465,8 +461,6 @@ pub(crate) fn merge_model_pages(pages: impl IntoIterator<Item = Vec<ModelInfo>>)
     out
 }
 
-/// Append baseline Claude ids missing from an API listing so cheaper tiers
-/// (Haiku) stay selectable when pagination or account visibility omits them.
 pub(crate) fn supplement_known_models(mut models: Vec<ModelInfo>) -> Vec<ModelInfo> {
     let present: std::collections::HashSet<String> = models.iter().map(|m| m.id.clone()).collect();
     for model in crate::config::known_anthropic_models() {

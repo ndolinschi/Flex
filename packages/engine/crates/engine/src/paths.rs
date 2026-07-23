@@ -1,5 +1,3 @@
-//! Default user-config paths and loop-limit helpers.
-
 use std::path::PathBuf;
 
 use agentloop_loop::LoopLimits;
@@ -31,8 +29,6 @@ pub(crate) fn default_user_skill_dir() -> Option<PathBuf> {
     })
 }
 
-/// A configured `max_iterations` overrides the loop's own default; `None`
-/// keeps it.
 pub(crate) fn resolve_max_iterations(configured: Option<u32>) -> u32 {
     configured.unwrap_or(LoopLimits::default().max_iterations)
 }

@@ -1,5 +1,3 @@
-//! Tool-call batching, permissions, hooks, and result feed-back.
-
 mod batch;
 mod dispatch;
 mod intercept;

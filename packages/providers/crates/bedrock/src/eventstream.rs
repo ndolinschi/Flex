@@ -1,17 +1,3 @@
-//! Minimal decoder for the AWS event-stream (`vnd.amazon.eventstream`) framing
-//! Bedrock uses for streaming responses.
-//!
-//! Each message is:
-//! ```text
-//! [total len: u32][headers len: u32][prelude CRC: u32]
-//! [headers ...][payload ...][message CRC: u32]
-//! ```
-//! Headers are `[name len: u8][name][value type: u8][value ...]`. We only need
-//! the string-typed `:event-type` / `:message-type` / `:exception-type` headers
-//! to route the payload; other header value types are skipped by their size.
-//! CRCs are not verified (length framing + JSON parsing already catch garbage).
-
-/// The routing headers plus raw payload of one decoded frame.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct RawEvent {
     pub event_type: Option<String>,
@@ -20,7 +6,6 @@ pub(crate) struct RawEvent {
     pub payload: Vec<u8>,
 }
 
-/// Accumulates bytes and yields whole frames as they complete.
 #[derive(Debug, Default)]
 pub(crate) struct EventStreamDecoder {
     buf: Vec<u8>,
@@ -35,8 +20,6 @@ impl EventStreamDecoder {
         self.buf.extend_from_slice(bytes);
     }
 
-    /// Pull the next complete frame. `Ok(None)` means more bytes are needed;
-    /// `Err` means the framing is corrupt (unrecoverable for this stream).
     pub(crate) fn next_message(&mut self) -> Result<Option<RawEvent>, String> {
         if self.buf.len() < 12 {
             return Ok(None);
@@ -73,7 +56,6 @@ fn be_u16(bytes: &[u8]) -> usize {
     (usize::from(bytes[0]) << 8) | usize::from(bytes[1])
 }
 
-/// Extract the routing headers we care about; skip everything else by size.
 fn parse_headers(mut headers: &[u8]) -> RawEvent {
     let mut event = RawEvent::default();
     while !headers.is_empty() {
@@ -132,7 +114,6 @@ fn assign(event: &mut RawEvent, name: &str, value: String) {
 mod tests {
     use super::*;
 
-    /// Build one event-stream frame with a single `:event-type` string header.
     fn frame(event_type: &str, payload: &[u8]) -> Vec<u8> {
         let name = b":event-type";
         let mut headers = Vec::new();

@@ -1,4 +1,3 @@
-//! Pairing / connection-info document for mobile clients.
 
 use serde::{Deserialize, Serialize};
 
@@ -6,15 +5,12 @@ use super::config::RemoteAccessConfig;
 
 pub const PROTOCOL_VERSION: u32 = 1;
 
-/// Advertised capabilities — chat companion only. Anything else is desktop-local.
 pub const CAPABILITIES: &[&str] = &["sessions.list", "messages.read", "messages.send"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthInfo {
     #[serde(rename = "type")]
     pub auth_type: String,
-    /// Present in Settings pairing payloads; omitted from unauthenticated
-    /// responses (there are none for `/v1/info` — it requires the bearer).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
 }
@@ -72,13 +68,11 @@ impl PairingInfo {
         }
     }
 
-    /// Compact JSON suitable for QR / clipboard.
     pub fn to_pairing_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
     }
 }
 
-/// Collect non-loopback IPv4 addresses for LAN pairing URLs.
 pub fn lan_ipv4_addrs() -> Vec<String> {
     let Ok(ifaces) = local_ip_address::list_afinet_netifas() else {
         return Vec::new();
@@ -97,7 +91,6 @@ pub fn lan_ipv4_addrs() -> Vec<String> {
     out
 }
 
-/// Render pairing JSON as an SVG QR code string (embeddable in the UI).
 pub fn pairing_qr_svg(pairing_json: &str) -> Result<String, String> {
     use qrcode::render::svg;
     use qrcode::{EcLevel, QrCode};

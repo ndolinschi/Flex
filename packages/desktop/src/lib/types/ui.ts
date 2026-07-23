@@ -51,8 +51,6 @@ export type AppRoute =
   | "memory"
   | "welcome"
 
-/** Preset TTLs offered by the memory expiry menu, mapped to absolute
- * `expiresAtMs` at selection time. `"forever"` clears any expiry. */
 export type MemoryTtlPreset = "forever" | "1d" | "1w" | "30d"
 
 const MEMORY_TTL_MS: Record<Exclude<MemoryTtlPreset, "forever">, number> = {
@@ -61,8 +59,6 @@ const MEMORY_TTL_MS: Record<Exclude<MemoryTtlPreset, "forever">, number> = {
   "30d": 30 * 24 * 60 * 60 * 1000,
 }
 
-/** Absolute expiry timestamp for a TTL preset selected "now", or `undefined`
- * for `"forever"` (never expires). */
 export const memoryExpiryFromPreset = (
   preset: MemoryTtlPreset,
   now: number = Date.now(),
@@ -91,7 +87,6 @@ export const extractThinkingText = (blocks: ContentBlock[]): string => {
   return parts.join("\n\n")
 }
 
-/** True when a user_message should render as a chat bubble (not tool-result feedback). */
 export const hasVisibleUserContent = (blocks: ContentBlock[]): boolean => {
   for (const block of blocks) {
     if (block.type === "markdown" && block.text.trim()) return true
@@ -107,24 +102,16 @@ export const truncateId = (id: string, len = 8): string => {
   return `${id.slice(0, len)}…`
 }
 
-/** True when the session still has the placeholder title (or none). */
 export const isDefaultSessionTitle = (title?: string | null): boolean => {
   const t = title?.trim()
   return !t || t === DEFAULT_SESSION_TITLE
 }
 
-/**
- * Unused draft: placeholder title and no isolated worktree.
- * DiffStat must not show for these — `git_status_since_baseline` falls back to
- * full-repo dirty status when no per-session baseline exists yet, which would
- * incorrectly paint project-wide `+N −M` on an empty "New Agent" row.
- */
 export const isPristineSession = (
   meta: Pick<SessionMeta, "title" | "base_cwd" | "workspace_id">,
 ): boolean =>
   isDefaultSessionTitle(meta.title) && !meta.base_cwd && !meta.workspace_id
 
-/** Title derived from the first user prompt . */
 export const titleFromPrompt = (text: string, maxLen = 48): string => {
   const cleaned = text.replace(/\s+/g, " ").trim()
   if (!cleaned) return DEFAULT_SESSION_TITLE
@@ -140,17 +127,14 @@ export const sessionLabel = (meta: SessionMeta): string => {
   return DEFAULT_SESSION_TITLE
 }
 
-/** A pending `mode_switch_proposed` awaiting user veto or auto-accept. */
 export type PendingModeSwitch = {
   sessionId: string
   id: string
   mode: string
   reason: string
-  /** Absolute timestamp (Date.now()) after which the UI auto-accepts. */
   deadlineMs: number
 }
 
-/** A persisted peer message received from another agent. */
 export type PeerMessage = {
   id: string
   sessionId: string

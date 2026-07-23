@@ -48,7 +48,6 @@ type PluginCardSpec = {
   category: string
 }
 
-/** Engine plugin catalog — mirrors the fixed PluginPrefs shape on the wire. */
 const PLUGIN_CATALOG: PluginCardSpec[] = [
   {
     key: "search",
@@ -120,9 +119,6 @@ const PLUGIN_CATALOG: PluginCardSpec[] = [
   },
 ]
 
-/** Searchable plugin toggle cards backed by the provider config's fixed
- * `PluginPrefs` shape. Rendered as a list (one row per plugin), matching
- * the MCP catalog/servers lists below it in `CustomizeSection`. */
 export const PluginCatalog = () => {
   const { config, isLoading, save } = useProviderConfig()
   const [query, setQuery] = useState("")
@@ -149,8 +145,6 @@ export const PluginCatalog = () => {
     setError(null)
     setBusyKey(busyId)
     try {
-      // Round-trip every field: save_provider_config overwrites baseUrl and
-      // defaultModel unconditionally, so a plugins-only payload would wipe them.
       await save({
         preferredProvider: config.preferredProvider ?? "",
         baseUrl: config.baseUrl,

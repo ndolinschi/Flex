@@ -1,31 +1,22 @@
-//! Context-window estimation and auto-compaction threshold helpers.
-
 use std::sync::Arc;
 
 use agentloop_contracts::{ContentBlock, ProviderId};
 use agentloop_core::Provider;
 use agentloop_core::provider::ChatRequest;
 
-/// Manual `/compact` records this strategy on the compaction boundary.
 pub(crate) const MANUAL_COMPACT_STRATEGY: &str = "summarize_oldest";
-/// Auto-compaction (near context limit) uses a distinct strategy for UI/telemetry.
 pub(crate) const AUTO_COMPACT_STRATEGY: &str = "auto_summarize_oldest";
 
-/// Fallback when neither provider caps nor a provider default apply.
 const DEFAULT_CONTEXT_LIMIT: u64 = 128_000;
 
-/// Copilot's documented prompt-token ceiling (see provider HTTP error mapping).
 const COPILOT_CONTEXT_LIMIT: u64 = 136_000;
 
-/// DeepSeek's documented context window (V4 flash/pro models: 1M tokens).
 const DEEPSEEK_CONTEXT_LIMIT: u64 = 1_000_000;
 
-/// Rough token estimate for a chat request (~4 characters per token).
 pub(crate) fn estimate_request_tokens(system: &str, request: &ChatRequest) -> u64 {
     estimate_request_chars(system, request).div_ceil(4)
 }
 
-/// Same heuristic as [`crate::compaction::estimate_tokens`], applied to a request.
 pub(crate) fn estimate_request_chars(system: &str, request: &ChatRequest) -> u64 {
     let mut total = system.len() as u64;
     for message in &request.messages {
@@ -71,9 +62,6 @@ fn blob_source_chars(source: &agentloop_contracts::BlobSource) -> u64 {
     }
 }
 
-/// Resolve the context limit for a model call.
-///
-/// Priority: `ProviderCaps::max_context_tokens`, then provider-specific defaults.
 pub(crate) fn resolve_context_limit(provider: &Arc<dyn Provider>) -> u64 {
     if let Some(limit) = provider.capabilities().max_context_tokens {
         return limit as u64;
@@ -89,10 +77,6 @@ fn provider_default_limit(provider_id: &ProviderId) -> u64 {
     }
 }
 
-/// Whether estimated prompt tokens are close enough to the limit to compact
-/// proactively. `threshold_percent` is clamped to 1–100: 0 is treated as 1
-/// (fire at 1% to avoid silent disabling), values above 100 are clamped to
-/// 100 (fire only when fully used).
 pub(crate) fn should_auto_compact(
     estimated_tokens: u64,
     context_limit: u64,
@@ -154,7 +138,6 @@ mod tests {
     #[test]
     fn should_auto_compact_respects_custom_threshold() {
         let limit = 1_000;
-        // 50% threshold: fires at 500.
         assert!(!should_auto_compact(499, limit, 50));
         assert!(should_auto_compact(500, limit, 50));
     }
@@ -162,10 +145,8 @@ mod tests {
     #[test]
     fn should_auto_compact_clamps_threshold_to_valid_range() {
         let limit = 1_000;
-        // 0 is clamped to 1% → threshold = 10.
         assert!(!should_auto_compact(9, limit, 0));
         assert!(should_auto_compact(10, limit, 0));
-        // 200 is clamped to 100% → threshold = 1000.
         assert!(!should_auto_compact(999, limit, 200));
         assert!(should_auto_compact(1_000, limit, 200));
     }

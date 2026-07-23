@@ -1,5 +1,3 @@
-//! `WebFetch`: fetch a URL as text.
-
 use async_trait::async_trait;
 use reqwest::Client;
 use schemars::JsonSchema;
@@ -18,15 +16,11 @@ const MAX_OUTPUT_CHARS: usize = 120_000;
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct WebFetchInput {
-    /// HTTP or HTTPS URL to fetch.
     url: String,
-    /// Maximum response bytes to keep. Defaults to 200000, capped at 1000000.
     max_bytes: Option<usize>,
-    /// Whether to include links found on the page in the output. Defaults to true.
     include_links: Option<bool>,
 }
 
-/// Fetch HTTP(S) content and return token-efficient text.
 #[derive(Clone)]
 pub struct WebFetchTool {
     client: Client,

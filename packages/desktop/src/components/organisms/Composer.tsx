@@ -26,22 +26,13 @@ import { ContextBar } from "./ContextBar"
 import { ComposerQueue } from "./composer/ComposerQueue"
 
 type ComposerProps = {
-  /** When set, bind drafts/send to this session instead of global active. */
   sessionId?: string | null
-  /** When false (visited/unfocused chat), disable editing; ContextBar stays
-   * visible so project/workspace chrome does not vanish in a split pane. */
   interactive?: boolean
-  /** Empty agent: ContextBar above the bubble; active chat: footer below.
-   * Layout is always the large column composer (never compact pill). */
   isHero?: boolean
-  /** Permission / question card stacked flush above the bubble (same rail). */
   dockedOverlay?: ReactNode
-  /** Optional "N Working" workers pill above the bubble. */
   workersSlot?: ReactNode
 }
 
-/** Send control that narrow-selects draft emptiness so the parent Composer
- * (and its ModelPicker) do not re-render on every keystroke. */
 const ComposerSendButton = ({
   sessionId,
   isStreaming,
@@ -73,16 +64,10 @@ const ComposerSendButton = ({
   )
 }
 
-/** Soft ambient + inset hairline — docked HITL paints the side/bottom stroke
- * so the seam with Permission/Question stays continuous (no top border/ring). */
 const DOCKED_BUBBLE_SHADOW = "shadow-[var(--shadow-composer)]"
 const DOCKED_BUBBLE_SHADOW_FOCUS =
   "focus-within:shadow-[var(--shadow-composer-focus)]"
 
-/** Elevated composer card. Draft subscription lives in `ComposerInput` /
- * `ComposerSendButton` so ContextBar + ModelPicker stay stable across keystrokes.
- * Always a column bubble: textarea on top, bottom toolbar
- * `Plus | Mode | (spacer) | Model | Bypass | Send`. */
 export const Composer = ({
   sessionId: sessionIdProp = null,
   interactive = true,

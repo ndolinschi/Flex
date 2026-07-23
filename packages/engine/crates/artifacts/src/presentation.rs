@@ -1,9 +1,3 @@
-//! `PresentationDocument` — builds minimal valid `.pptx` as a ZIP archive.
-//!
-//! Uses the `zip` crate (0.6.x series) directly; no third-party PPTX library.
-//! The OOXML structure is the smallest set that PowerPoint and LibreOffice
-//! Impress accept: one slide master, one slide layout, one slide per entry.
-
 use std::io::{Cursor, Write};
 
 use zip::CompressionMethod;
@@ -11,14 +5,9 @@ use zip::write::FileOptions;
 
 use crate::{ArtifactBuildSpec, ArtifactError, ArtifactKind, OfficeArtifact, Slide};
 
-/// Builds PowerPoint presentations (.pptx) as minimal OOXML ZIP archives.
 #[derive(Debug, Default)]
 pub struct PresentationDocument;
 
-// ── XML helpers ──────────────────────────────────────────────────────────────
-
-/// XML-escape a user-supplied string so it's safe to embed in an attribute or
-/// text node.
 fn xml_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for ch in s.chars() {
@@ -33,8 +22,6 @@ fn xml_escape(s: &str) -> String {
     }
     out
 }
-
-// ── Static XML parts ─────────────────────────────────────────────────────────
 
 fn content_types_xml(slide_count: usize) -> String {
     let mut overrides = String::new();
@@ -65,7 +52,7 @@ fn presentation_xml(slide_count: usize) -> String {
     let mut sld_ids = String::new();
     for i in 0..slide_count {
         let sld_id = 256u32 + i as u32;
-        let rid = i + 2; // rId1 = slide master, rId2+ = slides
+        let rid = i + 2;
         sld_ids.push_str(&format!(r#"    <p:sldId id="{sld_id}" r:id="rId{rid}"/>"#,));
         sld_ids.push('\n');
     }
@@ -153,7 +140,6 @@ fn slide_xml(slide: &Slide) -> String {
 
     let mut bullet_paras = String::new();
     if slide.bullets.is_empty() {
-        // Empty body placeholder needs at least one paragraph.
         bullet_paras.push_str("          <a:p/>\n");
     } else {
         for bullet in &slide.bullets {
@@ -206,8 +192,6 @@ fn slide_xml(slide: &Slide) -> String {
 </p:sld>"#
     )
 }
-
-// ── Builder ───────────────────────────────────────────────────────────────────
 
 fn write_entry(
     zip: &mut zip::ZipWriter<Cursor<Vec<u8>>>,
@@ -339,7 +323,6 @@ mod tests {
         };
         let bytes = deck.build(&spec).expect("build");
         assert!(!bytes.is_empty(), "pptx bytes must not be empty");
-        // .pptx is a ZIP — must start with PK signature
         assert_eq!(&bytes[..2], b"PK", "pptx must start with ZIP magic");
     }
 

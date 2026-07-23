@@ -1,12 +1,3 @@
-//! Route handlers for the desktop Remote Access `/v1` API.
-//!
-//! **Least privilege (non-negotiable):** a remote client may only
-//! - list / get root session titles,
-//! - read chat message events (filtered SSE),
-//! - send a text prompt (`disable_tools` + `DontAsk`).
-//!
-//! No session create/delete/update, no MCP, no providers, no HITL resolve,
-//! no permission_mode override, no cancel, no subagent sessions, no tools.
 
 use std::sync::Arc;
 
@@ -30,7 +21,6 @@ use crate::remote::config::RemoteAccessConfig;
 use crate::remote::pairing::{CAPABILITIES, PROTOCOL_VERSION};
 use crate::state::AppState;
 
-/// Shared axum state: Tauri app handle + a snapshot of remote config for `/v1/info`.
 #[derive(Clone)]
 pub struct RemoteApiState {
     pub app: AppHandle,
@@ -113,7 +103,6 @@ async fn list_sessions(
 ) -> Result<Json<Vec<SessionSummary>>, ApiError> {
     let service = require_service(&state.app).await?;
     let sessions = service.list_sessions().await?;
-    // Root chats only — subagent sessions are not a remote chat target.
     Ok(Json(
         sessions
             .into_iter()
@@ -159,7 +148,6 @@ async fn prompt(
     let prompt = text.to_owned();
     let service = require_service(&state.app).await?;
     let session = SessionId::from(id);
-    // Verify the target is a root chat session — never a subagent child.
     let meta = service.session_meta(&session).await?;
     if meta.depth != 0 || meta.parent_id.is_some() {
         return Err(ApiError::from((
@@ -167,9 +155,6 @@ async fn prompt(
             "remote chat may only target root sessions".into(),
         )));
     }
-    // Isolation: no tools offered to the model, and any tool call is denied.
-    // DontAsk alone is insufficient — PermissionHint::Never tools (Read/Grep)
-    // would still run and could exfiltrate files into the assistant reply.
     tokio::spawn(async move {
         let _ = service
             .prompt(

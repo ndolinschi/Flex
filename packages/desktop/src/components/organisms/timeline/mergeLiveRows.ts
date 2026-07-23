@@ -2,11 +2,6 @@ import type { StreamingBuffers, TimelineRow } from "../../../lib/types"
 
 export type SessionLogRow = { id: string; text: string; tsMs: number }
 
-/**
- * Merge materialized timeline rows with in-flight streaming buffers and
- * client-side session log rows. Builds id Sets once so each streaming key is
- * O(1) against materialization instead of O(rows) `.some` scans.
- */
 export const mergeLiveRows = (
   rows: TimelineRow[],
   streaming: StreamingBuffers,
@@ -29,9 +24,6 @@ export const mergeLiveRows = (
   const extra: TimelineRow[] = []
 
   for (const call of Object.values(streaming.toolCalls)) {
-    // RunWorkflow calls materialize as a `workflow` row and Verify calls as
-    // a `verdict` row (both in useSessionEvents) — never a plain `tool`
-    // row — skip the generic live-tool fallback here for both.
     if (call.tool_name === "RunWorkflow" || call.tool_name === "Verify") continue
     if (toolIds.has(call.id)) continue
     extra.push({
@@ -54,14 +46,8 @@ export const mergeLiveRows = (
     })
   }
 
-  // Thinking last among live-only extras so in-flight reasoning sits under
-  // tools / provisional narration (buildDisplayItems also reorders
-  // materialized thinking to the end of each work group).
   for (const [messageId, text] of Object.entries(streaming.thinking)) {
     if (!text) continue
-    // Skip once either a materialized thinking row OR the assistant
-    // message for this id exists — otherwise a thinking-only
-    // assistant_message (no markdown) would duplicate the live row.
     if (thinkingOrAssistantIds.has(messageId)) continue
     extra.push({
       type: "thinking",
@@ -79,9 +65,6 @@ export const mergeLiveRows = (
     tsMs: log.tsMs,
   }))
 
-  // `rows` is already in authoritative event order — never re-sort. Only
-  // `logRows` need slotting in by timestamp; live-only `extra` rows always
-  // represent the newest in-flight content and belong after materialized rows.
   if (logRows.length === 0) return [...rows, ...extra]
 
   const withLogs = [...rows]

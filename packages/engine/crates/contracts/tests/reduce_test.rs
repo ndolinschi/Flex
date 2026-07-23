@@ -1,5 +1,3 @@
-//! Golden tests for the pure reducer.
-
 mod common;
 
 use agentloop_contracts::*;

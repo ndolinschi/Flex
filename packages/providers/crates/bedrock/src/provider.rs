@@ -1,5 +1,3 @@
-//! AWS Bedrock provider implementation (Converse streaming + dynamic models).
-
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -20,7 +18,6 @@ use crate::models::{merge_dedup, parse_foundation_models, parse_inference_profil
 use crate::sigv4::{self, Sigv4Credentials};
 use crate::wire::{ConverseStreamMapper, build_request, static_models};
 
-/// AWS service names used in the SigV4 credential scope.
 const RUNTIME_SERVICE: &str = "bedrock-runtime";
 const CONTROL_SERVICE: &str = "bedrock";
 
@@ -32,11 +29,6 @@ pub struct BedrockProvider {
 
 impl BedrockProvider {
     pub fn new(config: BedrockConfig) -> Self {
-        // A bare `Client::new()` has no timeouts at all: a stalled TCP
-        // handshake or a stream that stops producing bytes hangs the turn
-        // forever with no error to surface. `read_timeout` bounds the gap
-        // between chunks (not total stream duration), so long responses
-        // still work while dead connections fail visibly.
         let client = Client::builder()
             .connect_timeout(Duration::from_secs(10))
             .read_timeout(Duration::from_secs(120))
@@ -56,8 +48,6 @@ impl BedrockProvider {
         &self.config.default_model
     }
 
-    /// Whether a usable credential (Bedrock API key or SigV4 creds) is present.
-    /// Bedrock is unusable without one, so callers gate on this before use.
     pub fn has_credentials(&self) -> bool {
         self.config.auth.is_present()
     }
@@ -66,8 +56,6 @@ impl BedrockProvider {
         ProviderId::from(BEDROCK_PROVIDER_ID)
     }
 
-    /// Apply the configured auth to a request: bearer token, or SigV4 signing
-    /// over the exact `payload`/headers that will be sent.
     fn apply_auth(
         &self,
         builder: RequestBuilder,
@@ -137,7 +125,6 @@ impl BedrockProvider {
         }
     }
 
-    /// GET a control-plane endpoint and return the JSON body.
     async fn control_get(&self, url: &str) -> Result<String, ProviderError> {
         let builder = self
             .client
@@ -159,13 +146,6 @@ impl BedrockProvider {
         })
     }
 
-    /// Fetch the live model catalog: on-demand foundation models plus the
-    /// cross-region inference profiles (where the newest Claude tiers live).
-    /// Both control-plane calls are best-effort and independent, so one failing
-    /// never hides the other. Returns `Err` only when nothing at all could be
-    /// listed *and* a call failed — so the caller can surface *why* (e.g. a
-    /// Bedrock API key without control-plane list permission) instead of
-    /// silently showing the static fallback.
     async fn fetch_dynamic_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
         let mut models = Vec::new();
         let mut error: Option<ProviderError> = None;
@@ -201,10 +181,6 @@ impl BedrockProvider {
         Ok(merged)
     }
 
-    /// Fetch cross-region inference profiles for both `SYSTEM_DEFINED` (the
-    /// built-in Claude/Nova/… profiles) and `APPLICATION` (user-created) types,
-    /// following `nextToken` across pages. Returns the models found plus the
-    /// first error encountered (so an all-fail can be surfaced upstream).
     async fn fetch_inference_profiles(&self) -> (Vec<ModelInfo>, Option<ProviderError>) {
         let mut out = Vec::new();
         let mut error = None;
@@ -222,8 +198,6 @@ impl BedrockProvider {
         (out, error)
     }
 
-    /// Page through `ListInferenceProfiles` for one profile type. The page cap
-    /// is a safety valve against a server that never clears the token.
     async fn fetch_inference_profiles_of_type(
         &self,
         profile_type: &str,
@@ -406,7 +380,6 @@ fn provider_stream(
     })
 }
 
-/// Pull every complete frame currently buffered and enqueue its mapped events.
 fn drain_frames(state: &mut StreamState) {
     loop {
         match state.decoder.next_message() {

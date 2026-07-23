@@ -2,19 +2,11 @@ import type { ReactNode } from "react"
 import { cn } from "../../lib/utils"
 
 type ChatThreadHeaderProps = {
-  /** Agent / session title — production text-base font-medium truncate. */
   title: string
-  /** Optional trailing cluster (repo chip, expand, panel toggle). */
   trailing?: ReactNode
   className?: string
 }
 
-/**
- * Production chat thread header (Agents Web 2026-07-23 7：56):
- * `h-[40px] pl-3 pr-2` · title left · actions right.
- * Desktop keeps WindowTitleBar for window chrome; this is the in-pane
- * conversation title row above the timeline.
- */
 export const ChatThreadHeader = ({
   title,
   trailing,

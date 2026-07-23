@@ -8,7 +8,6 @@ import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 const CONTEXT_BUDGET_TOKENS = 200_000
-/** Stable empty — inline `?? []` in a Zustand selector re-renders forever. */
 const EMPTY_QUEUE: string[] = []
 
 type StatusTabProps = {
@@ -36,7 +35,6 @@ const DetailRow = ({ label, value }: { label: string; value: string }) => (
   </div>
 )
 
-/** OpenCode-style session status: model, context, tokens, queue, per-model. */
 export const StatusTab = ({ session, active }: StatusTabProps) => {
   const sessionId = session.id
   const streaming = useAppStore((s) => !!s.streamingSessions[sessionId])

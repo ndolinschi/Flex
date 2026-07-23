@@ -35,19 +35,14 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 type TurnTimelineProps = {
   sessionId: string | null
-  /** When false, freeze the timeline (no live bus / remasure) for hidden tabs. */
   active?: boolean
   onConversationEmpty?: (empty: boolean) => void
-  /** Live merged rows — ChatSessionBody fingerprints running workers off
-   * this and only lifts state when the worker set changes (not every delta). */
   onLiveRows?: (rows: import("../../lib/types").TimelineRow[]) => void
 }
 
 const displayItemKey = (item: DisplayItem): string => {
   if (item.kind === "group") return item.id
   if (item.row.type === "assistant") return `answer:${item.row.messageId}`
-  // Stable across live → materialized so virtual rows (and in-row dialogs)
-  // don't remount when engine IDs replace `live-tool:` / `live-thinking:`.
   if (item.row.type === "tool") return `tool:${item.row.call.id}`
   if (item.row.type === "thinking") return `thinking:${item.row.messageId}`
   if (item.row.type === "checkpoint") return `checkpoint:${item.row.snapshotId}`
@@ -62,18 +57,12 @@ export const TurnTimeline = ({
 }: TurnTimelineProps) => {
   const { rows, streaming, isLoading, error, thinkingDurations, reconnectStatus, compactingStatus, indexingStatus } =
     useSessionEvents(sessionId, { live: active })
-  // Per-session — SubagentViewer mounts a second TurnTimeline for a child id;
-  // the global `isStreaming` flag tracks only the active root session.
   const isStreaming = useAppStore((s) =>
     sessionId ? !!s.streamingSessions[sessionId] : false,
   )
-  // Client-side log rows (model/provider changes) — not part of the engine
-  // event stream, so they're merged in here rather than in useSessionEvents.
   const sessionLogRows = useAppStore((s) =>
     sessionId ? s.sessionLogRows[sessionId] : undefined,
   )
-  // Narrow sessions subscription: only re-render when *this* session's cwd
-  // changes — not when any other session's title/updated_at mutates mid-stream.
   const { data: activeCwd } = useQuery({
     queryKey: SESSIONS_KEY,
     queryFn: listSessions,
@@ -83,8 +72,6 @@ export const TurnTimeline = ({
       sessionId ? list.find((s) => s.id === sessionId)?.cwd : undefined,
   })
   const prevStreamingRef = useRef(isStreaming)
-  // Keep overscan tight for a beat after settle so historical MarkdownBody
-  // remounts don't stack on the live→GFM parse of the just-finished answer.
   const [settleHold, setSettleHold] = useState(false)
 
   useEffect(() => {
@@ -97,8 +84,6 @@ export const TurnTimeline = ({
     prevStreamingRef.current = isStreaming
   }, [isStreaming])
 
-  // Warm the highlight.js chunk while tokens stream so live→settled does
-  // not wait on a dynamic import in the critical path.
   useEffect(() => {
     if (isStreaming) preloadMarkdownHighlight()
   }, [isStreaming])
@@ -122,19 +107,12 @@ export const TurnTimeline = ({
     [liveRows, isStreaming, thinkingDurations],
   )
 
-  // Bottom Working backstop while streaming — skip whenever ANY open
-  // WorkGroup already owns the Thinking/Working/Compacting cue (header
-  // RunningDot), or the trailing item is a live thinking row (its own
-  // shimmer). Gating only on lastItemIsOpenWorkGroup let a second "Working"
-  // appear under an open group's "Thinking".
   const last = displayItems[displayItems.length - 1]
   const lastIsLiveThinking =
     !!last &&
     last.kind === "row" &&
     last.row.type === "thinking" &&
     last.row.id.startsWith("live-thinking:")
-  // Visible live answer already owns the feed's motion — hide the bottom
-  // "Working" backstop so it does not stack under streaming text.
   const hasVisibleLiveAssistant = liveRows.some(
     (r) =>
       r.type === "assistant" &&
@@ -150,15 +128,7 @@ export const TurnTimeline = ({
     !lastIsLiveThinking &&
     !hasVisibleLiveAssistant
 
-  // The reconnect banner REPLACES the plain "Working" row while active —
-  // never both. Only shown while the session is actually streaming (a
-  // trailing status from a turn that already ended some other way is stale
-  // and useSessionEvents clears it on turn_completed/session_error anyway,
-  // but this guards the render regardless of ordering).
   const showReconnectBanner = isStreaming && !!reconnectStatus
-  // Compacting cue: priority reconnect > compacting > indexing > Working.
-  // When an open WorkGroup already owns the status via liveStatus, skip the
-  // bottom backstop (same XOR rule as Working/Thinking).
   const showCompactingIndicator =
     isStreaming &&
     !!compactingStatus &&
@@ -189,9 +159,6 @@ export const TurnTimeline = ({
     onConversationEmpty?.(isConversationEmpty)
   }, [isConversationEmpty, onConversationEmpty])
 
-  // Narrow stick-to-bottom dep: summed streaming text lengths + tool-call
-  // count, not the whole streaming object (avoids effect churn on identical
-  // structural updates that don't grow content).
   const streamContentKey = useMemo(() => {
     let key = 0
     for (const text of Object.values(streaming.markdown)) key += text.length
@@ -220,36 +187,16 @@ export const TurnTimeline = ({
     getScrollElement: () => scrollRef.current,
     estimateSize: (index) =>
       estimateSizeForItem(displayItems[index], index === 0),
-    // Smaller overscan while streaming / brief post-settle hold — WebView2
-    // RO + remount churn freezes under a tall overscan window during tool
-    // turns and when the just-finished answer upgrades to GFM.
     overscan: isStreaming || settleHold ? 4 : 10,
     getItemKey: (index) => displayItemKey(displayItems[index]),
-    // Always read the live DOM height. TanStack's default measureElement
-    // returns the cached size when called without a ResizeObserver entry,
-    // which blocks shrinks after collapse / null render.
     measureElement: (element) =>
       (element as HTMLElement).offsetHeight,
-    // Pin the end while near bottom so streaming growth / appends don't
-    // jump the viewport; when the user scrolls up, isAtEnd is false and
-    // followOnAppend is a no-op.
     anchorTo: "end",
     followOnAppend: true,
     scrollEndThreshold: 80,
-    // Defer RO → resizeItem to rAF — reduces WebView2 measurement races
-    // during fast scroll remounts.
     useAnimationFrameWithResizeObserver: true,
   })
 
-  // Live tail / streaming deltas grow without changing `count`. ResizeObserver
-  // usually handles this; we still remeasure mounted rows in place after paint
-  // as a safety net. Also remeasure when streaming stops (live→settled markdown
-  // + actions swap) even if streamContentKey is unchanged. Never call
-  // `virtualizer.measure()` here — it clears itemSizeCache and absolute rows
-  // overlap on stale estimateSize.
-  //
-  // While streaming, coalesce remasure to ≤1 / 120ms — every markdown/tool
-  // delta used to schedule double-rAF remasure and peg WebView2 on Windows.
   const wasStreamingRef = useRef(isStreaming)
   const lastStreamRemeasureAt = useRef(0)
   useEffect(() => {
@@ -263,7 +210,6 @@ export const TurnTimeline = ({
     const run = () => {
       remeasureMountedVirtualItems(virtualizer)
       if (!settled) return
-      // Second frame: GFM/prose margins apply after the live→settled swap.
       second = requestAnimationFrame(() => {
         remeasureMountedVirtualItems(virtualizer)
       })
@@ -291,19 +237,13 @@ export const TurnTimeline = ({
       if (first !== null) cancelAnimationFrame(first)
       if (second !== null) cancelAnimationFrame(second)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- remount on content growth / settle only
   }, [streamContentKey, isStreaming, displayItems.length, active])
 
-  // WorkGroup expand/collapse changes row height; remeasure in place before
-  // re-sticking so virtual offsets stay correct (esp. WebView2).
   const onLayoutChange = useCallback(() => {
     remeasureMountedVirtualItems(virtualizer)
     handleLayoutChange()
   }, [virtualizer, handleLayoutChange])
 
-  // During scroll, tanstack skips sync measureElement while isScrolling;
-  // WebView2 can also report stale heights on overscan remounts. Remeasure
-  // mounted rows in place after scroll settles — never wipe the size cache.
   const scrollRemeasureTimer = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   )
@@ -345,7 +285,6 @@ export const TurnTimeline = ({
           role="status"
           aria-label="Loading conversation"
         >
-          {/* Quiet full-width placeholders — not right-aligned chat bubbles. */}
           <Skeleton className="h-10 w-full rounded-[var(--radius-bubble)]" />
           <Skeleton className="h-14 w-[88%] rounded-[var(--radius-bubble)]" />
           <Skeleton className="h-8 w-4/5 rounded-[var(--radius-bubble)]" />
@@ -397,7 +336,6 @@ export const TurnTimeline = ({
                     "absolute top-0 left-0 w-full",
                     marginForItem(item, isFirst),
                   )}
-                  // Integer px avoids subpixel stacking on Windows fractional DPI.
                   style={{
                     transform: `translateY(${Math.round(vItem.start)}px)`,
                   }}
@@ -415,6 +353,11 @@ export const TurnTimeline = ({
                               : item.isOpen && item.hasLiveThinking
                                 ? "thinking"
                                 : "working"
+                        }
+                        liveNote={
+                          item.isOpen && indexingStatus
+                            ? indexingStatus.note
+                            : null
                         }
                         durationMs={item.summary?.duration_ms}
                         costUsd={item.summary?.cost_usd}
@@ -437,10 +380,6 @@ export const TurnTimeline = ({
                           checkpointsDisabled={isStreaming}
                         />
                       </WorkGroup>
-                      {/* Sibling, not a WorkGroup child — the group's children live
-                       * inside its own collapsible body, which stays collapsed for
-                       * a completed turn until the user expands it. The footer must
-                       * stay visible regardless of that collapsed state. */}
                       {item.footer ? <TurnFooter {...item.footer} /> : null}
                     </>
                   ) : (
@@ -458,11 +397,6 @@ export const TurnTimeline = ({
                         thinkingDurations={thinkingDurations}
                         sessionId={sessionId}
                         checkpointsDisabled={isStreaming}
-                        // `TimelineRowView` renders its own `TurnFooter` (right
-                        // after the message actions, see MessageActions'
-                        // `hideTimestamp`) so the two never stack a duplicate
-                        // relative-time label — do not ALSO render one here as a
-                        // sibling.
                         footer={item.footer}
                       />
                     </>
@@ -471,8 +405,6 @@ export const TurnTimeline = ({
               )
             })}
           </div>
-          {/* Live tail — always mounted below the virtual window so stick-
-           * to-bottom and end-of-turn chrome stay correct. */}
           {showReconnectBanner && reconnectStatus ? (
             <ReconnectBanner status={reconnectStatus} />
           ) : showCompactingIndicator ? (
@@ -483,7 +415,9 @@ export const TurnTimeline = ({
           ) : showIndexingIndicator ? (
             <div className="mt-1 flex min-h-6 items-center gap-1.5 text-base">
               <RunningDot className="-ml-1 h-4 w-4" />
-              <span className="animate-shimmer-text">Indexing repository…</span>
+              <span className="animate-shimmer-text">
+                {indexingStatus?.note?.trim() || "Indexing repository…"}
+              </span>
             </div>
           ) : showWorkingIndicator ? (
             <div className="mt-1 flex min-h-6 items-center gap-1.5 text-base">
@@ -491,10 +425,6 @@ export const TurnTimeline = ({
               <span className="animate-shimmer-text">Working</span>
             </div>
           ) : null}
-          {/* Reserved end-of-turn slot — holds height during streaming so the
-           * FilesChangedCard / summary enter doesn't jump the feed. Mount the
-           * card only after the settle hold so its git query doesn't compete
-           * with the just-finished answer's GFM parse. */}
           <div className="mt-2 min-h-[var(--end-of-turn-reserved-height)]">
             {!isStreaming && !settleHold ? (
               <FilesChangedCard cwd={activeCwd} sessionId={sessionId} />
@@ -504,7 +434,6 @@ export const TurnTimeline = ({
         </div>
       </div>
 
-      {/* Soft seam into the docked composer — continuous chrome, not a hard cut. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-5 bg-gradient-to-t from-chrome to-transparent"
@@ -518,7 +447,6 @@ export const TurnTimeline = ({
           aria-label="Scroll to bottom"
           className={cn(
             "absolute bottom-3 left-1/2 z-20 -translate-x-1/2",
-            // Floating chrome: panel + shadow-popover (ring lives in the shadow).
             "rounded-full bg-panel text-ink-secondary shadow-popover hover:bg-fill-4 hover:text-ink",
             "animate-tray-in",
           )}
