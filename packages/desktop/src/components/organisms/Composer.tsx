@@ -256,6 +256,17 @@ export const Composer = ({
     }
   }
 
+  const contextBar = interactive ? (
+    <ContextBar
+      cwd={active?.cwd}
+      projectCwd={active ? active.base_cwd || active.cwd : undefined}
+      sessionId={activeSessionId}
+      disabled={false}
+      onError={setError}
+      compact={isHero}
+    />
+  ) : null
+
   return (
     <div className="px-3 pt-1.5 pb-0.5">
       {error ? (
@@ -270,25 +281,14 @@ export const Composer = ({
         </div>
       ) : null}
 
-      <div
-        className={cn(
-          "mx-auto w-full max-w-[var(--content-rail)]",
-          // Empty agent: sit the folder|Direct strip flush above the bubble
-          // (Cursor glue). Full ContextBar keeps a breathing `mb-1`.
-          isHero ? "mb-0.5" : "mb-1",
-        )}
-      >
-        {interactive ? (
-          <ContextBar
-            cwd={active?.cwd}
-            projectCwd={active ? active.base_cwd || active.cwd : undefined}
-            sessionId={activeSessionId}
-            disabled={false}
-            onError={setError}
-            compact={isHero}
-          />
-        ) : null}
-      </div>
+      {/* Empty agent: folder|Direct glued ABOVE the bubble (Cursor New Agent).
+       * Active chat: context sits BELOW as a thin footer — one composer card,
+       * not a bolted second toolbar above it. */}
+      {isHero && contextBar ? (
+        <div className="mx-auto mb-0.5 w-full max-w-[var(--content-rail)]">
+          {contextBar}
+        </div>
+      ) : null}
 
       <ComposerQueue
         items={messageQueue}
@@ -408,6 +408,10 @@ export const Composer = ({
             </div>
           </div>
         </div>
+
+        {!isHero && contextBar ? (
+          <div className="mt-1 w-full">{contextBar}</div>
+        ) : null}
       </div>
     </div>
   )

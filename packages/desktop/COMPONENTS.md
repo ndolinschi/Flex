@@ -105,7 +105,7 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `SessionSidebar` | New Agent + Search + Agents list; groups via `useSessionSidebarGroups`; footer/resume/archive molecules | (hooks) | App shell |
 | `ProviderSettingsForm` | Connections list ↔ dedicated connection editor (`list`/`editor` screens); pieces: `ProviderProfileList`, `ProviderConnectionForm`, `SecretStorageSection` | — | SettingsPage, WelcomePage |
 | `Composer` | Prompt + ContextBar; draft in `ComposerInput`; trays/queue under `organisms/composer/`; optional `dockedOverlay` stacks Permission/Question flush above the bubble; optional `workersSlot` for WorkingAgentsPill | `isHero?`, `dockedOverlay?`, `workersSlot?`, `sessionId?` | ChatSessionBody |
-| `ContextBar` | Project · branch · context % | `cwd`, `sessionId` | Composer |
+| `ContextBar` | Project · branch · isolation · usage — compact above (empty) / footer below (active) | `cwd`, `sessionId`, `compact?` | Composer |
 | `TurnTimeline` | Turns + tools + plans + streaming; `@tanstack/react-virtual` over `displayItems` + live tail; pieces under `organisms/timeline/` (`WorkGroupBody` owns stable `renderOther`; `ToolStepList` clusters tools + parallel workers via `clusterWorkRows`) | `sessionId`, `onLiveRows?` | ChatSessionBody |
 | `PermissionPrompt` | Tool permission HITL header docked above composer bubble; actions in `PermissionActions` | `permission` | ChatSessionBody → `Composer.dockedOverlay` |
 | `QuestionPrompt` | AskUserQuestion HITL (same dock seam as PermissionPrompt) | `question` | ChatSessionBody → `Composer.dockedOverlay` |
@@ -218,7 +218,7 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 - Motion: hover 100ms ease; trays `animate-tray-in`; pane swaps `animate-pane-fade`; timeline rows `animate-row-fade`; end-of-turn `animate-end-turn-in` (160ms); HITL cards `animate-modal-in` (scale .97→1); overlays `animate-backdrop-in`.
 - Composer: `--radius-composer` 14px, real `border-stroke-3` → `stroke-1` on focus, soft ambient (no shadow-ring / no accent glow), compact auto-grow (~24–160px) + toolbar (`text-sm` input; Plus / Bypass / Send `h-6` circles; Mode tinted `text-xs` `h-6` pill + Model quiet ghost `text-xs` pill; left cluster `gap-1`, Bypass↔Send `gap-1.5`); attachment chips compact pills; expand icon focus-reveal.
 - Content rail: `--content-rail` 840px (`52.5rem`).
-- ContextBar sits above the composer (project / branch / context %) — Flex Canon.
+- ContextBar: empty = above composer; active = thin footer below — Flex Canon.
 - Sidebar footer = theme + settings (Flex Canon); rows use fill-4 hover / fill-2 selected.
 - Right panel tabs = Plan / Changes / Pull Request (when current branch has a PR) / Terminal / Browser (Flex Canon); pill tabs via shared `Tab`/`TabStrip`/`TabClose` atoms (`TabStrip` `px-2.5`/`gap-1.5`; `Tab` md/sm both `h-6` so selected fills clear the 30px strip edges; Files open-buffer chips compose the same `Tab` at `size="sm"`); sash hover white-alpha.
 - Focus policy: interactive chrome uses the global neutral `stroke-2` outline; form fields and chrome search inputs use a matching neutral stroke ring (never accent glow).

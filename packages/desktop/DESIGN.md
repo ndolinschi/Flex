@@ -23,12 +23,30 @@ audit and fix UI against this file. For shadcn adds/rewrites, also load the
 | Quiet chrome | Hairline `stroke-3` borders; sash hover is white-alpha, never accent |
 | Whisper fills | Selected `fill-2` (~8%), hover `fill-4` (~6%) (list rows, tabs, chrome buttons) |
 | Opacity hover | Quiet icon controls: idle `.5` → hover `.8`; mode/model pills idle `.8` → hover `1` |
-| Mode tint | Composer mode pill uses semantic fill (agent green / plan yellow / ask cyan / flex purple) |
-| Cool dark | Dark surfaces are neutral charcoal (`#101010` / `#161616` / `#1c1c1c`), not blue-cast |
+| Mode tint | Composer mode pill uses semantic fill (agent green / plan yellow / ask cyan / flex purple) — whisper ~10%, never neon |
+| Neutral dark | Dark surfaces are neutral charcoal (`#101010` / `#161616` / `#1c1c1c`), not blue-cast |
 | 4px grid | Spacing tokens `--space-1`…`--space-12` (4–48px) |
 | Radius by role | Controls `rounded-md` (8); composer/bubbles 14; settings cards 12; pills full; sidebar rows 6 |
 | Keyboard focus | Neutral `stroke-2` ring; no accent glow |
 | Semibold = 590 | Plus micro tracking on captions |
+
+### Neatness (why Cursor reads «аккуратно»)
+
+Cursor feels tidy because chrome **absorbs** controls instead of stacking
+bolted layers. Adapt these rules into Flex — do not clone Cursor brand chrome.
+
+| Cursor habit | Flex rule |
+|---|---|
+| One continuous surface ladder (whisper shade steps) | Neutral charcoal tokens; hairline only between panes |
+| Context lives in **one** band (empty: above input; work: thin footer under input) | Empty: compact folder\|Direct **above** bubble; active: ContextBar **below** bubble as footer |
+| Closed project/branch are quiet pills, not form fields | `ComboboxTrigger` + search inside popup |
+| Nested boxes avoided | Never wrap pill rows in a second bordered card |
+| One loud accent job at a time | Mode pill is the tinted control; CTAs stay neutral/soft; semantic `blue`/`cyan` muted |
+| Even density | Sidebar cells share one recipe (`h-7` / `px-2`); content rails keep gutters |
+
+**Anti-patterns that read messy:** form InputGroups in the context strip;
+ContextBar as a second full toolbar *above* an active composer; blue-cast
+ink; double chrome (card around pills); mixed control heights in one band.
 
 
 ## Reference extraction (Cursor glass → Flex)
@@ -79,9 +97,9 @@ colored icon only).
 
 - Product monochrome accent default (Settings can override) — not Cursor blue CTA.
 - Green switch ON track (`--color-switch-on`) for settings.
-- ContextBar above composer (empty agent: content-sized folder + Direct strip);
-  sidebar footer = theme + settings. Pristine New Agent selection collapses
-  split and prunes sibling tool tabs so the strip reads as one clean tab.
+- ContextBar: empty agent = bare folder + Direct **above** composer; active =
+  thin footer **below** composer. Sidebar footer = theme + settings. Pristine
+  New Agent selection collapses split and prunes sibling tool tabs.
 - Domain chrome stays custom: `Tab`/`TabStrip`, `WindowTitleBar`, Monaco/xterm,
   timeline WorkGroup/tool cards, HITL docks.
 - Light theme: white chrome / cool panel / elevated — three surface steps so
@@ -321,7 +339,7 @@ modal. HITL docks as a composer-adjacent blocking surface, not a dialog.
 | State | Component | Recipe |
 |---|---|---|
 | Empty | `EmptyState` | Top-weighted utility void: `py-10 gap-3` (not full-viewport `justify-center`); title `text-sm text-ink-secondary`; description `text-xs text-ink-muted`; CTA `Button secondary sm`; icon chip `bg-fill-3 text-ink-faint` |
-| Hero empty | `ChatShell` empty rail | Utility void: muted `text-ink-secondary` title (`text-[15px]`) + outline whisper chips; compact ContextBar is a **content-sized** `folder` + Direct strip (`inline-flex`, bubble fill + hairline + ambient) glued `mb-0.5` above composer; selecting a pristine draft from the sidebar prunes sibling tabs |
+| Hero empty | `ChatShell` empty rail | Utility void: muted `text-ink-secondary` title (`text-[15px]`) + outline whisper chips; bare compact ContextBar (folder + Direct pills, no card) glued `mb-0.5` above composer; selecting a pristine draft from the sidebar prunes sibling tabs |
 | Onboarding | `WelcomePage` | Primary controls **`h-9`** (`Button size="lg"`, inputs `h-9`); errors via `ErrorBanner` |
 | Loading list | `SidebarSkeleton` | Rows `min-h-7` / two-line `h-10`; headers `h-6`; `rounded-sm` whisper fills; `px-2` gutter |
 | Loading block | `Skeleton` | `bg-surface-muted` (fill-3) + soft pulse; **`opacity-70`** dampen |
@@ -381,13 +399,13 @@ column + `gap-1.5`, bottom toolbar of `h-6` controls.
 
 1. Outer `px-3` → rail `max-w-[var(--content-rail)]`
 2. Optional `workersSlot` / HITL docked flush above the bubble
-3. ContextBar above bubble — full mode `mb-1` + min-height status bar
-   (project/branch/isolation/commit/usage); empty-agent `compact` mode is a
-   content-sized elevated strip (`inline-flex`, `mb-0.5`) with project +
-   isolation only, glued to the input like Cursor's folder|Direct row.
-   Project/branch closed triggers are **quiet ghost pills** (`ComboboxTrigger`
-   + search `ComboboxInput` inside the popup) — never form-looking InputGroups
-   in the bar. Isolation uses the same `contextBarTriggerClass` recipe.
+3. ContextBar placement (Cursor neatness):
+   - **Empty agent (`compact`)**: bare folder\|Direct pills **above** the
+     bubble (`mb-0.5`) — no nested card chrome.
+   - **Active chat**: thin footer **below** the bubble (`mt-1`, `min-h-6`)
+     with project/branch/isolation/commit/usage — not a second toolbar above.
+   Project/branch closed triggers are quiet ghost pills (`ComboboxTrigger` +
+   search inside the popup). Isolation uses the same `contextBarTriggerClass`.
 4. Bubble: `--radius-composer` · `bg-user-bubble` · `border-stroke-3` ·
    `focus-within:border-stroke-1` · `shadow-composer` (ambient, **not** a
    shadow-painted ring). Docked HITL uses side/bottom stroke only.

@@ -47,8 +47,8 @@
   --color-red: #f07178;
   --color-yellow: #e6b450;
   --color-green: #7fd97a;
-  --color-blue: #6b9eff;
-  --color-cyan: #7dcfff;
+  --color-blue: #8a9bb8;
+  --color-cyan: #8aabb8;
   --color-magenta: #c3a6e0;
   --color-purple: #b38cff;
   --color-orange: #ff9b6a;
@@ -68,14 +68,14 @@
   --color-switch-on: #7fd97a;
 
   /* Composer mode semantics (Cursor mode tint: green/yellow/cyan/purple).
-   * Whisper secondary fills (~12–14%) so pills read tinted, not neon slabs. */
-  --color-mode-agent-bg: color-mix(in srgb, var(--color-green) 14%, transparent);
+   * Whisper secondary fills (~10%) so pills read tinted, not neon slabs. */
+  --color-mode-agent-bg: color-mix(in srgb, var(--color-green) 10%, transparent);
   --color-mode-agent-fg: var(--color-green);
-  --color-mode-plan-bg: color-mix(in srgb, var(--color-yellow) 14%, transparent);
+  --color-mode-plan-bg: color-mix(in srgb, var(--color-yellow) 10%, transparent);
   --color-mode-plan-fg: var(--color-yellow);
-  --color-mode-ask-bg: color-mix(in srgb, var(--color-cyan) 14%, transparent);
+  --color-mode-ask-bg: color-mix(in srgb, var(--color-cyan) 10%, transparent);
   --color-mode-ask-fg: var(--color-cyan);
-  --color-mode-flex-bg: color-mix(in srgb, var(--color-purple) 12%, transparent);
+  --color-mode-flex-bg: color-mix(in srgb, var(--color-purple) 10%, transparent);
   --color-mode-flex-fg: var(--color-purple);
 
   /* Elevation — soft on near-black; avoid heavy black slabs. */
@@ -123,8 +123,8 @@
   --color-red: #d94a5b;
   --color-yellow: #9a6700;
   --color-green: #1a7f4b;
-  --color-blue: #2f6fed;
-  --color-cyan: #3d7a96;
+  --color-blue: #5a6f8f;
+  --color-cyan: #4a6a78;
   --color-magenta: #8f6b8a;
   --color-purple: #6a5fd4;
   --color-orange: #b86f55;
@@ -140,14 +140,14 @@
   --color-settings-card: rgb(23 23 23 / 0.03);
   --color-switch-on: #1a7f4b;
 
-  /* Mode tints stronger on light so pills don't wash out. */
-  --color-mode-agent-bg: color-mix(in srgb, var(--color-green) 14%, transparent);
+  /* Mode tints quieter on light so pills don't dominate chrome. */
+  --color-mode-agent-bg: color-mix(in srgb, var(--color-green) 10%, transparent);
   --color-mode-agent-fg: var(--color-green);
-  --color-mode-plan-bg: color-mix(in srgb, var(--color-yellow) 16%, transparent);
+  --color-mode-plan-bg: color-mix(in srgb, var(--color-yellow) 12%, transparent);
   --color-mode-plan-fg: var(--color-yellow);
-  --color-mode-ask-bg: color-mix(in srgb, var(--color-cyan) 14%, transparent);
+  --color-mode-ask-bg: color-mix(in srgb, var(--color-cyan) 10%, transparent);
   --color-mode-ask-fg: var(--color-cyan);
-  --color-mode-flex-bg: color-mix(in srgb, var(--color-purple) 14%, transparent);
+  --color-mode-flex-bg: color-mix(in srgb, var(--color-purple) 10%, transparent);
   --color-mode-flex-fg: var(--color-purple);
 
   /* Elevation — soft graphite, not near-black slabs on white. */

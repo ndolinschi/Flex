@@ -25,7 +25,7 @@ type ContextBarProps = {
   compact?: boolean
 }
 
-/** Context row above the composer: project · branch · isolation · context %. */
+/** Context chrome for the composer: empty = compact pills above; active = thin footer below. */
 export const ContextBar = ({
   cwd,
   projectCwd,
@@ -50,11 +50,10 @@ export const ContextBar = ({
   const { data: isRepo = true } = useIsGitRepo(cwd)
 
   if (compact) {
-    // Content-sized strip (not a full-width status bar) — matches Cursor's
-    // folder|Direct row glued above the empty-agent input.
+    // Bare pill row — no nested card. Cursor's folder|Direct is chrome, not a box.
     return (
       <div
-        className="inline-flex max-w-full items-center gap-0.5 rounded-md border border-stroke-3 bg-user-bubble/80 px-0.5 py-0.5 shadow-[var(--shadow-composer)]"
+        className="inline-flex max-w-full items-center gap-0.5"
         data-context-bar="compact"
       >
         <ProjectPicker
@@ -77,11 +76,14 @@ export const ContextBar = ({
     )
   }
 
+  // Active session: thin footer strip (Cursor branch|Worktree rhythm) — not a
+  // second full toolbar. min-height stays for touch targets without looking tall.
   return (
     <div
       className={cn(
-        "flex min-h-[var(--status-bar-height)] items-center gap-2 px-0",
+        "flex min-h-6 items-center gap-2 px-0.5",
       )}
+      data-context-bar="footer"
     >
       {/* min-w-0 + flex-1 (not justify-between) so this group is what shrinks
           under pressure — the gap to the right-hand cluster is a real flex
