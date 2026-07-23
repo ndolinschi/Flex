@@ -159,8 +159,12 @@ export const ContentWorkspace = ({
           <>
             <ResizableHandle
               disabled={!showSash}
+              aria-label="Resize content panes"
               className={cn(
                 "sash-line-transition z-20 w-2 shrink-0 bg-transparent",
+                // Hit target extends into the chat pane (never under the
+                // native Browser webview, which paints above every DOM stack).
+                "before:absolute before:inset-y-0 before:-left-2 before:w-4 before:content-['']",
                 "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-stroke-3",
                 showSash && "cursor-col-resize",
                 showSash &&
@@ -172,6 +176,8 @@ export const ContentWorkspace = ({
               onPointerDown={(e) => {
                 if (!showSash) return
                 e.currentTarget.setPointerCapture?.(e.pointerId)
+                // Hide native Browser webview for the drag — it sits above DOM
+                // and would otherwise eat pointermove / block the sash.
                 setRightPanelDragging(true)
               }}
               onPointerUp={() => setRightPanelDragging(false)}

@@ -26,6 +26,7 @@ import {
 } from "../stores/appStore"
 import { log } from "../lib/debug/log"
 import type { BrowserDomElement } from "../lib/browserDesign"
+import { computeBrowserWebviewBounds } from "../lib/browserWebviewBounds"
 
 export const VIEWPORT_PRESETS: Array<{
   id: BrowserViewportPreset
@@ -357,15 +358,29 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
         name,
         payload: element,
       })
+      // Quiet select: chip + composer focus are the affordance; a toast on
+      // every inspect click is noise (Design Mode is intentionally silent).
+      // #region agent log
+      fetch("http://127.0.0.1:7920/ingest/43f1534f-3411-4042-8d21-9327abbca399", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Debug-Session-Id": "5cd2b5",
+        },
+        body: JSON.stringify({
+          sessionId: "5cd2b5",
+          runId: "pre-fix",
+          hypothesisId: "H6",
+          location: "useBrowserSession.ts:addDomChip",
+          message: "element select (no toast)",
+          data: { name, additive },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
       window.dispatchEvent(new CustomEvent("flex:focus-composer"))
-      pushToast(
-        additive
-          ? `Added ${name} — describe the change`
-          : `Selected ${name} — describe the change`,
-        "success",
-      )
     },
-    [addAttachment, clearAttachments, pushToast],
+    [addAttachment, clearAttachments],
   )
 
   useEffect(() => {
@@ -483,8 +498,8 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     let cancelled = false
     let rafId: number | null = null
     let lastSent: { x: number; y: number; w: number; h: number } | null = null
-    const panelEl = document.querySelector<HTMLElement>(
-      '[aria-label="Details panel"]',
+    const sashEls = document.querySelectorAll<HTMLElement>(
+      '[data-slot="resizable-handle"], [aria-label="Resize sessions sidebar"]',
     )
     const shouldHideWebview = (slotRect: DOMRectReadOnly) =>
       isNativeWebviewSuppressed(slotRect) ||
@@ -492,37 +507,86 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     const measure = (force: boolean) => {
       if (cancelled) return
       const rect = slot.getBoundingClientRect()
-      if (shouldHideWebview(rect)) {
+      const dragging = useAppStore.getState().rightPanelDragging
+      const suppressed = isNativeWebviewSuppressed(rect)
+      if (suppressed || dragging) {
+        // #region agent log
+        fetch("http://127.0.0.1:7920/ingest/43f1534f-3411-4042-8d21-9327abbca399", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Session-Id": "5cd2b5",
+          },
+          body: JSON.stringify({
+            sessionId: "5cd2b5",
+            runId: "pre-fix",
+            hypothesisId: dragging ? "H5" : "H1",
+            location: "useBrowserSession.ts:measure-hide",
+            message: "browserSetVisible(false)",
+            data: { suppressed, dragging, force },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion
         lastSent = null
         void browserSetVisible(false)
         return
       }
-      if (rect.width < 2 || rect.height < 2) {
+      const sashes = Array.from(sashEls)
+        .map((el) => el.getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.height > 0)
+        .map((r) => ({
+          x: r.left,
+          y: r.top,
+          width: r.width,
+          height: r.height,
+        }))
+      const presetWidth =
+        VIEWPORT_PRESETS.find((p) => p.id === viewportPreset)?.width ?? null
+      const next = computeBrowserWebviewBounds({
+        slot: {
+          x: rect.left,
+          y: rect.top,
+          width: rect.width,
+          height: rect.height,
+        },
+        presetWidth,
+        windowWidth: window.innerWidth,
+        windowHeight: window.innerHeight,
+        sashes,
+      })
+      if (!next) {
         lastSent = null
         void browserSetVisible(false)
         return
       }
-      const widthSource = rect.width
-      const presetWidth = VIEWPORT_PRESETS.find(
-        (p) => p.id === viewportPreset,
-      )?.width
-      let width = presetWidth
-        ? Math.min(presetWidth, widthSource)
-        : widthSource
-      let x = rect.left + (widthSource - width) / 2
-      let y = rect.top
-      let height = rect.height
-      const panelRect = panelEl?.getBoundingClientRect()
-      if (panelRect && panelRect.width > 0 && panelRect.height > 0) {
-        width = Math.min(width, panelRect.width)
-        height = Math.min(height, panelRect.bottom - y)
-        if (height < 2) {
-          lastSent = null
-          void browserSetVisible(false)
-          return
-        }
-        x = Math.max(panelRect.left, Math.min(x, panelRect.right - width))
+      const { x, y, width, height } = next
+      // #region agent log
+      if (force) {
+        fetch("http://127.0.0.1:7920/ingest/43f1534f-3411-4042-8d21-9327abbca399", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Session-Id": "5cd2b5",
+          },
+          body: JSON.stringify({
+            sessionId: "5cd2b5",
+            runId: "pre-fix",
+            hypothesisId: "H5",
+            location: "useBrowserSession.ts:measure-bounds",
+            message: "computed webview bounds",
+            data: {
+              x: Math.round(x),
+              y: Math.round(y),
+              w: Math.round(width),
+              h: Math.round(height),
+              sashCount: sashes.length,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
       }
+      // #endregion
       if (
         !force &&
         lastSent &&
@@ -540,6 +604,24 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
           void browserSetVisible(false)
           return
         }
+        // #region agent log
+        fetch("http://127.0.0.1:7920/ingest/43f1534f-3411-4042-8d21-9327abbca399", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Session-Id": "5cd2b5",
+          },
+          body: JSON.stringify({
+            sessionId: "5cd2b5",
+            runId: "pre-fix",
+            hypothesisId: "H2",
+            location: "useBrowserSession.ts:measure-show",
+            message: "browserSetVisible(true)",
+            data: { x: Math.round(x), w: Math.round(width) },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion
         void browserSetVisible(true)
       })
     }
@@ -558,11 +640,17 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     resizeObserver.observe(slot)
     const toolbar = toolbarRef.current
     if (toolbar) resizeObserver.observe(toolbar)
-    if (panelEl) resizeObserver.observe(panelEl)
+    for (const el of sashEls) resizeObserver.observe(el)
     const onScroll = () => schedule()
     window.addEventListener("scroll", onScroll, true)
-    if (panelEl) panelEl.addEventListener("scroll", onScroll, true)
-    window.addEventListener("resize", schedule)
+    // Live window resize throttles rAF inside WKWebView — hide immediately so
+    // the OS edge grip / sash stay hittable, then reshow on the next measure.
+    const onWindowResize = () => {
+      lastSent = null
+      void browserSetVisible(false)
+      schedule()
+    }
+    window.addEventListener("resize", onWindowResize)
     schedule()
     const watchdogMs = sessionStreaming ? 2000 : 500
     const watchdog = window.setInterval(() => measure(false), watchdogMs)
@@ -579,8 +667,7 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
       resizeObserver.disconnect()
       overlayObserver.disconnect()
       window.removeEventListener("scroll", onScroll, true)
-      if (panelEl) panelEl.removeEventListener("scroll", onScroll, true)
-      window.removeEventListener("resize", schedule)
+      window.removeEventListener("resize", onWindowResize)
       window.clearInterval(watchdog)
       if (rafId !== null) cancelAnimationFrame(rafId)
       void browserSetVisible(false)
