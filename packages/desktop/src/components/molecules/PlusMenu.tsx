@@ -37,17 +37,18 @@ export const PlusMenu = ({
             aria-label="Add context"
             title={open ? undefined : "Add context"}
             className={cn(
-              // Quiet + circle — matches Bypass/Send hit target, not a filled chip.
-              "size-6 rounded-full text-ink-muted opacity-60",
+              // Quiet chrome circle: idle whisper fill-4 + .5 → hover fill-2 + .8
+              // (visible rest fill so + isn't naked next to Mode / Send).
+              "size-6 rounded-full bg-fill-4 text-icon-2 opacity-50",
               "transition-[opacity,background-color,color,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-              "hover:bg-fill-4 hover:text-ink hover:opacity-100",
-              "active:translate-y-px active:opacity-100 motion-reduce:active:translate-y-0",
-              "aria-expanded:bg-fill-4 aria-expanded:text-ink aria-expanded:opacity-100",
+              "hover:bg-fill-2 hover:text-icon-1 hover:opacity-80",
+              "active:translate-y-px active:opacity-80 motion-reduce:active:translate-y-0",
+              "aria-expanded:bg-fill-2 aria-expanded:text-icon-1 aria-expanded:opacity-80",
             )}
           />
         }
       >
-        <PlusIcon />
+        <PlusIcon className="size-3.5" strokeWidth={1.5} aria-hidden />
       </DropdownMenuTrigger>
       {open ? (
         <DropdownMenuContent side="top" align="start" className="w-56">

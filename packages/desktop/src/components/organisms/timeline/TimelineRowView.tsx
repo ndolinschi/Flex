@@ -1,11 +1,9 @@
 import { memo } from "react"
-import { MousePointer2, Palette } from "lucide-react"
 import {
   CompactionCard,
   ErrorBanner,
   IndexingCard,
   MarkdownBody,
-  MentionText,
   PeerMessageCard,
   SubagentGroup,
   ToolCallChip,
@@ -16,11 +14,10 @@ import type { TimelineRow } from "../../../lib/types"
 import { parseDomContextMessage } from "../../../lib/browserDesign"
 import { parseComponentStyleMessage } from "../../../lib/componentDesign"
 import { useAppStore } from "../../../stores/appStore"
-import { cn } from "../../../lib/utils"
 import { Message, MessageContent } from "@/components/ui/message"
-import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { Marker, MarkerContent } from "@/components/ui/marker"
 import { ThinkingBlock } from "./ThinkingBlock"
+import { HumanMessageCard } from "./HumanMessageCard"
 import { MessageActions } from "./MessageActions"
 import { CheckpointChip } from "./CheckpointChip"
 import { TurnFooter } from "./TurnFooter"
@@ -71,68 +68,16 @@ export const TimelineRowView = memo(({
       const copyText =
         displayText.trim() || (style || dom ? displayText : row.text)
       return (
-        <Message
-          align="end"
-          className={cn(
-            "group/row",
-            dimmed ? "opacity-50 hover:opacity-100" : "opacity-100",
-            "transition-opacity duration-[var(--duration-fast)]",
-          )}
-        >
-          <MessageContent>
-            {/*
-             * Scope-override --color-secondary → --color-user-bubble so
-             * Bubble's variant="secondary" selector (bg-secondary on
-             * BubbleContent) picks up the Flex user-bubble token without
-             * needing !important overrides. The hover border/bg still
-             * reference the Flex token directly.
-             */}
-            <Bubble
-              variant="secondary"
-              align="end"
-              className="min-w-[150px] [--color-secondary:var(--color-user-bubble)] [--secondary:var(--color-user-bubble)]"
-            >
-              <BubbleContent
-                className={cn(
-                  "border-stroke-1 px-2.5 py-2",
-                  "hover:border-stroke-1 hover:bg-[color-mix(in_srgb,var(--color-user-bubble)_96%,white)]",
-                )}
-              >
-                {style ? (
-                  <span className="mb-1.5 mr-1 inline-flex h-5 items-center gap-1 rounded-[4px] border border-stroke-3 bg-fill-3 px-1 text-sm text-ink-secondary">
-                    <Palette className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
-                    {style.editCount} style edit{style.editCount > 1 ? "s" : ""}
-                  </span>
-                ) : null}
-                {dom ? (
-                  <span className="mb-1.5 inline-flex h-5 items-center gap-1 rounded-[4px] border border-stroke-3 bg-fill-3 px-1 text-sm text-ink-secondary">
-                    <MousePointer2 className="h-3 w-3 shrink-0 text-icon-3" aria-hidden />
-                    {dom.elementCount} element{dom.elementCount > 1 ? "s" : ""} selected
-                  </span>
-                ) : null}
-                {displayText.trim() ? (
-                  <p className="text-base leading-snug text-ink">
-                    <MentionText text={displayText} />
-                  </p>
-                ) : null}
-              </BubbleContent>
-            </Bubble>
-            {/* Pre-Message migration the user column was `w-fit ml-auto`, so
-             * timestamp/copy sat under the bubble on the right. MessageContent
-             * is full-width — without `self-end`, actions `justify-start` and
-             * land on the left over the agent stream (see live QA screenshot). */}
-            {showActions && !footer ? (
-              <div className="self-end">
-                <MessageActions text={copyText} tsMs={row.tsMs} />
-              </div>
-            ) : null}
-            {footer ? (
-              <div className="self-end">
-                <TurnFooter {...footer} />
-              </div>
-            ) : null}
-          </MessageContent>
-        </Message>
+        <HumanMessageCard
+          displayText={displayText}
+          copyText={copyText}
+          tsMs={row.tsMs}
+          styleEditCount={style?.editCount}
+          elementCount={dom?.elementCount}
+          showActions={showActions}
+          dimmed={dimmed}
+          footer={footer}
+        />
       )
     }
     case "assistant": {
@@ -140,14 +85,15 @@ export const TimelineRowView = memo(({
       const isLive = row.id.startsWith("live-assistant:")
       return (
         <Message align="start" className="group/row min-h-5">
-          <MessageContent>
+          <MessageContent className="gap-2 px-[9px]">
             <MarkdownBody content={row.text} live={isLive} />
             {showActions && !footer ? (
               <MessageActions text={row.text} tsMs={row.tsMs} />
             ) : isLive && !footer ? (
               // Reserve the actions row height while streaming so materialization
-              // (MessageActions mount) does not jump the virtual row ~28px.
-              <div className="mt-1 h-7" aria-hidden />
+              // (MessageActions mount) does not jump the virtual row — matches
+              // MessageActions `mt-1 h-5` (not legacy h-7).
+              <div className="mt-1 h-5" aria-hidden />
             ) : null}
             {footer ? <TurnFooter {...footer} /> : null}
           </MessageContent>

@@ -24,6 +24,7 @@ export const THEME_TOKEN_ALLOWLIST = [
   "--color-panel",
   "--color-editor",
   "--color-elevated",
+  "--color-brand",
   // Text hierarchy
   "--color-text-1",
   "--color-text-2",
@@ -34,13 +35,13 @@ export const THEME_TOKEN_ALLOWLIST = [
   "--color-icon-2",
   "--color-icon-3",
   "--color-icon-4",
-  // Whisper fills
+  // Whisper fills (bg-primary…quinary aliases)
   "--color-fill-1",
   "--color-fill-2",
   "--color-fill-3",
   "--color-fill-4",
   "--color-fill-5",
-  // Strokes
+  // Strokes / borders
   "--color-stroke-1",
   "--color-stroke-2",
   "--color-stroke-3",
@@ -59,6 +60,11 @@ export const THEME_TOKEN_ALLOWLIST = [
   "--color-magenta",
   "--color-purple",
   "--color-orange",
+  // Git status
+  "--color-added",
+  "--color-modified",
+  "--color-removed",
+  "--color-untracked",
   // Diff
   "--color-diff-added",
   "--color-diff-removed",

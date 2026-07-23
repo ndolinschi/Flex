@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react"
 import { cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
 import { Button } from "@/components/ui/button"
+import { ChatThreadHeader } from "../molecules/ChatThreadHeader"
 
 const QUICKSTART_SUGGESTIONS = [
   "Fix a bug in this repo",
@@ -23,14 +24,21 @@ type ChatShellProps = {
   composerHero?: boolean
   heroTitle?: string
   heroHint?: string
+  /**
+   * Production chat thread header title (40px row). Shown when the
+   * conversation has turns; empty hero uses the large void title instead.
+   */
+  threadTitle?: string
+  /** Optional trailing controls for the thread header (repo chip, etc.). */
+  threadTrailing?: ReactNode
 }
 
 /**
  * Chat column shell. Composer always docks at the bottom (IDE rail), even
  * when the conversation is empty — never a centered marketing hero.
  *
- * Empty composition matches Cursor New Agent: muted title + whisper chips in
- * the upper void; the primary control is the docked input below.
+ * Empty composition: muted header title + whisper chips in the upper void;
+ * the primary control is the docked input below.
  */
 export const ChatShell = ({
   sidebar,
@@ -42,6 +50,8 @@ export const ChatShell = ({
   composerHero = false,
   heroTitle = "Agent",
   heroHint = "Describe a task to get started.",
+  threadTitle,
+  threadTrailing,
 }: ChatShellProps) => {
   const setComposerDraft = useAppStore((s) => s.setComposerDraft)
   const tight = useAppStore((s) => s.viewport === "tight")
@@ -55,6 +65,13 @@ export const ChatShell = ({
     })
   }
 
+  /* Explicit empty string = hide title (tab already names the session);
+   * undefined falls back to heroTitle for callers that omit the prop. */
+  const headerTitle =
+    threadTitle !== undefined ? threadTitle : composerHero ? heroTitle : ""
+  const showThreadHeader =
+    headerTitle.trim().length > 0 || threadTrailing != null
+
   const paneStyle = {
     ...(tight ? ({ "--content-rail": "100%" } as CSSProperties) : {}),
   } as CSSProperties
@@ -62,21 +79,32 @@ export const ChatShell = ({
   const pane = (
     <div
       className={cn(
-        "flex h-full min-h-0 min-w-0 flex-1 flex-col bg-bg",
+        // Glass chat surface = chrome (#141414 pure gray), not elevated chip.
+        "flex h-full min-h-0 min-w-0 flex-1 flex-col bg-chrome",
         wide && "min-w-[380px]",
       )}
       style={Object.keys(paneStyle).length > 0 ? paneStyle : undefined}
     >
       <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {showThreadHeader ? (
+          <ChatThreadHeader title={headerTitle} trailing={threadTrailing} />
+        ) : null}
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div
+            className={cn(
+              "flex min-h-0 flex-1 flex-col overflow-hidden",
+              composerHero &&
+                "pointer-events-none invisible absolute inset-0",
+            )}
+            aria-hidden={composerHero || undefined}
+          >
+            {timeline}
+          </div>
           {composerHero ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-10">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-6">
               <div className="mx-auto w-full max-w-[var(--content-rail)]">
-                <h2 className="truncate text-[15px] font-medium tracking-[-0.02em] text-ink-secondary">
-                  {heroTitle}
-                </h2>
-                <p className="mt-1 text-xs text-ink-muted">{heroHint}</p>
-                <div className="mt-3.5 flex flex-wrap gap-1.5">
+                <p className="text-sm text-ink-muted">{heroHint}</p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
                   {QUICKSTART_SUGGESTIONS.map((suggestion) => (
                     <Button
                       key={suggestion}
@@ -91,9 +119,7 @@ export const ChatShell = ({
                 </div>
               </div>
             </div>
-          ) : (
-            timeline
-          )}
+          ) : null}
         </div>
 
         <div className="relative z-50 shrink-0 pb-2">

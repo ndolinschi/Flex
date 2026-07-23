@@ -7,7 +7,6 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
-  SidebarSeparator,
 } from "@/components/ui/sidebar"
 import {
   useCallback,
@@ -19,21 +18,15 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react"
 import {
-  ArrowUpRight,
   Bot,
   Brain,
-  ChevronDown,
-  ChevronRight,
+  FolderPlus,
+  PanelLeft,
   Search,
-  SlidersHorizontal,
   SquarePen,
-  Trash2,
-  X,
 } from "lucide-react"
 import {
   ArchivedSectionHeader,
-  ConfirmDialog,
-  ContextMenu,
   EmptyState,
   ErrorBanner,
   RepoSectionHeader,
@@ -43,8 +36,14 @@ import {
   SidebarProjectFilter,
   SidebarResumeError,
   SidebarSkeleton,
-  type ContextMenuItem,
+  reposHeaderIconClass,
 } from "../molecules"
+import { TitleBarMenus } from "../molecules/TitleBarMenus"
+import { TrafficLights } from "../molecules/WindowControls"
+import { BugReportDialog } from "../molecules/BugReportDialog"
+import { TitleBarDragRegion } from "./TitleBarChrome"
+import { useTitleBarActions } from "../../hooks/useTitleBarActions"
+import { detectWindowHost } from "../../lib/windowChrome"
 import { useQueryClient } from "@tanstack/react-query"
 import { SESSIONS_KEY, useSessions } from "../../hooks/useSessions"
 import { useWorkspaceStatuses } from "../../hooks/useWorkspaceStatuses"
@@ -52,12 +51,12 @@ import { useGitStatuses } from "../../hooks/useGitStatuses"
 import { useIndexedRepos } from "../../hooks/useIndexedRepos"
 import { useSessionSidebarGroups } from "../../hooks/useSessionSidebarGroups"
 import {
-  discardIsolatedSession,
   resumeSession,
   toInvokeError,
 } from "../../lib/tauri"
 import { AUTOMATIONS_UI_ENABLED } from "../../lib/featureFlags"
 import { isSessionNotFoundError } from "../../lib/sessions"
+import { nestSessionsByParent } from "../../lib/sessionGrouping"
 import { isDefaultSessionTitle, type SessionMeta } from "../../lib/types"
 import { cn } from "../../lib/utils"
 import { persistUiState, useAppStore } from "../../stores/appStore"
@@ -68,15 +67,13 @@ import {
   SIDEBAR_MIN_WIDTH,
 } from "../../stores/layoutConstants"
 
-const isMac =
-  typeof navigator !== "undefined" &&
-  /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
-
 type SessionSidebarProps = {
   onOpenSearch: () => void
 }
 
 export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
+  const host = detectWindowHost()
+  const isMacHost = host === "macos"
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const setActiveSessionId = useAppStore((s) => s.setActiveSessionId)
   const setRoute = useAppStore((s) => s.setRoute)
@@ -87,7 +84,12 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
   const setSidebarCollapsed = useAppStore((s) => s.setSidebarCollapsed)
   const viewport = useAppStore((s) => s.viewport)
+  const isBootstrapped = useAppStore((s) => s.isBootstrapped)
   const narrow = viewport !== "wide"
+  const [bugOpen, setBugOpen] = useState(false)
+  const openBugReport = useCallback(() => setBugOpen(true), [])
+  const closeBugReport = useCallback(() => setBugOpen(false), [])
+  // newAgent is declared below via useSessions — wire menus after that hook.
   const pinnedSessionIds = useAppStore((s) => s.pinnedSessionIds)
   const archivedSessionIds = useAppStore((s) => s.archivedSessionIds)
   const sidebarProjectSort = useAppStore((s) => s.sidebarProjectSort)
@@ -114,19 +116,11 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   const [selectError, setSelectError] = useState<string | null>(null)
   const [selectErrorId, setSelectErrorId] = useState<string | null>(null)
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
-  const [collapsedRepos, setCollapsedRepos] = useState<Record<string, boolean>>({})
   const [archivedCollapsed, setArchivedCollapsed] = useState(true)
+  const [collapsedRepos, setCollapsedRepos] = useState<Record<string, boolean>>(
+    {},
+  )
   const [dragging, setDragging] = useState(false)
-  const [repoMenu, setRepoMenu] = useState<{
-    cwd: string
-    position: { x: number; y: number }
-  } | null>(null)
-  const [deleteProject, setDeleteProject] = useState<{
-    cwd: string
-    label: string
-    sessions: SessionMeta[]
-  } | null>(null)
-  const [deletingProject, setDeletingProject] = useState(false)
   const {
     sessions: allSessions,
     isLoading,
@@ -137,17 +131,31 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     deleteSession,
     isCreating,
   } = useSessions()
+  const { handlers: titleBarHandlers } = useTitleBarActions({
+    newAgent,
+    onOpenSearch,
+    onOpenBugReport: openBugReport,
+  })
   const queryClient = useQueryClient()
-  // Subagent child sessions render inside their parent's feed — the sidebar
-  // lists only top-level agents.
+  // Roots fill time buckets / pins; children (`parent_id`) nest under roots.
   const sessions = useMemo(
     () => allSessions.filter((s) => !s.parent_id),
     [allSessions],
   )
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string, SessionMeta[]>()
+    for (const node of nestSessionsByParent(sessions, allSessions)) {
+      if (node.children.length > 0) map.set(node.session.id, node.children)
+    }
+    return map
+  }, [sessions, allSessions])
 
   const activeSession = useMemo(
-    () => sessions.find((s) => s.id === activeSessionId) ?? null,
-    [sessions, activeSessionId],
+    () =>
+      allSessions.find((s) => s.id === activeSessionId) ??
+      sessions.find((s) => s.id === activeSessionId) ??
+      null,
+    [allSessions, sessions, activeSessionId],
   )
 
   // Drop persisted active/pin ids that are no longer in the sessions list
@@ -177,16 +185,12 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     setActiveSessionId,
   ])
 
-  const { pinnedSessions, archivedSessions, repoGroups } = useSessionSidebarGroups(
-    sessions,
-    pinnedSessionIds,
-    archivedSessionIds,
-    {
+  const { pinnedSessions, archivedSessions, repoGroups } =
+    useSessionSidebarGroups(sessions, pinnedSessionIds, archivedSessionIds, {
       sort: sidebarProjectSort,
       visibility: sidebarProjectVisibility,
       activeSession,
-    },
-  )
+    })
 
   const handleCreate = useCallback(
     async (cwd?: string) => {
@@ -195,6 +199,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
       // mutation onSuccess selects the new session; awaiting here left the
       // sidebar button dead until create + post-select git/`gh` finished.
       if (narrow) setSidebarCollapsed(true)
+      else setSidebarCollapsed(false)
       void newAgent(cwd).catch((err: unknown) => {
         pushToast(toInvokeError(err), "error")
       })
@@ -226,8 +231,8 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
 
   const handleSelect = useCallback(
     async (id: string) => {
-      // Empty New Agent drafts should open as a single-tab composition
-      // (Cursor empty agent) — prune sibling Changes/Files tabs + collapse split.
+      // Empty New Agent drafts open as a single-tab composition —
+      // prune sibling Changes/Files tabs + collapse split.
       const sessions =
         queryClient.getQueryData<SessionMeta[]>(SESSIONS_KEY) ?? []
       const meta = sessions.find((s) => s.id === id)
@@ -341,7 +346,13 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     for (const id of pinnedSessionIds) addIfKnown(id)
     for (const group of repoGroups) {
       if (collapsedRepos[group.cwd]) continue
-      for (const s of group.sessions) ids.add(s.id)
+      for (const s of group.sessions) {
+        ids.add(s.id)
+        for (const child of childrenByParent.get(s.id) ?? []) ids.add(child.id)
+      }
+    }
+    for (const s of pinnedSessions) {
+      for (const child of childrenByParent.get(s.id) ?? []) ids.add(child.id)
     }
     if (!archivedCollapsed) {
       for (const s of archivedSessions) ids.add(s.id)
@@ -353,6 +364,8 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     pinnedSessionIds,
     repoGroups,
     collapsedRepos,
+    pinnedSessions,
+    childrenByParent,
     archivedCollapsed,
     archivedSessions,
   ])
@@ -362,10 +375,10 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   )
   const sessionCwdsForPoll = useMemo(
     () =>
-      sessions
+      allSessions
         .filter((s) => statusPollIds.has(s.id))
         .map((s) => ({ id: s.id, cwd: s.cwd })),
-    [sessions, statusPollIds],
+    [allSessions, statusPollIds],
   )
   const statusPollOptions = useMemo(
     () => ({
@@ -376,6 +389,7 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   )
   const workspaceStatuses = useWorkspaceStatuses(sessionIdsForPoll, statusPollOptions)
   const gitStatuses = useGitStatuses(sessionCwdsForPoll, statusPollOptions)
+
   const repoCwds = useMemo(() => repoGroups.map((g) => g.cwd), [repoGroups])
   const indexedRepos = useIndexedRepos(repoCwds)
 
@@ -383,94 +397,17 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
     setCollapsedRepos((prev) => ({ ...prev, [cwd]: !prev[cwd] }))
   }, [])
 
-  const handleRepoContextMenu = (
-    e: ReactMouseEvent<HTMLDivElement>,
-    cwd: string,
-  ) => {
-    e.preventDefault()
-    setRepoMenu({ cwd, position: { x: e.clientX, y: e.clientY } })
-  }
-
-  const repoMenuItems: ContextMenuItem[] = repoMenu
-    ? [
-        {
-          type: "item",
-          label: "New Agent here",
-          icon: SquarePen,
-          onSelect: () => void handleCreate(repoMenu.cwd),
-        },
-        {
-          type: "item",
-          label: collapsedRepos[repoMenu.cwd] ? "Expand" : "Collapse",
-          icon: collapsedRepos[repoMenu.cwd] ? ChevronRight : ChevronDown,
-          onSelect: () => toggleRepo(repoMenu.cwd),
-        },
-        { type: "separator" },
-        {
-          type: "item",
-          label: "Delete project & chats…",
-          icon: Trash2,
-          danger: true,
-          onSelect: () => {
-            const group = repoGroups.find((g) => g.cwd === repoMenu.cwd)
-            if (!group) return
-            setDeleteProject({
-              cwd: group.cwd,
-              label: group.label,
-              sessions: [...group.sessions],
-            })
-          },
-        },
-      ]
-    : []
-
-  const handleDeleteProject = useCallback(async () => {
-    if (!deleteProject) return
-    setDeletingProject(true)
-    const ids = deleteProject.sessions.map((s) => s.id)
-    const cwd = deleteProject.cwd
-    try {
-      for (const session of deleteProject.sessions) {
-        const isolated =
-          !!session.base_cwd &&
-          session.base_cwd !== session.cwd &&
-          !!session.workspace_id
-        if (isolated) {
-          try {
-            await discardIsolatedSession(session.id)
-          } catch {
-            // Best-effort — delete still proceeds.
-          }
-        }
-        await deleteSession(session.id)
-      }
-      const state = useAppStore.getState()
-      const pinnedSessionIds = state.pinnedSessionIds.filter(
-        (id) => !ids.includes(id),
-      )
-      const archivedSessionIds = state.archivedSessionIds.filter(
-        (id) => !ids.includes(id),
-      )
-      const recentCwds = state.recentCwds.filter((p) => p !== cwd)
-      useAppStore.setState({
-        pinnedSessionIds,
-        archivedSessionIds,
-        recentCwds,
-      })
-      void persistUiState({ pinnedSessionIds, archivedSessionIds, recentCwds })
-      setDeleteProject(null)
-    } catch (err) {
-      pushToast(toInvokeError(err), "error")
-    } finally {
-      setDeletingProject(false)
-    }
-  }, [deleteProject, deleteSession, pushToast])
-
   const handleSashDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     e.preventDefault()
+    e.stopPropagation()
     setDragging(true)
     const startX = e.clientX
     const startWidth = sidebarWidth
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      // Capture is best-effort — window listeners still drive the drag.
+    }
 
     const onMove = (ev: globalThis.PointerEvent) => {
       // Sidebar is on the left — dragging right grows it.
@@ -481,9 +418,11 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
       setDragging(false)
       window.removeEventListener("pointermove", onMove)
       window.removeEventListener("pointerup", onUp)
+      window.removeEventListener("pointercancel", onUp)
     }
     window.addEventListener("pointermove", onMove)
     window.addEventListener("pointerup", onUp)
+    window.addEventListener("pointercancel", onUp)
   }
 
   const handleSashDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
@@ -508,6 +447,55 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
   }
 
   const expanded = !collapsed
+
+  /** Root row + nested children (`parent_id`). */
+  const renderSessionTree = (
+    session: SessionMeta,
+    opts: { pinned?: boolean; archived?: boolean } = {},
+  ) => {
+    const children = childrenByParent.get(session.id) ?? []
+    return (
+      <div key={session.id} className="flex flex-col gap-px">
+        <SidebarMenuItem>
+          <SessionListItem
+            session={session}
+            isActive={session.id === activeSessionId}
+            errorMessage={rowErrors[session.id]}
+            workspaceStatus={workspaceStatuses[session.id]}
+            gitStatus={gitStatuses[session.id]}
+            pinned={opts.pinned}
+            archived={opts.archived}
+            onSelect={handleSelectRow}
+            onRename={renameSession}
+            onDelete={deleteSession}
+            onNewAgentInRepo={handleNewAgentInRepo}
+            onTogglePin={opts.archived ? undefined : toggleSessionPinned}
+            onSetArchived={handleSetArchived}
+          />
+        </SidebarMenuItem>
+        {children.map((child) => (
+          <SidebarMenuItem key={child.id}>
+            <SessionListItem
+              session={child}
+              isActive={child.id === activeSessionId}
+              errorMessage={rowErrors[child.id]}
+              workspaceStatus={workspaceStatuses[child.id]}
+              gitStatus={gitStatuses[child.id]}
+              nestDepth={1}
+              roleLabel={child.role ?? null}
+              archived={opts.archived}
+              onSelect={handleSelectRow}
+              onRename={renameSession}
+              onDelete={deleteSession}
+              onNewAgentInRepo={handleNewAgentInRepo}
+              onSetArchived={handleSetArchived}
+            />
+          </SidebarMenuItem>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <>
       {narrow && expanded ? (
@@ -520,7 +508,9 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
       <aside
         style={!collapsed && !narrow ? { width: sidebarWidth } : undefined}
         className={cn(
-          "relative flex h-full shrink-0 flex-col overflow-hidden bg-sidebar",
+          // overflow-visible so the sash (positioned past the right edge) can
+          // receive pointer events; inner shell clips list/nav content.
+          "relative flex h-full shrink-0 flex-col overflow-visible bg-sidebar",
           !dragging &&
             "transition-[width,opacity] duration-[var(--duration-normal)] ease-[var(--easing-default)] motion-reduce:transition-none",
           collapsed
@@ -528,10 +518,9 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
             : "border-r border-sidebar-border opacity-100",
           // Mobile (narrow/tight): full-width overlay anchored to the app's
           // left edge instead of a side-by-side column — same open/close
-          // state, now floating above the chat with a shadow (mirrors
-          // RightPanel.tsx's narrow handling).
+          // state, now floating above the chat with a shadow.
           narrow && expanded
-            ? "absolute inset-y-0 left-0 z-30 w-full shadow-popover"
+            ? "absolute inset-y-0 left-0 z-30 w-full overflow-hidden shadow-popover"
             : null,
         )}
         aria-hidden={collapsed}
@@ -550,7 +539,8 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
             onDoubleClick={handleSashDoubleClick}
             onKeyDown={handleSashKeyDown}
             className={cn(
-              "sash-line-transition absolute -right-[5px] inset-y-0 z-10 w-2.5 cursor-col-resize",
+              // z-30 above content pane so the hit target isn't covered.
+              "sash-line-transition absolute -right-[5px] inset-y-0 z-30 w-2.5 cursor-col-resize",
               "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-transparent",
               // Quiet sash: white-alpha hover only — never accent (Feel: Quiet chrome).
               "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_12%,transparent)]",
@@ -559,308 +549,232 @@ export const SessionSidebar = ({ onOpenSearch }: SessionSidebarProps) => {
           />
         ) : null}
 
-        {/* ── SidebarHeader: narrow overlay close bar + action rows + repo label ── */}
-        <SidebarHeader className="p-0 gap-0">
-          {narrow && expanded ? (
-            // Full-width overlay only — wide mode keeps the existing header
-            // (backdrop click is enough at side-by-side width; discoverability
-            // requires an explicit close control once the sidebar fills the
-            // chat area).
-            <div className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b border-sidebar-border px-4">
-              <span className="text-sm text-ink-muted">Sessions</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Close sidebar"
-                title="Close sidebar"
-                onClick={() => setSidebarCollapsed(true)}
-                className={cn(
-                  "text-ink-muted hover:bg-fill-4 hover:text-ink",
-                  "opacity-50 hover:opacity-80",
-                )}
-              >
-                <X className="h-3.5 w-3.5" aria-hidden />
-              </Button>
+        <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
+          <SidebarHeader className="gap-0 p-0">
+            <div className="flex flex-col gap-1 pb-3">
+              {/* Top chrome aligns with ContentPane TabStrip (`--titlebar-height`).
+               * Dedicated TitleBarDragRegion so the undecorated window can move;
+               * traffic lights / collapse stay no-drag via button CSS. */}
+              <div className="flex h-[var(--titlebar-height)] items-center gap-1 border-b border-stroke-3 px-2">
+                <div className="flex shrink-0 items-center gap-0.5">
+                  {isMacHost ? (
+                    <div className="flex h-full items-center pl-1.5 pr-0.5">
+                      <TrafficLights />
+                    </div>
+                  ) : null}
+                  {!isMacHost ? (
+                    <TitleBarMenus
+                      handlers={titleBarHandlers}
+                      isBootstrapped={isBootstrapped}
+                      canSearch
+                      canCommandPalette={false}
+                    />
+                  ) : null}
+                </div>
+                <TitleBarDragRegion />
+                <div className="flex shrink-0 items-center gap-px">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="Toggle left sidebar"
+                    title="Toggle left sidebar"
+                    onClick={() => setSidebarCollapsed(true)}
+                    className={cn(
+                      "h-6 w-6 text-icon-2 hover:bg-fill-4 hover:text-icon-1",
+                      "opacity-50 hover:opacity-80",
+                    )}
+                  >
+                    <PanelLeft className="size-3.5" strokeWidth={1.5} aria-hidden />
+                  </Button>
+                </div>
+              </div>
+
+              <nav className="flex flex-col gap-px pb-1" aria-label="Agent navigation">
+                <SidebarMenu className="gap-px">
+                  <SidebarMenuItem>
+                    <SidebarActionRow
+                      icon={SquarePen}
+                      label="New Agent"
+                      kbd={isMacHost ? "⌘N" : "Ctrl+N"}
+                      onClick={() => void handleCreate()}
+                      disabled={isCreating}
+                      loading={isCreating}
+                    />
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarActionRow
+                      icon={Search}
+                      label="Search"
+                      kbd={isMacHost ? "⌘K" : "Ctrl+K"}
+                      onClick={() => {
+                        onOpenSearch()
+                        if (narrow) setSidebarCollapsed(true)
+                      }}
+                    />
+                  </SidebarMenuItem>
+                  {AUTOMATIONS_UI_ENABLED ? (
+                    <SidebarMenuItem>
+                      <SidebarActionRow
+                        icon={Bot}
+                        label="Automations"
+                        onClick={() => {
+                          setRoute("automations")
+                          if (narrow) setSidebarCollapsed(true)
+                        }}
+                      />
+                    </SidebarMenuItem>
+                  ) : null}
+                  <SidebarMenuItem>
+                    <SidebarActionRow
+                      icon={Brain}
+                      label="Memory"
+                      onClick={() => {
+                        setRoute("memory")
+                        if (narrow) setSidebarCollapsed(true)
+                      }}
+                    />
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </nav>
+
+              <div className="flex items-center gap-0.5 px-2 pb-0.5">
+                <span className="min-w-0 flex-1 truncate text-xs tracking-[var(--tracking-caption)] text-ink-muted">
+                  Repositories
+                </span>
+                <SidebarProjectFilter
+                  sort={sidebarProjectSort}
+                  visibility={sidebarProjectVisibility}
+                  onSortChange={setSidebarProjectSort}
+                  onVisibilityChange={setSidebarProjectVisibility}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="New project"
+                  title="Open folder as project"
+                  disabled={!isBootstrapped || isCreating}
+                  onClick={() => titleBarHandlers.openFolder()}
+                  className={reposHeaderIconClass}
+                >
+                  <FolderPlus className="size-3.5" strokeWidth={1.5} aria-hidden />
+                </Button>
+              </div>
+            </div>
+          </SidebarHeader>
+
+          {error ? (
+            <div className="px-2 pb-2">
+              <ErrorBanner message={error} />
             </div>
           ) : null}
 
-          {/* Action rows: New Agent / Search / separator / nav links */}
-          <div className="flex flex-col gap-0.5 pt-2 pb-2">
-            <SidebarMenu className="gap-0.5">
-              <SidebarMenuItem>
-                <SidebarActionRow
-                  icon={SquarePen}
-                  label="New Agent"
-                  kbd={isMac ? "⌘N" : "Ctrl+N"}
-                  onClick={() => void handleCreate()}
-                  disabled={isCreating}
-                  loading={isCreating}
-                />
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarActionRow
-                  icon={Search}
-                  label="Search"
-                  kbd={isMac ? "⌘K" : "Ctrl+K"}
-                  onClick={() => {
-                    onOpenSearch()
-                    if (narrow) setSidebarCollapsed(true)
-                  }}
-                />
-              </SidebarMenuItem>
-            </SidebarMenu>
+          {/* Gutters live on rows (DESIGN: no px-2 on SidebarContent — avoids double indent). */}
+          <SidebarContent className="pb-2">
+            {isLoading ? (
+              <SidebarSkeleton />
+            ) : sessions.length === 0 ? (
+              <EmptyState
+                title="No agents yet"
+                description="Create an agent to start working on tasks."
+                actionLabel="New Agent"
+                onAction={() => void handleCreate()}
+                actionDisabled={isCreating}
+              />
+            ) : (
+              <div className="flex flex-col gap-px">
+                {pinnedSessions.length > 0 ? (
+                  <SidebarGroup className="gap-0 p-0">
+                    <SidebarGroupLabel className="flex h-6 items-center px-2 pl-8 text-sm font-normal text-ink-muted">
+                      Pinned
+                    </SidebarGroupLabel>
+                    <SidebarMenu className="gap-px">
+                      {pinnedSessions.map((session) =>
+                        renderSessionTree(session, { pinned: true }),
+                      )}
+                    </SidebarMenu>
+                  </SidebarGroup>
+                ) : null}
 
-            <SidebarSeparator className="mx-0 my-0" />
+                {repoGroups.map((group) => (
+                  <SidebarGroup key={group.cwd} className="gap-0 p-0">
+                    <div className="px-1">
+                      <RepoSectionHeader
+                        label={group.label}
+                        collapsed={!!collapsedRepos[group.cwd]}
+                        onToggle={() => toggleRepo(group.cwd)}
+                        onNewSession={() => void handleCreate(group.cwd)}
+                        indexed={!!indexedRepos[group.cwd]}
+                        isCreating={isCreating}
+                      />
+                    </div>
+                    {!collapsedRepos[group.cwd] ? (
+                      <SidebarMenu className="gap-px">
+                        {group.sessions.map((session) =>
+                          renderSessionTree(session),
+                        )}
+                      </SidebarMenu>
+                    ) : null}
+                  </SidebarGroup>
+                ))}
 
-            <SidebarMenu className="gap-0.5">
-              {AUTOMATIONS_UI_ENABLED ? (
-                <SidebarMenuItem>
-                  <SidebarActionRow
-                    icon={Bot}
-                    label="Automations"
-                    trailingIcon={ArrowUpRight}
-                    onClick={() => {
-                      setRoute("automations")
-                      if (narrow) setSidebarCollapsed(true)
-                    }}
+                {pinnedSessions.length === 0 &&
+                repoGroups.length === 0 &&
+                sidebarProjectVisibility === "active" ? (
+                  <EmptyState
+                    title="No active projects"
+                    description="Nothing updated in the last 14 days. Switch to All projects to see everything."
+                    actionLabel="Show all projects"
+                    onAction={() => setSidebarProjectVisibility("all")}
                   />
-                </SidebarMenuItem>
-              ) : null}
-              <SidebarMenuItem>
-                <SidebarActionRow
-                  icon={Brain}
-                  label="Memory"
-                  trailingIcon={ArrowUpRight}
-                  onClick={() => {
-                    setRoute("memory")
-                    if (narrow) setSidebarCollapsed(true)
-                  }}
-                />
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarActionRow
-                  icon={SlidersHorizontal}
-                  label="Customize"
-                  onClick={() => {
-                    setRoute("customize")
-                    if (narrow) setSidebarCollapsed(true)
-                  }}
-                />
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </div>
+                ) : null}
 
-          {/* "Repositories" label with filter / search icons */}
-          <div className="group/label flex items-center gap-1 px-2 pb-1">
-            <SidebarGroupLabel className="h-6 flex-1 px-0 text-xs font-normal tracking-[var(--tracking-caption)] text-ink-muted">
-              Repositories
-            </SidebarGroupLabel>
-            <SidebarProjectFilter
-              sort={sidebarProjectSort}
-              visibility={sidebarProjectVisibility}
-              onSortChange={setSidebarProjectSort}
-              onVisibilityChange={setSidebarProjectVisibility}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Search agents"
-              title="Search agents"
-              onClick={onOpenSearch}
-              className={cn(
-                "h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink",
-                "transition-opacity duration-[var(--duration-fast)]",
-                // Reveal on hover; when filter is non-default stay fully visible.
-                sidebarProjectSort !== "recency" ||
-                  sidebarProjectVisibility !== "all"
-                  ? "opacity-100"
-                  : "opacity-0 group-hover/label:opacity-100 group-focus-within/label:opacity-100 focus-visible:opacity-100",
-              )}
-            >
-              <Search className="h-3.5 w-3.5" aria-hidden />
-            </Button>
-          </div>
-        </SidebarHeader>
-
-        {error ? (
-          <div className="px-2 pb-2">
-            <ErrorBanner message={error} />
-          </div>
-        ) : null}
-
-        {/* ── SidebarContent: scrollable session list ── */}
-        <SidebarContent className="pb-2">
-          {isLoading ? (
-            <SidebarSkeleton />
-          ) : sessions.length === 0 ? (
-            <EmptyState
-              title="No agents yet"
-              description="Create an agent to start working on tasks."
-              actionLabel="New Agent"
-              onAction={() => void handleCreate()}
-              actionDisabled={isCreating}
-            />
-          ) : (
-            <div className="flex flex-col gap-2">
-              {pinnedSessions.length > 0 ? (
-                <SidebarGroup className="p-0 gap-0">
-                  <SidebarGroupLabel className="h-6 px-2 text-xs font-normal tracking-[var(--tracking-caption)] text-ink-muted">
-                    Pinned
-                  </SidebarGroupLabel>
-                  <SidebarMenu className="gap-px">
-                    {pinnedSessions.map((session) => (
-                      <SidebarMenuItem key={session.id}>
-                        <SessionListItem
-                          session={session}
-                          isActive={session.id === activeSessionId}
-                          errorMessage={rowErrors[session.id]}
-                          workspaceStatus={workspaceStatuses[session.id]}
-                          gitStatus={gitStatuses[session.id]}
-                          pinned
-                          onSelect={handleSelectRow}
-                          onRename={renameSession}
-                          onDelete={deleteSession}
-                          onNewAgentInRepo={handleNewAgentInRepo}
-                          onTogglePin={toggleSessionPinned}
-                          onSetArchived={handleSetArchived}
-                        />
-                      </SidebarMenuItem>
-                    ))}
-                  </SidebarMenu>
-                </SidebarGroup>
-              ) : null}
-
-              {repoGroups.map((group) => (
-                <SidebarGroup key={group.cwd} className="p-0 gap-0">
-                  <div
-                    onContextMenu={(e) => handleRepoContextMenu(e, group.cwd)}
-                  >
-                    <RepoSectionHeader
-                      label={group.label}
-                      collapsed={!!collapsedRepos[group.cwd]}
-                      onToggle={() => toggleRepo(group.cwd)}
-                      onNewSession={() => void handleCreate(group.cwd)}
-                      indexed={!!indexedRepos[group.cwd]}
-                      isCreating={isCreating}
+                {archivedSessions.length > 0 ? (
+                  <SidebarGroup className="p-0 gap-0">
+                    <ArchivedSectionHeader
+                      count={archivedSessions.length}
+                      collapsed={archivedCollapsed}
+                      onToggle={() => setArchivedCollapsed((prev) => !prev)}
                     />
-                  </div>
-                  {!collapsedRepos[group.cwd] ? (
-                    <SidebarMenu className="gap-px">
-                      {group.sessions.map((session) => (
-                        <SidebarMenuItem key={session.id}>
-                          <SessionListItem
-                            session={session}
-                            isActive={session.id === activeSessionId}
-                            errorMessage={rowErrors[session.id]}
-                            workspaceStatus={workspaceStatuses[session.id]}
-                            gitStatus={gitStatuses[session.id]}
-                            onSelect={handleSelectRow}
-                            onRename={renameSession}
-                            onDelete={deleteSession}
-                            onNewAgentInRepo={handleNewAgentInRepo}
-                            onTogglePin={toggleSessionPinned}
-                            onSetArchived={handleSetArchived}
-                          />
-                        </SidebarMenuItem>
-                      ))}
-                    </SidebarMenu>
-                  ) : null}
-                </SidebarGroup>
-              ))}
+                    {!archivedCollapsed ? (
+                      <SidebarMenu className="gap-px">
+                        {archivedSessions.map((session) =>
+                          renderSessionTree(session, { archived: true }),
+                        )}
+                      </SidebarMenu>
+                    ) : null}
+                  </SidebarGroup>
+                ) : null}
+              </div>
+            )}
+          </SidebarContent>
 
-              {pinnedSessions.length === 0 &&
-              repoGroups.length === 0 &&
-              sidebarProjectVisibility === "active" ? (
-                <EmptyState
-                  title="No active projects"
-                  description="Nothing updated in the last 14 days. Switch to All projects to see everything."
-                  actionLabel="Show all projects"
-                  onAction={() => setSidebarProjectVisibility("all")}
-                />
-              ) : null}
+          {selectError ? (
+            <SidebarResumeError
+              message={selectError}
+              onRetry={handleRetrySelect}
+              onDismiss={handleDismissSelectError}
+            />
+          ) : null}
 
-              {archivedSessions.length > 0 ? (
-                <SidebarGroup className="p-0 gap-0">
-                  <ArchivedSectionHeader
-                    count={archivedSessions.length}
-                    collapsed={archivedCollapsed}
-                    onToggle={() => setArchivedCollapsed((prev) => !prev)}
-                  />
-                  {!archivedCollapsed ? (
-                    <SidebarMenu className="gap-px">
-                      {archivedSessions.map((session) => (
-                        <SidebarMenuItem key={session.id}>
-                          <SessionListItem
-                            session={session}
-                            isActive={session.id === activeSessionId}
-                            errorMessage={rowErrors[session.id]}
-                            workspaceStatus={workspaceStatuses[session.id]}
-                            gitStatus={gitStatuses[session.id]}
-                            archived
-                            onSelect={handleSelectRow}
-                            onRename={renameSession}
-                            onDelete={deleteSession}
-                            onNewAgentInRepo={handleNewAgentInRepo}
-                            onTogglePin={toggleSessionPinned}
-                            onSetArchived={handleSetArchived}
-                          />
-                        </SidebarMenuItem>
-                      ))}
-                    </SidebarMenu>
-                  ) : null}
-                </SidebarGroup>
-              ) : null}
-            </div>
-          )}
-        </SidebarContent>
-
-        {selectError ? (
-          <SidebarResumeError
-            message={selectError}
-            onRetry={handleRetrySelect}
-            onDismiss={handleDismissSelectError}
-          />
-        ) : null}
-
-        {/* ── SidebarFooter: theme toggle + settings ── */}
-        <SbFooter className="p-0 gap-0">
-          <SidebarFooter
-            theme={theme}
-            onToggleTheme={toggleTheme}
-            onOpenSettings={() => {
-              setRoute("settings")
-              if (narrow) setSidebarCollapsed(true)
-            }}
-            isCreating={isCreating}
-          />
-        </SbFooter>
-
-        <ContextMenu
-          position={repoMenu?.position ?? null}
-          items={repoMenuItems}
-          onClose={() => setRepoMenu(null)}
-        />
-        <ConfirmDialog
-          open={!!deleteProject}
-          title="Delete project & chats?"
-          description={
-            deleteProject
-              ? `Delete "${deleteProject.label}" and its ${deleteProject.sessions.length} chat${
-                  deleteProject.sessions.length === 1 ? "" : "s"
-                }? This cannot be undone.`
-              : undefined
-          }
-          confirmLabel="Delete"
-          danger
-          isLoading={deletingProject}
-          onConfirm={() => void handleDeleteProject()}
-          onCancel={() => {
-            if (!deletingProject) setDeleteProject(null)
-          }}
-        />
+          <SbFooter className="gap-0 p-0">
+            <SidebarFooter
+              theme={theme}
+              onToggleTheme={toggleTheme}
+              onOpenSettings={() => {
+                setRoute("settings")
+                if (narrow) setSidebarCollapsed(true)
+              }}
+              isCreating={isCreating}
+            />
+          </SbFooter>
+        </div>
       </aside>
+      {!isMacHost ? (
+        <BugReportDialog open={bugOpen} onClose={closeBugReport} />
+      ) : null}
     </>
   )
 }
+

@@ -192,29 +192,19 @@ export const TitleBarMenus = ({
   )
 }
 
-/** Compact app mark used on Windows/Linux title bars (Cursor-style). */
 export const AppMark = ({ className }: { className?: string }) => (
-  <div
-    className={cn(
-      "flex h-full items-center justify-center px-1.5 text-ink-muted",
-      className,
-    )}
+  <svg
+    viewBox="0 0 16 16"
+    fill="none"
+    className={cn("size-3.5 shrink-0 text-ink-secondary", className)}
     aria-hidden
   >
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-      <path
-        d="M8 1.5L14 5v6L8 14.5 2 11V5L8 1.5Z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M8 1.5V8m0 0l6-3M8 8l-6-3M8 8v6.5"
-        stroke="currentColor"
-        strokeWidth="1.1"
-        strokeLinejoin="round"
-        opacity="0.7"
-      />
-    </svg>
-  </div>
+    <path
+      d="M4 2.5h8M4 2.5v11M4 8h5.5"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
 )

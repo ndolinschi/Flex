@@ -37,19 +37,20 @@ export const ACCENT_PRESETS: readonly AccentPreset[] = [
   {
     id: "neutral",
     label: "Neutral",
-    swatch: "#f2f2f2",
+    swatch: "#f0f0f0",
     tokens: {
-      dark: { accent: "#f2f2f2", hover: "#ffffff", text: "#0a0a0a" },
+      /* Neutral white on pure-gray chrome (Agents Web — no cool blue). */
+      dark: { accent: "#f0f0f0", hover: "#ffffff", text: "#141414" },
       light: { accent: "#1a1a1a", hover: "#000000", text: "#ffffff" },
     },
   },
   {
     id: "blue",
     label: "Blue",
-    swatch: "#6b9eff",
+    swatch: "#599ce7",
     tokens: {
-      dark: { accent: "#6b9eff", hover: "#82adff", text: "#0a0a0a" },
-      light: { accent: "#2f6fed", hover: "#245fda", text: "#ffffff" },
+      dark: { accent: "#599ce7", hover: "#7bafe9", text: "#0a0a0a" },
+      light: { accent: "#2778c1", hover: "#1f64a3", text: "#ffffff" },
     },
   },
   {

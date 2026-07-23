@@ -20,12 +20,20 @@ export const AgentTerminalRow = ({
         }
       }}
       className={cn(
-        "group flex w-full cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-xs",
-        selected ? "bg-fill-2 text-ink hover:bg-fill-2" : "hover:bg-fill-4",
+        // Match TerminalRow production pill (h-6 rounded-md quaternary selected).
+        "group mx-1.5 flex h-6 w-[calc(100%-12px)] cursor-pointer items-center gap-1.5 rounded-md px-2 text-sm",
+        "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+        selected
+          ? "bg-[var(--color-bg-quaternary-opaque)] text-ink hover:bg-[var(--color-bg-quaternary-opaque)]"
+          : "text-ink-secondary hover:bg-bg-quaternary hover:text-ink",
       )}
     >
-      <InfinityIcon className="h-3.5 w-3.5 shrink-0 text-yellow" aria-hidden />
-      <span className="min-w-0 flex-1 truncate">Agent terminal</span>
+      <InfinityIcon
+        className="size-3.5 shrink-0 text-yellow"
+        strokeWidth={1.5}
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1 truncate font-medium">Agent terminal</span>
     </div>
   )
 }

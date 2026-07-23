@@ -12,7 +12,7 @@ import {
 import { useQuery } from "@tanstack/react-query"
 import { MessageSquare, X } from "lucide-react"
 import { Tab, TabStrip, Tooltip } from "../../atoms"
-import { ContextMenu, OpenTabModal } from "../../molecules"
+import { ContextMenu, ErrorBanner, OpenTabModal } from "../../molecules"
 import { useSessions } from "../../../hooks/useSessions"
 import {
   startContentTabPointerDrag,
@@ -30,16 +30,27 @@ import {
 } from "../../../stores/appStore"
 import { isSplitEligible } from "../../../stores/slices/contentLayoutSlice"
 import { emptyPane } from "../../../stores/contentLayoutModel"
+import {
+  TitleBarDragRegion,
+  TitleBarLeading,
+  TitleBarTrailing,
+} from "../TitleBarChrome"
+import { ContextBar } from "../ContextBar"
 import { visibleRightPanelTabs } from "../right-panel/tabs"
 import { ChatSessionBody } from "./ChatSessionBody"
 import { ToolTabBody } from "./ToolTabBody"
 import { cn } from "../../../lib/utils"
 import { sessionColor, GROUP_PALETTE } from "../../../lib/sessionColor"
+import { toggleZoomWindow } from "../../../lib/windowChrome"
 
 type ContentPaneProps = {
   paneIndex: 0 | 1
   /** Tool tabs that must stay mounted (browser/terminal/files) across panes. */
   keepAliveTools: Set<string>
+  /** True when this pane is the eastmost — owns window trailing chrome. */
+  isEastmost?: boolean
+  onOpenCommandPalette?: () => void
+  onOpenSearch?: () => void
 }
 
 /**
@@ -130,7 +141,13 @@ const useVisitedChatTabs = (
   return visited
 }
 
-export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => {
+export const ContentPane = ({
+  paneIndex,
+  keepAliveTools,
+  isEastmost = paneIndex === 0,
+  onOpenCommandPalette,
+  onOpenSearch,
+}: ContentPaneProps) => {
   // Narrow selectors — avoid re-rendering this pane when only the sibling
   // pane's tabs change (structural sharing in activate/reorder/close).
   const pane = useAppStore(
@@ -153,9 +170,13 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
   const browserOwnerSessionId = useAppStore((s) => s.browserOwnerSessionId)
   const stampTabGroup = useAppStore((s) => s.stampTabGroup)
   const removeTabsFromGroup = useAppStore((s) => s.removeTabsFromGroup)
+  const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed)
   const { sessions } = useSessions()
   const dragUi = useTabDragUi()
   const [openTabModal, setOpenTabModal] = useState(false)
+  // Tool tabs hide ChatSessionBody (and thus Composer’s ContextBar). Local
+  // error state for the pane-level ContextBar strip below.
+  const [toolContextError, setToolContextError] = useState<string | null>(null)
 
   // ─── SHIFT range-select state ──────────────────────────────────────────────
   // Ephemeral — not persisted; clears when the pane unmounts or on plain click.
@@ -201,11 +222,27 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     return ids.size > 1
   }, [pane.tabs])
 
+  const activeTab = useMemo(
+    () => pane.tabs.find((t) => t.id === pane.activeTabId) ?? null,
+    [pane.tabs, pane.activeTabId],
+  )
+
   const contextSession: SessionId | null = useMemo(() => {
-    const active = pane.tabs.find((t) => t.id === pane.activeTabId)
-    if (active) return active.sessionId
+    if (activeTab) return activeTab.sessionId
     return activeSessionId
-  }, [pane.tabs, pane.activeTabId, activeSessionId])
+  }, [activeTab, activeSessionId])
+
+  // ContextBar lives under Composer — when the active body is a tool tab the
+  // chat (and its footer) are hidden. Surface the same strip on the pane so
+  // project / branch / isolation stay reachable on Files / Terminal / etc.
+  const toolContextSession = useMemo(() => {
+    if (activeTab?.kind !== "tool") return null
+    return sessionsById.get(activeTab.sessionId) ?? null
+  }, [activeTab, sessionsById])
+
+  useEffect(() => {
+    setToolContextError(null)
+  }, [pane.activeTabId])
 
   const cwd = useMemo(
     () => (contextSession ? sessionsById.get(contextSession)?.cwd : undefined),
@@ -314,6 +351,8 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
         // Continuous chrome surface (`--color-chrome` via bg-bg); tool work
         // surfaces can layer `bg-editor` inside their own hosts.
         "relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-bg",
+        // Keep panes below the split sash (z-20) so focused z-index never
+        // covers the resize hit target.
         paneFocused ? "z-[1]" : "z-0",
       )}
       data-content-pane={paneIndex}
@@ -321,17 +360,31 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
     >
       <TabStrip
         aria-label={paneIndex === 0 ? "Left pane tabs" : "Right pane tabs"}
-        // gap/height owned by TabStrip (1.5 / 30px); do not override.
-        className="min-w-0"
+        // One 35px band with sidebar header: quiet h-6 pills, all vertically
+        // centered (Agents). Mixing items-end tabs + centered actions reads crooked.
+        // Drag lives on TitleBarDragRegion (not the whole strip) so tab clicks,
+        // sash hits, and Mac trackpad gestures stay reliable.
+        className="h-[var(--titlebar-height)] min-w-0 items-center gap-1 px-2"
+        onDoubleClick={() => void toggleZoomWindow()}
         onKeyDown={handleTabsKeyDown}
       >
+        {paneIndex === 0 && sidebarCollapsed ? (
+          <TitleBarLeading
+            showWindowControls
+            showSidebarReopen
+            onOpenCommandPalette={onOpenCommandPalette}
+            onOpenSearch={onOpenSearch}
+            className="self-center"
+          />
+        ) : null}
         <div
           ref={tabsScrollRef}
           role="presentation"
           data-content-tab-strip={paneIndex}
           onWheel={handleTabsWheel}
           className={cn(
-            "flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto",
+            // Size to tabs; leave flex-1 for TitleBarDragRegion (window move).
+            "flex min-w-0 shrink items-center gap-1 overflow-x-auto",
             "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           )}
           style={
@@ -364,9 +417,14 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                 ? `${label} — ${sessionLabel(sessionsById.get(t.sessionId) ?? { title: t.sessionId.slice(0, 8) } as SessionMeta)}`
                 : label
 
-            // Divider between the last chat tab and first tool tab.
+            // Hairline between workspace/session clusters, tab groups, and
+            // the chat→tool seam so adjacent agents/projects stay separable.
             const prev = displayTabs[index - 1]
-            const showDivider = prev?.kind === "chat" && t.kind === "tool"
+            const showDivider =
+              !!prev &&
+              (prev.sessionId !== t.sessionId ||
+                prev.groupId !== t.groupId ||
+                (prev.kind === "chat" && t.kind === "tool"))
 
             // Session affinity dot: shown when multiple sessions share the pane.
             const dotColor = hasMultipleSessions
@@ -438,7 +496,9 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
                     ) : undefined
                   }
                   className={cn(
-                    "max-w-[180px] shrink-0 transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+                    // Quiet Agents pills — same optical center as sidebar F / actions.
+                    "max-w-[180px] shrink-0",
+                    "transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
                     isDragged && "opacity-40",
                   )}
                   title={titleText}
@@ -467,7 +527,8 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
             )
           })}
         </div>
-        <div className="flex shrink-0 items-center gap-0.5">
+        <TitleBarDragRegion className="self-stretch" />
+        <div className="flex shrink-0 items-center gap-0.5 self-center">
           {showGroupBar ? (
             <GroupSwatchBar onPickColor={handlePickGroupColor} />
           ) : null}
@@ -513,6 +574,7 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
               </Button>
             </Tooltip>
           ) : null}
+          {isEastmost ? <TitleBarTrailing showChatActions /> : null}
         </div>
       </TabStrip>
 
@@ -554,6 +616,31 @@ export const ContentPane = ({ paneIndex, keepAliveTools }: ContentPaneProps) => 
           </div>
         ) : null}
       </div>
+
+      {toolContextSession ? (
+        <div
+          className="shrink-0 border-t border-stroke-3 px-2.5 py-1"
+          data-pane-context-bar
+        >
+          {toolContextError ? (
+            <div className="mb-1">
+              <ErrorBanner
+                message={toolContextError}
+                onDismiss={() => setToolContextError(null)}
+              />
+            </div>
+          ) : null}
+          <ContextBar
+            cwd={toolContextSession.cwd}
+            projectCwd={
+              toolContextSession.base_cwd || toolContextSession.cwd
+            }
+            sessionId={toolContextSession.id}
+            disabled={!paneFocused}
+            onError={setToolContextError}
+          />
+        </div>
+      ) : null}
 
       <ContextMenu
         position={menuPosition}

@@ -21,8 +21,8 @@ type SidebarActionRowProps = {
   loading?: boolean
 }
 
-/** Sidebar action row density (Cursor agent-sidebar-cell rhythm):
- * `h-7` · `px-2` · `gap-1.5` · `rounded-sm` (6) · hover `fill-4`.
+/** Sidebar nav action row (Cursor Agents Web 2026-07-23):
+ * `h-8` · `px-2` · `gap-2` · `rounded-sm` (6) · hover `bg-quaternary`.
  * Icon + label flush start + trailing shortcut — no flex-1 on the label
  * (that + UA `text-align:center` centers the text mid-row). */
 export const SidebarActionRow = ({
@@ -42,9 +42,9 @@ export const SidebarActionRow = ({
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cn(
-        // Override Button sm (rounded-md / px-2.5) to sidebar cell recipe.
-        "h-7 w-full justify-start gap-1.5 rounded-sm px-2 font-normal",
-        "text-ink-secondary hover:bg-fill-4 hover:text-ink",
+        // Production nav: h-8 gap-2 px-2 rounded-sm — same gutter as agent-row.
+        "h-8 w-full justify-start gap-2 rounded-sm px-2 font-medium",
+        "text-ink hover:bg-[var(--color-bg-quaternary-opaque)] hover:text-ink",
         "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
       )}
     >

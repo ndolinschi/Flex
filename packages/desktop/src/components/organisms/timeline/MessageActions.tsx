@@ -7,18 +7,20 @@ export const MessageActions = ({
   text,
   tsMs,
   hideTimestamp = false,
+  reveal = "hover",
+  className,
 }: {
   text: string
   tsMs: number
-  /** Suppress the relative-time label when the row's turn footer (see
-   * `buildDisplayItems`'s `footer` attachment / `TurnFooter`) already renders
-   * its own "just now"-style timestamp directly below this row — otherwise
-   * the two stack and show the identical relative time twice. The copy
-   * button stays either way: this copies `text` (the message content), while
-   * the footer's copy button copies the whole turn's payload
-   * (`buildTurnCopyText`) — different payloads, so both affordances earn
-   * their place. */
+  /** Suppress the relative-time label when the row's turn footer already
+   * renders its own timestamp. */
   hideTimestamp?: boolean
+  /**
+   * `hover` (default): opacity-0 until group-hover/focus-within on `group/row`.
+   * `always`: visible (parent already gates reveal, e.g. absolute chip).
+   */
+  reveal?: "hover" | "always"
+  className?: string
 }) => {
   const [copied, setCopied] = useState(false)
 
@@ -35,9 +37,11 @@ export const MessageActions = ({
   return (
     <div
       className={cn(
-        // Always visible (not hover-reveal) — reserve h-6 so 30px-adjacent
-        // chrome density holds and the row never shifts on mount.
-        "mt-1 flex h-6 items-center justify-start gap-0.5",
+        "mt-1 flex h-5 items-center justify-end gap-0.5",
+        reveal === "hover" &&
+          "opacity-0 transition-opacity duration-[var(--duration-fast)] group-hover/row:opacity-100 group-focus-within/row:opacity-100",
+        reveal === "always" && "mt-0",
+        className,
       )}
     >
       {hideTimestamp ? null : (
@@ -46,32 +50,25 @@ export const MessageActions = ({
         </span>
       )}
       <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label={copied ? "Copied" : "Copy message"} title={copied ? "Copied" : "Copy message"}
-      onClick={() => void handleCopy()}
-      className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "h-6 w-6",
-      )}
-    >
-      {copied ? (
-          <Check className="h-3 w-3 text-green" aria-hidden />
-        ) : (
-          <Copy className="h-3 w-3" aria-hidden />
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label={copied ? "Copied" : "Copy message"}
+        title={copied ? "Copied" : "Copy message"}
+        onClick={(e) => {
+          e.stopPropagation()
+          void handleCopy()
+        }}
+        className={cn(
+          "h-5 w-5 p-0 text-icon-2 hover:bg-bg-quaternary hover:text-icon-1",
         )}
-    </Button>
+      >
+        {copied ? (
+          <Check className="h-3.5 w-3.5 text-green" aria-hidden />
+        ) : (
+          <Copy className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden />
+        )}
+      </Button>
     </div>
   )
 }
-
-/**
- * End-of-turn footer: renders once, after the LAST rendered item of a
- * completed agent turn (see `buildDisplayItems`'s `footer` attachment) —
- * timestamp + duration + a "Copy response" button whose payload is the full
- * text the agent produced that turn (assistant text plus a plain-text list
- * of tool actions, already assembled by `buildTurnCopyText`). Absent while
- * the turn is still streaming; renders for historical/replayed turns too,
- * since it's derived purely from materialized rows.
- */

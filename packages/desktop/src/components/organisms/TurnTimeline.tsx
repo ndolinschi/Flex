@@ -339,16 +339,16 @@ export const TurnTimeline = ({
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 flex-col px-3 py-3">
+      <div className="flex flex-1 flex-col px-2.5 py-3">
         <div
           className="mx-auto flex w-full max-w-[var(--content-rail)] flex-col gap-2.5"
           role="status"
           aria-label="Loading conversation"
         >
-          {/* Quiet bubble placeholders — shorter + dampened skeleton base. */}
-          <Skeleton className="ml-auto h-10 w-1/2 rounded-[var(--radius-bubble)]" />
+          {/* Quiet full-width placeholders — not right-aligned chat bubbles. */}
+          <Skeleton className="h-10 w-full rounded-[var(--radius-bubble)]" />
           <Skeleton className="h-14 w-[88%] rounded-[var(--radius-bubble)]" />
-          <Skeleton className="ml-auto h-8 w-2/5 rounded-[var(--radius-bubble)]" />
+          <Skeleton className="h-8 w-4/5 rounded-[var(--radius-bubble)]" />
           <Skeleton className="h-12 w-3/4 rounded-[var(--radius-bubble)]" />
         </div>
       </div>
@@ -357,7 +357,7 @@ export const TurnTimeline = ({
 
   if (error) {
     return (
-      <div className="px-3 py-3">
+      <div className="px-2.5 py-3">
         <ErrorBanner message={error} />
       </div>
     )
@@ -376,11 +376,11 @@ export const TurnTimeline = ({
         data-timeline-scroll=""
         onScroll={handleScrollAndRemeasure}
         className={cn(
-          "min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3",
+          "min-h-0 flex-1 overflow-y-auto overscroll-contain px-2.5 py-3",
           "[scrollbar-width:thin] [scrollbar-color:var(--color-stroke-3)_transparent]",
         )}
       >
-        <div className="mx-auto mt-auto flex w-full max-w-[var(--content-rail)] flex-col pb-2">
+        <div className="mx-auto flex w-full max-w-[var(--content-rail)] flex-col pb-2">
           <div
             className="relative w-full"
             style={{ height: virtualizer.getTotalSize() }}
@@ -503,6 +503,12 @@ export const TurnTimeline = ({
           <div ref={bottomRef} aria-hidden className="h-px w-full shrink-0" />
         </div>
       </div>
+
+      {/* Soft seam into the docked composer — continuous chrome, not a hard cut. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-5 bg-gradient-to-t from-chrome to-transparent"
+      />
 
       {showScrollDown ? (
         <Button

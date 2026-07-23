@@ -1,162 +1,282 @@
+/* ── Design tokens — Cursor glass + Agents Web (neutral, no blue cast) ─────
+ *
+ * Structure / recipes: Cursor.app `workbench.glass.main.css` (desktop glass).
+ * Surfaces / ink: Agents Web pure gray (HTML 7：42 / 7：56 / IDE 8：22) so the
+ * UI does not pick up the glass cool-blue cast (ecf1fa / 0c0e11 blues).
+ *
+ * Dark surfaces (Agents Web):
+ *   chrome  #141414 · sidebar #181818 · elevated #1d1e20 · base #f0f0f0
+ * Glass structure kept: white-alpha strokes, hover 7%, soft ambient, vibrancy.
+ *
+ * Flex names stay stable; product monochrome accent remains factory default.
+ */
+
 :root,
 [data-theme="dark"] {
-  /* ── Premium dark (Cursor glass–adapted) ────────────────────────────────
-     Neutral charcoal surfaces (not pure gray, not blue-black). Steps
-     between chrome / panel / elevated stay close so chrome reads continuous.
-     Text/icon/stroke use neutral white-alpha hierarchy — whisper, not chalk.
-     Extracted rhythm from Cursor glass workbench; brand colors stay Flex. */
-  /* Primary ink on dark / surfaces on light — kept as a raw token for
-   * non-Tailwind use. Not exposed as `--color-base` in `@theme` (that name
-   * steals the `text-base` font-size utility). */
-  --color-base: #f2f2f2;
-  --color-chrome: #101010; /* chat rail / shell — neutral, not blue-cast */
-  --color-panel: #161616; /* sidebar + explorer + popovers */
-  --color-editor: #121212; /* Monaco / work surface — shade step above chrome */
-  --color-elevated: #1c1c1c; /* chat bubbles / raised tiles */
+  /* ── Neutral pure gray (Agents Web) — glass depth without cool blue ───── */
+  --color-chrome: #141414; /* chat / shell */
+  --color-panel: #181818; /* sidebar */
+  --color-editor: #181818; /* file reader / editor work surface */
+  --color-elevated: #1d1e20; /* bubbles / popovers / raised */
+  --color-base: #f0f0f0; /* neutral ink for mixes (NOT cool #ecf1fa) */
 
-  /* Neutral white ink (no blue cast — was 236/241/250 cool stack). */
-  --color-text-1: rgb(242 242 242 / 0.94);
-  --color-text-2: rgb(235 235 235 / 0.58);
-  --color-text-3: rgb(235 235 235 / 0.48);
-  --color-text-4: rgb(235 235 235 / 0.32);
+  --color-accent-raw: #599ce7;
+  --color-action-label: #1a1a1a;
+  --color-brand: #f54e00;
+  --color-focus-raw: #f0f0f0;
+  --color-success-raw: #3fa266;
+  --color-warn-raw: #f1b467;
+  --color-danger-raw: #e34671;
 
-  --color-icon-1: rgb(242 242 242 / 0.88);
-  --color-icon-2: rgb(235 235 235 / 0.62);
-  --color-icon-3: rgb(235 235 235 / 0.42);
-  --color-icon-4: rgb(235 235 235 / 0.3);
+  --color-added: #70b489;
+  --color-modified: #f1b467;
+  --color-removed: #fc6b83;
+  --color-untracked: #88c0d0;
 
-  /* Whisper fills — hover ≈5–6%, selected ≈8% (Cursor tertiary/quaternary). */
-  --color-fill-1: rgb(255 255 255 / 0.09);
-  --color-fill-2: rgb(255 255 255 / 0.08); /* selected / active */
-  --color-fill-3: rgb(255 255 255 / 0.045);
-  --color-fill-4: rgb(255 255 255 / 0.06); /* list hover */
-  --color-fill-5: rgb(255 255 255 / 0.025);
+  --color-red: #fc6b83;
+  --color-orange: #d08770;
+  --color-yellow: #f1b467;
+  --color-green: #3fa266;
+  --color-cyan: #81a1c1;
+  --color-blue: #7bafe9;
+  --color-magenta: #b48ead;
+  --color-purple: #9386f2;
 
-  /* Stroke ladder — secondary strong enough for human-message rings. */
-  --color-stroke-1: rgb(255 255 255 / 0.16);
-  --color-stroke-2: rgb(255 255 255 / 0.12);
-  --color-stroke-3: rgb(255 255 255 / 0.09);
-  --color-stroke-4: rgb(255 255 255 / 0.04);
+  --shadow-primary: #0003;
+  --shadow-secondary: #0000001f;
+  --shadow-tertiary: #0000000f;
+  --shadow-color: var(--shadow-primary);
+  --shadow-ambient: var(--shadow-secondary);
 
-  /* Neutral high-contrast accent (white) — factory default. Colored accents
-     are applied from Settings → Appearance via `--color-accent*` overrides. */
-  --color-accent: #f2f2f2;
+  /* Syntax on elevated editor */
+  --syntax-foreground: #d6d6dd;
+  --syntax-background: #1d1e20;
+  --syntax-keyword: #82d2ce;
+  --syntax-string: #e394dc;
+  --syntax-function: #efb080;
+  --syntax-number: #ebc88d;
+  --syntax-comment: #6e7781;
+  --syntax-constant: #f8c762;
+  --syntax-parameter: #d6d6dd;
+  --syntax-punctuation: #d6d6dd;
+  --syntax-link: #87c3ff;
+  --syntax-string-expression: #e394dc;
+
+  /* Product monochrome accent (factory) — neutral white on dark. */
+  --color-accent: #f0f0f0;
   --color-accent-hover: #ffffff;
-  --color-accent-subtle: color-mix(in srgb, #f2f2f2 14%, transparent);
-  --color-accent-text: #0a0a0a;
-  --color-red: #f07178;
-  --color-yellow: #e6b450;
-  --color-green: #7fd97a;
-  --color-blue: #8a9bb8;
-  --color-cyan: #8aabb8;
-  --color-magenta: #c3a6e0;
-  --color-purple: #b38cff;
-  --color-orange: #ff9b6a;
-  --color-diff-added: #7fd97a33;
-  --color-diff-removed: #f0717833;
+  --color-accent-subtle: color-mix(in srgb, #f0f0f0 14%, transparent);
+  --color-accent-text: #141414;
 
-  --color-user-bubble: #1e1e1e;
-  /* Slight lift on hover without chalk white-mix (theme-aware). */
+  --color-user-bubble: #1d1e20;
   --color-user-bubble-hover: color-mix(in srgb, var(--color-user-bubble) 92%, white);
-  --color-code-inline: rgb(255 255 255 / 0.07);
-  --color-send: #f2f2f2;
-  --color-send-fg: #101010;
+  --color-code-inline: hsla(0, 0%, 100%, 0.07);
+  --color-send: #f0f0f0;
+  --color-send-fg: #141414;
 
-  /* Settings shell — one quiet step past panel, still alpha-notched. */
-  --color-settings-card: rgb(255 255 255 / 0.03);
-  /* Toggle ON track — green, not accent-blue. */
-  --color-switch-on: #7fd97a;
+  --color-settings-card: hsla(0, 0%, 100%, 0.03);
+  --color-switch-on: var(--color-success-raw);
 
-  /* Composer mode semantics (Cursor mode tint: green/yellow/cyan/purple).
-   * Whisper secondary fills (~10%) so pills read tinted, not neon slabs. */
-  --color-mode-agent-bg: color-mix(in srgb, var(--color-green) 10%, transparent);
-  --color-mode-agent-fg: var(--color-green);
-  --color-mode-plan-bg: color-mix(in srgb, var(--color-yellow) 10%, transparent);
-  --color-mode-plan-fg: var(--color-yellow);
-  --color-mode-ask-bg: color-mix(in srgb, var(--color-cyan) 10%, transparent);
-  --color-mode-ask-fg: var(--color-cyan);
-  --color-mode-flex-bg: color-mix(in srgb, var(--color-purple) 10%, transparent);
-  --color-mode-flex-fg: var(--color-purple);
-
-  /* Elevation — soft on near-black; avoid heavy black slabs. */
-  --shadow-color: rgb(0 0 0 / 0.45);
-  --shadow-ambient: rgb(0 0 0 / 0.2);
+  --color-diff-added: color-mix(in srgb, var(--color-added) 20%, transparent);
+  --color-diff-removed: color-mix(in srgb, var(--color-removed) 20%, transparent);
 }
 
 [data-theme="light"] {
-  /* ── Premium light (Cursor-density adapted) ───────────────────────────────
-     White chrome, cool gray panel, off-white elevated — three readable steps
-     so shell / sidebar / bubbles don't collapse into one flat plane. */
-  --color-base: #171717;
-  --color-chrome: #ffffff;
-  --color-panel: #f3f3f4;
-  --color-editor: #f7f7f8; /* work surface — quiet step off pure white chrome */
-  --color-elevated: #fafafa;
+  /* ── Primitives (`:root` light) ────────────────────────────────────────── */
+  --color-chrome: #f8f8f8;
+  --color-panel: #f3f3f3;
+  --color-editor: #fcfcfc;
+  --color-elevated: #fcfcfc;
+  --color-base: #141414;
 
-  --color-text-1: rgb(23 23 23 / 0.94);
-  --color-text-2: rgb(23 23 23 / 0.68);
-  --color-text-3: rgb(23 23 23 / 0.48);
-  --color-text-4: rgb(23 23 23 / 0.32);
+  --color-accent-raw: #2778c1;
+  --color-action-label: #fcfcfc;
+  --color-brand: #f54e00;
+  --color-focus-raw: #2778c1;
+  --color-success-raw: #007041;
+  --color-warn-raw: #a46700;
+  --color-danger-raw: #be1744;
 
-  --color-icon-1: rgb(23 23 23 / 0.92);
-  --color-icon-2: rgb(23 23 23 / 0.62);
-  --color-icon-3: rgb(23 23 23 / 0.46);
-  --color-icon-4: rgb(23 23 23 / 0.28);
+  --color-added: #007041;
+  --color-modified: #a46700;
+  --color-removed: #be1744;
+  --color-untracked: #176c74;
 
-  /* Whisper fills — selected slightly stronger than hover. */
-  --color-fill-1: rgb(23 23 23 / 0.1);
-  --color-fill-2: rgb(23 23 23 / 0.08); /* selected / active */
-  --color-fill-3: rgb(23 23 23 / 0.04);
-  --color-fill-4: rgb(23 23 23 / 0.055); /* list hover */
-  --color-fill-5: rgb(23 23 23 / 0.025);
+  --color-red: #be1744;
+  --color-orange: #cd4500;
+  --color-yellow: #a46700;
+  --color-green: #007041;
+  --color-cyan: #176c74;
+  --color-blue: #2778c1;
+  --color-magenta: #92156a;
+  --color-purple: #7565cc;
 
-  --color-stroke-1: rgb(23 23 23 / 0.16);
-  --color-stroke-2: rgb(23 23 23 / 0.11);
-  --color-stroke-3: rgb(23 23 23 / 0.07);
-  --color-stroke-4: rgb(23 23 23 / 0.04);
+  --shadow-primary: #0000000f;
+  --shadow-secondary: #00000009;
+  --shadow-tertiary: #00000005;
+  --shadow-color: var(--shadow-primary);
+  --shadow-ambient: var(--shadow-secondary);
 
-  /* Neutral high-contrast accent (black) — factory default. */
+  /* Syntax (light) */
+  --syntax-foreground: #141414eb;
+  --syntax-background: #fcfcfc;
+  --syntax-keyword: #b3003f;
+  --syntax-string: #8f84e0;
+  --syntax-function: #db704b;
+  --syntax-number: #b8448b;
+  --syntax-comment: #141414ad;
+  --syntax-constant: #206595;
+  --syntax-parameter: #141414eb;
+  --syntax-punctuation: #141414ad;
+  --syntax-link: #3c7cab;
+  --syntax-string-expression: #8f84e0;
+
   --color-accent: #1a1a1a;
   --color-accent-hover: #000000;
-  --color-accent-subtle: color-mix(in srgb, #1a1a1a 12%, transparent);
+  --color-accent-subtle: color-mix(in oklab, #1a1a1a 12%, transparent);
   --color-accent-text: #ffffff;
-  --color-red: #d94a5b;
-  --color-yellow: #9a6700;
-  --color-green: #1a7f4b;
-  --color-blue: #5a6f8f;
-  --color-cyan: #4a6a78;
-  --color-magenta: #8f6b8a;
-  --color-purple: #6a5fd4;
-  --color-orange: #b86f55;
-  --color-diff-added: #1a7f4b33;
-  --color-diff-removed: #d94a5b33;
 
-  --color-user-bubble: #f0f0f1;
-  --color-user-bubble-hover: #e8e8ea;
-  --color-code-inline: rgb(23 23 23 / 0.05);
-  --color-send: #171717;
+  --color-user-bubble: #f3f3f3;
+  --color-user-bubble-hover: color-mix(in oklab, var(--color-base) 6%, var(--color-user-bubble));
+  --color-code-inline: color-mix(in oklab, var(--color-base) 5%, transparent);
+  --color-send: #141414;
   --color-send-fg: #ffffff;
 
-  --color-settings-card: rgb(23 23 23 / 0.03);
-  --color-switch-on: #1a7f4b;
+  --color-settings-card: color-mix(in oklab, var(--color-base) 3%, transparent);
+  --color-switch-on: var(--color-success-raw);
 
-  /* Mode tints quieter on light so pills don't dominate chrome. */
-  --color-mode-agent-bg: color-mix(in srgb, var(--color-green) 10%, transparent);
-  --color-mode-agent-fg: var(--color-green);
-  --color-mode-plan-bg: color-mix(in srgb, var(--color-yellow) 12%, transparent);
-  --color-mode-plan-fg: var(--color-yellow);
-  --color-mode-ask-bg: color-mix(in srgb, var(--color-cyan) 10%, transparent);
-  --color-mode-ask-fg: var(--color-cyan);
-  --color-mode-flex-bg: color-mix(in srgb, var(--color-purple) 10%, transparent);
-  --color-mode-flex-fg: var(--color-purple);
-
-  /* Elevation — soft graphite, not near-black slabs on white. */
-  --shadow-color: rgb(20 20 20 / 0.12);
-  --shadow-ambient: rgb(20 20 20 / 0.05);
+  --color-diff-added: color-mix(in oklab, var(--color-added) 18%, transparent);
+  --color-diff-removed: color-mix(in oklab, var(--color-removed) 18%, transparent);
 }
 
+/* ── Semantic ladder (theme-independent; re-derives from primitives) ───────
+ * Exact percentages from production `color-mix(in oklab, …)`. */
 :root {
-  /* Semantic aliases */
+  /* Surfaces */
+  --color-bg-chrome: var(--color-chrome);
+  --color-bg-sidebar: var(--color-panel);
+  --color-bg-editor: var(--color-editor);
+  --color-bg-elevated: var(--color-elevated);
+  --color-bg-scrim: #0006;
+
+  /* Whisper fills — glass recipe on neutral base (no cool blue).
+   * tertiary 8% selected · quaternary 6% hover · hover ~7% */
+  --color-bg-primary: color-mix(in oklab, var(--color-base) 20%, transparent);
+  --color-bg-secondary: color-mix(in oklab, var(--color-base) 14%, transparent);
+  --color-bg-tertiary: color-mix(in oklab, var(--color-base) 8%, transparent);
+  --color-bg-quaternary: color-mix(in oklab, var(--color-base) 6%, transparent);
+  --color-bg-quinary: color-mix(in oklab, var(--color-base) 4%, transparent);
+  --color-bg-active: color-mix(in oklab, var(--color-base) 16%, transparent);
+  --color-bg-focused: color-mix(in oklab, var(--color-base) 22%, transparent);
+  --color-bg-hover: color-mix(in oklab, var(--color-base) 7%, transparent);
+  --color-bg-neutral: var(--color-base);
+  --color-bg-neutral-hover: color-mix(in oklab, var(--color-chrome) 10%, var(--color-base));
+  --color-bg-neutral-secondary: color-mix(in oklab, var(--color-base) 24%, transparent);
+
+  --color-bg-primary-opaque: color-mix(in oklab, var(--color-base) 20%, var(--color-bg-chrome));
+  --color-bg-secondary-opaque: color-mix(in oklab, var(--color-base) 14%, var(--color-bg-chrome));
+  --color-bg-tertiary-opaque: color-mix(in oklab, var(--color-base) 8%, var(--color-bg-chrome));
+  --color-bg-quaternary-opaque: color-mix(in oklab, var(--color-base) 6%, var(--color-bg-chrome));
+  --color-bg-quaternary-opaque-elevated: color-mix(
+    in oklab,
+    var(--color-base) 6%,
+    var(--color-bg-elevated)
+  );
+  --color-bg-quinary-opaque: color-mix(in oklab, var(--color-base) 4%, var(--color-bg-chrome));
+
+  /* agent-sidebar-cell: selected = tertiary, hover = quaternary */
+  --color-fill-1: var(--color-bg-primary);
+  --color-fill-2: var(--color-bg-tertiary); /* selected */
+  --color-fill-3: var(--color-bg-quinary);
+  --color-fill-4: var(--color-bg-quaternary); /* hover */
+  --color-fill-5: color-mix(in oklab, var(--color-base) 2.5%, transparent);
+
+  /* Neutral ink ladder (Agents Web oklab on --base — works light + dark). */
+  --color-text-1: var(--color-base);
+  --color-text-2: color-mix(in oklab, var(--color-base) 74%, transparent);
+  --color-text-3: color-mix(in oklab, var(--color-base) 60%, transparent);
+  --color-text-4: color-mix(in oklab, var(--color-base) 36%, transparent);
+  --color-text-inverted: var(--color-chrome);
+  --color-text-inverted-secondary: color-mix(in oklab, var(--color-chrome) 70%, transparent);
+  --color-text-inverted-tertiary: color-mix(in oklab, var(--color-chrome) 48%, transparent);
+  --color-text-inverted-quaternary: color-mix(in oklab, var(--color-chrome) 32%, transparent);
+
+  /* Icon ladder tracks ink (glass alphas mapped onto neutral base). */
+  --color-icon-1: color-mix(in oklab, var(--color-base) 88%, transparent);
+  --color-icon-2: color-mix(in oklab, var(--color-base) 62%, transparent);
+  --color-icon-3: color-mix(in oklab, var(--color-base) 42%, transparent);
+  --color-icon-4: color-mix(in oklab, var(--color-base) 30%, transparent);
+
+  /* Glass strokes via base (theme-safe; dark ≈ white 16%/9%). */
+  --color-border-primary: color-mix(in oklab, var(--color-base) 20%, transparent);
+  --color-border-secondary: color-mix(in oklab, var(--color-base) 16%, transparent);
+  --color-border-tertiary: color-mix(in oklab, var(--color-base) 9%, transparent);
+  --color-border-quaternary: color-mix(in oklab, var(--color-base) 4%, transparent);
+  --color-border-neutral: color-mix(in oklab, var(--color-base) 80%, transparent);
+  --color-border-focus: color-mix(in oklab, var(--color-focus-raw) 15%, transparent);
+
+  --color-stroke-1: var(--color-border-secondary);
+  --color-stroke-2: color-mix(in oklab, var(--color-base) 12%, transparent);
+  --color-stroke-3: var(--color-border-tertiary);
+  --color-stroke-4: var(--color-border-quaternary);
+
+  /* Semantic text */
+  --color-text-success: var(--color-success-raw);
+  --color-text-success-secondary: color-mix(in oklab, var(--color-success-raw) 78%, transparent);
+  --color-text-success-tertiary: color-mix(in oklab, var(--color-success-raw) 64%, transparent);
+  --color-text-success-quaternary: color-mix(in oklab, var(--color-success-raw) 40%, transparent);
+  --color-text-warn: var(--color-warn-raw);
+  --color-text-warn-secondary: color-mix(in oklab, var(--color-warn-raw) 78%, transparent);
+  --color-text-warn-tertiary: color-mix(in oklab, var(--color-warn-raw) 64%, transparent);
+  --color-text-warn-quaternary: color-mix(in oklab, var(--color-warn-raw) 40%, transparent);
+  --color-text-danger: var(--color-danger-raw);
+  --color-text-danger-secondary: color-mix(in oklab, var(--color-danger-raw) 78%, transparent);
+  --color-text-danger-tertiary: color-mix(in oklab, var(--color-danger-raw) 64%, transparent);
+  --color-text-danger-quaternary: color-mix(in oklab, var(--color-danger-raw) 40%, transparent);
+  --color-text-brand: var(--color-brand);
+  --color-text-accent-cursor: var(--color-accent-raw);
+
+  /* Semantic backgrounds (solid + hover + whisper ladder) */
+  --color-bg-success: var(--color-success-raw);
+  --color-bg-success-hover: color-mix(in oklab, var(--color-base) 10%, var(--color-success-raw));
+  --color-bg-success-secondary: color-mix(in oklab, var(--color-success-raw) 24%, transparent);
+  --color-bg-success-tertiary: color-mix(in oklab, var(--color-success-raw) 12%, transparent);
+  --color-bg-success-quaternary: color-mix(in oklab, var(--color-success-raw) 8%, transparent);
+
+  --color-bg-warn: var(--color-warn-raw);
+  --color-bg-warn-hover: color-mix(in oklab, var(--color-base) 10%, var(--color-warn-raw));
+  --color-bg-warn-secondary: color-mix(in oklab, var(--color-warn-raw) 24%, transparent);
+  --color-bg-warn-tertiary: color-mix(in oklab, var(--color-warn-raw) 12%, transparent);
+  --color-bg-warn-quaternary: color-mix(in oklab, var(--color-warn-raw) 8%, transparent);
+
+  --color-bg-danger: var(--color-danger-raw);
+  --color-bg-danger-hover: color-mix(in oklab, var(--color-base) 10%, var(--color-danger-raw));
+  --color-bg-danger-secondary: color-mix(in oklab, var(--color-danger-raw) 24%, transparent);
+  --color-bg-danger-tertiary: color-mix(in oklab, var(--color-danger-raw) 12%, transparent);
+  --color-bg-danger-quaternary: color-mix(in oklab, var(--color-danger-raw) 8%, transparent);
+
+  --color-bg-brand: var(--color-brand);
+  --color-bg-brand-hover: color-mix(in oklab, var(--color-base) 10%, var(--color-brand));
+  --color-bg-brand-secondary: color-mix(in oklab, var(--color-brand) 24%, transparent);
+  --color-bg-brand-tertiary: color-mix(in oklab, var(--color-brand) 12%, transparent);
+  --color-bg-brand-quaternary: color-mix(in oklab, var(--color-brand) 8%, transparent);
+
+  --color-bg-accent-cursor: var(--color-accent-raw);
+  --color-bg-accent-cursor-hover: color-mix(in oklab, var(--color-base) 10%, var(--color-accent-raw));
+  --color-bg-accent-cursor-secondary: color-mix(in oklab, var(--color-accent-raw) 24%, transparent);
+  --color-bg-accent-cursor-tertiary: color-mix(in oklab, var(--color-accent-raw) 12%, transparent);
+  --color-bg-accent-cursor-quaternary: color-mix(in oklab, var(--color-accent-raw) 8%, transparent);
+
+  /* Semantic borders */
+  --color-border-brand: color-mix(in oklab, var(--color-brand) 92%, transparent);
+  --color-border-brand-secondary: color-mix(in oklab, var(--color-brand) 56%, transparent);
+  --color-border-brand-tertiary: color-mix(in oklab, var(--color-brand) 32%, transparent);
+  --color-border-brand-quaternary: color-mix(in oklab, var(--color-brand) 28%, transparent);
+  --color-border-accent-cursor: color-mix(in oklab, var(--color-accent-raw) 92%, transparent);
+  --color-border-accent-cursor-secondary: color-mix(in oklab, var(--color-accent-raw) 56%, transparent);
+  --color-border-accent-cursor-tertiary: color-mix(in oklab, var(--color-accent-raw) 32%, transparent);
+
+  /* Semantic aliases used across the app */
   --color-bg: var(--color-chrome);
   --color-surface: var(--color-panel);
   --color-surface-raised: var(--color-fill-4);
@@ -170,92 +290,139 @@
   --color-border: var(--color-stroke-3);
   --color-border-strong: var(--color-stroke-2);
   --color-link: var(--color-accent);
-  --color-success: var(--color-green);
-  --color-success-subtle: color-mix(in srgb, var(--color-green) 15%, transparent);
-  --color-warning: var(--color-yellow);
-  --color-warning-subtle: color-mix(in srgb, var(--color-yellow) 15%, transparent);
-  --color-danger: var(--color-red);
-  --color-danger-subtle: color-mix(in srgb, var(--color-red) 15%, transparent);
+  --color-success: var(--color-success-raw);
+  --color-success-subtle: var(--color-bg-success-tertiary);
+  --color-warning: var(--color-warn-raw);
+  --color-warning-subtle: var(--color-bg-warn-tertiary);
+  --color-danger: var(--color-danger-raw);
+  --color-danger-subtle: var(--color-bg-danger-tertiary);
   --color-thinking: var(--color-text-3);
   --color-code-bg: var(--color-panel);
 
-  /* Typography */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+  /* Composer mode semantics (Flex domain — tinted whisper fills) */
+  /* Mode tints quieter (~10%) so pills read tinted, not neon (main neatness). */
+  --color-mode-agent-bg: color-mix(in oklab, var(--color-green) 10%, transparent);
+  --color-mode-agent-fg: var(--color-green);
+  --color-mode-plan-bg: color-mix(in oklab, var(--color-yellow) 10%, transparent);
+  --color-mode-plan-fg: var(--color-yellow);
+  --color-mode-ask-bg: color-mix(in oklab, var(--color-cyan) 10%, transparent);
+  --color-mode-ask-fg: var(--color-cyan);
+  --color-mode-flex-bg: color-mix(in oklab, var(--color-purple) 10%, transparent);
+  --color-mode-flex-fg: var(--color-purple);
+
+  /* Typography — production size ladder (7：56 HTML).
+   * UI: Inter first (prompt + web fallbacks). Code: JetBrains Mono / Cascadia. */
+  /* Glass desktop: system sans; code Menlo/Monaco first (editor 12px). */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Inter",
     sans-serif;
-  --font-mono: Menlo, Monaco, ui-monospace, "SF Mono", "Courier New", monospace;
+  --font-mono: Menlo, Monaco, "Cascadia Code", "SF Mono", "JetBrains Mono",
+    ui-monospace, Consolas, "Liberation Mono", "Courier New", monospace;
+  --editor-font-size: 12px;
+  --editor-line-height: 18px;
 
-  /* Reference canon (DESIGN.md Feel principles). Registered in the
-     `@theme` block in src/index.css so Tailwind's `font-semibold` emits 590. */
-  --font-weight-semibold: 590; /* fallback 600 */
+  /* Cursor glass: normal ~418, medium 500, semibold/bold 600. */
+  --font-weight-normal: 418;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 600;
 
-  --text-xs: 0.6875rem;
-  --text-sm: 0.75rem;
-  --text-base: 0.8125rem;
-  --text-lg: 0.875rem;
-  --text-xl: 1rem;
-  --text-2xl: 1.25rem;
+  --text-xs: 0.6875rem; /* 11px — font-size-xs */
+  --text-sm: 0.75rem; /* 12px — font-size-sm */
+  --text-base: 0.8125rem; /* 13px — font-size-base */
+  --text-lg: 1rem; /* 16px — production font-size-lg */
+  --text-xl: 1.25rem; /* 20px — production font-size-xl */
+  --text-2xl: 1.5rem;
 
   --leading-tight: 1.25;
   --leading-normal: 1.4;
   --leading-relaxed: 1.5;
+  --line-height-xs: 0.875rem;
+  --line-height-sm: 1rem;
+  --line-height-base: 1.125rem; /* pairs with text-base */
+  --line-height-lg: 1.5rem;
+  --line-height-xl: 1.75rem;
 
-  /* Micro tracking — captions 11–12px / body 13–14px (Feel: Semibold is 590). */
   --tracking-caption: 0.07px;
   --tracking-body: -0.078px;
 
-  /* Spacing — 4px grid */
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.25rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
-  --space-10: 2.5rem;
-  --space-12: 3rem;
+  /* Icons — thin stroke, 14–16px (production cursor-icon / lucide). */
+  --icon-size-sm: 14px;
+  --icon-size-md: 16px;
+  --icon-stroke: 1.5;
 
-  /* Radius — reference glass scale (sm6 / base8 / lg10 / xl14 / 2xl16). */
+  /* Spacing — Cursor dense 4px grid with half-steps (px values). */
+  --space-0-25: 1px;
+  --space-0-5: 2px;
+  --space-0-75: 3px;
+  --space-1: 4px;
+  --space-1-25: 5px;
+  --space-1-5: 6px;
+  --space-1-75: 7px;
+  --space-2: 8px;
+  --space-2-25: 9px;
+  --space-2-5: 10px;
+  --space-2-75: 11px;
+  --space-3: 12px;
+  --space-3-5: 14px;
+  --space-4: 16px;
+  --space-4-5: 18px;
+  --space-5: 20px;
+  --space-5-5: 22px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-9: 36px;
+  --space-10: 40px;
+  --space-11: 44px;
+  --space-12: 48px;
+  --space-14: 56px;
+  --space-16: 64px;
+
+  /* Radius — glass workbench (base 8, lg 10, xl 14) */
+  --radius-none: 0px;
+  --radius-2xs: 2px;
   --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-  --radius-2xl: 16px;
-  --radius-3xl: 18px;
-  --radius-bubble: 14px; /* conversation-surface-border-radius = radius-xl */
+  --radius-sm: 6px; /* agent-sidebar-cell border-radius */
+  --radius-md: 8px; /* cursor-radius-base — controls */
+  --radius-lg: 10px; /* cursor-radius-lg */
+  --radius-xl: 14px; /* cursor-radius-xl — bubbles */
+  --radius-2xl: 16px; /* cursor-radius-2xl */
+  --radius-3xl: 18px; /* cursor-radius-3xl */
+  --radius-bubble: 14px; /* cursor-radius-xl — human-message */
+  --radius-composer: 14px; /* cursor-radius-xl — chat-composer-card */
+  --radius-card: 12px;
   --radius-full: 9999px;
-  --radius-composer: 14px;
-  --radius-card: 12px; /* settings cards / grouped panels */
 
-  /* Shadows — reference glass: stroke ring + theme-aware elevation.
-     Colors come from per-theme --shadow-color / --shadow-ambient so they read
-     correctly on both near-black (dark) and light surfaces. */
-  --shadow-sm: 0 0 0 1px var(--color-stroke-3), 0 2px 8px var(--shadow-ambient);
+  /* Shadows — Cursor box-shadow recipes (soft, layered) */
+  --shadow-sm: 0 2px 8px 0 var(--shadow-secondary);
   --shadow-md:
-    0 0 0 1px var(--color-stroke-3),
-    0 0 4px var(--shadow-ambient),
-    0 8px 24px -2px var(--shadow-color);
+    0 0 0 1px var(--color-border-tertiary),
+    0 0 4px 0 var(--shadow-secondary),
+    0 8px 24px -2px var(--shadow-secondary);
   --shadow-lg:
-    0 0 0 1px var(--color-stroke-3),
-    0 0 4px var(--shadow-ambient),
-    0 16px 32px -4px var(--shadow-color);
-  /* Composer: Cursor glass elevation — soft ambient only.
-   * The 1px ring is a real border (stroke-3 idle → stroke-1 focus), not a
-   * shadow ring — double-painting a ring via box-shadow reads floaty/harsh. */
-  --shadow-composer: 0 1px 3px 0 var(--shadow-ambient),
-    0 4px 12px -4px var(--shadow-color);
-  /* Focus: slightly deeper ambient; border color carries the focus cue. */
+    inset 0 0 4px 0 #ffffff0d,
+    0 0 3px 0 var(--shadow-secondary),
+    0 16px 24px 0 var(--shadow-tertiary);
+  --shadow-xl:
+    inset 0 0 4px 0 #ffffff0d,
+    0 0 6px 8px var(--shadow-secondary),
+    0 24px 16px 6px var(--shadow-tertiary);
+  --shadow-soft: 0 0 8px 2px var(--shadow-tertiary);
+  --shadow-base: 0 0 8px 2px var(--shadow-primary);
+  /* Glass composer: idle inset stroke-3 + soft ambient (hover/focus in recipes). */
+  --shadow-composer:
+    inset 0 0 0 1px var(--color-border-tertiary),
+    0 1px 4px 0 color-mix(in srgb, var(--shadow-tertiary) 40%, transparent);
   --shadow-composer-focus:
-    0 1px 3px 0 var(--shadow-ambient),
-    0 8px 20px -6px var(--shadow-color);
-  /* Popover chrome — the reference design's box-shadow-xl (borderless, 4-layer). */
+    inset 0 0 0 1px var(--color-border-secondary),
+    0 1px 4px 0 color-mix(in srgb, var(--shadow-secondary) 40%, transparent),
+    0 2px 10px 0 color-mix(in srgb, var(--shadow-secondary) 35%, transparent);
   --shadow-popover:
-    0 0 0 1px var(--color-stroke-3),
-    0 0 4px 0 var(--shadow-ambient),
-    0 12px 24px 0 var(--shadow-ambient),
-    0 24px 36px 0 var(--shadow-ambient);
+    0 0 0 1px var(--color-border-tertiary),
+    0 0 4px 0 var(--shadow-secondary),
+    0 8px 24px -2px var(--shadow-secondary);
 
-  /* Motion — reference glass (subtle) */
+  /* Motion — Cursor production */
   --duration-instant: 50ms;
   --duration-fast: 100ms;
   --duration-normal: 150ms;
@@ -263,7 +430,6 @@
   --duration-slower: 300ms;
   --duration-content: 220ms;
   --duration-end-turn: 160ms;
-  /* reference accordion: max-height .25s + opacity .2s ease-in-out. */
   --duration-expand: 250ms;
   --duration-expand-fade: 200ms;
   --easing-default: ease;
@@ -274,27 +440,50 @@
   --easing-in-strong: cubic-bezier(0.895, 0.03, 0.685, 0.22);
   --easing-end-turn: cubic-bezier(0.23, 1, 0.32, 1);
 
-  /* Layout */
-  --sidebar-width: 16.5rem;
-  /* Custom window chrome (Cursor-style title bar above app content). */
-  --titlebar-height: 30px;
-  /* Native-like window clip (macOS CALayer + vibrancy radius; CSS fallback). */
+  /* Layout — Cursor glass desktop body (titlebar 35px, sidebar 210–400). */
+  --sidebar-width: 16.25rem; /* 260px Agents / Cursor density default */
+  --titlebar-height: 35px; /* glass-titlebar height */
+  --traffic-lights-spacer: 80px; /* glass macOS traffic-lights spacer */
   --window-radius: 10px;
+  /* Tab strips / dense chrome rows (not the window title bar). */
   --header-height: 30px;
-  /* Editor grow — Cursor ~one line min; max ~10rem keeps the rail grounded. */
+  /* Chat thread header + right-panel toolbars (Agents web + glass panels). */
+  --chat-header-height: 40px;
+  --panel-toolbar-height: 40px;
+  /* File tree toggle width (production Hide file tree control). */
+  --file-tree-toggle-width: 26px;
   --composer-min-height: 1.5rem;
   --composer-max-height: 10rem;
   --timeline-row-min-height: 1.25rem;
   --status-bar-height: 1.75rem;
-  --content-rail: 52.5rem;
+  /* Clamp chat column density when the right split is closed (Cursor middle-column feel). */
+  --content-rail: min(100%, 45rem);
   --form-rail: 32rem;
   --welcome-rail: 28rem;
   --end-of-turn-reserved-height: 1.25rem;
 
-  /* Overlay ladder — non-blocking hints stay below menus; blocking surfaces
-   * and transient feedback never compete for the same z-index tier. */
+  /* Scrollbar (Cursor: 8px, thin, border-tertiary thumb) */
+  --scrollbar-size: 8px;
+  --scrollbar-thumb: var(--color-border-tertiary);
+  --scrollbar-thumb-hover: var(--color-border-secondary);
+  --scrollbar-thumb-active: var(--color-text-3);
+
+  /* Focus ring — neutral stroke, never accent glow (production + DESIGN.md). */
+  --focus-ring-color: var(--color-border-secondary);
+  --focus-ring-width: 1px;
+  --focus-ring-offset: 2px;
+  --focus-ring: var(--focus-ring-width) solid var(--focus-ring-color);
+  /* denser in-panel focus (lists, selects) */
+  --focus-ring-inset: 0 0 0 1px var(--color-border-secondary);
+
+  /* Overlay ladder */
   --z-tooltip: 250;
   --z-overlay: 300;
   --z-toast: 400;
   --z-modal: 500;
+}
+
+/* ── Phase 0 foundation defaults (vars only; rules live in index.css) ───── */
+:root {
+  --icon-size: var(--icon-size-sm);
 }

@@ -163,7 +163,7 @@ export const modePlaceholder = (mode: ComposerMode, isHero: boolean): string => 
     if (mode === "ask") return "Ask a follow-up…"
     if (mode === "debug") return "Describe the failure or next probe…"
     if (mode === "flex") return "Direct the orchestrator…"
-    return "Send follow-up"
+    return "Add a follow-up"
   }
   if (mode === "plan") return "Plan and design before coding…"
   if (mode === "ask") return "Ask questions without making changes…"

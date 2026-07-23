@@ -28,4 +28,13 @@ describe("MessageActions", () => {
     // The copy button still renders.
     expect(html).toContain("Copy message")
   })
+
+  it("right-aligns actions and hover-reveals by default", () => {
+    const html = renderToStaticMarkup(
+      <MessageActions text="hello" tsMs={Date.now()} />,
+    )
+    expect(html).toContain("justify-end")
+    expect(html).toContain("opacity-0")
+    expect(html).toContain("group-hover/row:opacity-100")
+  })
 })

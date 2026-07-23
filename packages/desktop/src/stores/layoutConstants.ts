@@ -1,3 +1,4 @@
+/** Cursor glass workspace-sidebar (desktop body capture 2026-07-23). */
 export const SIDEBAR_MIN_WIDTH = 210
 export const SIDEBAR_MAX_WIDTH = 400
 export const SIDEBAR_DEFAULT_WIDTH = 260

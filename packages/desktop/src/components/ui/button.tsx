@@ -11,7 +11,8 @@ const buttonVariants = cva(
   // `text-left` overrides the UA `<button>` default (`text-align: center`) —
   // otherwise a flex-1 label sits far from its leading icon (sidebar / menus).
   // Hover: color/fill only @ 100ms. Exclude box-shadow so focus ring is instant.
-  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-left text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,opacity,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)] outline-none select-none focus-visible:border-stroke-2 focus-visible:ring-1 focus-visible:ring-stroke-2 active:not-aria-[haspopup]:translate-y-px motion-reduce:active:translate-y-0 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  // Production icons: 14px default, thin stroke via size-3.5; neutral focus ring.
+  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding text-left text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,opacity,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)] outline-none select-none focus-visible:border-stroke-2 focus-visible:ring-1 focus-visible:ring-stroke-2 active:not-aria-[haspopup]:translate-y-px motion-reduce:active:translate-y-0 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
   {
     variants: {
       variant: {

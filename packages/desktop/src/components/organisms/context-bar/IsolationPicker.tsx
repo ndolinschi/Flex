@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query"
 import { GitFork } from "lucide-react"
 import type { IsolationPolicy } from "../../../lib/types"
-import { listWorkspaces, type WorkspaceInfo } from "../../../lib/tauri"
+import { listSessions, listWorkspaces, type WorkspaceInfo } from "../../../lib/tauri"
 import { useAppStore } from "../../../stores/appStore"
+import { SESSIONS_KEY } from "../../../hooks/useSessions"
 import {
   Select,
   SelectContent,
@@ -33,6 +34,11 @@ const ISOLATION_OPTIONS: {
 ]
 
 const NEW_WORKSPACE_VALUE = "__new__"
+
+const policyLabel = (policy: IsolationPolicy | null | undefined): string => {
+  const value = policy === "required" ? "required" : "never"
+  return ISOLATION_OPTIONS.find((o) => o.value === value)!.label
+}
 
 /**
  * Draft-only picker: chooses the isolation for the NEXT session this draft
@@ -83,13 +89,30 @@ export const IsolationPicker = ({
   )
   const hasTurns = hasTurnUsage || logRowCount > 0
 
-  const current = selectedIsolation === "required" ? "required" : "never"
-  const currentLabel = ISOLATION_OPTIONS.find((o) => o.value === current)!.label
+  // Prefer this session's recorded policy so switching tabs does not show
+  // the global draft preference (selectedIsolation) belonging to another agent.
+  const { data: sessions } = useQuery({
+    queryKey: SESSIONS_KEY,
+    queryFn: listSessions,
+    staleTime: 30_000,
+  })
+  const sessionPolicy = sessions?.find((s) => s.id === sessionId)?.isolation
+
+  const draftPolicy: IsolationPolicy =
+    selectedIsolation === "required" ? "required" : "never"
+  // Locked sessions: show what *this* session was created with. Drafts still
+  // edit the global preference used on the next create_session.
+  const current: IsolationPolicy = hasTurns
+    ? sessionPolicy === "required"
+      ? "required"
+      : "never"
+    : draftPolicy
+  const currentLabel = policyLabel(current)
 
   // Only enumerate worktrees when the picker is actually going to show a
   // reuse dropdown — no wasted `git worktree list` on non-isolated drafts.
   const shouldListWorkspaces =
-    current === "required" && !!projectCwd && !hasTurns
+    !hasTurns && current === "required" && !!projectCwd
   const { data: workspaces = [] } = useQuery<WorkspaceInfo[]>({
     queryKey: ["list-workspaces", projectCwd ?? ""],
     queryFn: () => listWorkspaces(projectCwd!),

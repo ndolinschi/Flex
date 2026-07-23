@@ -141,41 +141,64 @@ export const TerminalTab = ({
           like BrowserToolbar: this row separates chrome from the xterm
           surface (a native-like body), not a second rule under TabStrip
           with only hairline content between. */}
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 border-b border-stroke-3 px-2.5">
-        <span className="min-w-0 flex-1 truncate text-sm text-ink">
-          {isAgentSelected
-            ? "Agent terminal"
-            : activeTerminal
-              ? basename(activeTerminal.cwd) || "Terminal"
-              : "Terminal"}
-        </span>
-        <div className="flex shrink-0 items-center gap-1">
+      {/* Production terminal-session-toolbar: h-10 border-b tertiary px-2 bg-card. */}
+      <div
+        role="toolbar"
+        aria-label="Terminal sessions"
+        className="panel-toolbar flex h-[var(--panel-toolbar-height)] shrink-0 items-center gap-1.5 border-b border-stroke-3 bg-elevated px-2"
+      >
+        <button
+          type="button"
+          className={cn(
+            "flex h-6 min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 text-base font-medium text-ink",
+            "hover:bg-bg-quaternary",
+          )}
+          title={
+            isAgentSelected
+              ? "Agent terminal"
+              : activeTerminal
+                ? activeTerminal.title || "Terminal"
+                : "Terminal"
+          }
+        >
+          <span className="min-w-0 truncate">
+            {isAgentSelected
+              ? "Agent terminal"
+              : activeTerminal
+                ? activeTerminal.title || basename(activeTerminal.cwd) || "Terminal"
+                : "Terminal"}
+          </span>
+        </button>
+        <div className="ml-auto flex shrink-0 items-center gap-1">
           <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label="New Terminal" title="New Terminal"
-      onClick={() => void handleNewTerminal()}
-      className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "h-6 w-6",
-      )}
-    >
-      <Plus className="h-3.5 w-3.5" aria-hidden />
-    </Button>
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="New Terminal"
+            title="New Terminal"
+            onClick={() => void handleNewTerminal()}
+            className="h-6 w-6 text-icon-2 hover:bg-bg-quaternary hover:text-icon-1"
+          >
+            <Plus className="size-3.5" strokeWidth={1.5} aria-hidden />
+          </Button>
           <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label={terminalListVisible ? "Hide Terminal List" : "Show Terminal List"} title={terminalListVisible ? "Hide Terminal List" : "Show Terminal List"}
-      onClick={toggleTerminalListVisible}
-      className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "h-6 w-6",
-      )}
-    >
-      <List className="h-3.5 w-3.5" aria-hidden />
-    </Button>
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={
+              terminalListVisible ? "Hide Terminal List" : "Show Terminal List"
+            }
+            title={
+              terminalListVisible ? "Hide Terminal List" : "Show Terminal List"
+            }
+            onClick={toggleTerminalListVisible}
+            className={cn(
+              "h-6 w-6 text-icon-2 hover:bg-bg-quaternary hover:text-icon-1",
+              terminalListVisible && "bg-bg-tertiary text-ink",
+            )}
+          >
+            <List className="size-3.5" strokeWidth={1.5} aria-hidden />
+          </Button>
         </div>
       </div>
       {isAgentSelected ? (
@@ -187,14 +210,15 @@ export const TerminalTab = ({
       {/* Body */}
       <div className="flex min-h-0 flex-1">
         {terminalListVisible && (terminals.length > 0 || hasAgentStream) ? (
-          <div className="flex w-[180px] shrink-0 flex-col border-r border-stroke-3">
-            <div className="flex h-6 shrink-0 items-center px-2.5 text-xs text-ink-muted">
-              <span>
-                {terminals.length === 0
+          // Production right rail: narrow session list (screenshot "1 Terminal" + zsh pills).
+          <div className="flex w-[160px] shrink-0 flex-col border-r border-stroke-3 bg-panel">
+            <div className="flex h-7 shrink-0 items-center px-2 text-xs text-ink-muted">
+              <span className="tabular-nums">
+                {terminals.length === 0 && !hasAgentStream
                   ? "Terminals"
-                  : terminals.length === 1
-                    ? "1 Terminal"
-                    : `${terminals.length} Terminals`}
+                  : `${terminals.length + (hasAgentStream ? 1 : 0)} Terminal${
+                      terminals.length + (hasAgentStream ? 1 : 0) === 1 ? "" : "s"
+                    }`}
               </span>
             </div>
             <ScrollArea className="min-h-0 flex-1 py-1.5">

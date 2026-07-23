@@ -203,7 +203,9 @@ export const useBootstrap = (
           useAppStore.getState().setRightPanelWidth(ui.rightPanelWidth)
         }
         if (typeof ui.sidebarWidth === "number") {
-          useAppStore.getState().setSidebarWidth(ui.sidebarWidth)
+          // Migrate pre-glass default (344) → Agents density (280).
+          const width = ui.sidebarWidth === 344 ? 280 : ui.sidebarWidth
+          useAppStore.getState().setSidebarWidth(width)
         }
 
         setRoute("chat")

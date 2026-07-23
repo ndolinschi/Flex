@@ -35,32 +35,26 @@ const KindIcon = ({
   if (running) {
     return (
       <LoaderCircle
-        className="h-3.5 w-3.5 shrink-0 animate-spin text-ink-faint"
+        className="size-3.5 shrink-0 animate-spin text-icon-3"
+        strokeWidth={1.5}
         aria-hidden
       />
     )
   }
+  const iconClass = "size-3.5 shrink-0 text-icon-3"
   if (kind === "explore") {
-    return (
-      <FileSearch className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
-    )
+    return <FileSearch className={iconClass} strokeWidth={1.5} aria-hidden />
   }
   if (kind === "edit") {
-    return (
-      <FilePenLine className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
-    )
+    return <FilePenLine className={iconClass} strokeWidth={1.5} aria-hidden />
   }
   if (kind === "shell") {
-    return (
-      <Terminal className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
-    )
+    return <Terminal className={iconClass} strokeWidth={1.5} aria-hidden />
   }
   if (kind === "plan") {
-    return (
-      <ListChecks className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
-    )
+    return <ListChecks className={iconClass} strokeWidth={1.5} aria-hidden />
   }
-  return <Wrench className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
+  return <Wrench className={iconClass} strokeWidth={1.5} aria-hidden />
 }
 
 type ToolStepGroupProps = {

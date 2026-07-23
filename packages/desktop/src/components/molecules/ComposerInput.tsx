@@ -18,6 +18,7 @@ type ComposerInputProps = {
   /** Bind drafts to this session (defaults to store activeSessionId). */
   sessionId?: string | null
   composerMode: ComposerMode
+  /** Empty-agent placeholders vs follow-up copy; layout is always large. */
   isHero?: boolean
   cwd: string | undefined
   enabled: boolean
@@ -66,7 +67,9 @@ export const ComposerInput = ({
   const browserDesignMode = useAppStore((s) => s.browserDesignMode)
   const hasDomChip = attachments.some((a) => a.kind === "dom")
   const backdropRef = useRef<HTMLDivElement>(null)
-  const { textareaRef } = useAutoGrowTextarea(composerDraft)
+  const { textareaRef } = useAutoGrowTextarea(composerDraft, {
+    minHeight: 36,
+  })
 
   // Keep the caller's out-ref in sync with the auto-grow ref (once the
   // textarea mounts / when the out-ref identity changes).
@@ -274,9 +277,6 @@ export const ComposerInput = ({
         </div>
       ) : null}
 
-      {/* Rich input: transparent textarea over a highlight backdrop that
-          renders @mentions as inline pills (aligned 1:1 by sharing metrics).
-          Padding matches Cursor full-input-box editor: 8px top · 10px sides. */}
       <div className="relative">
         {activeSessionId && enabled ? (
           <div className="absolute right-1 top-1 z-10">
@@ -305,9 +305,9 @@ export const ComposerInput = ({
           aria-hidden
           className={cn(
             "pointer-events-none absolute inset-0 overflow-hidden",
-            "min-h-[var(--composer-min-height)] max-h-[var(--composer-max-height)]",
-            "whitespace-pre-wrap break-words px-2.5 pt-2 text-sm leading-[1.45] text-ink",
+            "whitespace-pre-wrap break-words text-sm text-ink",
             "[overflow-wrap:break-word] [word-break:normal]",
+            "min-h-[var(--composer-min-height)] max-h-[var(--composer-max-height)] px-2.5 pt-2 leading-[1.45]",
             activeSessionId && enabled && "pr-8",
           )}
         >
@@ -315,9 +315,6 @@ export const ComposerInput = ({
             seg.pill ? (
               <span
                 key={i}
-                // No horizontal padding: the transparent textarea measures
-                // caret advance on unstyled glyphs; extra px would drift the
-                // caret left of the visible pill text.
                 className="rounded-[4px] bg-accent-subtle text-accent"
               >
                 {seg.value}
@@ -329,7 +326,6 @@ export const ComposerInput = ({
           {suggestion ? (
             <span className="text-ink-faint">{suggestion}</span>
           ) : null}
-          {/* trailing newline needs a rendered box to match the textarea */}
           {"​"}
         </div>
 
@@ -355,14 +351,11 @@ export const ComposerInput = ({
           rows={1}
           aria-label="Message composer"
           className={cn(
-            // transition-none: a height transition corrupts the scrollHeight-reset
-            // used for auto-grow (computed height lags, locking the box at max).
-            // Text is transparent (caret stays visible) so the backdrop shows through.
-            "relative min-h-[var(--composer-min-height)] max-h-[var(--composer-max-height)]",
-            "w-full resize-none overflow-y-auto border-0 bg-transparent text-transparent caret-ink",
+            "relative w-full resize-none overflow-y-auto border-0 bg-transparent text-transparent caret-ink",
             "[overflow-wrap:break-word] [word-break:normal]",
-            "px-2.5 pt-2 text-sm leading-[1.45] outline-none transition-none",
+            "text-sm outline-none transition-none",
             "placeholder:text-ink-muted/80",
+            "min-h-[var(--composer-min-height)] max-h-[var(--composer-max-height)] px-2.5 pt-2 leading-[1.45]",
             activeSessionId && enabled && "pr-8",
           )}
         />

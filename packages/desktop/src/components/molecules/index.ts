@@ -11,6 +11,7 @@ export { CompactionCard } from "./CompactionCard"
 export { IndexingCard } from "./IndexingCard"
 export { ConfirmDialog } from "./ConfirmDialog"
 export { ChatDiffCard } from "./ChatDiffCard"
+export { ChatThreadHeader } from "./ChatThreadHeader"
 export { ChatgptSignInDialog } from "./ChatgptSignInDialog"
 export { CopilotSignInDialog } from "./CopilotSignInDialog"
 export { CreatePrDialog } from "./CreatePrDialog"
@@ -68,7 +69,10 @@ export { SettingsSection, FieldRow, SettingsCard, SettingRow } from "./SettingsS
 export { SettingsNav, SETTINGS_NAV_ITEMS } from "./SettingsNav"
 export type { SettingsNavItem } from "./SettingsNav"
 export { SidebarActionRow } from "./SidebarActionRow"
-export { SidebarProjectFilter } from "./SidebarProjectFilter"
+export {
+  SidebarProjectFilter,
+  reposHeaderIconClass,
+} from "./SidebarProjectFilter"
 export { SidebarFooter } from "./SidebarFooter"
 export { SidebarResumeError } from "./SidebarResumeError"
 export { SidebarSkeleton } from "./SidebarSkeleton"

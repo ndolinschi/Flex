@@ -30,12 +30,20 @@ export const TerminalRow = ({
         }
       }}
       className={cn(
-        "group flex w-full cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-xs",
-        selected ? "bg-fill-2 text-ink hover:bg-fill-2" : "hover:bg-fill-4",
+        // Production terminal session pill: h-6 rounded-md, selected quaternary.
+        "group mx-1.5 flex h-6 w-[calc(100%-12px)] cursor-pointer items-center gap-1.5 rounded-md px-2 text-sm",
+        "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+        selected
+          ? "bg-[var(--color-bg-quaternary-opaque)] text-ink hover:bg-[var(--color-bg-quaternary-opaque)]"
+          : "text-ink-secondary hover:bg-bg-quaternary hover:text-ink",
       )}
     >
-      <TerminalIcon className="h-3.5 w-3.5 shrink-0 text-ink-muted" aria-hidden />
-      <span className="min-w-0 flex-1 truncate">{title}</span>
+      <TerminalIcon
+        className="size-3.5 shrink-0 text-icon-3"
+        strokeWidth={1.5}
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1 truncate font-medium">{title}</span>
       <span className="shrink-0 text-xs text-ink-muted group-hover:hidden">
         {formatElapsed(createdAtMs, now)}
       </span>

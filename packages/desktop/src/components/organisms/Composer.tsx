@@ -28,8 +28,11 @@ import { ComposerQueue } from "./composer/ComposerQueue"
 type ComposerProps = {
   /** When set, bind drafts/send to this session instead of global active. */
   sessionId?: string | null
-  /** When false (visited/hidden chat), disable autocomplete + skip ContextBar. */
+  /** When false (visited/unfocused chat), disable editing; ContextBar stays
+   * visible so project/workspace chrome does not vanish in a split pane. */
   interactive?: boolean
+  /** Empty agent: ContextBar above the bubble; active chat: footer below.
+   * Layout is always the large column composer (never compact pill). */
   isHero?: boolean
   /** Permission / question card stacked flush above the bubble (same rail). */
   dockedOverlay?: ReactNode
@@ -70,16 +73,16 @@ const ComposerSendButton = ({
   )
 }
 
-/** Soft ambient only — docked HITL paints the side/bottom stroke so the seam
- * with Permission/Question stays continuous (no top border/ring). */
+/** Soft ambient + inset hairline — docked HITL paints the side/bottom stroke
+ * so the seam with Permission/Question stays continuous (no top border/ring). */
 const DOCKED_BUBBLE_SHADOW = "shadow-[var(--shadow-composer)]"
 const DOCKED_BUBBLE_SHADOW_FOCUS =
   "focus-within:shadow-[var(--shadow-composer-focus)]"
 
-/** Cursor glass prompt anatomy: elevated fill, real 1px border (tertiary→
- * secondary on focus), soft ambient — not a heavy floaty shadow ring.
- * Draft subscription lives in `ComposerInput` / `ComposerSendButton` so
- * ContextBar + ModelPicker stay stable across keystrokes. */
+/** Elevated composer card. Draft subscription lives in `ComposerInput` /
+ * `ComposerSendButton` so ContextBar + ModelPicker stay stable across keystrokes.
+ * Always a column bubble: textarea on top, bottom toolbar
+ * `Plus | Mode | (spacer) | Model | Bypass | Send`. */
 export const Composer = ({
   sessionId: sessionIdProp = null,
   interactive = true,
@@ -89,8 +92,6 @@ export const Composer = ({
 }: ComposerProps) => {
   const storeActiveSessionId = useAppStore((s) => s.activeSessionId)
   const activeSessionId = sessionIdProp ?? storeActiveSessionId
-  // Docked Permission/Question sits as a sibling above this bubble — squash
-  // top corners and drop the top shadow-ring so the seam reads as one panel.
   const hasDockedOverlay = !!dockedOverlay
   const pendingPermission = useAppStore((s) =>
     s.pendingPermission && s.pendingPermission.sessionId === activeSessionId
@@ -122,11 +123,6 @@ export const Composer = ({
 
   const active = sessions.find((s) => s.id === activeSessionId)
 
-  // Whether the currently-selected model id resolves to a model with a
-  // configured provider. `null` while the list is still loading (don't block
-  // a send on an unknown); `false` when a stored id (e.g. `bedrock/…`) has no
-  // provider, so the picker shows "Select model" and the send must be blocked
-  // rather than firing a doomed request. See useComposerSend.
   const selectedModelUsable: boolean | null = modelsLoading
     ? null
     : !!selectedModelId && models.some((m) => m.id === selectedModelId)
@@ -139,11 +135,10 @@ export const Composer = ({
     error: attachmentError,
     setError: setAttachmentError,
     handlePick,
-    handlePaste,
     handleDrop,
+    handlePaste,
   } = useComposerAttachments()
 
-  // Surface attachment errors through the same banner as everything else.
   useEffect(() => {
     if (attachmentError) setError(attachmentError)
   }, [attachmentError])
@@ -179,9 +174,6 @@ export const Composer = ({
     setError,
   })
 
-  // Browser tab's load-error page "Ask Agent" button prefills the draft (via
-  // `setComposerDraft`) then asks for focus through this event, since the
-  // textarea ref lives here, not in the store.
   useEffect(() => {
     const handleFocusRequest = () => textareaRef.current?.focus()
     window.addEventListener("flex:focus-composer", handleFocusRequest)
@@ -189,7 +181,6 @@ export const Composer = ({
       window.removeEventListener("flex:focus-composer", handleFocusRequest)
   }, [])
 
-  // Sync composer model from the active session once per switch.
   useEffect(() => {
     if (!activeSessionId || !active) return
     if (syncedSessionRef.current === activeSessionId) return
@@ -200,7 +191,7 @@ export const Composer = ({
 
   if (!activeSessionId) {
     return (
-      <div className="px-3 pb-3 text-center text-sm text-ink-muted">
+      <div className="px-2.5 pb-3 text-center text-sm text-ink-muted">
         Select or create a session to start chatting.
       </div>
     )
@@ -213,9 +204,6 @@ export const Composer = ({
     const sessionId = activeSessionId
     void (async () => {
       try {
-        // Mid-run: push BypassPermissions into the in-flight turn so later
-        // tools stop prompting. Clearing when turning off reverts to session
-        // defaults for subsequent tools this turn.
         await setTurnPermissionMode(
           sessionId,
           next ? "bypass_permissions" : null,
@@ -228,8 +216,6 @@ export const Composer = ({
         })
       }
       if (!next) return
-      // Auto-resolve a pending ask for this session so the user isn't left
-      // staring at Allow Bash after they already flipped the shield on.
       const pending = useAppStore.getState().pendingPermission
       if (!pending || pending.sessionId !== sessionId) return
       try {
@@ -256,19 +242,88 @@ export const Composer = ({
     }
   }
 
-  const contextBar = interactive ? (
+  const contextBar = activeSessionId ? (
     <ContextBar
       cwd={active?.cwd}
       projectCwd={active ? active.base_cwd || active.cwd : undefined}
       sessionId={activeSessionId}
-      disabled={false}
+      disabled={!interactive}
       onError={setError}
       compact={isHero}
     />
   ) : null
 
+  const inputEnabled =
+    interactive &&
+    isBootstrapped &&
+    route !== "welcome" &&
+    !pendingPermission
+
+  const composerInput = (
+    <ComposerInput
+      sessionId={activeSessionId}
+      composerMode={composerMode}
+      isHero={isHero}
+      cwd={active?.cwd}
+      enabled={inputEnabled}
+      anchorRef={slashRootRef}
+      attachments={attachments}
+      removeAttachment={removeAttachment}
+      addAttachment={addAttachment}
+      handlePaste={handlePaste}
+      handleDrop={handleDrop}
+      onSend={() => void handleSend()}
+      textareaRefOut={textareaRef}
+    />
+  )
+
+  const plusCluster = !pendingPermission ? (
+    <PlusMenu
+      onAttachFile={() => void handlePick("file")}
+      onAttachImage={() => void handlePick("image")}
+    />
+  ) : (
+    <span className="px-1 text-xs text-ink-muted">Waiting for permission…</span>
+  )
+
+  const modePicker = !pendingPermission ? (
+    <ModePicker value={composerMode} onChange={setComposerMode} />
+  ) : null
+
+  const modelPicker = !pendingPermission ? (
+    <ModelPicker
+      models={models}
+      value={selectedModelId}
+      onChange={(id) => void handleModelChange(id)}
+      isLoading={modelsLoading}
+      effortFor={(modelId) => effortByModel[modelId] ?? null}
+      onEffortChange={setEffortForModel}
+      builtinProviders={builtinProviders}
+    />
+  ) : null
+
+  const actionCluster = pendingPermission ? (
+    <PermissionActions permission={pendingPermission} />
+  ) : (
+    <>
+      <BypassPermissionsButton
+        composerMode={composerMode}
+        sessionBypass={sessionBypass}
+        disabled={!activeSessionId}
+        onToggle={handleToggleBypass}
+      />
+      <ComposerSendButton
+        sessionId={activeSessionId}
+        isStreaming={isStreaming}
+        hasAttachments={attachments.length > 0}
+        onSend={() => void handleSend()}
+        onStop={() => void handleStop()}
+      />
+    </>
+  )
+
   return (
-    <div className="px-3 pt-1.5 pb-0.5">
+    <div className="px-2.5 pt-1 pb-1.5">
       {error ? (
         <div className="mx-auto mb-1.5 max-w-[var(--content-rail)]">
           <ErrorBanner
@@ -281,11 +336,8 @@ export const Composer = ({
         </div>
       ) : null}
 
-      {/* Empty agent: folder|Direct glued ABOVE the bubble (Cursor New Agent).
-       * Active chat: context sits BELOW as a thin footer — one composer card,
-       * not a bolted second toolbar above it. */}
       {isHero && contextBar ? (
-        <div className="mx-auto mb-0.5 w-full max-w-[var(--content-rail)]">
+        <div className="mx-auto mb-1 w-full max-w-[var(--content-rail)]">
           {contextBar}
         </div>
       ) : null}
@@ -296,115 +348,34 @@ export const Composer = ({
         onRemove={handleRemoveQueued}
       />
 
-      {/* Overlay + bubble share one rail column so they sit flush (no page-bg
-       * gap from ChatShell's old absolute `bottom-full` dock). */}
       <div className="relative mx-auto flex w-full max-w-[var(--content-rail)] flex-col">
         {workersSlot}
         {dockedOverlay}
         <div
           ref={slashRootRef}
+          data-composer-layout="hero"
           className={cn(
-            // w-full is required: without a fixed width the pill sizes to content,
-            // and the textarea's w-full creates a circular dependency that collapses
-            // width (→ placeholder wraps → scrollHeight inflates → height locks at max).
-            //
-            // Anatomy (Cursor full-input-box / ui-prompt-input):
-            // column + gap · editor · bottom toolbar · real border · soft ambient.
-            // group/composer: expand-icon reveals on focus-within.
-            "group/composer relative flex w-full flex-col gap-1.5",
-            "bg-user-bubble",
+            "group/composer relative flex w-full flex-col gap-1.5 composer-card",
             hasDockedOverlay
               ? cn(
                   "rounded-b-[var(--radius-composer)] rounded-t-none",
-                  // Continue the docked card's side/bottom stroke; omit the top
-                  // border so the seam with Permission/Question stays clean.
                   "border-x border-b border-stroke-2",
                   DOCKED_BUBBLE_SHADOW,
                   DOCKED_BUBBLE_SHADOW_FOCUS,
                 )
-              : cn(
-                  "rounded-[var(--radius-composer)]",
-                  // Real border (tertiary → secondary on focus) + soft ambient.
-                  // No shadow-ring: double-painted rings read harsh vs Cursor.
-                  "border border-stroke-3",
-                  "shadow-[var(--shadow-composer)]",
-                  "focus-within:border-stroke-1",
-                  "focus-within:shadow-[var(--shadow-composer-focus)]",
-                ),
-            // Instant focus border; only ambient shadow may ease if themed later.
-            "transition-[border-color] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
+              : "composer-card-hero focus-within:composer-card-focus",
           )}
         >
-          <ComposerInput
-            sessionId={activeSessionId}
-            composerMode={composerMode}
-            isHero={isHero}
-            cwd={active?.cwd}
-            enabled={
-              interactive &&
-              isBootstrapped &&
-              route !== "welcome" &&
-              !pendingPermission
-            }
-            anchorRef={slashRootRef}
-            attachments={attachments}
-            removeAttachment={removeAttachment}
-            addAttachment={addAttachment}
-            handlePaste={handlePaste}
-            handleDrop={handleDrop}
-            onSend={() => void handleSend()}
-            textareaRefOut={textareaRef}
-          />
-
-          {/* Bottom toolbar — Cursor gap ~0.55rem between clusters; h-6 controls. */}
-          <div className="flex items-center justify-between gap-2 px-2.5 pb-1.5">
+          {composerInput}
+          <div className="flex items-center gap-2 px-2.5 pb-1.5">
             <div className="flex min-w-0 items-center gap-1">
-              {!pendingPermission ? (
-                <>
-                  <PlusMenu
-                    onAttachFile={() => void handlePick("file")}
-                    onAttachImage={() => void handlePick("image")}
-                  />
-                  <ModePicker
-                    value={composerMode}
-                    onChange={setComposerMode}
-                  />
-                  <ModelPicker
-                    models={models}
-                    value={selectedModelId}
-                    onChange={(id) => void handleModelChange(id)}
-                    isLoading={modelsLoading}
-                    effortFor={(modelId) => effortByModel[modelId] ?? null}
-                    onEffortChange={setEffortForModel}
-                    builtinProviders={builtinProviders}
-                  />
-                </>
-              ) : (
-                <span className="px-1 text-xs text-ink-muted">
-                  Waiting for permission…
-                </span>
-              )}
+              {plusCluster}
+              {modePicker}
             </div>
+            <div className="min-w-0 flex-1" aria-hidden />
             <div className="flex shrink-0 items-center gap-1.5">
-              {pendingPermission ? (
-                <PermissionActions permission={pendingPermission} />
-              ) : (
-                <>
-                  <BypassPermissionsButton
-                    composerMode={composerMode}
-                    sessionBypass={sessionBypass}
-                    disabled={!activeSessionId}
-                    onToggle={handleToggleBypass}
-                  />
-                  <ComposerSendButton
-                    sessionId={activeSessionId}
-                    isStreaming={isStreaming}
-                    hasAttachments={attachments.length > 0}
-                    onSend={() => void handleSend()}
-                    onStop={() => void handleStop()}
-                  />
-                </>
-              )}
+              {modelPicker}
+              {actionCluster}
             </div>
           </div>
         </div>

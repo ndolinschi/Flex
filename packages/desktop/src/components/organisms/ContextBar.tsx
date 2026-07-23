@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { isIsolated } from "../../lib/tauri"
+import { isIsolated, listSessions } from "../../lib/tauri"
+import { SESSIONS_KEY } from "../../hooks/useSessions"
 import { useIsGitRepo } from "../../hooks/useIsGitRepo"
 import { cn } from "../../lib/utils"
 import { BranchPicker } from "../molecules/BranchPicker"
@@ -34,12 +35,25 @@ export const ContextBar = ({
   onError,
   compact = false,
 }: ContextBarProps) => {
-  const { data: isolated } = useQuery({
+  const { data: isolatedFromApi } = useQuery({
     queryKey: ["is-isolated", sessionId],
     queryFn: () => isIsolated(sessionId!),
     enabled: !!sessionId,
     staleTime: 5_000,
   })
+  // Optimistic: workspace_id on the session means an isolated worktree is
+  // attached — avoid a flash of Direct/IsolationPicker while isIsolated loads
+  // after a tab switch.
+  const { data: hasWorkspaceId } = useQuery({
+    queryKey: SESSIONS_KEY,
+    queryFn: listSessions,
+    staleTime: 30_000,
+    enabled: !!sessionId,
+  })
+  const isolated =
+    isolatedFromApi ??
+    (!!sessionId &&
+      !!hasWorkspaceId?.find((s) => s.id === sessionId)?.workspace_id)
 
   // Gate the entire git cluster (branch pill + commit bar) on the cwd
   // actually being a git repo — a non-git folder should show none of it

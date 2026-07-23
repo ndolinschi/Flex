@@ -1,6 +1,12 @@
 export { BrowserTab } from "./BrowserTab"
 export { CommandPalette } from "./CommandPalette"
 export { WindowTitleBar } from "./WindowTitleBar"
+export {
+  TitleBarChromeHost,
+  TitleBarLeading,
+  TitleBarTrailing,
+  TitleBarDragRegion,
+} from "./TitleBarChrome"
 export { Composer } from "./Composer"
 export { ContextBar } from "./ContextBar"
 export { PermissionPrompt } from "./PermissionPrompt"

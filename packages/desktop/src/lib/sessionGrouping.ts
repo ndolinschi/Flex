@@ -132,6 +132,98 @@ export const groupByRepo = (
  *
  * Callers own `prevOrder` (typically a ref updated after each render) —
  * this function is a pure reordering step, not a cache. */
+/**
+ * Attach child sessions (`parent_id`) under their root for sidebar nesting.
+ * Orphans (parent missing from the list) are returned as roots with no nest.
+ * Children sorted most-recent-first within each parent.
+ */
+export const nestSessionsByParent = (
+  roots: readonly SessionMeta[],
+  allSessions: readonly SessionMeta[],
+): { session: SessionMeta; children: SessionMeta[] }[] => {
+  const rootIds = new Set(roots.map((s) => s.id))
+  const byParent = new Map<string, SessionMeta[]>()
+  for (const session of allSessions) {
+    const parent = session.parent_id
+    if (!parent || !rootIds.has(parent)) continue
+    const list = byParent.get(parent) ?? []
+    list.push(session)
+    byParent.set(parent, list)
+  }
+  for (const list of byParent.values()) {
+    list.sort((a, b) => b.updated_at_ms - a.updated_at_ms)
+  }
+  return roots.map((session) => ({
+    session,
+    children: byParent.get(session.id) ?? [],
+  }))
+}
+
+/** Cursor Agents Web recency buckets (sidebar list sections). */
+export type TimeBucketId = "today" | "yesterday" | "last7" | "last30" | "older"
+
+export type TimeBucket = {
+  id: TimeBucketId
+  label: string
+  sessions: SessionMeta[]
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Local-calendar start-of-day for `nowMs` (ms since epoch). */
+export const startOfLocalDay = (nowMs: number): number => {
+  const d = new Date(nowMs)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
+/**
+ * Groups sessions like Cursor Agents: Today · Yesterday · Last 7 days ·
+ * Last 30 days · Older. Within each bucket, sessions stay most-recent-first.
+ * Empty buckets are omitted.
+ */
+export const groupByRecencyBuckets = (
+  sessions: readonly SessionMeta[],
+  nowMs: number = Date.now(),
+): TimeBucket[] => {
+  const todayStart = startOfLocalDay(nowMs)
+  const yesterdayStart = todayStart - DAY_MS
+  // "Last 7 days" = within the rolling 7 calendar days, excluding today+yesterday.
+  const last7Start = todayStart - 6 * DAY_MS
+  const last30Start = todayStart - 29 * DAY_MS
+
+  const buckets: Record<TimeBucketId, SessionMeta[]> = {
+    today: [],
+    yesterday: [],
+    last7: [],
+    last30: [],
+    older: [],
+  }
+
+  const sorted = [...sessions].sort((a, b) => b.updated_at_ms - a.updated_at_ms)
+  for (const session of sorted) {
+    const t = session.updated_at_ms
+    if (t >= todayStart) buckets.today.push(session)
+    else if (t >= yesterdayStart) buckets.yesterday.push(session)
+    else if (t >= last7Start) buckets.last7.push(session)
+    else if (t >= last30Start) buckets.last30.push(session)
+    else buckets.older.push(session)
+  }
+
+  const labels: Record<TimeBucketId, string> = {
+    today: "Today",
+    yesterday: "Yesterday",
+    last7: "Last 7 days",
+    last30: "Last 30 days",
+    older: "Older",
+  }
+
+  const order: TimeBucketId[] = ["today", "yesterday", "last7", "last30", "older"]
+  return order
+    .filter((id) => buckets[id].length > 0)
+    .map((id) => ({ id, label: labels[id], sessions: buckets[id] }))
+}
+
 export const orderStably = <T,>(
   items: readonly T[],
   keyOf: (item: T) => string,

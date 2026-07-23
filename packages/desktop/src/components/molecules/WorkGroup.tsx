@@ -139,7 +139,7 @@ export const WorkGroup = memo(({
             "cursor-pointer animate-end-turn-in",
           )}
         >
-          <span className="min-w-0 truncate text-ink-secondary [font-variant-numeric:tabular-nums]">
+          <span className="min-w-0 truncate text-ink-muted [font-variant-numeric:tabular-nums]">
             {collapsedPrimary}
           </span>
           {typeof totalTokens === "number" && totalTokens > 0 ? (

@@ -70,8 +70,15 @@ const TabDragGhost = () => {
 }
 
 /** Main content host: one or two ContentPanes with a resizable sash.
- * Chat chrome (sidebar / split / session) lives on WindowTitleBar. */
-export const ContentWorkspace = () => {
+ * Top chrome is each pane's TabStrip (`--titlebar-height`), flush with the
+ * sidebar header — no stacked WindowTitleBar above chat. */
+export const ContentWorkspace = ({
+  onOpenCommandPalette,
+  onOpenSearch,
+}: {
+  onOpenCommandPalette?: () => void
+  onOpenSearch?: () => void
+} = {}) => {
   useContentTabLifecycle()
   useInstallContentTabPointerDnD()
   const contentLayout = useAppStore((s) => s.contentLayout)
@@ -163,31 +170,53 @@ export const ContentWorkspace = () => {
           minSize={CHAT_MIN_WIDTH}
           className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
         >
-          <ContentPane paneIndex={0} keepAliveTools={keepAliveTools} />
+          <ContentPane
+            paneIndex={0}
+            keepAliveTools={keepAliveTools}
+            isEastmost={!split}
+            onOpenCommandPalette={onOpenCommandPalette}
+            onOpenSearch={onOpenSearch}
+          />
         </ResizablePanel>
         {split ? (
           <>
             <ResizableHandle
               disabled={!showSash}
               className={cn(
-                // Hit target w-1.5; paint only the 1px ::after hairline.
+                // Hit target w-2; paint only the 1px ::after hairline.
                 // Neutralize shadcn ResizableHandle defaults (bg-border, after:w-1).
-                "sash-line-transition z-10 w-1.5 shrink-0 cursor-col-resize bg-transparent",
+                // Always keep the hairline when split — only drag is gated by
+                // showSash (narrow content row), so panes stay visually separated.
+                "sash-line-transition z-20 w-2 shrink-0 bg-transparent",
                 "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-stroke-3",
                 // Quiet sash: white-alpha 12% hover only — never accent (Feel: Quiet chrome).
-                "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_12%,transparent)]",
+                showSash && "cursor-col-resize",
+                showSash &&
+                  "hover:after:bg-[color-mix(in_srgb,var(--color-text-1)_12%,transparent)]",
                 "focus-visible:ring-1 focus-visible:ring-stroke-2 focus-visible:outline-none",
                 rightPanelDragging && "after:bg-stroke-1",
-                !showSash && "invisible pointer-events-none",
+                !showSash && "pointer-events-none",
               )}
-              onPointerDown={() => setRightPanelDragging(true)}
+              onPointerDown={(e) => {
+                if (!showSash) return
+                e.currentTarget.setPointerCapture?.(e.pointerId)
+                setRightPanelDragging(true)
+              }}
+              onPointerUp={() => setRightPanelDragging(false)}
+              onPointerCancel={() => setRightPanelDragging(false)}
             />
             <ResizablePanel
               id={RIGHT_PANEL_ID}
               minSize={CHAT_MIN_WIDTH}
               className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
             >
-              <ContentPane paneIndex={1} keepAliveTools={keepAliveTools} />
+              <ContentPane
+                paneIndex={1}
+                keepAliveTools={keepAliveTools}
+                isEastmost
+                onOpenCommandPalette={onOpenCommandPalette}
+                onOpenSearch={onOpenSearch}
+              />
             </ResizablePanel>
           </>
         ) : null}

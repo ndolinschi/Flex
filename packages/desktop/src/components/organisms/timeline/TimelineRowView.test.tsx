@@ -73,7 +73,7 @@ describe("TimelineRowView", () => {
     expect(html).toContain("whitespace-pre-wrap")
     // Inline caret + reserved actions-row height (no MessageActions yet).
     expect(html).toContain("animate-pulse")
-    expect(html).toContain("h-7")
+    expect(html).toContain("h-5")
     expect(html).not.toContain("Copy message")
   })
 
@@ -94,7 +94,7 @@ describe("TimelineRowView", () => {
     expect(html).toContain("world")
   })
 
-  it("keeps user message actions under the bubble (right-aligned)", () => {
+  it("renders full-width sticky human cards (not right-aligned bubbles)", () => {
     const html = renderToStaticMarkup(
       <TimelineRowView
         row={{
@@ -108,10 +108,12 @@ describe("TimelineRowView", () => {
       />,
     )
 
-    expect(html).toContain("just now")
+    expect(html).toContain("human-message-card")
+    expect(html).toContain("human-turn-sticky")
+    expect(html).toContain("data-agent-turn-human")
     expect(html).toContain("Copy message")
-    // Wrapper must self-end so timestamp/copy do not sit full-bleed left
-    // under a right-aligned bubble (reads as agent chrome).
-    expect(html).toMatch(/self-end[\s\S]*Copy message/)
+    // No chat-bubble alignment chrome.
+    expect(html).not.toContain("data-align=\"end\"")
+    expect(html).not.toContain("min-w-[150px]")
   })
 })

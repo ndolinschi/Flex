@@ -11,16 +11,17 @@ type SendButtonProps = {
   onStop: () => void
 }
 
-/** Solid high-contrast circle when armed; quiet fill when empty (Cursor send). */
+/** Production send: h-6 w-6 rounded-full; bg-neutral (= base ink) + inverted fg. */
 const armedClass = cn(
   "size-6 shrink-0 rounded-full border-0 bg-send text-send-fg shadow-none",
-  "hover:bg-send hover:text-send-fg hover:opacity-90",
-  "active:translate-y-px",
+  "hover:opacity-90 active:translate-y-px",
+  "transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
 )
 const idleClass = cn(
   "size-6 shrink-0 rounded-full border-0 bg-send text-send-fg shadow-none",
   "opacity-35 hover:opacity-50",
   "disabled:pointer-events-none disabled:opacity-30",
+  "transition-[opacity,transform] duration-[var(--duration-fast)] ease-[var(--easing-default)]",
 )
 
 /** 24px circle send / stop / queue — shadcn Button icon shell. */

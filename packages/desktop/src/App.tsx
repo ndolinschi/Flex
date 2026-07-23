@@ -17,10 +17,15 @@ import {
   SessionSidebar,
   WindowTitleBar,
 } from "./components/organisms"
+import { TitleBarChromeHost } from "./components/organisms/TitleBarChrome"
 import { ContentWorkspace } from "./components/organisms/content/ContentWorkspace"
 import { ToastHost } from "./components/molecules"
 import { Spinner } from "./components/atoms"
 import { WelcomePage } from "./pages/WelcomePage"
+import {
+  IdePlayground,
+  isIdePlaygroundHash,
+} from "./playground/ide-mock"
 import { sessionScopeKey, useAppStore } from "./stores/appStore"
 import { cn } from "./lib/utils"
 import { startDesktopIdlePrefetch } from "./lib/idlePrefetch"
@@ -314,70 +319,97 @@ const AppRoutes = () => {
 
   // Persistent sidebar + keep Chat mounted so timeline/subscriptions survive
   // settings round-trips (reference glass: content swap, not full remount).
+  // Top chrome = sidebar header | ContentPane TabStrip (one row, no stacked
+  // WindowTitleBar). Welcome/bootstrap still use full-width WindowTitleBar.
   return (
-    <div className="flex h-full flex-col">
-      {titleBar}
-      <div className="relative flex min-h-0 flex-1">
-        {/* Root is `relative` so SessionSidebar's mobile overlay (absolute,
-         * anchored to this container's left edge — see SessionSidebar.tsx's
-         * `narrow` handling) spans the full app width, not just the chat area. */}
-        <SessionSidebar onOpenSearch={() => setSearchModalOpen(true)} />
-        {/* Content workspace fills remaining width (tabs + optional split). */}
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-          <div
-            className={cn(
-              "flex h-full min-h-0 flex-1 flex-col",
-              "transition-opacity duration-[var(--duration-normal)] ease-[var(--easing-default)] motion-reduce:transition-none",
-              route !== "chat" && "pointer-events-none opacity-0",
-            )}
-            aria-hidden={contentBlocked}
-            inert={contentBlocked}
-          >
-            <ContentWorkspace />
-          </div>
-          {route === "settings" ||
-          route === "customize" ||
-          (AUTOMATIONS_UI_ENABLED && route === "automations") ||
-          route === "memory" ? (
-            <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
-              <Suspense
-                fallback={
-                  <div
-                    className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    <Spinner size="md" />
-                    Loading…
-                  </div>
-                }
-              >
-                <SettingsPage embedded />
-              </Suspense>
-            </div>
-          ) : null}
+    <div className="relative flex h-full min-h-0">
+      <TitleBarChromeHost
+        onOpenCommandPalette={openCommandPalette}
+        onOpenSearch={openSearch}
+      />
+      {/* Root is `relative` so SessionSidebar's mobile overlay (absolute,
+       * anchored to this container's left edge — see SessionSidebar.tsx's
+       * `narrow` handling) spans the full app width, not just the chat area. */}
+      <SessionSidebar onOpenSearch={() => setSearchModalOpen(true)} />
+      {/* Content workspace fills remaining width (tabs + optional split). */}
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+        <div
+          className={cn(
+            "flex h-full min-h-0 flex-1 flex-col",
+            "transition-opacity duration-[var(--duration-normal)] ease-[var(--easing-default)] motion-reduce:transition-none",
+            route !== "chat" && "pointer-events-none opacity-0",
+          )}
+          aria-hidden={contentBlocked}
+          inert={contentBlocked}
+        >
+          <ContentWorkspace
+            onOpenCommandPalette={openCommandPalette}
+            onOpenSearch={openSearch}
+          />
         </div>
-        <CommandPalette
-          open={commandPaletteOpen}
-          onClose={() => setCommandPaletteOpen(false)}
-        />
-        <SearchModal
-          open={searchModalOpen}
-          onClose={() => setSearchModalOpen(false)}
-        />
-        <ToastHost />
+        {route === "settings" ||
+        route === "customize" ||
+        (AUTOMATIONS_UI_ENABLED && route === "automations") ||
+        route === "memory" ? (
+          <div className="absolute inset-0 flex min-h-0 flex-1 flex-col animate-pane-fade">
+            <Suspense
+              fallback={
+                <div
+                  className="flex h-full items-center justify-center gap-2 text-sm text-ink-muted"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <Spinner size="md" />
+                  Loading…
+                </div>
+              }
+            >
+              <SettingsPage embedded />
+            </Suspense>
+          </div>
+        ) : null}
       </div>
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+      />
+      <SearchModal
+        open={searchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+      />
+      <ToastHost />
     </div>
   )
 }
 
+const useIdePlayground = (): boolean => {
+  const [active, setActive] = useState(() =>
+    typeof window !== "undefined" ? isIdePlaygroundHash() : false,
+  )
+  useEffect(() => {
+    const sync = () => setActive(isIdePlaygroundHash())
+    window.addEventListener("hashchange", sync)
+    return () => window.removeEventListener("hashchange", sync)
+  }, [])
+  return active
+}
+
 const App = () => {
+  const playground = useIdePlayground()
+  if (playground) {
+    return (
+      <div className="h-full min-h-0 overflow-hidden">
+        <IdePlayground />
+      </div>
+    )
+  }
   if (isBrowserPreview()) return <NativeAppRequired />
   return (
     <QueryClientProvider client={queryClient}>
       {/* Rounded, clipped shell over a transparent Tauri window — see
           `.app-shell` in index.css and macOS vibrancy in macos_window.rs. */}
-      <div className="app-shell flex flex-col">
+      {/* agents-page shell: title bar + flex body (sidebar | main). */}
+      <div className="app-shell agents-page flex h-full min-h-0 flex-col overflow-hidden">
         <AppRoutes />
       </div>
     </QueryClientProvider>

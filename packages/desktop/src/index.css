@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./styles/tokens.css";
+@import "./styles/recipes.css";
 @import "./styles/terminal.css";
 @import "./styles/highlight.css";
 @import "tw-animate-css";
@@ -9,8 +10,7 @@
 @custom-variant light (&:is([data-theme="light"] *));
 
 @theme {
-  /* reference canon: semibold = 590 (see DESIGN.md Feel principles) */
-  --font-weight-semibold: 590;
+  /* Source of truth: tokens.css `--font-weight-semibold` (production 600). */
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 
@@ -93,16 +93,35 @@
   --color-mode-flex-bg: var(--color-mode-flex-bg);
   --color-mode-flex-fg: var(--color-mode-flex-fg);
 
+  /* Dense Cursor spacing (half-steps + full 4px grid). */
+  --spacing-0-25: var(--space-0-25);
+  --spacing-0-5: var(--space-0-5);
+  --spacing-0-75: var(--space-0-75);
   --spacing-1: var(--space-1);
+  --spacing-1-25: var(--space-1-25);
+  --spacing-1-5: var(--space-1-5);
+  --spacing-1-75: var(--space-1-75);
   --spacing-2: var(--space-2);
+  --spacing-2-25: var(--space-2-25);
+  --spacing-2-5: var(--space-2-5);
+  --spacing-2-75: var(--space-2-75);
   --spacing-3: var(--space-3);
+  --spacing-3-5: var(--space-3-5);
   --spacing-4: var(--space-4);
+  --spacing-4-5: var(--space-4-5);
   --spacing-5: var(--space-5);
+  --spacing-5-5: var(--space-5-5);
   --spacing-6: var(--space-6);
+  --spacing-7: var(--space-7);
   --spacing-8: var(--space-8);
+  --spacing-9: var(--space-9);
   --spacing-10: var(--space-10);
+  --spacing-11: var(--space-11);
   --spacing-12: var(--space-12);
+  --spacing-14: var(--space-14);
+  --spacing-16: var(--space-16);
 
+  --radius-2xs: var(--radius-2xs);
   --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
@@ -118,22 +137,74 @@
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-soft: var(--shadow-soft);
   --shadow-composer: var(--shadow-composer);
   --shadow-composer-focus: var(--shadow-composer-focus);
   --shadow-popover: var(--shadow-popover);
 
+  /* Cursor semantic surface / text ladders (utility-ready). */
+  --color-brand: var(--color-brand);
+  --color-bg-chrome: var(--color-bg-chrome);
+  --color-bg-sidebar: var(--color-bg-sidebar);
+  --color-bg-editor: var(--color-bg-editor);
+  --color-bg-elevated: var(--color-bg-elevated);
+  --color-bg-primary: var(--color-bg-primary);
+  --color-bg-secondary: var(--color-bg-secondary);
+  --color-bg-tertiary: var(--color-bg-tertiary);
+  --color-bg-quaternary: var(--color-bg-quaternary);
+  --color-bg-quinary: var(--color-bg-quinary);
+  --color-bg-active: var(--color-bg-active);
+  --color-bg-focused: var(--color-bg-focused);
+  --color-bg-neutral: var(--color-bg-neutral);
+  --color-bg-neutral-hover: var(--color-bg-neutral-hover);
+  --color-bg-success-quaternary: var(--color-bg-success-quaternary);
+  --color-bg-warn-quaternary: var(--color-bg-warn-quaternary);
+  --color-bg-danger-quaternary: var(--color-bg-danger-quaternary);
+  --color-text-success: var(--color-text-success);
+  --color-text-warn: var(--color-text-warn);
+  --color-text-danger: var(--color-text-danger);
+  --color-bg-success: var(--color-bg-success);
+  --color-bg-success-secondary: var(--color-bg-success-secondary);
+  --color-bg-success-tertiary: var(--color-bg-success-tertiary);
+  --color-bg-success-quaternary: var(--color-bg-success-quaternary);
+  --color-bg-warn: var(--color-bg-warn);
+  --color-bg-warn-secondary: var(--color-bg-warn-secondary);
+  --color-bg-warn-tertiary: var(--color-bg-warn-tertiary);
+  --color-bg-warn-quaternary: var(--color-bg-warn-quaternary);
+  --color-bg-danger: var(--color-bg-danger);
+  --color-bg-danger-secondary: var(--color-bg-danger-secondary);
+  --color-bg-danger-tertiary: var(--color-bg-danger-tertiary);
+  --color-bg-danger-quaternary: var(--color-bg-danger-quaternary);
+  --color-border-primary: var(--color-border-primary);
+  --color-border-secondary: var(--color-border-secondary);
+  --color-border-tertiary: var(--color-border-tertiary);
+  --color-border-quaternary: var(--color-border-quaternary);
+  --color-text-success: var(--color-text-success);
+  --color-text-warn: var(--color-text-warn);
+  --color-text-danger: var(--color-text-danger);
+  --color-added: var(--color-added);
+  --color-modified: var(--color-modified);
+  --color-removed: var(--color-removed);
+  --color-untracked: var(--color-untracked);
+
   --text-xs: var(--text-xs);
-  --text-xs--line-height: 14px;
+  --text-xs--line-height: var(--line-height-xs);
   --text-sm: var(--text-sm);
-  --text-sm--line-height: 16px;
+  --text-sm--line-height: var(--line-height-sm);
   --text-base: var(--text-base);
-  --text-base--line-height: 18px;
+  --text-base--line-height: var(--line-height-base);
   --text-lg: var(--text-lg);
-  --text-lg--line-height: 20px;
+  --text-lg--line-height: var(--line-height-lg);
   --text-xl: var(--text-xl);
-  --text-xl--line-height: 24px;
+  --text-xl--line-height: var(--line-height-xl);
   --text-2xl: var(--text-2xl);
-  --text-2xl--line-height: 28px;
+  --text-2xl--line-height: 2rem;
+
+  --font-weight-normal: var(--font-weight-normal);
+  --font-weight-medium: var(--font-weight-medium);
+  --font-weight-semibold: var(--font-weight-semibold);
+  --font-weight-bold: var(--font-weight-bold);
 
   --leading-tight: var(--leading-tight);
   --leading-normal: var(--leading-normal);
@@ -200,14 +271,29 @@ body {
   box-shadow: inset 0 0.5px 0 color-mix(in srgb, var(--color-text-1) 8%, transparent);
 }
 
-/* macOS: slight translucency so HudWindow vibrancy reads as soft glass
- * under chrome — not a full see-through panel. */
+/* macOS: HudWindow vibrancy reads through soft glass fills (not a solid sheet).
+ * Keep readable ink; surfaces stay translucent pure-gray, not cool-blue. */
 html[data-platform="macos"] .app-shell {
-  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 86%, transparent);
+  backdrop-filter: blur(24px) saturate(1.15);
+  -webkit-backdrop-filter: blur(24px) saturate(1.15);
 }
 
 html[data-platform="macos"] .app-shell header[role="banner"] {
-  background: color-mix(in srgb, var(--color-bg) 78%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+}
+
+/* Sidebar + chat panes: let vibrancy through instead of fully opaque paint. */
+html[data-platform="macos"] .app-shell aside[aria-label="Sessions sidebar"] {
+  background-color: color-mix(in srgb, var(--color-panel) 82%, transparent);
+}
+
+html[data-platform="macos"] .app-shell .bg-chrome {
+  background-color: color-mix(in srgb, var(--color-chrome) 88%, transparent);
+}
+
+html[data-platform="macos"] .app-shell .bg-sidebar {
+  background-color: color-mix(in srgb, var(--color-panel) 82%, transparent);
 }
 
 [data-theme="light"] body {
@@ -227,7 +313,10 @@ select option {
   color: var(--color-ink);
 }
 
-/* Custom title bar: mark drag regions for Tauri + Chromium app-region. */
+/* Custom title bar: mark drag regions for Tauri + Chromium app-region.
+ * Keep drag on dedicated empty chrome (TitleBarDragRegion / sidebar header
+ * spacer) — not on whole interactive strips — so Mac trackpad gestures and
+ * button clicks stay reliable. */
 [data-tauri-drag-region] {
   -webkit-app-region: drag;
   app-region: drag;
@@ -240,7 +329,10 @@ textarea,
 select,
 [role="button"],
 [role="menuitem"],
-[role="menu"] {
+[role="menu"],
+[role="tab"],
+[role="separator"],
+[data-slot="sidebar-menu-button"] {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
@@ -252,10 +344,10 @@ button[data-slot="button"] {
   text-align: left;
 }
 
-/* Keyboard-first focus — thin neutral ring, never accent glow (Feel: Keyboard-first focus). */
+/* Keyboard-first focus — Phase 0 tokens; neutral stroke, never accent glow. */
 :focus-visible:not(input):not(textarea):not(select) {
-  outline: 1px solid var(--color-stroke-2);
-  outline-offset: 2px;
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 /* Shared primitives and tabs paint their own neutral ring; suppress the global
@@ -362,10 +454,15 @@ mark[data-plan-comment-id].plan-comment-mark-active {
   }
 }
 
-/* Thin translucent scrollbars — track invisible, thumb ≈ fill hover (Feel: Thin scrollbars). */
+/* Thin dark scrollbars — Cursor production (8px, border-tertiary thumb). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
 }
 
 ::-webkit-scrollbar-track {
@@ -373,12 +470,16 @@ mark[data-plan-comment-id].plan-comment-mark-active {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-fill-4);
+  background-color: var(--scrollbar-thumb);
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-fill-2);
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--scrollbar-thumb-active);
 }
 
 /* Running indicator */

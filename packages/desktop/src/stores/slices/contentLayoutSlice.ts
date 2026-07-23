@@ -413,12 +413,17 @@ export const createContentLayoutSlice: StateCreator<
       focusedPane: pane,
       panes: replacePane(layout, pane, nextPane),
     }
+    const prevActive = get().activeSessionId
+    const nextActive = tab?.sessionId
     set({
       contentLayout: next,
-      ...(tab?.kind === "chat" ? { activeSessionId: tab.sessionId } : {}),
+      ...(nextActive ? { activeSessionId: nextActive } : {}),
       ...syncCompatFlags(next),
     })
     persistLayout(next)
+    if (nextActive && nextActive !== prevActive) {
+      void persistUiState({ activeSessionId: nextActive })
+    }
   },
 
   reorderTabInPane: (pane, tabId, insertAt) => {

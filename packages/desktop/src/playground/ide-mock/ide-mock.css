@@ -1,0 +1,76 @@
+.ide-mock-playground {
+  --bg-deepest: #141414;
+  --bg-editor: #181818;
+  --bg-elevated: #1a1a1a;
+  --bg-hover: #292929;
+  --bg-active: #163761;
+  --text-primary: #d6d6dd;
+  --text-secondary: #6d6d6d;
+  --text-muted: #505050;
+  --text-bright: #ffffff;
+  --accent: #228df2;
+  --border: #2a2a2a;
+  --border-subtle: #222222;
+  --success: #15ac91;
+  --warning: #e5b95c;
+  --error: #f14c4c;
+
+  --font-ui: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --radius-chrome: 4px;
+  --radius-modal: 6px;
+  --activity-h: 38px;
+  --sidebar-w: 260px;
+  --ai-w: 420px;
+  --status-h: 22px;
+  --bottom-h: 180px;
+
+  box-sizing: border-box;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg-deepest);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.4;
+  user-select: none;
+}
+
+.ide-mock-playground *,
+.ide-mock-playground *::before,
+.ide-mock-playground *::after {
+  box-sizing: border-box;
+}
+
+.ide-mock-playground button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.ide-mock-playground .im-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.ide-mock-playground .im-hairline {
+  border-color: var(--border);
+}
+
+.ide-mock-playground .im-hover:hover {
+  background: var(--bg-hover);
+}
+
+.ide-mock-playground .im-active {
+  background: var(--bg-active);
+  color: var(--text-bright);
+}
+
+.ide-mock-playground ::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}

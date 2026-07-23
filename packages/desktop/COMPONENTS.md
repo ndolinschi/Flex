@@ -20,7 +20,7 @@ data lives in hooks (`src/hooks/`) and Zustand (`src/stores/`).
 | `Spinner` | Indeterminate loading (size map over ui/spinner) | `size`, `label?` | SessionSidebar, forms |
 | `Tab` | Pill tab / open-buffer chip; pointer DnD | `selected`, `size?`, `onSelect`, `onClick?`, `onClose?`, `groupColor?`, `activityDot?`, `sessionColor?`, `rangeSelected?`, … | ContentPane, FilesTab |
 | `TabClose` | Opacity-reveal close control (no max-width layout anim); `group-focus-within` optional | `label`, `onClose`, `revealOnFocusWithin?` | `Tab` |
-| `TabStrip` | Horizontal open-tabs strip | `children`, `className?` | ContentPane, ChatSessionTabBar |
+| `TabStrip` | Horizontal open-tabs strip; content-pane top chrome uses `--titlebar-height` (35px), quiet `h-6` centered pills | `children`, `className?` | ContentPane, ChatSessionTabBar |
 | `Tooltip` | `{label, side, children}` adapter over ui/tooltip | `label`, `side?`, `children` | Chrome controls |
 
 Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, ScrollArea, Separator, and other installed primitives — atom re-exports were removed.
@@ -47,7 +47,7 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `ErrorBanner` | Quiet danger `Alert` (`border-danger/15 bg-danger-subtle/70`, text-xs) | `message`, `onDismiss?`, `title?` | Composer, Settings, timeline, dialogs |
 | `SidebarResumeError` | Same quiet danger + Retry/Dismiss; edge-to-edge sidebar | `message`, `onRetry`, `onDismiss` | SessionSidebar |
 | `ArchivedSectionHeader` | Collapsible Archived group header | `count`, `collapsed`, `onToggle` | SessionSidebar |
-| `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays + optional ghost-text inline completion (isolates keystrokes from ModelPicker/ContextBar) | `composerMode`, `anchorRef`, `attachments`, `onSend` | Composer |
+| `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays + optional ghost-text inline completion (isolates keystrokes from ModelPicker/ContextBar); large auto-grow surface | `composerMode`, `isHero?`, `anchorRef`, `attachments`, `onSend` | Composer |
 | `ModelSelect` | Simple model `<select>` | `models`, `value`, `onChange` | ProviderSettingsForm |
 | `ModelPicker` | Searchable model dropdown (shadcn DropdownMenu + effort submenu) | `models`, `value`, `onChange`, `effortFor`, `onEffortChange` | Composer |
 | `ModePicker` | Agent / Plan / Ask / Debug (/ Flex when flagged) mode dropdown | `value`, `onChange` | Composer |
@@ -89,12 +89,12 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `WorkflowGroup` | Multi-step workflow block (steps + nested subagents); organism-scale but kept in `molecules/` since it nests inside `TimelineRowView` like `SubagentGroup`/`WorkGroup` | `steps`, `subagents`, `status` | TurnTimeline (via `TimelineRowView`) |
 | `SidebarSkeleton` | Sidebar loading placeholder (headers + rows) | — | SessionSidebar |
 | `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?`, `disabled?` | SessionSidebar |
-| `SidebarProjectFilter` | Repositories sort + visibility tray | `sort`, `visibility`, `onSortChange`, `onVisibilityChange` | SessionSidebar |
+| `SidebarProjectFilter` | Repo sort + visibility tray on the Repositories label row | `sort`, `visibility`, … | SessionSidebar |
 | `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle`, `onNewSession`, `indexed?` | SessionSidebar |
 | `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions (`PlanModelPill`, `PlanFindBar`) | `title`, `status`, `onBuild`, `onAddComment?` | PlanTab |
 | `PlanModelPill` | Provider-grouped model dropdown for Plan toolbar | `models`, `value`, `onChange` | PlanToolbar |
 | `PlanFindBar` | Find-in-plan InputGroup chrome strip | `find`, `inputRef` | PlanToolbar |
-| `AppMark` / `TitleBarMenus` | Wireframe mark + in-window File/Edit/View/Help (Windows/Linux); Help → **Submit Bug…** opens `BugReportDialog` | `handlers`, `isBootstrapped`, `canSearch`, `canCommandPalette` | WindowTitleBar (non-macOS) |
+| `AppMark` / `TitleBarMenus` | Wireframe mark (optional) + in-window File/Edit/View/Help (Windows/Linux); Help → **Submit Bug…** opens `BugReportDialog` | `handlers`, `isBootstrapped`, `canSearch`, `canCommandPalette` | WindowTitleBar / sidebar menus (non-macOS); mark not shown in chat chrome |
 | `BugReportDialog` | Google-style Submit Bug modal: disclosure (app id + session/task ids), Terms/Privacy links, “Tell us what went wrong”, opens GitHub issue form | `open`, `onClose` | WindowTitleBar |
 | `WindowControls` / `TrafficLights` / `CaptionButtons` | Platform window controls (macOS traffic lights · Windows/Linux caption buttons) | `host?` | WindowTitleBar |
 
@@ -102,15 +102,15 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 
 | Component | Purpose | Key props | Used by |
 |---|---|---|---|
-| `SessionSidebar` | New Agent + Search + Agents list; groups via `useSessionSidebarGroups`; footer/resume/archive molecules | (hooks) | App shell |
+| `ContentPane` | Topmost `TabStrip` (`--titlebar-height`, Agents-style centered `h-6` pills) for chat + tool tabs; pointer DnD with live axis reorder preview; `+` menu; SHIFT+click range-select → `GroupSwatchBar`; tab groups / affinity / activity dots; eastmost pane owns split·session·captions; `ContextBar` footer when active body is a tool tab | `paneIndex`, `keepAliveTools`, `isEastmost?`, `onOpenCommandPalette?`, `onOpenSearch?` | ContentWorkspace |
+| `SessionSidebar` | New Agent + Search + **Repositories** list (project-grouped); top header owns traffic lights (mac) + `TitleBarDragRegion` when expanded (no AppMark); groups via `useSessionSidebarGroups` / `groupByRepo`; footer/resume/archive molecules; right-edge sash resize | (hooks) | App shell |
 | `ProviderSettingsForm` | Connections list ↔ dedicated connection editor (`list`/`editor` screens); pieces: `ProviderProfileList`, `ProviderConnectionForm`, `SecretStorageSection` | — | SettingsPage, WelcomePage |
-| `Composer` | Prompt + ContextBar; draft in `ComposerInput`; trays/queue under `organisms/composer/`; optional `dockedOverlay` stacks Permission/Question flush above the bubble; optional `workersSlot` for WorkingAgentsPill | `isHero?`, `dockedOverlay?`, `workersSlot?`, `sessionId?` | ChatSessionBody |
-| `ContextBar` | Project · branch · isolation · usage — compact above (empty) / footer below (active) | `cwd`, `sessionId`, `compact?` | Composer |
+| `Composer` | Prompt + ContextBar; draft in `ComposerInput`; trays/queue under `organisms/composer/`; always large column bubble (`Plus \| Mode \| spacer \| Model \| Bypass \| Send`); optional `dockedOverlay` stacks Permission/Question flush above the bubble; optional `workersSlot` for WorkingAgentsPill | `isHero?` (ContextBar placement + placeholders only), `dockedOverlay?`, `workersSlot?`, `sessionId?` | ChatSessionBody |
+| `ContextBar` | Project · branch · isolation · usage — compact above (empty) / footer below (active); also pane footer when a tool tab is active | `cwd`, `sessionId`, `compact?` | Composer, ContentPane |
 | `TurnTimeline` | Turns + tools + plans + streaming; `@tanstack/react-virtual` over `displayItems` + live tail; pieces under `organisms/timeline/` (`WorkGroupBody` owns stable `renderOther`; `ToolStepList` clusters tools + parallel workers via `clusterWorkRows`) | `sessionId`, `onLiveRows?` | ChatSessionBody |
 | `PermissionPrompt` | Tool permission HITL header docked above composer bubble; actions in `PermissionActions` | `permission` | ChatSessionBody → `Composer.dockedOverlay` |
 | `QuestionPrompt` | AskUserQuestion HITL (same dock seam as PermissionPrompt) | `question` | ChatSessionBody → `Composer.dockedOverlay` |
-| `ContentWorkspace` | One or two content panes (optional split sash; first split starts with a compact 38% chat rail and 62% work surface); tab DnD ghost + cross-pane drop zones; no secondary header | — | App shell |
-| `ContentPane` | Tab strip for chat + tool tabs; pointer DnD with live axis reorder preview; `+` menu; SHIFT+click range-select → `GroupSwatchBar` color picker; tab groups (underbar), session-affinity dots, streaming activity dots; chat bodies mount on first visit | `paneIndex`, `keepAliveTools` | ContentWorkspace |
+| `ContentWorkspace` | One or two content panes (optional split sash; first split starts with a compact 38% chat rail and 62% work surface); TabStrip is the topmost header; tab DnD ghost + cross-pane drop zones | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
 | `MemoryTab` | Memory surface with Browser-recipe chrome + `ScrollArea`; reuses Settings `MemoryContent` (global + project notes). Empty-state ready. | — | ToolTabBody |
 | `DatabaseTab` | UI plugin (Terminal-style 2-col): 180px sidebar (connections + tables) + SQL/results main pane. **Connections are scoped per project cwd** (`projectKey` on each saved spec in `db_connections.json`; list/upsert/connect/mention/active filter by the active session's cwd). Switching sessions clears selection and restores that project's last active connection. Legacy unscoped entries (`projectKey: ""`) stay in the store but are hidden until re-saved under a project. Empty state has no duplicate chrome (Add CTA only); with connections, slim count + refresh/add. Result grid paginates (50/page; table preview via `limit`/`offset`, query results client-side). | `active`, `session` | ToolTabBody (plugin registry) |
 | `ComponentsTab` | UI plugin (Terminal-style workspace): **180px** component inventory (toggleable List), **Files-style mini-tabs** for open components, neutral preview + CSS parameters, and a **local mini-prompt** at the bottom. **Send** packages component context (file, props, dependencies, source excerpt) + CSS diffs as a hidden `component-style` attachment and fires the main composer turn — the timeline shows only the typed instruction + a compact chip. Live CSS overrides inject into the Browser when a Design Mode selection exists. Detects **React / Vue / Angular** (package markers + config files); unsupported cwd shows an empty gate. | `active`, `session` | ToolTabBody (plugin registry) |
@@ -118,7 +118,9 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `ArtifactsTab` | UI plugin: project-scoped shelf of AI-created non-code deliverables (csv / spreadsheet / presentation / diagram / image / …). Left list with **agent affinity** (“This agent” vs other session); CSV + image preview in-pane; other kinds open externally. Auto-registers from Write/Edit/CreateDocument/CreateSpreadsheet/CreatePresentation of allowlisted paths under `artifacts/`/`reports/`/… via `artifactSideEffects`. | `active`, `session` | ToolTabBody (plugin registry) |
 | `PromptTab` | Session prompt pad: write with `@`/`/` + optional ghost-text completion → **Verify** (session model grill) → apply/dismiss findings without ending review; coach questions + re-verify; synced to `draftsBySession`. Panels: `PromptTabHeader`, `PromptMarksPanel` (+ `PromptFindingsList`), `PromptQuestionsForm`, `PromptHoverTip` | `sessionId`, `active` | ToolTabBody |
 | `StatusTab` | OpenCode-style session status: model, context approx, tokens, queue, per-model usage | `session`, `active` | ToolTabBody |
-| `WindowTitleBar` | Compact custom window chrome (`decorations: false`, `transparent: true`, 30px): traffic lights / caption buttons + sidebar / split / session controls + drag region (double-click zooms — fullscreen on macOS, maximize elsewhere); in-window File/Edit/View/Help on Windows/Linux; native macOS menu bar via `useNativeAppMenu`; macOS HudWindow vibrancy + 10px corner clip (`macos_window` + `--window-radius`) | `onOpenCommandPalette?`, `onOpenSearch?` | App shell |
+| `WindowTitleBar` | Full-width chrome for welcome / bootstrap only (`decorations: false`); chat uses sidebar header + TabStrip | `onOpenCommandPalette?`, `onOpenSearch?` | App shell (welcome/bootstrap) |
+| `TitleBarChromeHost` | Native macOS menus + undecorated window + bug dialog without a painted row | `onOpenCommandPalette?`, `onOpenSearch?` | App shell (chat) |
+| `TitleBarLeading` / `TitleBarTrailing` | Collapsed-sidebar window controls + split/session/captions for eastmost TabStrip | flags + callbacks | ContentPane |
 | `BrowserTab` | Embedded browser panel; shared `EmptyState` / `Spinner` / quiet error actions; Design Mode select → composer chips; chrome under `organisms/browser/` | `active` | ToolTabBody |
 | `TerminalTab` | PTY / agent terminal; pieces under `organisms/terminal/`. Opening the tab with zero workspace PTYs auto-creates one shell. | — | ToolTabBody |
 | `CommandPalette` | ⌘K-style action palette (nav, theme, new agent); rows via `CommandPaletteRow`, scoring via `lib/fuzzySearch` | `open`, `onClose` | App shell |
@@ -141,7 +143,9 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 
 | Component | Purpose |
 |---|---|
-| `ChatShell` | Timeline + docked-bottom composer (empty = compact top rail, never centered hero); `hideSidebar` when App owns sidebar |
+| `ChatShell` | Timeline + docked-bottom composer (empty = compact top rail, never centered hero); optional 40px `ChatThreadHeader` (skipped when TabStrip owns the name); `hideSidebar` when App owns sidebar |
+| `ChatThreadHeader` | Agents Web 40px title row (`pl-3 pr-2`, title `text-base font-medium`) | `title`, `trailing?` | ChatShell |
+| `StatusPill` | Semantic full-radius whisper chip (success/warn/danger/neutral) | `tone`, `icon?` | lists, headers |
 | `SettingsShell` | Back header + form (`embedded` when App owns sidebar) |
 | `ErrorBoundary` | Top-level render-error fence (`templates/`) |
 | `SettingsPage` | Settings shell; sections from `pages/settings/` |
@@ -151,6 +155,7 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `src-tauri/plugins/` | Desktop-only engine plugins: `BrowserPlugin` (panel navigate/screenshot/eval/click/console/devtools) + `ComputerPlugin` (OS screenshot/move/click/type/open + animated agent cursor overlay) |
 | `src-tauri/screen_capture.rs` | Shared macOS/Linux/Windows screenshot backends used by Browser UI command + Browser/Computer plugins |
 | `WelcomePage` | First-run wizard: provider key → model → optional project |
+| `playground/ide-mock/` | **Demo-only** IDE playground mock (scoped palette; hash `#ide-playground` / `#playground`). Does not change factory Flex tokens/accent. |
 
 ### Page subfolders
 
@@ -213,13 +218,13 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 
 ## Theme & motion
 
-- Themes: `data-theme="dark"|"light"` on `<html>` (premium palettes — cool charcoal dark / clean white light, close surface steps, whisper fills, neutral monochrome accent by default; colored accents via Settings → Appearance). See DESIGN.md **Reference extraction** for Cursor glass → Flex mapping.
-- Feel principles ([DESIGN.md](./DESIGN.md)): compact density, quiet chrome, whisper fills, opacity hover, mode tint, cool dark, micro-motion, alpha hierarchy, keyboard focus, weight 590 + micro tracking, alpha borders, radius-by-role, thin scrollbars.
+- Themes: `data-theme="dark"|"light"` on `<html>` (neutral pure-gray glass — chrome `#141414` / sidebar `#181818` / elevated `#1d1e20` · ink `#f0f0f0`; light `#f8f8f8`/`#f3f3f3`; monochrome accent by default; no cool-blue cast). Recipes: `src/styles/recipes.css`. See DESIGN.md.
+- Feel principles ([DESIGN.md](./DESIGN.md)): compact density, quiet chrome, whisper fills, opacity hover, mode tint, production dark (`#141414`/`#181818`), micro-motion, alpha hierarchy, keyboard focus, weight **600** + micro tracking, alpha borders, radius-by-role, thin scrollbars.
 - Motion: hover 100ms ease; trays `animate-tray-in`; pane swaps `animate-pane-fade`; timeline rows `animate-row-fade`; end-of-turn `animate-end-turn-in` (160ms); HITL cards `animate-modal-in` (scale .97→1); overlays `animate-backdrop-in`.
-- Composer: `--radius-composer` 14px, real `border-stroke-3` → `stroke-1` on focus, soft ambient (no shadow-ring / no accent glow), compact auto-grow (~24–160px) + toolbar (`text-sm` input; Plus / Bypass / Send `h-6` circles; Mode tinted `text-xs` `h-6` pill + Model quiet ghost `text-xs` pill; left cluster `gap-1`, Bypass↔Send `gap-1.5`); attachment chips compact pills; expand icon focus-reveal.
-- Content rail: `--content-rail` 840px (`52.5rem`).
-- ContextBar: empty = above composer; active = thin footer below — Flex Canon.
-- Sidebar footer = theme + settings (Flex Canon); rows use fill-4 hover / fill-2 selected.
+- Composer: `composer-card` elevation (idle inset stroke-3 + soft ambient + `blur(10px)`; hover stroke-2; focus `--shadow-composer-focus`); **always** column bubble `--radius-composer` 14px (`composer-card-hero`) + bottom toolbar `Plus | Mode | (spacer) | Model | Bypass | Send`; Plus / Bypass / Send `h-6` circles (quiet opacity `.5`→`.8`); Mode tinted `text-xs` `h-6` pill + Model quiet ghost `text-xs` pill; attachment chips compact pills; expand icon on textarea.
+- Content rail: `--content-rail` `min(100%, 45rem)`; outer gutters `px-2.5`.
+- ContextBar: empty = above composer (`mb-1`); active = thin footer below (`mt-1`); tool-tab pane = same footer on ContentPane — Flex Canon.
+- Sidebar footer = theme + settings only (no account/avatar); agent rows use `fill-4` hover / `fill-2` selected (selected stays fill-2).
 - Right panel tabs = Plan / Changes / Pull Request (when current branch has a PR) / Terminal / Browser (Flex Canon); pill tabs via shared `Tab`/`TabStrip`/`TabClose` atoms (`TabStrip` `px-2.5`/`gap-1.5`; `Tab` md/sm both `h-6` so selected fills clear the 30px strip edges; Files open-buffer chips compose the same `Tab` at `size="sm"`); sash hover white-alpha.
 - Focus policy: interactive chrome uses the global neutral `stroke-2` outline; form fields and chrome search inputs use a matching neutral stroke ring (never accent glow).
 - Prior user bubbles dim to 50% (hover restores); hairline stroke-2; message actions reveal on row hover.

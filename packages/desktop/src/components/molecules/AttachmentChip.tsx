@@ -32,8 +32,6 @@ export const AttachmentChip = ({ attachment, onRemove }: AttachmentChipProps) =>
       size="xs"
       state="done"
       orientation="horizontal"
-      // Composer chips are compact pills (Cursor density), not mini-cards.
-      // Override kit `min-w-40` / card surface for the toolbar strip.
       className="min-w-0 max-w-[12rem] gap-1 rounded-md border-stroke-3 bg-fill-3 py-0 text-xs text-ink-secondary shadow-none"
     >
       <AttachmentMedia

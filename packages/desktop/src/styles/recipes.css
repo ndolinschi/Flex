@@ -1,0 +1,337 @@
+/* ── Component recipes — Cursor Agents Web UI (production 2026-07-23 7：56) ─
+ *
+ * Structural / interaction patterns from the live agents page capture:
+ * list rows, dashboard cells, human-message cards, composer card, chat header.
+ * Prefer these classes (or matching Tailwind strings in components) over
+ * one-off spacing so density stays uniform.
+ *
+ * Source HTML landmarks (7：56 capture):
+ *   .agents-page → sidebar (bg-sidebar, border-tertiary) | main
+ *   chat header → h-[40px] pl-3 pr-2 · title text-base font-medium · repo h-7
+ *   agent list row → h-8 rounded-md hover:bg-quaternary selected:bg-tertiary
+ *   .human-message-card → rounded-[14px] px-2.5 py-2 border-tertiary
+ *   .chat-composer-card → elevated + inset hairline + soft ambient + blur(10px)
+ *   .chat-composer-card:hover → inset secondary (when not focus-within)
+ *   .chat-composer-card:focus-within → inset secondary + 0 2px 10px ambient
+ *   terminal toolbar → h-10 border-b tertiary px-2
+ *   .dashboard-table-row:hover → bg-quaternary, radius 6, hide sibling dividers
+ *   message actions → h-5 w-5 icon 3.5
+ */
+
+/* Production chat thread header (title + repo chip row). */
+@utility chat-thread-header {
+  display: flex;
+  height: var(--chat-header-height);
+  flex-shrink: 0;
+  align-items: center;
+  padding-left: 0.75rem; /* pl-3 */
+  padding-right: 0.5rem; /* pr-2 */
+}
+
+@utility chat-thread-title {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-base);
+  line-height: var(--line-height-base);
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--color-text-1);
+}
+
+/* Production right-panel / terminal session toolbar. */
+@utility panel-toolbar {
+  display: flex;
+  height: var(--panel-toolbar-height);
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.375rem;
+  border-bottom: 1px solid var(--color-border-tertiary);
+  padding-inline: 0.5rem; /* px-2 */
+  background-color: var(--color-bg-elevated);
+}
+
+/* File reader editor surface (Agents HTML: Editor content 12px mono). */
+@utility file-editor-surface {
+  background-color: var(--color-editor);
+  font-family: var(--font-mono);
+  font-size: var(--editor-font-size);
+  line-height: var(--editor-line-height);
+  color: var(--color-text-1);
+}
+
+/* Glass titlebar spacer for macOS traffic lights. */
+@utility traffic-lights-spacer {
+  width: var(--traffic-lights-spacer);
+  flex-shrink: 0;
+}
+
+/* Sidebar / agent list cell — production agent-sidebar-cell */
+@utility agent-row {
+  display: flex;
+  height: 2rem; /* h-8 exact — never min-h + py */
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem; /* gap-2 */
+  border-radius: var(--radius-sm); /* 6 — matches nav rounded-sm */
+  padding-inline: 0.5rem; /* px-2 — same gutter as SidebarActionRow */
+  font-size: var(--text-base);
+  transition-property: color, background-color;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--easing-default);
+}
+
+@utility agent-row-hover {
+  &:hover {
+    background-color: var(--color-bg-quaternary-opaque); /* fill-4 */
+    color: var(--color-text-1);
+  }
+}
+
+@utility agent-row-selected {
+  background-color: var(--color-bg-tertiary-opaque); /* fill-2 */
+  color: var(--color-text-1);
+  &:hover {
+    background-color: var(--color-bg-tertiary-opaque);
+  }
+}
+
+/* Nav action under logo (New Agent / Automations / …) — production h-8 */
+@utility agent-nav-row {
+  display: flex;
+  height: 2rem;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  border-radius: var(--radius-sm);
+  padding-inline: 0.5rem;
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--color-text-1);
+  transition-property: color, background-color;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--easing-default);
+  &:hover {
+    background-color: var(--color-bg-quaternary);
+    color: var(--color-text-1);
+  }
+}
+
+/* Date / section label in agent list — glass agent-sidebar-section-title h-24 px-6 */
+@utility agent-section-label {
+  display: flex;
+  height: 1.5rem; /* h-6 */
+  align-items: center;
+  gap: 0.125rem;
+  padding-inline: 0.375rem; /* px-1.5 */
+  font-size: var(--text-sm);
+  color: var(--color-text-3);
+  white-space: nowrap;
+  cursor: pointer;
+  transition-property: color;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--easing-default);
+  &:hover {
+    color: var(--color-text-1);
+  }
+}
+
+/* Dashboard / table list row — hover fill + radius 6, dividers vanish */
+@utility dashboard-row {
+  position: relative;
+  border-radius: var(--radius-sm);
+  transition-property: background-color;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--easing-default);
+  &:hover {
+    background-color: var(--color-bg-quaternary);
+  }
+  /* Hide this row's divider + the next row's top divider on hover */
+  &:hover .dashboard-row-divider,
+  &:hover + .dashboard-row .dashboard-row-divider {
+    opacity: 0;
+  }
+}
+
+@utility dashboard-row-divider {
+  height: 1px;
+  background-color: var(--color-border-quaternary);
+  opacity: 1;
+  transition: opacity var(--duration-fast) var(--easing-default);
+}
+
+/* Clickable dashboard cell */
+@utility dashboard-cell {
+  border-radius: var(--radius-sm);
+  transition-property: background-color;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--easing-default);
+}
+
+@utility dashboard-cell-clickable {
+  cursor: pointer;
+  &:hover {
+    background-color: var(--color-bg-quaternary);
+  }
+  &:active {
+    background-color: var(--color-bg-tertiary);
+  }
+}
+
+/* Human / user message card — production human-message-card (full-bleed, not chat bubble) */
+@utility human-message-card {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-bubble); /* 14px */
+  border: 1px solid var(--color-border-tertiary);
+  background-color: var(--color-bg-elevated);
+  padding: 0.5rem 0.625rem; /* py-2 px-2.5 */
+  box-shadow: 0 1px 2px 0
+    color-mix(in srgb, var(--shadow-tertiary) 35%, transparent);
+  transition-property: border-color, background-color, box-shadow;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--easing-default);
+  &:hover {
+    border-color: var(--color-border-secondary);
+    background-color: color-mix(
+      in oklab,
+      var(--color-base) 2.5%,
+      var(--color-bg-elevated)
+    );
+  }
+}
+
+/* Sticky human turn — chrome fill + soft dissolve under the card (Agents Web). */
+@utility human-turn-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  margin-bottom: 0.75rem; /* mb-3 */
+  background-color: var(--color-chrome);
+}
+
+@utility human-turn-sticky-mask {
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 1;
+  height: 1.25rem; /* h-5 */
+  background-color: var(--color-chrome);
+  -webkit-mask-image: linear-gradient(#000 0%, transparent 100%);
+  mask-image: linear-gradient(#000 0%, transparent 100%);
+  transition: opacity var(--duration-slow) var(--easing-in-out);
+}
+
+/* Collapsed body + 18px bottom fade (production max-h-[68px]). */
+@utility human-message-body-collapsed {
+  max-height: 68px;
+  overflow: hidden;
+}
+
+@utility human-message-fade {
+  pointer-events: none;
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 18px;
+  background: linear-gradient(
+    to top,
+    var(--color-bg-elevated),
+    transparent
+  );
+}
+
+/* Composer card — production elevation (radius applied by layout variant). */
+@utility composer-card {
+  background-color: var(--color-bg-elevated);
+  /* Idle: inset stroke-3 + soft ambient. Hover (not focus): stroke-2. */
+  box-shadow: var(--shadow-composer);
+  backdrop-filter: blur(10px);
+  transition: box-shadow var(--duration-fast) var(--easing-default);
+  &:hover:not(:focus-within) {
+    box-shadow:
+      inset 0 0 0 1px var(--color-border-secondary),
+      0 1px 4px 0 color-mix(in srgb, var(--shadow-tertiary) 40%, transparent);
+  }
+}
+
+@utility composer-card-focus {
+  box-shadow: var(--shadow-composer-focus);
+}
+
+/* Large column composer card — always `--radius-composer` (never pill/full). */
+@utility composer-card-hero {
+  border-radius: var(--radius-composer);
+}
+
+/* Status pill — compact full-radius semantic chip */
+@utility status-pill {
+  display: inline-flex;
+  height: 1.25rem; /* h-5 */
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: var(--radius-full);
+  padding-inline: 0.5rem;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1;
+}
+
+@utility status-pill-success {
+  background-color: var(--color-bg-success-quaternary);
+  color: var(--color-text-success);
+}
+
+@utility status-pill-warn {
+  background-color: var(--color-bg-warn-quaternary);
+  color: var(--color-text-warn);
+}
+
+@utility status-pill-danger {
+  background-color: var(--color-bg-danger-quaternary);
+  color: var(--color-text-danger);
+}
+
+@utility status-pill-neutral {
+  background-color: var(--color-bg-quaternary);
+  color: var(--color-text-2);
+}
+
+/* Segmented control track (mode / density toggles) */
+@utility segmented-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-bg-quinary);
+  padding: 2px;
+}
+
+@utility segmented-item {
+  display: inline-flex;
+  height: 1.5rem; /* h-6 */
+  align-items: center;
+  justify-content: center;
+  border-radius: calc(var(--radius-sm) - 1px);
+  padding-inline: 0.5rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-3);
+  transition-property: color, background-color;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--easing-default);
+  &:hover {
+    color: var(--color-text-1);
+  }
+  &[data-active="true"],
+  &[aria-pressed="true"] {
+    background-color: var(--color-bg-quaternary-opaque);
+    color: var(--color-text-1);
+  }
+}

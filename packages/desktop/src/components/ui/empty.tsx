@@ -8,8 +8,8 @@ function Empty({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="empty"
       className={cn(
         // Compact empty: top-weighted utility void (IDE), not a full-viewport
-        // marketing hero. Callers that need flex-1 centering pass it explicitly.
-        "flex w-full min-w-0 flex-col items-center gap-3 rounded-xl border-dashed px-4 py-10 text-center text-balance",
+        // marketing hero. Production: no loud dashed slab — quiet void only.
+        "flex w-full min-w-0 flex-col items-center gap-3 rounded-[var(--radius-card)] px-4 py-10 text-center text-balance",
         className
       )}
       {...props}

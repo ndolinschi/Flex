@@ -19,15 +19,15 @@ describe("accent helpers", () => {
   })
 
   it("picks dark text on light accents and light text on dark accents", () => {
-    expect(accentTextFor("#f2f2f2")).toBe("#0a0a0a")
+    expect(accentTextFor("#f0f0f0")).toBe("#0a0a0a")
     expect(accentTextFor("#1a1a1a")).toBe("#ffffff")
     expect(accentLuminance("#ffffff")).toBeGreaterThan(0.9)
   })
 
   it("resolves neutral + custom tokens per theme", () => {
-    const darkNeutral = resolveAccentTokens("neutral", "#6b9eff", "dark")
-    expect(darkNeutral.accent).toBe("#f2f2f2")
-    expect(darkNeutral.text).toBe("#0a0a0a")
+    const darkNeutral = resolveAccentTokens("neutral", "#599ce7", "dark")
+    expect(darkNeutral.accent).toBe("#f0f0f0")
+    expect(darkNeutral.text).toBe("#141414")
 
     const custom = tokensFromCustomHex("#8b1e3f", "light")
     expect(custom.accent).toBe("#8b1e3f")

@@ -1,5 +1,6 @@
 import { useMemo, useRef } from "react"
 import {
+  groupByRecencyBuckets,
   groupByRepo,
   orderByPinnedIds,
   orderStably,
@@ -7,13 +8,17 @@ import {
   type RepoGroup,
   type SidebarProjectSort,
   type SidebarProjectVisibility,
+  type TimeBucket,
 } from "../lib/sessionGrouping"
 import type { SessionMeta } from "../lib/types"
 
 export type SessionSidebarGroups = {
   pinnedSessions: SessionMeta[]
   archivedSessions: SessionMeta[]
+  /** Primary chrome: project/repo folders with nested sessions. */
   repoGroups: RepoGroup[]
+  /** Optional recency buckets (Search / helpers — not default sidebar chrome). */
+  timeBuckets: TimeBucket[]
 }
 
 export type SessionSidebarGroupOptions = {
@@ -82,6 +87,11 @@ export const useSessionSidebarGroups = (
   const rowOrderByGroupRef = useRef<Map<string, string[]>>(new Map())
   const lastPrefsRef = useRef(`${sort}:${visibility}`)
 
+  const timeBuckets = useMemo(
+    () => groupByRecencyBuckets(groupableSessions),
+    [groupableSessions],
+  )
+
   const repoGroups = useMemo(() => {
     const prefsKey = `${sort}:${visibility}`
     if (lastPrefsRef.current !== prefsKey) {
@@ -125,5 +135,5 @@ export const useSessionSidebarGroups = (
     return ordered
   }, [sortedGroups, sort, visibility])
 
-  return { pinnedSessions, archivedSessions, repoGroups }
+  return { pinnedSessions, archivedSessions, repoGroups, timeBuckets }
 }

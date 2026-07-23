@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest"
 import {
   ACTIVE_PROJECT_WINDOW_MS,
+  groupByRecencyBuckets,
   groupByRepo,
+  nestSessionsByParent,
   orderByPinnedIds,
   orderStably,
   projectCwd,
+  startOfLocalDay,
 } from "./sessionGrouping"
 import type { SessionMeta } from "./types"
 
@@ -225,5 +228,72 @@ describe("orderStably", () => {
     ]
     const result = orderStably(withNew, keyOf, prevOrder)
     expect(result.map((s) => s.id)).toEqual(["c", "b", "a"])
+  })
+})
+
+describe("nestSessionsByParent", () => {
+  it("nests children under matching parent roots", () => {
+    const parent = makeSession("p", 300)
+    const childA = { ...makeSession("c1", 200), parent_id: "p" }
+    const childB = { ...makeSession("c2", 250), parent_id: "p" }
+    const other = makeSession("o", 100)
+    const nested = nestSessionsByParent([parent, other], [parent, childA, childB, other])
+    expect(nested).toHaveLength(2)
+    expect(nested[0]!.session.id).toBe("p")
+    expect(nested[0]!.children.map((c) => c.id)).toEqual(["c2", "c1"]) // recency
+    expect(nested[1]!.children).toHaveLength(0)
+  })
+
+  it("ignores orphans whose parent is not in roots", () => {
+    const root = makeSession("r", 100)
+    const orphan = { ...makeSession("x", 90), parent_id: "missing" }
+    const nested = nestSessionsByParent([root], [root, orphan])
+    expect(nested[0]!.children).toHaveLength(0)
+  })
+})
+
+describe("groupByRecencyBuckets", () => {
+  const DAY_MS = 24 * 60 * 60 * 1000
+
+  it("buckets sessions like Cursor Agents (Today / Yesterday / Last 7 / Last 30 / Older)", () => {
+    const now = new Date(2026, 6, 23, 15, 0, 0).getTime() // July 23 2026 local
+    const today0 = startOfLocalDay(now)
+    const sessions = [
+      makeSession("today", today0 + 3_600_000),
+      makeSession("yest", today0 - DAY_MS + 3_600_000),
+      makeSession("d3", today0 - 3 * DAY_MS),
+      makeSession("d10", today0 - 10 * DAY_MS),
+      makeSession("old", today0 - 40 * DAY_MS),
+    ]
+    const buckets = groupByRecencyBuckets(sessions, now)
+    expect(buckets.map((b) => b.id)).toEqual([
+      "today",
+      "yesterday",
+      "last7",
+      "last30",
+      "older",
+    ])
+    expect(buckets.find((b) => b.id === "today")!.sessions.map((s) => s.id)).toEqual([
+      "today",
+    ])
+    expect(buckets.find((b) => b.id === "yesterday")!.sessions.map((s) => s.id)).toEqual([
+      "yest",
+    ])
+    expect(buckets.find((b) => b.id === "last7")!.sessions.map((s) => s.id)).toEqual([
+      "d3",
+    ])
+    expect(buckets.find((b) => b.id === "last30")!.sessions.map((s) => s.id)).toEqual([
+      "d10",
+    ])
+    expect(buckets.find((b) => b.id === "older")!.sessions.map((s) => s.id)).toEqual([
+      "old",
+    ])
+  })
+
+  it("omits empty buckets", () => {
+    const now = Date.now()
+    const buckets = groupByRecencyBuckets([makeSession("a", now)], now)
+    expect(buckets).toHaveLength(1)
+    expect(buckets[0]!.id).toBe("today")
   })
 })

@@ -14,16 +14,13 @@ import {
 import { useStoreWithEqualityFn } from "zustand/traditional"
 import type { GitStatusSummary, SessionMeta, WorkspaceStatusDto } from "../../lib/types"
 import { sessionLabel } from "../../lib/types"
-import { basename, formatCompactTime, cn } from "../../lib/utils"
+import { formatCompactTime, cn } from "../../lib/utils"
 import { useAppStore } from "../../stores/appStore"
-import { RunningDot, Tooltip } from "../atoms"
+import { DiffStat, RunningDot, Tooltip } from "../atoms"
 import { ConfirmDialog } from "./ConfirmDialog"
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu"
 import { SessionRowActions } from "./SessionRowActions"
-import {
-  SessionRowSubtitle,
-  sessionRowHasSubtitle,
-} from "./SessionRowSubtitle"
+import { parseDiffStat } from "./SessionRowSubtitle"
 import { Input } from "@/components/ui/input"
 
 type SessionListItemProps = {
@@ -42,6 +39,13 @@ type SessionListItemProps = {
   pinned?: boolean
   /** Whether this session is archived (dimmed row, restore action instead of archive/delete). */
   archived?: boolean
+  /**
+   * Nest depth for child sessions (`parent_id`). 0 = root, 1 = nested under
+   * parent (Cursor Agents nested thread indent).
+   */
+  nestDepth?: 0 | 1
+  /** Role badge for nested subagents (e.g. `worker`, `searcher`). */
+  roleLabel?: string | null
   onSelect: (id: string) => void
   onRename: (id: string, title: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
@@ -59,6 +63,8 @@ export const SessionListItem = memo(function SessionListItem({
   gitStatus,
   pinned = false,
   archived = false,
+  nestDepth = 0,
+  roleLabel = null,
   onSelect,
   onRename,
   onDelete,
@@ -98,9 +104,6 @@ export const SessionListItem = memo(function SessionListItem({
   const [actionsReady, setActionsReady] = useState(false)
 
   const label = sessionLabel(session)
-  const repoLabel = pinned
-    ? basename(session.base_cwd || session.cwd)
-    : undefined
 
   const armActions = useCallback(() => {
     setActionsReady(true)
@@ -216,9 +219,19 @@ export const SessionListItem = memo(function SessionListItem({
     },
   ]
 
-  const showSubtitle =
-    !isEditing &&
-    sessionRowHasSubtitle(workspaceStatus, gitStatus, repoLabel)
+  // Production Agents Web row is single-line h-8 with trailing +N −M that
+  // fades on hover (actions take its place) — not a two-line subtitle stack.
+  const workspaceDiff = workspaceStatus
+    ? parseDiffStat(workspaceStatus.summary)
+    : null
+  const gitDiff =
+    !workspaceStatus && gitStatus && gitStatus.totalCount > 0
+      ? { added: gitStatus.totalAdded, removed: gitStatus.totalRemoved }
+      : null
+  const trailingDiff = workspaceDiff ?? gitDiff
+  const hasTrailingDiff =
+    !!trailingDiff && (trailingDiff.added > 0 || trailingDiff.removed > 0)
+
   // Numeric unread > 0 gets the "(N) " title prefix (reference design).
   const unreadCount = typeof unread === "number" && unread > 0 ? unread : null
   // Status-first triage: needs-input > working > failed > unread.
@@ -277,103 +290,105 @@ export const SessionListItem = memo(function SessionListItem({
       onPointerEnter={armActions}
       onFocusCapture={armActions}
       className={cn(
-        // Cursor agent-sidebar-cell: pad 6×8, radius 6 (sm), gap 12.
-        "group relative flex min-h-7 items-center gap-3 rounded-sm px-2 py-1.5",
-        "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)]",
-        // Non-virtualized list: skip paint for off-screen rows in ScrollArea.
-        // Safe here (fixed-ish row height); NEVER apply on virtualized timeline.
+        // Production agent-sidebar-cell: h-8 px-1.5 rounded-md, quaternary hover/selected.
+        "agent-row group relative",
+        isActive ? "agent-row-selected" : "agent-row-hover text-ink",
         "cv-auto-meta",
-        // Whisper fills: selected fill-2 (~8%) stronger than hover fill-4 (~6%).
-        // Pin selected on hover so fill-4 never overrides (SettingsNav pattern).
-        isActive ? "bg-fill-2 hover:bg-fill-2" : "hover:bg-fill-4",
+        nestDepth > 0 && "ml-4 border-l border-stroke-4 pl-2",
         archived && "opacity-60",
       )}
     >
-      <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-        <span className="flex items-center gap-1.5">
-          <span
-            className="flex h-5 w-5 shrink-0 items-center justify-center"
-          >
-            {statusKind === "needs-input" ? (
-              <Tooltip label="Needs your input">
-                <MessageCircleQuestion
-                  className="h-3.5 w-3.5 text-accent"
-                  aria-label="Needs your input"
-                />
-              </Tooltip>
-            ) : statusKind === "working" ? (
-              <RunningDot />
-            ) : statusKind === "failed" ? (
-              <Tooltip label="Last turn failed">
-                <CircleAlert
-                  className="h-3.5 w-3.5 text-destructive"
-                  aria-label="Last turn failed"
-                />
-              </Tooltip>
-            ) : statusKind === "unread" ? (
-              <Tooltip label="Unread">
-                <span
-                  className="h-[5px] w-[5px] shrink-0 rounded-full bg-accent"
-                  aria-hidden
-                />
-              </Tooltip>
-            ) : null}
-          </span>
-
-          {isEditing ? (
-            <Input
-              autoFocus
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={() => void handleSaveRename()}
-              onKeyDown={handleKeyDown}
-              onClick={(e) => e.stopPropagation()}
-              aria-label="Rename session"
-              className="h-6 min-w-0 flex-1 text-sm"
-            />
-          ) : (
-            <Tooltip label={label}>
-              <p
-                className={cn(
-                  // Plain ellipsis — no mask-image fade on hover (DESIGN: quiet chrome).
-                  "min-w-0 flex-1 truncate text-left text-sm",
-                  // Reserve room for absolute trailing actions so "…" stops before them.
-                  "group-hover:pr-[5.5rem] group-focus-within:pr-[5.5rem]",
-                  isActive ? "text-ink" : "text-ink-secondary",
-                )}
-              >
-                {unreadCount ? (
-                  <span className="text-ink">({unreadCount}) </span>
-                ) : null}
-                {label}
-              </p>
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        {/* Production status slot ~13px wide */}
+        <span className="flex w-[13px] shrink-0 items-center justify-center text-icon-2">
+          {statusKind === "needs-input" ? (
+            <Tooltip label="Needs your input">
+              <MessageCircleQuestion
+                className="size-3.5 text-accent"
+                strokeWidth={1.5}
+                aria-label="Needs your input"
+              />
             </Tooltip>
-          )}
-
-          {!isEditing && errorMessage ? (
-            <Tooltip label={errorMessage}>
-              <span className="shrink-0" aria-label={`Resume failed: ${errorMessage}`}>
-                <TriangleAlert className="h-3.5 w-3.5 text-yellow" aria-hidden />
-              </span>
+          ) : statusKind === "working" ? (
+            <RunningDot />
+          ) : statusKind === "failed" ? (
+            <Tooltip label="Last turn failed">
+              <CircleAlert
+                className="size-3.5 text-danger"
+                strokeWidth={1.5}
+                aria-label="Last turn failed"
+              />
+            </Tooltip>
+          ) : statusKind === "unread" ? (
+            <Tooltip label="Unread">
+              <span
+                className="h-[5px] w-[5px] shrink-0 rounded-full bg-accent"
+                aria-hidden
+              />
             </Tooltip>
           ) : null}
         </span>
 
-        {showSubtitle ? (
-          <SessionRowSubtitle
-            updatedAtMs={session.updated_at_ms}
-            workspaceStatus={workspaceStatus}
-            gitStatus={gitStatus}
-            repoLabel={repoLabel}
+        {isEditing ? (
+          <Input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => void handleSaveRename()}
+            onKeyDown={handleKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Rename session"
+            className="h-6 min-w-0 flex-1 text-sm"
           />
+        ) : (
+          <Tooltip label={label}>
+            <p
+              className={cn(
+                "min-w-0 flex-1 truncate text-left text-base",
+                // Room for absolute trailing actions on hover.
+                "group-hover:pr-[5.5rem] group-focus-within:pr-[5.5rem]",
+                isActive ? "text-ink" : "text-ink-secondary",
+              )}
+            >
+              {unreadCount ? (
+                <span className="text-ink">({unreadCount}) </span>
+              ) : null}
+              {label}
+              {roleLabel ? (
+                <span className="ml-1.5 text-xs text-ink-faint">{roleLabel}</span>
+              ) : null}
+            </p>
+          </Tooltip>
+        )}
+
+        {!isEditing && errorMessage ? (
+          <Tooltip label={errorMessage}>
+            <span className="shrink-0" aria-label={`Resume failed: ${errorMessage}`}>
+              <TriangleAlert className="size-3.5 text-yellow" strokeWidth={1.5} aria-hidden />
+            </span>
+          </Tooltip>
         ) : null}
-      </span>
+      </div>
+
+      {/* In-flow trailing slot — same cross-axis as the title (not absolute
+       * top-1/2 which floated +N−M above the baseline). Actions overlay. */}
+      {!isEditing && hasTrailingDiff && trailingDiff ? (
+        <DiffStat
+          summary={trailingDiff}
+          size="xs"
+          className={cn(
+            "shrink-0 leading-none",
+            "transition-opacity duration-[var(--duration-fast)]",
+            "group-hover:opacity-0 group-focus-within:opacity-0",
+          )}
+        />
+      ) : null}
 
       {isEditing ? null : (
         <SessionRowActions
           pinned={pinned}
           archived={archived}
-          showTrailingTime={!showSubtitle}
+          showTrailingTime={!hasTrailingDiff}
           updatedAtMs={session.updated_at_ms}
           isActive={isActive}
           formatTime={formatCompactTime}

@@ -22,6 +22,7 @@ dist-ssr
 # Research / extraction notes (not for public commit)
 design-map/
 DESIGN-NOTES.md
+.audit/
 
 # Editor directories and files
 .vscode/*

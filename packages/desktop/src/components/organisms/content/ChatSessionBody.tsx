@@ -44,8 +44,12 @@ export const ChatSessionBody = ({
   )
   const lastWorkersSigRef = useRef("")
   const { sessions } = useSessions()
+  // Belt-and-suspenders with ChatShell keeping TurnTimeline mounted: leave
+  // hero as soon as this session starts streaming so chrome cannot stick.
+  const isStreaming = useAppStore((s) => !!s.streamingSessions[sessionId])
 
   useEffect(() => {
+    setConversationEmpty(false)
     setRunningWorkers([])
     lastWorkersSigRef.current = ""
   }, [sessionId])
@@ -70,7 +74,7 @@ export const ChatSessionBody = ({
       ?.scrollIntoView({ behavior: "smooth", block: "center" })
   }, [sessionId])
 
-  const composerHero = conversationEmpty
+  const composerHero = conversationEmpty && !isStreaming
   const meta = sessions.find((s) => s.id === sessionId)
   const heroTitle = meta ? sessionLabel(meta) : "New Agent"
 
@@ -126,6 +130,10 @@ export const ChatSessionBody = ({
         composerHero={composerHero}
         heroTitle={heroTitle}
         heroHint="Describe a task to get started."
+        /* Tab strip names the session; ContextBar owns the project chip.
+         * No second title / second Flex label in the thread chrome. */
+        threadTitle=""
+        threadTrailing={undefined}
       />
     </div>
   )

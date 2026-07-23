@@ -201,7 +201,7 @@ const FileChip = ({ path, active, dirty, onSelect, onClose }: FileChipProps) => 
   </Tab>
 )
 
-/** Cursor-style file strip + Monaco editor inside the right panel.
+/** File strip + Monaco editor inside the right panel.
  * Keep mounted (hidden) while the Files tab stays in openTabs so buffers
  * and dirty drafts survive switching to Changes/Terminal. Empty Files tab
  * shows a workspace file browser (not auto-closed). Markdown files can
@@ -442,7 +442,7 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
     return (
       <div className="flex h-full min-h-0 flex-col">
         {openFiles.length > 0 ? (
-          <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-stroke-3 px-2.5">
+          <div className="panel-toolbar flex h-[var(--panel-toolbar-height)] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-stroke-3 px-2">
             {fileChips}
           </div>
         ) : null}
@@ -488,21 +488,24 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-editor">
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-stroke-3 px-2.5">
+      {/* Production file/IDE toolbar: h-10 · px-2 · border-b tertiary (8：22). */}
+      <div className="panel-toolbar flex h-[var(--panel-toolbar-height)] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-stroke-3 bg-editor px-2">
+        {/* Production "Hide file tree": w-[26px], active bg-tertiary. */}
         <Button
           type="button"
           variant="ghost"
           size="icon-xs"
-          aria-label={explorerOpen ? "Hide file explorer" : "Show file explorer"}
-          title={explorerOpen ? "Hide file explorer" : "Show file explorer"}
+          aria-label={explorerOpen ? "Hide file tree" : "Show file tree"}
+          title={explorerOpen ? "Hide file tree" : "Show file tree"}
           aria-pressed={explorerOpen}
           onClick={() => setExplorerOpen((open) => !open)}
           className={cn(
-            "shrink-0 text-ink-muted hover:bg-fill-4 hover:text-ink",
-            explorerOpen && "bg-fill-2 text-ink hover:bg-fill-2",
+            "h-6 w-[var(--file-tree-toggle-width)] shrink-0 px-0 text-icon-2",
+            "hover:bg-bg-quaternary hover:text-icon-1",
+            explorerOpen && "bg-bg-tertiary text-ink hover:bg-bg-tertiary",
           )}
         >
-          <FolderTree className="h-3.5 w-3.5" aria-hidden />
+          <FolderTree className="size-3.5" strokeWidth={1.5} aria-hidden />
         </Button>
         {fileChips}
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
@@ -621,7 +624,9 @@ export const FilesTab = ({ active, session }: FilesTabProps) => {
                   onChange={handleChange}
                   onMount={handleEditorMount}
                   options={{
-                    fontSize: 13,
+                    // Production Editor content: 12px mono / 18px line-height.
+                    fontSize: 12,
+                    lineHeight: 18,
                     fontFamily: "var(--font-mono), ui-monospace, monospace",
                     minimap: { enabled: false },
                     scrollBeyondLastLine: false,

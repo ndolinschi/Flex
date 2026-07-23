@@ -32,9 +32,10 @@ export const RepoSectionHeader = ({
         if (e.key === "Enter") onToggle()
       }}
       className={cn(
-        "group flex h-6 w-full cursor-default items-center gap-1.5 rounded-sm px-2",
-        "text-xs tracking-[var(--tracking-caption)] text-ink-muted",
-        "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)] hover:bg-fill-4 hover:text-ink-secondary",
+        // Production date/section labels: px-1 py-2 text-sm text-tertiary.
+        "group flex w-full cursor-default items-center gap-0.5 rounded-sm px-1 py-2",
+        "text-sm tracking-[var(--tracking-caption)] text-ink-muted",
+        "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-default)] hover:text-ink",
       )}
     >
       <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">

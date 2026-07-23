@@ -10,19 +10,20 @@ type BadgeProps = {
   className?: string
 }
 
+/** Production whisper chips — quaternary semantic fills (Phase 4). */
 const toneClasses: Record<BadgeTone, string> = {
-  default: "bg-primary/15 text-primary border-transparent",
-  success: "bg-success-subtle text-success border-transparent",
-  warning: "bg-warning-subtle text-warning border-transparent",
-  danger: "bg-destructive/10 text-destructive border-transparent",
-  muted: "bg-fill-3 text-ink-muted border-transparent",
+  default: "border-transparent bg-bg-quaternary text-ink-secondary",
+  success: "border-transparent bg-bg-success-quaternary text-text-success",
+  warning: "border-transparent bg-bg-warn-quaternary text-text-warn",
+  danger: "border-transparent bg-bg-danger-quaternary text-text-danger",
+  muted: "border-transparent bg-fill-3 text-ink-muted",
 }
 
 export const Badge = ({ variant = "default", children, className }: BadgeProps) => (
   <BadgePrimitive
     variant="outline"
     className={cn(
-      "tracking-[var(--tracking-caption)]",
+      "h-5 rounded-full px-2 text-xs font-medium tracking-[var(--tracking-caption)]",
       toneClasses[variant],
       className,
     )}
