@@ -203,7 +203,7 @@ export const FileDocumentTab = ({
     editorRef.current = editor
   }, [])
 
-  const markers = useMonacoMarkers(path)
+  const markers = useMonacoMarkers(path, active)
   const errorCount = markers.filter(
     (m) => m.severity === MarkerSeverity.Error,
   ).length

@@ -3,8 +3,10 @@ import { cn } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
 import {
   describeHunklessDiff,
+  DIFF_RENDER_LINE_CAP,
   isDiffTruncated,
   parseUnifiedDiff,
+  softCapLines,
   unmodifiedLinesBeforeHunk,
   unmodifiedLinesBetweenHunks,
   type Hunk,
@@ -21,6 +23,17 @@ type DiffViewProps = {
   collapseUnmodified?: boolean
 }
 
+type RenderHunk = {
+  hunk: Hunk
+  lines: string[]
+  gap: number
+}
+
+type RenderFile = {
+  file: ParsedDiffFile
+  hunks: RenderHunk[]
+}
+
 const lineClass = (line: string): string => {
   if (line.startsWith("+++") || line.startsWith("---")) return "text-ink-faint"
   if (line.startsWith("@@")) return "text-cyan"
@@ -32,8 +45,27 @@ const lineClass = (line: string): string => {
   return "text-ink-muted"
 }
 
+const TruncationFooter = ({ count }: { count: number }) => {
+  if (count <= 0) return null
+  return (
+    <div
+      className={cn(
+        "px-3 py-1 font-mono text-xs text-ink-faint",
+        "tracking-[var(--tracking-caption)]",
+      )}
+      role="note"
+    >
+      … truncated {count} more line{count === 1 ? "" : "s"}
+    </div>
+  )
+}
+
 const PlainDiff = ({ diff }: { diff: string }) => {
-  const lines = diff.replace(/\n$/, "").split("\n")
+  const allLines = useMemo(
+    () => diff.replace(/\n$/, "").split("\n"),
+    [diff],
+  )
+  const { lines, truncated } = softCapLines(allLines, DIFF_RENDER_LINE_CAP)
   return (
     <>
       {lines.map((line, i) => (
@@ -47,6 +79,7 @@ const PlainDiff = ({ diff }: { diff: string }) => {
           {line || " "}
         </div>
       ))}
+      <TruncationFooter count={truncated} />
     </>
   )
 }
@@ -70,11 +103,13 @@ const UnmodifiedCollapse = ({ count }: { count: number }) => {
 const HunkBlock = ({
   file,
   hunk,
+  lines,
   onKeepHunk,
   onUndoHunk,
 }: {
   file: ParsedDiffFile
   hunk: Hunk
+  lines: string[]
   onKeepHunk?: (hunk: Hunk, file: ParsedDiffFile) => void
   onUndoHunk?: (hunk: Hunk, file: ParsedDiffFile) => void
 }) => {
@@ -109,7 +144,7 @@ const HunkBlock = ({
           ) : null}
         </span>
       </div>
-      {hunk.lines.map((line, i) => (
+      {lines.map((line, i) => (
         <div
           key={i}
           className={cn(
@@ -124,48 +159,50 @@ const HunkBlock = ({
   )
 }
 
-const FileHunks = ({
-  file,
-  collapseUnmodified,
-  onKeepHunk,
-  onUndoHunk,
-}: {
-  file: ParsedDiffFile
-  collapseUnmodified: boolean
-  onKeepHunk?: (hunk: Hunk, file: ParsedDiffFile) => void
-  onUndoHunk?: (hunk: Hunk, file: ParsedDiffFile) => void
-}) => {
-  if (file.hunks.length === 0) {
-    return (
-      <div className="px-3 py-2.5 text-sm text-ink-muted">
-        {describeHunklessDiff(file)}
-      </div>
-    )
+/**
+ * Soft-cap hunk body lines across all files to `cap`. Parsing stays full-size;
+ * only the render plan is truncated. Returns omitted body-line count.
+ */
+const planSoftCappedRender = (
+  files: ParsedDiffFile[],
+  collapseUnmodified: boolean,
+  cap: number,
+): { plan: RenderFile[]; truncated: number } => {
+  let remaining = cap
+  let totalBody = 0
+  const plan: RenderFile[] = []
+
+  for (const file of files) {
+    totalBody += file.hunks.reduce((n, h) => n + h.lines.length, 0)
+    if (file.hunks.length === 0) {
+      plan.push({ file, hunks: [] })
+      continue
+    }
+    if (remaining <= 0) continue
+
+    const renderHunks: RenderHunk[] = []
+    for (let hi = 0; hi < file.hunks.length; hi++) {
+      if (remaining <= 0) break
+      const hunk = file.hunks[hi]
+      const gap =
+        !collapseUnmodified
+          ? 0
+          : hi === 0
+            ? unmodifiedLinesBeforeHunk(hunk)
+            : unmodifiedLinesBetweenHunks(file.hunks[hi - 1], hunk)
+      const take = Math.min(hunk.lines.length, remaining)
+      renderHunks.push({
+        hunk,
+        lines: hunk.lines.slice(0, take),
+        gap,
+      })
+      remaining -= take
+      if (take < hunk.lines.length) break
+    }
+    plan.push({ file, hunks: renderHunks })
   }
 
-  return (
-    <>
-      {file.hunks.map((hunk, hi) => {
-        const gap =
-          !collapseUnmodified
-            ? 0
-            : hi === 0
-              ? unmodifiedLinesBeforeHunk(hunk)
-              : unmodifiedLinesBetweenHunks(file.hunks[hi - 1], hunk)
-        return (
-          <div key={hi}>
-            <UnmodifiedCollapse count={gap} />
-            <HunkBlock
-              file={file}
-              hunk={hunk}
-              onKeepHunk={onKeepHunk}
-              onUndoHunk={onUndoHunk}
-            />
-          </div>
-        )
-      })}
-    </>
-  )
+  return { plan, truncated: Math.max(0, totalBody - cap) }
 }
 
 export const DiffView = ({
@@ -190,6 +227,15 @@ export const DiffView = ({
     }
   }, [diff])
 
+  const softPlan = useMemo(() => {
+    if (!parsed) return null
+    return planSoftCappedRender(
+      parsed.files,
+      collapseUnmodified,
+      DIFF_RENDER_LINE_CAP,
+    )
+  }, [parsed, collapseUnmodified])
+
   return (
     <pre
       className={cn(
@@ -197,16 +243,32 @@ export const DiffView = ({
         className,
       )}
     >
-      {parsed ? (
-        parsed.files.map((file, fi) => (
-          <FileHunks
-            key={fi}
-            file={file}
-            collapseUnmodified={collapseUnmodified}
-            onKeepHunk={wantsHunkActions ? onKeepHunk : undefined}
-            onUndoHunk={wantsHunkActions ? onUndoHunk : undefined}
-          />
-        ))
+      {softPlan ? (
+        <>
+          {softPlan.plan.map(({ file, hunks }, fi) =>
+            hunks.length === 0 && file.hunks.length === 0 ? (
+              <div key={fi} className="px-3 py-2.5 text-sm text-ink-muted">
+                {describeHunklessDiff(file)}
+              </div>
+            ) : (
+              <div key={fi}>
+                {hunks.map(({ hunk, lines, gap }, hi) => (
+                  <div key={hi}>
+                    <UnmodifiedCollapse count={gap} />
+                    <HunkBlock
+                      file={file}
+                      hunk={hunk}
+                      lines={lines}
+                      onKeepHunk={wantsHunkActions ? onKeepHunk : undefined}
+                      onUndoHunk={wantsHunkActions ? onUndoHunk : undefined}
+                    />
+                  </div>
+                ))}
+              </div>
+            ),
+          )}
+          <TruncationFooter count={softPlan.truncated} />
+        </>
       ) : (
         <PlainDiff diff={diff} />
       )}

@@ -32,6 +32,8 @@ import { ReconnectBanner } from "./timeline/ReconnectBanner"
 import { remeasureMountedVirtualItems } from "./timeline/remeasureMountedVirtualItems"
 import { WorkGroupBody } from "./timeline/WorkGroupBody"
 import { Skeleton } from "@/components/ui/skeleton"
+import { patchLiveDisplayItems } from "../../lib/timeline/patchLiveDisplayItems"
+import type { TimelineRow } from "../../lib/types"
 
 type TurnTimelineProps = {
   sessionId: string | null
@@ -97,15 +99,32 @@ export const TurnTimeline = ({
     onLiveRows?.(liveRows)
   }, [liveRows, onLiveRows])
 
-  const displayItems = useMemo(
-    () =>
+  const displayCacheRef = useRef<{
+    items: DisplayItem[]
+    liveRows: TimelineRow[]
+  } | null>(null)
+
+  const displayItems = useMemo(() => {
+    const rebuild = () =>
       buildDisplayItems(
         collapseConsecutiveCheckpoints(liveRows),
         isStreaming,
         thinkingDurations,
-      ),
-    [liveRows, isStreaming, thinkingDurations],
-  )
+      )
+    const cache = displayCacheRef.current
+    const patched =
+      isStreaming && cache
+        ? patchLiveDisplayItems(
+            cache.items,
+            cache.liveRows,
+            liveRows,
+            rebuild,
+          )
+        : null
+    const next = patched ?? rebuild()
+    displayCacheRef.current = { items: next, liveRows }
+    return next
+  }, [liveRows, isStreaming, thinkingDurations])
 
   const last = displayItems[displayItems.length - 1]
   const lastIsLiveThinking =

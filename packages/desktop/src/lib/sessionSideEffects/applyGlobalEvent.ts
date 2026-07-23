@@ -17,7 +17,10 @@ import { maybeToastDevServerUrl } from "./devServerToast"
 import { maybeAutoTitleSession } from "./autoTitle"
 import { maybeRegisterArtifact } from "./artifactSideEffects"
 import { maybeRevealBrowser } from "./browserSideEffects"
-import { invalidateGitQueries } from "../invalidateGitQueries"
+import {
+  invalidateGitQueries,
+  invalidateGitQueriesDebounced,
+} from "../invalidateGitQueries"
 import {
   invalidateWorkspaceQueries,
   isFsMutatingTool,
@@ -43,6 +46,12 @@ const sessionTitleFromCache = (
   sessionId: string,
 ): string => sessionMetaFromCache(queryClient, sessionId)?.title?.trim() || "Agent"
 
+const PURE_STREAM_DELTA_KINDS = new Set([
+  "markdown_delta",
+  "thinking_delta",
+  "tool_args_delta",
+])
+
 export const applyGlobalSessionEvent = (
   event: SessionEvent,
   opts?: {
@@ -52,6 +61,27 @@ export const applyGlobalSessionEvent = (
 ) => {
   const { payload } = event
   const store = useAppStore.getState()
+
+  // Pure text/arg deltas are handled by the session timeline flush path.
+  // Ensure the streaming flag when needed, then skip the rest of the
+  // global side-effect graph (git, plans, notifications, terminal, …).
+  if (PURE_STREAM_DELTA_KINDS.has(payload.kind)) {
+    if (!opts?.ignoreStreaming) {
+      const isStraggler =
+        store.completedTurns[event.session_id] !== undefined
+      if (!store.streamingSessions[event.session_id] && !isStraggler) {
+        store.setSessionStreaming(event.session_id, true)
+      }
+      if (
+        event.session_id === store.activeSessionId &&
+        !store.isStreaming &&
+        !isStraggler
+      ) {
+        store.setIsStreaming(true)
+      }
+    }
+    return
+  }
 
   if (payload.kind === "permission_requested" && !opts?.ignoreStreaming) {
     log.info("session", "permission requested", {
@@ -117,12 +147,7 @@ export const applyGlobalSessionEvent = (
         store.setPendingPlanApproval(null)
       }
     }
-    if (
-      payload.kind === "markdown_delta" ||
-      payload.kind === "thinking_delta" ||
-      payload.kind === "tool_args_delta" ||
-      payload.kind === "tool_call_updated"
-    ) {
+    if (payload.kind === "tool_call_updated") {
       if (!store.streamingSessions[event.session_id] && !isStragglerForCompletedTurn()) {
         store.setSessionStreaming(event.session_id, true)
       }
@@ -254,8 +279,15 @@ export const applyGlobalSessionEvent = (
 
   if (payload.kind === "turn_completed" || payload.kind === "session_error") {
     if (opts?.queryClient) {
-      invalidateGitQueries(opts.queryClient)
-      invalidateWorkspaceQueries(opts.queryClient)
+      const meta = sessionMetaFromCache(opts.queryClient, event.session_id)
+      // Scope git to this session/cwd so other sessions' badges stay warm.
+      invalidateGitQueries(opts.queryClient, {
+        sessionId: event.session_id,
+        cwd: meta?.cwd,
+      })
+      // Skip workspace invalidation here — FS-mutating tools cover tree/file
+      // caches when the working tree actually changed (avoids path-cache wipes
+      // on every turn, including pure chat turns).
     }
   }
 
@@ -271,7 +303,17 @@ export const applyGlobalSessionEvent = (
       state === "failed" ||
       state === "cancelled"
     ) {
-      invalidateWorkspaceQueries(opts.queryClient)
+      const meta = sessionMetaFromCache(opts.queryClient, event.session_id)
+      const scope = {
+        sessionId: event.session_id,
+        cwd: meta?.cwd,
+      }
+      // Debounce git: multi-edit bursts would thrash status otherwise.
+      invalidateGitQueriesDebounced(opts.queryClient, scope, 400)
+      invalidateWorkspaceQueries(opts.queryClient, {
+        sessionId: event.session_id,
+        clearPathCache: true,
+      })
     }
   }
 
@@ -391,12 +433,7 @@ export const applyGlobalSessionEvent = (
   if (payload.kind === "turn_started") {
     store.setIsStreaming(true)
   }
-  if (
-    payload.kind === "markdown_delta" ||
-    payload.kind === "thinking_delta" ||
-    payload.kind === "tool_args_delta" ||
-    payload.kind === "tool_call_updated"
-  ) {
+  if (payload.kind === "tool_call_updated") {
     if (!store.isStreaming && !isStragglerForCompletedTurn()) {
       store.setIsStreaming(true)
     }

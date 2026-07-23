@@ -1,7 +1,8 @@
-import { useCallback, useRef } from "react"
+import { memo, useCallback, useMemo, useRef } from "react"
 import { ToolStepList } from "../../molecules"
 import type { TimelineToolRowLike } from "../../../lib/toolPresentation"
 import type { TimelineRow } from "../../../lib/types"
+import { windowWorkGroupRows } from "../../../lib/timeline/windowToolRows"
 import { TimelineRowView } from "./TimelineRowView"
 
 type WorkGroupBodyProps = {
@@ -13,18 +14,20 @@ type WorkGroupBodyProps = {
   checkpointsDisabled: boolean
 }
 
-export const WorkGroupBody = ({
+export const WorkGroupBody = memo(function WorkGroupBody({
   rows,
   progress,
   forceOpenDetails,
   thinkingDurations,
   sessionId,
   checkpointsDisabled,
-}: WorkGroupBodyProps) => {
+}: WorkGroupBodyProps) {
   const thinkingDurationsRef = useRef(thinkingDurations)
   thinkingDurationsRef.current = thinkingDurations
   const checkpointsDisabledRef = useRef(checkpointsDisabled)
   checkpointsDisabledRef.current = checkpointsDisabled
+
+  const windowed = useMemo(() => windowWorkGroupRows(rows), [rows])
 
   const renderOther = useCallback(
     (row: TimelineToolRowLike) => (
@@ -40,11 +43,19 @@ export const WorkGroupBody = ({
   )
 
   return (
-    <ToolStepList
-      rows={rows}
-      progress={progress}
-      forceOpenDetails={forceOpenDetails}
-      renderOther={renderOther}
-    />
+    <>
+      {windowed.earlierCount > 0 ? (
+        <p className="min-h-[var(--timeline-row-min-height)] px-0 py-px text-base leading-[1.5] text-ink-muted/70">
+          {windowed.earlierCount} earlier step
+          {windowed.earlierCount === 1 ? "" : "s"}
+        </p>
+      ) : null}
+      <ToolStepList
+        rows={windowed.rows}
+        progress={progress}
+        forceOpenDetails={forceOpenDetails}
+        renderOther={renderOther}
+      />
+    </>
   )
-}
+})

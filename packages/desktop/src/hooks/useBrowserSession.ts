@@ -27,6 +27,11 @@ import {
 import { log } from "../lib/debug/log"
 import type { BrowserDomElement } from "../lib/browserDesign"
 import { computeBrowserWebviewBounds } from "../lib/browserWebviewBounds"
+import {
+  BROWSER_BODY_OBSERVER,
+  BROWSER_ROOT_OBSERVER,
+  browserBoundsWatchdogMs,
+} from "../lib/browserBoundsPolicy"
 
 export const VIEWPORT_PRESETS: Array<{
   id: BrowserViewportPreset
@@ -62,9 +67,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
   const isOwner = browserOwnerSessionId === sessionKey
   const browserDesignMode = useAppStore((s) => s.browserDesignMode)
   const rightPanelDragging = useAppStore((s) => s.rightPanelDragging)
-  const sessionStreaming = useAppStore((s) =>
-    sessionId ? !!s.streamingSessions[sessionId] : false,
-  )
 
   const setBrowserSessionState = useAppStore((s) => s.setBrowserSessionState)
   const setBrowserOwnerSessionId = useAppStore(
@@ -570,15 +572,17 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     }
     window.addEventListener("resize", onWindowResize)
     schedule()
-    const watchdogMs = sessionStreaming ? 2000 : 500
-    const watchdog = window.setInterval(() => measure(false), watchdogMs)
+    // Streaming and idle share a 2s cadence — the previous 500ms idle
+    // watchdog was overkill once dialogs no longer fan out via subtree.
+    const watchdog = window.setInterval(
+      () => measure(false),
+      browserBoundsWatchdogMs(false),
+    )
+    // Cheap overlay detection: body direct children only (dialogs mount as
+    // body-level portals), plus aria-modal / suppress flags on <html>.
     const overlayObserver = new MutationObserver(() => schedule())
-    overlayObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["aria-modal", "data-suppress-native-webview"],
-    })
+    overlayObserver.observe(document.body, BROWSER_BODY_OBSERVER)
+    overlayObserver.observe(document.documentElement, BROWSER_ROOT_OBSERVER)
 
     return () => {
       cancelled = true
@@ -597,7 +601,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     loadError,
     viewportPreset,
     rightPanelDragging,
-    sessionStreaming,
   ])
 
   const preview = isBrowserPreview()

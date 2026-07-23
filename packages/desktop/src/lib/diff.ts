@@ -167,6 +167,29 @@ export const describeHunklessDiff = (file: ParsedDiffFile): string => {
   return "No content changes"
 }
 
+/** Soft-cap for rendered unified-diff lines (DOM cost), not parse. */
+export const DIFF_RENDER_LINE_CAP = 800
+
+export type SoftCappedLines<T> = {
+  lines: T[]
+  truncated: number
+}
+
+/**
+ * Keep at most `cap` lines for render; callers show a muted footer when
+ * `truncated > 0`. Parsing stays full-size.
+ */
+export const softCapLines = <T>(
+  lines: readonly T[],
+  cap: number = DIFF_RENDER_LINE_CAP,
+): SoftCappedLines<T> => {
+  if (lines.length <= cap) return { lines: lines as T[], truncated: 0 }
+  return {
+    lines: lines.slice(0, cap) as T[],
+    truncated: lines.length - cap,
+  }
+}
+
 /** New-file line count omitted before the first hunk (Cursor-style collapse). */
 export const unmodifiedLinesBeforeHunk = (hunk: Hunk): number =>
   Math.max(0, hunk.newStart - 1)

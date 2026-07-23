@@ -7,6 +7,7 @@ mod config;
 mod db_plugin;
 mod debug;
 mod error;
+mod event_coalesce;
 #[cfg(target_os = "macos")]
 mod macos_window;
 mod path_resolve;

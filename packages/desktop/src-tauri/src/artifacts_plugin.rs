@@ -41,14 +41,20 @@ pub struct CsvPreview {
     pub row_count: usize,
 }
 
+fn path_has_dir_segment(path: &str, name: &str) -> bool {
+    path.split(['/', '\\'])
+        .any(|segment| segment == name)
+}
+
 pub fn infer_artifact_kind(path: &str) -> Option<ArtifactKind> {
     let lower = path.to_ascii_lowercase();
     let ext = lower.rsplit('.').next().unwrap_or("");
 
-    let in_artifact_dir = lower.contains("/artifacts/")
-        || lower.contains("/reports/")
-        || lower.contains("/exports/")
-        || lower.contains("/plans/");
+    // Match dir segments with or without a leading slash (e.g. "reports/x.md").
+    let in_artifact_dir = path_has_dir_segment(&lower, "artifacts")
+        || path_has_dir_segment(&lower, "reports")
+        || path_has_dir_segment(&lower, "exports")
+        || path_has_dir_segment(&lower, "plans");
 
     match ext {
         "csv" | "tsv" => Some(ArtifactKind::Csv),

@@ -91,6 +91,63 @@ describe("applyGlobalSessionEvent — streaming lifecycle", () => {
     expect(useAppStore.getState().isStreaming).toBe(true)
   })
 
+  it("pure stream deltas re-arm streaming when not already streaming, then no-op when already", () => {
+    expect(useAppStore.getState().streamingSessions[SID]).toBeUndefined()
+    applyGlobalSessionEvent(
+      ev({
+        kind: "markdown_delta",
+        message_id: "m1",
+        text: "hi",
+      } as AgentEvent),
+    )
+    expect(useAppStore.getState().streamingSessions[SID]).toBe(true)
+    expect(useAppStore.getState().isStreaming).toBe(true)
+
+    // Second pure delta while already streaming must not throw / re-clear
+    applyGlobalSessionEvent(
+      ev({
+        kind: "thinking_delta",
+        message_id: "m1",
+        text: "…",
+      } as AgentEvent),
+    )
+    expect(useAppStore.getState().streamingSessions[SID]).toBe(true)
+    expect(useAppStore.getState().isStreaming).toBe(true)
+  })
+
+  it("pure stream deltas do not write plan/verdict side effects", () => {
+    applyGlobalSessionEvent(
+      ev({
+        kind: "markdown_delta",
+        message_id: "m1",
+        text: "hi",
+      } as AgentEvent),
+    )
+    const after = useAppStore.getState()
+    // Early-return path must not invent plan/verdict bookkeeping
+    expect(after.sessionPlansBySession[SID]).toBeUndefined()
+    expect(after.latestVerdictBySession[SID]).toBeUndefined()
+    expect(after.pendingPermission).toBeNull()
+  })
+
+  it("pure stream deltas do not re-arm after a completed turn (straggler)", () => {
+    applyGlobalSessionEvent(ev({ kind: "turn_started", turn_id: "t1" }, "t1"))
+    applyGlobalSessionEvent(
+      ev({ kind: "turn_completed", turn_id: "t1", summary }, "t1"),
+    )
+    expect(useAppStore.getState().streamingSessions[SID]).toBe(false)
+
+    applyGlobalSessionEvent(
+      ev({
+        kind: "markdown_delta",
+        message_id: "m1",
+        text: "late",
+      } as AgentEvent),
+    )
+    expect(useAppStore.getState().streamingSessions[SID]).toBe(false)
+    expect(useAppStore.getState().isStreaming).toBe(false)
+  })
+
   it("enqueue + removeQueuedMessage while streaming, then turn_completed → no stuck state", () => {
     const store = useAppStore.getState()
     applyGlobalSessionEvent(ev({ kind: "turn_started", turn_id: "t1" }, "t1"))

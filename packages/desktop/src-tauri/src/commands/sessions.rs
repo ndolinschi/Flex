@@ -379,18 +379,83 @@ pub async fn subscribe_session(
 
     let key = session_id.clone();
     let handle = tokio::spawn(async move {
+        use crate::event_coalesce::{EventCoalescer, FLUSH_INTERVAL_MS};
+        use std::time::Duration;
+
         let session_key = key;
         let mut stream = stream;
-        while let Some(event) = stream.next().await {
-            if let Err(err) = app.emit("session-event", &event) {
-                tracing::warn!(
-                    session_id = %session_key.as_str(),
-                    error = %err,
-                    "session-event emit failed; ending subscription relay"
-                );
+        let mut coalescer = EventCoalescer::new();
+        // Deadline for the current pending batch (set when the first delta lands).
+        let mut flush_deadline: Option<tokio::time::Instant> = None;
+
+        loop {
+            let next_event = if let Some(deadline) = flush_deadline {
+                tokio::select! {
+                    item = stream.next() => item,
+                    _ = tokio::time::sleep_until(deadline) => {
+                        if let Some(pending) = coalescer.flush() {
+                            if let Err(err) = app.emit("session-event", &pending) {
+                                tracing::warn!(
+                                    session_id = %session_key.as_str(),
+                                    error = %err,
+                                    "session-event emit failed; ending subscription relay"
+                                );
+                                break;
+                            }
+                        }
+                        flush_deadline = None;
+                        continue;
+                    }
+                }
+            } else {
+                stream.next().await
+            };
+
+            let Some(event) = next_event else {
+                if let Some(pending) = coalescer.flush() {
+                    if let Err(err) = app.emit("session-event", &pending) {
+                        tracing::warn!(
+                            session_id = %session_key.as_str(),
+                            error = %err,
+                            "session-event emit failed on stream end flush"
+                        );
+                    }
+                }
+                break;
+            };
+
+            let ready = coalescer.push(event);
+            let emitted_any = !ready.is_empty();
+            let mut emit_failed = false;
+            for ready_event in ready {
+                if let Err(err) = app.emit("session-event", &ready_event) {
+                    tracing::warn!(
+                        session_id = %session_key.as_str(),
+                        error = %err,
+                        "session-event emit failed; ending subscription relay"
+                    );
+                    emit_failed = true;
+                    break;
+                }
+            }
+            if emit_failed {
                 break;
             }
+
+            if coalescer.has_pending() {
+                // Arm (or re-arm after a forced flush started a new batch) the
+                // 16ms window; keep the existing deadline while deltas merge.
+                if flush_deadline.is_none() || emitted_any {
+                    flush_deadline = Some(
+                        tokio::time::Instant::now()
+                            + Duration::from_millis(FLUSH_INTERVAL_MS),
+                    );
+                }
+            } else {
+                flush_deadline = None;
+            }
         }
+
         tracing::debug!(
             session_id = %session_key.as_str(),
             "session subscription stream ended"

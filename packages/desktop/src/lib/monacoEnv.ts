@@ -6,9 +6,11 @@ import tsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker"
 import { loader } from "@monaco-editor/react"
 import * as monaco from "monaco-editor"
 import {
+  capCompletionContext,
   INLINE_COMPLETION_DEBOUNCE_MS,
   INLINE_COMPLETION_MIN_PREFIX,
 } from "./inlineCompletion"
+import { MONACO_DEFAULT_DIAGNOSTICS } from "./monacoPolicy"
 import { completePromptInline } from "./tauri"
 
 export { languageForPath } from "./monacoLanguages"
@@ -56,8 +58,10 @@ const ensureInlineProvider = (): void => {
         })
         if (token.isCancellationRequested) return { items: [] }
 
+        const capped = capCompletionContext(prefix, suffix)
+
         try {
-          const text = await completePromptInline(prefix, suffix)
+          const text = await completePromptInline(capped.prefix, capped.suffix)
           if (token.isCancellationRequested || !text) return { items: [] }
           return { items: [{ insertText: text }] }
         } catch {
@@ -100,9 +104,9 @@ export const ensureMonaco = (): void => {
     allowSyntheticDefaultImports: true,
     esModuleInterop: true,
   }
+  // Syntax-only by default: full semantic LS is expensive without a project graph.
   const tsDiagOptions: monaco.languages.typescript.DiagnosticsOptions = {
-    noSemanticValidation: false,
-    noSyntaxValidation: false,
+    ...MONACO_DEFAULT_DIAGNOSTICS,
   }
   monaco.languages.typescript.typescriptDefaults.setCompilerOptions(
     tsCompilerOptions,

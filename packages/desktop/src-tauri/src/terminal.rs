@@ -174,29 +174,104 @@ pub async fn terminal_create(
 
     let reader_id = id.clone();
     let reader_app = app.clone();
+    // Coalesce PTY output: buffer for up to ~16ms or 64 KiB, then single emit.
+    // Reader thread blocks on PTY; coalescer thread uses recv_timeout so exit
+    // detection is not delayed by the window once the reader closes.
     std::thread::spawn(move || {
-        let mut buf = [0u8; 8192];
-        loop {
-            match reader.read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => {
-                    let data = String::from_utf8_lossy(&buf[..n]).into_owned();
-                    if reader_app
-                        .emit(
-                            "terminal-output",
-                            &TerminalOutputEvent {
-                                id: reader_id.clone(),
-                                data,
-                            },
-                        )
-                        .is_err()
-                    {
+        use std::sync::mpsc;
+        use std::time::{Duration, Instant};
+
+        const COALESCE_MS: u64 = 16;
+        const MAX_COALESCE_BYTES: usize = 64 * 1024;
+
+        let (tx, rx) = mpsc::sync_channel::<Option<String>>(64);
+        let reader_thread = std::thread::spawn(move || {
+            let mut buf = [0u8; 8192];
+            loop {
+                match reader.read(&mut buf) {
+                    Ok(0) => {
+                        let _ = tx.send(None);
+                        break;
+                    }
+                    Ok(n) => {
+                        let data = String::from_utf8_lossy(&buf[..n]).into_owned();
+                        if tx.send(Some(data)).is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => {
+                        let _ = tx.send(None);
                         break;
                     }
                 }
-                Err(_) => break,
+            }
+        });
+
+        let mut coalescer = OutputCoalescer::new(MAX_COALESCE_BYTES);
+        let mut closed = false;
+
+        while !closed {
+            // Block until the first chunk of a batch arrives (or reader EOF).
+            match rx.recv() {
+                Ok(Some(chunk)) => coalescer.push(&chunk),
+                Ok(None) | Err(_) => {
+                    closed = true;
+                }
+            }
+            if closed {
+                break;
+            }
+
+            let deadline = Instant::now() + Duration::from_millis(COALESCE_MS);
+            loop {
+                if coalescer.should_flush() {
+                    break;
+                }
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    break;
+                }
+                match rx.recv_timeout(remaining) {
+                    Ok(Some(chunk)) => coalescer.push(&chunk),
+                    Ok(None) => {
+                        closed = true;
+                        break;
+                    }
+                    Err(mpsc::RecvTimeoutError::Timeout) => break,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        closed = true;
+                        break;
+                    }
+                }
+            }
+
+            if let Some(data) = coalescer.take_if_non_empty() {
+                if reader_app
+                    .emit(
+                        "terminal-output",
+                        &TerminalOutputEvent {
+                            id: reader_id.clone(),
+                            data,
+                        },
+                    )
+                    .is_err()
+                {
+                    break;
+                }
             }
         }
+
+        // Flush any trailing buffered output before the exit event.
+        if let Some(data) = coalescer.take_if_non_empty() {
+            let _ = reader_app.emit(
+                "terminal-output",
+                &TerminalOutputEvent {
+                    id: reader_id.clone(),
+                    data,
+                },
+            );
+        }
+
         let _ = reader_app.emit(
             "terminal-exit",
             &TerminalExitEvent {
@@ -204,6 +279,7 @@ pub async fn terminal_create(
                 exit_code: None,
             },
         );
+        let _ = reader_thread.join();
     });
 
     Ok(TerminalInfo {
@@ -311,6 +387,41 @@ pub fn kill_all_terminals(state: &AppState) {
     }
 }
 
+/// Pure coalescer used by the PTY reader path — unit-tested without PTY.
+pub(crate) struct OutputCoalescer {
+    pending: String,
+    max_bytes: usize,
+}
+
+impl OutputCoalescer {
+    pub(crate) fn new(max_bytes: usize) -> Self {
+        Self {
+            pending: String::new(),
+            max_bytes,
+        }
+    }
+
+    pub(crate) fn push(&mut self, chunk: &str) {
+        self.pending.push_str(chunk);
+    }
+
+    pub(crate) fn should_flush(&self) -> bool {
+        self.pending.len() >= self.max_bytes
+    }
+
+    pub(crate) fn take_if_non_empty(&mut self) -> Option<String> {
+        if self.pending.is_empty() {
+            None
+        } else {
+            Some(std::mem::take(&mut self.pending))
+        }
+    }
+
+    pub(crate) fn pending_len(&self) -> usize {
+        self.pending.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -327,5 +438,24 @@ mod tests {
             resolve_cwd(Some(tmp.to_string_lossy().into_owned())).expect("tmp exists");
         assert!(Path::new(&resolved).is_dir());
         assert!(fallback.is_none());
+    }
+
+    #[test]
+    fn output_coalescer_batches_until_take() {
+        let mut c = OutputCoalescer::new(64 * 1024);
+        c.push("a");
+        c.push("b");
+        assert_eq!(c.pending_len(), 2);
+        assert!(!c.should_flush());
+        assert_eq!(c.take_if_non_empty().as_deref(), Some("ab"));
+        assert_eq!(c.pending_len(), 0);
+        assert!(c.take_if_non_empty().is_none());
+    }
+
+    #[test]
+    fn output_coalescer_flags_size_flush() {
+        let mut c = OutputCoalescer::new(4);
+        c.push("12345");
+        assert!(c.should_flush());
     }
 }

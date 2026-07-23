@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useGroupRef, type LayoutChangedMeta } from "react-resizable-panels"
+import { useShallow } from "zustand/react/shallow"
 import { useAppStore } from "../../../stores/appStore"
 import { CHAT_MIN_WIDTH } from "../../../stores/layoutConstants"
-import { clampSplitRatio } from "../../../stores/contentLayoutModel"
 import { ContentPane } from "./ContentPane"
 import {
   ResizableHandle,
@@ -16,21 +16,13 @@ import {
   useInstallContentTabPointerDnD,
   useTabDragUi,
 } from "../../../hooks/useContentTabPointerDnD"
+import {
+  CONTENT_LEFT_PANEL_ID as LEFT_PANEL_ID,
+  CONTENT_RIGHT_PANEL_ID as RIGHT_PANEL_ID,
+  contentWorkspaceDefaultLayout,
+} from "./contentWorkspaceLayout"
 
-const LEFT_PANEL_ID = "content-left"
-const RIGHT_PANEL_ID = "content-right"
-
-export const contentWorkspaceDefaultLayout = (
-  split: boolean,
-  splitRatio: number,
-): Record<string, number> => {
-  if (!split) return { [LEFT_PANEL_ID]: 100 }
-  const left = Math.round(clampSplitRatio(splitRatio) * 100)
-  return {
-    [LEFT_PANEL_ID]: left,
-    [RIGHT_PANEL_ID]: 100 - left,
-  }
-}
+export { contentWorkspaceDefaultLayout } from "./contentWorkspaceLayout"
 
 const TabDragGhost = () => {
   const dragUi = useTabDragUi()
@@ -74,10 +66,31 @@ export const ContentWorkspace = ({
 } = {}) => {
   useContentTabLifecycle()
   useInstallContentTabPointerDnD()
-  const contentLayout = useAppStore((s) => s.contentLayout)
+  // Coarse field selectors — avoid re-render on every contentLayout nested write.
+  const mode = useAppStore((s) => s.contentLayout.mode)
+  const splitRatio = useAppStore((s) => s.contentLayout.splitRatio)
+  const paneCount = useAppStore((s) => s.contentLayout.panes.length)
   const setSplitRatio = useAppStore((s) => s.setSplitRatio)
   const setRightPanelDragging = useAppStore((s) => s.setRightPanelDragging)
   const rightPanelDragging = useAppStore((s) => s.rightPanelDragging)
+  const keepAliveToolKeys = useAppStore(
+    useShallow((s) => {
+      const keys: string[] = []
+      for (const pane of s.contentLayout.panes) {
+        for (const t of pane.tabs) {
+          if (
+            t.kind === "tool" &&
+            (t.tool === "files" ||
+              t.tool === "terminal" ||
+              t.tool === "browser")
+          ) {
+            keys.push(`${t.sessionId}:${t.tool}`)
+          }
+        }
+      }
+      return keys
+    }),
+  )
   const groupImperativeRef = useGroupRef()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [canShowSash, setCanShowSash] = useState(false)
@@ -98,27 +111,17 @@ export const ContentWorkspace = ({
     return () => ro.disconnect()
   }, [])
 
-  const keepAliveTools = useMemo(() => {
-    const set = new Set<string>()
-    for (const pane of contentLayout.panes) {
-      for (const t of pane.tabs) {
-        if (
-          t.kind === "tool" &&
-          (t.tool === "files" || t.tool === "terminal" || t.tool === "browser")
-        ) {
-          set.add(`${t.sessionId}:${t.tool}`)
-        }
-      }
-    }
-    return set
-  }, [contentLayout.panes])
+  const keepAliveTools = useMemo(
+    () => new Set(keepAliveToolKeys),
+    [keepAliveToolKeys],
+  )
 
-  const split = contentLayout.mode === "split" && contentLayout.panes.length > 1
+  const split = mode === "split" && paneCount > 1
   const showSash = split && canShowSash
 
   const defaultLayout = useMemo(
-    () => contentWorkspaceDefaultLayout(split, contentLayout.splitRatio),
-    [split, contentLayout.splitRatio],
+    () => contentWorkspaceDefaultLayout(split, splitRatio),
+    [split, splitRatio],
   )
 
   return (

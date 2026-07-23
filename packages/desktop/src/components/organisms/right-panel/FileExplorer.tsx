@@ -132,7 +132,10 @@ export const FileExplorer = ({
         queryKey: ["workspace-file", sessionId, p],
       })
     }
-    invalidateGitQueries(queryClient)
+    invalidateGitQueries(queryClient, {
+      sessionId: sessionId || undefined,
+      cwd: cwd || undefined,
+    })
   }
 
   const toggleDir = (dirPath: string) => {

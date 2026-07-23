@@ -1,6 +1,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import type * as MonacoNs from "monaco-editor"
+import { shouldSubscribeMonacoMarkers } from "../lib/monacoPolicy"
 
 export type MonacoMarker = MonacoNs.editor.IMarker
 
@@ -11,17 +12,23 @@ export const MarkerSeverity = {
   Error: 8,
 } as const
 
-export const useMonacoMarkers = (modelPath: string | null): MonacoMarker[] => {
+export const useMonacoMarkers = (
+  modelPath: string | null,
+  enabled = true,
+): MonacoMarker[] => {
   const [markers, setMarkers] = useState<MonacoMarker[]>([])
   const disposeRef = useRef<MonacoNs.IDisposable | null>(null)
   const monacoRef = useRef<typeof MonacoNs | null>(null)
 
   useEffect(() => {
-    if (!modelPath) {
+    if (!shouldSubscribeMonacoMarkers(modelPath, enabled) || !modelPath) {
       setMarkers([])
+      disposeRef.current?.dispose()
+      disposeRef.current = null
       return
     }
 
+    const path = modelPath
     let cancelled = false
 
     void import("monaco-editor").then((monaco) => {
@@ -32,7 +39,7 @@ export const useMonacoMarkers = (modelPath: string | null): MonacoMarker[] => {
         setMarkers(monaco.editor.getModelMarkers({ resource: uri }))
       }
 
-      const uri = monaco.Uri.parse(modelPath)
+      const uri = monaco.Uri.parse(path)
       refresh(uri)
 
       disposeRef.current?.dispose()
@@ -48,7 +55,7 @@ export const useMonacoMarkers = (modelPath: string | null): MonacoMarker[] => {
       disposeRef.current?.dispose()
       disposeRef.current = null
     }
-  }, [modelPath])
+  }, [modelPath, enabled])
 
   return markers
 }

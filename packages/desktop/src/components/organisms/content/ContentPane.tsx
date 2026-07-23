@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button"
 import {
   Fragment,
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -20,14 +21,26 @@ import {
 } from "../../../hooks/useContentTabPointerDnD"
 import { useTabStripScroll } from "../../../hooks/useTabStripScroll"
 import { useContentPaneContextMenu } from "../../../hooks/useContentPaneContextMenu"
+import {
+  nextChatKeepAlive,
+  sameStringList,
+} from "../../../lib/chatKeepAlive"
+import {
+  activeChatTabId as resolveActiveChatTabId,
+  openChatTabIds,
+  shouldMountChatTab,
+  shouldMountFileTab,
+} from "../../../lib/chatMountPolicy"
 import { previewTabsForPane } from "../../../lib/tabDnD"
 import { gitPrStatus } from "../../../lib/tauri"
 import { sessionLabel, type SessionId, type SessionMeta } from "../../../lib/types"
 import {
+  sessionScopeKey,
   useAppStore,
   type ContentTab,
   type RightPanelTab,
 } from "../../../stores/appStore"
+import { MAX_KEEPALIVE_CHAT_TABS } from "../../../stores/layoutConstants"
 import { isSplitEligible } from "../../../stores/slices/contentLayoutSlice"
 import { emptyPane } from "../../../stores/contentLayoutModel"
 import {
@@ -43,7 +56,6 @@ import { FileDocumentTab } from "../right-panel/FileDocumentTab"
 import { cn, basename, fileIconForPath } from "../../../lib/utils"
 import { sessionColor, GROUP_PALETTE } from "../../../lib/sessionColor"
 import { toggleZoomWindow } from "../../../lib/windowChrome"
-import { sessionScopeKey } from "../../../stores/appStore"
 
 type ContentPaneProps = {
   paneIndex: 0 | 1
@@ -97,36 +109,51 @@ const tabLabel = (
   return catalog.find((c) => c.id === tab.tool)?.label ?? tab.tool
 }
 
-const useVisitedChatTabs = (
+/** LRU of visited chat tab ids kept mounted (hidden) for warm switch. */
+const useChatKeepAliveTabs = (
   tabs: ContentTab[],
   activeTabId: string | null,
 ): ReadonlySet<string> => {
-  const [visited, setVisited] = useState<ReadonlySet<string>>(() => new Set())
+  const [kept, setKept] = useState<string[]>([])
 
   useEffect(() => {
-    setVisited((prev) => {
-      const openIds = new Set(tabs.map((t) => t.id))
-      let next: Set<string> | null = null
-
-      const active = tabs.find((t) => t.id === activeTabId)
-      if (active?.kind === "chat" && !prev.has(active.id)) {
-        next = new Set(prev)
-        next.add(active.id)
-      }
-
-      for (const id of prev) {
-        if (!openIds.has(id)) {
-          if (!next) next = new Set(prev)
-          next.delete(id)
-        }
-      }
-
-      return next ?? prev
+    const openIds = openChatTabIds(tabs)
+    const activeChatId = resolveActiveChatTabId(tabs, activeTabId)
+    setKept((prev) => {
+      const next = nextChatKeepAlive(
+        prev,
+        activeChatId,
+        openIds,
+        MAX_KEEPALIVE_CHAT_TABS,
+      )
+      return sameStringList(prev, next) ? prev : next
     })
   }, [activeTabId, tabs])
 
-  return visited
+  return useMemo(() => new Set(kept), [kept])
 }
+
+/** Per-tab activity indicator — avoids ContentPane re-render on any stream flag. */
+const TabActivityDot = memo(function TabActivityDot({
+  sessionId,
+  isBrowser,
+}: {
+  sessionId: SessionId
+  isBrowser: boolean
+}) {
+  const show = useAppStore(
+    (s) =>
+      !!s.streamingSessions[sessionId] ||
+      (isBrowser && s.browserOwnerSessionId === sessionId),
+  )
+  if (!show) return null
+  return (
+    <span
+      className="ml-0.5 inline-block h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-accent"
+      aria-hidden
+    />
+  )
+})
 
 export const ContentPane = ({
   paneIndex,
@@ -151,8 +178,6 @@ export const ContentPane = ({
   const openTabToSide = useAppStore((s) => s.openTabToSide)
   const setFocusedPane = useAppStore((s) => s.setFocusedPane)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
-  const streamingSessions = useAppStore((s) => s.streamingSessions)
-  const browserOwnerSessionId = useAppStore((s) => s.browserOwnerSessionId)
   const stampTabGroup = useAppStore((s) => s.stampTabGroup)
   const removeTabsFromGroup = useAppStore((s) => s.removeTabsFromGroup)
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed)
@@ -187,7 +212,7 @@ export const ContentPane = ({
 
   const { tabsScrollRef, handleTabsWheel } = useTabStripScroll()
 
-  const visitedChats = useVisitedChatTabs(pane.tabs, pane.activeTabId)
+  const keepAliveChats = useChatKeepAliveTabs(pane.tabs, pane.activeTabId)
 
   const sessionsById = useMemo(
     () => new Map(sessions.map((s) => [s.id, s])),
@@ -393,10 +418,6 @@ export const ContentPane = ({
               : undefined
 
             const isBrowser = t.kind === "tool" && t.tool === "browser"
-            const isStreaming = streamingSessions[t.sessionId] ?? false
-            const isBrowserOwner =
-              isBrowser && browserOwnerSessionId === t.sessionId
-            const showActivity = isStreaming || isBrowserOwner
 
             const groupColor =
               t.groupId != null && pane.groups?.[t.groupId] != null
@@ -477,7 +498,12 @@ export const ContentPane = ({
                     startContentTabPointerDrag(e, paneIndex, t.id)
                   }}
                   groupColor={groupColor}
-                  activityDot={showActivity}
+                  badge={
+                    <TabActivityDot
+                      sessionId={t.sessionId}
+                      isBrowser={isBrowser}
+                    />
+                  }
                   sessionColor={dotColor}
                   rangeSelected={isRangeSelected}
                 >
@@ -543,7 +569,8 @@ export const ContentPane = ({
         {pane.tabs.map((t) => {
           const isActive = t.id === pane.activeTabId
           if (t.kind === "chat") {
-            if (!isActive && !visitedChats.has(t.id)) return null
+            // Mount active chat + LRU keep-alive set only (not every visited tab).
+            if (!shouldMountChatTab(t.id, isActive, keepAliveChats)) return null
             return (
               <div
                 key={t.id}
@@ -561,6 +588,10 @@ export const ContentPane = ({
             )
           }
           if (t.kind === "file") {
+            const dirty =
+              !!fileDraftsBySession[sessionScopeKey(t.sessionId)]?.[t.path]
+            // Mount only when active or dirty so Monaco/query cost stays bounded.
+            if (!shouldMountFileTab(isActive, dirty)) return null
             return (
               <div
                 key={t.id}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   describeHunklessDiff,
   parseUnifiedDiff,
+  softCapLines,
   unmodifiedLinesBeforeHunk,
   unmodifiedLinesBetweenHunks,
 } from "./diff"
@@ -61,5 +62,21 @@ describe("unmodified line gaps", () => {
     expect(unmodifiedLinesBeforeHunk(file.hunks[0])).toBe(9)
     // first hunk covers new lines 10..13 (4 lines); second starts at 51 → gap 37
     expect(unmodifiedLinesBetweenHunks(file.hunks[0], file.hunks[1])).toBe(37)
+  })
+})
+
+describe("softCapLines", () => {
+  it("returns full list when under cap", () => {
+    expect(softCapLines(["a", "b"], 10)).toEqual({
+      lines: ["a", "b"],
+      truncated: 0,
+    })
+  })
+
+  it("slices and reports omitted count when over cap", () => {
+    expect(softCapLines(["a", "b", "c", "d"], 2)).toEqual({
+      lines: ["a", "b"],
+      truncated: 2,
+    })
   })
 })

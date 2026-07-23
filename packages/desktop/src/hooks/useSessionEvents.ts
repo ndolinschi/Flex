@@ -12,6 +12,10 @@ import { subscribeSessionEvents } from "../lib/sessionEventBus"
 import { applyGlobalSessionEvent } from "./useGlobalSessionEvents"
 import { emptyStreamingBuffers, useAppStore } from "../stores/appStore"
 import {
+  getStreamingBuffers,
+  useStreamingBuffers,
+} from "../lib/streamingBuffersStore"
+import {
   applyEventToTimeline,
   closeRunningRows,
   findDanglingAskRow,
@@ -23,8 +27,6 @@ import {
   type ThinkingSpan,
 } from "../lib/timeline/thinkingSpans"
 import { log } from "../lib/debug/log"
-
-const EMPTY_STREAMING: StreamingBuffers = emptyStreamingBuffers()
 
 export type ReconnectStatus = {
   attempt: number
@@ -97,6 +99,20 @@ const MATERIALIZED_ID_KINDS: ReadonlySet<AgentEvent["kind"]> = new Set([
   "user_message",
 ])
 
+/** Shallow-compare duration maps so identical values keep the same state ref. */
+const sameDurationMaps = (
+  a: Record<string, number>,
+  b: Record<string, number>,
+): boolean => {
+  const aKeys = Object.keys(a)
+  const bKeys = Object.keys(b)
+  if (aKeys.length !== bKeys.length) return false
+  for (const key of aKeys) {
+    if (a[key] !== b[key]) return false
+  }
+  return true
+}
+
 export const useSessionEvents = (
   sessionId: string | null,
   options?: { live?: boolean },
@@ -137,14 +153,19 @@ export const useSessionEvents = (
   const flushPending = useCallback(() => {
     flushHandleRef.current = null
     setRows([...rowsRef.current])
-    setThinkingDurations(durationsFromSpans(thinkingSpansRef.current))
+    const nextDurations = durationsFromSpans(thinkingSpansRef.current)
+    setThinkingDurations((prev) =>
+      sameDurationMaps(prev, nextDurations) ? prev : nextDurations,
+    )
 
     const bufferUpdate = pendingBuffersRef.current
     const bufferSessionId = pendingSessionIdRef.current
     pendingBuffersRef.current = null
     pendingSessionIdRef.current = null
     if (bufferUpdate && bufferSessionId) {
-      useAppStore.getState().updateStreamingBuffers(bufferSessionId, bufferUpdate)
+      useAppStore
+        .getState()
+        .updateStreamingBuffers(bufferSessionId, bufferUpdate)
     }
 
     const plan = pendingPlanRef.current
@@ -320,8 +341,7 @@ export const useSessionEvents = (
     } => {
       let accumulated = opts.seedAccumulated ? rowsRef.current : []
       let buffers = opts.seedAccumulated
-        ? (useAppStore.getState().streamingBySession[sessionId] ??
-          emptyStreamingBuffers())
+        ? getStreamingBuffers(sessionId)
         : emptyStreamingBuffers()
       let spans = opts.seedAccumulated ? { ...thinkingSpansRef.current } : {}
       let turnOpenFromReplay = false
@@ -406,7 +426,10 @@ export const useSessionEvents = (
             setRows(nextRows)
             useAppStore.getState().setStreamingBuffers(sessionId, buffers)
             thinkingSpansRef.current = spans
-            setThinkingDurations(durationsFromSpans(spans))
+            const nextDurations = durationsFromSpans(spans)
+            setThinkingDurations((prev) =>
+              sameDurationMaps(prev, nextDurations) ? prev : nextDurations,
+            )
           }
         } catch (err) {
           log.warn("session", "warm remount delta replay failed; cold boot", {
@@ -579,11 +602,7 @@ export const useSessionEvents = (
     void resyncRef.current?.()
   }, [sessionId, resyncRequest])
 
-  const streaming = useAppStore((s) =>
-    sessionId
-      ? (s.streamingBySession[sessionId] ?? EMPTY_STREAMING)
-      : EMPTY_STREAMING,
-  )
+  const streaming = useStreamingBuffers(sessionId)
 
   return {
     rows,

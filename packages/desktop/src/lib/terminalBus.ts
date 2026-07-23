@@ -35,6 +35,11 @@ export const ensureTerminalBus = (): Promise<void> => {
   return startPromise
 }
 
+/**
+ * Subscribe to terminal output for `id`. Replay the buffer immediately
+ * (unbatched, so attach is complete), then batch subsequent chunks into a
+ * single `onData(joined)` call per animation frame to cut xterm write cost.
+ */
 export const subscribeTerminal = (
   id: string,
   onData: TerminalSubscriber,
@@ -42,14 +47,42 @@ export const subscribeTerminal = (
   void ensureTerminalBus()
   const buffered = buffers.get(id)
   if (buffered) onData(buffered)
+
+  let pending = ""
+  let raf = 0
+  const flush = () => {
+    raf = 0
+    if (!pending) return
+    const chunk = pending
+    pending = ""
+    onData(chunk)
+  }
+  const batched: TerminalSubscriber = (data) => {
+    pending += data
+    if (!raf) {
+      raf = requestAnimationFrame(flush)
+    }
+  }
+
   let subs = subscribers.get(id)
   if (!subs) {
     subs = new Set()
     subscribers.set(id, subs)
   }
-  subs.add(onData)
+  subs.add(batched)
   return () => {
-    subs?.delete(onData)
+    if (raf) {
+      cancelAnimationFrame(raf)
+      raf = 0
+    }
+    // Flush any pending bytes so subscribers don't lose a trailing chunk
+    // when the component unsubscribes mid-frame.
+    if (pending) {
+      const chunk = pending
+      pending = ""
+      onData(chunk)
+    }
+    subs?.delete(batched)
   }
 }
 

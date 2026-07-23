@@ -6,13 +6,17 @@ import type {
   SessionPlan,
   SessionSliceState,
 } from "../types"
-import { emptyStreaming } from "../types"
 import { persistUiState } from "../persist"
 import { firstPlanHeading } from "../../lib/planTitle"
 import { log } from "../../lib/debug/log"
 import type { PlanEntry, SessionId } from "../../lib/types"
 import { addUsageToModelMap } from "../../lib/modelUsage"
 import { defaultContentLayout, chatTabId } from "../contentLayoutModel"
+import {
+  clearStreamingBuffers,
+  setStreamingBuffers as setExternalStreamingBuffers,
+  updateStreamingBuffers as updateExternalStreamingBuffers,
+} from "../../lib/streamingBuffersStore"
 
 const annotationsFromPlans = (
   sessionPlansBySession: Record<SessionId, SessionPlan[]>,
@@ -313,24 +317,18 @@ export const createSessionSlice: StateCreator<
         [sessionId]: info,
       },
     })),
-  setStreamingBuffers: (sessionId, buffers) =>
-    set((state) => ({
-      streamingBySession: { ...state.streamingBySession, [sessionId]: buffers },
-    })),
-  updateStreamingBuffers: (sessionId, updater) => {
-    const prev = get().streamingBySession[sessionId] ?? emptyStreaming()
-    const next = updater(prev)
-    set((state) => ({
-      streamingBySession: { ...state.streamingBySession, [sessionId]: next },
-    }))
+  // Live buffers live in streamingBuffersStore (useSyncExternalStore) so token
+  // deltas do not notify the global Zustand tree. These actions remain the
+  // public API for callers that already go through the store.
+  setStreamingBuffers: (sessionId, buffers) => {
+    setExternalStreamingBuffers(sessionId, buffers)
   },
-  clearStreamingForSession: (sessionId) =>
-    set((state) => ({
-      streamingBySession: {
-        ...state.streamingBySession,
-        [sessionId]: emptyStreaming(),
-      },
-    })),
+  updateStreamingBuffers: (sessionId, updater) => {
+    updateExternalStreamingBuffers(sessionId, updater)
+  },
+  clearStreamingForSession: (sessionId) => {
+    clearStreamingBuffers(sessionId)
+  },
   requestSweep: (sessionId) =>
     set((state) => ({
       sweepRequests: {

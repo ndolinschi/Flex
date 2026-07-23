@@ -19,6 +19,24 @@ export const INLINE_COMPLETION_MIN_PREFIX = 4
 
 export const INLINE_COMPLETION_DEBOUNCE_MS = 300
 
+/** Cap IPC payload: last N chars of prefix + first M of suffix. */
+export const INLINE_COMPLETION_MAX_PREFIX = 8_000
+export const INLINE_COMPLETION_MAX_SUFFIX = 2_000
+
+export const capCompletionContext = (
+  prefix: string,
+  suffix: string,
+): { prefix: string; suffix: string } => ({
+  prefix:
+    prefix.length > INLINE_COMPLETION_MAX_PREFIX
+      ? prefix.slice(-INLINE_COMPLETION_MAX_PREFIX)
+      : prefix,
+  suffix:
+    suffix.length > INLINE_COMPLETION_MAX_SUFFIX
+      ? suffix.slice(0, INLINE_COMPLETION_MAX_SUFFIX)
+      : suffix,
+})
+
 export const RECOMMENDED_OLLAMA_MODEL = "qwen2.5:0.5b"
 
 export const OLLAMA_PULL_COMMAND = `ollama pull ${RECOMMENDED_OLLAMA_MODEL}`

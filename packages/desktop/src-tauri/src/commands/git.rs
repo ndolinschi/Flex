@@ -2,9 +2,39 @@
 use super::common::{require_service, review_dirs, validate_repo_relative_path};
 use super::prelude::*;
 
-#[tracing::instrument(level = "debug", skip_all)]
-#[tauri::command]
-pub fn git_is_repo(cwd: String) -> bool {
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+/// Short TTL for `git_is_repo` probes — the FE hits this often on cwd changes.
+const GIT_IS_REPO_TTL: Duration = Duration::from_secs(30);
+
+fn git_is_repo_cache() -> &'static Mutex<HashMap<String, (Instant, bool)>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, (Instant, bool)>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn git_is_repo_cached(cwd: &str) -> Option<bool> {
+    let guard = git_is_repo_cache().lock().ok()?;
+    let (at, ok) = guard.get(cwd)?;
+    if at.elapsed() < GIT_IS_REPO_TTL {
+        Some(*ok)
+    } else {
+        None
+    }
+}
+
+fn git_is_repo_store(cwd: String, ok: bool) {
+    if let Ok(mut guard) = git_is_repo_cache().lock() {
+        // Bound cache size so a long-lived app probing many paths can't grow forever.
+        if guard.len() > 256 {
+            guard.clear();
+        }
+        guard.insert(cwd, (Instant::now(), ok));
+    }
+}
+
+pub(crate) fn git_is_repo_sync(cwd: &str) -> bool {
     crate::win_console::command("git")
         .args(["rev-parse", "--git-dir"])
         .current_dir(cwd)
@@ -13,9 +43,7 @@ pub fn git_is_repo(cwd: String) -> bool {
         .unwrap_or(false)
 }
 
-#[tracing::instrument(level = "debug", skip_all)]
-#[tauri::command]
-pub fn git_has_remote(cwd: String) -> bool {
+pub(crate) fn git_has_remote_sync(cwd: &str) -> bool {
     crate::win_console::command("git")
         .args(["remote"])
         .current_dir(cwd)
@@ -24,9 +52,7 @@ pub fn git_has_remote(cwd: String) -> bool {
         .unwrap_or(false)
 }
 
-#[tracing::instrument(level = "debug", skip_all)]
-#[tauri::command]
-pub fn git_branch(cwd: String) -> Option<String> {
+pub(crate) fn git_branch_sync(cwd: &str) -> Option<String> {
     let output = crate::win_console::command("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(cwd)
@@ -39,9 +65,7 @@ pub fn git_branch(cwd: String) -> Option<String> {
     (!branch.is_empty()).then_some(branch)
 }
 
-#[tracing::instrument(level = "debug", skip_all, err)]
-#[tauri::command]
-pub fn git_list_branches(cwd: String) -> DesktopResult<Vec<String>> {
+pub(crate) fn git_list_branches_sync(cwd: &str) -> DesktopResult<Vec<String>> {
     let output = crate::win_console::command("git")
         .args(["branch", "--format=%(refname:short)"])
         .current_dir(cwd)
@@ -64,6 +88,59 @@ pub fn git_list_branches(cwd: String) -> DesktopResult<Vec<String>> {
     branches.sort();
     branches.dedup();
     Ok(branches)
+}
+
+#[tracing::instrument(level = "debug", skip_all)]
+#[tauri::command]
+pub async fn git_is_repo(cwd: String) -> bool {
+    if let Some(cached) = git_is_repo_cached(&cwd) {
+        return cached;
+    }
+    match tokio::task::spawn_blocking(move || {
+        let ok = git_is_repo_sync(&cwd);
+        git_is_repo_store(cwd, ok);
+        ok
+    })
+    .await
+    {
+        Ok(ok) => ok,
+        Err(err) => {
+            tracing::warn!(error = %err, "git_is_repo join failed");
+            false
+        }
+    }
+}
+
+#[tracing::instrument(level = "debug", skip_all)]
+#[tauri::command]
+pub async fn git_has_remote(cwd: String) -> bool {
+    match tokio::task::spawn_blocking(move || git_has_remote_sync(&cwd)).await {
+        Ok(ok) => ok,
+        Err(err) => {
+            tracing::warn!(error = %err, "git_has_remote join failed");
+            false
+        }
+    }
+}
+
+#[tracing::instrument(level = "debug", skip_all)]
+#[tauri::command]
+pub async fn git_branch(cwd: String) -> Option<String> {
+    match tokio::task::spawn_blocking(move || git_branch_sync(&cwd)).await {
+        Ok(branch) => branch,
+        Err(err) => {
+            tracing::warn!(error = %err, "git_branch join failed");
+            None
+        }
+    }
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn git_list_branches(cwd: String) -> DesktopResult<Vec<String>> {
+    tokio::task::spawn_blocking(move || git_list_branches_sync(&cwd))
+        .await
+        .map_err(|e| DesktopError::Message(format!("git list branches join: {e}")))?
 }
 
 #[tracing::instrument(level = "debug", skip_all, err)]
@@ -599,7 +676,7 @@ pub(crate) fn push_current_branch(cwd: &std::path::Path) -> DesktopResult<()> {
     }
     let stderr = String::from_utf8_lossy(&push.stderr).trim().to_string();
     if stderr.contains("has no upstream branch") || stderr.contains("--set-upstream") {
-        let branch = git_branch(cwd.to_string_lossy().to_string())
+        let branch = git_branch_sync(&cwd.to_string_lossy())
             .ok_or_else(|| DesktopError::Message("could not determine current branch".into()))?;
         let retry = crate::win_console::command("git")
             .args(["push", "-u", "origin", &branch])
@@ -1303,7 +1380,7 @@ mod git_status_tests {
             .unwrap();
         assert!(out.status.success());
         assert!(
-            !git_has_remote(dir.to_string_lossy().into_owned()),
+            !git_has_remote_sync(&dir.to_string_lossy()),
             "fresh init must report no remotes"
         );
         std::fs::remove_dir_all(&dir).ok();
@@ -1333,7 +1410,7 @@ mod git_status_tests {
             .unwrap();
         assert!(add.status.success());
         assert!(
-            git_has_remote(dir.to_string_lossy().into_owned()),
+            git_has_remote_sync(&dir.to_string_lossy()),
             "configured origin must count as a push remote"
         );
         std::fs::remove_dir_all(&dir).ok();

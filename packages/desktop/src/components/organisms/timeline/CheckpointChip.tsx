@@ -26,7 +26,7 @@ export const CheckpointChip = ({
     setError(null)
     try {
       await revertSnapshot(sessionId, snapshotId)
-      invalidateGitQueries(queryClient)
+      invalidateGitQueries(queryClient, { sessionId })
       void queryClient.invalidateQueries({ queryKey: ["workspace-status"] })
       setOpen(false)
     } catch (err) {

@@ -77,8 +77,8 @@ export const CommitCenter = ({
   const disabled = busy || nothingSelected || !trimmed
 
   const invalidate = () => {
-    invalidateGitQueries(queryClient)
-    void queryClient.invalidateQueries({ queryKey: ["git-branch"] })
+    invalidateGitQueries(queryClient, { sessionId, cwd })
+    void queryClient.invalidateQueries({ queryKey: ["git-branch", cwd] })
   }
 
   const runCommitPr = async (title: string, body: string) => {

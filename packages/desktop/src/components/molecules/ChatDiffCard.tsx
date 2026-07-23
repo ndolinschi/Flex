@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { cn } from "../../lib/utils"
 import {
   chatDiffBasename,
@@ -8,6 +9,9 @@ import {
 } from "../../lib/chatDiff"
 import { DiffStat } from "../atoms/DiffStat"
 import { Button } from "@/components/ui/button"
+
+/** Soft-cap for rendered chat-diff lines inside the scroller. */
+export const CHAT_DIFF_RENDER_LINE_CAP = 400
 
 type ChatDiffCardProps = {
   diff?: string
@@ -43,10 +47,12 @@ export const ChatDiffCard = ({
   maxHeight = 320,
   className,
 }: ChatDiffCardProps) => {
-  const parsed = linesProp
-    ? null
-    : parseChatDiff(diff ?? "")
-  const lines = linesProp ?? parsed?.lines ?? []
+  const parsed = useMemo(() => {
+    if (linesProp) return null
+    return parseChatDiff(diff ?? "")
+  }, [diff, linesProp])
+
+  const allLines = linesProp ?? parsed?.lines ?? []
   const path = pathProp ?? parsed?.path ?? null
   const added = addedProp ?? parsed?.added ?? 0
   const removed = removedProp ?? parsed?.removed ?? 0
@@ -54,6 +60,12 @@ export const ChatDiffCard = ({
   const badge = chatDiffExtBadge(path)
   const maxHeightCss =
     typeof maxHeight === "number" ? `${maxHeight}px` : maxHeight
+
+  const truncated = Math.max(0, allLines.length - CHAT_DIFF_RENDER_LINE_CAP)
+  const lines =
+    truncated > 0
+      ? allLines.slice(0, CHAT_DIFF_RENDER_LINE_CAP)
+      : allLines
 
   const headerInner = (
     <>
@@ -102,23 +114,33 @@ export const ChatDiffCard = ({
         {lines.length === 0 ? (
           <div className="px-2.5 py-1.5 text-ink-faint">No changes</div>
         ) : (
-          lines.map((line, i) => (
-            <div
-              key={i}
-              className={cn(
-                "flex whitespace-pre",
-                lineRowClass(line.kind),
-              )}
-            >
-              <span
-                className={cn("w-0.5 shrink-0 self-stretch", gutterClass(line.kind))}
-                aria-hidden
-              />
-              <span className="min-w-0 flex-1 overflow-x-auto px-2.5 py-px">
-                {line.text || " "}
-              </span>
-            </div>
-          ))
+          <>
+            {lines.map((line, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "flex whitespace-pre",
+                  lineRowClass(line.kind),
+                )}
+              >
+                <span
+                  className={cn("w-0.5 shrink-0 self-stretch", gutterClass(line.kind))}
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1 overflow-x-auto px-2.5 py-px">
+                  {line.text || " "}
+                </span>
+              </div>
+            ))}
+            {truncated > 0 ? (
+              <div
+                className="px-2.5 py-1 text-xs text-ink-faint tracking-[var(--tracking-caption)]"
+                role="note"
+              >
+                … truncated {truncated} more line{truncated === 1 ? "" : "s"}
+              </div>
+            ) : null}
+          </>
         )}
       </div>
     </div>

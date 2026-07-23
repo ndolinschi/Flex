@@ -12,3 +12,12 @@ export const statusRefetchInterval = (
   if (options?.pollIds && !options.pollIds.has(sessionId)) return false
   return intervalMs
 }
+
+/**
+ * Changes / review panels: pause interval polling while a turn streams and
+ * rely on scoped invalidation instead of thrashing git.
+ */
+export const changesStatusRefetchInterval = (
+  isStreaming: boolean,
+  idleIntervalMs = 30_000,
+): number | false => (isStreaming ? false : idleIntervalMs)

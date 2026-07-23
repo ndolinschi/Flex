@@ -9,13 +9,20 @@ type CollapsibleProps = {
   open: boolean
   children: ReactNode
   className?: string
+  /** When true, keep closed content mounted (default false for timeline perf). */
+  keepMounted?: boolean
 }
 
-export const Collapsible = ({ open, children, className }: CollapsibleProps) => {
+export const Collapsible = ({
+  open,
+  children,
+  className,
+  keepMounted = false,
+}: CollapsibleProps) => {
   return (
     <CollapsibleRoot open={open}>
       <CollapsibleContent
-        keepMounted
+        keepMounted={keepMounted}
         className={cn(
           "grid transition-[grid-template-rows,opacity]",
           "[transition-duration:var(--duration-expand),var(--duration-expand-fade)]",

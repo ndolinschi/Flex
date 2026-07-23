@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { statusRefetchInterval } from "./statusPoll"
+import {
+  changesStatusRefetchInterval,
+  statusRefetchInterval,
+} from "./statusPoll"
 
 const MS = 15_000
 
@@ -29,5 +32,15 @@ describe("statusRefetchInterval", () => {
 
   it("polls every session when pollingEnabled and pollIds are omitted", () => {
     expect(statusRefetchInterval("any", MS, { pollingEnabled: true })).toBe(MS)
+  })
+})
+
+describe("changesStatusRefetchInterval", () => {
+  it("pauses polling while streaming", () => {
+    expect(changesStatusRefetchInterval(true)).toBe(false)
+  })
+
+  it("uses the idle interval when not streaming", () => {
+    expect(changesStatusRefetchInterval(false, 30_000)).toBe(30_000)
   })
 })

@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react"
+import { memo, useMemo, type ReactNode } from "react"
 import { ToolStepGroup } from "./ToolStepGroup"
 import {
   isRunning,
@@ -8,10 +8,14 @@ import {
   clusterWorkRows,
   type SubagentTimelineRow,
 } from "../../lib/workerPresentation"
+import {
+  progressForRunningCalls,
+  windowToolCalls,
+} from "../../lib/timeline/windowToolRows"
 import { WorkersGroup } from "./WorkersGroup"
 import { useAppStore } from "../../stores/appStore"
 
-export const ToolStepList = ({
+export const ToolStepList = memo(function ToolStepList({
   rows,
   renderOther,
   progress,
@@ -20,20 +24,32 @@ export const ToolStepList = ({
   renderOther: (row: TimelineToolRowLike) => ReactNode
   progress?: Record<string, string>
   forceOpenDetails?: boolean
-}) => {
+}) {
   const openSubagentViewer = useAppStore((s) => s.openSubagentViewer)
   const clusters = useMemo(() => clusterWorkRows(rows), [rows])
   return (
     <>
       {clusters.map((cluster, i) => {
         if (cluster.kind === "tools") {
+          const windowed = windowToolCalls(cluster.calls)
+          const slimProgress = progressForRunningCalls(
+            windowed.calls,
+            progress,
+          )
           return (
-            <ToolStepGroup
-              key={`tools:${cluster.calls[0].id}`}
-              calls={cluster.calls}
-              forceOpen={cluster.calls.some(isRunning)}
-              progress={progress}
-            />
+            <div key={`tools:${cluster.calls[0].id}`}>
+              {windowed.earlierCount > 0 ? (
+                <p className="min-h-[var(--timeline-row-min-height)] px-0 py-px text-base leading-[1.5] text-ink-muted/70">
+                  {windowed.earlierCount} earlier step
+                  {windowed.earlierCount === 1 ? "" : "s"}
+                </p>
+              ) : null}
+              <ToolStepGroup
+                calls={windowed.calls}
+                forceOpen={windowed.calls.some(isRunning)}
+                progress={slimProgress}
+              />
+            </div>
           )
         }
         if (cluster.kind === "workers") {
@@ -62,4 +78,4 @@ export const ToolStepList = ({
       })}
     </>
   )
-}
+})

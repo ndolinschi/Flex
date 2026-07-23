@@ -105,7 +105,7 @@ export const FileRow = memo(function FileRow({
     setBusyAction("keep")
     try {
       await reviewKeepFile(sessionId, file.path)
-      invalidateReviewQueries(queryClient, file.path)
+      invalidateReviewQueries(queryClient, file.path, { sessionId })
       pushToast(`Kept ${name}`, "success")
     } catch (err) {
       const message = toInvokeError(err)
@@ -121,7 +121,7 @@ export const FileRow = memo(function FileRow({
     setBusyAction("undo")
     try {
       await reviewUndoFile(sessionId, file.path)
-      invalidateReviewQueries(queryClient, file.path)
+      invalidateReviewQueries(queryClient, file.path, { sessionId })
       pushToast(`Undid ${name}`, "success")
     } catch (err) {
       const message = toInvokeError(err)
@@ -142,7 +142,7 @@ export const FileRow = memo(function FileRow({
         "base",
         false,
       )
-      invalidateReviewQueries(queryClient, file.path)
+      invalidateReviewQueries(queryClient, file.path, { sessionId })
       void refetchDiff()
       pushToast(`Kept hunk in ${name}`, "success")
     } catch (err) {
@@ -161,7 +161,7 @@ export const FileRow = memo(function FileRow({
         "worktree",
         true,
       )
-      invalidateReviewQueries(queryClient, file.path)
+      invalidateReviewQueries(queryClient, file.path, { sessionId })
       void refetchDiff()
       pushToast(`Undid hunk in ${name}`, "success")
     } catch (err) {

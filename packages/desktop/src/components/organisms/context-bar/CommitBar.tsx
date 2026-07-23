@@ -73,7 +73,7 @@ export const CommitBar = ({
     setBusy("commit")
     try {
       const sha = await gitCommit(sessionId, trimmed)
-      invalidateGitQueries(queryClient)
+      invalidateGitQueries(queryClient, { sessionId, cwd })
       pushToast(`Committed ${sha}`, "success")
       if (andPush) {
         setBusy("push")
@@ -101,7 +101,7 @@ export const CommitBar = ({
     setBusy("pr")
     try {
       const sha = await gitCommit(sessionId, trimmed)
-      invalidateGitQueries(queryClient)
+      invalidateGitQueries(queryClient, { sessionId, cwd })
       try {
         await gitPush(sessionId)
       } catch (err) {
@@ -111,7 +111,7 @@ export const CommitBar = ({
         return
       }
       const outcome = await gitCreatePrForBranch(cwd, title, body)
-      invalidateGitQueries(queryClient)
+      invalidateGitQueries(queryClient, { sessionId, cwd })
       toastPrOutcome(pushToast, outcome, "Pull request created")
       setPrDialogOpen(false)
       setOpen(false)

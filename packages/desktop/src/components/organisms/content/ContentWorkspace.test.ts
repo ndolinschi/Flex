@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { contentWorkspaceDefaultLayout } from "./ContentWorkspace"
+import { contentWorkspaceDefaultLayout } from "./contentWorkspaceLayout"
 
 describe("contentWorkspaceDefaultLayout", () => {
   it("returns a single 100% panel when not split", () => {

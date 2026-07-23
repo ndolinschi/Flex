@@ -28,6 +28,7 @@ import {
 } from "../../../lib/tauri"
 import { toastPrOutcome } from "../../../lib/prOutcomeToast"
 import { invalidateGitQueries } from "../../../lib/invalidateGitQueries"
+import { changesStatusRefetchInterval } from "../../../hooks/statusPoll"
 import type { SessionMeta } from "../../../lib/types"
 import { useAppStore } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
@@ -63,12 +64,22 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     queryKey: ["git-status", cwd, sessionId],
     queryFn: () => gitStatusSinceBaseline(sessionId!),
     enabled: !!cwd && !!sessionId && isRepo,
-    refetchInterval: isStreaming ? 5_000 : 30_000,
+    // Steady 30s poll (no aggressive 5s stream poll). Live updates come from
+    // scoped invalidation on turn complete / FS-mutating tools.
+    refetchInterval: changesStatusRefetchInterval(isStreaming),
     refetchOnWindowFocus: true,
   })
 
+  const gitScope = useMemo(
+    () => ({
+      cwd: cwd || undefined,
+      sessionId: sessionId ?? undefined,
+    }),
+    [cwd, sessionId],
+  )
+
   const handleRefresh = () => {
-    invalidateGitQueries(queryClient)
+    invalidateGitQueries(queryClient, gitScope)
     void refetchIsRepo()
     if (isRepo) void refetch()
   }
@@ -141,7 +152,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     setCreatingPr(true)
     try {
       const outcome = await gitCreatePrForBranch(cwd, title, body)
-      invalidateGitQueries(queryClient)
+      invalidateGitQueries(queryClient, gitScope)
       toastPrOutcome(pushToast, outcome)
       setCreatePrOpen(false)
     } catch (err) {
@@ -165,10 +176,10 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
   const prevStreaming = useRef(isStreaming)
   useEffect(() => {
     if (prevStreaming.current && !isStreaming) {
-      invalidateGitQueries(queryClient)
+      invalidateGitQueries(queryClient, gitScope)
     }
     prevStreaming.current = isStreaming
-  }, [isStreaming, queryClient])
+  }, [isStreaming, queryClient, gitScope])
 
   const totals = useMemo(
     () => ({
@@ -215,7 +226,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
           /* continue remaining */
         }
       }
-      invalidateGitQueries(queryClient)
+      invalidateGitQueries(queryClient, gitScope)
       pushToast("Discarded changes", "success")
       setConfirmDiscard(false)
     } catch (err) {
