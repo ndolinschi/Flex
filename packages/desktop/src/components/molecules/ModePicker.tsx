@@ -107,11 +107,7 @@ export const ModePicker = ({ value, onChange, disabled }: ModePickerProps) => {
       disabled={disabled}
       onValueChange={(next) => {
         if (next == null) return
-        const mode = next as ComposerMode
-        onChange(mode)
-        if (mode === "plan") {
-          useAppStore.getState().revealPlanPanel()
-        }
+        onChange(next as ComposerMode)
       }}
     >
       <SelectTrigger
