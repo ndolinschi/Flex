@@ -59,8 +59,8 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `OpenTabModal` | Searchable open-tab picker; `+` Button is PopoverTrigger; cmdk Input search | `open`, `onOpenChange`, `trigger`, `paneIndex`, `sessionId`, `tabs`, … | ContentPane |
 | `PermissionActions` | Composer-footer Allow once / Always allow / Deny (replaces Send) | `permission` | Composer |
 | `PlusMenu` | Attach + mode shortcuts (Plan/Ask) | `onAttachFile`, `onAttachImage`, `onSetMode?` | Composer |
-| `ProjectPicker` | Recent cwds + Open Folder | `sessionId`, `cwd`, `onError?` | ContextBar |
-| `BranchPicker` | List/checkout local git branches; shows current-branch PR # + checks when present | `cwd`, `onError?` | ContextBar |
+| `ProjectPicker` | Quiet pill trigger + searchable popup (recents + Open Folder) | `sessionId`, `cwd`, `onError?` | ContextBar |
+| `BranchPicker` | Quiet pill trigger + searchable popup; current-branch PR # + checks when present | `cwd`, `onError?` | ContextBar |
 | `BranchPrStatusChip` | Current-branch PR # + title + CI summary; opens PR in browser | `pr` | ChangesTab header |
 | `CreatePrDialog` | Editable title/body modal before `gh pr create` | `open`, `initialTitle?`, `initialBody?`, `onConfirm` | ChangesTab, CommitCenter, CommitBar |
 | `PopoverTray` | Shared Esc/click-outside/↑↓ tray for composer autocomplete (`autoFocus={false}`; not Base UI Popover) | `open`, `onClose`, `placement`, `children` | SlashCommandTray, AtMentionTray |
@@ -274,7 +274,7 @@ existing `data-theme` token system. Agents: load the **shadcn** skill
 | Chart | skip | — | No dashboards |
 | Checkbox | ✅ done | `Checkbox` atom | Base UI Checkbox + round + indeterminate; API adapter |
 | Collapsible | ✅ done | WorkGroup / tool cards via molecule adapter | `@/components/ui/collapsible`; section headers still thin |
-| Combobox | ✅ done | `ProjectPicker`, `BranchPicker` | `@/components/ui/combobox` — searchable + Open Folder (not plain Select) |
+| Combobox | ✅ done | `ProjectPicker`, `BranchPicker` | `@/components/ui/combobox` — closed state is a ghost pill trigger; search input lives inside the popup (not a form InputGroup in the bar) |
 | Command | ✅ done | `CommandPalette`, `SearchModal`, `OpenTabModal`, ModelSelect/MultiSelect lists | `shouldFilter={false}` + fuzzyScore; cmdk owns ↑↓/Enter |
 | Context Menu | ✅ done | `ContextMenu` molecule → `@/components/ui/context-menu` | Imperative position API; timeline-scroll / webview-blur ignore preserved |
 | Data Table | ✅ done (Table) | DatabaseTab result grid | `@/components/ui/table` + compact `text-xs` density |
