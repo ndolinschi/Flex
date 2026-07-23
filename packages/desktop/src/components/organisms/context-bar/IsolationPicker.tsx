@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { contextBarTriggerClass } from "./chrome"
 
 const ISOLATION_OPTIONS: {
   value: IsolationPolicy
@@ -129,7 +130,7 @@ export const IsolationPicker = ({
       >
         <SelectTrigger
           aria-label={`Isolation: ${currentLabel}`}
-          className="ml-1 border-0 bg-transparent text-sm font-normal text-ink-muted opacity-80 shadow-none hover:bg-transparent hover:text-ink hover:opacity-100 data-open:opacity-100"
+          className={contextBarTriggerClass("ml-0.5 data-[size=xs]:rounded-md data-[size=xs]:pr-1.5")}
           size="xs"
         >
           <GitFork className="size-3 shrink-0" aria-hidden />
@@ -166,7 +167,9 @@ export const IsolationPicker = ({
         >
           <SelectTrigger
             aria-label="Reuse workspace"
-            className="border-0 bg-transparent text-sm font-normal text-ink-muted opacity-80 shadow-none hover:bg-transparent hover:text-ink hover:opacity-100 data-open:opacity-100"
+            className={contextBarTriggerClass(
+              "max-w-[9rem] data-[size=xs]:rounded-md data-[size=xs]:pr-1.5",
+            )}
             size="xs"
           >
             <SelectValue placeholder="New workspace" />

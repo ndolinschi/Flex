@@ -8,9 +8,8 @@ import { invalidateWorkspaceQueries } from "../../lib/invalidateWorkspaceQueries
 import { DEFAULT_SESSION_TITLE } from "../../lib/types"
 import { useAppStore } from "../../stores/appStore"
 import { upsertSessionInCache } from "../../hooks/useSessions"
-import { basename, parentPathPrefix, cn } from "../../lib/utils"
+import { basename, parentPathPrefix } from "../../lib/utils"
 import { Button } from "@/components/ui/button"
-import { InputGroupAddon } from "@/components/ui/input-group"
 import {
   Combobox,
   ComboboxContent,
@@ -21,7 +20,9 @@ import {
   ComboboxLabel,
   ComboboxList,
   ComboboxSeparator,
+  ComboboxTrigger,
 } from "@/components/ui/combobox"
+import { contextBarTriggerClass } from "../organisms/context-bar/chrome"
 
 type ProjectPickerProps = {
   sessionId: string | null
@@ -31,9 +32,6 @@ type ProjectPickerProps = {
 }
 
 const RECENT_CAP = 10
-
-const triggerInputClassName =
-  "h-6 min-w-0 flex-1 border-0 bg-transparent shadow-none ring-0 has-[[data-slot=input-group-control]:focus-visible]:border-transparent has-[[data-slot=input-group-control]:focus-visible]:ring-0 focus-within:border-transparent focus-within:ring-0 text-sm font-normal text-ink-muted opacity-80 hover:opacity-100 data-open:opacity-100"
 
 export const ProjectPicker = ({
   sessionId,
@@ -153,17 +151,21 @@ export const ProjectPicker = ({
       onOpenChange={setOpen}
       disabled={disabled || busy}
     >
-      <ComboboxInput
-        placeholder={label}
+      <ComboboxTrigger
         aria-label={`Project: ${label}`}
-        className={cn(triggerInputClassName, "max-w-[10rem]")}
         disabled={disabled || busy}
+        className={contextBarTriggerClass()}
       >
-        <InputGroupAddon align="inline-start" className="py-0 pl-1.5 pr-0">
-          <Folder className="size-3.5 shrink-0 text-ink-muted" aria-hidden />
-        </InputGroupAddon>
-      </ComboboxInput>
+        <Folder className="size-3.5 text-ink-muted" aria-hidden />
+        <span className="min-w-0 truncate">{label}</span>
+      </ComboboxTrigger>
       <ComboboxContent className="w-80" side="top" align="start">
+        <ComboboxInput
+          placeholder="Search projects…"
+          aria-label="Search projects"
+          showTrigger={false}
+          disabled={disabled || busy}
+        />
         <ComboboxEmpty>No recent projects</ComboboxEmpty>
         {recents.length > 0 ? (
           <ComboboxGroup>

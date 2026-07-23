@@ -27,11 +27,14 @@ function ComboboxTrigger({
   return (
     <ComboboxPrimitive.Trigger
       data-slot="combobox-trigger"
-      className={cn("[&_svg:not([class*='size-'])]:size-4", className)}
+      className={cn(
+        "inline-flex items-center gap-1 [&_svg:not([class*='size-'])]:size-3.5",
+        className,
+      )}
       {...props}
     >
       {children}
-      <ChevronDownIcon className="pointer-events-none size-3.5 text-ink-muted" />
+      <ChevronDownIcon className="pointer-events-none size-3 shrink-0 text-ink-muted opacity-70" />
     </ComboboxPrimitive.Trigger>
   )
 }
@@ -60,25 +63,28 @@ function ComboboxInput({
   showTrigger?: boolean
   showClear?: boolean
 }) {
+  const showEndAddon = showTrigger || showClear
   return (
     <InputGroup className={cn("w-auto", className)}>
       <ComboboxPrimitive.Input
         render={<InputGroupInput disabled={disabled} />}
         {...props}
       />
-      <InputGroupAddon align="inline-end">
-        {showTrigger && (
-          <InputGroupButton
-            size="icon-xs"
-            variant="ghost"
-            render={<ComboboxTrigger />}
-            data-slot="input-group-button"
-            className="group-has-data-[slot=combobox-clear]/input-group:hidden data-pressed:bg-fill-4"
-            disabled={disabled}
-          />
-        )}
-        {showClear && <ComboboxClear disabled={disabled} />}
-      </InputGroupAddon>
+      {showEndAddon ? (
+        <InputGroupAddon align="inline-end">
+          {showTrigger && (
+            <InputGroupButton
+              size="icon-xs"
+              variant="ghost"
+              render={<ComboboxTrigger />}
+              data-slot="input-group-button"
+              className="group-has-data-[slot=combobox-clear]/input-group:hidden data-pressed:bg-fill-4"
+              disabled={disabled}
+            />
+          )}
+          {showClear && <ComboboxClear disabled={disabled} />}
+        </InputGroupAddon>
+      ) : null}
       {children}
     </InputGroup>
   )

@@ -11,7 +11,6 @@ import {
 } from "../../lib/tauri"
 import { openExternalUrl } from "../../lib/openExternalUrl"
 import { Button } from "@/components/ui/button"
-import { InputGroupAddon } from "@/components/ui/input-group"
 import {
   Combobox,
   ComboboxContent,
@@ -19,17 +18,16 @@ import {
   ComboboxInput,
   ComboboxItem,
   ComboboxList,
+  ComboboxTrigger,
 } from "@/components/ui/combobox"
 import { cn } from "../../lib/utils"
+import { contextBarTriggerClass } from "../organisms/context-bar/chrome"
 
 type BranchPickerProps = {
   cwd?: string
   disabled?: boolean
   onError?: (message: string) => void
 }
-
-const triggerInputClassName =
-  "h-6 min-w-0 flex-1 border-0 bg-transparent shadow-none ring-0 has-[[data-slot=input-group-control]:focus-visible]:border-transparent has-[[data-slot=input-group-control]:focus-visible]:ring-0 focus-within:border-transparent focus-within:ring-0 text-sm font-normal text-ink-muted opacity-80 hover:opacity-100 data-open:opacity-100"
 
 /** Defer `gh pr view` until the session chrome is interactive — running it on
  * every ContextBar mount (new session / switch) stacked with git_status and
@@ -127,20 +125,21 @@ export const BranchPicker = ({
         onOpenChange={setOpen}
         disabled={!canOpen || busy}
       >
-        <ComboboxInput
-          placeholder={label}
+        <ComboboxTrigger
           aria-label={`Branch: ${label}`}
-          className={cn(triggerInputClassName, "max-w-[12rem]")}
           disabled={!canOpen || busy}
+          className={contextBarTriggerClass("max-w-[12rem]")}
         >
-          <InputGroupAddon align="inline-start" className="py-0 pl-1.5 pr-0">
-            <GitBranch
-              className="size-3.5 shrink-0 text-ink-muted"
-              aria-hidden
-            />
-          </InputGroupAddon>
-        </ComboboxInput>
+          <GitBranch className="size-3.5 text-ink-muted" aria-hidden />
+          <span className="min-w-0 truncate">{label}</span>
+        </ComboboxTrigger>
         <ComboboxContent className="w-72" side="top" align="start">
+          <ComboboxInput
+            placeholder="Search branches…"
+            aria-label="Search branches"
+            showTrigger={false}
+            disabled={!canOpen || busy}
+          />
           <ComboboxEmpty>
             {isFetching ? "Loading branches…" : "No branches found"}
           </ComboboxEmpty>

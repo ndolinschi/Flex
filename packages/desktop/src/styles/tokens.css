@@ -1,29 +1,29 @@
 :root,
 [data-theme="dark"] {
   /* ── Premium dark (Cursor glass–adapted) ────────────────────────────────
-     Cool charcoal surfaces (not pure gray, not Nord blue-black). Steps
+     Neutral charcoal surfaces (not pure gray, not blue-black). Steps
      between chrome / panel / elevated stay close so chrome reads continuous.
-     Text/icon/stroke use cool white-alpha hierarchy — whisper, not chalk.
+     Text/icon/stroke use neutral white-alpha hierarchy — whisper, not chalk.
      Extracted rhythm from Cursor glass workbench; brand colors stay Flex. */
   /* Primary ink on dark / surfaces on light — kept as a raw token for
    * non-Tailwind use. Not exposed as `--color-base` in `@theme` (that name
    * steals the `text-base` font-size utility). */
   --color-base: #f2f2f2;
-  --color-chrome: #0f1114; /* chat rail / shell */
-  --color-panel: #14171c; /* sidebar + explorer + popovers */
-  --color-editor: #12151a; /* Monaco / work surface — shade step above chrome */
-  --color-elevated: #1a1d24; /* chat bubbles / raised tiles */
+  --color-chrome: #101010; /* chat rail / shell — neutral, not blue-cast */
+  --color-panel: #161616; /* sidebar + explorer + popovers */
+  --color-editor: #121212; /* Monaco / work surface — shade step above chrome */
+  --color-elevated: #1c1c1c; /* chat bubbles / raised tiles */
 
-  /* Cool white ink (Cursor glass icon stack: ~236 241 250). */
-  --color-text-1: rgb(236 241 250 / 0.92);
-  --color-text-2: rgb(226 233 244 / 0.58);
-  --color-text-3: rgb(226 233 244 / 0.48);
-  --color-text-4: rgb(226 233 244 / 0.32);
+  /* Neutral white ink (no blue cast — was 236/241/250 cool stack). */
+  --color-text-1: rgb(242 242 242 / 0.94);
+  --color-text-2: rgb(235 235 235 / 0.58);
+  --color-text-3: rgb(235 235 235 / 0.48);
+  --color-text-4: rgb(235 235 235 / 0.32);
 
-  --color-icon-1: rgb(236 241 250 / 0.88);
-  --color-icon-2: rgb(226 233 244 / 0.62);
-  --color-icon-3: rgb(226 233 244 / 0.42);
-  --color-icon-4: rgb(226 233 244 / 0.3);
+  --color-icon-1: rgb(242 242 242 / 0.88);
+  --color-icon-2: rgb(235 235 235 / 0.62);
+  --color-icon-3: rgb(235 235 235 / 0.42);
+  --color-icon-4: rgb(235 235 235 / 0.3);
 
   /* Whisper fills — hover ≈5–6%, selected ≈8% (Cursor tertiary/quaternary). */
   --color-fill-1: rgb(255 255 255 / 0.09);
@@ -55,12 +55,12 @@
   --color-diff-added: #7fd97a33;
   --color-diff-removed: #f0717833;
 
-  --color-user-bubble: #1c2028;
+  --color-user-bubble: #1e1e1e;
   /* Slight lift on hover without chalk white-mix (theme-aware). */
   --color-user-bubble-hover: color-mix(in srgb, var(--color-user-bubble) 92%, white);
   --color-code-inline: rgb(255 255 255 / 0.07);
   --color-send: #f2f2f2;
-  --color-send-fg: #0f1114;
+  --color-send-fg: #101010;
 
   /* Settings shell — one quiet step past panel, still alpha-notched. */
   --color-settings-card: rgb(255 255 255 / 0.03);

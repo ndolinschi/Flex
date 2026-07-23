@@ -24,7 +24,7 @@ audit and fix UI against this file. For shadcn adds/rewrites, also load the
 | Whisper fills | Selected `fill-2` (~8%), hover `fill-4` (~6%) (list rows, tabs, chrome buttons) |
 | Opacity hover | Quiet icon controls: idle `.5` → hover `.8`; mode/model pills idle `.8` → hover `1` |
 | Mode tint | Composer mode pill uses semantic fill (agent green / plan yellow / ask cyan / flex purple) |
-| Cool dark | Dark surfaces are cool charcoal (`#0f1114` / `#14171c` / `#1a1d24`), not pure gray |
+| Cool dark | Dark surfaces are neutral charcoal (`#101010` / `#161616` / `#1c1c1c`), not blue-cast |
 | 4px grid | Spacing tokens `--space-1`…`--space-12` (4–48px) |
 | Radius by role | Controls `rounded-md` (8); composer/bubbles 14; settings cards 12; pills full; sidebar rows 6 |
 | Keyboard focus | Neutral `stroke-2` ring; no accent glow |
@@ -41,14 +41,14 @@ adapt rhythm, hierarchy, and density into Flex tokens and domain components.
 
 | Role | Cursor glass | Flex token |
 |---|---|---|
-| Primary / chat | `#0c0e11` | `--color-chrome` `#0f1114` |
-| Secondary / sidebar | `#14171d` | `--color-panel` `#14171c` |
-| Elevated / bubble | `#1b1f27` | `--color-elevated` / `--color-user-bubble` `#1a1d24` |
+| Primary / chat | `#0c0e11` | `--color-chrome` `#101010` |
+| Secondary / sidebar | `#14171d` | `--color-panel` `#161616` |
+| Elevated / bubble | `#1b1f27` | `--color-elevated` / `--color-user-bubble` `#1c1c1c` / `#1e1e1e` |
 | Hover fill | `hsla(0,0%,100%,.07)` / quaternary ~6% | `--color-fill-4` ~6% |
 | Selected fill | tertiary ~8% fg | `--color-fill-2` ~8% |
 
-Ink/icons use cool white (`236 241 250` / `226 233 244` alpha steps), matching
-Cursor's icon primary/secondary stack — not pure `#fafafa`.
+Ink/icons use neutral white (`242 242 242` / `235 235 235` alpha steps) — no
+blue-cast cool stack. Cursor's icon ladder is adapted for rhythm, not hue.
 
 ### Stroke & elevation
 
@@ -385,8 +385,9 @@ column + `gap-1.5`, bottom toolbar of `h-6` controls.
    (project/branch/isolation/commit/usage); empty-agent `compact` mode is a
    content-sized elevated strip (`inline-flex`, `mb-0.5`) with project +
    isolation only, glued to the input like Cursor's folder|Direct row.
-   Comboboxes are `h-6` with addon `py-0` so folder/branch icons sit on the
-   text baseline (default InputGroupAddon `py-1.5` is for `h-8` forms)
+   Project/branch closed triggers are **quiet ghost pills** (`ComboboxTrigger`
+   + search `ComboboxInput` inside the popup) — never form-looking InputGroups
+   in the bar. Isolation uses the same `contextBarTriggerClass` recipe.
 4. Bubble: `--radius-composer` · `bg-user-bubble` · `border-stroke-3` ·
    `focus-within:border-stroke-1` · `shadow-composer` (ambient, **not** a
    shadow-painted ring). Docked HITL uses side/bottom stroke only.
