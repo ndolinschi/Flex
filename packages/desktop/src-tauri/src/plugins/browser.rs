@@ -120,11 +120,11 @@ impl Plugin for BrowserPlugin {
     fn system_prompt_fragment(&self) -> Option<String> {
         Some(
             "Browser tools control the embedded Browser panel (not headless Chromium).\n\
-             - BrowserNavigate loads a URL; BrowserScreenshot captures the panel.\n\
+             - BrowserNavigate opens the panel if needed and loads a URL; BrowserScreenshot captures it.\n\
              - BrowserEval runs JS; BrowserClick clicks a CSS selector in-page.\n\
              - BrowserConsole returns captured console.log/warn/error lines.\n\
              - BrowserOpenDevtools opens the webview inspector for the user.\n\
-             Prefer these when debugging a live page in the Browser tab."
+             Prefer these when the user asks to open or use the browser."
                 .into(),
         )
     }
@@ -145,7 +145,9 @@ impl Tool for BrowserNavigateTool {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
             name: "BrowserNavigate".into(),
-            description: "Navigate the embedded Browser panel to a URL.".into(),
+            description: "Open or navigate the embedded Browser panel to a URL \
+                          (creates the panel webview if it is not open yet)."
+                .into(),
             input_schema: schema_of::<BrowserNavigateInput>(),
             read_only: false,
             category: ToolCategory::Web,
@@ -165,11 +167,15 @@ impl Tool for BrowserNavigateTool {
         })?;
         let target = crate::browser::normalize_url_public(&input.url)
             .map_err(|e| ToolError::InvalidInput(e.to_string()))?;
-        with_webview(&self.app, |wv| {
-            wv.navigate(target.clone())
-                .map_err(|e| ToolError::Execution(e.to_string()))
-        })
-        .await?;
+        // Ensure the embedded panel exists (creates child webview if needed),
+        // then navigate — same path as the UI Browser tab.
+        crate::browser::browser_open(
+            self.app.clone(),
+            self.app.state::<crate::state::AppState>(),
+            Some(input.url.clone()),
+        )
+        .await
+        .map_err(|e| ToolError::Execution(e.to_string()))?;
         tokio::time::sleep(std::time::Duration::from_millis(350)).await;
         let _ = eval_string(&self.app, CONSOLE_HOOK_JS).await;
         Ok(ToolOutput::text(format!("Navigated to {target}")))

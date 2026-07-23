@@ -360,24 +360,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
       })
       // Quiet select: chip + composer focus are the affordance; a toast on
       // every inspect click is noise (Design Mode is intentionally silent).
-      // #region agent log
-      fetch("http://127.0.0.1:7920/ingest/43f1534f-3411-4042-8d21-9327abbca399", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "5cd2b5",
-        },
-        body: JSON.stringify({
-          sessionId: "5cd2b5",
-          runId: "pre-fix",
-          hypothesisId: "H6",
-          location: "useBrowserSession.ts:addDomChip",
-          message: "element select (no toast)",
-          data: { name, additive },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
       window.dispatchEvent(new CustomEvent("flex:focus-composer"))
     },
     [addAttachment, clearAttachments],
@@ -507,27 +489,7 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
     const measure = (force: boolean) => {
       if (cancelled) return
       const rect = slot.getBoundingClientRect()
-      const dragging = useAppStore.getState().rightPanelDragging
-      const suppressed = isNativeWebviewSuppressed(rect)
-      if (suppressed || dragging) {
-        // #region agent log
-        fetch("http://127.0.0.1:7920/ingest/43f1534f-3411-4042-8d21-9327abbca399", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "5cd2b5",
-          },
-          body: JSON.stringify({
-            sessionId: "5cd2b5",
-            runId: "pre-fix",
-            hypothesisId: dragging ? "H5" : "H1",
-            location: "useBrowserSession.ts:measure-hide",
-            message: "browserSetVisible(false)",
-            data: { suppressed, dragging, force },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-        // #endregion
+      if (shouldHideWebview(rect)) {
         lastSent = null
         void browserSetVisible(false)
         return
@@ -561,32 +523,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
         return
       }
       const { x, y, width, height } = next
-      // #region agent log
-      if (force) {
-        fetch("http://127.0.0.1:7920/ingest/43f1534f-3411-4042-8d21-9327abbca399", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "5cd2b5",
-          },
-          body: JSON.stringify({
-            sessionId: "5cd2b5",
-            runId: "pre-fix",
-            hypothesisId: "H5",
-            location: "useBrowserSession.ts:measure-bounds",
-            message: "computed webview bounds",
-            data: {
-              x: Math.round(x),
-              y: Math.round(y),
-              w: Math.round(width),
-              h: Math.round(height),
-              sashCount: sashes.length,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-      }
-      // #endregion
       if (
         !force &&
         lastSent &&
@@ -604,24 +540,6 @@ export const useBrowserSession = (active: boolean, sessionId: string | null) => 
           void browserSetVisible(false)
           return
         }
-        // #region agent log
-        fetch("http://127.0.0.1:7920/ingest/43f1534f-3411-4042-8d21-9327abbca399", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "5cd2b5",
-          },
-          body: JSON.stringify({
-            sessionId: "5cd2b5",
-            runId: "pre-fix",
-            hypothesisId: "H2",
-            location: "useBrowserSession.ts:measure-show",
-            message: "browserSetVisible(true)",
-            data: { x: Math.round(x), w: Math.round(width) },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-        // #endregion
         void browserSetVisible(true)
       })
     }

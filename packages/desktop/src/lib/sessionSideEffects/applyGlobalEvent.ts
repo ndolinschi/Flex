@@ -16,6 +16,7 @@ import {
 import { maybeToastDevServerUrl } from "./devServerToast"
 import { maybeAutoTitleSession } from "./autoTitle"
 import { maybeRegisterArtifact } from "./artifactSideEffects"
+import { maybeRevealBrowser } from "./browserSideEffects"
 import { invalidateGitQueries } from "../invalidateGitQueries"
 import {
   invalidateWorkspaceQueries,
@@ -275,6 +276,9 @@ export const applyGlobalSessionEvent = (
   }
 
   if (!opts?.ignoreStreaming && payload.kind === "tool_call_updated") {
+    maybeRevealBrowser(event, {
+      activeSessionId: store.activeSessionId,
+    })
     maybeRegisterArtifact(event, {
       activeSessionId: store.activeSessionId,
       queryClient: opts?.queryClient,
