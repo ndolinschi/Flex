@@ -79,7 +79,8 @@ colored icon only).
 
 - Product monochrome accent default (Settings can override) — not Cursor blue CTA.
 - Green switch ON track (`--color-switch-on`) for settings.
-- ContextBar above composer; sidebar footer = theme + settings.
+- ContextBar above composer (empty agent: compact folder + Direct only);
+  sidebar footer = theme + settings.
 - Domain chrome stays custom: `Tab`/`TabStrip`, `WindowTitleBar`, Monaco/xterm,
   timeline WorkGroup/tool cards, HITL docks.
 - Light theme: white chrome / cool panel / elevated — three surface steps so
@@ -319,7 +320,7 @@ modal. HITL docks as a composer-adjacent blocking surface, not a dialog.
 | State | Component | Recipe |
 |---|---|---|
 | Empty | `EmptyState` | Top-weighted utility void: `py-10 gap-3` (not full-viewport `justify-center`); title `text-sm text-ink-secondary`; description `text-xs text-ink-muted`; CTA `Button secondary sm`; icon chip `bg-fill-3 text-ink-faint` |
-| Hero empty | `ChatShell` empty rail | Compact top-weighted title + chips; composer stays docked at bottom |
+| Hero empty | `ChatShell` empty rail | Utility void: muted `text-ink-secondary` title + whisper chips (`ghost` + `fill-5`); compact ContextBar (`folder` + Direct only) glued above composer; composer docked bottom with ambient elevation |
 | Onboarding | `WelcomePage` | Primary controls **`h-9`** (`Button size="lg"`, inputs `h-9`); errors via `ErrorBanner` |
 | Loading list | `SidebarSkeleton` | Rows `min-h-7` / two-line `h-10`; headers `h-6`; `rounded-sm` whisper fills; `px-2` gutter |
 | Loading block | `Skeleton` | `bg-surface-muted` (fill-3) + soft pulse; **`opacity-70`** dampen |
@@ -379,9 +380,11 @@ column + `gap-1.5`, bottom toolbar of `h-6` controls.
 
 1. Outer `px-3` → rail `max-w-[var(--content-rail)]`
 2. Optional `workersSlot` / HITL docked flush above the bubble
-3. ContextBar above bubble (`mb-1`, min-height status bar) — project/branch
-   comboboxes are `h-6` with addon `py-0` so folder/branch icons sit on the
-   text baseline (default InputGroupAddon `py-1.5` is for `h-8` forms)
+3. ContextBar above bubble (`mb-1`) — full mode uses min-height status bar
+   (project/branch/isolation/commit/usage); empty-agent `compact` mode shows
+   only project + isolation, glued to the input. Comboboxes are `h-6` with
+   addon `py-0` so folder/branch icons sit on the text baseline (default
+   InputGroupAddon `py-1.5` is for `h-8` forms)
 4. Bubble: `--radius-composer` · `bg-user-bubble` · `border-stroke-3` ·
    `focus-within:border-stroke-1` · `shadow-composer` (ambient, **not** a
    shadow-painted ring). Docked HITL uses side/bottom stroke only.

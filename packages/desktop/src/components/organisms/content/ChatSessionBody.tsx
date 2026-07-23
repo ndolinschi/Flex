@@ -125,7 +125,7 @@ export const ChatSessionBody = ({
         }
         composerHero={composerHero}
         heroTitle={heroTitle}
-        heroHint="Describe a task to start the native agent loop."
+        heroHint="Describe a task to get started."
       />
     </div>
   )

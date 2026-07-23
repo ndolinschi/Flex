@@ -19,7 +19,7 @@ type ChatShellProps = {
    * section. Prefer `Composer.dockedOverlay` for Permission/Question cards
    * that must merge with the bubble (avoids a page-bg gap at the seam). */
   overlayDocked?: boolean
-  /** Empty conversation — compact top-weighted empty, composer stays docked. */
+  /** Empty conversation — utility void; composer stays docked at bottom. */
   composerHero?: boolean
   heroTitle?: string
   heroHint?: string
@@ -28,6 +28,9 @@ type ChatShellProps = {
 /**
  * Chat column shell. Composer always docks at the bottom (IDE rail), even
  * when the conversation is empty — never a centered marketing hero.
+ *
+ * Empty composition matches Cursor New Agent: muted title + whisper chips in
+ * the upper void; the primary control is the docked input below.
  */
 export const ChatShell = ({
   sidebar,
@@ -38,7 +41,7 @@ export const ChatShell = ({
   overlayDocked = false,
   composerHero = false,
   heroTitle = "Agent",
-  heroHint = "Describe a task to start the native agent loop.",
+  heroHint = "Describe a task to get started.",
 }: ChatShellProps) => {
   const setComposerDraft = useAppStore((s) => s.setComposerDraft)
   const tight = useAppStore((s) => s.viewport === "tight")
@@ -67,20 +70,20 @@ export const ChatShell = ({
       <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {composerHero ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-6">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-8">
               <div className="mx-auto w-full max-w-[var(--content-rail)]">
-                <h2 className="truncate text-sm font-medium text-ink">
+                <h2 className="truncate text-base font-medium tracking-[-0.02em] text-ink-secondary">
                   {heroTitle}
                 </h2>
-                <p className="mt-1 text-xs text-ink-muted">{heroHint}</p>
-                <div className="mt-3 flex flex-wrap gap-1.5">
+                <p className="mt-1.5 text-xs text-ink-muted">{heroHint}</p>
+                <div className="mt-4 flex flex-wrap gap-1.5">
                   {QUICKSTART_SUGGESTIONS.map((suggestion) => (
                     <Button
                       key={suggestion}
-                      variant="outline"
+                      variant="ghost"
                       size="xs"
                       onClick={() => handleQuickstart(suggestion)}
-                      className="rounded-md border-stroke-3 text-xs text-ink-secondary opacity-80 hover:border-stroke-2 hover:bg-fill-4 hover:text-ink-secondary hover:opacity-100"
+                      className="h-7 rounded-md border border-stroke-3 bg-fill-5 px-2.5 text-xs font-normal text-ink-muted hover:border-stroke-2 hover:bg-fill-4 hover:text-ink-secondary"
                     >
                       {suggestion}
                     </Button>

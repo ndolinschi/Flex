@@ -12,7 +12,7 @@ import { firstPlanHeading } from "../../lib/planTitle"
 import { log } from "../../lib/debug/log"
 import type { PlanEntry, SessionId } from "../../lib/types"
 import { addUsageToModelMap } from "../../lib/modelUsage"
-import { defaultContentLayout } from "../contentLayoutModel"
+import { defaultContentLayout, chatTabId } from "../contentLayoutModel"
 
 /** Snapshot annotations from in-memory plans for ui.json persistence. */
 const annotationsFromPlans = (
@@ -122,7 +122,8 @@ export const createSessionSlice: StateCreator<
       })
     }
     // Sync content panes: open/activate this session's chat in the focused pane.
-    // `opts.panel: "closed"` collapses split on boot / New Agent.
+    // `opts.panel: "closed"` collapses split on boot / New Agent and prunes
+    // sibling tool tabs so the empty agent reads as a single-tab composition.
     if (id) {
       get().openChatInPane(
         get().contentLayout.mode === "split"
@@ -130,8 +131,11 @@ export const createSessionSlice: StateCreator<
           : 0,
         id,
       )
-      if (opts?.panel === "closed" && get().contentLayout.mode === "split") {
-        get().collapseSplit()
+      if (opts?.panel === "closed") {
+        if (get().contentLayout.mode === "split") {
+          get().collapseSplit()
+        }
+        get().closeOtherTabsInPane(0, chatTabId(id))
       }
     } else {
       get().setContentLayout(defaultContentLayout(null))

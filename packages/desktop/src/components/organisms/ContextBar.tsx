@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { isIsolated } from "../../lib/tauri"
 import { useIsGitRepo } from "../../hooks/useIsGitRepo"
+import { cn } from "../../lib/utils"
 import { BranchPicker } from "../molecules/BranchPicker"
 import { ProjectPicker } from "../molecules/ProjectPicker"
 import { UsageRing } from "./context-bar/UsageRing"
@@ -16,6 +17,12 @@ type ContextBarProps = {
   sessionId?: string | null
   disabled?: boolean
   onError?: (message: string) => void
+  /**
+   * Empty New Agent — compact selectors glued to the composer (folder +
+   * isolation only). Hides branch / commit / usage so the input reads as one
+   * composition unit with Cursor's empty agent strip.
+   */
+  compact?: boolean
 }
 
 /** Context row above the composer: project · branch · isolation · context %. */
@@ -25,6 +32,7 @@ export const ContextBar = ({
   sessionId,
   disabled = false,
   onError,
+  compact = false,
 }: ContextBarProps) => {
   const { data: isolated } = useQuery({
     queryKey: ["is-isolated", sessionId],
@@ -41,8 +49,35 @@ export const ContextBar = ({
   // positively know there's no repo.
   const { data: isRepo = true } = useIsGitRepo(cwd)
 
+  if (compact) {
+    return (
+      <div className="flex items-center gap-0.5 px-0">
+        <ProjectPicker
+          sessionId={sessionId ?? null}
+          cwd={projectCwd || cwd}
+          disabled={disabled}
+          onError={onError}
+        />
+        {isolated && sessionId ? (
+          <IsolationBadge sessionId={sessionId} onError={onError} />
+        ) : null}
+        {!isolated && sessionId ? (
+          <IsolationPicker
+            sessionId={sessionId}
+            projectCwd={projectCwd || cwd}
+            disabled={disabled}
+          />
+        ) : null}
+      </div>
+    )
+  }
+
   return (
-    <div className="flex min-h-[var(--status-bar-height)] items-center gap-2 px-0">
+    <div
+      className={cn(
+        "flex min-h-[var(--status-bar-height)] items-center gap-2 px-0",
+      )}
+    >
       {/* min-w-0 + flex-1 (not justify-between) so this group is what shrinks
           under pressure — the gap to the right-hand cluster is a real flex
           gap, not `justify-between`'s leftover space, so it can never

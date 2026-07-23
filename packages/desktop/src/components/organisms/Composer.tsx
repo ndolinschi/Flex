@@ -278,6 +278,7 @@ export const Composer = ({
             sessionId={activeSessionId}
             disabled={false}
             onError={setError}
+            compact={isHero}
           />
         ) : null}
       </div>

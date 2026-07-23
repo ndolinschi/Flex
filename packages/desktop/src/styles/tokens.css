@@ -55,7 +55,7 @@
   --color-diff-added: #7fd97a33;
   --color-diff-removed: #f0717833;
 
-  --color-user-bubble: #1a1d24;
+  --color-user-bubble: #1c2028;
   /* Slight lift on hover without chalk white-mix (theme-aware). */
   --color-user-bubble-hover: color-mix(in srgb, var(--color-user-bubble) 92%, white);
   --color-code-inline: rgb(255 255 255 / 0.07);
@@ -242,11 +242,12 @@
   /* Composer: Cursor glass elevation — soft ambient only.
    * The 1px ring is a real border (stroke-3 idle → stroke-1 focus), not a
    * shadow ring — double-painting a ring via box-shadow reads floaty/harsh. */
-  --shadow-composer: 0 1px 2px 0 var(--shadow-ambient);
+  --shadow-composer: 0 1px 3px 0 var(--shadow-ambient),
+    0 4px 12px -4px var(--shadow-color);
   /* Focus: slightly deeper ambient; border color carries the focus cue. */
   --shadow-composer-focus:
-    0 1px 2px 0 var(--shadow-ambient),
-    0 6px 18px -6px var(--shadow-color);
+    0 1px 3px 0 var(--shadow-ambient),
+    0 8px 20px -6px var(--shadow-color);
   /* Popover chrome — the reference design's box-shadow-xl (borderless, 4-layer). */
   --shadow-popover:
     0 0 0 1px var(--color-stroke-3),
