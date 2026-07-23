@@ -18,7 +18,7 @@ import {
   startContentTabPointerDrag,
   useTabDragUi,
 } from "../../../hooks/useContentTabPointerDnD"
-import { useTabStripScrollFade } from "../../../hooks/useTabStripScrollFade"
+import { useTabStripScroll } from "../../../hooks/useTabStripScroll"
 import { useContentPaneContextMenu } from "../../../hooks/useContentPaneContextMenu"
 import { previewTabsForPane } from "../../../lib/tabDnD"
 import { gitPrStatus } from "../../../lib/tauri"
@@ -185,9 +185,7 @@ export const ContentPane = ({
     [selectedTabIds, paneIndex, stampTabGroup, clearSelection],
   )
 
-  const { tabsScrollRef, scrollMask, handleTabsWheel } = useTabStripScrollFade(
-    pane.tabs.length,
-  )
+  const { tabsScrollRef, handleTabsWheel } = useTabStripScroll()
 
   const visitedChats = useVisitedChatTabs(pane.tabs, pane.activeTabId)
 
@@ -350,11 +348,6 @@ export const ContentPane = ({
             "flex min-w-0 shrink items-center gap-1.5 overflow-x-auto",
             "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           )}
-          style={
-            scrollMask
-              ? { WebkitMaskImage: scrollMask, maskImage: scrollMask }
-              : undefined
-          }
         >
           {displayTabs.map((t, index) => {
             const def =
