@@ -124,11 +124,22 @@ export const ContentWorkspace = ({
     [split, splitRatio],
   )
 
+  // Apply layout when split mode flips — without remounting the group (a remount
+  // key on single↔split was destroying chat keep-alive and causing flicker).
+  // Do not re-apply on every splitRatio drag; the sash owns that live.
+  const prevSplitRef = useRef(split)
+  useEffect(() => {
+    if (prevSplitRef.current === split) return
+    prevSplitRef.current = split
+    const group = groupImperativeRef.current
+    if (!group) return
+    group.setLayout(contentWorkspaceDefaultLayout(split, splitRatio))
+  }, [split, splitRatio, groupImperativeRef])
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
       <TabDragGhost />
       <ResizablePanelGroup
-        key={split ? "split" : "single"}
         orientation="horizontal"
         elementRef={containerRef}
         groupRef={groupImperativeRef}

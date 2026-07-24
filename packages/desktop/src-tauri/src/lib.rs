@@ -22,7 +22,9 @@ mod win_console;
 use tauri::{Emitter, LogicalSize, Manager};
 use tracing_subscriber::prelude::*;
 
-use crate::compose::{build_service, open_session_store};
+use crate::compose::{
+    build_service, build_service_fast, has_enabled_mcp_servers, open_session_store,
+};
 use crate::config::load_config;
 use crate::state::AppState;
 
@@ -141,8 +143,10 @@ pub fn run() {
 
             let store = open_session_store().map_err(|e| e.to_string())?;
             let config = load_config().unwrap_or_default();
+            // Skip MCP tool discovery on the critical path — connect servers after
+            // the window is up (see spawn below). MCP connect is often multi-second.
             let service = if config.is_ready() {
-                match build_service(&config, store.clone(), app.handle().clone()) {
+                match build_service_fast(&config, store.clone(), app.handle().clone()) {
                     Ok(s) => Some(s),
                     Err(err) => {
                         tracing::warn!(error = %err, "failed to build engine on launch");
@@ -153,6 +157,44 @@ pub fn run() {
                 None
             };
             app.manage(AppState::new(store, config, service));
+
+            // Attach MCP after first paint when any servers are configured.
+            if has_enabled_mcp_servers() {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // Yield so the webview can finish the Loading→shell transition.
+                    tokio::task::yield_now().await;
+                    let state = handle.state::<AppState>();
+                    let cfg = state.config.lock().await.clone();
+                    if !cfg.is_ready() {
+                        return;
+                    }
+                    let store = state.store.clone();
+                    let built = tokio::task::spawn_blocking({
+                        let handle = handle.clone();
+                        move || build_service(&cfg, store, handle)
+                    })
+                    .await;
+                    match built {
+                        Ok(Ok(service)) => {
+                            *state.service.lock().await = Some(service);
+                            tracing::info!("engine rebuilt with MCP servers after launch");
+                        }
+                        Ok(Err(err)) => {
+                            tracing::warn!(
+                                error = %err,
+                                "failed to rebuild engine with MCP after launch"
+                            );
+                        }
+                        Err(err) => {
+                            tracing::warn!(
+                                error = %err,
+                                "MCP rebuild task joined with error"
+                            );
+                        }
+                    }
+                });
+            }
 
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {

@@ -10,7 +10,7 @@ export const RIGHT_PANEL_DEFAULT_WIDTH = 380
 export const CHAT_MIN_WIDTH = 380
 
 /** Max chat tab bodies kept mounted (CSS-hidden) when inactive. */
-export const MAX_KEEPALIVE_CHAT_TABS = 3
+export const MAX_KEEPALIVE_CHAT_TABS = 5
 
 export const clampRightPanelWidth = (
   width: number,

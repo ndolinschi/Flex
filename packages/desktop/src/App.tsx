@@ -295,7 +295,8 @@ const AppRoutes = () => {
         <div
           className={cn(
             "flex h-full min-h-0 flex-1 flex-col",
-            "transition-opacity duration-[var(--duration-normal)] ease-[var(--easing-default)] motion-reduce:transition-none",
+            // Instant hide when leaving chat — animated opacity made session
+            // return look like a flicker over a fading shell.
             route !== "chat" && "pointer-events-none opacity-0",
           )}
           aria-hidden={contentBlocked}

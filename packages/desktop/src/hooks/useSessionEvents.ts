@@ -119,7 +119,9 @@ export const useSessionEvents = (
 ) => {
   const live = options?.live !== false
   const [rows, setRows] = useState<TimelineRow[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  // Start loading when a session is present so first paint shows skeleton, not
+  // an empty hero that then flashes to skeleton then content.
+  const [isLoading, setIsLoading] = useState(() => sessionId != null)
   const [error, setError] = useState<string | null>(null)
   const [thinkingDurations, setThinkingDurations] = useState<
     Record<string, number>
@@ -307,6 +309,7 @@ export const useSessionEvents = (
       materializedIdsRef.current = new Set()
       rowsRef.current = []
       setRows([])
+      setIsLoading(false)
       setError(null)
       thinkingSpansRef.current = {}
       setThinkingDurations({})
@@ -320,9 +323,13 @@ export const useSessionEvents = (
       hasBootedRef.current = false
       lastSeqRef.current = 0
       materializedIdsRef.current = new Set()
+      // Cold session swap: show skeleton immediately (sync with paint).
+      setIsLoading(true)
     }
 
     if (!live) {
+      // Keep-alive hidden: stay mounted with current rows, no live subscription.
+      // Do not clear rows or toggle loading — avoids hero/skeleton flash on re-show.
       cancelPendingFlush()
       return
     }

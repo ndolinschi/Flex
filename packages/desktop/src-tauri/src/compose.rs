@@ -204,10 +204,35 @@ fn resolve_active_connection(cfg: &ProviderConfig) -> DesktopResult<ActiveConnec
     })
 }
 
+/// Build the engine. When `include_mcp` is false, MCP servers are skipped so
+/// cold launch can paint the UI before slow stdio/HTTP tool discovery.
 pub fn build_service(
     cfg: &ProviderConfig,
     store: Arc<JsonlStore>,
     app: AppHandle,
+) -> DesktopResult<EngineService> {
+    build_service_opts(cfg, store, app, true)
+}
+
+/// Fast path used at app launch: same as [`build_service`] without blocking MCP connects.
+pub fn build_service_fast(
+    cfg: &ProviderConfig,
+    store: Arc<JsonlStore>,
+    app: AppHandle,
+) -> DesktopResult<EngineService> {
+    build_service_opts(cfg, store, app, false)
+}
+
+/// True when at least one enabled MCP server is configured (disk only — no connect).
+pub fn has_enabled_mcp_servers() -> bool {
+    !load_enabled_mcp_servers().servers.is_empty()
+}
+
+fn build_service_opts(
+    cfg: &ProviderConfig,
+    store: Arc<JsonlStore>,
+    app: AppHandle,
+    include_mcp: bool,
 ) -> DesktopResult<EngineService> {
     let conn = resolve_active_connection(cfg)?;
     let preferred = conn.provider;
@@ -323,7 +348,11 @@ pub fn build_service(
                     backend = backend.with_max_per_base(cap.max(1) as usize);
                 }
                 config.workspace = Some(Arc::new(backend));
-                config.mcp = load_enabled_mcp_servers();
+                config.mcp = if include_mcp {
+                    load_enabled_mcp_servers()
+                } else {
+                    McpBridgeConfig::default()
+                };
 
                 config.roles.extend(flex_composer_roles());
             }

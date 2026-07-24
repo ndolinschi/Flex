@@ -78,6 +78,18 @@ const Guarded = ({
   </PanelErrorBoundary>
 )
 
+/** Keep body mounted (CSS-hidden) when active or keepAlive — avoids remount flicker. */
+const bodyClass = (
+  active: boolean,
+  keepAlive: boolean,
+  display: "flex" | "block" = "flex",
+): string =>
+  cn(
+    "absolute inset-0",
+    display === "flex" && "flex flex-col",
+    active || keepAlive ? (active ? display : "hidden") : "hidden",
+  )
+
 export const ToolTabBody = ({
   tool,
   session,
@@ -86,29 +98,26 @@ export const ToolTabBody = ({
 }: ToolTabBodyProps) => {
   const pluginTab = useMemo(() => findPluginTab(tool), [tool])
   const label = toolLabel(tool, pluginTab?.label)
+  // Once shown, stay mounted for the life of this tab row (plus keepAlive tools).
+  const mounted = active || keepAlive
 
   if (tool === "status") {
-    if (!session) return null
-    return active ? (
-      <div className="absolute inset-0 flex flex-col">
+    if (!session || !mounted) return null
+    return (
+      <div className={bodyClass(active, true)}>
         <Guarded label={label}>
           <Suspense fallback={<PanelFallback />}>
             <StatusTab session={session} active={active} />
           </Suspense>
         </Guarded>
       </div>
-    ) : null
+    )
   }
 
   if (tool === "prompt") {
-    if (!session) return null
+    if (!session || !mounted) return null
     return (
-      <div
-        className={cn(
-          "absolute inset-0 flex flex-col",
-          active || keepAlive ? (active ? "flex" : "hidden") : "hidden",
-        )}
-      >
+      <div className={bodyClass(active, true)}>
         <Guarded label={label}>
           <PromptTab sessionId={session.id} active={active} />
         </Guarded>
@@ -117,50 +126,50 @@ export const ToolTabBody = ({
   }
 
   if (tool === "plan") {
-    return active ? (
-      <div className="absolute inset-0 flex flex-col">
+    if (!mounted) return null
+    return (
+      <div className={bodyClass(active, true)}>
         <Guarded label={label}>
           <PlanTab active={session} />
         </Guarded>
       </div>
-    ) : null
+    )
   }
   if (tool === "changes") {
-    return active ? (
-      <div className="absolute inset-0 flex flex-col">
+    if (!mounted) return null
+    return (
+      <div className={bodyClass(active, true)}>
         <Guarded label={label}>
           <ChangesTab active={session} />
         </Guarded>
       </div>
-    ) : null
+    )
   }
   if (tool === "pr") {
-    return active ? (
-      <div className="absolute inset-0 flex flex-col">
+    if (!mounted) return null
+    return (
+      <div className={bodyClass(active, true)}>
         <Guarded label={label}>
           <PrTab active={session} />
         </Guarded>
       </div>
-    ) : null
+    )
   }
   if (tool === "memory") {
-    return active ? (
-      <div className="absolute inset-0 flex flex-col">
+    if (!mounted) return null
+    return (
+      <div className={bodyClass(active, true)}>
         <Guarded label={label}>
           <MemoryTab />
         </Guarded>
       </div>
-    ) : null
+    )
   }
 
   if (tool === "files") {
+    if (!mounted) return null
     return (
-      <div
-        className={cn(
-          "absolute inset-0 flex flex-col",
-          active || keepAlive ? (active ? "flex" : "hidden") : "hidden",
-        )}
-      >
+      <div className={bodyClass(active, true)}>
         <Guarded label={label}>
           <Suspense fallback={<PanelFallback />}>
             <FilesTab active={active} session={session} />
@@ -171,13 +180,9 @@ export const ToolTabBody = ({
   }
 
   if (tool === "terminal") {
+    if (!mounted) return null
     return (
-      <div
-        className={cn(
-          "absolute inset-0 flex flex-col",
-          active || keepAlive ? (active ? "flex" : "hidden") : "hidden",
-        )}
-      >
+      <div className={bodyClass(active, true)}>
         <Guarded label={label}>
           <Suspense fallback={<PanelFallback />}>
             <TerminalTab active={active} sessionId={session?.id ?? null} />
@@ -188,13 +193,9 @@ export const ToolTabBody = ({
   }
 
   if (tool === "browser") {
+    if (!mounted) return null
     return (
-      <div
-        className={cn(
-          "absolute inset-0",
-          active || keepAlive ? (active ? "block" : "hidden") : "hidden",
-        )}
-      >
+      <div className={bodyClass(active, true, "block")}>
         <Guarded label={label}>
           <Suspense fallback={<PanelFallback />}>
             <BrowserTab active={active} sessionId={session?.id ?? null} />
@@ -205,13 +206,9 @@ export const ToolTabBody = ({
   }
 
   if (pluginTab) {
+    if (!mounted) return null
     return (
-      <div
-        className={cn(
-          "absolute inset-0 flex flex-col",
-          active ? "flex" : "hidden",
-        )}
-      >
+      <div className={bodyClass(active, true)}>
         <Guarded label={label}>
           {pluginTab.render({ active, session })}
         </Guarded>

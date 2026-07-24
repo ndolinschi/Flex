@@ -9,6 +9,7 @@ import {
 import { isConfigured, resumeSession } from "../lib/tauri"
 import type { AppRoute } from "../lib/types/ui"
 import { restoreUiState, useAppStore } from "../stores/appStore"
+import { chatTabId } from "../stores/contentLayoutModel"
 import type { UiTheme } from "../stores/types"
 
 export const useBootstrap = (
@@ -176,16 +177,39 @@ export const useBootstrap = (
           useAppStore.getState().setSidebarWidth(width)
         }
 
+        // Restore active session id before the loading gate lifts so the shell
+        // paints with the right chat tab instead of empty → session flash.
+        const activeId = ui.activeSessionId
+        if (activeId) {
+          // Layout (contentLayout / open tabs) was already restored above.
+          // Activate before the loading gate lifts so the shell paints with the
+          // right chat instead of empty → session flash. Defer work-pane ensure
+          // until after resume (below).
+          const store = useAppStore.getState()
+          const chatId = chatTabId(activeId)
+          const hasChatTab = store.contentLayout.panes.some((pane) =>
+            pane.tabs.some((t) => t.id === chatId),
+          )
+          store.setActiveSessionId(
+            activeId,
+            hasChatTab ? undefined : { panel: "closed" },
+          )
+        }
+
         setRoute("chat")
         useAppStore.getState().setBootstrapped(true)
 
-        const activeId = ui.activeSessionId
         if (activeId) {
           try {
             await resumeSession(activeId)
-            // Restore 3-col Agents silhouette for the active session unless
-            // the user previously hid the work pane (rightPanelCollapsed).
-            useAppStore.getState().setActiveSessionId(activeId)
+            // Ensure work pane for non-draft sessions after engine is ready.
+            const store = useAppStore.getState()
+            if (
+              store.activeSessionId === activeId &&
+              !store.rightPanelCollapsed
+            ) {
+              store.ensureDefaultWorkPane(activeId)
+            }
           } catch {
             useAppStore.getState().setActiveSessionId(null)
           }

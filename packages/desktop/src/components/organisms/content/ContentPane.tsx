@@ -115,21 +115,25 @@ const useChatKeepAliveTabs = (
   tabs: ContentTab[],
   activeTabId: string | null,
 ): ReadonlySet<string> => {
-  const [kept, setKept] = useState<string[]>([])
+  // Seed from the current active chat so the first paint already mounts it
+  // (and the previous active) — useEffect would leave a one-frame gap.
+  const openIds = openChatTabIds(tabs)
+  const activeChatId = resolveActiveChatTabId(tabs, activeTabId)
+  const [kept, setKept] = useState<string[]>(() =>
+    nextChatKeepAlive([], activeChatId, openIds, MAX_KEEPALIVE_CHAT_TABS),
+  )
 
-  useEffect(() => {
-    const openIds = openChatTabIds(tabs)
-    const activeChatId = resolveActiveChatTabId(tabs, activeTabId)
-    setKept((prev) => {
-      const next = nextChatKeepAlive(
-        prev,
-        activeChatId,
-        openIds,
-        MAX_KEEPALIVE_CHAT_TABS,
-      )
-      return sameStringList(prev, next) ? prev : next
-    })
-  }, [activeTabId, tabs])
+  // Sync during render when the active/open set changes so we never unmount
+  // the newly active chat for a frame before useEffect runs.
+  const desired = nextChatKeepAlive(
+    kept,
+    activeChatId,
+    openIds,
+    MAX_KEEPALIVE_CHAT_TABS,
+  )
+  if (!sameStringList(kept, desired)) {
+    setKept(desired)
+  }
 
   return useMemo(() => new Set(kept), [kept])
 }
@@ -158,11 +162,12 @@ const TabActivityDot = memo(function TabActivityDot({
 
 export const ContentPane = ({
   paneIndex,
-  keepAliveTools,
+  keepAliveTools: _keepAliveTools,
   isEastmost = paneIndex === 0,
   onOpenCommandPalette,
   onOpenSearch,
 }: ContentPaneProps) => {
+  void _keepAliveTools
   const pane = useAppStore(
     (s) => s.contentLayout.panes[paneIndex] ?? EMPTY_PANE,
   )
@@ -611,14 +616,14 @@ export const ContentPane = ({
               </div>
             )
           }
-          const keepKey = `${t.sessionId}:${t.tool}`
           return (
             <ToolTabBody
               key={t.id}
               tool={t.tool}
               session={sessionsById.get(t.sessionId)}
               active={isActive}
-              keepAlive={keepAliveTools.has(keepKey)}
+              // Open tool tabs stay mounted (CSS-hidden) so tab switches are solid.
+              keepAlive
             />
           )
         })}

@@ -112,36 +112,55 @@ export const createSessionSlice: StateCreator<
   messageQueueBySession: {},
   restoredPlanAnnotations: {},
   setActiveSessionId: (id, opts) => {
+    const prevId = get().activeSessionId
     set({ activeSessionId: id, subagentViewer: null })
     void persistUiState({ activeSessionId: id })
-    if (id) {
-      get().openChatTab(id)
-      set((state) => {
-        if (!state.unreadBySession[id]) return state
-        const next = { ...state.unreadBySession }
-        delete next[id]
-        return { unreadBySession: next }
-      })
+
+    if (!id) {
+      get().setContentLayout(defaultContentLayout(null))
+      return
     }
-    if (id) {
+
+    get().openChatTab(id)
+    set((state) => {
+      if (!state.unreadBySession[id]) return state
+      const next = { ...state.unreadBySession }
+      delete next[id]
+      return { unreadBySession: next }
+    })
+
+    const chatId = chatTabId(id)
+    const layout = get().contentLayout
+    let existingPane: 0 | 1 | null = null
+    for (let i = 0; i < layout.panes.length; i++) {
+      if (layout.panes[i]?.tabs.some((t) => t.id === chatId)) {
+        existingPane = i as 0 | 1
+        break
+      }
+    }
+
+    // Prefer activating an already-open chat tab over openChatInPane, which can
+    // rewrite focused pane / layout and thrash the split.
+    if (existingPane !== null) {
+      get().activateTabInPane(existingPane, chatId)
+    } else {
       get().openChatInPane(
         get().contentLayout.mode === "split"
           ? get().contentLayout.focusedPane
           : 0,
         id,
       )
-      if (opts?.panel === "closed") {
-        if (get().contentLayout.mode === "split") {
-          get().collapseSplit()
-        }
-        get().closeOtherTabsInPane(0, chatTabId(id))
-      } else {
-        // Active (non-pristine) sessions default to Cursor Agents 3-col:
-        // sidebar | chat | work. Respect an explicit user hide.
-        get().ensureDefaultWorkPane(id)
+    }
+
+    if (opts?.panel === "closed") {
+      if (get().contentLayout.mode === "split") {
+        get().collapseSplit()
       }
-    } else {
-      get().setContentLayout(defaultContentLayout(null))
+      get().closeOtherTabsInPane(0, chatId)
+    } else if (prevId !== id || get().contentLayout.mode !== "split") {
+      // Non-pristine sessions default to 3-col work pane. Skip re-select of the
+      // same session when a work split is already open.
+      get().ensureDefaultWorkPane(id)
     }
   },
   setIsStreaming: (streaming) => set({ isStreaming: streaming }),
