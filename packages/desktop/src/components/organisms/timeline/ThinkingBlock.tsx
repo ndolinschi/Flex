@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { memo, useState } from "react"
 import { ChevronRight } from "lucide-react"
 import { Tooltip } from "../../atoms"
 import { Collapsible } from "../../molecules"
@@ -6,7 +6,7 @@ import { cn } from "../../../lib/utils"
 import { thinkingDurationLabel } from "./buildDisplayItems"
 import { Button } from "@/components/ui/button"
 
-export const ThinkingBlock = ({
+export const ThinkingBlock = memo(function ThinkingBlock({
   text,
   durationMs,
   streaming,
@@ -16,16 +16,19 @@ export const ThinkingBlock = ({
   durationMs?: number
   streaming?: boolean
   suppressStatusLabel?: boolean
-}) => {
+}) {
   const [collapsed, setCollapsed] = useState(true)
 
   if (!text.trim()) return null
+
+  const displayText =
+    streaming && text.length > 4_000 ? text.slice(-4_000) : text
 
   if (streaming && suppressStatusLabel) {
     return (
       <div className="min-h-5">
         <p className="whitespace-pre-wrap pb-1 text-base leading-relaxed text-ink-muted opacity-50">
-          {text}
+          {displayText}
         </p>
       </div>
     )
@@ -66,9 +69,9 @@ export const ThinkingBlock = ({
       </Tooltip>
       <Collapsible open={!collapsed}>
         <p className="whitespace-pre-wrap pb-1 text-base leading-relaxed text-ink-muted opacity-50">
-          {text}
+          {displayText}
         </p>
       </Collapsible>
     </div>
   )
-}
+})

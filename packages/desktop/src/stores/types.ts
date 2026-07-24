@@ -137,6 +137,10 @@ export type SessionSliceState = {
     SessionId,
     { tokensBefore?: number; tokensAfter?: number; strategy: string }
   >
+  /**
+   * @deprecated Live buffers live in `streamingBuffersStore` (session-scoped
+   * external store). Kept empty for type-compat; do not read/write here.
+   */
   streamingBySession: Record<SessionId, StreamingBuffers>
   sweepRequests: Record<SessionId, number>
   resyncRequests: Record<SessionId, number>

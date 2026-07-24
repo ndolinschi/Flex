@@ -2,7 +2,14 @@ import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { List, Plus, Terminal as TerminalIcon } from "lucide-react"
 
-import { ConfirmDialog, EmptyState } from "../../molecules"
+import {
+  ConfirmDialog,
+  EmptyState,
+  PanelSideRail,
+  PanelToolbar,
+  panelChromeIconActiveClass,
+  panelChromeIconClass,
+} from "../../molecules"
 import { agentTerminalId } from "../../../hooks/useGlobalSessionEvents"
 import { terminalCreate, terminalKill, toInvokeError } from "../../../lib/tauri"
 import { dropTerminalBuffer, ensureTerminalBus } from "../../../lib/terminalBus"
@@ -108,73 +115,79 @@ export const TerminalTab = ({
         const remaining = terminals.filter((t) => t.id !== id)
         setActiveTerminalId(sessionKey, remaining[0]?.id ?? null)
       }
+    } catch (err) {
+      useAppStore
+        .getState()
+        .pushToast(toInvokeError(err) || "Could not close terminal", "error")
     } finally {
       setClosing(false)
       setPendingClose(null)
     }
   }
 
+  const titleLabel = isAgentSelected
+    ? "Agent terminal"
+    : activeTerminal
+      ? activeTerminal.title || basename(activeTerminal.cwd) || "Terminal"
+      : "Terminal"
+
+  const listCount = terminals.length + (hasAgentStream ? 1 : 0)
+  const listHeader =
+    listCount === 0
+      ? "Terminals"
+      : `${listCount} Terminal${listCount === 1 ? "" : "s"}`
+
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div
-        role="toolbar"
+      <PanelToolbar
+        variant="elevated"
         aria-label="Terminal sessions"
-        className="panel-toolbar flex h-[var(--panel-toolbar-height)] shrink-0 items-center gap-1.5 border-b border-stroke-3 bg-elevated px-2"
+        actions={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="New Terminal"
+              title="New Terminal"
+              onClick={() => void handleNewTerminal()}
+              className={cn("h-6 w-6", panelChromeIconClass)}
+            >
+              <Plus className="size-3.5" strokeWidth={1.5} aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={
+                terminalListVisible ? "Hide Terminal List" : "Show Terminal List"
+              }
+              title={
+                terminalListVisible ? "Hide Terminal List" : "Show Terminal List"
+              }
+              onClick={toggleTerminalListVisible}
+              className={cn(
+                "h-6 w-6",
+                panelChromeIconClass,
+                terminalListVisible && panelChromeIconActiveClass,
+              )}
+            >
+              <List className="size-3.5" strokeWidth={1.5} aria-hidden />
+            </Button>
+          </>
+        }
       >
         <button
           type="button"
           className={cn(
             "flex h-6 min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 text-base font-medium text-ink",
-            "hover:bg-bg-quaternary",
+            "hover:bg-fill-4",
           )}
-          title={
-            isAgentSelected
-              ? "Agent terminal"
-              : activeTerminal
-                ? activeTerminal.title || "Terminal"
-                : "Terminal"
-          }
+          title={titleLabel}
         >
-          <span className="min-w-0 truncate">
-            {isAgentSelected
-              ? "Agent terminal"
-              : activeTerminal
-                ? activeTerminal.title || basename(activeTerminal.cwd) || "Terminal"
-                : "Terminal"}
-          </span>
+          <span className="min-w-0 truncate">{titleLabel}</span>
         </button>
-        <div className="ml-auto flex shrink-0 items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="New Terminal"
-            title="New Terminal"
-            onClick={() => void handleNewTerminal()}
-            className="h-6 w-6 text-icon-2 hover:bg-bg-quaternary hover:text-icon-1"
-          >
-            <Plus className="size-3.5" strokeWidth={1.5} aria-hidden />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label={
-              terminalListVisible ? "Hide Terminal List" : "Show Terminal List"
-            }
-            title={
-              terminalListVisible ? "Hide Terminal List" : "Show Terminal List"
-            }
-            onClick={toggleTerminalListVisible}
-            className={cn(
-              "h-6 w-6 text-icon-2 hover:bg-bg-quaternary hover:text-icon-1",
-              terminalListVisible && "bg-bg-tertiary text-ink",
-            )}
-          >
-            <List className="size-3.5" strokeWidth={1.5} aria-hidden />
-          </Button>
-        </div>
-      </div>
+      </PanelToolbar>
       {isAgentSelected ? (
         <p className="shrink-0 truncate border-b border-stroke-3 px-2.5 py-1.5 text-sm text-ink-muted">
           Agent is using this terminal. It&apos;s read-only.
@@ -183,16 +196,10 @@ export const TerminalTab = ({
 
       <div className="flex min-h-0 flex-1">
         {terminalListVisible && (terminals.length > 0 || hasAgentStream) ? (
-          <div className="flex w-[160px] shrink-0 flex-col border-r border-stroke-3 bg-panel">
-            <div className="flex h-7 shrink-0 items-center px-2 text-xs text-ink-muted">
-              <span className="tabular-nums">
-                {terminals.length === 0 && !hasAgentStream
-                  ? "Terminals"
-                  : `${terminals.length + (hasAgentStream ? 1 : 0)} Terminal${
-                      terminals.length + (hasAgentStream ? 1 : 0) === 1 ? "" : "s"
-                    }`}
-              </span>
-            </div>
+          <PanelSideRail
+            width={160}
+            header={<span className="tabular-nums">{listHeader}</span>}
+          >
             <ScrollArea className="min-h-0 flex-1 py-1.5">
               {hasAgentStream && agentId ? (
                 <>
@@ -227,7 +234,7 @@ export const TerminalTab = ({
                 </>
               ) : null}
             </ScrollArea>
-          </div>
+          </PanelSideRail>
         ) : null}
 
         <div className="relative min-h-0 flex-1">

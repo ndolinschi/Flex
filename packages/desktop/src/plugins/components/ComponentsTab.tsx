@@ -17,7 +17,16 @@ import {
   Tab,
   Tooltip,
 } from "../../components/atoms"
-import { EmptyState, ErrorBanner } from "../../components/molecules"
+import {
+  EmptyState,
+  ErrorBanner,
+  PanelSideRail,
+  PanelToolbar,
+  PanelToolbarTitle,
+  ToolQueryError,
+  panelChromeIconActiveClass,
+  panelChromeIconClass,
+} from "../../components/molecules"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -166,7 +175,13 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
     setError(null)
   }, [cwd, fallbackCwd])
 
-  const { data: detect, isFetching: detectFetching } = useQuery({
+  const {
+    data: detect,
+    isFetching: detectFetching,
+    isError: detectIsError,
+    error: detectError,
+    refetch: refetchDetect,
+  } = useQuery({
     queryKey: ["components-detect", cwd, fallbackCwd ?? ""],
     queryFn: () => componentsDetect(cwd, fallbackCwd),
     enabled: active && !!cwd,
@@ -176,6 +191,8 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
   const {
     data: list,
     isFetching: listFetching,
+    isError: listIsError,
+    error: listError,
     refetch: refetchList,
   } = useQuery({
     queryKey: ["components-list", cwd, fallbackCwd ?? ""],
@@ -184,7 +201,13 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
     staleTime: 15_000,
   })
 
-  const { data: detail } = useQuery({
+  const {
+    data: detail,
+    isError: detailIsError,
+    error: detailError,
+    refetch: refetchDetail,
+    isFetching: detailFetching,
+  } = useQuery({
     queryKey: ["components-detail", cwd, fallbackCwd ?? "", activeId],
     queryFn: () => componentsDetail(cwd, activeId!, fallbackCwd),
     enabled: active && !!cwd && !!activeId,
@@ -351,6 +374,20 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
     )
   }
 
+  if (detectIsError) {
+    return (
+      <div className="absolute inset-0 flex flex-col">
+        <ToolQueryError
+          title="Couldn't detect UI framework"
+          error={detectError}
+          fallbackMessage="Failed to scan the project for React, Vue, or Angular."
+          onRetry={() => void refetchDetect()}
+          retrying={detectFetching}
+        />
+      </div>
+    )
+  }
+
   if (detect && !isComponentsSupported(detect)) {
     return (
       <div className="absolute inset-0 flex flex-col">
@@ -364,66 +401,79 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
   }
 
   const busy = detectFetching || listFetching
+  const refreshAll = () => {
+    void refetchDetect()
+    void refetchList().catch((err) => setError(toInvokeError(err)))
+  }
 
   return (
     <div className="absolute inset-0 flex flex-col">
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
-        <span className="min-w-0 flex-1 truncate text-sm text-ink">
+      <PanelToolbar
+        aria-label="Components"
+        actions={
+          <>
+            <Tooltip label={listVisible ? "Hide list" : "Show list"}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={listVisible ? "Hide list" : "Show list"}
+                title={listVisible ? "Hide list" : "Show list"}
+                onClick={() => setListVisible((v) => !v)}
+                className={cn(
+                  "h-6 w-6",
+                  panelChromeIconClass,
+                  listVisible && panelChromeIconActiveClass,
+                )}
+              >
+                <List className="h-3.5 w-3.5" aria-hidden />
+              </Button>
+            </Tooltip>
+            <Tooltip label="Refresh">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Refresh"
+                title="Refresh"
+                onClick={refreshAll}
+                className={cn("h-6 w-6", panelChromeIconClass)}
+              >
+                <RefreshCw
+                  className={cn("h-3.5 w-3.5", busy && "animate-spin")}
+                  aria-hidden
+                />
+              </Button>
+            </Tooltip>
+          </>
+        }
+      >
+        <PanelToolbarTitle>
           {list
             ? `${list.components.length} component${list.components.length === 1 ? "" : "s"} · ${frameworkLabel(list.frameworks ?? detect?.frameworks)}`
             : busy
               ? "Scanning…"
               : "Components"}
-        </span>
-        <Tooltip label={listVisible ? "Hide list" : "Show list"}>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label={listVisible ? "Hide list" : "Show list"}
-            title={listVisible ? "Hide list" : "Show list"}
-            onClick={() => setListVisible((v) => !v)}
-            className={cn(
-              "text-ink-secondary hover:bg-fill-4 hover:text-ink",
-              "opacity-50 hover:opacity-80",
-              "h-6 w-6",
-            )}
-          >
-            <List className="h-3.5 w-3.5" aria-hidden />
-          </Button>
-        </Tooltip>
-        <Tooltip label="Refresh">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Refresh"
-            title="Refresh"
-            onClick={() => {
-              void refetchList().catch((err) => setError(toInvokeError(err)))
-            }}
-            className={cn(
-              "text-ink-secondary hover:bg-fill-4 hover:text-ink",
-              "opacity-50 hover:opacity-80",
-              "h-6 w-6",
-            )}
-          >
-            <RefreshCw
-              className={cn("h-3.5 w-3.5", busy && "animate-spin")}
-              aria-hidden
-            />
-          </Button>
-        </Tooltip>
-      </div>
+        </PanelToolbarTitle>
+      </PanelToolbar>
 
       {error ? (
         <ErrorBanner
           message={error}
           className="shrink-0 rounded-none border-x-0 border-t-0 px-2.5 py-1.5 text-xs"
+          onDismiss={() => setError(null)}
         />
       ) : null}
 
-      {!list && busy ? (
+      {listIsError && !list ? (
+        <ToolQueryError
+          title="Couldn't load components"
+          error={listError}
+          fallbackMessage="Failed to scan components in this project."
+          onRetry={() => void refetchList()}
+          retrying={listFetching}
+        />
+      ) : !list && busy ? (
         <div className="flex min-h-0 flex-1 items-center justify-center gap-2 px-2.5 text-sm text-ink-muted">
           <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden />
           Scanning…
@@ -437,10 +487,7 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
       ) : (
         <div className="flex min-h-0 flex-1">
           {listVisible ? (
-            <aside className="flex w-[180px] shrink-0 flex-col border-r border-stroke-3">
-              <div className="flex h-6 shrink-0 items-center px-2.5 text-xs text-ink-muted">
-                Available
-              </div>
+            <PanelSideRail width={180} header="Available">
               <ScrollArea className="min-h-0 flex-1 py-1.5">
                 <ul>
                   {tree.map(({ node, depth }) => {
@@ -454,7 +501,7 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
                           style={{ paddingLeft: `${10 + depth * 10}px` }}
                           className={cn(
                             "h-auto w-full justify-start gap-1 py-1.5 pr-2.5 text-xs font-normal",
-                              isActive
+                            isActive
                               ? "bg-fill-2 text-ink hover:bg-fill-2"
                               : isOpen
                                 ? "bg-fill-4 text-ink-secondary hover:bg-fill-4"
@@ -481,12 +528,15 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
                   })}
                 </ul>
               </ScrollArea>
-            </aside>
+            </PanelSideRail>
           ) : null}
 
           <main className="flex min-w-0 flex-1 flex-col">
             {openIds.length > 0 ? (
-              <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 overflow-x-auto border-b border-stroke-3 px-2.5">
+              <PanelToolbar
+                aria-label="Open components"
+                className="overflow-x-auto"
+              >
                 {openIds.map((id) => {
                   const node = byId.get(id)
                   const dirty =
@@ -510,10 +560,18 @@ export const ComponentsTab = ({ active, session }: ComponentsTabProps) => {
                     </Tab>
                   )
                 })}
-              </div>
+              </PanelToolbar>
             ) : null}
 
-            {activeId && detail ? (
+            {activeId && detailIsError && !detail ? (
+              <ToolQueryError
+                title="Couldn't load component"
+                error={detailError}
+                fallbackMessage="Failed to load component details."
+                onRetry={() => void refetchDetail()}
+                retrying={detailFetching}
+              />
+            ) : activeId && detail ? (
               <>
                 <ComponentCanvas
                   detail={detail}

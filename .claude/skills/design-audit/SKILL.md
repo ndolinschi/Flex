@@ -59,6 +59,7 @@ Do **not** invent a parallel design-map. If comments still say `design-map/…`,
 | Do | Don’t |
 |---|---|
 | Reuse `Tab` / `TabStrip` / `TabClose` for panel + file chips | Copy pill markup per surface |
+| Reuse `PanelToolbar` / `PanelSideRail` / `panelChromeIconClass` (Browser/Terminal recipe) | Hand-roll tool-tab headers |
 | Align panel body chrome to TabStrip `px-2.5` | Leave one tab header on `px-2` / `px-4` |
 | Quiet sash hover (white-alpha) | Accent-colored resize lines |
 | `fill-2` selected / `fill-4` hover on lists | Random `fill-3` active states |

@@ -53,6 +53,7 @@ import { visibleRightPanelTabs } from "../right-panel/tabs"
 import { ChatSessionBody } from "./ChatSessionBody"
 import { ToolTabBody } from "./ToolTabBody"
 import { FileDocumentTab } from "../right-panel/FileDocumentTab"
+import { PanelErrorBoundary } from "../../templates"
 import { cn, basename, fileIconForPath } from "../../../lib/utils"
 import { sessionColor, GROUP_PALETTE } from "../../../lib/sessionColor"
 import { toggleZoomWindow } from "../../../lib/windowChrome"
@@ -600,11 +601,13 @@ export const ContentPane = ({
                   isActive ? "flex" : "hidden",
                 )}
               >
-                <FileDocumentTab
-                  path={t.path}
-                  session={sessionsById.get(t.sessionId)}
-                  active={isActive}
-                />
+                <PanelErrorBoundary label="File">
+                  <FileDocumentTab
+                    path={t.path}
+                    session={sessionsById.get(t.sessionId)}
+                    active={isActive}
+                  />
+                </PanelErrorBoundary>
               </div>
             )
           }

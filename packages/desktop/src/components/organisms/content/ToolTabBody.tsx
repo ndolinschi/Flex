@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo } from "react"
+import { lazy, Suspense, useMemo, type ReactNode } from "react"
 import type { SessionMeta } from "../../../lib/types"
 import type { RightPanelTab } from "../../../stores/appStore"
 import { findPluginTab } from "../../../plugins/registry"
@@ -8,6 +8,7 @@ import { MemoryTab } from "../right-panel/MemoryTab"
 import { PrTab } from "../right-panel/PrTab"
 import { PromptTab } from "../right-panel/PromptTab"
 import { Spinner } from "../../atoms"
+import { PanelErrorBoundary } from "../../templates"
 import { cn } from "../../../lib/utils"
 
 const FilesTab = lazy(() =>
@@ -37,6 +38,46 @@ const PanelFallback = () => (
   </div>
 )
 
+const toolLabel = (tool: RightPanelTab, pluginLabel?: string): string => {
+  if (pluginLabel) return pluginLabel
+  switch (tool) {
+    case "status":
+      return "Status"
+    case "prompt":
+      return "Prompt"
+    case "plan":
+      return "Plan"
+    case "changes":
+      return "Changes"
+    case "pr":
+      return "Pull Request"
+    case "memory":
+      return "Memory"
+    case "files":
+      return "Files"
+    case "terminal":
+      return "Terminal"
+    case "browser":
+      return "Browser"
+    case "database":
+      return "Database"
+    default:
+      return tool.charAt(0).toUpperCase() + tool.slice(1)
+  }
+}
+
+const Guarded = ({
+  label,
+  children,
+}: {
+  label: string
+  children: ReactNode
+}) => (
+  <PanelErrorBoundary label={label}>
+    {children}
+  </PanelErrorBoundary>
+)
+
 export const ToolTabBody = ({
   tool,
   session,
@@ -44,14 +85,17 @@ export const ToolTabBody = ({
   keepAlive,
 }: ToolTabBodyProps) => {
   const pluginTab = useMemo(() => findPluginTab(tool), [tool])
+  const label = toolLabel(tool, pluginTab?.label)
 
   if (tool === "status") {
     if (!session) return null
     return active ? (
       <div className="absolute inset-0 flex flex-col">
-        <Suspense fallback={<PanelFallback />}>
-          <StatusTab session={session} active={active} />
-        </Suspense>
+        <Guarded label={label}>
+          <Suspense fallback={<PanelFallback />}>
+            <StatusTab session={session} active={active} />
+          </Suspense>
+        </Guarded>
       </div>
     ) : null
   }
@@ -65,7 +109,9 @@ export const ToolTabBody = ({
           active || keepAlive ? (active ? "flex" : "hidden") : "hidden",
         )}
       >
-        <PromptTab sessionId={session.id} active={active} />
+        <Guarded label={label}>
+          <PromptTab sessionId={session.id} active={active} />
+        </Guarded>
       </div>
     )
   }
@@ -73,28 +119,36 @@ export const ToolTabBody = ({
   if (tool === "plan") {
     return active ? (
       <div className="absolute inset-0 flex flex-col">
-        <PlanTab active={session} />
+        <Guarded label={label}>
+          <PlanTab active={session} />
+        </Guarded>
       </div>
     ) : null
   }
   if (tool === "changes") {
     return active ? (
       <div className="absolute inset-0 flex flex-col">
-        <ChangesTab active={session} />
+        <Guarded label={label}>
+          <ChangesTab active={session} />
+        </Guarded>
       </div>
     ) : null
   }
   if (tool === "pr") {
     return active ? (
       <div className="absolute inset-0 flex flex-col">
-        <PrTab active={session} />
+        <Guarded label={label}>
+          <PrTab active={session} />
+        </Guarded>
       </div>
     ) : null
   }
   if (tool === "memory") {
     return active ? (
       <div className="absolute inset-0 flex flex-col">
-        <MemoryTab />
+        <Guarded label={label}>
+          <MemoryTab />
+        </Guarded>
       </div>
     ) : null
   }
@@ -107,9 +161,11 @@ export const ToolTabBody = ({
           active || keepAlive ? (active ? "flex" : "hidden") : "hidden",
         )}
       >
-        <Suspense fallback={<PanelFallback />}>
-          <FilesTab active={active} session={session} />
-        </Suspense>
+        <Guarded label={label}>
+          <Suspense fallback={<PanelFallback />}>
+            <FilesTab active={active} session={session} />
+          </Suspense>
+        </Guarded>
       </div>
     )
   }
@@ -122,9 +178,11 @@ export const ToolTabBody = ({
           active || keepAlive ? (active ? "flex" : "hidden") : "hidden",
         )}
       >
-        <Suspense fallback={<PanelFallback />}>
-          <TerminalTab active={active} sessionId={session?.id ?? null} />
-        </Suspense>
+        <Guarded label={label}>
+          <Suspense fallback={<PanelFallback />}>
+            <TerminalTab active={active} sessionId={session?.id ?? null} />
+          </Suspense>
+        </Guarded>
       </div>
     )
   }
@@ -137,9 +195,11 @@ export const ToolTabBody = ({
           active || keepAlive ? (active ? "block" : "hidden") : "hidden",
         )}
       >
-        <Suspense fallback={<PanelFallback />}>
-          <BrowserTab active={active} sessionId={session?.id ?? null} />
-        </Suspense>
+        <Guarded label={label}>
+          <Suspense fallback={<PanelFallback />}>
+            <BrowserTab active={active} sessionId={session?.id ?? null} />
+          </Suspense>
+        </Guarded>
       </div>
     )
   }
@@ -152,7 +212,9 @@ export const ToolTabBody = ({
           active ? "flex" : "hidden",
         )}
       >
-        {pluginTab.render({ active, session })}
+        <Guarded label={label}>
+          {pluginTab.render({ active, session })}
+        </Guarded>
       </div>
     )
   }

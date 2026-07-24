@@ -167,6 +167,25 @@ export const describeHunklessDiff = (file: ParsedDiffFile): string => {
   return "No content changes"
 }
 
+/**
+ * Fast path: collect `b/` paths from `diff --git` headers without full hunk parse.
+ * Useful for truncation notices and multi-file inventories.
+ */
+export const listDiffPaths = (text: string): string[] => {
+  if (!text) return []
+  const paths: string[] = []
+  const seen = new Set<string>()
+  for (const line of text.replace(/\r\n/g, "\n").split("\n")) {
+    const m = FILE_HEADER_RE.exec(line)
+    if (!m) continue
+    const path = stripPath(m[2] || m[1] || "").trim()
+    if (!path || path === "/dev/null" || seen.has(path)) continue
+    seen.add(path)
+    paths.push(path)
+  }
+  return paths
+}
+
 /** Soft-cap for rendered unified-diff lines (DOM cost), not parse. */
 export const DIFF_RENDER_LINE_CAP = 800
 

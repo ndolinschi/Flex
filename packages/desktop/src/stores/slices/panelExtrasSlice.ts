@@ -239,7 +239,13 @@ export const createPanelExtrasSlice: StateCreator<
     })),
   setWorkspaceFileDraft: (sessionKey, path, draft) =>
     set((state) => {
-      const drafts = { ...(state.fileDraftsBySession[sessionKey] ?? {}) }
+      const prev = state.fileDraftsBySession[sessionKey] ?? {}
+      if (draft === null) {
+        if (!(path in prev)) return state
+      } else if (prev[path] === draft) {
+        return state
+      }
+      const drafts = { ...prev }
       if (draft === null) delete drafts[path]
       else drafts[path] = draft
       return {

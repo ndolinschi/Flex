@@ -30,6 +30,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { RunningDot } from "../atoms"
+import { PanelToolbar } from "./PanelToolbar"
 import { PlanModelPill } from "./PlanModelPill"
 import { PlanFindBar, type PlanFindState } from "./PlanFindBar"
 
@@ -96,7 +97,7 @@ export const PlanToolbar = ({
 
   return (
     <div className={cn("flex shrink-0 flex-col", className)}>
-      <div className="flex h-[var(--header-height)] items-center gap-1.5 px-2.5 text-sm">
+      <PanelToolbar aria-label="Plan" className="text-sm">
         <Breadcrumb className="min-w-0 flex-1 overflow-hidden">
           <BreadcrumbList className="flex-nowrap overflow-hidden gap-1.5">
             <BreadcrumbItem className="min-w-0 shrink overflow-hidden">
@@ -249,7 +250,7 @@ export const PlanToolbar = ({
             </DropdownMenuContent>
           </DropdownMenu>
         </span>
-      </div>
+      </PanelToolbar>
 
       {find?.open ? <PlanFindBar find={find} inputRef={findInputRef} /> : null}
     </div>

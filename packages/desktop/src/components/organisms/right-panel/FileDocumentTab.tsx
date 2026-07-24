@@ -17,7 +17,14 @@ import {
 } from "lucide-react"
 import type { OnMount } from "@monaco-editor/react"
 import { Spinner } from "../../atoms"
-import { EmptyState, ErrorBanner, MarkdownBody } from "../../molecules"
+import {
+  EmptyState,
+  MarkdownBody,
+  PanelToolbar,
+  PanelToolbarTitle,
+  ToolQueryError,
+  panelChromeIconClass,
+} from "../../molecules"
 import { Button } from "@/components/ui/button"
 import { languageForPath } from "../../../lib/monacoLanguages"
 import {
@@ -203,6 +210,22 @@ export const FileDocumentTab = ({
     editorRef.current = editor
   }, [])
 
+  // Drop the Monaco model when this tab body unmounts so long multi-file
+  // sessions do not accumulate language-service models.
+  useEffect(() => {
+    return () => {
+      const editor = editorRef.current
+      editorRef.current = null
+      if (!editor) return
+      try {
+        const model = editor.getModel?.()
+        model?.dispose?.()
+      } catch {
+        // Editor may already be disposed by @monaco-editor/react
+      }
+    }
+  }, [path])
+
   const markers = useMonacoMarkers(path, active)
   const errorCount = markers.filter(
     (m) => m.severity === MarkerSeverity.Error,
@@ -310,60 +333,64 @@ export const FileDocumentTab = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-editor">
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
-        <span className="min-w-0 flex-1 truncate text-sm text-ink" title={path}>
+      <PanelToolbar
+        aria-label="File"
+        actions={
+          <>
+            {isMarkdown ? (
+              <div
+                className="segmented-track"
+                role="group"
+                aria-label="Markdown view"
+              >
+                <button
+                  type="button"
+                  className="segmented-item"
+                  data-active={showPreview ? "true" : undefined}
+                  aria-pressed={showPreview}
+                  onClick={() => setPreviewMode(true)}
+                >
+                  Preview
+                </button>
+                <button
+                  type="button"
+                  className="segmented-item"
+                  data-active={!showPreview ? "true" : undefined}
+                  aria-pressed={!showPreview}
+                  onClick={() => setPreviewMode(false)}
+                >
+                  Source
+                </button>
+              </div>
+            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={dirty ? "Save" : "Save (no changes)"}
+              title={dirty ? "Save" : "Save (no changes)"}
+              disabled={!dirty || saving}
+              onClick={() => void handleSave()}
+              className={panelChromeIconClass}
+            >
+              {saving ? (
+                <Spinner size="sm" />
+              ) : (
+                <Save className="h-3 w-3" aria-hidden />
+              )}
+            </Button>
+          </>
+        }
+      >
+        <PanelToolbarTitle title={path}>
           {basename(path)}
           {dirty ? (
             <span className="ml-1 text-ink-faint" aria-label="Unsaved">
               ●
             </span>
           ) : null}
-        </span>
-        <div className="ml-auto flex shrink-0 items-center gap-1">
-          {isMarkdown ? (
-            <div
-              className="segmented-track"
-              role="group"
-              aria-label="Markdown view"
-            >
-              <button
-                type="button"
-                className="segmented-item"
-                data-active={showPreview ? "true" : undefined}
-                aria-pressed={showPreview}
-                onClick={() => setPreviewMode(true)}
-              >
-                Preview
-              </button>
-              <button
-                type="button"
-                className="segmented-item"
-                data-active={!showPreview ? "true" : undefined}
-                aria-pressed={!showPreview}
-                onClick={() => setPreviewMode(false)}
-              >
-                Source
-              </button>
-            </div>
-          ) : null}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            aria-label={dirty ? "Save" : "Save (no changes)"}
-            title={dirty ? "Save" : "Save (no changes)"}
-            disabled={!dirty || saving}
-            onClick={() => void handleSave()}
-            className="text-ink-muted hover:bg-fill-4 hover:text-ink"
-          >
-            {saving ? (
-              <Spinner size="sm" />
-            ) : (
-              <Save className="h-3 w-3" aria-hidden />
-            )}
-          </Button>
-        </div>
-      </div>
+        </PanelToolbarTitle>
+      </PanelToolbar>
 
       {breadcrumbSegments.length > 0 ? (
         <nav
@@ -401,16 +428,13 @@ export const FileDocumentTab = ({
             Loading…
           </div>
         ) : loadError ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
-            <ErrorBanner message={loadError} className="max-w-md" />
-            <Button
-              variant="link"
-              onClick={() => void refetch()}
-              className="h-auto px-0 py-0 text-xs font-normal"
-            >
-              Retry
-            </Button>
-          </div>
+          <ToolQueryError
+            title="Couldn't open file"
+            error={loadError}
+            fallbackMessage="Failed to read this file."
+            onRetry={() => void refetch()}
+            className="h-full"
+          />
         ) : showPreview ? (
           <ScrollArea className="h-full">
             <div className="px-2.5 py-2">

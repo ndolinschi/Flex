@@ -287,13 +287,11 @@ pub(crate) fn git_status_full(cwd: &str) -> DesktopResult<Vec<GitFileStatus>> {
     Ok(files)
 }
 
-#[tracing::instrument(level = "debug", skip_all, err)]
-#[tauri::command]
-pub async fn git_status_since_baseline(
-    state: State<'_, AppState>,
-    session_id: String,
+async fn compute_status_since_baseline(
+    state: &AppState,
+    session_id: &str,
 ) -> DesktopResult<GitStatusSummary> {
-    let (cwd, base_cwd) = review_dirs(&state, &session_id).await?;
+    let (cwd, base_cwd) = review_dirs(state, session_id).await?;
     let cwd_str = cwd.to_string_lossy().to_string();
     let cwd_path = cwd.clone();
 
@@ -307,7 +305,7 @@ pub async fn git_status_since_baseline(
     let baseline = {
         let baselines = state.session_baselines.lock().await;
         baselines
-            .get(&session_id)
+            .get(session_id)
             .map(|b| (b.head_sha.clone(), b.files.clone()))
     };
     let Some((baseline_head, baseline_files)) = baseline else {
@@ -352,6 +350,71 @@ pub async fn git_status_since_baseline(
     })
     .await
     .map_err(|e| DesktopError::Message(format!("git status join: {e}")))?
+}
+
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn git_status_since_baseline(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> DesktopResult<GitStatusSummary> {
+    compute_status_since_baseline(state.inner(), &session_id).await
+}
+
+/// One entry in a multi-session git status batch (sidebar badges).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStatusBatchEntry {
+    pub session_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<GitStatusSummary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+const MAX_STATUS_BATCH: usize = 64;
+/// Cap concurrent git subprocesses so large sidebars don't thrash the disk.
+const STATUS_BATCH_CONCURRENCY: usize = 4;
+
+/// Single IPC for many sessions — avoids N× round-trips from the sidebar poller.
+/// Sessions run in chunks of `STATUS_BATCH_CONCURRENCY` via `join_all`.
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub async fn git_status_since_baseline_batch(
+    state: State<'_, AppState>,
+    session_ids: Vec<String>,
+) -> DesktopResult<Vec<GitStatusBatchEntry>> {
+    let mut ids: Vec<String> = session_ids
+        .into_iter()
+        .filter(|id| !id.trim().is_empty())
+        .take(MAX_STATUS_BATCH)
+        .collect();
+    ids.sort();
+    ids.dedup();
+
+    let mut out = Vec::with_capacity(ids.len());
+    for chunk in ids.chunks(STATUS_BATCH_CONCURRENCY) {
+        let results =
+            futures::future::join_all(chunk.iter().map(|id| {
+                compute_status_since_baseline(state.inner(), id)
+            }))
+            .await;
+        for (id, result) in chunk.iter().zip(results) {
+            match result {
+                Ok(summary) => out.push(GitStatusBatchEntry {
+                    session_id: id.clone(),
+                    summary: Some(summary),
+                    error: None,
+                }),
+                Err(err) => out.push(GitStatusBatchEntry {
+                    session_id: id.clone(),
+                    summary: None,
+                    error: Some(err.to_string()),
+                }),
+            }
+        }
+    }
+    Ok(out)
 }
 
 pub(crate) fn hash_object(cwd: &std::path::Path, path: &str) -> Option<String> {
@@ -1114,17 +1177,74 @@ fn git_pr_status_sync(cwd: String) -> DesktopResult<BranchPrStatus> {
     })
 }
 
+/// Paths changed in the open PR (for paged PR review UI).
 #[tracing::instrument(level = "debug", skip_all, err)]
 #[tauri::command]
-pub fn git_pr_diff(cwd: String) -> DesktopResult<String> {
+pub fn git_pr_files(cwd: String) -> DesktopResult<Vec<String>> {
     let path = std::path::PathBuf::from(&cwd);
     if !gh_available(&path) {
-        return Ok(String::new());
+        return Ok(Vec::new());
     }
 
     let out = match crate::win_console::command("gh")
-        .args(["pr", "diff"])
+        .args(["pr", "diff", "--name-only"])
         .current_dir(&path)
+        .output()
+    {
+        Ok(out) => out,
+        Err(err) => {
+            tracing::debug!(error = %err, "gh pr diff --name-only spawn failed");
+            invalidate_gh_bin_cache();
+            return Ok(Vec::new());
+        }
+    };
+
+    if !out.status.success() {
+        return Ok(Vec::new());
+    }
+
+    let mut files: Vec<String> = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect();
+    files.sort();
+    files.dedup();
+    // Cap list so monorepo PRs stay navigable; FE pages diffs per file.
+    const MAX_PR_FILES: usize = 500;
+    files.truncate(MAX_PR_FILES);
+    Ok(files)
+}
+
+/// Full PR diff, or a single path when `path` is set (paged review).
+#[tracing::instrument(level = "debug", skip_all, err)]
+#[tauri::command]
+pub fn git_pr_diff(cwd: String, path: Option<String>) -> DesktopResult<String> {
+    let root = std::path::PathBuf::from(&cwd);
+    if !gh_available(&root) {
+        return Ok(String::new());
+    }
+
+    let mut args = vec!["pr".to_string(), "diff".to_string()];
+    if let Some(rel) = path
+        .as_deref()
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+    {
+        // Reject path traversal into the command args.
+        if rel.contains("..") || rel.starts_with('/') || rel.starts_with('\\') {
+            return Err(DesktopError::Message(
+                "invalid path for pull request diff".into(),
+            ));
+        }
+        args.push("--".into());
+        args.push(rel.to_string());
+    }
+
+    let out = match crate::win_console::command("gh")
+        .args(&args)
+        .current_dir(&root)
         .output()
     {
         Ok(out) => out,
@@ -1140,9 +1260,18 @@ pub fn git_pr_diff(cwd: String) -> DesktopResult<String> {
     }
 
     let mut diff = String::from_utf8_lossy(&out.stdout).into_owned();
-    const MAX_CHARS: usize = 512_000;
-    if diff.len() > MAX_CHARS {
-        diff.truncate(MAX_CHARS);
+    // Per-file diffs stay smaller; full PR still hard-capped.
+    let max_chars: usize = if path.as_ref().is_some_and(|p| !p.trim().is_empty()) {
+        256 * 1024
+    } else {
+        512_000
+    };
+    if diff.len() > max_chars {
+        let mut cut = max_chars;
+        while cut > 0 && !diff.is_char_boundary(cut) {
+            cut -= 1;
+        }
+        diff.truncate(cut);
         diff.push_str("\n\n… diff truncated …\n");
     }
     Ok(diff)

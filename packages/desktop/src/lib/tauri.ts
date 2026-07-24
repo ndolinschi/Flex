@@ -300,6 +300,18 @@ export const gitStatusSinceBaseline = (
   sessionId: string,
 ): Promise<GitStatusSummary> => invoke("git_status_since_baseline", { sessionId })
 
+export type GitStatusBatchEntry = {
+  sessionId: string
+  summary?: GitStatusSummary
+  error?: string
+}
+
+/** Single IPC for many sessions (sidebar badges). Caps at 64 server-side. */
+export const gitStatusSinceBaselineBatch = (
+  sessionIds: string[],
+): Promise<GitStatusBatchEntry[]> =>
+  invoke("git_status_since_baseline_batch", { sessionIds })
+
 export const gitDiff = (cwd: string, path: string): Promise<string> =>
   invoke("git_diff", { cwd, path })
 
@@ -364,8 +376,13 @@ export type BranchPrStatus = {
 export const gitPrStatus = (cwd: string): Promise<BranchPrStatus> =>
   invoke("git_pr_status", { cwd })
 
-export const gitPrDiff = (cwd: string): Promise<string> =>
-  invoke("git_pr_diff", { cwd })
+/** Paths changed in the open PR (for paged review). */
+export const gitPrFiles = (cwd: string): Promise<string[]> =>
+  invoke("git_pr_files", { cwd })
+
+/** Full PR diff, or a single path when `path` is set. */
+export const gitPrDiff = (cwd: string, path?: string): Promise<string> =>
+  invoke("git_pr_diff", { cwd, path: path ?? null })
 
 export type PrDraft = {
   title: string
@@ -846,6 +863,35 @@ export const toInvokeError = (err: unknown): string => {
   if (typeof err === "string") return err
   if (err instanceof Error) return err.message
   return "An unexpected error occurred"
+}
+
+/** Coarse classification for UI branching (retry vs empty vs reauth). */
+export type InvokeErrorKind =
+  | "session_not_found"
+  | "not_configured"
+  | "permission"
+  | "not_found"
+  | "network"
+  | "unknown"
+
+export const classifyInvokeError = (err: unknown): InvokeErrorKind => {
+  const msg = toInvokeError(err).toLowerCase()
+  if (/session\s+\S+\s+not found/.test(msg) || /session not found/.test(msg)) {
+    return "session_not_found"
+  }
+  if (/not configured|save a provider|no provider/.test(msg)) {
+    return "not_configured"
+  }
+  if (/permission|denied|not allowed|eacces|eperm/.test(msg)) {
+    return "permission"
+  }
+  if (/\bnot found\b|enoent|no such file/.test(msg)) {
+    return "not_found"
+  }
+  if (/network|econnrefused|etimedout|fetch failed|offline|dns/.test(msg)) {
+    return "network"
+  }
+  return "unknown"
 }
 
 export type UserIdentityDto = {

@@ -12,6 +12,11 @@ import {
   parseVerdict,
   parseWorkflowSteps,
 } from "./parseWorkflow"
+import {
+  findToolRowIndex,
+  findVerdictRowIndex,
+  findWorkflowRowIndex,
+} from "./rowIndex"
 
 const RUNNING_TOOL_STATES: ReadonlySet<string> = new Set([
   "pending",
@@ -43,42 +48,55 @@ export const findDanglingAskRow = (rows: TimelineRow[]): boolean =>
     }
   })
 
-export const closeRunningRows = (rows: TimelineRow[]): TimelineRow[] =>
-  rows.map((row) => {
+export const closeRunningRows = (rows: TimelineRow[]): TimelineRow[] => {
+  let changed = false
+  const next = rows.map((row) => {
     switch (row.type) {
       case "tool": {
         const status = closeStatus(row.call.status)
-        return status === row.call.status
-          ? row
-          : { ...row, call: { ...row.call, status } }
+        if (status === row.call.status) return row
+        changed = true
+        return { ...row, call: { ...row.call, status } }
       }
       case "verdict": {
         const status = closeStatus(row.status)
-        return status === row.status ? row : { ...row, status }
+        if (status === row.status) return row
+        changed = true
+        return { ...row, status }
       }
       case "subagent": {
         const children = closeRunningRows(row.children)
         if (row.phase === "started") {
-          return { ...row, phase: "completed", children }
+          changed = true
+          return { ...row, phase: "completed" as const, children }
         }
-        return children === row.children ? row : { ...row, children }
+        if (children === row.children) return row
+        changed = true
+        return { ...row, children }
       }
       case "workflow": {
-        const status = closeStatus(row.status)
+        let subChanged = false
         const subagents = row.subagents.map((slot) => {
           const children = closeRunningRows(slot.children)
           if (slot.phase === "started") {
+            subChanged = true
             return { ...slot, phase: "completed" as const, children }
           }
-          return children === slot.children ? slot : { ...slot, children }
+          if (children === slot.children) return slot
+          subChanged = true
+          return { ...slot, children }
         })
-        if (status === row.status && subagents === row.subagents) return row
+        const status = closeStatus(row.status)
+        if (status === row.status && !subChanged) return row
+        changed = true
         return { ...row, status, subagents }
       }
       default:
         return row
     }
   })
+  return changed ? next : rows
+}
 
 export const applyEventToTimeline = (
   rows: TimelineRow[],
@@ -125,9 +143,7 @@ export const applyEventToTimeline = (
     }
     case "tool_call_updated": {
       if (payload.call.tool_name === VERIFIER_TOOL_NAME) {
-        const existingIdx = next.findIndex(
-          (r) => r.type === "verdict" && r.callId === payload.call.id,
-        )
+        const existingIdx = findVerdictRowIndex(next, payload.call.id)
         const row: TimelineRow = {
           type: "verdict",
           id: rowId("verdict", payload.call.id, seq),
@@ -147,9 +163,7 @@ export const applyEventToTimeline = (
         break
       }
       if (payload.call.tool_name === WORKFLOW_TOOL_NAME) {
-        const existingIdx = next.findIndex(
-          (r) => r.type === "workflow" && r.callId === payload.call.id,
-        )
+        const existingIdx = findWorkflowRowIndex(next, payload.call.id)
         const steps = parseWorkflowSteps(payload.call.input)
         if (existingIdx >= 0) {
           const existing = next[existingIdx]
@@ -174,9 +188,7 @@ export const applyEventToTimeline = (
         }
         break
       }
-      const existingIdx = next.findIndex(
-        (r) => r.type === "tool" && r.call.id === payload.call.id,
-      )
+      const existingIdx = findToolRowIndex(next, payload.call.id)
       const row: TimelineRow = {
         type: "tool",
         id: rowId("tool", payload.call.id, seq),

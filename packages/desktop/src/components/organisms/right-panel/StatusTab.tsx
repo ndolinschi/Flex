@@ -4,6 +4,7 @@ import { cacheTotalsFromModelUsage } from "../../../lib/modelUsage"
 import { sessionLabel, type SessionMeta } from "../../../lib/types"
 import { cn, formatTokens } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
+import { PanelToolbar, PanelToolbarTitle } from "../../molecules"
 import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
@@ -106,10 +107,9 @@ export const StatusTab = ({ session, active }: StatusTabProps) => {
       )}
       aria-hidden={!active}
     >
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
-        <Activity className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
-        <span className="min-w-0 flex-1 truncate text-sm text-ink">Status</span>
-      </div>
+      <PanelToolbar aria-label="Status">
+        <PanelToolbarTitle icon={<Activity aria-hidden />}>Status</PanelToolbarTitle>
+      </PanelToolbar>
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="px-2.5 py-3">

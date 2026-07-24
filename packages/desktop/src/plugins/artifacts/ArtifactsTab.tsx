@@ -31,7 +31,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ContextMenu, EmptyState } from "../../components/molecules"
+import {
+  ContextMenu,
+  EmptyState,
+  PanelSideRail,
+  PanelToolbar,
+  PanelToolbarTitle,
+  ToolQueryError,
+  panelChromeIconClass,
+} from "../../components/molecules"
 import {
   buildArtifactOpenWithMenuItems,
   availableArtifactOpenWithIds,
@@ -112,6 +120,8 @@ export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
   const {
     data: artifacts = [],
     isFetching,
+    isError: listIsError,
+    error: listError,
     refetch,
   } = useQuery({
     queryKey: ["artifacts", projectKey],
@@ -184,25 +194,32 @@ export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {artifacts.length > 0 ? (
-        <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 px-2.5">
-          <span className="min-w-0 flex-1 truncate text-sm text-ink-muted">
-            {countLabel}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Refresh artifacts"
-            title="Refresh artifacts"
-            onClick={() => void refetch()}
-            className={cn(
-              "h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink",
-              isFetching && "pointer-events-none",
-            )}
-          >
-            <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
-          </Button>
-        </div>
+        <PanelToolbar
+          aria-label="Artifacts"
+          actions={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Refresh artifacts"
+              title="Refresh artifacts"
+              onClick={() => void refetch()}
+              className={cn(
+                "h-6 w-6",
+                panelChromeIconClass,
+                isFetching && "pointer-events-none",
+              )}
+            >
+              <RefreshCw
+                className={cn("h-3.5 w-3.5", isFetching && "animate-spin")}
+              />
+            </Button>
+          }
+        >
+          <PanelToolbarTitle>
+            <span className="text-ink-muted">{countLabel}</span>
+          </PanelToolbarTitle>
+        </PanelToolbar>
       ) : null}
 
       {!projectKey ? (
@@ -211,6 +228,14 @@ export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
           icon={<Package className="h-6 w-6" aria-hidden />}
           title="No project folder"
           description="Pick a working directory for this session to see its artifacts."
+        />
+      ) : listIsError && artifacts.length === 0 ? (
+        <ToolQueryError
+          title="Couldn't load artifacts"
+          error={listError}
+          fallbackMessage="Failed to list project artifacts."
+          onRetry={() => void refetch()}
+          retrying={isFetching}
         />
       ) : artifacts.length === 0 ? (
         <EmptyState
@@ -221,7 +246,7 @@ export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
         />
       ) : (
         <div className="flex min-h-0 flex-1">
-          <aside className="flex w-[180px] shrink-0 flex-col border-r border-stroke-3">
+          <PanelSideRail width={180}>
             <ScrollArea className="min-h-0 flex-1 py-1.5">
               <ul>
                 {artifacts.map((artifact) => {
@@ -260,7 +285,7 @@ export const ArtifactsTab = ({ active, session }: ArtifactsTabProps) => {
                 })}
               </ul>
             </ScrollArea>
-          </aside>
+          </PanelSideRail>
 
           <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
             {!selected ? (
@@ -319,51 +344,58 @@ const ArtifactPreview = ({
 }: ArtifactPreviewProps) => {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5">
-        <KindIcon kind={artifact.kind} className="h-3.5 w-3.5 text-icon-3" />
-        <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink">
-          {artifact.title}
-        </span>
-        {openWithIds.length > 0 ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Open with"
-                  title="Open with"
-                  className="h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink"
-                />
-              }
+      <PanelToolbar
+        aria-label="Artifact preview"
+        actions={
+          <>
+            {openWithIds.length > 0 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Open with"
+                      title="Open with"
+                      className={cn("h-6 w-6", panelChromeIconClass)}
+                    />
+                  }
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" aria-hidden />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" sideOffset={4} className="w-52">
+                  <DropdownMenuGroup>
+                    {openWithIds.map((id) => (
+                      <DropdownMenuItem key={id} onClick={() => onOpenWith(id)}>
+                        {OPEN_WITH_LABELS[id]}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Open externally"
+              title="Open externally"
+              disabled={isOpeningExternal}
+              onClick={onOpenExternal}
+              className={cn("h-6 w-6", panelChromeIconClass)}
             >
-              <MoreHorizontal className="h-3.5 w-3.5" aria-hidden />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" sideOffset={4} className="w-52">
-              <DropdownMenuGroup>
-                {openWithIds.map((id) => (
-                  <DropdownMenuItem key={id} onClick={() => onOpenWith(id)}>
-                    {OPEN_WITH_LABELS[id]}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Open externally"
-          title="Open externally"
-          disabled={isOpeningExternal}
-          onClick={onOpenExternal}
-          className="h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink"
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+            </Button>
+          </>
+        }
+      >
+        <PanelToolbarTitle
+          icon={<KindIcon kind={artifact.kind} className="h-3.5 w-3.5" />}
         >
-          <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-        </Button>
-      </div>
+          <span className="text-xs font-medium">{artifact.title}</span>
+        </PanelToolbarTitle>
+      </PanelToolbar>
 
       {error ? (
         <div className="flex items-start gap-2 border-b border-stroke-3 bg-danger/5 px-2.5 py-2 text-xs text-danger">

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 
 import {
   EmptyState,
+  ErrorBanner,
   MarkdownBody,
   PlanCommentList,
   PlanCommentPopover,
@@ -67,6 +68,13 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
   const multi = sessionPlans.length > 1
   const [browsingList, setBrowsingList] = useState(true)
   const [commentHint, setCommentHint] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  const reportActionError = (prefix: string, err: unknown) => {
+    const msg = `${prefix}: ${toInvokeError(err)}`
+    setActionError(msg)
+    pushToast(msg, "error")
+  }
 
   const awaitingApproval =
     !!active &&
@@ -163,11 +171,9 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
 
   const handleKeepPlanning = () => {
     if (!active) return
+    setActionError(null)
     void keepPlanning(active.id, planDoc).catch((err) => {
-      pushToast(
-        `Couldn't continue planning: ${err instanceof Error ? err.message : String(err)}`,
-        "error",
-      )
+      reportActionError("Couldn't continue planning", err)
     })
   }
 
@@ -202,6 +208,7 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
 
   const handleSaveToWorkspace = () => {
     if (!active || !planDoc) return
+    setActionError(null)
     const date = new Date().toISOString().slice(0, 10)
     const relativePath = `plans/${slugifyPlanTitle(title)}-${date}.md`
     void saveTextFile(active.id, relativePath, planDoc)
@@ -209,7 +216,7 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
         pushToast(`Saved plan to ${absolutePath}`, "success")
       })
       .catch((err) => {
-        pushToast(`Couldn't save plan: ${toInvokeError(err)}`, "error")
+        reportActionError("Couldn't save plan", err)
       })
   }
 
@@ -225,11 +232,9 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
     const snapshot = draft
     clearSelection()
     window.getSelection()?.removeAllRanges()
+    setActionError(null)
     void saveAndSendComment(snapshot, body).catch((err) => {
-      pushToast(
-        `Couldn't send comment: ${err instanceof Error ? err.message : String(err)}`,
-        "error",
-      )
+      reportActionError("Couldn't send comment", err)
     })
   }
 
@@ -318,26 +323,31 @@ export const PlanTab = ({ active }: { active: SessionMeta | undefined }) => {
         onRewrite={
           planDoc
             ? () => {
+                setActionError(null)
                 void rewritePlan(active.id, planDoc).catch((err) => {
-                  pushToast(
-                    `Couldn't rewrite: ${err instanceof Error ? err.message : String(err)}`,
-                    "error",
-                  )
+                  reportActionError("Couldn't rewrite", err)
                 })
               }
             : undefined
         }
         onRestart={() => {
+          setActionError(null)
           void restartPlan(active.id).catch((err) => {
-            pushToast(
-              `Couldn't restart: ${err instanceof Error ? err.message : String(err)}`,
-              "error",
-            )
+            reportActionError("Couldn't restart", err)
           })
         }}
         onAddComment={planDoc ? handleAddComment : undefined}
         actionsDisabled={actionsDisabled}
       />
+
+      {actionError ? (
+        <ErrorBanner
+          title="Plan action failed"
+          message={actionError}
+          onDismiss={() => setActionError(null)}
+          className="rounded-none border-x-0 border-t-0 px-2.5 py-1.5 text-xs"
+        />
+      ) : null}
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto w-full max-w-[800px] px-4 pb-16 pt-8">

@@ -20,6 +20,8 @@ export type { ContextMenuItem, ContextMenuProps } from "./ContextMenu"
 export { DiffView } from "./DiffView"
 export { EmptyState } from "./EmptyState"
 export { ErrorBanner } from "./ErrorBanner"
+export { ToolQueryError, toolQueryErrorMessage } from "./ToolQueryError"
+export type { ToolQueryErrorProps } from "./ToolQueryError"
 export { FilesChangedCard } from "./FilesChangedCard"
 export { FormField } from "./FormField"
 export { MarkdownBody, preloadMarkdownHighlight } from "./MarkdownBody"
@@ -38,6 +40,15 @@ export type { PlanCommentDraft } from "./PlanCommentPopover"
 export { PlanList } from "./PlanList"
 export { PlanToolbar } from "./PlanToolbar"
 export type { PlanBuildStatus } from "./PlanToolbar"
+export {
+  PanelToolbar,
+  PanelToolbarTitle,
+  panelChromeIconClass,
+  panelChromeIconActiveClass,
+} from "./PanelToolbar"
+export type { PanelToolbarProps, PanelToolbarVariant } from "./PanelToolbar"
+export { PanelSideRail } from "./PanelSideRail"
+export type { PanelSideRailWidth } from "./PanelSideRail"
 export { PlanModelPill } from "./PlanModelPill"
 export { PlanFindBar } from "./PlanFindBar"
 export type { PlanFindState } from "./PlanFindBar"

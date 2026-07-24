@@ -541,15 +541,23 @@ FAB: `absolute bottom-3 left-1/2`. WorkGroup resume is a quiet control
 ### RightPanel
 
 1. **TabStrip** — `px-2.5 gap-1.5`, tabs `h-6`
-2. Tab chrome rows — same `px-2.5` / 30px height; **omit `border-b`** on
-   the first tool subheader under TabStrip (TabStrip already owns the strip
-   border — stacking a second `border-b` with only the hairline between reads
-   as a double rule). `PlanList` is the reference. Keep `border-b` on
-   *secondary* chrome that separates body regions (file/component chip strips,
-   Changes select toolbar, Terminal agent subtitle, BrowserToolbar over the
-   webview, error/status banners, PlanToolbar find bar).
-3. Body — `relative flex-1` + absolute tab hosts
-4. Terminal tab — **160px** left list (`px-2.5 py-1.5 text-xs` rows); Database / Components — optional **180px** left list
+2. **Tool panel chrome** — reuse shared `PanelToolbar` / `PanelSideRail`
+   (Browser + Terminal are the reference implementations):
+   - **`host`** (default): `h-[var(--header-height)]` (30px), `px-2.5`,
+     `border-b border-stroke-3`, `bg-bg` — Browser recipe; use for almost
+     every tool tab title row so chrome clearly separates from body
+   - **`elevated`**: `panel-toolbar` / `--panel-toolbar-height` (40px) —
+     Terminal title row only
+   - **`quiet`**: same 30px/`px-2.5` **without** `border-b` — only when a
+     secondary strip already owns the body separator (rare)
+   - Trailing actions: `actions` slot (`ml-auto gap-1`); icon buttons use
+     `panelChromeIconClass` / `panelChromeIconActiveClass`
+   - Left inventory rails: `PanelSideRail` width **160** (Terminal) or
+     **180** (Database / Components / Artifacts)
+3. Keep `border-b` on *secondary* chrome that separates body regions
+   (file/component chip strips, Changes select toolbar, Terminal agent
+   subtitle, error/status banners, PlanToolbar find bar).
+4. Body — `relative flex-1` + absolute tab hosts
 
 ### TabStrip — tab groups and agent affinity
 
@@ -568,18 +576,19 @@ Color palette constants (`lib/sessionColor.ts`): `GROUP_PALETTE` (8 colors for g
 
 | Tab | Header notes |
 |---|---|
-| Plan | `PlanToolbar` breadcrumbs + Build (`h-6` controls); find bar is a secondary `h-8` row with `border-y border-stroke-3` |
-| Changes | Quiet Local / branch title cues (no `border-b`); header trailing `N files` + DiffStat beside CTAs; one `h-6` **Last Turn Changes** + select checkbox row (`border-b`); file list `@tanstack/react-virtual` (native overflow, not `ScrollArea`); auto-expands **one** path for inline `DiffView` (lazy IPC; unmodified collapse bars); rows own `h-7 px-2.5 gap-2` (list has no horizontal pad); empties use shared `EmptyState`; header CTA scrolls to `CommitCenter`; backend caps listed files at 300 (`truncated`) |
-| Pull Request | Fixed `--header-height` chrome (`#` · title · checks · Open `h-6`); body `ScrollArea` + `DiffView` / `EmptyState` |
-| Files | **Explorer only** (`FileExplorer` full-pane). Opening a file creates a content `kind: "file"` document tab (basename label + file icon) in the work-pane TabStrip — not an in-Files chip strip. Document body: quiet title chrome (Preview/Source for md, Save `h-6`) + path breadcrumbs (`h-6` + `border-b`) + Monaco (`bg-editor`) / markdown preview + Problems strip. Multiple file tabs; drag between west/east panes via existing pointer DnD. |
-| Status | Quiet title row + body `ScrollArea` (session metrics) |
-| Prompt | Quiet title row (`h-6` icon controls; Insert uses Base UI `Popover`); marks / findings scroll via `ScrollArea` |
-| Memory | Quiet title row + body `ScrollArea` reusing Settings `MemoryContent` |
-| Terminal | Title row **keeps** `border-b` (separates chrome from xterm, same rationale as BrowserToolbar); New / List; agent subtitle separate bordered row |
-| Components | Count + List/Refresh (borderless under TabStrip); Files-style open chips with `gap-1.5` + `border-b`; bottom mini-prompt + Send `h-6` |
-| Browser | Toolbar `z-20` over webview slot — **keeps** `border-b` (separates chrome from native webview); reference chrome recipe |
-| Database | Connection count chrome (borderless under TabStrip when present); schema chips `py-1.5`; SQL strip `px-2.5` + Run `h-6`; Disconnect `hover:bg-fill-4` |
-| Artifacts | Quiet count chrome + 180px list (agent affinity labels) + preview pane; CSV/image in-app, others external. Agent creates `.docx`/`.xlsx`/`.pptx` via `CreateDocument` / `CreateSpreadsheet` / `CreatePresentation` (`OfficeArtifact` trait in `agentloop-artifacts`) |
+| Plan | `PlanToolbar` via `PanelToolbar` host + breadcrumbs/Build (`h-6`); find bar is a secondary `h-8` row with `border-y border-stroke-3` |
+| Changes | `PanelToolbar` host: Local / branch + inverse Create Branch & Commit pill; secondary select row (`border-b`); virtual file list; `CommitCenter` footer controls `h-6`. Status query failure uses `ToolQueryError` (never “Working tree clean”). Sidebar multi-session badges use **one** `git_status_since_baseline_batch` IPC (seeds per-session query cache) |
+| Pull Request | `PanelToolbar` host (`#` · title · checks · Open `h-6`); **paged** file list (`git_pr_files` + `PanelSideRail`) and per-file `git_pr_diff`. Status/files/diff failures use `ToolQueryError` + Retry |
+| Files | `PanelToolbar` host wraps search + new-file. Opening a file creates a content `kind: "file"` document tab. Document body: `PanelToolbar` host (Preview/Source, Save) + path breadcrumbs + Monaco / markdown preview. Load failures use `ToolQueryError`; render crashes isolated by `PanelErrorBoundary` |
+| Diffs | Backend size truncation shows a soft status strip (“Diff truncated by the server”); display soft-cap still appends “… N more lines (display limit)” |
+| Status | `PanelToolbar` host + title; body `ScrollArea` (session metrics) |
+| Prompt | `PanelToolbar` host + icon actions (`panelChromeIconClass`; Insert Popover); marks / findings via `ScrollArea` |
+| Memory | `PanelToolbar` host + body `ScrollArea` reusing Settings `MemoryContent` |
+| Terminal | `PanelToolbar` **elevated** + New / List; `PanelSideRail` 160px; agent subtitle separate bordered row; PTY output already coalesced in Rust (~16ms / 64KiB) |
+| Components | `PanelToolbar` host count + List/Refresh; `PanelSideRail` 180px; open chips on secondary `PanelToolbar`; mini-prompt + Send `h-6` |
+| Browser | `PanelToolbar` host (`z-20`) over webview — **reference** host chrome recipe |
+| Database | `PanelToolbar` host when connections present; `PanelSideRail` 180px; schema chips; SQL strip + Run `h-6` |
+| Artifacts | `PanelToolbar` host count + `PanelSideRail` 180px + preview `PanelToolbar`; CSV/image in-app, others external |
 
 ### Settings
 
@@ -675,6 +684,7 @@ Tailwind `p-*` / `gap-*` map through `@theme` in `src/index.css`.
 | Do | Don’t |
 |---|---|
 | Reuse `Tab` / `TabStrip` / `TabClose` for panel tabs + file chips | Duplicate pill markup per surface |
+| Reuse `PanelToolbar` / `PanelSideRail` / `panelChromeIconClass` for tool chrome | Hand-roll per-tab header divs or mixed hover tokens |
 | Keep content-pane + chat chrome at `px-2.5` (one column axis) | Mix gutters under the same strip (`px-2` under a `px-2.5` TabStrip) |
 | Put only **`h-6`** controls in 30px header rows | `h-7` pills inside `--header-height` (reads flush) |
 | Give TabStrip the bottom border; content headers title the body | Stack two `border-b` with no content between |

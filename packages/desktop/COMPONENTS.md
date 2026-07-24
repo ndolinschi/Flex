@@ -45,6 +45,7 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `SessionRowActions` | Hover pin / archive / more trailing actions | `pinned`, `archived`, `onTogglePin`, … | SessionListItem |
 | `SidebarFooter` | Theme + settings chrome (+ optional creating spinner) | `theme`, `onToggleTheme`, `onOpenSettings`, `isCreating?` | SessionSidebar |
 | `ErrorBanner` | Quiet danger `Alert` (`border-danger/15 bg-danger-subtle/70`, text-xs) | `message`, `onDismiss?`, `title?` | Composer, Settings, timeline, dialogs |
+| `ToolQueryError` | Distinguishes IPC/query failure from true empty: `fill` EmptyState+Retry or `banner` strip+Retry | `error`, `onRetry?`, `variant?` | Changes, PR, Files, Components, Database, Artifacts, `PanelErrorBoundary` |
 | `SidebarResumeError` | Same quiet danger + Retry/Dismiss; edge-to-edge sidebar | `message`, `onRetry`, `onDismiss` | SessionSidebar |
 | `ArchivedSectionHeader` | Collapsible Archived group header | `count`, `collapsed`, `onToggle` | SessionSidebar |
 | `ComposerInput` | Draft-subscribed textarea + backdrop + slash/@ trays + optional ghost-text inline completion (isolates keystrokes from ModelPicker/ContextBar); large auto-grow surface | `composerMode`, `isHero?`, `anchorRef`, `attachments`, `onSend` | Composer |
@@ -92,7 +93,10 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `SidebarActionRow` | New Agent / Search row | `icon`, `label`, `kbd?`, `disabled?` | SessionSidebar |
 | `SidebarProjectFilter` | Repo sort + visibility tray on the Repositories label row | `sort`, `visibility`, … | SessionSidebar |
 | `RepoSectionHeader` | Collapsible repo group | `label`, `collapsed`, `onToggle`, `onNewSession`, `indexed?` | SessionSidebar |
-| `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions (`PlanModelPill`, `PlanFindBar`) | `title`, `status`, `onBuild`, `onAddComment?` | PlanTab |
+| `PlanToolbar` | Plan tab header: breadcrumbs, build/comment/rewrite actions (`PlanModelPill`, `PlanFindBar`); wraps `PanelToolbar` | `title`, `status`, `onBuild`, `onAddComment?` | PlanTab |
+| `PanelToolbar` | Shared tool-panel chrome (Browser/Terminal recipe): `host` 30px+border-b, `elevated` 40px, `quiet` no border; optional `actions` trailing cluster | `variant?`, `actions?`, `children` | BrowserToolbar, TerminalTab, tool tabs |
+| `PanelToolbarTitle` | Leading icon + truncate title for `PanelToolbar` | `icon?`, `children` | Status/Memory/Prompt/PR/… |
+| `PanelSideRail` | Left inventory rail (border-r, bg-panel); width 160 or 180 | `width?`, `header?`, `children` | Terminal, Database, Components, Artifacts |
 | `PlanModelPill` | Provider-grouped model dropdown for Plan toolbar | `models`, `value`, `onChange` | PlanToolbar |
 | `PlanFindBar` | Find-in-plan InputGroup chrome strip | `find`, `inputRef` | PlanToolbar |
 | `AppMark` / `TitleBarMenus` | Wireframe mark (optional) + in-window File/Edit/View/Help (Windows/Linux); Help → **Submit Bug…** opens `BugReportDialog` | `handlers`, `isBootstrapped`, `canSearch`, `canCommandPalette` | WindowTitleBar / sidebar menus (non-macOS); mark not shown in chat chrome |
@@ -135,8 +139,8 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 |---|---|
 | `organisms/timeline/` | `buildDisplayItems` (+ `estimateSizeForItem`), `TimelineRowView`, `WorkGroupBody`, `ThinkingBlock`, `MessageActions`, `TurnFooter`, `ReconnectBanner`, `CheckpointChip` |
 | `organisms/composer/` | `SlashCommandTray`, `AtMentionTray`, `ComposerQueue`, `composerAttachments` |
-| `organisms/right-panel/` | Tool tab bodies: `PlanTab`, `ChangesTab` (`@tanstack/react-virtual` file list; one lazy `DiffView`), `PrTab`, `PromptTab` (+ `PromptTabHeader`, `PromptMarksPanel`/`PromptFindingsList`, `PromptQuestionsForm`, `PromptHoverTip`), `FilesTab` (explorer), `FileDocumentTab` (document body for content `file` tabs), `FileExplorer` (+ `TreeBranch`, `FileExplorerDialogs`, `FileExplorerSearchResults`, `fileExplorerGit`), `FileRow`, `CommitCenter`, `tabs` catalog |
-| `organisms/content/` | `ContentWorkspace`, `ContentPane`, `ChatSessionBody`, `ToolTabBody` |
+| `organisms/right-panel/` | Tool tab bodies: `PlanTab` (action failures → `ErrorBanner` + toast), `ChangesTab` (virtual list + `ToolQueryError`), `PrTab` (paged PR files + per-file diff), `PromptTab` (+ header/marks/findings/questions), `FilesTab` / `FileDocumentTab`, `FileExplorer` (+ `TreeBranch` list errors), `FileRow`, `CommitCenter`, `tabs` catalog |
+| `organisms/content/` | `ContentWorkspace`, `ContentPane`, `ChatSessionBody`, `ToolTabBody` (wraps each tool in `PanelErrorBoundary`) |
 | `organisms/context-bar/` | `CommitBar` (changes chip + Commit / Commit & Push / Create PR), `UsageRing`, `IsolationBadge`, `IsolationPicker` |
 | `organisms/browser/` | `BrowserToolbar` (Design Mode toggle), `BrowserOverflowMenu` — composed by `BrowserTab` |
 | `organisms/terminal/` | `TerminalTab`, `TerminalInstance`, `TerminalRow`, `AgentTerminalRow`, `time` helpers |
@@ -149,7 +153,8 @@ Prefer `@/components/ui/*` for Button, Input, Textarea, Label, Kbd, Skeleton, Sc
 | `ChatThreadHeader` | Agents Web 40px title row (`pl-3 pr-2`, title `text-base font-medium`) | `title`, `trailing?` | ChatShell |
 | `StatusPill` | Semantic full-radius whisper chip (success/warn/danger/neutral) | `tone`, `icon?` | lists, headers |
 | `SettingsShell` | Back header + form (`embedded` when App owns sidebar) |
-| `ErrorBoundary` | Top-level render-error fence (`templates/`) |
+| `ErrorBoundary` | Top-level render-error fence (`templates/`) — full-app Reload |
+| `PanelErrorBoundary` | Scoped tool/file panel fence; recovers via `ToolQueryError` Retry without remounting the shell |
 | `SettingsPage` | Settings shell; sections from `pages/settings/` |
 | `CustomizeSection` / `MemorySection` / `IndexingSection` / `AutomationsSection` / `DiagnosticsSection` / `RemoteAccessSection` | Settings nav sections (`pages/settings/`) |
 | `plugins/prompt-completion/` | UI plugin: `CompletionSetupModal` (Ollama pull guidance or existing provider) + `InlineCompletionSettingsCard` (Customize) |

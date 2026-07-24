@@ -7,6 +7,12 @@ import {
   ShieldCheck,
 } from "lucide-react"
 import { Spinner, Tooltip } from "../../atoms"
+import {
+  PanelToolbar,
+  PanelToolbarTitle,
+  panelChromeIconActiveClass,
+  panelChromeIconClass,
+} from "../../molecules"
 import { Button } from "@/components/ui/button"
 import {
   Popover,
@@ -49,113 +55,107 @@ export const PromptTabHeader = ({
   onVerify,
   onSend,
 }: PromptTabHeaderProps) => (
-  <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
-    <Maximize2 className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
-    <span className="min-w-0 flex-1 truncate text-sm text-ink">Prompt</span>
-    <span className="shrink-0 text-xs text-ink-muted [font-variant-numeric:tabular-nums]">
-      {chars.toLocaleString()} · ~{tokens.toLocaleString()} tok
-    </span>
-    <Popover
-      open={insertOpen}
-      onOpenChange={(open) => setInsertOpen(open)}
-    >
-      <PopoverTrigger
-        render={
+  <PanelToolbar
+    aria-label="Prompt"
+    actions={
+      <>
+        <span className="shrink-0 text-xs text-ink-muted [font-variant-numeric:tabular-nums]">
+          {chars.toLocaleString()} · ~{tokens.toLocaleString()} tok
+        </span>
+        <Popover open={insertOpen} onOpenChange={(open) => setInsertOpen(open)}>
+          <PopoverTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Insert section"
+                title={insertOpen ? undefined : "Insert section"}
+                className={cn(panelChromeIconClass, "opacity-50 hover:opacity-80")}
+              />
+            }
+          >
+            <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            side="bottom"
+            sideOffset={4}
+            className="w-44 gap-0 overflow-hidden p-1"
+          >
+            <PopoverTitle className="sr-only">Insert section</PopoverTitle>
+            {PROMPT_SECTION_TEMPLATES.map((t) => (
+              <Button
+                key={t.id}
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setDraft(appendPromptSection(draft, t.markdown))
+                  setInsertOpen(false)
+                }}
+                className="h-auto w-full justify-start px-2.5 py-1 text-xs text-ink-secondary font-normal hover:bg-fill-4 hover:text-ink"
+              >
+                {t.label}
+              </Button>
+            ))}
+          </PopoverContent>
+        </Popover>
+        {annotationsCount > 0 ? (
+          <Tooltip
+            label={showMarks ? "Edit text (@ /)" : "Show highlighted marks"}
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={showMarks ? "Edit prompt" : "Show marks"}
+              onClick={() => setShowMarks((v) => !v)}
+              className={cn(
+                panelChromeIconClass,
+                showMarks && panelChromeIconActiveClass,
+              )}
+            >
+              {showMarks ? (
+                <Pencil className="h-3.5 w-3.5" aria-hidden />
+              ) : (
+                <Eye className="h-3.5 w-3.5" aria-hidden />
+              )}
+            </Button>
+          </Tooltip>
+        ) : null}
+        <Tooltip label="Verify with model (grill the prompt)">
           <Button
             type="button"
             variant="ghost"
             size="icon-xs"
-            aria-label="Insert section"
-            title={insertOpen ? undefined : "Insert section"}
-            className={cn(
-              "text-ink-muted hover:bg-fill-4 hover:text-ink",
-              "opacity-50 hover:opacity-80",
-              "shrink-0",
+            aria-label="Verify prompt"
+            disabled={!draft.trim() || busy}
+            onClick={onVerify}
+            className={panelChromeIconClass}
+          >
+            {busy ? (
+              <Spinner size="sm" label="Verifying prompt" />
+            ) : (
+              <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
             )}
-          />
-        }
-      >
-        <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        side="bottom"
-        sideOffset={4}
-        className="w-44 gap-0 overflow-hidden p-1"
-      >
-        <PopoverTitle className="sr-only">Insert section</PopoverTitle>
-        {PROMPT_SECTION_TEMPLATES.map((t) => (
+          </Button>
+        </Tooltip>
+        <Tooltip label="Send prompt">
           <Button
-            key={t.id}
             type="button"
             variant="ghost"
-            onClick={() => {
-              setDraft(appendPromptSection(draft, t.markdown))
-              setInsertOpen(false)
-            }}
-            className="h-auto w-full justify-start px-2.5 py-1 text-xs text-ink-secondary font-normal hover:bg-fill-4 hover:text-ink"
+            size="icon-xs"
+            aria-label="Send prompt"
+            disabled={!draft.trim() || busy}
+            onClick={onSend}
+            className={panelChromeIconClass}
           >
-            {t.label}
+            <Send className="h-3.5 w-3.5" aria-hidden />
           </Button>
-        ))}
-      </PopoverContent>
-    </Popover>
-    {annotationsCount > 0 ? (
-      <Tooltip label={showMarks ? "Edit text (@ /)" : "Show highlighted marks"}>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          aria-label={showMarks ? "Edit prompt" : "Show marks"}
-          onClick={() => setShowMarks((v) => !v)}
-          className={cn(
-            "text-ink-muted hover:bg-fill-4 hover:text-ink",
-            showMarks && "bg-fill-2 text-ink hover:bg-fill-2",
-          )}
-        >
-          {showMarks ? (
-            <Pencil className="h-3.5 w-3.5" aria-hidden />
-          ) : (
-            <Eye className="h-3.5 w-3.5" aria-hidden />
-          )}
-        </Button>
-      </Tooltip>
-    ) : null}
-    <Tooltip label="Verify with model (grill the prompt)">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        aria-label="Verify prompt"
-        disabled={!draft.trim() || busy}
-        onClick={onVerify}
-        className={cn(
-          "text-ink-muted hover:bg-fill-4 hover:text-ink",
-          "shrink-0",
-        )}
-      >
-        {busy ? (
-          <Spinner size="sm" label="Verifying prompt" />
-        ) : (
-          <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
-        )}
-      </Button>
-    </Tooltip>
-    <Tooltip label="Send prompt">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        aria-label="Send prompt"
-        disabled={!draft.trim() || busy}
-        onClick={onSend}
-        className={cn(
-          "text-ink-muted hover:bg-fill-4 hover:text-ink",
-          "shrink-0",
-        )}
-      >
-        <Send className="h-3.5 w-3.5" aria-hidden />
-      </Button>
-    </Tooltip>
-  </div>
+        </Tooltip>
+      </>
+    }
+  >
+    <PanelToolbarTitle icon={<Maximize2 aria-hidden />}>Prompt</PanelToolbarTitle>
+  </PanelToolbar>
 )

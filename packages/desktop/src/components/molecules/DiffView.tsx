@@ -5,6 +5,7 @@ import {
   describeHunklessDiff,
   DIFF_RENDER_LINE_CAP,
   isDiffTruncated,
+  listDiffPaths,
   parseUnifiedDiff,
   softCapLines,
   unmodifiedLinesBeforeHunk,
@@ -45,7 +46,31 @@ const lineClass = (line: string): string => {
   return "text-ink-muted"
 }
 
-const TruncationFooter = ({ count }: { count: number }) => {
+const TruncationFooter = ({
+  count,
+  reason = "display",
+  fileHint,
+}: {
+  count: number
+  reason?: "display" | "source"
+  fileHint?: string
+}) => {
+  if (count <= 0 && reason === "display") return null
+  if (reason === "source") {
+    return (
+      <div
+        className={cn(
+          "border-b border-stroke-3 bg-fill-4/50 px-3 py-1.5 font-sans text-xs text-ink-muted",
+          "tracking-[var(--tracking-caption)]",
+        )}
+        role="status"
+      >
+        Diff truncated by the server (size limit). Showing the available portion
+        only
+        {fileHint ? ` · ${fileHint}` : ""}.
+      </div>
+    )
+  }
   if (count <= 0) return null
   return (
     <div
@@ -55,7 +80,7 @@ const TruncationFooter = ({ count }: { count: number }) => {
       )}
       role="note"
     >
-      … truncated {count} more line{count === 1 ? "" : "s"}
+      … truncated {count} more line{count === 1 ? "" : "s"} (display limit)
     </div>
   )
 }
@@ -236,42 +261,54 @@ export const DiffView = ({
     )
   }, [parsed, collapseUnmodified])
 
+  const sourceTruncated = isDiffTruncated(diff)
+  const pathCount = useMemo(
+    () => (sourceTruncated ? listDiffPaths(diff).length : 0),
+    [diff, sourceTruncated],
+  )
+  const fileHint =
+    pathCount > 1
+      ? `${pathCount} files in remaining chunk`
+      : pathCount === 1
+        ? "1 file in remaining chunk"
+        : undefined
+
   return (
-    <pre
-      className={cn(
-        "overflow-x-auto font-mono text-sm leading-[18px]",
-        className,
-      )}
-    >
-      {softPlan ? (
-        <>
-          {softPlan.plan.map(({ file, hunks }, fi) =>
-            hunks.length === 0 && file.hunks.length === 0 ? (
-              <div key={fi} className="px-3 py-2.5 text-sm text-ink-muted">
-                {describeHunklessDiff(file)}
-              </div>
-            ) : (
-              <div key={fi}>
-                {hunks.map(({ hunk, lines, gap }, hi) => (
-                  <div key={hi}>
-                    <UnmodifiedCollapse count={gap} />
-                    <HunkBlock
-                      file={file}
-                      hunk={hunk}
-                      lines={lines}
-                      onKeepHunk={wantsHunkActions ? onKeepHunk : undefined}
-                      onUndoHunk={wantsHunkActions ? onUndoHunk : undefined}
-                    />
-                  </div>
-                ))}
-              </div>
-            ),
-          )}
-          <TruncationFooter count={softPlan.truncated} />
-        </>
-      ) : (
-        <PlainDiff diff={diff} />
-      )}
-    </pre>
+    <div className={cn("flex min-h-0 flex-col", className)}>
+      {sourceTruncated ? (
+        <TruncationFooter count={0} reason="source" fileHint={fileHint} />
+      ) : null}
+      <pre className="min-h-0 flex-1 overflow-x-auto font-mono text-sm leading-[18px]">
+        {softPlan ? (
+          <>
+            {softPlan.plan.map(({ file, hunks }, fi) =>
+              hunks.length === 0 && file.hunks.length === 0 ? (
+                <div key={fi} className="px-3 py-2.5 text-sm text-ink-muted">
+                  {describeHunklessDiff(file)}
+                </div>
+              ) : (
+                <div key={fi}>
+                  {hunks.map(({ hunk, lines, gap }, hi) => (
+                    <div key={hi}>
+                      <UnmodifiedCollapse count={gap} />
+                      <HunkBlock
+                        file={file}
+                        hunk={hunk}
+                        lines={lines}
+                        onKeepHunk={wantsHunkActions ? onKeepHunk : undefined}
+                        onUndoHunk={wantsHunkActions ? onUndoHunk : undefined}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ),
+            )}
+            <TruncationFooter count={softPlan.truncated} reason="display" />
+          </>
+        ) : (
+          <PlainDiff diff={diff} />
+        )}
+      </pre>
+    </div>
   )
 }

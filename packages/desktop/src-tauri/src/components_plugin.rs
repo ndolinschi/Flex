@@ -1,7 +1,10 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::time::{Duration, Instant, SystemTime};
 
 use std::sync::LazyLock;
 
@@ -108,6 +111,80 @@ pub struct ComponentsListResult {
     pub frameworks: Vec<String>,
     pub components: Vec<ComponentNode>,
     pub roots: Vec<String>,
+}
+
+/// Short TTL list cache so repeated Components tab opens / Refresh don't
+/// re-walk the tree when package markers and scan roots are unchanged.
+const COMPONENTS_LIST_CACHE_TTL: Duration = Duration::from_secs(20);
+
+struct ComponentsListCacheEntry {
+    fingerprint: u64,
+    result: ComponentsListResult,
+    built_at: Instant,
+}
+
+static COMPONENTS_LIST_CACHE: LazyLock<Mutex<HashMap<String, ComponentsListCacheEntry>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn path_mtime_secs(path: &Path) -> u64 {
+    fs::metadata(path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Cheap fingerprint of framework markers + common component roots.
+fn components_list_fingerprint(cwd: &Path) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    cwd.hash(&mut hasher);
+    for name in [
+        "package.json",
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "src",
+        "app",
+        "components",
+        "pages",
+        "packages",
+    ] {
+        let p = cwd.join(name);
+        name.hash(&mut hasher);
+        path_mtime_secs(&p).hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
+fn list_components_cached(cwd: &Path) -> ComponentsListResult {
+    let key = cwd.to_string_lossy().to_string();
+    let fingerprint = components_list_fingerprint(cwd);
+    if let Ok(guard) = COMPONENTS_LIST_CACHE.lock() {
+        if let Some(entry) = guard.get(&key) {
+            if entry.fingerprint == fingerprint
+                && entry.built_at.elapsed() < COMPONENTS_LIST_CACHE_TTL
+            {
+                return entry.result.clone();
+            }
+        }
+    }
+    let result = list_components(cwd);
+    if let Ok(mut guard) = COMPONENTS_LIST_CACHE.lock() {
+        // Bound cache size for long-lived apps with many projects.
+        if guard.len() > 32 {
+            guard.clear();
+        }
+        guard.insert(
+            key,
+            ComponentsListCacheEntry {
+                fingerprint,
+                result: result.clone(),
+                built_at: Instant::now(),
+            },
+        );
+    }
+    result
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -946,7 +1023,7 @@ pub async fn components_list(
     else {
         return Err(message(cwd_not_a_directory_msg(&cwd)));
     };
-    Ok(list_components(&path))
+    Ok(list_components_cached(&path))
 }
 
 #[tauri::command]

@@ -17,7 +17,13 @@ import type { FileHit } from "../../../lib/types"
 import { basename, cn } from "../../../lib/utils"
 import { useAppStore } from "../../../stores/appStore"
 import { Spinner } from "../../atoms"
-import { ContextMenu, EmptyState, type ContextMenuItem } from "../../molecules"
+import {
+  ContextMenu,
+  EmptyState,
+  PanelToolbar,
+  ToolQueryError,
+  type ContextMenuItem,
+} from "../../molecules"
 import {
   InputGroup,
   InputGroupAddon,
@@ -95,6 +101,9 @@ export const FileExplorer = ({
     data: searchHits = [],
     isLoading: searchLoading,
     isFetching: searchFetching,
+    isError: searchIsError,
+    error: searchError,
+    refetch: refetchSearch,
   } = useQuery({
     queryKey: ["workspace-file-list", cwd, fallbackCwd ?? "", debounced],
     queryFn: () => listFiles(cwd, debounced, true, fallbackCwd),
@@ -251,7 +260,7 @@ export const FileExplorer = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
+      <PanelToolbar aria-label="Files">
         <InputGroup
           className={cn(
             "h-6 min-w-0 flex-1 border-0 bg-transparent shadow-none dark:bg-transparent",
@@ -287,22 +296,33 @@ export const FileExplorer = ({
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
-      </div>
+      </PanelToolbar>
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="py-1">
         {searching ? (
-          <FileExplorerSearchResults
-            loading={searchLoading}
-            rows={searchRows}
-            gitIndex={gitIndex}
-            onOpenFile={onOpenFile}
-            onOpenDir={(path) => {
-              setQuery("")
-              setExpanded((prev) => new Set(prev).add(path))
-            }}
-            onContextMenu={handleContextMenu}
-          />
+          searchIsError && searchRows.length === 0 && !searchLoading ? (
+            <ToolQueryError
+              title="Couldn't search files"
+              error={searchError}
+              fallbackMessage="Failed to search the workspace."
+              onRetry={() => void refetchSearch()}
+              retrying={searchFetching}
+              className="py-12"
+            />
+          ) : (
+            <FileExplorerSearchResults
+              loading={searchLoading}
+              rows={searchRows}
+              gitIndex={gitIndex}
+              onOpenFile={onOpenFile}
+              onOpenDir={(path) => {
+                setQuery("")
+                setExpanded((prev) => new Set(prev).add(path))
+              }}
+              onContextMenu={handleContextMenu}
+            />
+          )
         ) : resolvingCwd ? (
           <div className="flex items-center gap-2 px-2.5 py-6 text-xs text-ink-muted">
             <Spinner size="sm" />

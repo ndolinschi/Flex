@@ -36,7 +36,17 @@ import {
   PaginationItem,
 } from "@/components/ui/pagination"
 import { Separator } from "@/components/ui/separator"
-import { ConfirmDialog, EmptyState, ErrorBanner, FormField } from "../../components/molecules"
+import {
+  ConfirmDialog,
+  EmptyState,
+  ErrorBanner,
+  FormField,
+  PanelSideRail,
+  PanelToolbar,
+  PanelToolbarTitle,
+  ToolQueryError,
+  panelChromeIconClass,
+} from "../../components/molecules"
 import {
   dbActiveConnection,
   dbConnect,
@@ -159,7 +169,13 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
     }))
   }
 
-  const { data: connections = [], isFetching } = useQuery({
+  const {
+    data: connections = [],
+    isFetching,
+    isError: connectionsIsError,
+    error: connectionsError,
+    refetch: refetchConnections,
+  } = useQuery({
     queryKey: ["db-connections", projectKey],
     queryFn: () => dbListConnections(projectKey),
     enabled: active && !!projectKey,
@@ -315,37 +331,41 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {connections.length > 0 ? (
-        <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5">
-          <span className="min-w-0 flex-1 truncate text-sm text-ink-muted">
-            {connectionCountLabel}
-          </span>
-          <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label="Refresh tables" title="Refresh tables"
-      onClick={() => void refetchTables()}
-      className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "h-6 w-6",
-      )}
-    >
-      <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
-    </Button>
-          <Button
-      type="button"
-      variant="ghost"
-      size="icon-sm"
-      aria-label="Add connection" title="Add connection"
-      onClick={openAddForm}
-      className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "h-6 w-6",
-      )}
-    >
-      <Plus className="h-3.5 w-3.5" />
-    </Button>
-        </div>
+        <PanelToolbar
+          aria-label="Database"
+          actions={
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Refresh tables"
+                title="Refresh tables"
+                onClick={() => void refetchTables()}
+                className={cn("h-6 w-6", panelChromeIconClass)}
+              >
+                <RefreshCw
+                  className={cn("h-3.5 w-3.5", isFetching && "animate-spin")}
+                />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Add connection"
+                title="Add connection"
+                onClick={openAddForm}
+                className={cn("h-6 w-6", panelChromeIconClass)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </>
+          }
+        >
+          <PanelToolbarTitle className="text-ink-muted">
+            <span className="text-ink-muted">{connectionCountLabel}</span>
+          </PanelToolbarTitle>
+        </PanelToolbar>
       ) : null}
 
       {error ? (
@@ -378,11 +398,19 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
         </div>
       ) : null}
 
-      { !projectKey ? (
+      {!projectKey ? (
         <EmptyState
           className="min-h-0 flex-1"
           title="No project folder"
           description="Pick a working directory for this session to manage database connections for that project."
+        />
+      ) : connectionsIsError && connections.length === 0 ? (
+        <ToolQueryError
+          title="Couldn't load connections"
+          error={connectionsError}
+          fallbackMessage="Failed to load database connections for this project."
+          onRetry={() => void refetchConnections()}
+          retrying={isFetching}
         />
       ) : isFetching && connections.length === 0 ? (
         <div className="flex min-h-0 flex-1 items-center justify-center gap-2 px-2.5 text-sm text-ink-muted">
@@ -399,7 +427,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
         />
       ) : (
         <div className="flex min-h-0 flex-1">
-          <aside className="flex w-[180px] shrink-0 flex-col border-r border-stroke-3">
+          <PanelSideRail width={180}>
             <ScrollArea className="min-h-0 flex-1 py-1.5">
               <ul>
                 {connections.map((c) => (
@@ -478,7 +506,7 @@ export const DatabaseTab = ({ active, session }: DatabaseTabProps) => {
                 Disconnect
               </Button>
             ) : null}
-          </aside>
+          </PanelSideRail>
 
           <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
             {!selectedId ? (
@@ -756,7 +784,9 @@ const ResultGrid = ({
             : kind === "query"
               ? `Showing ${showingFrom}–${showingTo} of ${totalFetched}`
               : `Showing ${showingFrom}–${showingTo}`}
-          {result.truncated ? " (truncated)" : ""}
+          {result.truncated
+            ? " · result truncated at 500 rows (refine the query or use LIMIT)"
+            : ""}
           {kind === "preview" && canNext ? "+" : ""}
         </span>
         <Pagination className="mx-0 w-auto">

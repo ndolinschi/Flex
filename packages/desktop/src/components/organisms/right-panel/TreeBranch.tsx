@@ -10,7 +10,7 @@ import { sortFileHits } from "../../../lib/fileTree"
 import type { FileHit } from "../../../lib/types"
 import { cn, fileIconForPath } from "../../../lib/utils"
 import { Spinner } from "../../atoms"
-import { EmptyState } from "../../molecules"
+import { EmptyState, ToolQueryError } from "../../molecules"
 import { Button } from "@/components/ui/button"
 import { gitStatusClass, type GitStatusIndex } from "./fileExplorerGit"
 
@@ -44,7 +44,14 @@ export const TreeBranch = ({
   const isRoot = dirPath === ""
   const shouldLoad = isRoot || expanded.has(dirPath)
 
-  const { data: children = [], isLoading, isFetching } = useQuery({
+  const {
+    data: children = [],
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["workspace-dir-children", cwd, fallbackCwd ?? "", dirPath],
     queryFn: () => listDirChildren(cwd, dirPath, fallbackCwd),
     enabled: !!cwd && shouldLoad,
@@ -57,6 +64,38 @@ export const TreeBranch = ({
   )
 
   if (!shouldLoad) return null
+
+  if (isError && sorted.length === 0) {
+    if (isRoot) {
+      return (
+        <ToolQueryError
+          title="Couldn't list files"
+          error={error}
+          fallbackMessage="Failed to list workspace files."
+          onRetry={() => void refetch()}
+          retrying={isFetching}
+          className="py-12"
+        />
+      )
+    }
+    return (
+      <div
+        className="px-2 py-1 text-xs text-danger/90"
+        style={{ paddingLeft: 8 + (depth + 1) * INDENT_PX }}
+      >
+        Failed to load folder
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="ml-1 h-5 px-1 text-xs"
+          onClick={() => void refetch()}
+        >
+          Retry
+        </Button>
+      </div>
+    )
+  }
 
   if (isLoading && sorted.length === 0) {
     return (

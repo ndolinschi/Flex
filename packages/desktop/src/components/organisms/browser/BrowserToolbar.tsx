@@ -20,6 +20,11 @@ import {
   ToggleGroupItem,
 } from "@/components/ui/toggle-group"
 import { Spinner, Tooltip } from "../../atoms"
+import {
+  PanelToolbar,
+  panelChromeIconActiveClass,
+  panelChromeIconClass,
+} from "../../molecules"
 import { VIEWPORT_PRESETS as VIEWPORT_PRESETS_BASE } from "../../../hooks/useBrowserSession"
 import type { BrowserViewportPreset } from "../../../stores/appStore"
 import { cn } from "../../../lib/utils"
@@ -120,58 +125,50 @@ export const BrowserToolbar = ({
   }
 
   return (
-    <div
+    <PanelToolbar
       ref={toolbarRef}
-      className="relative z-20 flex h-[var(--header-height)] min-h-[var(--header-height)] shrink-0 items-center gap-1 overflow-hidden border-b border-stroke-3 bg-bg px-2.5"
+      className="z-20 gap-1 overflow-hidden"
       data-browser-chrome="toolbar"
+      aria-label="Browser"
     >
       <div className="flex items-center gap-px">
         <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      aria-label="Back"
-      disabled={!showLiveContent}
-      onClick={browserBack}
-      className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "shrink-0",
-      )}
-    >
-      <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-    </Button>
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Back"
+          disabled={!showLiveContent}
+          onClick={browserBack}
+          className={panelChromeIconClass}
+        >
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+        </Button>
         <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      aria-label="Forward"
-      disabled={!showLiveContent}
-      onClick={browserForward}
-      className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "shrink-0",
-      )}
-    >
-      <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-    </Button>
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Forward"
+          disabled={!showLiveContent}
+          onClick={browserForward}
+          className={panelChromeIconClass}
+        >
+          <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+        </Button>
         <div className="relative flex h-6 w-6 items-center justify-center">
           {browserLoading ? (
             <Spinner size="sm" label="Loading page" />
           ) : (
             <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      aria-label="Reload"
-      disabled={!showLiveContent}
-      onClick={handleReload}
-      className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "shrink-0",
-      )}
-    >
-      <RotateCw className="h-3.5 w-3.5" aria-hidden />
-    </Button>
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Reload"
+              disabled={!showLiveContent}
+              onClick={handleReload}
+              className={panelChromeIconClass}
+            >
+              <RotateCw className="h-3.5 w-3.5" aria-hidden />
+            </Button>
           )}
         </div>
       </div>
@@ -218,7 +215,7 @@ export const BrowserToolbar = ({
               size="icon-xs"
               aria-label={label}
               className={cn(
-                "text-ink-muted hover:bg-fill-4 hover:text-ink",
+                panelChromeIconClass,
                 "rounded-md p-0",
                 "data-pressed:bg-fill-2 data-pressed:text-ink data-pressed:hover:bg-fill-2",
               )}
@@ -229,38 +226,39 @@ export const BrowserToolbar = ({
         ))}
       </ToggleGroup>
 
-      <Tooltip label={browserDesignMode ? "Exit Design Mode (⌘⇧D)" : "Design Mode (⌘⇧D)"}>
+      <Tooltip
+        label={
+          browserDesignMode ? "Exit Design Mode (⌘⇧D)" : "Design Mode (⌘⇧D)"
+        }
+      >
         <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      aria-label={browserDesignMode ? "Exit Design Mode" : "Design Mode"}
-      disabled={!showLiveContent}
-      onClick={() => void toggleDesignMode()}
-      className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        browserDesignMode && "bg-fill-2 text-ink hover:bg-fill-2",
-      )}
-    >
-      <MousePointer2 className="h-3.5 w-3.5" aria-hidden />
-    </Button>
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label={browserDesignMode ? "Exit Design Mode" : "Design Mode"}
+          disabled={!showLiveContent}
+          onClick={() => void toggleDesignMode()}
+          className={cn(
+            panelChromeIconClass,
+            browserDesignMode && panelChromeIconActiveClass,
+          )}
+        >
+          <MousePointer2 className="h-3.5 w-3.5" aria-hidden />
+        </Button>
       </Tooltip>
 
       <Tooltip label="Open DevTools (floating)">
         <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      aria-label="Open DevTools"
-      disabled={!showLiveContent}
-      onClick={handleOpenDevtools}
-      className={cn(
-        "text-ink-muted hover:bg-fill-4 hover:text-ink",
-        "shrink-0",
-      )}
-    >
-      <Bug className="h-3.5 w-3.5" aria-hidden />
-    </Button>
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Open DevTools"
+          disabled={!showLiveContent}
+          onClick={handleOpenDevtools}
+          className={panelChromeIconClass}
+        >
+          <Bug className="h-3.5 w-3.5" aria-hidden />
+        </Button>
       </Tooltip>
 
       <BrowserOverflowMenu
@@ -275,6 +273,6 @@ export const BrowserToolbar = ({
         onClearHistory={handleClearHistory}
         onClearData={handleClearData}
       />
-    </div>
+    </PanelToolbar>
   )
 }

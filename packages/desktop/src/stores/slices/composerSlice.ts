@@ -28,12 +28,16 @@ export const createComposerSlice: StateCreator<
   setComposerDraft: (draft, forSessionId) => {
     const sessionId = forSessionId ?? get().activeSessionId
     if (!sessionId) {
+      if (get().orphanDraft === draft) return
       set({ orphanDraft: draft })
       return
     }
-    set((state) => ({
-      draftsBySession: { ...state.draftsBySession, [sessionId]: draft },
-    }))
+    set((state) => {
+      if (state.draftsBySession[sessionId] === draft) return state
+      return {
+        draftsBySession: { ...state.draftsBySession, [sessionId]: draft },
+      }
+    })
   },
   setComposerMode: (mode) => {
     const next = mode === "flex" && !FLEX_MODE_ENABLED ? "agent" : mode

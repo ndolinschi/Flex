@@ -5,7 +5,16 @@ import { Spinner } from "@/components/ui/spinner"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ChevronDown, GitMerge, PlusSquare, RefreshCw, Undo2, XCircle } from "lucide-react"
 import { DiffStat } from "../../atoms"
-import { BranchPrStatusChip, ConfirmDialog, CreatePrDialog, EmptyState, ErrorBanner } from "../../molecules"
+import {
+  BranchPrStatusChip,
+  ConfirmDialog,
+  CreatePrDialog,
+  EmptyState,
+  ErrorBanner,
+  PanelToolbar,
+  ToolQueryError,
+  panelChromeIconClass,
+} from "../../molecules"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,7 +69,14 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
     sessionId ? !!s.streamingSessions[sessionId] : false,
   )
 
-  const { data: summary, refetch, isFetching } = useQuery({
+  const {
+    data: summary,
+    refetch,
+    isFetching,
+    isError: statusIsError,
+    error: statusError,
+    isPending: statusPending,
+  } = useQuery({
     queryKey: ["git-status", cwd, sessionId],
     queryFn: () => gitStatusSinceBaseline(sessionId!),
     enabled: !!cwd && !!sessionId && isRepo,
@@ -302,8 +318,74 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Quiet Local | branch + inverse Create Branch & Commit pill (Cursor). */}
-      <div className="flex h-[var(--header-height)] shrink-0 items-center gap-1.5 px-2.5 [font-variant-numeric:tabular-nums]">
+      {/* Host chrome: Local | branch + inverse Create Branch & Commit pill (Cursor). */}
+      <PanelToolbar
+        aria-label="Local changes"
+        className="[font-variant-numeric:tabular-nums]"
+        actions={
+          <>
+            {branchPr ? <BranchPrStatusChip pr={branchPr} /> : null}
+            {!isolated && totalCount > 0 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      type="button"
+                      size="xs"
+                      className="h-6 shrink-0 gap-1 rounded-full bg-ink px-2.5 text-xs font-medium text-bg hover:bg-ink/90"
+                    />
+                  }
+                >
+                  Create Branch & Commit
+                  <ChevronDown className="size-3 opacity-70" aria-hidden />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" sideOffset={4} className="w-56">
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        selectAll()
+                        scrollToCommit()
+                      }}
+                    >
+                      Commit selected…
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        selectAll()
+                        scrollToCommit()
+                      }}
+                    >
+                      Create Branch & Commit…
+                    </DropdownMenuItem>
+                    {hasRemote && prStatus?.ghAvailable ? (
+                      <DropdownMenuItem onClick={() => setCreatePrOpen(true)}>
+                        Create PR…
+                      </DropdownMenuItem>
+                    ) : null}
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Refresh changes"
+              title="Refresh changes"
+              onClick={handleRefresh}
+              className={cn("h-6 w-6", panelChromeIconClass)}
+            >
+              <RefreshCw
+                className={cn(
+                  "h-3.5 w-3.5",
+                  (isFetching || isRepoFetching) && "animate-spin",
+                )}
+                aria-hidden
+              />
+            </Button>
+          </>
+        }
+      >
         <div
           className="flex min-w-0 items-center gap-1.5 text-sm tracking-[var(--tracking-caption)]"
           aria-label={branch ? `Local on ${branch}` : "Local changes"}
@@ -320,67 +402,7 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
             </>
           ) : null}
         </div>
-        <div className="min-w-0 flex-1" />
-        {branchPr ? <BranchPrStatusChip pr={branchPr} /> : null}
-        {!isolated && totalCount > 0 ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  type="button"
-                  size="xs"
-                  className="h-6 shrink-0 gap-1 rounded-full bg-ink px-2.5 text-xs font-medium text-bg hover:bg-ink/90"
-                />
-              }
-            >
-              Create Branch & Commit
-              <ChevronDown className="size-3 opacity-70" aria-hidden />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" sideOffset={4} className="w-56">
-              <DropdownMenuGroup>
-                <DropdownMenuItem
-                  onClick={() => {
-                    selectAll()
-                    scrollToCommit()
-                  }}
-                >
-                  Commit selected…
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    selectAll()
-                    scrollToCommit()
-                  }}
-                >
-                  Create Branch & Commit…
-                </DropdownMenuItem>
-                {hasRemote && prStatus?.ghAvailable ? (
-                  <DropdownMenuItem onClick={() => setCreatePrOpen(true)}>
-                    Create PR…
-                  </DropdownMenuItem>
-                ) : null}
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Refresh changes"
-          title="Refresh changes"
-          onClick={handleRefresh}
-          className="h-6 w-6 text-ink-muted hover:bg-fill-4 hover:text-ink"
-        >
-          <RefreshCw
-            className={cn(
-              "h-3.5 w-3.5",
-              (isFetching || isRepoFetching) && "animate-spin",
-            )}
-            aria-hidden
-          />
-        </Button>
-      </div>
+      </PanelToolbar>
 
       {totalCount > 0 ? (
         <div className="flex h-6 shrink-0 items-center gap-2 border-b border-stroke-3 px-2.5 [font-variant-numeric:tabular-nums]">
@@ -423,10 +445,21 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
         </div>
       ) : null}
 
+      {statusIsError ? (
+        <ToolQueryError
+          variant="banner"
+          title="Couldn't load changes"
+          error={statusError}
+          fallbackMessage="Failed to read git status for this session."
+          onRetry={() => void refetch()}
+          retrying={isFetching}
+        />
+      ) : null}
       {error ? (
         <ErrorBanner
           message={error}
           className="rounded-none border-x-0 border-t-0 px-2.5 py-1.5 text-xs"
+          onDismiss={() => setError(null)}
         />
       ) : null}
 
@@ -437,7 +470,21 @@ export const ChangesTab = ({ active }: { active: SessionMeta | undefined }) => {
           "[scrollbar-width:thin] [scrollbar-color:var(--color-stroke-3)_transparent]",
         )}
       >
-        {totalCount === 0 ? (
+        {statusIsError && !summary ? (
+          <ToolQueryError
+            title="Couldn't load changes"
+            error={statusError}
+            fallbackMessage="Failed to read git status for this session."
+            onRetry={() => void refetch()}
+            retrying={isFetching}
+            className="py-12"
+          />
+        ) : statusPending && !summary ? (
+          <div className="flex items-center justify-center gap-2 px-2.5 py-12 text-sm text-ink-muted">
+            <Spinner className="size-3.5" />
+            Loading changes…
+          </div>
+        ) : totalCount === 0 ? (
           <EmptyState
             className="px-2.5"
             icon={<GitMerge className="h-6 w-6" aria-hidden />}
