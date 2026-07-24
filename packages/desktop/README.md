@@ -121,10 +121,12 @@ Isolated). Type `/` in the composer for slash-command autocomplete.
   an always-on work indicator, and completed turns fold into a "Worked for Ns"
   summary with duration, tokens, and cost. `plan_updated` → `PlanCard`;
   `question_requested` → a step-by-step wizard docked into the composer.
-- Right panel: on-demand, closable preview tabs (Changes / Browser / Terminal /
-  Files) with a collapsible slim strip. **Changes** shows per-file ± counts and a
-  commit center — select files, write a message, and Commit / Commit & Push /
-  Create Branch & Commit / Commit & Create PR (`gh`, with graceful degradation).
+- Right panel: on-demand, closable tool tabs. **Chat**, **Files**, and **Plan**
+  (Plan only once a plan is ready for the session) are always available; other
+  tabs (Changes / Browser / Terminal / …) stay behind preview future flags.
+  When enabled, **Changes** shows per-file ± counts and a commit center — select
+  files, write a message, and Commit / Commit & Push / Create Branch & Commit /
+  Commit & Create PR (`gh`, with graceful degradation).
 - Background bash: long commands can move to the background and keep streaming;
   killing one terminates its whole process group.
 - Resilience: transient provider errors retry on an escalating backoff with a

@@ -51,8 +51,8 @@ type OpenTabModalProps = {
 
 const PRIMARY_TOOL_ORDER: readonly RightPanelTab[] = [
   "plan",
-  "changes",
   "files",
+  "changes",
   "artifacts",
   "terminal",
   "browser",

@@ -1,3 +1,4 @@
+import { isRightPanelTabEnabled } from "../lib/featureFlags"
 import type { SessionId } from "../lib/types"
 import type { RightPanelTab } from "./types"
 
@@ -30,7 +31,7 @@ export type PaneState = {
 export const DEFAULT_SPLIT_RATIO = 0.48
 
 /** Default right-pane tool when an active session opens the Agents 3-col shell. */
-export const DEFAULT_WORK_TAB = "changes" as const satisfies ToolTabId
+export const DEFAULT_WORK_TAB = "files" as const satisfies ToolTabId
 
 export type ContentLayout = {
   mode: "single" | "split"
@@ -326,6 +327,43 @@ export const upsertFileInPane = (
   }
 }
 
+/** Drop tool tabs whose future flags are off (Chat / Files / Plan stay). */
+export const scrubDisabledToolTabs = (layout: ContentLayout): ContentLayout => {
+  const scrubPane = (pane: PaneState): PaneState => {
+    const tabs = pane.tabs.filter(
+      (t) => t.kind !== "tool" || isRightPanelTabEnabled(t.tool),
+    )
+    if (tabs.length === pane.tabs.length) return pane
+    const activeStill =
+      pane.activeTabId != null && tabs.some((t) => t.id === pane.activeTabId)
+    return {
+      ...pane,
+      tabs,
+      activeTabId: activeStill
+        ? pane.activeTabId
+        : (tabs[tabs.length - 1]?.id ?? null),
+    }
+  }
+  return normalizeLayout({
+    ...layout,
+    panes:
+      layout.panes.length === 2
+        ? [scrubPane(layout.panes[0]!), scrubPane(layout.panes[1]!)]
+        : [scrubPane(layout.panes[0]!)],
+  })
+}
+
+export const filterEnabledOpenTabs = (
+  openTabsBySession: Record<string, RightPanelTab[]> | undefined,
+): Record<string, RightPanelTab[]> | undefined => {
+  if (!openTabsBySession) return openTabsBySession
+  const next: Record<string, RightPanelTab[]> = {}
+  for (const [key, tabs] of Object.entries(openTabsBySession)) {
+    next[key] = tabs.filter((t) => isRightPanelTabEnabled(t))
+  }
+  return next
+}
+
 export const migrateToContentLayout = (opts: {
   contentLayout?: ContentLayout | null
   activeSessionId: SessionId | null
@@ -334,7 +372,7 @@ export const migrateToContentLayout = (opts: {
   rightPanelOpen?: boolean
 }): ContentLayout => {
   if (opts.contentLayout?.panes?.length) {
-    return normalizeLayout(opts.contentLayout)
+    return scrubDisabledToolTabs(normalizeLayout(opts.contentLayout))
   }
 
   const chatIds =
@@ -351,7 +389,9 @@ export const migrateToContentLayout = (opts: {
       : (chatIds[0] ?? null)
 
   const sessionKey = activeChat ?? "none"
-  const toolIds = (opts.openTabsBySession?.[sessionKey] ?? []).filter(Boolean)
+  const toolIds = (opts.openTabsBySession?.[sessionKey] ?? []).filter(
+    (t) => Boolean(t) && isRightPanelTabEnabled(t),
+  )
   const toolTabs: ContentTab[] =
     activeChat != null
       ? toolIds.map((tool) => makeToolTab(activeChat, tool))

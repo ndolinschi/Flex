@@ -178,7 +178,7 @@ describe("contentLayout", () => {
     expect(useAppStore.getState().activeSessionId).toBe("sess-a")
   })
 
-  it("setActiveSessionId opens default Changes work pane beside chat", () => {
+  it("setActiveSessionId opens default Files work pane beside chat", () => {
     useAppStore.getState().setActiveSessionId("sess-a")
     const layout = useAppStore.getState().contentLayout
     expect(layout.mode).toBe("split")
@@ -186,7 +186,7 @@ describe("contentLayout", () => {
       true,
     )
     expect(
-      layout.panes[1]!.tabs.some((t) => t.id === toolTabId("sess-a", "changes")),
+      layout.panes[1]!.tabs.some((t) => t.id === toolTabId("sess-a", "files")),
     ).toBe(true)
   })
 
@@ -245,7 +245,7 @@ describe("contentLayout", () => {
     )
   })
 
-  it("migrates legacy openTabs into split layout", () => {
+  it("migrates legacy openTabs into split layout (scrubs preview-off tabs)", () => {
     const layout = migrateToContentLayout({
       activeSessionId: "sess-a",
       openChatSessionIds: ["sess-a"],
@@ -253,7 +253,10 @@ describe("contentLayout", () => {
       rightPanelOpen: true,
     })
     expect(layout.mode).toBe("split")
-    expect(layout.panes[1]!.tabs.map((t) => t.kind)).toEqual(["tool", "tool"])
+    expect(layout.panes[1]!.tabs.map((t) => t.kind)).toEqual(["tool"])
+    expect(layout.panes[1]!.tabs.map((t) => (t as { tool: string }).tool)).toEqual([
+      "plan",
+    ])
   })
 
   it("openTabToSide places a tab in the other pane", () => {
@@ -295,24 +298,24 @@ describe("contentLayout", () => {
   it("reorderTabInPane moves a tab Chrome-style", () => {
     useAppStore.getState().openChatInPane(0, "sess-a")
     useAppStore.getState().openToolInPane(0, "sess-a", "plan")
-    useAppStore.getState().openToolInPane(0, "sess-a", "status")
+    useAppStore.getState().openToolInPane(0, "sess-a", "files")
     const before = useAppStore
       .getState()
       .contentLayout.panes[0]!.tabs.map((t) => t.id)
     expect(before).toEqual([
       chatTabId("sess-a"),
       toolTabId("sess-a", "plan"),
-      toolTabId("sess-a", "status"),
+      toolTabId("sess-a", "files"),
     ])
     useAppStore
       .getState()
-      .reorderTabInPane(0, toolTabId("sess-a", "status"), 1)
+      .reorderTabInPane(0, toolTabId("sess-a", "files"), 1)
     const after = useAppStore
       .getState()
       .contentLayout.panes[0]!.tabs.map((t) => t.id)
     expect(after).toEqual([
       chatTabId("sess-a"),
-      toolTabId("sess-a", "status"),
+      toolTabId("sess-a", "files"),
       toolTabId("sess-a", "plan"),
     ])
   })
@@ -334,9 +337,9 @@ describe("contentLayout", () => {
   it("closeTabInPane selects right neighbor when closing a middle tab", () => {
     useAppStore.getState().openChatInPane(0, "sess-a")
     useAppStore.getState().openToolInPane(0, "sess-a", "plan")
-    useAppStore.getState().openToolInPane(0, "sess-a", "status")
+    useAppStore.getState().openToolInPane(0, "sess-a", "files")
     const planId = toolTabId("sess-a", "plan")
-    const statusId = toolTabId("sess-a", "status")
+    const filesId = toolTabId("sess-a", "files")
     // Force-select without promote-beside-chat (tools share the chat pane).
     const layout = useAppStore.getState().contentLayout
     const pane0 = layout.panes[0]!
@@ -347,7 +350,7 @@ describe("contentLayout", () => {
       },
     })
     useAppStore.getState().closeTabInPane(0, planId)
-    expect(useAppStore.getState().contentLayout.panes[0]!.activeTabId).toBe(statusId)
+    expect(useAppStore.getState().contentLayout.panes[0]!.activeTabId).toBe(filesId)
   })
 
   it("closeTabInPane selects left neighbor when closing the last tab", () => {
@@ -362,7 +365,7 @@ describe("contentLayout", () => {
   it("closeOtherTabsInPane keeps only the specified tab", () => {
     useAppStore.getState().openChatInPane(0, "sess-a")
     useAppStore.getState().openToolInPane(0, "sess-a", "plan")
-    useAppStore.getState().openToolInPane(0, "sess-a", "status")
+    useAppStore.getState().openToolInPane(0, "sess-a", "files")
     const planId = toolTabId("sess-a", "plan")
     useAppStore.getState().closeOtherTabsInPane(0, planId)
     const pane = useAppStore.getState().contentLayout.panes[0]!
@@ -373,11 +376,11 @@ describe("contentLayout", () => {
   it("closeTabsToRightInPane removes all tabs after the specified tab", () => {
     useAppStore.getState().openChatInPane(0, "sess-a")
     useAppStore.getState().openToolInPane(0, "sess-a", "plan")
-    useAppStore.getState().openToolInPane(0, "sess-a", "status")
+    useAppStore.getState().openToolInPane(0, "sess-a", "files")
     const chatId = chatTabId("sess-a")
     const planId = toolTabId("sess-a", "plan")
-    const statusId = toolTabId("sess-a", "status")
-    useAppStore.getState().activateTabInPane(0, statusId)
+    const filesId = toolTabId("sess-a", "files")
+    useAppStore.getState().activateTabInPane(0, filesId)
     useAppStore.getState().closeTabsToRightInPane(0, planId)
     const pane = useAppStore.getState().contentLayout.panes[0]!
     expect(pane.tabs.map((t) => t.id)).toEqual([chatId, planId])
@@ -397,10 +400,10 @@ describe("contentLayout", () => {
   it("moveTabBetweenPanes selects right neighbor when active tab leaves source pane", () => {
     useAppStore.getState().openChatInPane(0, "sess-a")
     useAppStore.getState().openToolInPane(0, "sess-a", "plan")
-    useAppStore.getState().openToolInPane(0, "sess-a", "status")
+    useAppStore.getState().openToolInPane(0, "sess-a", "files")
     useAppStore.getState().ensureSplit()
     const planId = toolTabId("sess-a", "plan")
-    const statusId = toolTabId("sess-a", "status")
+    const filesId = toolTabId("sess-a", "files")
     const layout = useAppStore.getState().contentLayout
     const pane0 = layout.panes[0]!
     useAppStore.setState({
@@ -411,7 +414,7 @@ describe("contentLayout", () => {
     })
     useAppStore.getState().moveTabBetweenPanes(0, 1, planId, 0)
     const left = useAppStore.getState().contentLayout.panes[0]!
-    expect(left.activeTabId).toBe(statusId)
+    expect(left.activeTabId).toBe(filesId)
   })
 
   it("ensureSplit is a no-op when viewport is narrow (isSplitEligible guard)", () => {
@@ -485,32 +488,32 @@ describe("contentLayout", () => {
     expect(layout.focusedPane).toBe(0)
   })
 
-  it("activateTabInPane keeps Artifacts on west when Files is also west", () => {
+  it("activateTabInPane keeps Plan on west when Files is also west", () => {
     useAppStore.getState().openChatInPane(0, "sess-a")
     useAppStore.getState().openToolInPane(0, "sess-a", "files")
-    useAppStore.getState().openToolInPane(0, "sess-a", "artifacts")
+    useAppStore.getState().openToolInPane(0, "sess-a", "plan")
     useAppStore.getState().activateTabInPane(0, toolTabId("sess-a", "files"))
     let layout = useAppStore.getState().contentLayout
     expect(layout.mode).toBe("single")
     expect(layout.panes[0]!.activeTabId).toBe(toolTabId("sess-a", "files"))
-    useAppStore.getState().activateTabInPane(0, toolTabId("sess-a", "artifacts"))
+    useAppStore.getState().activateTabInPane(0, toolTabId("sess-a", "plan"))
     layout = useAppStore.getState().contentLayout
-    expect(layout.panes[0]!.activeTabId).toBe(toolTabId("sess-a", "artifacts"))
+    expect(layout.panes[0]!.activeTabId).toBe(toolTabId("sess-a", "plan"))
     expect(layout.focusedPane).toBe(0)
   })
 
-  it("openToolBesideChat reveals Artifacts when the work pane is collapsed", () => {
+  it("openToolBesideChat reveals Plan when the work pane is collapsed", () => {
     useAppStore.getState().openChatInPane(0, "sess-a")
     useAppStore.getState().openToolBesideChat("sess-a", "files")
     useAppStore.getState().setRightPanelCollapsed(true)
     useAppStore.getState().collapseSplit()
     expect(useAppStore.getState().contentLayout.mode).toBe("single")
-    useAppStore.getState().openToolBesideChat("sess-a", "artifacts")
+    useAppStore.getState().openToolBesideChat("sess-a", "plan")
     const layout = useAppStore.getState().contentLayout
     expect(useAppStore.getState().rightPanelCollapsed).toBe(false)
     expect(layout.mode).toBe("split")
     expect(layout.focusedPane).toBe(1)
-    expect(layout.panes[1]!.activeTabId).toBe(toolTabId("sess-a", "artifacts"))
+    expect(layout.panes[1]!.activeTabId).toBe(toolTabId("sess-a", "plan"))
   })
 
   it("openWorkspaceFile creates a file document tab in the work pane", () => {
@@ -590,12 +593,12 @@ describe("contentLayout", () => {
     useAppStore.getState().openToolBesideChat("sess-a", "plan")
     const planId = toolTabId("sess-a", "plan")
     useAppStore.getState().activateTabInPane(1, planId)
-    useAppStore.getState().openToolInPane(0, "sess-a", "status")
+    useAppStore.getState().openToolInPane(0, "sess-a", "files")
     const before = useAppStore.getState().contentLayout
     expect(before.mode).toBe("split")
     const rightBefore = before.panes[1]
-    const statusId = toolTabId("sess-a", "status")
-    expect(before.panes[0]!.activeTabId).toBe(statusId)
+    const filesId = toolTabId("sess-a", "files")
+    expect(before.panes[0]!.activeTabId).toBe(filesId)
     useAppStore.getState().activateTabInPane(0, chatTabId("sess-a"))
     const after = useAppStore.getState().contentLayout
     expect(after.panes[1]).toBe(rightBefore)

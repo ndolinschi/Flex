@@ -36,6 +36,7 @@ import {
   FLEX_MODE_ENABLED,
 } from "../../lib/featureFlags"
 import { fuzzyScore } from "../../lib/fuzzySearch"
+import { sessionHasPlanReady } from "../../lib/planReady"
 import { resumeSession, toInvokeError } from "../../lib/tauri"
 import { sessionLabel } from "../../lib/types"
 import { basename } from "../../lib/utils"
@@ -69,6 +70,10 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
   const setComposerMode = useAppStore((s) => s.setComposerMode)
   const setActiveSessionId = useAppStore((s) => s.setActiveSessionId)
 
+  const hasPlanReady = useAppStore((s) =>
+    sessionHasPlanReady(s.activeSessionId, s),
+  )
+
   const openToolTab = (tab: RightPanelTab) => {
     setRoute("chat")
     const sessionId = useAppStore.getState().activeSessionId
@@ -90,8 +95,12 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
   }
 
   const tabCatalog = useMemo(
-    () => visibleRightPanelTabs({ hasBranchPr: true }),
-    [],
+    () =>
+      visibleRightPanelTabs({
+        hasBranchPr: true,
+        hasPlanReady,
+      }),
+    [hasPlanReady],
   )
 
   const commands: CommandEntry[] = useMemo(

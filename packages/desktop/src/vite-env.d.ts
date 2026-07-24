@@ -6,6 +6,13 @@ interface ImportMetaEnv {
   readonly VITE_MEMORY_TAB?: string
   readonly VITE_DATABASE_TAB?: string
   readonly VITE_COMPONENTS_TAB?: string
+  readonly VITE_ARTIFACTS_TAB?: string
+  readonly VITE_STATUS_TAB?: string
+  readonly VITE_PROMPT_TAB?: string
+  readonly VITE_CHANGES_TAB?: string
+  readonly VITE_PR_TAB?: string
+  readonly VITE_TERMINAL_TAB?: string
+  readonly VITE_BROWSER_TAB?: string
   readonly VITE_INLINE_COMPLETION?: string
 }
 

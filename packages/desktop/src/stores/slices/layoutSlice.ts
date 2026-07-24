@@ -21,7 +21,7 @@ export const createLayoutSlice: StateCreator<
   sidebarCollapsed: false,
   sidebarWidth: SIDEBAR_DEFAULT_WIDTH,
   rightPanelOpen: false,
-  rightPanelTab: "changes" as RightPanelTab,
+  rightPanelTab: "files" as RightPanelTab,
   rightPanelWidth: RIGHT_PANEL_DEFAULT_WIDTH,
   rightPanelCollapsed: false,
   rightPanelDragging: false,

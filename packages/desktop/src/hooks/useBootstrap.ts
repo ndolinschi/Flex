@@ -61,21 +61,23 @@ export const useBootstrap = (
           return
         }
 
-        if (ui.openTabsBySession) {
-          useAppStore.getState().setOpenTabsBySession(ui.openTabsBySession)
-        }
-        if (ui.openChatSessionIds?.length) {
-          useAppStore.getState().setOpenChatSessionIds(ui.openChatSessionIds)
-        }
         {
-          const { migrateToContentLayout } = await import(
-            "../stores/contentLayoutModel"
-          )
+          const {
+            migrateToContentLayout,
+            filterEnabledOpenTabs,
+          } = await import("../stores/contentLayoutModel")
+          const openTabs = filterEnabledOpenTabs(ui.openTabsBySession)
+          if (openTabs) {
+            useAppStore.getState().setOpenTabsBySession(openTabs)
+          }
+          if (ui.openChatSessionIds?.length) {
+            useAppStore.getState().setOpenChatSessionIds(ui.openChatSessionIds)
+          }
           const layout = migrateToContentLayout({
             contentLayout: ui.contentLayout,
             activeSessionId: ui.activeSessionId ?? null,
             openChatSessionIds: ui.openChatSessionIds,
-            openTabsBySession: ui.openTabsBySession,
+            openTabsBySession: openTabs,
             rightPanelOpen: ui.rightPanelOpen,
           })
           if (!ui.contentLayout && layout.mode === "split") {

@@ -6,6 +6,13 @@ import {
   FLEX_MODE_ENABLED,
   INLINE_COMPLETION_ENABLED,
   MEMORY_TAB_ENABLED,
+  ARTIFACTS_TAB_ENABLED,
+  STATUS_TAB_ENABLED,
+  PROMPT_TAB_ENABLED,
+  CHANGES_TAB_ENABLED,
+  PR_TAB_ENABLED,
+  TERMINAL_TAB_ENABLED,
+  BROWSER_TAB_ENABLED,
   isRightPanelTabEnabled,
 } from "./featureFlags"
 import { visibleComposerModes } from "../components/molecules/ModePicker"
@@ -38,48 +45,53 @@ describe("AUTOMATIONS_UI_ENABLED", () => {
   })
 })
 
-describe("MEMORY_TAB_ENABLED", () => {
-  it("defaults off so Memory is hidden from the right-panel tab strip", () => {
+describe("right-panel future flags", () => {
+  it("defaults preview tabs off; only Files is always catalog-visible", () => {
     resetUiPluginsForTests()
     expect(MEMORY_TAB_ENABLED).toBe(false)
+    expect(DATABASE_TAB_ENABLED).toBe(false)
+    expect(COMPONENTS_TAB_ENABLED).toBe(false)
+    expect(ARTIFACTS_TAB_ENABLED).toBe(false)
+    expect(STATUS_TAB_ENABLED).toBe(false)
+    expect(PROMPT_TAB_ENABLED).toBe(false)
+    expect(CHANGES_TAB_ENABLED).toBe(false)
+    expect(PR_TAB_ENABLED).toBe(false)
+    expect(TERMINAL_TAB_ENABLED).toBe(false)
+    expect(BROWSER_TAB_ENABLED).toBe(false)
+
+    expect(isRightPanelTabEnabled("files")).toBe(true)
+    expect(isRightPanelTabEnabled("plan")).toBe(true)
+    expect(isRightPanelTabEnabled("changes")).toBe(false)
+    expect(isRightPanelTabEnabled("terminal")).toBe(false)
+    expect(isRightPanelTabEnabled("browser")).toBe(false)
+    expect(isRightPanelTabEnabled("status")).toBe(false)
+    expect(isRightPanelTabEnabled("prompt")).toBe(false)
     expect(isRightPanelTabEnabled("memory")).toBe(false)
-    expect(visibleRightPanelTabs().map((t) => t.id)).not.toContain("memory")
-    expect(visibleRightPanelTabs().map((t) => t.id)).toEqual([
-      "status",
-      "prompt",
-      "plan",
-      "changes",
-      "files",
-      "terminal",
-      "browser",
-    ])
+
+    expect(visibleRightPanelTabs().map((t) => t.id)).toEqual(["files"])
+    expect(
+      visibleRightPanelTabs({ hasPlanReady: true }).map((t) => t.id),
+    ).toEqual(["plan", "files"])
   })
 })
 
 describe("DATABASE_TAB_ENABLED", () => {
-  it("defaults on and appears via the UI plugin registry", () => {
+  it("defaults off so Database stays out of the tab strip (preview)", () => {
     resetUiPluginsForTests()
     registerBuiltinUiPlugins()
-    expect(DATABASE_TAB_ENABLED).toBe(true)
-    expect(isRightPanelTabEnabled("database")).toBe(true)
-    expect(visibleRightPanelTabs().map((t) => t.id)).toContain("database")
+    expect(DATABASE_TAB_ENABLED).toBe(false)
+    expect(isRightPanelTabEnabled("database")).toBe(false)
+    expect(visibleRightPanelTabs().map((t) => t.id)).not.toContain("database")
   })
 })
 
 describe("ARTIFACTS_TAB_ENABLED", () => {
-  it("defaults on with a Package icon via the UI plugin registry", async () => {
+  it("defaults off so Artifacts stays out of the tab strip (preview)", () => {
     resetUiPluginsForTests()
-    const before = visibleRightPanelTabs().map((t) => t.id)
-    expect(before).not.toContain("artifacts")
-
     registerBuiltinUiPlugins()
-    const { ARTIFACTS_TAB_ENABLED } = await import("./featureFlags")
-    expect(ARTIFACTS_TAB_ENABLED).toBe(true)
-    expect(isRightPanelTabEnabled("artifacts")).toBe(true)
-    const artifacts = visibleRightPanelTabs().find((t) => t.id === "artifacts")
-    expect(artifacts).toBeDefined()
-    expect(artifacts?.icon).toBeDefined()
-    expect(artifacts?.label).toBe("Artifacts")
+    expect(ARTIFACTS_TAB_ENABLED).toBe(false)
+    expect(isRightPanelTabEnabled("artifacts")).toBe(false)
+    expect(visibleRightPanelTabs().map((t) => t.id)).not.toContain("artifacts")
   })
 })
 

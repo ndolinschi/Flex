@@ -32,6 +32,7 @@ import {
   shouldMountFileTab,
 } from "../../../lib/chatMountPolicy"
 import { previewTabsForPane } from "../../../lib/tabDnD"
+import { sessionHasPlanReady } from "../../../lib/planReady"
 import { gitPrStatus } from "../../../lib/tauri"
 import { sessionLabel, type SessionId, type SessionMeta } from "../../../lib/types"
 import {
@@ -66,7 +67,8 @@ type ContentPaneProps = {
   onOpenSearch?: () => void
 }
 
-const fullStripCatalog = () => visibleRightPanelTabs({ hasBranchPr: true })
+const fullStripCatalog = (hasPlanReady: boolean) =>
+  visibleRightPanelTabs({ hasBranchPr: true, hasPlanReady })
 
 const EMPTY_PANE = emptyPane()
 
@@ -261,11 +263,17 @@ export const ContentPane = ({
     staleTime: 60_000,
   })
   const hasBranchPr = !!prQuery.data?.pr
-  const catalog = useMemo(
-    () => visibleRightPanelTabs({ hasBranchPr }),
-    [hasBranchPr],
+  const hasPlanReady = useAppStore((s) =>
+    sessionHasPlanReady(contextSession, s),
   )
-  const stripLabels = useMemo(() => fullStripCatalog(), [])
+  const catalog = useMemo(
+    () => visibleRightPanelTabs({ hasBranchPr, hasPlanReady }),
+    [hasBranchPr, hasPlanReady],
+  )
+  const stripLabels = useMemo(
+    () => fullStripCatalog(hasPlanReady),
+    [hasPlanReady],
+  )
   const paneFocused = focusedPane === paneIndex
 
   const handleUngroup = useCallback(

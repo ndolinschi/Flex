@@ -15,6 +15,13 @@ import {
   MEMORY_TAB_ENABLED,
   DATABASE_TAB_ENABLED,
   COMPONENTS_TAB_ENABLED,
+  ARTIFACTS_TAB_ENABLED,
+  STATUS_TAB_ENABLED,
+  PROMPT_TAB_ENABLED,
+  CHANGES_TAB_ENABLED,
+  PR_TAB_ENABLED,
+  TERMINAL_TAB_ENABLED,
+  BROWSER_TAB_ENABLED,
 } from "../../../lib/featureFlags"
 import { pluginRightPanelTabs } from "../../../plugins/registry"
 import type { RightPanelTab } from "../../../stores/appStore"
@@ -40,19 +47,18 @@ export const BUILTIN_TABS: RightPanelTabDef[] = [
 
 export const TABS = BUILTIN_TABS
 
-export const PROJECT_PINNED_TABS: readonly RightPanelTab[] = [
-  "changes",
-  "browser",
-  "terminal",
-  "files",
-] as const
+/** Always-on project tools (Chat is a content tab, not listed here). */
+export const PROJECT_PINNED_TABS: readonly RightPanelTab[] = ["files"] as const
 
 export const visibleRightPanelTabs = (opts?: {
   hasBranchPr?: boolean
+  /** When false/omitted, Plan is hidden from the catalog until a plan is ready. */
+  hasPlanReady?: boolean
 }): RightPanelTabDef[] => {
   const builtins = BUILTIN_TABS.filter((tab) => {
     if (!isRightPanelTabEnabled(tab.id)) return false
     if (tab.id === "pr") return opts?.hasBranchPr === true
+    if (tab.id === "plan") return opts?.hasPlanReady === true
     return true
   })
   const fromPlugins: RightPanelTabDef[] = pluginRightPanelTabs().map((t) => ({
@@ -71,4 +77,11 @@ export {
   MEMORY_TAB_ENABLED,
   DATABASE_TAB_ENABLED,
   COMPONENTS_TAB_ENABLED,
+  ARTIFACTS_TAB_ENABLED,
+  STATUS_TAB_ENABLED,
+  PROMPT_TAB_ENABLED,
+  CHANGES_TAB_ENABLED,
+  PR_TAB_ENABLED,
+  TERMINAL_TAB_ENABLED,
+  BROWSER_TAB_ENABLED,
 }

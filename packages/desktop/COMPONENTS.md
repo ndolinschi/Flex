@@ -383,13 +383,27 @@ spacing changes, update [DESIGN.md](./DESIGN.md).
 
 ## Feature flags
 
+Future flags gate preview surfaces. Defaults are **off** (still in preview —
+not permanently removed). Rebuild with the matching `VITE_*=true` to enable.
+Always available without a flag: **Chat**, **Files**. **Plan** is always
+flag-enabled but only appears in the `+` / command catalog once a plan is
+ready for the session (`ExitPlanMode` / pending approval); it still auto-opens
+on that event.
+
 | Flag | Default | Env | Effect |
 |---|---|---|---|
-| `AUTOMATIONS_UI_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_AUTOMATIONS_UI=true` | Shows Automations in settings nav/search, sidebar, command palette, and the legacy `automations` route |
-| `FLEX_MODE_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_FLEX_MODE=true` | Shows composer Flex mode in the ModePicker (orchestrator across plan / review / workers) |
-| `MEMORY_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_MEMORY_TAB=true` | Shows Memory in the right-panel tab strip / `+` menu / command palette (Settings → Memory stays available either way) |
-| `DATABASE_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `true` | `VITE_DATABASE_TAB=false` | Shows Database UI plugin tab (connections / schemas / tables / query) |
-| `COMPONENTS_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `false` | `VITE_COMPONENTS_TAB=true` | Shows Components UI plugin tab (React inventory / CSS edit → agent) |
+| `AUTOMATIONS_UI_ENABLED` (`src/lib/featureFlags.ts`) | `false` (preview) | `VITE_AUTOMATIONS_UI=true` | Shows Automations in settings nav/search, sidebar, command palette, and the legacy `automations` route |
+| `FLEX_MODE_ENABLED` (`src/lib/featureFlags.ts`) | `false` (preview) | `VITE_FLEX_MODE=true` | Shows composer Flex mode in the ModePicker (orchestrator across plan / review / workers) |
+| `STATUS_TAB_ENABLED` | `false` (preview) | `VITE_STATUS_TAB=true` | Shows Status in the right-panel tab strip / `+` menu / command palette |
+| `PROMPT_TAB_ENABLED` | `false` (preview) | `VITE_PROMPT_TAB=true` | Shows Prompt in the right-panel tab strip / `+` menu / command palette |
+| `CHANGES_TAB_ENABLED` | `false` (preview) | `VITE_CHANGES_TAB=true` | Shows Changes in the right-panel tab strip / `+` menu / command palette |
+| `PR_TAB_ENABLED` | `false` (preview) | `VITE_PR_TAB=true` | Shows PR when the branch has an open pull request |
+| `TERMINAL_TAB_ENABLED` | `false` (preview) | `VITE_TERMINAL_TAB=true` | Shows Terminal in the right-panel tab strip / `+` menu / command palette |
+| `BROWSER_TAB_ENABLED` | `false` (preview) | `VITE_BROWSER_TAB=true` | Shows Browser in the right-panel tab strip / `+` menu / command palette |
+| `MEMORY_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `false` (preview) | `VITE_MEMORY_TAB=true` | Shows Memory in the right-panel tab strip / `+` menu / command palette (Settings → Memory stays available either way) |
+| `DATABASE_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `false` (preview) | `VITE_DATABASE_TAB=true` | Shows Database UI plugin tab (connections / schemas / tables / query) |
+| `COMPONENTS_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `false` (preview) | `VITE_COMPONENTS_TAB=true` | Shows Components UI plugin tab (React inventory / CSS edit → agent) |
+| `ARTIFACTS_TAB_ENABLED` (`src/lib/featureFlags.ts`) | `false` (preview) | `VITE_ARTIFACTS_TAB=true` | Shows Artifacts UI plugin tab |
 | `INLINE_COMPLETION_ENABLED` (`src/lib/featureFlags.ts`) | `true` | `VITE_INLINE_COMPLETION=false` | Registers the `prompt-completion` UI plugin (ghost-text in composer + Prompt tab; setup under Settings → Tools) |
 
 ## Perf notes (Wave 3)

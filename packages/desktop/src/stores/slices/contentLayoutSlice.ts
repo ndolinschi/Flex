@@ -32,9 +32,9 @@ import {
 } from "../contentLayoutModel"
 
 const DEFAULT_WORK_CANDIDATES: readonly ToolTabId[] = [
-  "changes",
   "files",
   "plan",
+  "changes",
   "terminal",
   "browser",
   "artifacts",
@@ -64,7 +64,7 @@ const syncCompatFlags = (
           | undefined)?.tool
   return {
     rightPanelOpen: layout.mode === "split",
-    rightPanelTab: tool ?? "changes",
+    rightPanelTab: tool ?? "files",
   }
 }
 
